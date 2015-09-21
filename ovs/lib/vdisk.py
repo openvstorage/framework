@@ -464,19 +464,14 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.set_config_params')
-    def set_config_params(vdisk_guid, config_params):
+    def set_config_params(vdisk_guid, new_config_params, old_config_params):
         """
         Sets configuration parameters for a given vdisk.
         """
-        vdisk = VDisk(vdisk_guid)
-        old_resolved_config = vdisk.resolved_configuration
-        vdisk.configuration = config_params
-        vdisk.save()
-        vdisk.invalidate_dynamics(['resolved_configuration'])
-        new_resolved_config = vdisk.resolved_configuration
-        for key in new_resolved_config:
-            if old_resolved_config.get(key) != new_resolved_config.get(key):
-                logger.info('Updating property {0} on vDisk {1} to {2}'.format(key, vdisk_guid, new_resolved_config.get(key)))
+        for key, old_value in old_config_params.iteritems():
+            new_value = new_config_params.get(key)
+            if new_value != old_value:
+                logger.info('Updating property {0} on vDisk {1} from {2} to {3}'.format(key, vdisk_guid, old_value, new_value))
 
     @staticmethod
     def sync_with_mgmtcenter(disk, pmachine, storagedriver):

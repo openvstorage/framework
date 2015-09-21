@@ -55,7 +55,6 @@ define([
         // Observables
         self.snapshotsInitialLoad = ko.observable(true);
         self.vMachine             = ko.observable();
-        self.dtlLocation          = ko.observable();
 
         // Functions
         self.load = function() {
@@ -186,30 +185,6 @@ define([
                             }
                         });
                 }
-            }
-        };
-        self.saveConfiguration = function() {
-            if (self.vMachine() !== undefined) {
-                var vm = self.vMachine();
-                api.post('vmachines/' + vm.guid() + '/set_config_params', {
-                    data: { config_params: vm.newConfiguration() }
-                })
-                    .then(self.shared.tasks.wait)
-                    .done(function () {
-                        generic.alertSuccess(
-                            $.t('ovs:vmachines.saveconfig.done'),
-                            $.t('ovs:vmachines.saveconfig.donemsg', { what: vm.name() })
-                        );
-                    })
-                    .fail(function (error) {
-                        generic.alertError(
-                            $.t('ovs:generic.error'),
-                            $.t('ovs:generic.messages.errorwhile_error', {
-                                what: $.t('ovs:vmachines.saveconfig.errormsg', { what: vm.name() }),
-                                error: error
-                            })
-                        );
-                    });
             }
         };
 

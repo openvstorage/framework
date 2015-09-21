@@ -172,6 +172,7 @@
         "noelements": "No items available",
         "elementsloading": "Items loading...",
         "customvalue": "Custom:",
+        "default": "Default",
         "errorsfound": "Errors were found. Please check the contents of all fields.",
         "followingerrorsfound": "Following errors were found:",
         "cachefs": "Cache",
@@ -197,7 +198,6 @@
         "storageip": "Storage IP",
         "namespace": "Backend location",
         "save": "Save",
-        "fallbackvalue": "Fallback",
         "usage": "Usage",
         "custompath": "Custom path",
         "reload": "Reload",
@@ -275,10 +275,6 @@
                     "async": "Async",
                     "nosync": "No Sync",
                     "sync": "Sync"
-                },
-                "dtl_options": {
-                    "false": "No",
-                    "true": "Yes"
                 },
                 "sco_size": "SCO size",
                 "strategy": "Strategy",

@@ -38,7 +38,6 @@ define([
         // Observables
         self.snapshotsInitialLoad = ko.observable(true);
         self.vDisk                = ko.observable();
-        self.dtlLocation          = ko.observable();
 
         // Functions
         self.load = function() {
@@ -92,7 +91,8 @@ define([
             if (self.vDisk() !== undefined) {
                 var vd = self.vDisk();
                 api.post('vdisks/' + vd.guid() + '/set_config_params', {
-                    data: { config_params: vd.newConfiguration() }
+                    data: { new_config_params: vd.configuration(),
+                            old_config_params: vd.oldConfiguration() }
                 })
                     .then(self.shared.tasks.wait)
                     .done(function () {
