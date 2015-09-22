@@ -533,11 +533,20 @@ class StorageRouterController(object):
         else:
             storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
 
+        tlog_multiplier = 20
         if 'config_params' in parameters:
             sco_size = parameters['config_params']['sco_size']
             if 'write_buffer' in parameters['config_params']:
                 # sco_factor = write buffer (in GiB) / tlog multiplier (default 20) / sco size (in MiB)
-                sco_factor = parameters['config_params']['write_buffer'] * 1024.0 / 20 / sco_size
+                sco_factor = parameters['config_params']['write_buffer'] * 1024.0 / tlog_multiplier / sco_size
+                while sco_factor > 64:
+                    sco_factor /= 2
+                    tlog_multiplier *= 2
+                while sco_factor <= 1:
+                    sco_factor *= 10
+                    tlog_multiplier /= 10
+                    if tlog_multiplier <= 1:
+                        raise ValueError('Tlog multiplier cannot be smaller than 1')
             else:
                 # Below table makes sure the write buffer is always between 1 and 5 GiG
                 sco_factor = {4: 12,
@@ -568,6 +577,7 @@ class StorageRouterController(object):
                                                       foc_throttle_usecs=4000,
                                                       read_cache_default_mode=StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode],
                                                       read_cache_default_behaviour=StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy],
+                                                      number_of_scos_in_tlog=tlog_multiplier,
                                                       non_disposable_scos_factor=sco_factor)
         storagedriver_config.configure_volume_router(vrouter_id=vrouter_id,
                                                      vrouter_redirect_timeout_ms='5000',

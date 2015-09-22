@@ -543,7 +543,17 @@ class VDiskController(object):
                         vdisk.storagedriver_client.set_sco_multiplier(volume_id, new_value / 4 * 1024)
                     elif key == 'write_buffer':
                         tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id) or 20
-                        vdisk.storagedriver_client.set_sco_cache_max_non_disposable_factor(volume_id, new_value * 1024 / tlog_multiplier / new_config_params['sco_size'])
+                        sco_factor = new_value * 1024.0 / tlog_multiplier / new_config_params['sco_size']
+                        if sco_factor > 64:
+                            sco_factor /= 2
+                            tlog_multiplier *= 2
+                        if sco_factor <= 1:
+                            sco_factor *= 10
+                            tlog_multiplier /= 10
+                            if tlog_multiplier <= 1:
+                                raise ValueError('Tlog multiplier cannot be smaller than 1')
+                        vdisk.storagedriver_client.set_sco_cache_max_non_disposable_factor(volume_id, sco_factor)
+                        vdisk.storagedriver_client.set_tlog_multiplier(volume_id, tlog_multiplier)
                     else:
                         raise KeyError('Unsupported property provided: "{0}"'.format(key))
                     logger.info('Updated property {0}'.format(key))
