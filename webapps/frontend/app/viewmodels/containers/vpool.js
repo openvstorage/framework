@@ -189,6 +189,9 @@ define([
                     .done(function(data) {
                         if (data.write_buffer !== undefined) {
                             data.write_buffer = Math.round(data.write_buffer);
+                            if (data.write_buffer === 0) {  // Always show at least 1GiB in GUI
+                                data.write_buffer = 1;
+                            }
                         }
                         self.configuration(data);
                         deferred.resolve();

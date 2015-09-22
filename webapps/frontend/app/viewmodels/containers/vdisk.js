@@ -58,9 +58,9 @@ define([
         self.vpoolGuid           = ko.observable();
         self.vMachineGuid        = ko.observable();
         self.failoverMode        = ko.observable();
-        self.cacheStrategies     = ko.observableArray(['onread', 'onwrite', 'none']);
-        self.dtlModes            = ko.observableArray(['nosync', 'async', 'sync']);
-        self.dedupeModes         = ko.observableArray(['dedupe', 'nondedupe']);
+        self.cacheStrategies     = ko.observableArray(['on_read', 'on_write', 'none']);
+        self.dtlModes            = ko.observableArray(['no_sync', 'a_sync', 'sync']);
+        self.dedupeModes         = ko.observableArray(['dedupe', 'non_dedupe']);
         self.scoSizes            = ko.observableArray([4, 8, 16, 32, 64, 128]);
 
         // Computed
@@ -245,6 +245,9 @@ define([
                     .done(function(data) {
                         if (data.write_buffer !== undefined) {
                             data.write_buffer = Math.round(data.write_buffer);
+                            if (data.write_buffer === 0) {  // Always show at least 1GiB in GUI
+                                data.write_buffer = 1;
+                            }
                         }
                         if (self.parentConfiguration() === undefined) {
                             self.parentConfiguration(data);
@@ -254,16 +257,19 @@ define([
                     .fail(deferred.reject);
             }).promise();
         };
-        self.loadConfiguration = function() {
+        self.loadConfiguration = function(reload) {
             return $.Deferred(function(deferred) {
                 self.loadConfig = api.get('vdisks/' + self.guid() + '/get_config_params')
                     .then(self.shared.tasks.wait)
                     .done(function(data) {
                         if (data.write_buffer !== undefined) {
                             data.write_buffer = Math.round(data.write_buffer);
+                            if (data.write_buffer === 0) {  // Always show at least 1GiB in GUI
+                                data.write_buffer = 1;
+                            }
                         }
                         self.configuration(data);
-                        if (self.oldConfiguration() === undefined) {
+                        if (self.oldConfiguration() === undefined || reload === true) {
                             self.oldConfiguration($.extend({}, data));  // Used to make comparison to check for changes
                         }
                         deferred.resolve();
@@ -272,22 +278,8 @@ define([
             }).promise();
         };
         self.loadAllConfigurations = function() {
-            self.loadConfiguration();
+            self.loadConfiguration(false);
             self.loadParentConfiguration();
-        };
-        self.updateConfiguration = function() {
-            return $.Deferred(function(deferred) {
-                self.loadConfig = api.get('vdisks/' + self.guid() + '/get_config_params')
-                    .then(self.shared.tasks.wait)
-                    .done(function(data) {
-                        if (data.write_buffer !== undefined) {
-                            data.write_buffer = Math.round(data.write_buffer);
-                        }
-                        self.oldConfiguration(data);
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject);
-            }).promise();
         };
     };
 });

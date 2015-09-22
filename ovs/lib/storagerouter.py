@@ -118,18 +118,6 @@ class StorageRouterController(object):
         """
         Add a vPool to the machine this task is running on
         """
-        onread = 'CacheOnRead'
-        onwrite = 'CacheOnWrite'
-        deduped = 'ContentBased'
-        non_deduped = 'LocationBased'
-        cache_mapping = {'none': None,
-                         'onread': onread,
-                         'onwrite': onwrite}
-        dedupe_mapping = {'dedupe': deduped,
-                          'nondedupe': non_deduped}
-        dtl_mode_mapping = {'sync': '',
-                            'async': '',
-                            'nosync': ''}
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
                            'storagerouter_ip': (str, Toolbox.regex_ip),
@@ -141,13 +129,13 @@ class StorageRouterController(object):
                            'mountpoint_readcaches': (list, Toolbox.regex_mountpoint),
                            'mountpoint_writecaches': (list, Toolbox.regex_mountpoint)}
         required_params_for_new_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
-                                         'config_params': (dict, {'dtl_mode': (str, dtl_mode_mapping.keys()),
+                                         'config_params': (dict, {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
                                                                   'sco_size': (int, [4, 8, 16, 32, 64, 128]),
-                                                                  'dedupe_mode': (str, dedupe_mapping.keys()),
+                                                                  'dedupe_mode': (str, StorageDriverClient.VPOOL_DEDUPE_MAP.keys()),
                                                                   'dtl_enabled': (bool, None),
                                                                   'dtl_location': (str, None),
                                                                   'write_buffer': (int, None, False),
-                                                                  'cache_strategy': (str, cache_mapping.keys())}),
+                                                                  'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys())}),
                                          'connection_host': (str, Toolbox.regex_ip, False),
                                          'connection_port': (int, None),
                                          'connection_backend': (dict, None),
@@ -578,8 +566,8 @@ class StorageRouterController(object):
                                                       metadata_path=metadatapath,
                                                       tlog_path=tlogpath,
                                                       foc_throttle_usecs=4000,
-                                                      read_cache_default_mode=dedupe_mapping[dedupe_mode],
-                                                      read_cache_default_behaviour=cache_mapping[cache_strategy],
+                                                      read_cache_default_mode=StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode],
+                                                      read_cache_default_behaviour=StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy],
                                                       non_disposable_scos_factor=sco_factor)
         storagedriver_config.configure_volume_router(vrouter_id=vrouter_id,
                                                      vrouter_redirect_timeout_ms='5000',

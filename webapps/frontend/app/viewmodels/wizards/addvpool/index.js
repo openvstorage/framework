@@ -72,11 +72,11 @@ define([
         data.mgmtcenterType(undefined);
         data.mgmtcenterName(undefined);
         data.mgmtcenterLoaded(undefined);
-        data.cacheStrategy('onread');
+        data.cacheStrategy('on_read');
         data.dedupeMode('dedupe');
         data.dtlEnabled(false);
         data.dtlLocation('');
-        data.dtlMode('nosync');
+        data.dtlMode('no_sync');
         data.scoSize(4);
         data.writeBuffer(undefined);
     };

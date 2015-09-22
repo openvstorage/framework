@@ -252,8 +252,8 @@
                 "cache_strategies": {
                     "none": "No Cache",
                     "null": "-",
-                    "onread": "Cache On Read",
-                    "onwrite": "Cache On Write"
+                    "on_read": "Cache On Read",
+                    "on_write": "Cache On Write"
                 },
                 "caching": "Caching",
                 "dedupe": "Deduplication",
@@ -261,7 +261,7 @@
                 "dedupe_help_title": "Help - Deduplication",
                 "dedupe_modes": {
                     "dedupe": "Deduped",
-                    "nondedupe": "Non-Deduped",
+                    "non_dedupe": "Non-Deduped",
                     "null": "-"
                 },
                 "dedupe_warning": "Non-deduplication cannot be changed again!",
@@ -272,8 +272,8 @@
                 "dtl_location": "Location",
                 "dtl_mode": "Mode",
                 "dtl_modes": {
-                    "async": "Async",
-                    "nosync": "No Sync",
+                    "a_sync": "Async",
+                    "no_sync": "No Sync",
                     "sync": "Sync"
                 },
                 "sco_size": "SCO size",
