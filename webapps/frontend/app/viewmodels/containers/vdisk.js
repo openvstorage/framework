@@ -60,7 +60,7 @@ define([
         self.failoverMode        = ko.observable();
         self.cacheStrategies     = ko.observableArray(['on_read', 'on_write', 'none']);
         self.dtlModes            = ko.observableArray(['no_sync', 'a_sync', 'sync']);
-        self.dedupeModes         = ko.observableArray(['dedupe', 'non_dedupe']);
+        self.dedupeModes         = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
         self.scoSizes            = ko.observableArray([4, 8, 16, 32, 64, 128]);
 
         // Computed
@@ -90,13 +90,13 @@ define([
         self.dedupeMode = ko.computed({
             read: function() {
                 if (self.configuration() !== undefined && self.configuration().hasOwnProperty('dedupe_mode')) {
-                    return self.configuration().dedupe_mode;
+                    return {name: self.configuration().dedupe_mode, disabled: false};
                 }
                 return undefined;
             },
             write: function(value) {
                 var target = self.configuration();
-                target.dedupe_mode = value;
+                target.dedupe_mode = value.name;
                 self.configuration(target);
             }
         });
@@ -267,6 +267,14 @@ define([
                             if (data.write_buffer === 0) {  // Always show at least 1GiB in GUI
                                 data.write_buffer = 1;
                             }
+                        }
+                        if (data.dedupe_mode !== undefined && data.dedupe_mode === 'non_dedupe') {
+                            $.each(self.dedupeModes(), function (i, key) {
+                                if (key.name === 'dedupe') {
+                                    self.dedupeModes()[i].disabled = true;
+                                    return false;
+                                }
+                            });
                         }
                         self.configuration(data);
                         if (self.oldConfiguration() === undefined || reload === true) {

@@ -191,7 +191,11 @@ limitations under the License.
                                                     <tr>
                                                         <td style="width: 20%; padding: 0;">
                                                             <div style="margin-top: 5px;">
-                                                                <span data-i18n="ovs:storagedrivers.configuration.general.dtl_enable"></span>:
+                                                                <label class="control-label"
+                                                                       for="enableDTL"
+                                                                       style="padding: inherit; font-weight: inherit; margin-bottom: inherit;"
+                                                                       data-i18n="ovs:storagedrivers.configuration.general.dtl_enable">
+                                                                </label>:
                                                             </div>
                                                         </td>
                                                         <td style="width: 16%; padding: 0;">
@@ -320,7 +324,7 @@ limitations under the License.
                                                                                  items: dedupeModes,
                                                                                  target: dedupeMode,
                                                                                  text: function(item) {
-                                                                                     return $.t('ovs:storagedrivers.configuration.general.dedupe_modes.' + item);
+                                                                                     return $.t('ovs:storagedrivers.configuration.general.dedupe_modes.' + item.name);
                                                                                  },
                                                                                  small: true
                                                                              }">
