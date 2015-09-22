@@ -19,15 +19,11 @@ Module for SetupController
 import os
 import re
 import sys
-import copy
 import json
 import time
-import glob
 import base64
 import urllib2
 import subprocess
-from string import digits
-from pyudev import Context
 from paramiko import AuthenticationException
 
 from ConfigParser import RawConfigParser
@@ -46,11 +42,11 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.os.os import OSManager
 from ovs.extensions.generic.filemutex import FileMutex
 
 logger = LogHandler.get('lib', name='setup')
 logger.logger.propagate = False
+
 
 # @TODO: Make the setup_node re-entrant
 # @TODO: Make it possible to run as a non-privileged user
@@ -62,9 +58,9 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
+    ARAKOON_DB_MOUNTPOINT = '/opt/OpenvStorage/db'
     ARAKOON_OVSDB = 'arakoon-ovsdb'
     ARAKOON_VOLDRV = 'arakoon-voldrv'
-    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1', 'type': 'storage', 'ssd': False}
 
     # Arakoon
     arakoon_clusters = {'ovsdb': ARAKOON_OVSDB,
@@ -112,9 +108,6 @@ class SetupController(object):
         hypervisor_username = 'root'
         known_passwords = {}
         master_ip = None
-        auto_config = None
-        disk_layout = None
-        arakoon_mountpoint = None
         join_cluster = False
         configure_memcached = True
         configure_rabbitmq = True
@@ -136,9 +129,6 @@ class SetupController(object):
             hypervisor_ip = config.get('setup', 'hypervisor_ip')
             hypervisor_username = config.get('setup', 'hypervisor_username')
             hypervisor_password = config.get('setup', 'hypervisor_password')
-            arakoon_mountpoint = config.get('setup', 'arakoon_mountpoint')
-            auto_config = config.getboolean('setup', 'auto_config')
-            disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
             configure_memcached = config.getboolean('setup', 'configure_memcached')
             configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
@@ -344,29 +334,24 @@ class SetupController(object):
                 for node in nodes:
                     known_passwords[node] = target_password
 
-            mountpoints, hypervisor_info, writecaches, ip_client_map = SetupController._prepare_node(cluster_ip=cluster_ip,
-                                                                                                     nodes=nodes,
-                                                                                                     known_passwords=known_passwords,
-                                                                                                     ip_client_map=ip_client_map,
-                                                                                                     hypervisor_info={'type': hypervisor_type,
-                                                                                                                      'name': hypervisor_name,
-                                                                                                                      'username': hypervisor_username,
-                                                                                                                      'ip': hypervisor_ip,
-                                                                                                                      'password': hypervisor_password},
-                                                                                                     auto_config=auto_config,
-                                                                                                     disk_layout=disk_layout)
+            hypervisor_info, ip_client_map = SetupController._prepare_node(cluster_ip=cluster_ip,
+                                                                           nodes=nodes,
+                                                                           known_passwords=known_passwords,
+                                                                           ip_client_map=ip_client_map,
+                                                                           hypervisor_info={'type': hypervisor_type,
+                                                                                            'name': hypervisor_name,
+                                                                                            'username': hypervisor_username,
+                                                                                            'ip': hypervisor_ip,
+                                                                                            'password': hypervisor_password})
             if first_node is True:
                 SetupController._setup_first_node(target_client=ip_client_map[cluster_ip],
                                                   unique_id=unique_id,
-                                                  mountpoints=mountpoints,
                                                   cluster_name=cluster_name,
                                                   node_name=node_name,
                                                   hypervisor_info=hypervisor_info,
-                                                  arakoon_mountpoint=arakoon_mountpoint,
                                                   enable_heartbeats=enable_heartbeats,
                                                   configure_memcached=configure_memcached,
-                                                  configure_rabbitmq=configure_rabbitmq,
-                                                  writecaches=writecaches)
+                                                  configure_rabbitmq=configure_rabbitmq)
             else:
                 # Deciding master/extra
                 print 'Analyzing cluster layout'
@@ -394,15 +379,15 @@ class SetupController(object):
                                                   cluster_name=cluster_name,
                                                   ip_client_map=ip_client_map,
                                                   unique_id=unique_id,
-                                                  mountpoints=mountpoints,
-                                                  arakoon_mountpoint=arakoon_mountpoint,
                                                   configure_memcached=configure_memcached,
-                                                  configure_rabbitmq=configure_rabbitmq,
-                                                  writecaches=writecaches)
+                                                  configure_rabbitmq=configure_rabbitmq)
 
             print ''
             print Interactive.boxed_message(['Setup complete.',
                                              'Point your browser to https://{0} to use Open vStorage'.format(cluster_ip)])
+            from ovs.lib.disk import DiskController
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
+            DiskController.sync_with_reality(StorageRouterList.get_by_ip(cluster_ip).guid)
             logger.info('Setup complete')
 
         except Exception as exception:
@@ -506,11 +491,8 @@ class SetupController(object):
                                               cluster_name=cluster_name,
                                               ip_client_map=ip_client_map,
                                               unique_id=unique_id,
-                                              mountpoints=None,
-                                              arakoon_mountpoint=None,
                                               configure_memcached=configure_memcached,
-                                              configure_rabbitmq=configure_rabbitmq,
-                                              writecaches=None)
+                                              configure_rabbitmq=configure_rabbitmq)
             else:
                 SetupController._demote_node(cluster_ip=ip,
                                              master_ip=master_ip,
@@ -814,12 +796,11 @@ class SetupController(object):
             file_mutex.release()
 
     @staticmethod
-    def _prepare_node(cluster_ip, nodes, known_passwords, ip_client_map, hypervisor_info, auto_config, disk_layout):
+    def _prepare_node(cluster_ip, nodes, known_passwords, ip_client_map, hypervisor_info):
         """
         Prepares a node:
         - Exchange SSH keys
         - Update hosts files
-        - Partitioning
         - Request hypervisor information
         """
 
@@ -900,32 +881,7 @@ class SetupController(object):
             cmd = 'su - ovs -c "cp {1} {1}.tmp; ssh-keyscan -t rsa {0} {2} 2> /dev/null  >> {1}.tmp; cat {1}.tmp | sort -u - > {1}"'
             node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(ovs_ssh_folder), ' '.join(all_hostnames)))
 
-        # Creating filesystems
-        print 'Creating filesystems'
-        logger.info('Creating filesystems')
-
         target_client = ip_client_map[cluster_ip]
-        disk_layout = SetupController.apply_flexible_disk_layout(target_client, auto_config, disk_layout)
-
-        readcaches = list()
-        writecaches = list()
-        storage = list()
-        for mountpoint, details in disk_layout.iteritems():
-            if 'readcache' in details['type']:
-                readcaches.append(mountpoint)
-                continue
-            elif 'writecache' in details['type']:
-                writecaches.append(mountpoint)
-                continue
-            else:
-                storage.append(mountpoint)
-
-        target_client.config_set('ovs.partitions.readcaches', map(str, readcaches))
-        target_client.config_set('ovs.partitions.writecaches', map(str, writecaches))
-        target_client.config_set('ovs.partitions.storage', map(str, storage))
-
-        mountpoints = disk_layout.keys()
-        mountpoints.sort()
 
         print 'Collecting hypervisor information'
         logger.info('Collecting hypervisor information')
@@ -974,7 +930,7 @@ class SetupController(object):
             hypervisor_info['username'] = 'root'
         logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
 
-        return mountpoints, hypervisor_info, writecaches, ip_client_map
+        return hypervisor_info, ip_client_map
 
     @staticmethod
     def _log_message(message, client_ip=None, severity='info'):
@@ -1019,7 +975,8 @@ class SetupController(object):
         return True
 
     @staticmethod
-    def _setup_first_node(target_client, unique_id, mountpoints, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats, configure_memcached, configure_rabbitmq, writecaches):
+    def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats,
+                          configure_memcached, configure_rabbitmq):
         """
         Sets up the first node services. This node is always a master
         """
@@ -1029,12 +986,8 @@ class SetupController(object):
 
         print 'Setting up Arakoon'
         logger.info('Setting up Arakoon')
-        # Loading arakoon mountpoint
         cluster_ip = target_client.ip
-        if arakoon_mountpoint is None:
-            arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
-                                                        default_value=writecaches[0] if writecaches else '')
-        target_client.config_set('ovs.arakoon.location', arakoon_mountpoint)
+        target_client.config_set('ovs.arakoon.location', SetupController.ARAKOON_DB_MOUNTPOINT)
         arakoon_ports = {}
         exclude_ports = []
         for cluster in SetupController.arakoon_clusters:
@@ -1140,7 +1093,8 @@ class SetupController(object):
         logger.info('First node complete')
 
     @staticmethod
-    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map, hypervisor_info, configure_memcached, configure_rabbitmq):
+    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map, hypervisor_info,
+                          configure_memcached, configure_rabbitmq):
         """
         Sets up an additional node
         """
@@ -1207,7 +1161,8 @@ class SetupController(object):
         logger.info('Extra node complete')
 
     @staticmethod
-    def _promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, mountpoints, arakoon_mountpoint, configure_memcached, configure_rabbitmq, writecaches):
+    def _promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached,
+                      configure_rabbitmq):
         """
         Promotes a given node
         """
@@ -1248,25 +1203,7 @@ class SetupController(object):
 
         print 'Joining arakoon cluster'
         logger.info('Joining arakoon cluster')
-        # Loading arakoon mountpoint
-        if arakoon_mountpoint is None:
-            if mountpoints:
-                manual = 'Enter custom path'
-                mountpoints.sort()
-                mountpoints = [manual] + mountpoints
-                arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
-                                                            default_value=writecaches[0] if len(writecaches) > 0 else None,
-                                                            sort_choices=False)
-                if arakoon_mountpoint == manual:
-                    arakoon_mountpoint = None
-            if arakoon_mountpoint is None:
-                while True:
-                    arakoon_mountpoint = Interactive.ask_string('Enter arakoon database path').strip().rstrip('/')
-                    if target_client.dir_exists(arakoon_mountpoint):
-                        break
-                    else:
-                        print '  Invalid path, please retry'
-        target_client.config_set('ovs.arakoon.location', arakoon_mountpoint)
+        target_client.config_set('ovs.arakoon.location', SetupController.ARAKOON_DB_MOUNTPOINT)
         arakoon_ports = {}
         exclude_ports = ServiceList.get_ports_for_ip(cluster_ip)
         for cluster in SetupController.arakoon_clusters:
@@ -1352,7 +1289,8 @@ class SetupController(object):
         logger.info('Promote complete')
 
     @staticmethod
-    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached, configure_rabbitmq):
+    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached,
+                     configure_rabbitmq):
         """
         Demotes a given node
         """
@@ -1697,601 +1635,6 @@ EOF
         return storagerouter
 
     @staticmethod
-    def _get_disk_configuration(client):
-        """
-        Connect to target host and retrieve sata/ssd/raid configuration
-        """
-        with Remote(client.ip, [glob, os, Context]) as remote:
-            def get_value(location):
-                file_open = remote.os.open(location, remote.os.O_RDONLY)
-                file_content = remote.os.read(file_open, 10240)
-                remote.os.close(file_open)
-                return str(file_content)
-
-            content = get_value('/etc/mtab')
-            boot_device = None
-            for line in content.splitlines():
-                if ' / ' in line:
-                    boot_partition = line.split()[0]
-                    boot_device = boot_partition.lstrip('/dev/').translate(None, digits)
-
-            blk_devices = dict()
-            devices = [remote.os.path.basename(device_path) for device_path in remote.glob.glob('/sys/block/*')]
-            matching_devices = [device for device in devices if re.match('^(?:sd|fio|vd|xvd|nvme).*', device)]
-
-            for matching_device in matching_devices:
-                model = ''
-                sectors = get_value('/sys/block/{0}/size'.format(matching_device))
-                sector_size = get_value('/sys/block/{0}/queue/hw_sector_size'.format(matching_device))
-                rotational = get_value('/sys/block/{0}/queue/rotational'.format(matching_device))
-                context = remote.Context()
-                devices = context.list_devices(subsystem='block')
-                is_raid_member = False
-
-                for entry in devices:
-                    if matching_device not in entry['DEVNAME']:
-                        continue
-
-                    if entry['DEVTYPE'] == 'partition' and 'ID_FS_USAGE' in entry:
-                        if 'raid' in entry['ID_FS_USAGE'].lower():
-                            is_raid_member = True
-
-                    if entry['DEVTYPE'] == 'disk' and 'ID_MODEL' in entry:
-                        model = str(entry['ID_MODEL'])
-
-                if 'fio' in matching_device:
-                    model = 'FUSIONIO'
-
-                device_details = {'size': float(sectors) * float(sector_size),
-                                  'type': 'disk' if '1' in rotational else 'ssd',
-                                  'software_raid': is_raid_member,
-                                  'model': model,
-                                  'boot_device': matching_device == boot_device}
-
-                blk_devices[matching_device] = device_details
-
-        # cross-check ssd devices - flawed detection on vmware
-        for disk in blk_devices.keys():
-            output = str(client.run("hdparm -I {0} 2> /dev/null | grep 'Solid State' || true".format('/dev/' + disk)).strip())
-            if 'Solid State' in output and blk_devices[disk]['type'] == 'disk':
-                print 'Updating device type for /dev/{0} to ssd'.format(disk)
-                blk_devices[disk]['type'] = 'ssd'
-
-        return blk_devices
-
-    @staticmethod
-    def _generate_default_partition_layout(blk_devices):
-        """
-        Process detected block devices while
-        - ignoring bootdevice unless it's the only one
-        - ignoring devices part of a software raid
-
-        """
-
-        mps_to_allocate = {'/mnt/cache1': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'cache1', 'type': 'writecache'},
-                           '/mnt/cache2': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'cache2', 'type': 'readcache'},
-                           '/mnt/bfs': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'backendfs', 'type': 'storage'},
-                           '/var/tmp': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'tempfs', 'type': 'storage'}}
-
-        selected_devices = dict(blk_devices)
-        skipped_devices = set()
-        for device, values in blk_devices.iteritems():
-            if values['boot_device']:
-                skipped_devices.add(device)
-            if values['software_raid']:
-                skipped_devices.add(device)
-
-        for device in skipped_devices:
-            selected_devices.pop(device)
-
-        ssd_devices = list()
-        disk_devices = list()
-
-        for device, values in selected_devices.iteritems():
-            if values['type'] == 'ssd':
-                ssd_devices.append('/dev/' + device)
-            if values['type'] == 'disk':
-                disk_devices.append('/dev/' + device)
-
-        nr_of_ssds = len(ssd_devices)
-        nr_of_disks = len(disk_devices)
-
-        print '{0} ssd devices: {1}'.format(nr_of_ssds, str(ssd_devices))
-        print '{0} sata drives: {1}'.format(nr_of_disks, str(disk_devices))
-        print
-
-        if nr_of_ssds == 1:
-            mps_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
-            mps_to_allocate['/mnt/cache1']['percentage'] = 50
-            mps_to_allocate['/mnt/cache1']['label'] = 'cache1'
-            mps_to_allocate['/mnt/cache1']['type'] = 'writecache'
-            mps_to_allocate['/mnt/cache2']['device'] = ssd_devices[0]
-            mps_to_allocate['/mnt/cache2']['percentage'] = 50
-            mps_to_allocate['/mnt/cache2']['label'] = 'cache2'
-            mps_to_allocate['/mnt/cache2']['type'] = 'readcache'
-
-        elif nr_of_ssds > 1:
-            for count in xrange(nr_of_ssds):
-                marker = '/mnt/cache' + str(count + 1)
-                mps_to_allocate[marker] = dict()
-                mps_to_allocate[marker]['device'] = ssd_devices[count]
-                mps_to_allocate[marker]['type'] = 'readcache' if count > 0 else 'writecache'
-                mps_to_allocate[marker]['percentage'] = 100
-                mps_to_allocate[marker]['label'] = 'cache' + str(count + 1)
-
-        for mp, values in mps_to_allocate.iteritems():
-            if values['device'] in ssd_devices:
-                mps_to_allocate[mp]['ssd'] = True
-            else:
-                mps_to_allocate[mp]['ssd'] = False
-
-        return mps_to_allocate, skipped_devices
-
-    @staticmethod
-    def _partition_disks(client, partition_layout):
-        fstab_separator = ('# BEGIN Open vStorage', '# END Open vStorage')  # Don't change, for backwards compatibility
-        mounted = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 2").strip().splitlines()]
-
-        boot_disk = ''
-        unique_disks = set()
-        for mp, values in partition_layout.iteritems():
-            unique_disks.add(values['device'])
-            if 'boot_device' in values and values['boot_device']:
-                boot_disk = values['device']
-                print 'Boot disk {0} will not be cleared'.format(boot_disk)
-            # Umount partitions
-            if mp in mounted and values['device'] != 'DIR_ONLY':
-                print 'Unmounting {0}'.format(mp)
-                client.run('umount -l {0}'.format(mp))
-
-        mounted_devices = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 1").strip().splitlines()]
-
-        for mounted_device in mounted_devices:
-            for chosen_device in unique_disks:
-                if boot_disk in mounted_device:
-                    continue
-                if chosen_device in mounted_device:
-                    print 'Unmounting {0}'.format(mounted_device)
-                    client.run('umount -l {0}'.format(mounted_device))
-
-        # Wipe disks
-        for disk in unique_disks:
-            if disk == 'DIR_ONLY':
-                continue
-            if disk == boot_disk:
-                continue
-
-            print "Partitioning disk {0}".format(disk)
-            client.run('parted {0} -s mklabel gpt'.format(disk))
-
-        # Pre process partition info (disk as key)
-        mountpoints = partition_layout.keys()
-        mountpoints.sort()
-        partitions_by_disk = dict()
-        for mp in mountpoints:
-            partition = partition_layout[mp]
-            disk = partition['device']
-            percentage = partition['percentage']
-            label = partition['label']
-            if disk in partitions_by_disk:
-                partitions_by_disk[disk].append((mp, percentage, label))
-            else:
-                partitions_by_disk[disk] = [(mp, percentage, label)]
-
-        # Partition and format disks
-        mpts_to_mount = []
-        fstab_entries = ['{0} - Do not edit anything in this block'.format(fstab_separator[0])]
-        for disk, partitions in partitions_by_disk.iteritems():
-            if disk == 'DIR_ONLY':
-                for directory, _, _ in partitions:
-                    client.dir_create(directory)
-                continue
-
-            if disk == boot_disk:
-                for mp, percentage, label in partitions:
-                    print 'Partitioning free space on bootdisk: {0}'.format(disk)
-                    command = """parted {0} """.format(boot_disk)
-                    command += """unit % print free | grep 'Free Space' | tail -n1 | awk '{print $1}'"""
-                    start = int(float(client.run(command).split('%')[0])) + 1
-                    nr_of_partitions = int(client.run('lsblk {0} | grep part | wc -l'.format(boot_disk))) + 1
-                    client.run('parted -s -a optimal {0} unit % mkpart primary ext4 {1}% 100%'.format(disk, start))
-                    fstab_entry = OSManager.get_fstab_entry(label, mp)
-                    fstab_entries.append(fstab_entry)
-                    if 'nvme' in disk:
-                        client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + 'p' + str(nr_of_partitions), label))
-                    else:
-                        client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + str(nr_of_partitions), label))
-                    mpts_to_mount.append(mp)
-                continue
-
-            start = '2MB'
-            count = 1
-            for mp, percentage, label in partitions:
-                if start == '2MB':
-                    size_in_percentage = int(percentage)
-                    client.run('parted {0} -s mkpart {1} {2} {3}%'.format(disk, label, start, size_in_percentage))
-                else:
-                    size_in_percentage = int(start) + int(percentage)
-                    client.run('parted {0} -s mkpart {1} {2}% {3}%'.format(disk, label, start, size_in_percentage))
-                if 'nvme' in disk:
-                    client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + 'p' + str(count), label))
-                else:
-                    client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + str(count), label))
-                fstab_entry = OSManager.get_fstab_entry(label, mp)
-                fstab_entries.append(fstab_entry)
-                mpts_to_mount.append(mp)
-                count += 1
-                start = size_in_percentage
-
-        fstab_entries.append(fstab_separator[1])
-
-        # Update fstab
-        original_content = [line.strip() for line in client.file_read('/etc/fstab').strip().splitlines()]
-        new_content = []
-        skip = False
-        for line in original_content:
-            if skip is False:
-                if line.startswith(fstab_separator[0]):
-                    skip = True
-                else:
-                    new_content.append(line)
-            elif line.startswith(fstab_separator[1]):
-                skip = False
-        new_content += fstab_entries
-        client.file_write('/etc/fstab', '{0}\n'.format('\n'.join(new_content)))
-
-        print 'Mounting all partitions ...'
-        output = client.run('mount -l || true')
-        for mp in mpts_to_mount:
-            client.dir_create(mp)
-            if mp not in output:
-                client.run('mount {0}'.format(mp))
-
-        client.run('chmod 1777 /var/tmp')
-
-    @staticmethod
-    def apply_flexible_disk_layout(client, auto_config=False, default=None):
-        def print_and_sleep(message, sleep_count=1):
-            if not message.startswith('\n>>>'):
-                message = '\n>>> {0}'.format(message)
-            if not message.endswith('\n'):
-                message = '{0}\n'.format(message)
-            print message
-            time.sleep(sleep_count)
-
-        def show_layout(proposed):
-            print
-            print 'Proposed partition layout:'
-            print
-            print '! Mark fastest ssd device as writecache'
-            print '! Leave /mnt/bfs as DIR_ONLY when not using a local vpool'
-            print
-            key_map = list()
-            longest_mp = max([len(mp) for mp in proposed])
-            for mp in sorted(proposed):
-                key_map.append(mp)
-                if not proposed[mp]['device'] or proposed[mp]['device'] == 'DIR_ONLY':
-                    print "{0:{1}} :  device : DIR_ONLY".format(mp, longest_mp)
-                    continue
-
-                mp_values = ''
-                for dict_key in sorted(proposed[mp]):
-                    value = str(proposed[mp][dict_key])
-                    if dict_key == 'device' and value and value != 'DIR_ONLY':
-                        size = device_size_map[value]
-                        size_in_gb = int(size / 1000.0 / 1000.0 / 1000.0)
-                        value = value + ' ({0} GB)'.format(size_in_gb)
-                    if dict_key == 'device':
-                        mp_values += ' {0} : {1:20}'.format(dict_key, value)
-                    elif dict_key == 'label':
-                        mp_values += ' {0} : {1:10}'.format(dict_key, value)
-                    else:
-                        mp_values += ' {0} : {1:5}'.format(dict_key, value)
-
-                print "{0:{1}} : {2}".format(mp, longest_mp, mp_values)
-
-            return key_map
-
-        def check_percentages(percentage_mapping, device_to_check):
-            total_percentage_assigned = sum([perc for perc in percentage_mapping[device_to_check].itervalues()])
-            if total_percentage_assigned > 100:
-                print_and_sleep('More than 100% specified for device {0}, please update manually'.format(device_to_check))
-            elif total_percentage_assigned < 100:
-                print_and_sleep('Less than 100% specified for device {0}, please update manually if required'.format(device_to_check))
-
-        # use the partition layout already defined in the openvstorage_preconfig.cfg
-        if auto_config is True and default is not None:
-            SetupController._partition_disks(client, default)
-            return default
-
-        blk_devices = SetupController._get_disk_configuration(client)
-        boot_disk = ''
-        # check for free space on bootdevice
-        if auto_config is False:
-            for disk, values in blk_devices.iteritems():
-                if values['boot_device'] and values['type'] in ['ssd']:
-                    boot_disk += disk
-                    break
-
-            if not boot_disk:
-                print 'No SSD boot disk detected ...'
-                print 'Skipping partitioning of free space on boot disk ...'
-            else:
-                command = """parted /dev/{0} """.format(boot_disk)
-                command += """unit GB print free | grep 'Free Space' | tail -n1 | awk '{print $3}'"""
-                free_space = float(client.run(command).split('GB')[0])
-
-                if free_space < 1.0:
-                    print 'Skipping auto partitioning of free space on bootdisk as it is < 1 GiB'
-                    print 'If required partition and mount manually for use in add vpool'
-                    boot_disk = ''
-
-        skipped = set()
-        if default is None:
-            default, skipped = SetupController._generate_default_partition_layout(blk_devices)
-
-        ssd_devices = set([mountpoint_info['device'] for mountpoint_info in default.itervalues() if mountpoint_info.get('ssd', False) is True])
-
-        print 'Excluded: {0}'.format(skipped)
-        print '-> bootdisk or part of software RAID configuration'
-        print
-
-        if boot_disk:
-            print 'Adding free space on boot disk - only mountpoint, label and type can be changed!'
-            default['/mnt/os_cache'] = {'device': "/dev/{0}".format(boot_disk), 'ssd': True, 'boot_device': True, 'percentage': 100, 'label': 'os_cache', 'type': 'readcache'}
-
-        device_size_map = dict()
-        for key, values in blk_devices.iteritems():
-            device_size_map['/dev/' + key] = values['size']
-
-        if auto_config is True:
-            SetupController._partition_disks(client, default)
-            return default
-
-        choices = show_layout(default)
-        percentage_map = {}
-        for mountpoint, info in default.iteritems():
-            device = info.get('device')
-            if device == 'DIR_ONLY':
-                continue
-
-            if device not in percentage_map:
-                percentage_map[device] = {mountpoint: 0}
-            elif mountpoint not in percentage_map[device]:
-                percentage_map[device][mountpoint] = 0
-            percentage_map[device][mountpoint] += info['percentage']
-
-        while True:
-            menu_actions = ['Add', 'Remove', 'Update', 'Print', 'Apply', 'Quit']
-            chosen = Interactive.ask_choice(menu_actions, 'Make a choice', sort_choices=False)
-
-            if chosen == 'Add':
-                to_add = Interactive.ask_string('Enter mountpoint to add')
-                if to_add in default:
-                    print_and_sleep('Mountpoint {0} already exists'.format(to_add))
-                else:
-                    # Calculcate new default labelname
-                    label_counters = []
-                    for mountpoint_info in default.itervalues():
-                        if re.match('^cache[0-9]{1,2}$', mountpoint_info['label'].strip()):
-                            label_counters.append(int(mountpoint_info['label'].strip().split('cache')[1]))
-
-                    new_label = None
-                    for new_counter in xrange(1, 1000):
-                        if new_counter in label_counters:
-                            continue
-                        new_label = 'cache{0}'.format(new_counter)
-                        break
-                    default[to_add] = dict(SetupController.PARTITION_DEFAULTS)
-                    default[to_add]['label'] = new_label
-
-                choices = show_layout(default)
-
-            elif chosen == 'Remove':
-                to_remove = Interactive.ask_string('Enter mountpoint to remove')
-                if to_remove in default:
-                    copied_map = copy.deepcopy(percentage_map)
-                    for device, mp_info in copied_map.iteritems():
-                        for mountp in copied_map[device]:
-                            if mountp == to_remove:
-                                percentage_map[device].pop(to_remove)
-                    default.pop(to_remove)
-                else:
-                    print_and_sleep('Mountpoint {0} not found, no action taken'.format(to_remove))
-                choices = show_layout(default)
-
-            elif chosen == 'Quit':
-                return 'QUIT'
-
-            elif chosen == 'Print':
-                show_layout(default)
-
-            elif chosen == 'Update':
-                to_update = Interactive.ask_choice(choices)
-                subitem = default[to_update]
-                is_boot_device = 'boot_device' in subitem and subitem['boot_device'] is True
-                submenu_items = subitem.keys()
-                if 'boot_device' in submenu_items:
-                    submenu_items.remove('boot_device')
-                submenu_items.remove('ssd')
-                submenu_items.append('mountpoint')
-                submenu_items.append('finish')
-
-                while True:
-                    for sub_key in sorted(subitem):
-                        print "{0:15} : {1}".format(sub_key, subitem[sub_key])
-                    print "{0:15} : {1}".format('mountpoint', to_update)
-                    print
-
-                    subitem_chosen = Interactive.ask_choice(submenu_items, sort_choices=False)
-                    if subitem_chosen == 'finish':
-                        break
-                    elif is_boot_device and subitem_chosen not in ['type', 'label']:
-                        print '\nOnly mountpoint, label and type can be changed for a boot device'
-                        print 'All free space will be allocated to the new partition'
-                        time.sleep(1)
-                    elif subitem_chosen == 'percentage':
-                        answer = Interactive.ask_integer('Please specify the percentage: ', 1, 100)
-                        subitem['percentage'] = answer
-                        device = subitem['device']
-                        # Recalculate percentages
-                        if device in percentage_map:
-                            percentage_map[device][to_update] = answer
-                            if len(percentage_map[device]) != 2:
-                                check_percentages(percentage_map, device)
-                            else:
-                                total_percentage = sum([percent for percent in percentage_map[device].itervalues()])
-                                if total_percentage > 100:
-                                    for mountp in percentage_map[device].iterkeys():
-                                        if mountp != to_update:
-                                            percentage_map[device][mountp] = 100 - answer
-                                            default[mountp]['percentage'] = 100 - answer
-                                            print_and_sleep('Overallocation detected, updated {0} on device {1} to {2}%'.format(mountp, device, 100 - answer))
-                    elif subitem_chosen == 'type':
-                        answer = Interactive.ask_choice(['readcache', 'writecache', 'storage'], 'Please set the type', 'storage', False)
-                        subitem['type'] = answer
-                    elif subitem_chosen == 'label':
-                        answer = Interactive.ask_string('Please set the label')
-                        if not re.match('^[a-z]+[0-9]*', answer):
-                            print_and_sleep('Invalid entry {0} for label'.format(answer))
-                        else:
-                            subitem['label'] = answer
-                    elif subitem_chosen == 'mountpoint':
-                        answer = Interactive.ask_string('Please set the mountpoint')
-                        if not re.match('^/(?:[a-zA-Z0-9_-]+/)*[a-zA-Z0-9_-]+$', answer):
-                            print_and_sleep('Invalid entry {0} for mountpoint'.format(answer))
-                        elif answer in default:
-                            print_and_sleep('New mountpoint already exists!')
-                        else:
-                            default.pop(to_update)
-                            default[answer] = subitem
-                            for dev, mp_info in percentage_map.iteritems():
-                                for mountp in mp_info.iterkeys():
-                                    if mountp == to_update:
-                                        percentage = percentage_map[dev].pop(mountp)
-                                        percentage_map[dev][answer] = percentage
-                            to_update = answer
-                    elif subitem_chosen == 'device':
-                        answer = Interactive.ask_string('Please set the device')
-                        if not re.match('^/dev/[a-z]{3}$', answer):
-                            print_and_sleep('Invalid entry {0} for device'.format(answer))
-                        elif answer not in device_size_map:
-                            print_and_sleep('Device {0} does not exist'.format(answer))
-                        elif answer == subitem['device']:
-                            print_and_sleep('Same device specified, nothing will be updated')
-                        else:
-                            mountpoint = to_update
-                            orig_device = subitem['device']
-                            percentage = subitem['percentage']
-                            subitem['ssd'] = answer in ssd_devices
-                            subitem['device'] = answer
-
-                            if orig_device in percentage_map:
-                                # Update original device
-                                percentage_map[orig_device].pop(mountpoint)
-                                if len(percentage_map[orig_device]) > 1:
-                                    check_percentages(percentage_map, orig_device)
-
-                                # Update new device
-                                if answer in percentage_map:
-                                    percentage_map[answer][mountpoint] = percentage
-                                    if len(percentage_map[answer]) == 2:
-                                        default[mountpoint]['percentage'] = percentage
-                                        total_percentage = sum([percent for percent in percentage_map[answer].itervalues()])
-                                        if total_percentage > 100:
-                                            for mountp in percentage_map[answer].iterkeys():
-                                                if mountp != mountpoint:
-                                                    percentage_map[answer][mountp] = 100 - percentage
-                                                    default[mountp]['percentage'] = 100 - percentage
-                                                    print_and_sleep('Overallocation detected, updated {0} on device {1} to {2}%'.format(mountp, answer, 100 - percentage))
-                                    elif len(percentage_map[answer]) > 2:
-                                        check_percentages(percentage_map, answer)
-
-                            if answer not in percentage_map:
-                                percentage_map[answer] = {mountpoint: percentage if isinstance(percentage, int) else 0}
-                            elif mountpoint not in percentage_map[answer]:
-                                percentage_map[answer][mountpoint] = percentage if isinstance(percentage, int) else 0
-                                check_percentages(percentage_map, answer)
-
-                choices = show_layout(default)
-
-            elif chosen == 'Apply':
-                total = dict()
-                valid_percentages = True
-                for details in default.itervalues():
-                    device = details['device']
-                    if device == 'DIR_ONLY':
-                        continue
-                    if details['percentage'] == 'NA' or details['percentage'] == 0:
-                        print '>>> Invalid percentage value for device: {0}'.format(device)
-                        print
-                        time.sleep(1)
-                        valid_percentages = False
-                        break
-                    percentage = int(details['percentage'])
-                    if device in total:
-                        total[device] += percentage
-                    else:
-                        total[device] = percentage
-
-                if valid_percentages is True:
-                    for device, percentage in total.iteritems():
-                        if 0 < percentage <= 100:
-                            continue
-                        else:
-                            print '>>> Invalid total {0}% for device: {1}'.format(percentage, device)
-                            print
-                            time.sleep(1)
-                            valid_percentages = False
-                            break
-
-                if valid_percentages is False:
-                    choices = show_layout(default)
-                    continue
-
-                has_read = False
-                has_write = False
-                for details in default.itervalues():
-                    disk_type = details['type']
-                    if disk_type == 'readcache':
-                        has_read = True
-                    elif disk_type == 'writecache':
-                        has_write = True
-                if has_read is False or has_write is False:
-                    print
-                    print '>>> At least one readcache partition and one writecache partition must be configured'
-                    print
-                    time.sleep(1)
-                    choices = show_layout(default)
-                    continue
-
-                valid_labels = True
-                partitions = set()
-                nr_of_labels = 0
-                for details in default.itervalues():
-                    if 'DIR_ONLY' not in details['device']:
-                        partitions.add(details['label'])
-                        nr_of_labels += 1
-                if len(partitions) < nr_of_labels:
-                    print '! Partition labels should be unique across partitions'
-                    print
-                    time.sleep(1)
-                    valid_labels = False
-
-                if valid_labels is False:
-                    choices = show_layout(default)
-                    continue
-
-                show_layout(default)
-                confirmation = Interactive.ask_yesno('Please confirm the partition layout, ALL DATA WILL BE ERASED ON THE DISKS ABOVE!', False)
-                if confirmation is True:
-                    print 'Applying partition layout ...'
-                    SetupController._partition_disks(client, default)
-                    return default
-                else:
-                    print 'Please confirm by typing "y"'
-
-    @staticmethod
     def _discover_nodes(client):
         nodes = {}
         SetupController._change_service_state(client, 'dbus', 'start')
@@ -2390,7 +1733,8 @@ EOF
                     rabbitmq_running = True
                     rabbitmq_pid_ctl = match_groups['pid']
 
-        if ServiceManager.has_service('rabbitmq-server', client) and ServiceManager.get_service_status('rabbitmq-server', client):
+        if ServiceManager.has_service('rabbitmq-server', client) \
+                and ServiceManager.get_service_status('rabbitmq-server', client):
             rabbitmq_running = True
             rabbitmq_pid_sm = ServiceManager.get_service_pid('rabbitmq-server', client)
 
