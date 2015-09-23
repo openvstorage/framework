@@ -14,25 +14,30 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/generic', 'ovs/api'
-], function($, ko, generic, api) {
+    'ovs/generic', 'ovs/api', 'ovs/shared'
+], function($, ko, generic, api, shared) {
     "use strict";
     return function(guid) {
         var self = this;
 
+        // Variables
+        self.shared = shared;
+
         // Handles
-        self.loadHandle  = undefined;
+        self.loadConfigured = undefined;
 
         // Observables
-        self.edit           = ko.observable(false);
-        self.loading        = ko.observable(false);
-        self.loaded         = ko.observable(false);
-        self.guid           = ko.observable(guid);
-        self.name           = ko.observable();
-        self.ipAddress      = ko.observable();
-        self.hvtype         = ko.observable();
-        self.mgmtCenterGuid = ko.observable();
-        self.backupValue    = ko.observable();
+        self.edit              = ko.observable(false);
+        self.loading           = ko.observable(false);
+        self.loaded            = ko.observable(false);
+        self.guid              = ko.observable(guid);
+        self.name              = ko.observable();
+        self.ipAddress         = ko.observable();
+        self.hvtype            = ko.observable();
+        self.mgmtCenterGuid    = ko.observable();
+        self.backupValue       = ko.observable();
+        self.isConfigured      = ko.observable(false);
+        self.isVPoolConfigured = ko.observable({});
 
         // Functions
         self.fillData = function(data) {
@@ -61,38 +66,38 @@ define([
                     });
             }).promise();
         };
-        self.save = function() {
+        self.loadHostConfigurationState = function() {
             return $.Deferred(function(deferred) {
-                self.loading(true);
-                api.patch('pmachines/' + self.guid(), {
-                        data: {
-                            name: self.name(),
-                            mgmtcenter_guid: self.mgmtCenterGuid() === undefined ? null : self.mgmtCenterGuid(),
-                            ip: self.ipAddress(),
-                            hvtype: self.hvtype()
-                        },
-                        queryparams: { contents: 'mgmtcenter' }
+                if (generic.xhrCompleted(self.loadConfigured)) {
+                    self.loadConfigured = api.get('pmachines/' + self.guid() + '/is_host_configured')
+                        .then(self.shared.tasks.wait)
+                        .done(function(data) {
+                            self.isConfigured(data);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
+        self.loadVPoolConfigurationState = function(vpoolGuid) {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadConfigured)) {
+                    self.loadConfigured = api.get('pmachines/' + self.guid() + '/is_host_configured_for_vpool', {
+                        queryparams: { vpool_guid: vpoolGuid }
                     })
-                    .done(function() {
-                        generic.alertSuccess(
-                            $.t('ovs:pmachines.save.complete'),
-                            $.t('ovs:pmachines.save.success', { what: self.name() })
-                        );
-                        self.loading(false);
-                        deferred.resolve();
-                    })
-                    .fail(function(error) {
-                        error = $.parseJSON(error.responseText);
-                        generic.alertError(
-                            $.t('ovs:generic.error'),
-                            $.t('ovs:pmachines.save.failed', {
-                                what: self.name(),
-                                why: error.detail
-                            })
-                        );
-                        self.loading(false);
-                        deferred.reject();
-                    });
+                        .then(self.shared.tasks.wait)
+                        .done(function(data) {
+                            var configuredVPools = self.isVPoolConfigured();
+                            configuredVPools[vpoolGuid] = data;
+                            self.isVPoolConfigured(configuredVPools);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
             }).promise();
         };
     };

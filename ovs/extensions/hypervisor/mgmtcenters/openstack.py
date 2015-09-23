@@ -21,6 +21,7 @@ from ovs.extensions.hypervisor.mgmtcenters.management.openstack_mgmt import Open
 
 logger = LogHandler.get('extensions', name='openstack_mgmt')
 
+
 class OpenStack(object):
     """
     Represents the management center for OpenStack
@@ -47,54 +48,45 @@ class OpenStack(object):
         self.nova_client = nova_client.Client(username = username,
                                               api_key = password,
                                               project_id = 'admin',
-                                              auth_url = 'http://{}:35357/v2.0'.format(ip),
+                                              auth_url = 'http://{0}:35357/v2.0'.format(ip),
                                               service_type="compute")
         self.cinder_client = cinder_client.Client(username = username,
                                                   api_key = password,
                                                   project_id = 'admin',
-                                                  auth_url = 'http://{}:35357/v2.0'.format(ip),
+                                                  auth_url = 'http://{0}:35357/v2.0'.format(ip),
                                                   service_type="volumev2")
         self.management = OpenStackManagement(cinder_client = self.cinder_client)
-        self.metadata = {}
-        self.config_cinder = False
         self.STATE_MAPPING = {'up': 'RUNNING'}
 
         logger.debug('Init complete')
 
-    def get_metadata(self, metadata, parameters):
-        """
-        Get specific config values:
-        - config_cinder (first time comes from GUI integratemgmt: True/False)
-        """
-        _ = self
-        config_cinder = parameters.get('integratemgmt', metadata.get('integratemgmt', False))
-        return {'integratemgmt': config_cinder}
+    def configure_vpool_for_host(self, vpool_guid, ip):
+        try:
+            return self.management.configure_vpool_for_host(vpool_guid, ip)
+        except (SystemExit, Exception) as ex:
+            logger.error('Management action "configure_vpool_for_host" failed {0}'.format(ex))
+            raise ex
 
-    def set_metadata(self, metadata):
-        """
-        Update local metadata
-        """
-        self.metadata = metadata
-        self.config_cinder = metadata.get('integratemgmt')
-        logger.debug('Cinder configuration is <{0}>'.format(str(self.config_cinder)))
+    def unconfigure_vpool_for_host(self, vpool_guid, remove_volume_type, ip):
+        try:
+            return self.management.unconfigure_vpool_for_host(vpool_guid, remove_volume_type, ip)
+        except (SystemExit, Exception) as ex:
+            logger.error('Management action "unconfigure_vpool_for_host" failed {0}'.format(ex))
+            raise ex
 
-    def configure_vpool(self, vpool_name, mountpoint):
-        if self.config_cinder:
-            try:
-                return self.management.configure_vpool(vpool_name, mountpoint)
-            except (SystemExit, Exception) as ex:
-                logger.error('Management action "configure_vpool" failed %s' % ex)
-        else:
-            logger.info('Cinder configuration is disabled')
+    def configure_host(self, ip):
+        try:
+            return self.management.configure_host(ip)
+        except (SystemExit, Exception) as ex:
+            logger.error('Management action "configure_host" failed {0}'.format(ex))
+            raise ex
 
-    def unconfigure_vpool(self, vpool_name, mountpoint, remove_volume_type):
-        if self.config_cinder:
-            try:
-                return self.management.unconfigure_vpool(vpool_name, mountpoint, remove_volume_type)
-            except (SystemExit, Exception) as ex:
-                logger.error('Management action "unconfigure_vpool" failed %s' % ex)
-        else:
-            logger.info('Cinder configuration is disabled')
+    def unconfigure_host(self, ip):
+        try:
+            return self.management.unconfigure_host(ip)
+        except (SystemExit, Exception) as ex:
+            logger.error('Management action "unconfigure_host" failed {0}'.format(ex))
+            raise ex
 
     def get_host_status_by_ip(self, host_ip):
         """
@@ -274,3 +266,17 @@ class OpenStack(object):
                                      'order': order})
             order += 1
         return vm_info
+
+    def is_host_configured(self, ip):
+        try:
+            return self.management.is_host_configured(ip)
+        except (SystemExit, Exception) as ex:
+            logger.error('Management action "is_host_configured" failed {0}'.format(ex))
+        return False
+
+    def is_host_configured_for_vpool(self, vpool_guid, ip):
+        try:
+            return self.management.is_host_configured_for_vpool(vpool_guid, ip)
+        except (SystemExit, Exception) as ex:
+            logger.error('Management action "is_host_configured_for_vpool" failed {0}'.format(ex))
+        return False

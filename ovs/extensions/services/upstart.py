@@ -16,7 +16,11 @@
 Upstart module
 """
 
+import re
 from subprocess import CalledProcessError
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('extensions', name='servicemanager')
 
 
 class Upstart(object):
@@ -38,9 +42,12 @@ class Upstart(object):
         """
         if Upstart._service_exists(name, client, path):
             return name
+        if client.file_exists('/etc/init.d/{0}'.format(name)):
+            return name
         name = 'ovs-{0}'.format(name)
         if Upstart._service_exists(name, client, path):
             return name
+        logger.info('Service {0} could not be found.'.format(name))
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
@@ -53,34 +60,52 @@ class Upstart(object):
             ))
 
     @staticmethod
-    def add_service(name, client, params=None):
+    def add_service(name, client, params=None, target_name=None, additional_dependencies=None):
         if params is None:
             params = {}
 
         name = Upstart._get_name(name, client, '/opt/OpenvStorage/config/templates/upstart/')
-        template_dir = '/opt/OpenvStorage/config/templates/upstart/{0}'
-        upstart_dir = '/etc/init/{0}'
-        upstart_conf = '{0}.conf'.format(name)
-        template_conf = client.file_read(template_dir.format(upstart_conf))
+        template_conf = '/opt/OpenvStorage/config/templates/upstart/{0}.conf'
+
+        if not client.file_exists(template_conf.format(name)):
+            # Given template doesn't exist so we are problably using system
+            # init scripts
+            return
+
+        template_file = client.file_read(template_conf.format(name))
 
         for key, value in params.iteritems():
-            template_conf = template_conf.replace('<{0}>'.format(key), value)
-        if '<SERVICE_NAME>' in template_conf:
-            template_conf = template_conf.replace('<SERVICE_NAME>', name.lstrip('ovs-'))
+            template_file = template_file.replace('<{0}>'.format(key), value)
+        if '<SERVICE_NAME>' in template_file:
+            template_file = template_file.replace('<SERVICE_NAME>', name.lstrip('ovs-'))
 
-        client.file_write(upstart_dir.format(upstart_conf), template_conf)
+        dependencies = ''
+        if additional_dependencies:
+            for service in additional_dependencies:
+                dependencies += '{0} '.format(service)
+        template_file = template_file.replace('<ADDITIONAL_DEPENDENCIES>', dependencies)
+
+        if target_name is None:
+            client.file_write('/etc/init/{0}.conf'.format(name), template_file)
+        else:
+            client.file_write('/etc/init/{0}.conf'.format(target_name), template_file)
 
     @staticmethod
     def get_service_status(name, client):
         try:
             name = Upstart._get_name(name, client)
-            output = client.run('status {0}'.format(name))
-            if 'start' in output:
+            output = client.run('service {0} status'.format(name))
+            # Special cases (especially old SysV ones)
+            if 'rabbitmq' in name:
+                return re.search('\{pid,\d+?\}', output) is not None
+            # Normal cases - or if the above code didn't yield an outcome
+            if 'start' in output or 'is running' in output:
                 return True
-            if 'stop' in output:
+            if 'stop' in output or 'not running' in output:
                 return False
             return False
-        except CalledProcessError:
+        except CalledProcessError, ex:
+            logger.error('Get {0}.service status failed: {1}'.format(name, ex))
             raise Exception('Retrieving status for service "{0}" failed'.format(name))
 
     @staticmethod
@@ -104,27 +129,30 @@ class Upstart(object):
     def start_service(name, client):
         try:
             name = Upstart._get_name(name, client)
-            output = client.run('start {0}'.format(name))
+            output = client.run('service {0} start'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
+            logger.error('Start {0} failed, {1}'.format(name, output))
         return output
 
     @staticmethod
     def stop_service(name, client):
         try:
             name = Upstart._get_name(name, client)
-            output = client.run('stop {0}'.format(name))
+            output = client.run('service {0} stop'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
+            logger.error('Stop {0} failed, {1}'.format(name, output))
         return output
 
     @staticmethod
     def restart_service(name, client):
         try:
             name = Upstart._get_name(name, client)
-            output = client.run('restart {0}'.format(name))
+            output = client.run('service {0} restart'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
+            logger.error('Restart {0} failed, {1}'.format(name, output))
         return output
 
     @staticmethod
@@ -134,3 +162,28 @@ class Upstart(object):
             return True
         except ValueError:
             return False
+
+    @staticmethod
+    def is_enabled(name, client):
+        name = Upstart._get_name(name, client)
+        if client.file_exists('/etc/init/{0}.override'.format(name)):
+            return False
+        return True
+
+    @staticmethod
+    def get_service_pid(name, client):
+        name = Upstart._get_name(name, client)
+        if Upstart.get_service_status(name, client):
+            output = client.run('service {0} status'.format(name))
+            if output:
+                # Special cases (especially old SysV ones)
+                if 'rabbitmq' in name:
+                    match = re.search('\{pid,(?P<pid>\d+?)\}', output)
+                else:
+                    # Normal cases - or if the above code didn't yield an outcome
+                    match = re.search('start/running, process (?P<pid>\d+)', output)
+                if match is not None:
+                    match_groups = match.groupdict()
+                    if 'pid' in match_groups:
+                        return match_groups['pid']
+        return -1

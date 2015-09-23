@@ -1,4 +1,4 @@
-﻿<!--
+﻿﻿<!--
 Copyright 2014 Open vStorage NV
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,7 @@ limitations under the License.
     <div>
         <h2 class="pull-left" data-i18n="ovs:pmachines.mgmtcenter.title"></h2>
         <button class="btn btn-default pull-right"
-                data-bind="click: addMgmtCenter, enable: $.inArray('manage', $root.shared.user.roles()) !== -1"
+                data-bind="click: addMgmtCenter, enable: $root.shared.user.roles().contains('manage')"
                 id="buttonAddMgmtCenter"
                 style="margin-top: 20px; margin-bottom: 10px;">
             <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
@@ -43,21 +43,30 @@ limitations under the License.
                 </td>
                 <td>
                     <i data-bind="click: function() {
-                                      if ($.inArray('manage', $root.shared.user.roles()) !== -1) {
+                                      if ($root.shared.user.roles().contains('manage')) {
                                           $root.deleteMgmtCenter($data.guid());
                                       }
                                   },
-                                  style: { color: $.inArray('manage', $root.shared.user.roles()) !== -1 ? 'black' : 'lightgrey' }"
-                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
+                                  style: { color: $root.shared.user.roles().contains('manage') ? 'black' : 'lightgrey' }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete">
+                    </i>
                 </td>
             </tr>
         </table>
     </div>
-    <h2 class="pull-left" data-i18n="ovs:pmachines.pmachines.title"></h2>
+    <div>
+        <h2 class="pull-left" data-i18n="ovs:pmachines.pmachines.title"></h2>
+        <button class="btn btn-default pull-right"
+                data-bind="click: linkHosts, enable: $root.shared.user.roles().contains('manage'), visible: mgmtCenters().length !== 0"
+                id="buttonLinkHosts"
+                style="margin-top: 20px; margin-bottom: 10px;">
+            <span class="fa" data-i18n="[html]ovs:icons.link"></span>&nbsp;
+            <span data-i18n="ovs:pmachines.pmachines.link"></span>
+        </button>
+    </div>
     <div data-bind="pager: { loadData: loadPMachines, headers: pMachineHeaders, refreshInterval: 5000, controls: true, container: pMachines }" style="clear: both;">
-         style="clear: both;">
         <table data-dummy="dummy">
-            <tr data-part="vitem" data-bind="css: { 'danger': !mgmtCenterValid() }">
+            <tr data-part="vitem" data-bind="css: { 'danger': !mgmtCenterValid() || missingMgmtCenter() }">
                 <td style="position: relative;">
                     <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
                        <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
@@ -66,37 +75,42 @@ limitations under the License.
                 </td>
                 <td><span data-bind="text: ipAddress"></span></td>
                 <td><span data-bind="text: hvtype"></span></td>
-                <td data-bind="style: { 'paddingBottom': edit() ? '5px' : '8px', 'paddingTop': edit() ? '5px' : '8px' }" class="edit-container">
-                    <span data-bind="visible: !edit()">
-                        <span data-bind="text: mgmtCenter() !== undefined ? mgmtCenter().name() : '-'"></span>
-                        <i class="hand fa fa-fw edit-button" data-i18n="[html]ovs:icons.edit" style="padding-left: 10px; display: none;"
-                           data-bind="click: function() {
-                                          if ($root.mgmtCenters().length > 0 && $.inArray('manage', $root.shared.user.roles()) !== -1) {
-                                              backupValue(mgmtCenterGuid());
-                                              edit(true);
-                                          }
-                                      },
-                                      style: { color: $root.mgmtCenters().length > 0 && $.inArray('manage', $root.shared.user.roles()) !== -1 ? 'black' : 'lightgrey' },"></i>
-                    </span>
-                    <span data-bind="visible: edit()">
-                        <span data-bind="dropdown: {
-                                             items: $root.mgmtCenterChoices, target: mgmtCenter,
-                                             text: function(item) {
-                                                 if (item === undefined) {
-                                                     return '-';
-                                                 }
-                                                 return item.name();
-                                             }, key: 'guid', keyisfunction: true, small: true
-                                         }"></span>
-                        <i class="hand fa fa-fw" data-i18n="[html]ovs:icons.save" style="padding-left: 10px;"
-                           data-bind="click: function() { save(); edit(false); }"></i>
-                        <i class="hand fa fa-fw" data-i18n="[html]ovs:icons.cancel" style="padding-left: 10px;"
-                           data-bind="click: function() { mgmtCenterGuid(backupValue()); edit(false); }"></i>
-                    </span>
+                <td>
+                    <div>
+                        <span data-bind="text: mgmtCenter() !== undefined ? mgmtCenter().name() : ''"></span>
+                        <i class="fa fa-fw pointer"
+                           data-i18n="[html]ovs:icons.warning"
+                           data-bind="visible: !mgmtCenterValid(), tooltip: 'ovs:pmachines.pmachines.incorrectmgmtcenter'">
+                        </i>
+                        <i class="fa fa-fw pointer"
+                           data-i18n="[html]ovs:icons.warning"
+                           data-bind="visible: missingMgmtCenter(), tooltip: 'ovs:pmachines.pmachines.missingmgmtcenter'">
+                        </i>
+                    </div>
                 </td>
                 <td>
-                    <i class="fa fa-fw pointer" data-i18n="[html]ovs:icons.warning"
-                       data-bind="visible: !mgmtCenterValid(), tooltip: 'ovs:pmachines.pmachines.incorrectmgmtcenter'"></i>
+                    <span class="fa-stack">
+                        <i data-bind="click: function() {
+                                          if ($root.shared.user.roles().contains('manage')) {
+                                              $root.reconfigureHost(guid(), true);
+                                          }
+                                      },
+                                      tooltip: isConfigured() === true ? '' : 'ovs:wizards.linkhosts.gather.configure',
+                                      style: { color: $root.shared.user.roles().contains('manage') ? 'black' : 'lightgrey' },
+                                      visible: (missingMgmtCenter() === false && isConfigured() === false && $root.mgmtCenters().length > 0) || isConfigured() === true"
+                           class="hand fa fa-fw fa-stack-1x" data-i18n="[html]ovs:icons.cog">
+                        </i>
+                        <i data-bind="click: function() {
+                                          if ($root.shared.user.roles().contains('manage')) {
+                                              $root.reconfigureHost(guid(), false);
+                                          }
+                                      },
+                                      tooltip: 'ovs:wizards.linkhosts.gather.unconfigure',
+                                      style: { color: $root.shared.user.roles().contains('manage') ? 'red' : 'lightgrey' },
+                                      visible: isConfigured() === true"
+                           class="hand fa fa-fw fa-stack-1px6" data-i18n="[html]ovs:icons.ban">
+                        </i>
+                    </span>
                 </td>
             </tr>
         </table>

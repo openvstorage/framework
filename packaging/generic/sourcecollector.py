@@ -150,9 +150,12 @@ class SourceCollector(object):
         print '    Revision: {0}'.format(current_revision)
 
         # Build version
-        version = '{0}.{1}.{2}'.format(settings.get('version', 'major'),
-                                       settings.get('version', 'minor'),
-                                       settings.get('version', 'patch'))
+        filename = '{0}/packaging/settings.cfg'.format(repo_path_code)
+        code_settings = RawConfigParser()
+        code_settings.read(filename)
+        version = '{0}.{1}.{2}'.format(code_settings.get('version', 'major'),
+                                       code_settings.get('version', 'minor'),
+                                       code_settings.get('version', 'patch'))
         print '  Version: {0}'.format(version)
 
         # Load tag information
@@ -293,9 +296,10 @@ class SourceCollector(object):
         """
         if not os.path.exists('{0}/.git'.format(path)):
             SourceCollector.run('git clone {0} {1}'.format(settings.get('packaging', 'repo'), path), path)
-        SourceCollector.run('git pull', path)
-        SourceCollector.run('git fetch -p', path)
+        SourceCollector.run('git pull --all --prune', path)
         SourceCollector.run('git checkout {0}'.format(revision), path)
+        SourceCollector.run('git pull --prune', path)
+        SourceCollector.run('git fetch --tags', path)
 
     @staticmethod
     def run(command, working_directory):

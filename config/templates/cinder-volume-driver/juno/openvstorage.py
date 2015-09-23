@@ -18,6 +18,10 @@ OpenStack Cinder driver - interface to OVS api
 - uses Cinder logging
 """
 
+# Workaround for non-FHS OpenvStorage installation path
+import sys
+sys.path.append('/opt/OpenvStorage')
+
 import socket
 import time
 

@@ -77,10 +77,10 @@ class StorageRouterController(object):
 
         storagerouter = StorageRouter(storagerouter_guid)
         mountpoints = check_output('mount -v', shell=True).strip().splitlines()
-        mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
-                       and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
-                       and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
-                       and p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
+        mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2 and
+                       not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc') and
+                       not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run') and
+                       p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
         arakoon_mountpoint = Configuration.get('ovs.arakoon.location')
         if arakoon_mountpoint in mountpoints:
             mountpoints.remove(arakoon_mountpoint)
@@ -120,6 +120,7 @@ class StorageRouterController(object):
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
                            'storagerouter_ip': (str, Toolbox.regex_ip),
+                           'integratemgmt': (bool, None),
                            'mountpoint_md': (str, Toolbox.regex_mountpoint),
                            'mountpoint_bfs': (str, Toolbox.regex_mountpoint, False),
                            'mountpoint_foc': (str, Toolbox.regex_mountpoint),
@@ -175,7 +176,6 @@ class StorageRouterController(object):
         all_storagerouters = [storagerouter]
         if vpool is not None:
             all_storagerouters += [sd.storagerouter for sd in vpool.storagedrivers]
-        voldrv_service = 'volumedriver_{0}'.format(vpool_name)
 
         # Fetch clients services
         ip_client_map = {}
@@ -204,7 +204,7 @@ class StorageRouterController(object):
                                   'local_connection_path': mountpoint_bfs}
             elif vpool.backend_type.code == 'alba':
                 if connection_host == '':
-                    connection_host = Configuration.get('ovs.grid.ip')
+                    connection_host = StorageRouterList.get_masters()[0].ip
                     connection_port = 443
                     clients = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')
                     oauth_client = None
@@ -360,8 +360,8 @@ class StorageRouterController(object):
         logger.info('mountpoint_foc: {0}'.format(mountpoint_foc))
         logger.info('mountpoint_fragmentcache: {0}'.format(mountpoint_fragmentcache))
         logger.info('mountpoint_fcache: {0}'.format(mountpoint_fcache))
-        logger.info('moutpoint_readcaches: {0}'.format(mountpoint_readcaches))
-        logger.info('moutpoint_writecaches: {0}'.format(mountpoint_writecaches))
+        logger.info('mountpoint_readcaches: {0}'.format(mountpoint_readcaches))
+        logger.info('mountpoint_writecaches: {0}'.format(mountpoint_writecaches))
         logger.info('all_locations: {0}'.format(mountpoint_count_mapping.keys()))
 
         model_ports_in_use = []
@@ -452,6 +452,25 @@ class StorageRouterController(object):
                                                                       queue_password,
                                                                       current_storagerouter.ip)})
 
+        # Updating the model
+        storagedriver.name = vrouter_id.replace('_', ' ')
+        storagedriver.ports = ports
+        storagedriver.vpool = vpool
+        storagedriver.cluster_ip = grid_ip
+        storagedriver.storage_ip = volumedriver_storageip
+        storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
+        storagedriver.description = storagedriver.name
+        storagedriver.storagerouter = storagerouter
+        storagedriver.storagedriver_id = vrouter_id
+        storagedriver.mountpoint_md = mountpoint_md
+        storagedriver.mountpoint_foc = mountpoint_foc
+        storagedriver.mountpoint_bfs = mountpoint_bfs
+        storagedriver.mountpoint_temp = mountpoint_temp
+        storagedriver.mountpoint_readcaches = mountpoint_readcaches
+        storagedriver.mountpoint_writecaches = mountpoint_writecaches
+        storagedriver.mountpoint_fragmentcache = mountpoint_fragmentcache
+        storagedriver.save()
+
         config_dir = '{0}/storagedriver/storagedriver'.format(client.config_read('ovs.core.cfgdir'))
         client.dir_create(config_dir)
         alba_proxy = storagedriver.alba_proxy
@@ -537,26 +556,8 @@ class StorageRouterController(object):
                                                    fd_namespace='fd-{0}-{1}'.format(vpool_name, vpool.guid))
         storagedriver_config.configure_event_publisher(events_amqp_routing_key=queue_volumerouterqueue,
                                                        events_amqp_uris=queue_urls)
+        storagedriver_config.configure_threadpool_component(num_threads=16)
         storagedriver_config.save(client, reload_config=False)
-
-        # Updating the model
-        storagedriver.name = vrouter_id.replace('_', ' ')
-        storagedriver.ports = ports
-        storagedriver.vpool = vpool
-        storagedriver.cluster_ip = grid_ip
-        storagedriver.storage_ip = volumedriver_storageip
-        storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
-        storagedriver.description = storagedriver.name
-        storagedriver.storagerouter = storagerouter
-        storagedriver.storagedriver_id = vrouter_id
-        storagedriver.mountpoint_md = mountpoint_md
-        storagedriver.mountpoint_foc = mountpoint_foc
-        storagedriver.mountpoint_bfs = mountpoint_bfs
-        storagedriver.mountpoint_temp = mountpoint_temp
-        storagedriver.mountpoint_readcaches = mountpoint_readcaches
-        storagedriver.mountpoint_writecaches = mountpoint_writecaches
-        storagedriver.mountpoint_fragmentcache = mountpoint_fragmentcache
-        storagedriver.save()
 
         DiskController.sync_with_reality(storagerouter.guid)
         for mountpoint, usage in {mountpoint_md: {'type': 'metadata',
@@ -599,25 +600,24 @@ class StorageRouterController(object):
                   'OVS_GID': check_output('id -g ovs', shell=True).strip(),
                   'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
 
-        template_dir = '/opt/OpenvStorage/config/templates/upstart'
-        template_configs = {'ovs-failovercache': 'ovs-failovercache_{0}'.format(vpool.name)}
+        logger.info('volumedriver_mode: {0}'.format(volumedriver_mode))
+        logger.info('backend_type: {0}'.format(vpool.backend_type.code))
+        foc_service = 'ovs-failovercache_{0}'.format(vpool.name)
+        ServiceManager.add_service(name='ovs-failovercache', params=params, client=root_client, target_name=foc_service)
+        ServiceManager.start_service(foc_service, client=root_client)
+        if vpool.backend_type.code == 'alba':
+            alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
+            ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name=alba_proxy_service)
+            ServiceManager.start_service(alba_proxy_service, client=root_client)
+            dependencies = [alba_proxy_service]
+        else:
+            dependencies = None
         if volumedriver_mode == 'ganesha':
-            template_configs['ovs-ganesha'] = 'ovs-volumedriver_{0}'.format(vpool.name)
-        else:  # classic
-            template_configs['ovs-volumedriver'] = 'ovs-volumedriver_{0}'.format(vpool.name)
-        if vpool.backend_type.code == 'alba':
-            template_configs['ovs-albaproxy'] = 'ovs-albaproxy_{0}'.format(vpool.name)
-        for template_file, vpool_file in template_configs.iteritems():
-            ServiceManager.prepare_template(template_file, vpool_file, client=client)
-
-        ServiceManager.add_service(name='volumedriver_{0}'.format(vpool_name), params=params, client=root_client)
-        ServiceManager.add_service(name='failovercache_{0}'.format(vpool_name), params=params, client=root_client)
-        if vpool.backend_type.code == 'alba':
-            ServiceManager.add_service(name='albaproxy_{0}'.format(vpool_name), params=params, client=root_client)
-
-        # Remove copied template config files (obsolete after add service)
-        for vpool_file in template_configs.itervalues():
-            client.file_delete('{0}/{1}.conf'.format(template_dir, vpool_file))
+            template_name = 'ovs-ganesha'
+        else:
+            template_name = 'ovs-volumedriver'
+        voldrv_service = 'ovs-volumedriver_{0}'.format(vpool.name)
+        ServiceManager.add_service(name=template_name, params=params, client=root_client, target_name=voldrv_service, additional_dependencies=dependencies)
 
         if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'classic':
             root_client.run("grep -q '/tmp localhost(ro,no_subtree_check)' /etc/exports || echo '/tmp localhost(ro,no_subtree_check)' >> /etc/exports")
@@ -669,7 +669,7 @@ class StorageRouterController(object):
                 storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
                 storagedriver_config.save(node_client)
 
-        # Everything's reconfigured, refresh new clusterconfiguration
+        # Everything's reconfigured, refresh new cluster configuration
         client = StorageDriverClient.load(vpool)
         for current_storagedriver in vpool.storagedrivers:
             client.update_cluster_node_configs(str(current_storagedriver.storagedriver_id))
@@ -684,13 +684,8 @@ class StorageRouterController(object):
 
         mgmt_center = Factory.get_mgmtcenter(storagerouter.pmachine)
         if mgmt_center:
-            # Store specific metadata in mgmtcenter object
-            metadata = mgmt_center.get_metadata(storagerouter.pmachine.mgmtcenter.metadata, parameters)
-            storagerouter.pmachine.mgmtcenter.metadata.update(metadata)
-            storagerouter.pmachine.mgmtcenter.save()
-            mgmt_center.set_metadata(metadata)
-            # Configure vpool on management center
-            mgmt_center.configure_vpool(vpool_name, storagedriver.mountpoint)
+            if parameters['integratemgmt'] is True:
+                mgmt_center.configure_vpool_for_host(vpool.guid, storagerouter.pmachine.ip)
         else:
             logger.info('Storagerouter {0} does not have management center'.format(storagerouter.name))
 
@@ -744,7 +739,7 @@ class StorageRouterController(object):
         removal_mdsservices = [mds_service for mds_service in vpool.mds_services
                                if mds_service.service.storagerouter_guid == storagerouter.guid]
 
-        # Unconfigure or reconfigure the MDSses
+        # Unconfigure or reconfigure the MDSes
         vdisks = []
         for mds in removal_mdsservices:
             for junction in mds.vdisks:
@@ -753,6 +748,7 @@ class StorageRouterController(object):
             if vdisk.storagedriver_id:
                 MDSServiceController.ensure_safety(vdisk, [storagerouter])
 
+        client = SSHClient(ip, username='root')
         configuration_dir = client.config_read('ovs.core.cfgdir')
         # Possible modes: ['classic', 'ganesha']
         if storagerouter.pmachine.hvtype == 'VMWARE':
@@ -770,10 +766,12 @@ class StorageRouterController(object):
                                                           voldrv_arakoon_client_config[arakoon_node][1]))
         vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), voldrv_arakoon_cluster_id, arakoon_node_configs)
 
-        client = SSHClient(ip, username='root')
         if ServiceManager.has_service(voldrv_service, client=client):
             ServiceManager.disable_service(voldrv_service, client=client)
             ServiceManager.stop_service(voldrv_service, client=client)
+        if ServiceManager.has_service(foc_service, client=client):
+            ServiceManager.disable_service(foc_service, client=client)
+            ServiceManager.stop_service(foc_service, client=client)
 
         if not storagedrivers_left:
             try:
@@ -806,10 +804,9 @@ class StorageRouterController(object):
 
         # Unconfigure vpool on management
         logger.debug('Unconfigure vPool from MgmtCenter')
-        with Remote(ip, [System, Factory]) as remote:
-            mgmtcenter = remote.Factory.get_mgmtcenter(remote.System.get_my_storagerouter().pmachine)
-            if mgmtcenter:
-                mgmtcenter.unconfigure_vpool(vpool.name, storagedriver.mountpoint, not storagedrivers_left)
+        mgmtcenter = Factory.get_mgmtcenter(storagerouter.pmachine)
+        if mgmtcenter:
+            mgmtcenter.unconfigure_vpool_for_host(vpool.guid, not storagedrivers_left, storagerouter.pmachine.ip)
 
         # KVM pool
         if pmachine.hvtype == 'KVM':
@@ -906,10 +903,10 @@ class StorageRouterController(object):
         dirs2remove.append(storagedriver.mountpoint)
 
         mountpoints = client.run('mount -v').strip().splitlines()
-        mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
-                       and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
-                       and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
-                       and p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
+        mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2 and
+                       not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc') and
+                       not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run') and
+                       p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
 
         for directory in set(dirs2remove):
             if directory and directory not in mountpoints:
@@ -919,9 +916,9 @@ class StorageRouterController(object):
         for disk in storagerouter.disks:
             for partition in disk.partitions:
                 partition.usage = [usage for usage in partition.usage
-                                   if 'relation' not in usage
-                                   or usage['relation'][0] != 'storagedriver'
-                                   or usage['relation'][1] != storagedriver.guid]
+                                   if 'relation' not in usage or
+                                   usage['relation'][0] != 'storagedriver' or
+                                   usage['relation'][1] != storagedriver.guid]
                 partition.save()
 
         # First model cleanup
@@ -1151,7 +1148,7 @@ class StorageRouterController(object):
                     package_map[key] = []
                 package_map[key] += value
 
-        # Update apt (only our ovsaptrepo.list)
+        # Update apt (only our ovs apt repo)
         PackageManager.update(client=root_client)
 
         # Compare installed and candidate versions

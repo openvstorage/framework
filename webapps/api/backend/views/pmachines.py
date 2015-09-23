@@ -16,14 +16,17 @@
 PMachine module
 """
 
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
-from ovs.dal.lists.pmachinelist import PMachineList
-from ovs.dal.hybrids.pmachine import PMachine
+from backend.decorators import required_roles, load, return_object, return_list, log, return_task
 from backend.serializers.serializers import FullSerializer
-from rest_framework.response import Response
+from ovs.dal.hybrids.pmachine import PMachine
+from ovs.dal.lists.pmachinelist import PMachineList
+from ovs.lib.mgmtcenter import MgmtCenterController
 from rest_framework import status
-from backend.decorators import required_roles, load, return_object, return_list, log
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.decorators import link
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 
 class PMachineViewSet(viewsets.ViewSet):
@@ -68,3 +71,81 @@ class PMachineViewSet(viewsets.ViewSet):
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(PMachine)
+    def configure_host(self, pmachine, mgmtcenter_guid, update_link=True):
+        """
+        Configure the physical host
+        """
+        return MgmtCenterController.configure_host.s(pmachine.guid, mgmtcenter_guid, update_link).apply_async(
+            routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
+        )
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(PMachine)
+    def unconfigure_host(self, pmachine, mgmtcenter_guid, update_link=True):
+        """
+        Unconfigure the physical host
+        """
+        return MgmtCenterController.unconfigure_host.s(pmachine.guid, mgmtcenter_guid, update_link).apply_async(
+            routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
+        )
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(PMachine)
+    def is_host_configured(self, pmachine):
+        """
+        Checks whether the hypervisor is configured for use with the management center, e.g. OpenStack or vCenter
+        """
+        return MgmtCenterController.is_host_configured.s(pmachine.guid).apply_async(
+            routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
+        )
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(PMachine)
+    def configure_vpool_for_host(self, pmachine, vpool_guid):
+        """
+        Configure the vPool on the physical host for use with the management center, e.g. OpenStack or vCenter
+        """
+        return MgmtCenterController.configure_vpool_for_host.s(pmachine.guid, vpool_guid).apply_async(
+            routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
+        )
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(PMachine)
+    def unconfigure_vpool_for_host(self, pmachine, vpool_guid):
+        """
+        Unconfigure the vPool from the physical host
+        """
+        return MgmtCenterController.unconfigure_vpool_for_host.s(pmachine.guid, vpool_guid).apply_async(
+            routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
+        )
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(PMachine)
+    def is_host_configured_for_vpool(self, pmachine, vpool_guid):
+        """
+        Checks whether the vPool is configured on the hypervisor for use with the management center, e.g. OpenStack or vCenter
+        """
+        return MgmtCenterController.is_host_configured_for_vpool.s(pmachine.guid, vpool_guid).apply_async(
+            routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
+        )

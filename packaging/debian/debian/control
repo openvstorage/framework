@@ -3,23 +3,27 @@ Maintainer: Kenneth Henderick <kenneth.henderick@openvstorage.com>
 Standards-Version: 3.9.4.0
 Section: python
 Priority: optional
-Build-Depends: python (>= 2.7.2)
+Build-Depends: python-all (>= 2.7.2), debhelper (>= 9)
 
 Package: openvstorage-core
 Architecture: amd64
 Pre-Depends: python (>= 2.7.2), python-pip (>= 1.4.1-2)
-Depends: rabbitmq-server (<< 3.3), python-memcache (>= 1.47-2), memcached (>= 1.4.7),
+Depends: rabbitmq-server (>= 3.2.4), python-memcache (>= 1.47-2), memcached (>= 1.4.7),
  volumedriver-server (>= 3.6.0), arakoon (>= 1.8), alba (>=0.5), lsscsi (>= 0.27-2), libvirt0 (>= 1.1.1),
- python-libvirt (>= 1.1.1), virtinst (>= 0.600.4), python-dev (>= 2.7.5), python-pyinotify,
- libev4 (>= 1:4.11-1), logstash (>= 1.4.0-1-c82dc09), autossh, avahi-utils (>= 0.6.31),
- python-boto, nfs-kernel-server, ipython, gcc, openvpn, devscripts
+ python-libvirt (>= 1.1.1), python-dev (>= 2.7.5), python-pyinotify, sudo,
+ libev4 (>= 1:4.11-1), python-boto, nfs-kernel-server, python-suds-jurko, python-datadiff,
+ ipython, gcc, devscripts, openssh-server, python-paramiko, python-rpyc, python-librabbitmq (>= 1.5.2),
+ python-pysnmp4, python-kombu (>= 3.0.7), python-celery (>= 3.1.6), python-pika,
+ python-six, python-protobuf, python-pyudev, sshpass
+Recommends: avahi-utils (>= 0.6.31), openvpn, ntp
+Suggests: logstash (>= 1.4.0-1-c82dc09), virtinst (>= 0.600.4)
 Description: openvStorage core
  Core components for the Open vStorage product
 
 Package: openvstorage-webapps
 Architecture: amd64
 Pre-Depends: openvstorage-core (= ${binary:Version})
-Depends: python-django (>= 1.5.1-2), nginx (>= 1.2.6),
+Depends: python-django (>= 1.5.1-2), nginx (>= 1.2.6), python-djangorestframework (>= 2.3.9),
  gunicorn (>= 0.15.0-1), python-gevent (>= 0.13.0-1build2), python-markdown (>= 2.3.1-1)
 Description: openvStorage Web Applications
  Web components for the Open vStorage product

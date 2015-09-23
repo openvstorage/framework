@@ -17,6 +17,9 @@ Module for the vcenter management center client
 """
 
 from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('extensions', name='mgmtcenter')
 
 
 class VCenter(object):
@@ -29,9 +32,9 @@ class VCenter(object):
         Initializes the object with credentials and connection information
         """
         self.sdk = Sdk(ip, username, password)
-        self.STATE_MAPPING = {'poweredOn' : 'RUNNING',
+        self.STATE_MAPPING = {'poweredOn': 'RUNNING',
                               'poweredOff': 'HALTED',
-                              'suspended' : 'PAUSED'}
+                              'suspended': 'PAUSED'}
 
     def get_host_status_by_ip(self, host_ip):
         """
@@ -62,7 +65,7 @@ class VCenter(object):
          extra check to make sure sdk points to vCenter
         """
         self.sdk.test_connection()
-        return self.sdk._is_vcenter
+        return self.sdk.is_vcenter
 
     def get_hosts(self):
         """
@@ -70,23 +73,10 @@ class VCenter(object):
         """
         return self.sdk.get_hosts()
 
-    def get_metadata(self, metadata, parameters):
-        """
-        Get specific config values:
-        - integratemgmt: True/False
-        """
-        return {}
-
-    def set_metadata(self, metadata):
-        """
-        Update local metadata
-        """
-        self.metadata = metadata
-
-    def configure_vpool(self, vpool_name, mountpoint):
+    def configure_vpool_for_host(self, vpool_guid, ip):
         pass
 
-    def unconfigure_vpool(self, vpool_name, mountpoint, remove_volume_type):
+    def unconfigure_vpool_for_host(self, vpool_guid, remove_volume_type, ip):
         pass
 
     def get_guests(self):
@@ -150,3 +140,20 @@ class VCenter(object):
         'name': 'instance1'}
         """
         return self.sdk.make_agnostic_config(self.sdk.get_nfs_datastore_object(ip, mountpoint, devicename)[0])
+
+    def is_host_configured_for_vpool(self, vpool_guid, ip):
+        _ = self
+        _ = ip
+        _ = vpool_guid
+        return False
+
+    def is_host_configured(self, ip):
+        _ = self
+        _ = ip
+        return False
+
+    def configure_host(self, ip):
+        pass
+
+    def unconfigure_host(self, ip):
+        pass

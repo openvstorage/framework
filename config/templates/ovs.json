@@ -17,7 +17,9 @@
         },
         "audittrails": {
             "keep": 30
-        }
+        },
+        "setupcompleted": false,
+        "nodetype": "UNCONFIGURED"
     },
     "webapps": {
         "main": {
@@ -72,5 +74,8 @@
     "plugins": {
         "generic": [],
         "backends": []
+    },
+    "path": {
+        "celery": []
     }
 }

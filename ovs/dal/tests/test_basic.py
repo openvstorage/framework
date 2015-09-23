@@ -1082,35 +1082,6 @@ class Basic(TestCase):
         # Restore relation
         [_ for _ in disk._relations if _.name == 'machine'][0].mandatory = False
 
-    def test_saveorder(self):
-        """
-        Validates whether the order of saving related objects doesn't matter
-        """
-        machine1 = TestMachine()
-        machine1.name = 'machine'
-        disk1_1 = TestDisk()
-        disk1_1.name = 'disk1'
-        disk1_1.machine = machine1
-        disk1_1.save()
-        disk1_2 = TestDisk()
-        disk1_2.name = 'disk2'
-        disk1_2.machine = machine1
-        disk1_2.save()
-        machine1.save()
-        self.assertEqual(len(machine1.disks), 2, 'There should be two disks. {0}'.format(len(machine1.disks)))
-        machine2 = TestMachine()
-        machine2.name = 'machine'
-        machine2.save()
-        disk2_1 = TestDisk()
-        disk2_1.name = 'disk1'
-        disk2_1.machine = machine2
-        disk2_1.save()
-        disk2_2 = TestDisk()
-        disk2_2.name = 'disk2'
-        disk2_2.machine = machine2
-        disk2_2.save()
-        self.assertEqual(len(machine2.disks), 2, 'There should be two disks. {0}'.format(len(machine2.disks)))
-
     def test_versioning(self):
         """
         Validates whether the versioning system works
@@ -1303,6 +1274,20 @@ class Basic(TestCase):
         self.assertIsNone(VolatileFactory.store.get(key), 'The reverse index should not be created (save on existing object)')
         amount = len(machine.disks)
         self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
+
+    def test_save_nonexisting_relation(self):
+        """
+        Validates the behavior when saving ab object having nonexisting relations
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        disk1 = TestDisk()
+        disk1.name = 'disk'
+        disk1.machine = machine
+        with self.assertRaises(ObjectNotFoundException):
+            disk1.save()
+        machine.save()
+        disk1.save()
 
 if __name__ == '__main__':
     import unittest
