@@ -519,7 +519,7 @@ class VDiskController(object):
                            'dedupe_mode': (str, StorageDriverClient.VDISK_DEDUPE_MAP.keys()),
                            'dtl_enabled': (bool, None),
                            # 'dtl_location': (str, None),
-                           'write_buffer': (int, {'max': 1024}),
+                           'write_buffer': (int, {'min': 128, 'max': 10240}),
                            'cache_strategy': (str, StorageDriverClient.VDISK_CACHE_MAP.keys())}
 
         Toolbox.verify_required_params(required_params, new_config_params)
