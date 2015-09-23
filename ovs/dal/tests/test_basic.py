@@ -642,13 +642,13 @@ class Basic(TestCase):
         """
         disk = TestDisk()
         disk.name = 'disk'
-        keys = DataList.get_pks(disk._namespace, disk._classname)
+        keys = list(DataList.get_pks(disk._namespace, disk._classname))
         self.assertEqual(len(keys), 0, 'There should be no primary keys ({0})'.format(len(keys)))
         disk.save()
-        keys = DataList.get_pks(disk._namespace, disk._classname)
+        keys = list(DataList.get_pks(disk._namespace, disk._classname))
         self.assertEqual(len(keys), 1, 'There should be one primary key ({0})'.format(len(keys)))
         disk.delete()
-        keys = DataList.get_pks(disk._namespace, disk._classname)
+        keys = list(DataList.get_pks(disk._namespace, disk._classname))
         self.assertEqual(len(keys), 0, 'There should be no primary keys ({0})'.format(len(keys)))
 
     def test_reduceddatalist(self):
@@ -1288,6 +1288,31 @@ class Basic(TestCase):
             disk1.save()
         machine.save()
         disk1.save()
+
+    def test_invalidate_dynamics(self):
+        """
+        Validates whether the invalidate_dynamics call actually works.
+        """
+        disk = TestDisk()
+        disk.__dict__['dynamic_value'] = 0
+        disk.dynamic_value = 0
+        disk.name = 'test'
+        disk.save()
+        value = disk.updatable
+        self.assertEqual(value, 0, 'Dynamic should be 0')
+        disk.dynamic_value = 5
+        value = disk.updatable
+        self.assertEqual(value, 0, 'Dynamic should still be 0 ({0})'.format(value))
+        time.sleep(5)
+        value = disk.updatable
+        self.assertEqual(value, 5, 'Dynamic should be 5 now ({0})'.format(value))
+        disk.dynamic_value = 10
+        value = disk.updatable
+        self.assertEqual(value, 5, 'Dynamic should still be 5 ({0})'.format(value))
+        disk.invalidate_dynamics(['updatable'])
+        value = disk.updatable
+        self.assertEqual(value, 10, 'Dynamic should be 10 now ({0})'.format(value))
+
 
 if __name__ == '__main__':
     import unittest

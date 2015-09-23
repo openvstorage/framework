@@ -60,16 +60,12 @@ class DummyPersistentStore(object):
         else:
             raise KeyNotFoundException(key)
 
-    def prefix(self, key, max_elements=10000):
+    def prefix(self, key):
         """
         Lists all keys starting with the given prefix
         """
         data = self._read()
-        entries = [k for k in data.keys() if k.startswith(key)]
-        if max_elements >= 0:
-            return entries[:max_elements]
-        else:
-            return entries
+        return [k for k in data.keys() if k.startswith(key)]
 
     def set(self, key, value):
         """

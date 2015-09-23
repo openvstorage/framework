@@ -241,3 +241,13 @@ class VMachineViewSet(viewsets.ViewSet):
             else:
                 pmachine_guids = list(this_pmachine_guids & set(pmachine_guids))
         return pmachine_guids if hints['full'] is False else [pmachines[guid] for guid in pmachine_guids]
+
+    @action()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(VMachine)
+    def set_config_params(self, vmachine, config_params):
+        """
+        Sets configuration parameters to a given vmachine/vdisk.
+        """
+        return VMachineController.set_config_params.delay(vmachine_guid=vmachine.guid, config_params=config_params)

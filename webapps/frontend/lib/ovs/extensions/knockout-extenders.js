@@ -21,6 +21,11 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
             write: function(newValue) {
                 var parsedValue = parseInt(newValue, 10);
                 if (isNaN(parsedValue)) {
+                    if (settings.hasOwnProperty('allowUndefined') && settings.allowUndefined === true) {
+                        target(undefined);
+                        target.notifySubscribers(undefined);
+                        return;
+                    }
                     parsedValue = 0;
                 }
                 if (settings.hasOwnProperty('min')) {

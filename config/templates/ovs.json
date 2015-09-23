@@ -30,10 +30,6 @@
         },
         "html_endpoint": "/",
         "dir": "webapps",
-        "admin": {
-            "name": "Open vStorage Engineering Dept.",
-            "email": "engineering@openvstorage.com"
-        },
         "oauth2": {
             "mode": "local"
         }

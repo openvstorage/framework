@@ -68,6 +68,9 @@ class Toolbox(object):
             expected_value = key_info[1]
             optional = len(key_info) == 3 and key_info[2] is False
 
+            if optional is True and (required_key not in actual_params or actual_params[required_key] in ('', None)):
+                continue
+
             if required_key not in actual_params:
                 error_messages.append('Missing required param "{0}"'.format(required_key))
                 continue
@@ -77,7 +80,7 @@ class Toolbox(object):
                 error_messages.append('Required param "{0}" is of type "{1}" but we expected type "{2}"'.format(required_key, type(actual_value), expected_type))
                 continue
 
-            if expected_value is None or (optional is True and actual_value in ('', None)):
+            if expected_value is None:
                 continue
 
             if expected_type == list:
@@ -85,6 +88,8 @@ class Toolbox(object):
                     for item in actual_value:
                         if not re.match(expected_value, item):
                             error_messages.append('Required param "{0}" has an item "{1}" which does not match regex "{2}"'.format(required_key, item, expected_value.pattern))
+            elif expected_type == dict:
+                Toolbox.verify_required_params(expected_value, actual_params[required_key])
             else:
                 if HelperToolbox.check_type(expected_value, list)[0] is True and actual_value not in expected_value:
                     error_messages.append('Required param "{0}" with value "{1}" should be 1 of the following: {2}'.format(required_key, actual_value, expected_value))

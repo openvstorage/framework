@@ -19,7 +19,7 @@ limitations under the License.
         <p data-i18n="ovs:wizards.addvpool.gathermountpoints.bfsinfo"
            data-bind="visible: data.backend() === 'local' || data.backend() === 'distributed'">
         </p>
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('bfs', canContinue().fields) !== -1 },
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('bfs') },
                                            visible: data.backend() === 'local' || data.backend() === 'distributed'">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.bfs"></label>
             <div class="col-lg-7">
@@ -29,7 +29,7 @@ limitations under the License.
             </div>
         </div>
         <p data-i18n="ovs:wizards.addvpool.gathermountpoints.mtptinfo"></p>
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('temp', canContinue().fields) !== -1 }">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('temp') }">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.tempfs"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptTemp,
@@ -37,7 +37,7 @@ limitations under the License.
                 </span>
             </div>
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('md', canContinue().fields) !== -1 }">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('md') }">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.md"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: { items: data.writecaches, target: data.mtptMD,
@@ -45,7 +45,7 @@ limitations under the License.
                 </span>
             </div>
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('readcache', canContinue().fields) !== -1 }">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('readcache') }">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.readcaches"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: { items: data.allReadMountpoints, target: data.readCacheDistributor,
@@ -68,7 +68,7 @@ limitations under the License.
                 </div>
             </div>
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('writecache', canContinue().fields) !== -1 }">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('writecache') }">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.writecaches"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: { items: data.allWriteMountpoints, target: data.writeCacheDistributor,
@@ -91,7 +91,7 @@ limitations under the License.
                 </div>
             </div>
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('foc', canContinue().fields) !== -1 }">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('foc') }">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.foc"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: { items: data.writecaches, target: data.mtptFOC,

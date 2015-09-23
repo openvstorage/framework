@@ -15,11 +15,10 @@
 """
 Delete snapshots test module
 """
-import logging
 import sys
 import unittest
 from time import mktime
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest import TestCase
 from ovs.lib.tests.mockups import StorageDriverModule
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -99,14 +98,24 @@ class DeleteSnapshots(TestCase):
         """
         # Setup
         # There are 2 machines; one with two disks, one with one disk and an additional disk
+        backend_type = BackendType()
+        backend_type.name = 'BackendType'
+        backend_type.code = 'BT'
+        backend_type.save()
         vpool = VPool()
         vpool.name = 'vpool'
-        vpool.backend_type = BackendType()
+        vpool.backend_type = backend_type
         vpool.save()
+        pmachine = PMachine()
+        pmachine.name = 'PMachine'
+        pmachine.username = 'root'
+        pmachine.ip = '127.0.0.1'
+        pmachine.hvtype = 'VMWARE'
+        pmachine.save()
         vmachine_1 = VMachine()
         vmachine_1.name = 'vmachine_1'
         vmachine_1.devicename = 'dummy'
-        vmachine_1.pmachine = PMachine()
+        vmachine_1.pmachine = pmachine
         vmachine_1.save()
         vdisk_1_1 = VDisk()
         vdisk_1_1.name = 'vdisk_1_1'
@@ -129,7 +138,7 @@ class DeleteSnapshots(TestCase):
         vmachine_2 = VMachine()
         vmachine_2.name = 'vmachine_2'
         vmachine_2.devicename = 'dummy'
-        vmachine_2.pmachine = PMachine()
+        vmachine_2.pmachine = pmachine
         vmachine_2.save()
         vdisk_2_1 = VDisk()
         vdisk_2_1.name = 'vdisk_2_1'
@@ -155,16 +164,16 @@ class DeleteSnapshots(TestCase):
         # Run the testing scenario
         debug = True
         amount_of_days = 50
-        now = int(mktime(datetime.now().date().timetuple()))  # Last night
+        base = datetime.now().date()
+        day = timedelta(1)
         minute = 60
         hour = minute * 60
-        day = hour * 24
+
         for d in xrange(0, amount_of_days):
-            base_timestamp = now + (day * d)
+            base_timestamp = DeleteSnapshots._make_timestamp(base, day * d)
             print ''
             print 'Day cycle: {}: {}'.format(
-                d,
-                datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')
+                d, datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')
             )
 
             # At the start of the day, delete snapshot policy runs at 00:30
@@ -173,8 +182,8 @@ class DeleteSnapshots(TestCase):
 
             # Validate snapshots
             print '- Validating snapshots'
-            for vdisk in [vdisk_3]:  # [vdisk_1_1, vdisk_1_2, vdisk_2_1, vdisk_3]:
-                self._validate(vdisk, d, now, amount_of_days, debug)
+            for vdisk in [vdisk_1_1, vdisk_1_2, vdisk_2_1, vdisk_3]:
+                self._validate(vdisk, d, base, amount_of_days, debug)
 
             # During the day, snapshots are taken
             # - Create non consistent snapshot every hour, between 2:00 and 22:00
@@ -184,30 +193,30 @@ class DeleteSnapshots(TestCase):
                 timestamp = base_timestamp + (hour * h)
                 for vm in [vmachine_1, vmachine_2]:
                     VMachineController.snapshot(machineguid=vm.guid,
-                                                label='ss_i_{}:00'.format(str(h)),
+                                                label='ss_i_{0}:00'.format(str(h)),
                                                 is_consistent=False,
                                                 timestamp=timestamp)
                     if h in [6, 12, 18]:
                         ts = (timestamp + (minute * 30))
                         VMachineController.snapshot(machineguid=vm.guid,
-                                                    label='ss_c_{}:30'.format(str(h)),
+                                                    label='ss_c_{0}:30'.format(str(h)),
                                                     is_consistent=True,
                                                     timestamp=ts)
 
                 VDiskController.create_snapshot(diskguid=vdisk_3.guid,
-                                                metadata={'label': 'ss_i_{}:00'.format(str(h)),
+                                                metadata={'label': 'ss_i_{0}:00'.format(str(h)),
                                                           'is_consistent': False,
-                                                          'timestamp': timestamp,
+                                                          'timestamp': str(timestamp),
                                                           'machineguid': None})
                 if h in [6, 12, 18]:
                     ts = (timestamp + (minute * 30))
                     VDiskController.create_snapshot(diskguid=vdisk_3.guid,
-                                                    metadata={'label': 'ss_c_{}:30'.format(str(h)),
+                                                    metadata={'label': 'ss_c_{0}:30'.format(str(h)),
                                                               'is_consistent': True,
-                                                              'timestamp': ts,
+                                                              'timestamp': str(ts),
                                                               'machineguid': None})
 
-    def _validate(self, vdisk, current_day, initial_timestamp, amount_of_days, debug):
+    def _validate(self, vdisk, current_day, base_date, amount_of_days, debug):
         """
         This validates assumes the same policy as currently implemented in the policy code
         itself. In case the policy strategy ever changes, this unittest should be adapted as well
@@ -222,26 +231,28 @@ class DeleteSnapshots(TestCase):
 
         minute = 60
         hour = minute * 60
-        day = hour * 24
+        day = timedelta(1)
+
+        print '  - {0}'.format(vdisk.name)
 
         # Visualisation
         if debug:
             snapshots = {}
             for snapshot in vdisk.snapshots:
-                snapshots[snapshot['timestamp']] = snapshot
+                snapshots[int(snapshot['timestamp'])] = snapshot
             for d in xrange(0, amount_of_days):
-                timestamp = initial_timestamp + (d * day)
-                visual = '  - {} '.format(datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d'))
-                for t in xrange(timestamp, timestamp + day, minute * 30):
+                timestamp = DeleteSnapshots._make_timestamp(base_date, d * day)
+                visual = '    - {0} '.format(datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d'))
+                for t in xrange(timestamp, timestamp + hour * 24, minute * 30):
                     if t in snapshots:
                         visual += 'C' if snapshots[t]['is_consistent'] else 'R'
                     else:
                         visual += '-'
                 print visual
 
-        consistent = [s['timestamp'] for s in vdisk.snapshots if s['is_consistent'] is True]
-        inconsistent = [s['timestamp'] for s in vdisk.snapshots if s['is_consistent'] is False]
-        print '  - {} consistent, {} inconsistent'.format(len(consistent), len(inconsistent))
+        consistent = [int(s['timestamp']) for s in vdisk.snapshots if s['is_consistent'] is True]
+        inconsistent = [int(s['timestamp']) for s in vdisk.snapshots if s['is_consistent'] is False]
+        print '    - {0} consistent, {1} inconsistent'.format(len(consistent), len(inconsistent))
 
         # Check for correct amount of snapshots
         amount_consistent = 0
@@ -259,50 +270,54 @@ class DeleteSnapshots(TestCase):
             pointer += 7
         self.assertEqual(
             len(consistent), amount_consistent,
-            'Wrong amount of consistent snapshots: {} vs expected {}'.format(len(consistent),
-                                                                             amount_consistent)
+            'Wrong amount of consistent snapshots: {0} vs expected {1}'.format(len(consistent),
+                                                                               amount_consistent)
         )
         self.assertEqual(
             len(inconsistent), amount_inconsistent,
-            'Wrong amount of inconsistent snapshots: {} vs expected {}'.format(len(inconsistent),
-                                                                               amount_inconsistent)
+            'Wrong amount of inconsistent snapshots: {0} vs expected {1}'.format(len(inconsistent),
+                                                                                 amount_inconsistent)
         )
 
         # Check of the correctness of the snapshot timestamp
         for d in xrange(0, current_day):
             if d == (current_day - 1):
                 for h in xrange(2, 23):
-                    timestamp = initial_timestamp + (d * day) + (hour * h)
+                    timestamp = DeleteSnapshots._make_timestamp(base_date, d * day) + (hour * h)
                     self.assertIn(
                         timestamp, inconsistent,
-                        'Expected hourly inconsistent snapshot at {}'.format(
-                            datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
+                        'Expected hourly inconsistent snapshot for {0} at {1}'.format(
+                            vdisk.name, datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
                         )
                     )
                     if h in [6, 12, 18]:
                         ts = (timestamp + (minute * 30))
                         self.assertIn(
                             ts, consistent,
-                            'Expected random consistent snapshot at {}'.format(
-                                datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M')
+                            'Expected random consistent snapshot for {0} at {1}'.format(
+                                vdisk.name, datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M')
                             )
                         )
             elif d > (current_day - 7):
-                timestamp = initial_timestamp + (day * d) + (hour * 18) + (minute * 30)
+                timestamp = DeleteSnapshots._make_timestamp(base_date, d * day) + (hour * 18) + (minute * 30)
                 self.assertIn(
                     timestamp, consistent,
-                    'Expected daily consistent snapshot at {}'.format(
-                        datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
+                    'Expected daily consistent snapshot for {0} at {1}'.format(
+                        vdisk.name, datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
                     )
                 )
             elif d % 7 == 0 and d > 28:
-                timestamp = initial_timestamp + (day * d) + (hour * 18) + (minute * 30)
+                timestamp = DeleteSnapshots._make_timestamp(base_date, d * day) + (hour * 18) + (minute * 30)
                 self.assertIn(
                     timestamp, consistent,
-                    'Expected weekly consistent snapshot at {}'.format(
-                        datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
+                    'Expected weekly consistent snapshot for {0} at {1}'.format(
+                        vdisk.name, datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
                     )
                 )
+
+    @staticmethod
+    def _make_timestamp(base, offset):
+        return int(mktime((base + offset).timetuple()))
 
 
 if __name__ == '__main__':

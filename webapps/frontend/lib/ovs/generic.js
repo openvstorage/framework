@@ -25,8 +25,8 @@ define(['jquery', 'jqp/pnotify'], function($) {
         return returnvalue;
     }
     function deg2rad(deg) {
-		return deg * Math.PI / 180;
-	}
+        return deg * Math.PI / 180;
+    }
     function setDecimals(value, decimals) {
         decimals = decimals || 2;
         var parts = [];
@@ -362,6 +362,24 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return false;
     }
+    function merge(originalObject, newObject, targetObject, keys) {
+        // If the target equals the original, the target wasn't updated, so it can updated with the new.
+        $.each(keys, function(i, key) {
+            if (originalObject.hasOwnProperty(key) && targetObject.hasOwnProperty(key)) {
+                if (originalObject[key] === targetObject[key]) {
+                    if (newObject.hasOwnProperty(key)) {
+                        targetObject[key] = newObject[key];
+                    } else {
+                        delete targetObject[key];
+                    }
+                }
+            } else if (!originalObject.hasOwnProperty(key) && !targetObject.hasOwnProperty(key)) {
+                if (newObject.hasOwnProperty(key)) {
+                    targetObject[key] = newObject[key];
+                }
+            }
+        });
+    }
     function getColor(index) {
         var colors = ['#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'];
         return colors[index % colors.length];
@@ -466,44 +484,45 @@ define(['jquery', 'jqp/pnotify'], function($) {
         return stringStartsWith(this, searchString);
     };
     return {
-        getTimestamp: getTimestamp,
-        formatBytes: formatBytes,
-        formatSpeed: formatSpeed,
-        formatRatio: formatRatio,
-        formatShort: formatShort,
-        formatNumber: formatNumber,
-        formatPercentage: formatPercentage,
-        padRight: padRight,
-        padLeft: padLeft,
-        tryGet: tryGet,
-        trySet: trySet,
-        lower: lower,
+        advancedSort: advancedSort,
         alert: alert,
+        alertError: alertError,
         alertInfo: alertInfo,
         alertSuccess: alertSuccess,
-        alertError: alertError,
-        keys: keys,
-        xhrAbort: xhrAbort,
-        xhrCompleted: xhrCompleted,
-        removeElement: removeElement,
-        smooth: smooth,
-        round: round,
-        ceil: ceil,
-        buildString: buildString,
-        setDecimals: setDecimals,
-        crossFiller: crossFiller,
-        syncObservableArray: syncObservableArray,
-        deg2rad: deg2rad,
-        numberSort: numberSort,
-        advancedSort: advancedSort,
-        validate: validate,
-        overlap: overlap,
-        getColor: getColor,
-        getLocalTime: getLocalTime,
         arrayFilterUnique: arrayFilterUnique,
-        getHash: getHash,
-        setCookie: setCookie,
+        buildString: buildString,
+        ceil: ceil,
+        crossFiller: crossFiller,
+        deg2rad: deg2rad,
+        formatBytes: formatBytes,
+        formatNumber: formatNumber,
+        formatPercentage: formatPercentage,
+        formatRatio: formatRatio,
+        formatShort: formatShort,
+        formatSpeed: formatSpeed,
+        getColor: getColor,
         getCookie: getCookie,
-        removeCookie: removeCookie
+        getHash: getHash,
+        getLocalTime: getLocalTime,
+        getTimestamp: getTimestamp,
+        keys: keys,
+        lower: lower,
+        merge: merge,
+        numberSort: numberSort,
+        overlap: overlap,
+        padLeft: padLeft,
+        padRight: padRight,
+        removeCookie: removeCookie,
+        removeElement: removeElement,
+        round: round,
+        setCookie: setCookie,
+        setDecimals: setDecimals,
+        smooth: smooth,
+        syncObservableArray: syncObservableArray,
+        tryGet: tryGet,
+        trySet: trySet,
+        validate: validate,
+        xhrAbort: xhrAbort,
+        xhrCompleted: xhrCompleted
     };
 });

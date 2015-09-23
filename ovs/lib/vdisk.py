@@ -80,7 +80,7 @@ class VDiskController(object):
         _ = storagedriver_id  # For logging purposes
         disk = VDiskList.get_vdisk_by_volume_id(volumename)
         if disk is not None:
-            mutex = VolatileMutex('{}_{}'.format(volumename, disk.devicename))
+            mutex = VolatileMutex('{0}_{1}'.format(volumename, disk.devicename))
             try:
                 mutex.acquire(wait=20)
                 pmachine = None
@@ -102,7 +102,7 @@ class VDiskController(object):
                     if exists is True:
                         logger.info('Disk {0} still exists, ignoring delete'.format(disk.devicename))
                         return
-                logger.info('Delete disk {}'.format(disk.name))
+                logger.info('Delete disk {0}'.format(disk.name))
                 for mds_service in disk.mds_services:
                     mds_service.delete()
                 disk.delete()
@@ -125,7 +125,7 @@ class VDiskController(object):
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         hypervisor = Factory.get(pmachine)
         volumepath = hypervisor.clean_backing_disk_filename(volumepath)
-        mutex = VolatileMutex('{}_{}'.format(volumename, volumepath))
+        mutex = VolatileMutex('{0}_{1}'.format(volumename, volumepath))
         try:
             mutex.acquire(wait=30)
             disk = VDiskList.get_vdisk_by_volume_id(volumename)
@@ -161,9 +161,9 @@ class VDiskController(object):
         volume_new_path = hypervisor.clean_backing_disk_filename(volume_new_path)
         disk = VDiskList.get_vdisk_by_volume_id(volumename)
         if disk:
-            logger.info('Move disk {} from {} to {}'.format(disk.name,
-                                                            volume_old_path,
-                                                            volume_new_path))
+            logger.info('Move disk {0} from {1} to {2}'.format(disk.name,
+                                                               volume_old_path,
+                                                               volume_new_path))
             disk.devicename = volume_new_path
             disk.save()
 
@@ -175,7 +175,7 @@ class VDiskController(object):
         """
         pmachine = PMachine(pmachineguid)
         hypervisor = Factory.get(pmachine)
-        description = '{} {}'.format(machinename, devicename)
+        description = '{0} {1}'.format(machinename, devicename)
         properties_to_clone = ['description', 'size', 'type', 'retentionpolicyguid',
                                'snapshotpolicyguid', 'autobackup']
         vdisk = VDisk(diskguid)
@@ -201,7 +201,7 @@ class VDiskController(object):
             if mds_service is None:
                 raise RuntimeError('Could not find a MDS service')
 
-            logger.info('Clone snapshot {} of disk {} to location {}'.format(snapshotid, vdisk.name, location))
+            logger.info('Clone snapshot {0} of disk {1} to location {2}'.format(snapshotid, vdisk.name, location))
             volume_id = vdisk.storagedriver_client.create_clone(
                 target_path=location,
                 metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
@@ -238,7 +238,7 @@ class VDiskController(object):
         @param metadata: dict of metadata
         """
         disk = VDisk(diskguid)
-        logger.info('Create snapshot for disk {}'.format(disk.name))
+        logger.info('Create snapshot for disk {0}'.format(disk.name))
         if snapshotid is None:
             snapshotid = str(uuid.uuid4())
         metadata = pickle.dumps(metadata)
@@ -264,7 +264,7 @@ class VDiskController(object):
         if a clone was created from it.
         """
         disk = VDisk(diskguid)
-        logger.info('Deleting snapshot {} from disk {}'.format(snapshotid, disk.name))
+        logger.info('Deleting snapshot {0} from disk {1}'.format(snapshotid, disk.name))
         disk.storagedriver_client.delete_snapshot(str(disk.volume_id), str(snapshotid))
         disk.invalidate_dynamics(['snapshots'])
 
@@ -288,7 +288,7 @@ class VDiskController(object):
         disk = VDisk(diskguid)
         snapshots = [snap for snap in disk.snapshots if snap['timestamp'] == timestamp]
         if not snapshots:
-            raise ValueError('No snapshot found for timestamp {}'.format(timestamp))
+            raise ValueError('No snapshot found for timestamp {0}'.format(timestamp))
         snapshotguid = snapshots[0]['guid']
         disk.storagedriver_client.rollback_volume(str(disk.volume_id), snapshotguid)
         disk.invalidate_dynamics(['snapshots'])
@@ -300,7 +300,7 @@ class VDiskController(object):
         """
         Create a disk from a template
 
-        @param devicename: device file name for the disk (eg: mydisk-flat.vmdk)
+        @param devicename: device file name for the disk (eg: my_disk-flat.vmdk)
         @param machineguid: guid of the machine to assign disk to
         @return diskguid: guid of new disk
         """
@@ -309,7 +309,7 @@ class VDiskController(object):
         hypervisor = Factory.get(pmachine)
         disk_path = hypervisor.get_disk_path(machinename, devicename)
 
-        description = '{} {}'.format(machinename, devicename)
+        description = '{0} {1}'.format(machinename, devicename)
         properties_to_clone = [
             'description', 'size', 'type', 'retentionpolicyid',
             'snapshotpolicyid', 'vmachine', 'vpool']
@@ -332,7 +332,7 @@ class VDiskController(object):
         new_vdisk.vpool = vdisk.vpool
         new_vdisk.devicename = hypervisor.clean_backing_disk_filename(disk_path)
         new_vdisk.parent_vdisk = vdisk
-        new_vdisk.name = '{}-clone'.format(vdisk.name)
+        new_vdisk.name = '{0}-clone'.format(vdisk.name)
         new_vdisk.description = description
         new_vdisk.vmachine = VMachine(machineguid) if machineguid else vdisk.vmachine
         new_vdisk.save()
@@ -341,7 +341,7 @@ class VDiskController(object):
         if mds_service is None:
             raise RuntimeError('Could not find a MDS service')
 
-        logger.info('Create disk from template {} to new disk {} to location {}'.format(
+        logger.info('Create disk from template {0} to new disk {1} to location {2}'.format(
             vdisk.name, new_vdisk.name, disk_path
         ))
         try:
@@ -454,7 +454,7 @@ class VDiskController(object):
             return
 
         vpool = vdisk.vpool
-        mutex = VolatileMutex('{}_{}'.format(old_name, vpool.guid if vpool is not None else 'none'))
+        mutex = VolatileMutex('{0}_{1}'.format(old_name, vpool.guid if vpool is not None else 'none'))
         try:
             mutex.acquire(wait=5)
             vdisk.name = new_name
@@ -463,11 +463,27 @@ class VDiskController(object):
             mutex.release()
 
     @staticmethod
+    @celery.task(name='ovs.vdisk.set_config_params')
+    def set_config_params(vdisk_guid, config_params):
+        """
+        Sets configuration parameters for a given vdisk.
+        """
+        vdisk = VDisk(vdisk_guid)
+        old_resolved_config = vdisk.resolved_configuration
+        vdisk.configuration = config_params
+        vdisk.save()
+        vdisk.invalidate_dynamics(['resolved_configuration'])
+        new_resolved_config = vdisk.resolved_configuration
+        for key in new_resolved_config:
+            if old_resolved_config.get(key) != new_resolved_config.get(key):
+                logger.info('Updating property {0} on vDisk {1} to {2}'.format(key, vdisk_guid, new_resolved_config.get(key)))
+
+    @staticmethod
     def sync_with_mgmtcenter(disk, pmachine, storagedriver):
         """
         Update disk info using management center (if available)
-         If no management center, try with hypervisor
-         If no info retrieved, use devicename
+        If no management center, try with hypervisor
+        If no info retrieved, use devicename
         @param disk: vDisk hybrid (vdisk to be updated)
         @param pmachine: pmachine hybrid (pmachine running the storagedriver)
         @param storagedriver: storagedriver hybrid (storagedriver serving the vdisk)

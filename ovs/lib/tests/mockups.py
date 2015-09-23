@@ -28,6 +28,7 @@ class Snapshot():
         """
         self.metadata = metadata
         self.stored = 0
+        self.in_backend = True
 
 
 class SRClient():

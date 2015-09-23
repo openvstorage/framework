@@ -38,10 +38,7 @@ STATIC_URL = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
 
 FORCE_SCRIPT_NAME = FRONTEND_ROOT
 
-ADMINS = (
-    (Configuration.get('ovs.webapps.admin.name'), Configuration.get('ovs.webapps.admin.email')),
-)
-
+ADMINS = ()
 MANAGERS = ADMINS
 
 DATABASES = {

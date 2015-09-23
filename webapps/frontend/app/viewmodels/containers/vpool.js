@@ -13,17 +13,21 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'knockout',
+    'jquery', 'knockout', 'ovs/shared',
     'ovs/generic', 'ovs/api',
     'viewmodels/containers/backendtype', 'viewmodels/containers/vdisk', 'viewmodels/containers/vmachine'
-], function($, ko, generic, api, BackendType, VDisk, VMachine) {
+], function($, ko, shared, generic, api, BackendType, VDisk, VMachine) {
     "use strict";
     return function(guid) {
         var self = this;
 
+        // Variables
+        self.shared = shared;
+
         // Handles
         self.loadHandle          = undefined;
         self.diskHandle          = undefined;
+        self.loadConfig          = undefined;
         self.machineHandle       = undefined;
         self.storageRouterHandle = undefined;
 
@@ -32,6 +36,7 @@ define([
         self.loaded             = ko.observable(false);
         self.guid               = ko.observable(guid);
         self.name               = ko.observable();
+        self.configuration      = ko.observable();
         self.size               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.iops               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.storedData         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
@@ -55,6 +60,9 @@ define([
 
         // Computed
         self.cacheRatio = ko.computed(function() {
+            if (self.cacheHits() === undefined || self.cacheMisses() === undefined) {
+                return undefined;
+            }
             var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
             if (total === 0) {
                 total = 1;
@@ -62,6 +70,9 @@ define([
             return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
         });
         self.bandwidth = ko.computed(function() {
+            if (self.readSpeed() === undefined || self.writeSpeed() === undefined) {
+                return undefined;
+            }
             var total = (self.readSpeed.raw() || 0) + (self.writeSpeed.raw() || 0);
             return generic.formatSpeed(total);
         });
@@ -92,7 +103,7 @@ define([
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;
-                self.iops(stats.operations_ps);
+                self.iops(stats['4k_operations_ps']);
                 self.cacheHits(stats.cache_hits_ps);
                 self.cacheMisses(stats.cache_misses_ps);
                 self.readSpeed(stats.data_read_ps);
@@ -169,6 +180,20 @@ define([
                     .always(function() {
                         self.loading(false);
                     });
+            }).promise();
+        };
+        self.loadConfiguration = function() {
+            return $.Deferred(function(deferred) {
+                self.loadConfig = api.get('vpools/' + self.guid() + '/get_configuration')
+                    .then(self.shared.tasks.wait)
+                    .done(function(data) {
+                        if (data.write_buffer !== undefined) {
+                            data.write_buffer = Math.round(data.write_buffer);
+                        }
+                        self.configuration(data);
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
             }).promise();
         };
         self.loadStorageRouters = function() {
