@@ -73,6 +73,11 @@ define([
                                             self.pMachineCache[pMachineGuid] = pm;
                                         }
                                         item.pMachine(self.pMachineCache[pMachineGuid]);
+                                    } else if (pMachineGuid && item.pMachine() !== undefined && item.pMachine().loaded() === false) {
+                                        if (!self.pMachineCache.hasOwnProperty(item.pMachine().guid())) {
+                                            self.pMachineCache[item.pMachine().guid()] = item.pMachine();
+                                        }
+                                        item.pMachine().load();
                                     }
                                 }
                             });
