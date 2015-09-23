@@ -130,11 +130,11 @@ class StorageRouterController(object):
                            'mountpoint_writecaches': (list, Toolbox.regex_mountpoint)}
         required_params_for_new_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
                                          'config_params': (dict, {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
-                                                                  'sco_size': (int, [4, 8, 16, 32, 64, 128]),
+                                                                  'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
                                                                   'dedupe_mode': (str, StorageDriverClient.VPOOL_DEDUPE_MAP.keys()),
                                                                   'dtl_enabled': (bool, None),
                                                                   'dtl_location': (str, None),
-                                                                  'write_buffer': (int, None, False),
+                                                                  'write_buffer': (int, {'min': 128, 'max': 10240}),
                                                                   'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys())}),
                                          'connection_host': (str, Toolbox.regex_ip, False),
                                          'connection_port': (int, None),
@@ -202,6 +202,11 @@ class StorageRouterController(object):
                 Toolbox.verify_required_params(required_params_for_new_local_vpool, parameters)
             else:
                 Toolbox.verify_required_params(required_params_for_new_vpool, parameters)
+                sco_size = parameters['config_params']['sco_size']
+                write_buffer = parameters['config_params']['write_buffer']
+                if sco_size not in StorageDriverClient.TLOG_MULTIPLIER_MAP or (sco_size == 128 and write_buffer < 256) or not (128 <= write_buffer <= 10240):
+                    raise ValueError('Incorrect storagedriver configuration settings specified')
+
             vpool = VPool()
             backend_type = BackendTypeList.get_backend_type_by_code(parameters['type'])
             vpool.backend_type = backend_type
@@ -533,34 +538,16 @@ class StorageRouterController(object):
         else:
             storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
 
-        tlog_multiplier = 20
         if 'config_params' in parameters:
             sco_size = parameters['config_params']['sco_size']
-            if 'write_buffer' in parameters['config_params']:
-                # sco_factor = write buffer (in GiB) / tlog multiplier (default 20) / sco size (in MiB)
-                sco_factor = parameters['config_params']['write_buffer'] * 1024.0 / tlog_multiplier / sco_size
-                while sco_factor > 64:
-                    sco_factor /= 2
-                    tlog_multiplier *= 2
-                while sco_factor <= 1:
-                    sco_factor *= 10
-                    tlog_multiplier /= 10
-                    if tlog_multiplier <= 1:
-                        raise ValueError('Tlog multiplier cannot be smaller than 1')
-            else:
-                # Below table makes sure the write buffer is always between 1 and 5 GiG
-                sco_factor = {4: 12,
-                              8: 12,
-                              16: 12,
-                              32: 6,
-                              64: 3,
-                              128: 2}[sco_size]
-
+            tlog_multiplier = StorageDriverClient.TLOG_MULTIPLIER_MAP[sco_size]
+            sco_factor = float(parameters['config_params']['write_buffer']) / tlog_multiplier / sco_size  # sco_factor = write buffer / tlog multiplier (default 20) / sco size (in MiB)
             dedupe_mode = parameters['config_params']['dedupe_mode']
             cache_strategy = parameters['config_params']['cache_strategy']
         else:
             sco_size = current_storage_driver_config['sco_size']
-            sco_factor = current_storage_driver_config['write_buffer'] * 1024.0 / 20 / sco_size
+            tlog_multiplier = current_storage_driver_config['tlog_multiplier']
+            sco_factor = float(current_storage_driver_config['write_buffer']) / tlog_multiplier / sco_size
             dedupe_mode = current_storage_driver_config['dedupe_mode']
             cache_strategy = current_storage_driver_config['cache_strategy']
 

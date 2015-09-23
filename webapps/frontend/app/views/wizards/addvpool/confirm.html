@@ -55,12 +55,8 @@ limitations under the License.
         <ul>
             <li><b data-i18n="ovs:vpools.cache_strategy"></b>: <span data-bind="translate: data.cacheStrategy() !== undefined ? 'ovs:storagedrivers.configuration.general.cache_strategies.' + data.cacheStrategy() : ''"></span></li>
             <li><b data-i18n="ovs:vpools.dedupe_mode"></b>: <span data-bind="translate: data.dedupeMode() !== undefined ? 'ovs:storagedrivers.configuration.general.dedupe_modes.' + data.dedupeMode() : ''"></span></li>
-            <li><b data-i18n="ovs:vpools.sco_size"></b>: <span data-bind="text: data.scoSize() !== undefined ? data.scoSize() : ''"></span><span data-i18n="ovs:generic.mib"></span></li>
-            <li data-bind="visible: data.writeBuffer() !== undefined">
-                <b data-i18n="ovs:vpools.write_buffer"></b>:
-                <span data-bind="text: data.writeBuffer() !== undefined ? data.writeBuffer() : ''"></span>
-                <span data-i18n="ovs:generic.gib" data-bind="visible: data.writeBuffer() !== undefined"></span>
-            </li>
+            <li><b data-i18n="ovs:vpools.sco_size"></b>: <span data-bind="text: data.scoSize() !== undefined ? data.scoSize() : ''"></span> <span data-i18n="ovs:generic.mib"></span></li>
+            <li><b data-i18n="ovs:vpools.write_buffer"></b>: <span data-bind="text: data.writeBuffer() !== undefined ? data.writeBuffer() : ''"></span> <span data-i18n="ovs:generic.mib"></span></li>
             <li>
                 <b data-bind="translate: 'ovs:vpools.' + (data.dtlEnabled() === true ? 'dtl_mode' : 'dtl')"></b>:
                 <span data-bind="translate: (data.dtlEnabled() === true ? 'ovs:storagedrivers.configuration.general.dtl_modes.' + data.dtlMode() : 'ovs:vpools.dtl_disabled')"></span>

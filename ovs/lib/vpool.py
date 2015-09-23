@@ -108,7 +108,7 @@ class VPoolController(object):
         sco_size = sco_multiplier * 4 / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
         dtl_enabled = storagedriver_config.configuration.get('', {}).get('', False)
         dtl_location = storagedriver_config.configuration.get('', {}).get('', None)
-        write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor / 1024.0  # SCO size is in MiB, but write buffer must be GiB
+        write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor
 
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
@@ -116,4 +116,5 @@ class VPoolController(object):
                 'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
                 'write_buffer': write_buffer,
                 'dtl_location': dtl_location,
-                'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy]}
+                'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],
+                'tlog_multiplier': tlog_multiplier}

@@ -18,6 +18,7 @@ Module containing certain helper classes providing various logic
 import os
 import re
 import imp
+import sys
 import random
 import string
 import inspect
@@ -90,6 +91,14 @@ class Toolbox(object):
                             error_messages.append('Required param "{0}" has an item "{1}" which does not match regex "{2}"'.format(required_key, item, expected_value.pattern))
             elif expected_type == dict:
                 Toolbox.verify_required_params(expected_value, actual_params[required_key])
+            elif expected_type == int:
+                if isinstance(expected_value, list) and actual_value not in expected_value:
+                    error_messages.append('Required param "{0}" with value "{1}" should be 1 of the following: {2}'.format(required_key, actual_value, expected_value))
+                if isinstance(expected_value, dict):
+                    minimum = expected_value.get('min', sys.maxint * -1)
+                    maximum = expected_value.get('max', sys.maxint)
+                    if not minimum <= actual_value <= maximum:
+                        error_messages.append('Required param "{0}" with value "{1}" should be in range: {2} - {3}'.format(required_key, actual_value, minimum, maximum))
             else:
                 if HelperToolbox.check_type(expected_value, list)[0] is True and actual_value not in expected_value:
                     error_messages.append('Required param "{0}" with value "{1}" should be 1 of the following: {2}'.format(required_key, actual_value, expected_value))

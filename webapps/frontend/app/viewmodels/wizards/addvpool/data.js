@@ -78,7 +78,7 @@ define([
             cacheStrategies:  ko.observableArray(['on_read', 'on_write', 'none']),
             dedupeModes:      ko.observableArray(['dedupe', 'non_dedupe']),
             scoSizes:         ko.observableArray([4, 8, 16, 32, 64, 128]),
-            writeBuffer:      ko.observable().extend({ numeric: { min: 0, max: 1024, allowUndefined: true } }),
+            writeBuffer:      ko.observable(128).extend({numeric: {min: 128, max: 10240}}),
         }, resetAlbaBackends = function() {
             wizardData.albaBackends(undefined);
             wizardData.albaBackend(undefined);
@@ -149,6 +149,14 @@ define([
             wizardData.accesskey('');
             wizardData.secretkey('');
             resetAlbaBackends();
+        });
+        wizardData.scoSize.subscribesubscribe(function(size) {
+            if (size < 128) {
+                wizardData.writeBuffer.min = 128;
+            } else {
+                wizardData.writeBuffer.min = 256;
+            }
+            wizardData.writeBuffer(wizardData.writeBuffer());
         });
 
         return wizardData;

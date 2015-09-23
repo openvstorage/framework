@@ -40,7 +40,6 @@ define([
         self.name                = ko.observable();
         self.order               = ko.observable(0);
         self.snapshots           = ko.observableArray([]);
-        self.configuration       = ko.observable({});
         self.parentConfiguration = ko.observable();
         self.oldConfiguration    = ko.observable();
         self.size                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
@@ -58,6 +57,13 @@ define([
         self.vpoolGuid           = ko.observable();
         self.vMachineGuid        = ko.observable();
         self.failoverMode        = ko.observable();
+        self.cacheStrategy       = ko.observable('on_read'),
+        self.dtlEnabled          = ko.observable(false),
+        self.dtlLocation         = ko.observable(),
+        self.scoSize             = ko.observable(4);
+        self.dtlMode             = ko.observable();
+        self.dedupeMode          = ko.observable();
+        self.writeBuffer         = ko.observable(128).extend({numeric: {min: 128, max: 10240}}),
         self.cacheStrategies     = ko.observableArray(['on_read', 'on_write', 'none']);
         self.dtlModes            = ko.observableArray(['no_sync', 'a_sync', 'sync']);
         self.dedupeModes         = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
@@ -74,96 +80,36 @@ define([
             }
             return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
         });
-        self.cacheStrategy = ko.computed({
+        self.configuration = ko.computed({
             read: function() {
-                if (self.configuration() !== undefined && self.configuration().hasOwnProperty('cache_strategy')) {
-                    return self.configuration().cache_strategy;
-                }
-                return undefined;
+                return {sco_size: self.scoSize(),
+                        dtl_mode: self.dtlMode(),
+                        dtl_enabled: self.dtlEnabled(),
+                        dedupe_mode: self.dedupeMode() !== undefined ? self.dedupeMode().name : undefined,
+                        write_buffer: self.writeBuffer(),
+                        dtl_location: self.dtlLocation(),
+                        cache_strategy: self.cacheStrategy()}
             },
-            write: function(value) {
-                var target = self.configuration();
-                target.cache_strategy = value;
-                self.configuration(target);
+            write: function(configData) {
+                self.writeBuffer(Math.round(configData.write_buffer));
+                self.scoSize(configData.sco_size);
+                self.dtlMode(configData.dtl_mode);
+                self.dedupeMode({name: configData.dedupe_mode, disabled: false});
+                self.dtlLocation(configData.dtl_location);
+                self.cacheStrategy(configData.cache_strategy);
             }
         });
-        self.dedupeMode = ko.computed({
-            read: function() {
-                if (self.configuration() !== undefined && self.configuration().hasOwnProperty('dedupe_mode')) {
-                    return {name: self.configuration().dedupe_mode, disabled: false};
-                }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self.configuration();
-                target.dedupe_mode = value.name;
-                self.configuration(target);
+        self.scoSize.subscribe(function(size) {
+            if (size < 128) {
+                self.writeBuffer.min = 128;
+            } else {
+                self.writeBuffer.min = 256;
             }
+            self.writeBuffer(self.writeBuffer());
         });
-        self.dtlEnable = ko.computed({
-            read: function() {
-                if (self.configuration() !== undefined && self.configuration().hasOwnProperty('dtl_enabled')) {
-                    return self.configuration().dtl_enabled;
-                }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self.configuration();
-                target.dtl_enabled = value;
-                self.configuration(target);
-            }
-        });
-        self.dtlMode = ko.computed({
-            read: function() {
-                if (self.configuration() !== undefined && self.configuration().hasOwnProperty('dtl_mode')) {
-                    return self.configuration().dtl_mode;
-                }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self.configuration();
-                target.dtl_mode = value;
-                self.configuration(target);
-            }
-        });
-        self.scoSize = ko.computed({
-            read: function() {
-                if (self.configuration() !== undefined && self.configuration().hasOwnProperty('sco_size')) {
-                    return self.configuration().sco_size;
-                }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self.configuration();
-                target.sco_size = value;
-                self.configuration(target);
-            }
-        });
-        self.writeBuffer = ko.computed({
-            read: function() {
-                if (self.configuration() !== undefined && self.configuration().hasOwnProperty('write_buffer')) {
-                    return self.configuration().write_buffer;
-                }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self.configuration();
-                if (value === '') {
-                    target.write_buffer = null;
-                } else {
-                    target.write_buffer = parseInt(value, 10);
-                    if (isNaN(target.write_buffer)) {
-                        delete target.write_buffer;
-                    } else if (target.write_buffer === 0) {
-                        target.write_buffer = null;
-                    }
-                }
-                self.configuration(target);
-            }
-        }).extend({ notify: 'always' });
         self.configChanged = ko.computed(function() {
             var changed = false;
-            if (self.configuration() !== undefined && self.oldConfiguration() !== undefined) {
+            if (self.oldConfiguration() !== undefined) {
                 $.each(self.oldConfiguration(), function (key, i) {
                     if (!self.configuration().hasOwnProperty(key)) {
                         changed = true;
@@ -243,12 +189,6 @@ define([
                 self.loadParentConfig = api.get('vpools/' + self.vpoolGuid() + '/get_configuration')
                     .then(self.shared.tasks.wait)
                     .done(function(data) {
-                        if (data.write_buffer !== undefined) {
-                            data.write_buffer = Math.round(data.write_buffer);
-                            if (data.write_buffer === 0) {  // Always show at least 1GiB in GUI
-                                data.write_buffer = 1;
-                            }
-                        }
                         if (self.parentConfiguration() === undefined) {
                             self.parentConfiguration(data);
                         }
@@ -262,12 +202,6 @@ define([
                 self.loadConfig = api.get('vdisks/' + self.guid() + '/get_config_params')
                     .then(self.shared.tasks.wait)
                     .done(function(data) {
-                        if (data.write_buffer !== undefined) {
-                            data.write_buffer = Math.round(data.write_buffer);
-                            if (data.write_buffer === 0) {  // Always show at least 1GiB in GUI
-                                data.write_buffer = 1;
-                            }
-                        }
                         if (data.dedupe_mode !== undefined && data.dedupe_mode === 'non_dedupe') {
                             $.each(self.dedupeModes(), function (i, key) {
                                 if (key.name === 'dedupe') {
@@ -279,6 +213,13 @@ define([
                         self.configuration(data);
                         if (self.oldConfiguration() === undefined || reload === true) {
                             self.oldConfiguration($.extend({}, data));  // Used to make comparison to check for changes
+                            $.each(self.oldConfiguration(), function (key, value) {
+                                if (key === 'write_buffer') {
+                                    var oldConfig = self.oldConfiguration();
+                                    oldConfig.write_buffer = Math.round(self.oldConfiguration().write_buffer);
+                                    self.oldConfiguration(oldConfig);
+                                }
+                            });
                         }
                         deferred.resolve();
                     })

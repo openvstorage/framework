@@ -97,6 +97,12 @@ class StorageDriverClient(object):
                             '': FRAMEWORK_DTL_SYNC,
                             '': FRAMEWORK_DTL_ASYNC,
                             '': FRAMEWORK_DTL_NOSYNC}
+    TLOG_MULTIPLIER_MAP = {4: 16,
+                           8: 8,
+                           16: 4,
+                           32: 2,
+                           64: 1,
+                           128: 1}
 
     foc_status = {'': 0,
                   'ok_standalone': 10,

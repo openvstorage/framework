@@ -199,7 +199,7 @@ limitations under the License.
                                                             </div>
                                                         </td>
                                                         <td style="width: 16%; padding: 0;">
-                                                            <input type="checkbox" id="enableDTL" data-bind="checked: dtlEnable">
+                                                            <input type="checkbox" id="enableDTL" data-bind="checked: dtlEnabled">
                                                         </td>
                                                         <td style="padding: 0;">
                                                             <!-- ko if: configuration() !== undefined  && parentConfiguration() !== undefined && configuration().dtl_enabled === parentConfiguration().dtl_enabled -->
@@ -375,10 +375,10 @@ limitations under the License.
                                                             </div>
                                                         </td>
                                                         <td style="padding: 0;">
-                                                            <input data-bind="value: writeBuffer, valueUpdate: 'afterkeydown'"
+                                                            <input data-bind="value: writeBuffer"
                                                                    size="5"
                                                                    style="height: 25px; text-align: center;"/>
-                                                            <span data-i18n="ovs:generic.gib"></span>
+                                                            <span data-i18n="ovs:generic.mib"></span>
                                                         </td>
                                                         <td style="padding: 0;">
                                                             <!-- ko if: configuration() !== undefined  && parentConfiguration() !== undefined && configuration().write_buffer === parentConfiguration().write_buffer -->
