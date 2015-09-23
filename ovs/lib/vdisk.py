@@ -486,6 +486,7 @@ class VDiskController(object):
         dedupe_mode = vdisk.storagedriver_client.get_readcache_mode(volume_id)
         cache_strategy = vdisk.storagedriver_client.get_readcache_behaviour(volume_id)
         tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id)
+        readcache_limit = vdisk.storagedriver_client.get_readcache_limit(volume_id)
         non_disposable_sco_factor = vdisk.storagedriver_client.get_sco_cache_max_non_disposable_factor(volume_id)
 
         if dedupe_mode is None:
@@ -494,6 +495,10 @@ class VDiskController(object):
             cache_strategy = volume_manager.get('read_cache_default_behaviour', StorageDriverClient.VOLDRV_CACHE_ON_READ)
         if tlog_multiplier is None:
             tlog_multiplier = volume_manager.get('number_of_scos_in_tlog', 20)
+        if readcache_limit is not None:
+            vol_info = vdisk.storagedriver_client.info_volume(volume_id)
+            block_size = vol_info.lba_size * vol_info.cluster_multiplier or 4096
+            readcache_limit = readcache_limit * block_size / 1024 / 1024 / 1024
         if non_disposable_sco_factor is None:
             non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
 
@@ -505,7 +510,8 @@ class VDiskController(object):
                 'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
                 'write_buffer': write_buffer,
                 'dtl_location': None,
-                'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy]}
+                'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],
+                'readcache_limit': readcache_limit}
 
     @staticmethod
     @celery.task(name='ovs.vdisk.set_config_params')
@@ -519,8 +525,9 @@ class VDiskController(object):
                            'dedupe_mode': (str, StorageDriverClient.VDISK_DEDUPE_MAP.keys()),
                            'dtl_enabled': (bool, None),
                            # 'dtl_location': (str, None),
-                           'write_buffer': (int, {'min': 128, 'max': 10240}),
-                           'cache_strategy': (str, StorageDriverClient.VDISK_CACHE_MAP.keys())}
+                           'write_buffer': (int, {'min': 128, 'max': 10 * 1024}),
+                           'cache_strategy': (str, StorageDriverClient.VDISK_CACHE_MAP.keys()),
+                           'readcache_limit': (int, {'min': 1, 'max': 10 * 1024}, False)}
 
         Toolbox.verify_required_params(required_params, new_config_params)
         Toolbox.verify_required_params(required_params, old_config_params)
@@ -562,6 +569,11 @@ class VDiskController(object):
                         tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id) or StorageDriverClient.TLOG_MULTIPLIER_MAP[new_sco_size]
                         sco_factor = float(new_value) / tlog_multiplier / new_sco_size
                         vdisk.storagedriver_client.set_sco_cache_max_non_disposable_factor(volume_id, sco_factor)
+                    elif key == 'readcache_limit':
+                        volume_info = vdisk.storagedriver_client.info_volume(volume_id)
+                        block_size = volume_info.lba_size * volume_info.cluster_multiplier or 4096
+                        limit = new_value * 1024 * 1024 * 1024 / block_size if new_value else None
+                        vdisk.storagedriver_client.set_readcache_limit(volume_id, limit)
                     else:
                         raise KeyError('Unsupported property provided: "{0}"'.format(key))
                     logger.info('Updated property {0}'.format(key))

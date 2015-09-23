@@ -257,7 +257,7 @@
                 },
                 "caching": "Caching",
                 "dedupe": "Deduplication",
-                "dedupe_help_message": "Deduplication will calculate MD5 sum for each write resulting in performance loss, but better cache performance",
+                "dedupe_help_message": "Deduplication will calculate an MD5 sum for each write resulting in performance loss, but better cache performance",
                 "dedupe_help_title": "Help - Deduplication",
                 "dedupe_modes": {
                     "dedupe": "Deduped",
@@ -267,7 +267,7 @@
                 "dedupe_warning": "Non-deduplication cannot be changed again!",
                 "dtl": "Distributed Transaction Log",
                 "dtl_enable": "Enable",
-                "dtl_help_message": "The Distributed Transaction Log does a bunch of stuff",
+                "dtl_help_message": "Copies unprotected data in the write buffer of a vDisk to another Storage Router",
                 "dtl_help_title": "Distributed Transaction Log",
                 "dtl_location": "Location",
                 "dtl_mode": "Mode",
@@ -276,6 +276,7 @@
                     "no_sync": "No Sync",
                     "sync": "Sync"
                 },
+                "readcache_limit": "Read cache limit",
                 "sco_size": "SCO size",
                 "strategy": "Strategy",
                 "volume": "Volumes",
@@ -300,9 +301,9 @@
         "dtl_location": "DTL Location",
         "dtl_mode": "DTL Mode",
         "freespace": "Free space",
-        "title": "vPools",
         "sco_size": "SCO Size",
         "statistics": "Statistics",
+        "title": "vPools",
         "write_buffer": "Write Buffer",
         "detail": {
             "title": "vPool",

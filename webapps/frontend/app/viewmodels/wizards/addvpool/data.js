@@ -150,7 +150,7 @@ define([
             wizardData.secretkey('');
             resetAlbaBackends();
         });
-        wizardData.scoSize.subscribesubscribe(function(size) {
+        wizardData.scoSize.subscribe(function(size) {
             if (size < 128) {
                 wizardData.writeBuffer.min = 128;
             } else {

@@ -63,7 +63,8 @@ define([
         self.scoSize             = ko.observable(4);
         self.dtlMode             = ko.observable();
         self.dedupeMode          = ko.observable();
-        self.writeBuffer         = ko.observable(128).extend({numeric: {min: 128, max: 10240}}),
+        self.writeBuffer         = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
+        self.readCacheLimit      = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});
         self.cacheStrategies     = ko.observableArray(['on_read', 'on_write', 'none']);
         self.dtlModes            = ko.observableArray(['no_sync', 'a_sync', 'sync']);
         self.dedupeModes         = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
@@ -88,7 +89,8 @@ define([
                         dedupe_mode: self.dedupeMode() !== undefined ? self.dedupeMode().name : undefined,
                         write_buffer: self.writeBuffer(),
                         dtl_location: self.dtlLocation(),
-                        cache_strategy: self.cacheStrategy()}
+                        cache_strategy: self.cacheStrategy(),
+                        readcache_limit: self.readCacheLimit() || null}
             },
             write: function(configData) {
                 self.writeBuffer(Math.round(configData.write_buffer));
@@ -97,6 +99,7 @@ define([
                 self.dedupeMode({name: configData.dedupe_mode, disabled: false});
                 self.dtlLocation(configData.dtl_location);
                 self.cacheStrategy(configData.cache_strategy);
+                self.readCacheLimit(configData.readcache_limit);
             }
         });
         self.scoSize.subscribe(function(size) {
@@ -218,6 +221,7 @@ define([
                                     var oldConfig = self.oldConfiguration();
                                     oldConfig.write_buffer = Math.round(self.oldConfiguration().write_buffer);
                                     self.oldConfiguration(oldConfig);
+                                    return false;
                                 }
                             });
                         }

@@ -336,6 +336,19 @@ limitations under the License.
                                                             <!-- /ko -->
                                                         </td>
                                                     </tr>
+                                                    <tr data-bind="visible: dedupeMode() !== undefined && dedupeMode().name === 'non_dedupe'">
+                                                        <td style="padding: 0;">
+                                                            <div>
+                                                                <span data-i18n="ovs:storagedrivers.configuration.general.readcache_limit"></span>:
+                                                            </div>
+                                                        </td>
+                                                        <td style="padding: 0;">
+                                                            <input data-bind="value: readCacheLimit, valueUpdate: 'afterkeydown'"
+                                                                   size="5"
+                                                                   style="height: 25px; text-align: center;"/>
+                                                            <span data-i18n="ovs:generic.gib"></span>
+                                                        </td>
+                                                    </tr>
                                                 </tbody>
                                             </table>
                                         </div>
