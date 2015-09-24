@@ -273,7 +273,7 @@ class OVSSNMPServer:
                         self._register_dal_model(0, vm, 'snapshots', "11", atype = int)
                         self._register_dal_model(0, vm, 'vdisks', "12", atype = int)
                         self._register_dal_model(0, vm, 'DTL', '13',
-                                                 func = lambda vm: 'DEGRADED' if all(item == 'DEGRADED' for item in [vd.info['dtl_mode'] for vd in vm.vdisks]) else 'OK')
+                                                 func = lambda vm: 'DEGRADED' if all(item == 'DEGRADED' for item in [vd.info['failover_mode'] for vd in vm.vdisks]) else 'OK')
                     self.instance_oid += 1
 
             for vd in VDiskList.get_vdisks():
@@ -317,7 +317,7 @@ class OVSSNMPServer:
                     self._register_dal_model(1, vd, 'statistics', "2.33", key = "write_operations_ps", atype = int)
                     self._register_dal_model(1, vd, 'statistics', "2.34", key = "data_transferred", atype = int)
                     self._register_dal_model(1, vd, 'info', "3", key = 'stored', atype = int)
-                    self._register_dal_model(1, vd, 'info', "4", key = 'dtl_mode', atype = int)
+                    self._register_dal_model(1, vd, 'info', "4", key = 'failover_mode', atype = int)
                     self._register_dal_model(1, vd, 'snapshots', "5", atype = int)
                     self.instance_oid += 1
 

@@ -79,7 +79,7 @@ class StorageRouter(DataObject):
         for storagedriver in self.storagedrivers:
             for vdisk in storagedriver.vpool.vdisks:
                 if vdisk.storagedriver_id == storagedriver.storagedriver_id:
-                    mode = vdisk.info['dtl_mode']
+                    mode = vdisk.info['failover_mode']
                     current_status_code = StorageDriverClient.DTL_STATUS[mode.lower()]
                     if current_status_code > status_code:
                         status = mode
