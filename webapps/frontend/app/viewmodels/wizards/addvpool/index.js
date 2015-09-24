@@ -60,8 +60,7 @@ define([
         data.storageRouters([]);
         data.storageDrivers([]);
         data.mountpoints([]);
-        data.readcaches([]);
-        data.writecaches([]);
+        data.partitions([]);
         data.ipAddresses([]);
         data.albaBackends(undefined);
         data.albaBackend(undefined);

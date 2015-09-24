@@ -30,6 +30,7 @@ class StorageDriverPartition(DataObject):
     * my_partition.storagedrivers[0].storagedriver
     """
     __properties = [Property('number', int, doc='Number of the service in case there are more than one'),
+                    Property('size', long, doc='Size in bytes configured for use'),
                     Property('usage', ['bfs', 'db', 'dtl', 'fragment', 'md', 'read', 'scrub', 'tmp', 'write'],
                              doc='Usage of partition')]
     __relations = [Relation('partition', DiskPartition, 'storagedrivers'),

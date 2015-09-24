@@ -59,8 +59,7 @@ define([
             storageDriver:    ko.observable(),
             storageDrivers:   ko.observableArray([]),
             mountpoints:      ko.observableArray([]),
-            readcaches:       ko.observableArray([]),
-            writecaches:      ko.observableArray([]),
+            partitions:       ko.observableArray([]),
             ipAddresses:      ko.observableArray([]),
             vPool:            ko.observable(),
             vPools:           ko.observableArray([]),
@@ -84,60 +83,6 @@ define([
             wizardData.albaBackend(undefined);
             wizardData.albaPreset(undefined);
         };
-
-        wizardData.allReadMountpoints = ko.computed(function() {
-            var returnValue = [];
-            $.each(wizardData.readcaches(), function(i, e) {
-                returnValue.push(e);
-            });
-            $.each(wizardData.mtptCustomRCs(), function(i, e) {
-                returnValue.push(e);
-            });
-            return returnValue;
-        });
-        wizardData.readCacheDistributor = ko.computed(function() {
-            return wizardData.mtptReadCaches();
-        });
-        wizardData.readCacheDistributor.push = function(element) {
-            wizardData.mtptReadCaches.push(element);
-        };
-        wizardData.readCacheDistributor.remove = function(element) {
-            if ($.inArray(element, wizardData.mtptCustomRCs()) !== -1) {
-                wizardData.mtptCustomRCs.remove(element);
-            }
-            if ($.inArray(element, wizardData.mtptReadCaches()) !== -1) {
-                wizardData.mtptReadCaches.remove(element);
-            }
-        };
-        wizardData.readCacheDistributor.isObservableArray = true;
-        wizardData.readCacheDistributor.identifier = 'mtpt-readcaches';
-
-        wizardData.allWriteMountpoints = ko.computed(function() {
-            var returnValue = [];
-            $.each(wizardData.writecaches(), function(i, e) {
-                returnValue.push(e);
-            });
-            $.each(wizardData.mtptCustomWCs(), function(i, e) {
-                returnValue.push(e);
-            });
-            return returnValue;
-        });
-        wizardData.writeCacheDistributor = ko.computed(function() {
-            return wizardData.mtptWriteCaches();
-        });
-        wizardData.writeCacheDistributor.push = function(element) {
-            wizardData.mtptWriteCaches.push(element);
-        };
-        wizardData.writeCacheDistributor.remove = function(element) {
-            if ($.inArray(element, wizardData.mtptCustomWCs()) !== -1) {
-                wizardData.mtptCustomWCs.remove(element);
-            }
-            if ($.inArray(element, wizardData.mtptWriteCaches()) !== -1) {
-                wizardData.mtptWriteCaches.remove(element);
-            }
-        };
-        wizardData.writeCacheDistributor.isObservableArray = true;
-        wizardData.writeCacheDistributor.identifier = 'mtpt-writecaches';
 
         wizardData.accesskey.subscribe(resetAlbaBackends);
         wizardData.secretkey.subscribe(resetAlbaBackends);

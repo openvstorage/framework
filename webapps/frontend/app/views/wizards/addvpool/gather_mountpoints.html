@@ -23,80 +23,27 @@ limitations under the License.
                                            visible: data.backend() === 'local' || data.backend() === 'distributed'">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.bfs"></label>
             <div class="col-lg-7">
-                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptBFS,
+                <span data-bind="dropdown: { items: data.partitions, target: data.mtptBFS,
                                              free: true, defaultfree: '/mnt/bfs/' + data.name(), defaultRegex: /bfs/ }">
                 </span>
             </div>
         </div>
-        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.mtptinfo"></p>
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('temp') }">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.tempfs"></label>
-            <div class="col-lg-7">
-                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptTemp,
-                                             free: true, defaultfree: '/', defaultRegex: /tmp/ }">
-                </span>
-            </div>
-        </div>
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('md') }">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.md"></label>
-            <div class="col-lg-7">
-                <span data-bind="dropdown: { items: data.writecaches, target: data.mtptMD,
-                                             free: true, defaultfree: '/', defaultRegex: /.*/ }">
-                </span>
-            </div>
-        </div>
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('readcache') }">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.readcaches"></label>
-            <div class="col-lg-7">
-                <span data-bind="dropdown: { items: data.allReadMountpoints, target: data.readCacheDistributor,
-                                             defaultRegex: /.*/ }">
-                </span>
-            </div>
-        </div>
+        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.cachesizing"></p>
+        <p data-i18n=""></p>
         <div class="form-group">
-            <label class="col-lg-3 control-label"></label>
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.readcachesize"></label>
             <div class="col-lg-7">
                 <div class="input-group">
-                    <span class="input-group-addon" data-i18n="ovs:generic.custompath"></span>
-                    <input type="text" id="inputCustomRC" data-bind="value: data.mtptCustomRC" class="form-control" />
-                    <div class="input-group-btn">
-                        <button type="button" class="btn btn-small btn-default" data-bind="click: addReadCache"
-                                id="buttonAddCustomRC">
-                            <span class="fa" data-i18n="[html]ovs:icons.add"></span>
-                        </button>
-                    </div>
+                    <input type="text" id="amount" class="form-control" data-bind="value: data.amount">
                 </div>
             </div>
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('writecache') }">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.writecaches"></label>
-            <div class="col-lg-7">
-                <span data-bind="dropdown: { items: data.allWriteMountpoints, target: data.writeCacheDistributor,
-                                             defaultRegex: /.*/ }">
-                </span>
-            </div>
-        </div>
         <div class="form-group">
-            <label class="col-lg-3 control-label"></label>
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.writecachesize"></label>
             <div class="col-lg-7">
                 <div class="input-group">
-                    <span class="input-group-addon" data-i18n="ovs:generic.custompath"></span>
-                    <input type="text" id="inputCustomWC" data-bind="value: data.mtptCustomWC" class="form-control" />
-                    <div class="input-group-btn">
-                        <button type="button" class="btn btn-small btn-default" data-bind="click: addWriteCache"
-                                id="buttonAddCustomWC">
-                            <span class="fa" data-i18n="[html]ovs:icons.add"></span>
-                        </button>
-                    </div>
+                    <input type="text" id="amount" class="form-control" data-bind="value: data.amount">
                 </div>
-            </div>
-        </div>
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('foc') }">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.foc"></label>
-            <div class="col-lg-7">
-                <span data-bind="dropdown: { items: data.writecaches, target: data.mtptFOC,
-                                             free: true, defaultfree: '/', defaultRegex: /.*/ }">
-                </span>
             </div>
         </div>
         <p data-i18n="ovs:wizards.addvpool.gathermountpoints.otherinfo"></p>

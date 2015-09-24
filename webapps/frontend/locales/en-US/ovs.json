@@ -718,6 +718,7 @@
                 "bfsname": "Backend FS",
                 "bfsinfo": "Backend Filesystem location which will contain all data for this vPool:",
                 "bfsnotshared": "The Backend FS mountpoint should not be shared between vPools",
+                "cachesizing": "Please specify required size in GB for:",
                 "foc": "Failover Cache:",
                 "focname": "Failover Cache",
                 "invalidmtpt": "The __what__ mountpoint is invalid",
@@ -730,12 +731,14 @@
                 "portinuse": "The ports are already in use.",
                 "readcachename": "Read Cache",
                 "readcaches": "Read Caches:",
+                "readcachesize": "Read Cache:",
                 "tempfs": "Temporary FS:",
                 "tempname": "Temporary FS",
                 "uniquemtpt": "The __what__ mountpoint needs to be uniquely defined",
                 "vpoolnotallowed": "A vPool cannot be added to this Storage Router: Prerequisites not met.",
                 "writecachename": "Write Cache",
-                "writecaches": "Write Caches:"
+                "writecaches": "Write Caches:",
+                "writecachesize": "Write Cache:"
             },
             "integratemgmtcenter": {
                 "integratemgmt": "Automatically configure the vPool on the Hypervisor.",

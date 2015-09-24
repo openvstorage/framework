@@ -37,19 +37,6 @@ class StorageDriverPartitionList(object):
         return DataObjectList(sd_partitions, StorageDriverPartition)
 
     @staticmethod
-    def get_partitions_by_storagedriver(storagedriver):
-        """
-        Returns a list of all StorageDriverPartitions
-        """
-        storagedriver_guid = None if storagedriver is None else storagedriver.guid
-        sd_partitions = DataList({'object': StorageDriverPartition,
-                                  'data': DataList.select.GUIDS,
-                                  'query': {'type': DataList.where_operator.AND,
-                                            'items': [('storagedriver_guid', DataList.operator.EQUALS,
-                                                      storagedriver_guid)]}}).data
-        return DataObjectList(sd_partitions, StorageDriverPartition)
-
-    @staticmethod
     def get_partitions_by_storagedriver_and_usage(storagedriver, usage):
         """
         Returns a list of all StorageDriverPartitions

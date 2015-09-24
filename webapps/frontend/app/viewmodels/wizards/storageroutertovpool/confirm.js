@@ -83,8 +83,8 @@ define([
             self.mtptOK         = ko.observable(true);
             self.storageDrivers = ko.observableArray([]);
             self.mountpoints    = ko.observableArray([]);
-            self.readcaches     = ko.observableArray([]);
-            self.writecaches    = ko.observableArray([]);
+            //self.readcaches     = ko.observableArray([]);
+            //self.writecaches    = ko.observableArray([]);
             self.ipAddresses    = ko.observableArray([]);
 
             // Computed
@@ -192,8 +192,6 @@ define([
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.mountpoints(data.mountpoints);
-                                self.readcaches(data.readcaches);
-                                self.writecaches(data.writecaches);
                                 self.ipAddresses(data.ipaddresses);
                                 self.allowVPool(data.allow_vpool);
                             })

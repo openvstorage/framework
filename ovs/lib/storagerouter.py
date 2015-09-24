@@ -88,11 +88,6 @@ class StorageRouterController(object):
         arakoon_mountpoint = Configuration.get('ovs.arakoon.location')
         if arakoon_mountpoint in mountpoints:
             mountpoints.remove(arakoon_mountpoint)
-        # include directories chosen during ovs setup
-        readcaches = [entry for entry in Configuration.get('ovs.partitions.readcaches') if entry]
-        writecaches = [entry for entry in Configuration.get('ovs.partitions.writecaches') if entry]
-        storage = [entry for entry in Configuration.get('ovs.partitions.storage') if entry]
-        mountpoints.extend(storage)
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']
         else:
@@ -105,13 +100,43 @@ class StorageRouterController(object):
         for check_file in files:
             file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
 
+        # 'bfs', 'db', 'dtl', 'fragment', 'md', 'read', 'scrub', 'tmp', 'write'
+        partitions = {'bfs': list(),
+                      'db': list(),
+                      'dtl': list(),
+                      'fragment': list(),
+                      'md': list(),
+                      'read': list(),
+                      'scrub': list(),
+                      'tmp': list(),
+                      'write': list()}
+
+        for disk_partition in DiskPartitionList.get_partitions():
+            for usage in disk_partition.usages:
+                logger.info('{0} {1} {2}'.format(usage, disk_partition.size, disk_partition.guid))
+                partitions[usage].append({disk_partition.guid, disk_partition.size})
+
+        # check if requirements for backend type are met:
+        backend_prereqs = {'bfs': False,
+                           'db': False,
+                           'dtl': False,
+                           'fragment': False,
+                           'md': False,
+                           'read': False,
+                           'scrub': False,
+                           'tmp': False,
+                           'write': False}
+        for backend_type in partitions.keys():
+            if len(partitions[backend_type]) > 0:
+                backend_prereqs[backend_type] = True
+
         logger.info('mountpoints:{0}'.format(mountpoints))
-        logger.info('readcaches:{0}'.format(readcaches))
-        logger.info('writecaches:{0}'.format(writecaches))
+        logger.info('partitions:{0}'.format(partitions))
+        logger.info('backend_prereqs:{0}'.format(backend_prereqs))
 
         return {'mountpoints': mountpoints,
-                'readcaches': readcaches,
-                'writecaches': writecaches,
+                'partitions': partitions,
+                'backend_prereqs': backend_prereqs,
                 'ipaddresses': ipaddresses,
                 'files': file_existence,
                 'allow_vpool': allow_vpool}
@@ -137,13 +162,7 @@ class StorageRouterController(object):
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
                            'storagerouter_ip': (str, Toolbox.regex_ip),
-                           'integratemgmt': (bool, None),
-                           'mountpoint_md': (str, Toolbox.regex_mountpoint),
-                           'mountpoint_bfs': (str, Toolbox.regex_mountpoint, False),
-                           'mountpoint_foc': (str, Toolbox.regex_mountpoint),
-                           'mountpoint_temp': (str, Toolbox.regex_mountpoint),
-                           'mountpoint_readcaches': (list, Toolbox.regex_mountpoint),
-                           'mountpoint_writecaches': (list, Toolbox.regex_mountpoint)}
+                           'integratemgmt': (bool, None)}
         required_params_for_new_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
                                          'config_params': (dict, {'dtl_mode': (str, dtl_mode_mapping.keys()),
                                                                   'sco_size': (int, None),
@@ -167,10 +186,7 @@ class StorageRouterController(object):
         vpool_name = parameters['vpool_name']
         storage_ip = parameters['storage_ip']
 
-        md_partition = DiskPartitionList.get_partition_for(parameters['mountpoint_md'])
-        bfs_partition = DiskPartitionList.get_partition_for(parameters['mountpoint_bfs'])
-        dtl_partition = DiskPartitionList.get_partition_for(parameters['mountpoint_foc'])
-        tmp_partition = DiskPartitionList.get_partition_for(parameters['mountpoint_temp'])
+        # @todo: make sure to pass in mountpoint + size requested for further calculation
         read_partitions = list()
         for readcache in parameters['mountpoint_readcaches']:
             read_partitions.append(DiskPartitionList.get_partition_for(readcache))
@@ -617,40 +633,6 @@ class StorageRouterController(object):
         storagedriver_config.save(client, reload_config=False)
 
         DiskController.sync_with_reality(storagerouter.guid)
-
-        # mountpoint_usage = dict()
-        # for disk_partition in StorageDriverPartitionList.get_partitions_by_storagedriver(storagedriver):
-        #     if disk_partition:
-        #         if disk_partition.usage == 'dtl':
-        #             mountpoint_usage[disk_partition.mountpoint] = {'type': 'cache',
-        #                                                            'metadata': {'type': 'foc'}}
-        #         elif disk_partition.usage == 'local':
-        #             mountpoint_usage[disk_partition.mountpoint] = {'type': 'backend',
-        #                                                            'metadata': {'type': 'local'}},
-        #         elif disk_partition.usage == 'md':
-        #             mountpoint_usage[disk_partition.mountpoint] = {'type': 'metadata',
-        #                                                            'metadata': {}},
-        #         elif disk_partition.usage == 'temp':
-        #             mountpoint_usage[disk_partition.mountpoint] = {'type': 'temp',
-        #                                                            'metadata': {}},
-
-        # for mountpoint, usage in mountpoint_usage.iteritems():
-        #     if not mountpoint:
-        #         continue
-        #     inode = os.stat(mountpoint).st_dev
-        #     if inode not in directory_usage:
-        #         directory_usage[inode] = []
-        #     usage['size'] = None
-        #     directory_usage[inode].append(usage)
-        # for inode in directory_usage:
-        #     for usage in directory_usage[inode]:
-        #         usage['relation'] = ('storagedriver', storagedriver.guid)
-        # for disk_partition in StorageDriverPartitionList.get_partitions_by_storagedriver(storagedriver):
-        # # for disk in storagerouter.disks:
-        # #     for partition in disk.partitions:
-        #     if disk_partition.partition.inode is not None and disk_partition.partition.inode in directory_usage:
-        #         partition.usage += directory_usage[partition.inode]
-        #         partition.save()
 
         MDSServiceController.prepare_mds_service(client, storagerouter, vpool, reload_config=False)
 
@@ -1384,7 +1366,7 @@ class StorageRouterController(object):
         Returns new storagedriver partition object with correct number
         """
         highest_number = 0
-        for existing_sdp in StorageDriverPartitionList.get_partitions_by_storagedriver(storagedriver):
+        for existing_sdp in storagedriver.partitions:
             if existing_sdp.storagedriver.mountpoint == storagedriver.mountpoint and existing_sdp.usage == usage:
                     highest_number = max(existing_sdp.number, highest_number)
         sdp = StorageDriverPartition()

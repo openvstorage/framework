@@ -48,12 +48,6 @@ define([
             self.storageIP(data.storage_ip);
             self.storageDriverID(data.storageDriverID);
             self.mountpoint(data.mountpoint);
-            self.mountpointTemp(data.mountpoint_temp);
-            self.mountpointBFS(data.mountpoint_bfs);
-            self.mountpointMD(data.mountpoint_md);
-            self.mountpointReadCaches(data.mountpoint_readcaches);
-            self.mountpointWriteCaches(data.mountpoint_writecaches);
-            self.mountpointFOC(data.mountpoint_foc);
             self.loaded(true);
             self.loading(false);
         };

@@ -42,12 +42,6 @@ define([
                         connection_password: self.data.secretkey(),
                         connection_backend: {'backend': (self.data.backend() === 'alba' ? self.data.albaBackend().guid : undefined),
                                              'metadata': (self.data.backend() === 'alba' ? self.data.albaPreset().name : undefined)},
-                        mountpoint_temp: self.data.mtptTemp(),
-                        mountpoint_bfs: self.data.mtptBFS(),
-                        mountpoint_md: self.data.mtptMD(),
-                        mountpoint_readcaches: self.data.mtptReadCaches(),
-                        mountpoint_writecaches: self.data.mtptWriteCaches(),
-                        mountpoint_foc: self.data.mtptFOC(),
                         storage_ip: self.data.storageIP(),
                         integratemgmt: self.data.integratemgmt()
                     }

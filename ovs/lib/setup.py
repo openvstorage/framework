@@ -152,7 +152,8 @@ class SetupController(object):
                 ip = '127.0.0.1'
             if target_password is None:
                 node_string = 'this node' if ip == '127.0.0.1' else ip
-                target_node_password = SetupController._ask_validate_password(ip, username='root', node_string=node_string)
+                target_node_password = SetupController._ask_validate_password(ip, username='root',
+                                                                              node_string=node_string)
             else:
                 target_node_password = target_password
             target_client = SSHClient(ip, username='root', password=target_node_password)
@@ -430,7 +431,8 @@ class SetupController(object):
             elif node_type not in ['MASTER', 'EXTRA']:
                 raise RuntimeError('This node is not correctly configured.')
 
-            target_password = SetupController._ask_validate_password('127.0.0.1', username='root', node_string='this node')
+            target_password = SetupController._ask_validate_password('127.0.0.1', username='root',
+                                                                     node_string='this node')
             target_client = SSHClient('127.0.0.1', username='root', password=target_password)
 
             unique_id = System.get_my_machine_id(target_client)
@@ -542,15 +544,16 @@ class SetupController(object):
             # 0. Create locks
             SetupController._log_message('Creating lock files', client_ip=this_client.ip)
             for client in ssh_clients:
-                client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually install or upgrade individual packages
-                client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
+                client.run('touch {0}'.format(upgrade_file))  # Prevents manual install or upgrade individual packages
+                client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Prevents clicking x times on 'Update' btn
 
             # 1. Check requirements
             packages_to_update = set()
             all_services_to_restart = []
             for client in ssh_clients:
                 for function in Toolbox.fetch_hooks('update', 'metadata'):
-                    SetupController._log_message('Executing function {0}'.format(function.__name__), client_ip=client.ip)
+                    SetupController._log_message('Executing function {0}'.format(function.__name__),
+                                                 client_ip=client.ip)
                     output = function(client)
                     for key, value in output.iteritems():
                         if key != 'framework':
@@ -562,7 +565,8 @@ class SetupController(object):
             services_to_restart = []
             for service in all_services_to_restart:
                 if service not in services_to_restart:
-                    services_to_restart.append(service)  # Filter out duplicates keeping the order of services (eg: watcher-framework before memcached)
+                    services_to_restart.append(service)  # Filter out duplicates maintaining the order of services
+                                                         # (eg: watcher-framework before memcached)
 
             SetupController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
             SetupController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
@@ -571,7 +575,8 @@ class SetupController(object):
             if SetupController._change_services_state(services=services_to_restart,
                                                       ssh_clients=ssh_clients,
                                                       action='stop') is False:
-                SetupController._log_message('Stopping all services on every node failed, cannot continue', client_ip=this_client.ip, severity='warning')
+                SetupController._log_message('Stopping all services on every node failed, cannot continue',
+                                             client_ip=this_client.ip, severity='warning')
                 SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
 
                 # Start services again if a service could not be stopped
@@ -580,7 +585,8 @@ class SetupController(object):
                                                        ssh_clients=ssh_clients,
                                                        action='start')
 
-                SetupController._log_message('Failed to stop all required services, aborting update', client_ip=this_client.ip, severity='error')
+                SetupController._log_message('Failed to stop all required services, aborting update',
+                                             client_ip=this_client.ip, severity='error')
                 return
 
             # 3. Update packages
@@ -597,13 +603,15 @@ class SetupController(object):
                         SetupController._log_message('Installed {0}'.format(package), client.ip)
                     client.file_delete(upgrade_file)
                 except subprocess.CalledProcessError as cpe:
-                    SetupController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip, 'error')
+                    SetupController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip,
+                                                 'error')
                     failed_clients.append(client)
                     break
 
             if failed_clients:
                 SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-                SetupController._log_message('Error occurred. Attempting to start all services again', client_ip=this_client.ip, severity='error')
+                SetupController._log_message('Error occurred. Attempting to start all services again',
+                                             client_ip=this_client.ip, severity='error')
                 SetupController._change_services_state(services=services_to_restart,
                                                        ssh_clients=ssh_clients,
                                                        action='start')
@@ -631,7 +639,8 @@ class SetupController(object):
                 SetupController._log_message('Finished model migration', client_ip=this_client.ip)
             except Exception as ex:
                 SetupController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
-                SetupController._log_message('An unexpected error occurred: {0}'.format(ex), client_ip=this_client.ip, severity='error')
+                SetupController._log_message('An unexpected error occurred: {0}'.format(ex), client_ip=this_client.ip,
+                                             severity='error')
                 return
 
             for client in ssh_clients:
@@ -650,12 +659,15 @@ class SetupController(object):
             for client in ssh_clients:
                 with Remote(client.ip, [Toolbox, SSHClient]) as remote:
                     for function in remote.Toolbox.fetch_hooks('update', 'postupgrade'):
-                        SetupController._log_message('Executing action {0}'.format(function.__name__), client_ip=client.ip)
+                        SetupController._log_message('Executing action {0}'.format(function.__name__),
+                                                     client_ip=client.ip)
                         try:
                             function(remote.SSHClient(client.ip, username='root'))
-                            SetupController._log_message('Executing action {0} completed'.format(function.__name__), client_ip=client.ip)
+                            SetupController._log_message('Executing action {0} completed'.format(function.__name__),
+                                                         client_ip=client.ip)
                         except Exception as ex:
-                            SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex), client.ip, 'error')
+                            SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex),
+                                                         client.ip, 'error')
 
             # 7. Start watcher and restart support-agent
             SetupController._change_services_state(services=services_to_restart,
@@ -700,15 +712,16 @@ class SetupController(object):
             # 0. Create locks
             SetupController._log_message('Creating lock files', client_ip=this_client.ip)
             for client in ssh_clients:
-                client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually install or upgrade individual packages
-                client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
+                client.run('touch {0}'.format(upgrade_file))  # Prevents manual install or upgrade individual packages
+                client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Prevents clicking x times on 'Update' btn
 
             # 1. Check requirements
             packages_to_update = set()
             all_services_to_restart = []
             for client in ssh_clients:
                 for function in Toolbox.fetch_hooks('update', 'metadata'):
-                    SetupController._log_message('Executing function {0}'.format(function.__name__), client_ip=client.ip)
+                    SetupController._log_message('Executing function {0}'.format(function.__name__),
+                                                 client_ip=client.ip)
                     output = function(client)
                     for key, value in output.iteritems():
                         if key != 'volumedriver':
@@ -720,7 +733,8 @@ class SetupController(object):
             services_to_restart = []
             for service in all_services_to_restart:
                 if service not in services_to_restart:
-                    services_to_restart.append(service)  # Filter out duplicates keeping the order of services (eg: watcher-framework before memcached)
+                    services_to_restart.append(service)  # Filter out duplicates keeping the order of services
+                                                         # (eg: watcher-framework before memcached)
 
             SetupController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
             SetupController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
@@ -729,14 +743,16 @@ class SetupController(object):
             if SetupController._change_services_state(services=services_to_restart,
                                                       ssh_clients=ssh_clients,
                                                       action='stop') is False:
-                SetupController._log_message('Stopping all services on every node failed, cannot continue', client_ip=this_client.ip, severity='warning')
+                SetupController._log_message('Stopping all services on every node failed, cannot continue',
+                                             client_ip=this_client.ip, severity='warning')
                 SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
 
                 SetupController._log_message('Attempting to start the services again', client_ip=this_client.ip)
                 SetupController._change_services_state(services=services_to_restart,
                                                        ssh_clients=ssh_clients,
                                                        action='start')
-                SetupController._log_message('Failed to stop all required services, update aborted', client_ip=this_client.ip, severity='error')
+                SetupController._log_message('Failed to stop all required services, update aborted',
+                                             client_ip=this_client.ip, severity='error')
                 return
 
             # 2. Update packages
@@ -752,13 +768,15 @@ class SetupController(object):
                         SetupController._log_message('Installed {0}'.format(package_name), client.ip)
                     client.file_delete(upgrade_file)
                 except subprocess.CalledProcessError as cpe:
-                    SetupController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip, 'error')
+                    SetupController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip,
+                                                 'error')
                     failed_clients.append(client)
                     break
 
             if failed_clients:
                 SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-                SetupController._log_message('Error occurred. Attempting to start all services again', client_ip=this_client.ip, severity='error')
+                SetupController._log_message('Error occurred. Attempting to start all services again',
+                                             client_ip=this_client.ip, severity='error')
                 SetupController._change_services_state(services=services_to_restart,
                                                        ssh_clients=ssh_clients,
                                                        action='start')
@@ -773,7 +791,8 @@ class SetupController(object):
                     try:
                         function(client)
                     except Exception as ex:
-                        SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex), client.ip, 'error')
+                        SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex),
+                                                     client.ip, 'error')
 
             # 4. Start services
             SetupController._log_message('Starting services', client_ip=this_client.ip)
@@ -827,7 +846,8 @@ class SetupController(object):
                 if node not in ip_client_map:
                     ip_client_map[node] = SSHClient(node, username='root', password=prev_node_password)
             else:
-                this_node_password = SetupController._ask_validate_password(node, username='root', previous=prev_node_password)
+                this_node_password = SetupController._ask_validate_password(node, username='root',
+                                                                            previous=prev_node_password)
                 passwords[node] = this_node_password
                 prev_node_password = this_node_password
                 if node not in ip_client_map:
@@ -877,9 +897,11 @@ class SetupController(object):
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
             cmd = 'cp {1} {1}.tmp; ssh-keyscan -t rsa {0} {2} 2> /dev/null >> {1}.tmp; cat {1}.tmp | sort -u - > {1}'
-            node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(root_ssh_folder), ' '.join(all_hostnames)))
+            node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(root_ssh_folder),
+                                       ' '.join(all_hostnames)))
             cmd = 'su - ovs -c "cp {1} {1}.tmp; ssh-keyscan -t rsa {0} {2} 2> /dev/null  >> {1}.tmp; cat {1}.tmp | sort -u - > {1}"'
-            node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(ovs_ssh_folder), ' '.join(all_hostnames)))
+            node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(ovs_ssh_folder),
+                                       ' '.join(all_hostnames)))
 
         target_client = ip_client_map[cluster_ip]
 
@@ -963,7 +985,8 @@ class SetupController(object):
                 description = 'stopping' if action == 'stop' else 'starting' if action == 'start' else 'restarting'
                 try:
                     if ServiceManager.has_service(service_name, client=ssh_client):
-                        SetupController._log_message('{0} service {1}'.format(description.capitalize(), service_name), ssh_client.ip)
+                        SetupController._log_message('{0} service {1}'.format(description.capitalize(), service_name),
+                                                     ssh_client.ip)
                         SetupController._change_service_state(client=ssh_client,
                                                               name=service_name,
                                                               state=action)
@@ -1480,7 +1503,8 @@ EOF
         print 'Update existing vPools'
         logger.info('Update existing vPools')
         for node_ip in node_ips:
-            with Remote(node_ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration, ArakoonManagementEx], 'ovs') as remote:
+            with Remote(node_ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration, ArakoonManagementEx],
+                        'ovs') as remote:
                 login = remote.Configuration.get('ovs.core.broker.login')
                 password = remote.Configuration.get('ovs.core.broker.password')
                 protocol = remote.Configuration.get('ovs.core.broker.protocol')
@@ -1490,7 +1514,8 @@ EOF
 
                 uris = []
                 for node in [n.strip() for n in cfg.get('main', 'nodes').split(',')]:
-                    uris.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(protocol, login, password, cfg.get(node, 'location'))})
+                    uris.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(protocol, login, password, cfg.get(node,
+                                                                                                           'location'))})
 
                 arakoon_cluster_config = remote.ArakoonManagementEx().getCluster('voldrv').getClientConfig()
                 arakoon_nodes = []
