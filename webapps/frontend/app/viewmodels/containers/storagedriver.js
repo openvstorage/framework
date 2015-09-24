@@ -38,7 +38,7 @@ define([
         self.mountpointMD          = ko.observable();
         self.mountpointReadCaches  = ko.observable();
         self.mountpointWriteCaches = ko.observable();
-        self.mountpointFOC         = ko.observable();
+        self.mountpointDTL         = ko.observable();
 
         // Functions
         self.fillData = function(data) {
@@ -53,7 +53,7 @@ define([
             self.mountpointMD(data.mountpoint_md);
             self.mountpointReadCaches(data.mountpoint_readcaches);
             self.mountpointWriteCaches(data.mountpoint_writecaches);
-            self.mountpointFOC(data.mountpoint_foc);
+            self.mountpointDTL(data.mountpoint_dtl);
             self.loaded(true);
             self.loading(false);
         };

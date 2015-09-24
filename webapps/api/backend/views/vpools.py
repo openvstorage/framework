@@ -118,7 +118,7 @@ class VPoolViewSet(viewsets.ViewSet):
                       'mountpoint_md': storagedriver.mountpoint_md,
                       'mountpoint_readcaches': storagedriver.mountpoint_readcaches,
                       'mountpoint_writecaches': storagedriver.mountpoint_writecaches,
-                      'mountpoint_foc': storagedriver.mountpoint_foc,
+                      'mountpoint_dtl': storagedriver.mountpoint_dtl,
                       'storage_ip': storagedriver.storage_ip,
                       'type': vpool.backend_type.code,
                       'vpool_name': vpool.name}

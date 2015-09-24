@@ -23,7 +23,7 @@
                 "undefined": "Unknown",
                 "unknown": "Unknown"
             },
-            "foc": {
+            "dtl": {
                 "ok_standalone": "Healthy (standalone)",
                 "ok_sync": "Healthy (sync)",
                 "catch_up": "Rebuilding",
@@ -75,9 +75,9 @@
             "CLIENT_CREDENTIALS": "Client Credentials"
         },
         "caches": {
+            "dtl": "DTL",
             "read": "Read cache",
             "write": "Write cache",
-            "foc": "Failover cache",
             "fragment": "Fragment cache"
         },
         "username": "Username",
@@ -148,7 +148,7 @@
         "no": "No",
         "size": "Size",
         "api": "API",
-        "focstatus": "FOC",
+        "dtl_status": "DTL",
         "performance": "Performance",
         "current": "Current",
         "bandwidth": "Bandwidth",
@@ -182,7 +182,7 @@
         "management": "Management actions",
         "usedports": "Used Ports",
         "xmlrpcport": "XML-RPC",
-        "focport": "FOC",
+        "dtl_port": "DTL",
         "mgmtport": "Management",
         "templatehaschildren": "This vTemplate does have children",
         "clone": "Create clones",
@@ -715,8 +715,8 @@
                 "bfsname": "Backend FS",
                 "bfsinfo": "Backend Filesystem location which will contain all data for this vPool:",
                 "bfsnotshared": "The Backend FS mountpoint should not be shared between vPools",
-                "foc": "Failover Cache:",
-                "focname": "Failover Cache",
+                "dtl": "DTL:",
+                "dtl_name": "DTL",
                 "invalidmtpt": "The __what__ mountpoint is invalid",
                 "ipaddress": "Storage IP:",
                 "mtptinfo": "Required locations:",

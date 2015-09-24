@@ -104,8 +104,8 @@ define([
                         if (storageDriver.mountpointMD() !== undefined) {
                             storagedriver_mountpoints.push(storageDriver.mountpointMD());
                         }
-                        if (storageDriver.mountpointFOC() !== undefined) {
-                            storagedriver_mountpoints.push(storageDriver.mountpointFOC());
+                        if (storageDriver.mountpointDTL() !== undefined) {
+                            storagedriver_mountpoints.push(storageDriver.mountpointDTL());
                         }
                         if (storageDriver.mountpointTemp() !== undefined) {
                             storagedriver_mountpoints.push(storageDriver.mountpointTemp());
@@ -135,10 +135,10 @@ define([
                             fields.push('temp');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', {what: $.t('ovs:generic.tempfs')}));
                         }
-                        if (storagedriver_mountpoints.contains(self.storageDriver().mountpointFOC()) && !fields.contains('foc')) {
+                        if (storagedriver_mountpoints.contains(self.storageDriver().mountpointDTL()) && !fields.contains('dtl')) {
                             valid = false;
-                            fields.push('foc');
-                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', {what: $.t('ovs:generic.foc')}));
+                            fields.push('dtl');
+                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', {what: $.t('ovs:generic.dtl')}));
                         }
                         if (self.storageDriver().mountpointReadCaches() !== undefined) {
                             $.each(self.storageDriver().mountpointReadCaches(), function (i, e) {

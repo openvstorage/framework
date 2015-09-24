@@ -56,10 +56,10 @@ define([
         self.storageRouterGuid   = ko.observable();
         self.vpoolGuid           = ko.observable();
         self.vMachineGuid        = ko.observable();
-        self.failoverMode        = ko.observable();
-        self.cacheStrategy       = ko.observable('on_read'),
-        self.dtlEnabled          = ko.observable(false),
-        self.dtlLocation         = ko.observable(),
+        self.dtlMode             = ko.observable();
+        self.cacheStrategy       = ko.observable('on_read');
+        self.dtlEnabled          = ko.observable(false);
+        self.dtlLocation         = ko.observable();
         self.scoSize             = ko.observable(4);
         self.dtlMode             = ko.observable();
         self.dedupeMode          = ko.observable();
@@ -146,7 +146,7 @@ define([
             generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);
-                self.failoverMode(data.info.failover_mode.toLowerCase() || 'unknown');
+                self.dtlMode(data.info.dtl_mode.toLowerCase() || 'unknown');
                 self.namespace(data.info.namespace);
             }
             if (data.hasOwnProperty('statistics')) {

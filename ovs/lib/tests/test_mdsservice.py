@@ -175,7 +175,7 @@ class MDSServices(TestCase):
             storagedriver.storagerouter = storagerouters[sr_id]
             storagedriver.name = str(sd_id)
             storagedriver.mountpoint_temp = '/'
-            storagedriver.mountpoint_foc = '/'
+            storagedriver.mountpoint_dtl = '/'
             storagedriver.mountpoint_readcaches = ['/']
             storagedriver.mountpoint_writecaches = ['/']
             storagedriver.mountpoint_temp = '/'
@@ -375,7 +375,7 @@ class MDSServices(TestCase):
 
         def _test_scenario(scenario, _vdisks, _mds_services):
             """
-            Executes a testrun for a given scenario
+            Executes a test run for a given scenario
             """
             _generate_backend_config(scenario, _vdisks, _mds_services)
             for vdisk_id in _vdisks:
@@ -486,13 +486,13 @@ class MDSServices(TestCase):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         _check_reality(configs, loads, vdisks, mds_services)
 
-        # Validate whether this extra (unnessecairy) run doesn't change anything, preventing reconfiguring over and
+        # Validate whether this extra (unnecessary) run doesn't change anything, preventing reconfiguring over and
         # over again
         for vdisk_id in sorted(vdisks.keys()):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         _check_reality(configs, loads, vdisks, mds_services)
 
-        # Validating whether an overloaded node will cause correct rebalancing
+        # Validating whether an overloaded node is correctly rebalanced
         mds_services[2].capacity = 2
         mds_services[2].save()
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}],
@@ -511,7 +511,7 @@ class MDSServices(TestCase):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         _check_reality(configs, loads, vdisks, mds_services)
 
-        # Validate whether the overloaded services are still handled. In this case, causing a reoder of the slaves as
+        # Validate whether the overloaded services are still handled. In this case, causing a re-order of the slaves as
         # ordered in the model
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}],
@@ -534,7 +534,7 @@ class MDSServices(TestCase):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         _check_reality(configs, loads, vdisks, mds_services)
 
-        # A MDS service will be added (next to the overloaded service), this should cause the expected rebalancing
+        # A MDS service will be added (next to the overloaded service), this should cause the expected to be rebalanced
         s_id = '{0}-5'.format(storagerouters[2].name)
         service = Service()
         service.name = s_id
@@ -566,14 +566,14 @@ class MDSServices(TestCase):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         _check_reality(configs, loads, vdisks, mds_services)
 
-        # If the tlogs are not catched up, nothing should be changed
+        # If the tlogs are not caught up, nothing should be changed
         for vdisk_id in [3, 4]:
             StorageDriverClient.catch_up[vdisks[vdisk_id].volume_id] = 1000
         for vdisk_id in sorted(vdisks.keys()):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         _check_reality(configs, loads, vdisks, mds_services)
 
-        # The next run, after tlogs are catched up, a master switch should be executed
+        # The next run, after tlogs are caught up, a master switch should be executed
         for vdisk_id in [3, 4]:
             StorageDriverClient.catch_up[vdisks[vdisk_id].volume_id] = 50
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}],
@@ -585,7 +585,7 @@ class MDSServices(TestCase):
                    [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.2', 'port': 5}],
                    [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}]]
         loads = [['10.0.0.1', 1, 2, 5, 10, 70.0],
-                 ['10.0.0.2', 2, 1, 0, 2,  50.0],
+                 ['10.0.0.2', 2, 1, 0, 2, 50.0],
                  ['10.0.0.3', 3, 2, 5, 10, 70.0],
                  ['10.0.0.4', 4, 2, 5, 10, 70.0],
                  ['10.0.0.2', 5, 1, 1, 10, 20.0]]
@@ -604,7 +604,7 @@ class MDSServices(TestCase):
                    [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.2', 'port': 5}],
                    [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}]]
         loads = [['10.0.0.1', 1, 1, 6, 10, 70.0],
-                 ['10.0.0.2', 2, 1, 0, 2,  50.0],
+                 ['10.0.0.2', 2, 1, 0, 2, 50.0],
                  ['10.0.0.3', 3, 3, 4, 10, 70.0],
                  ['10.0.0.4', 4, 2, 4, 10, 60.0],
                  ['10.0.0.2', 5, 1, 2, 10, 30.0]]

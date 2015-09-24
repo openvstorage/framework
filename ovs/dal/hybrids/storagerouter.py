@@ -35,7 +35,7 @@ class StorageRouter(DataObject):
     __relations = [Relation('pmachine', PMachine, 'storagerouters')]
     __dynamics = [Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('stored_data', int, 60),
-                  Dynamic('failover_mode', str, 60),
+                  Dynamic('dtl_mode', str, 60),
                   Dynamic('vmachines_guids', list, 15),
                   Dynamic('vpools_guids', list, 15),
                   Dynamic('vdisks_guids', list, 15),
@@ -47,7 +47,7 @@ class StorageRouter(DataObject):
         """
         from ovs.dal.hybrids.vdisk import VDisk
         statistics = {}
-        for key in StorageDriverClient.stat_keys:
+        for key in StorageDriverClient.STAT_KEYS:
             statistics[key] = 0
             statistics['{0}_ps'.format(key)] = 0
         for storagedriver in self.storagedrivers:
@@ -70,17 +70,17 @@ class StorageRouter(DataObject):
                     data += vdisk.info['stored']
         return data
 
-    def _failover_mode(self):
+    def _dtl_mode(self):
         """
-        Gets the aggregated failover mode
+        Gets the aggregated DTL mode
         """
         status = 'UNKNOWN'
         status_code = 0
         for storagedriver in self.storagedrivers:
             for vdisk in storagedriver.vpool.vdisks:
                 if vdisk.storagedriver_id == storagedriver.storagedriver_id:
-                    mode = vdisk.info['failover_mode']
-                    current_status_code = StorageDriverClient.foc_status[mode.lower()]
+                    mode = vdisk.info['dtl_mode']
+                    current_status_code = StorageDriverClient.DTL_STATUS[mode.lower()]
                     if current_status_code > status_code:
                         status = mode
                         status_code = current_status_code
