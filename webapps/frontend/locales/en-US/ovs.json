@@ -172,6 +172,7 @@
         "noelements": "No items available",
         "elementsloading": "Items loading...",
         "customvalue": "Custom:",
+        "default": "Default",
         "errorsfound": "Errors were found. Please check the contents of all fields.",
         "followingerrorsfound": "Following errors were found:",
         "cachefs": "Cache",
@@ -197,7 +198,6 @@
         "storageip": "Storage IP",
         "namespace": "Backend location",
         "save": "Save",
-        "fallbackvalue": "Fallback",
         "usage": "Usage",
         "custompath": "Custom path",
         "reload": "Reload",
@@ -252,34 +252,31 @@
                 "cache_strategies": {
                     "none": "No Cache",
                     "null": "-",
-                    "onread": "Cache On Read",
-                    "onwrite": "Cache On Write"
+                    "on_read": "Cache On Read",
+                    "on_write": "Cache On Write"
                 },
                 "caching": "Caching",
                 "dedupe": "Deduplication",
-                "dedupe_help_message": "Deduplication will calculate MD5 sum for each write resulting in performance loss, but better cache performance",
+                "dedupe_help_message": "Deduplication will calculate an MD5 sum for each write resulting in performance loss, but better cache performance",
                 "dedupe_help_title": "Help - Deduplication",
                 "dedupe_modes": {
                     "dedupe": "Deduped",
-                    "nondedupe": "Non-Deduped",
+                    "non_dedupe": "Non-Deduped",
                     "null": "-"
                 },
                 "dedupe_warning": "Non-deduplication cannot be changed again!",
                 "dtl": "Distributed Transaction Log",
                 "dtl_enable": "Enable",
-                "dtl_help_message": "The Distributed Transaction Log does a bunch of stuff",
+                "dtl_help_message": "Copies unprotected data in the write buffer of a vDisk to another Storage Router",
                 "dtl_help_title": "Distributed Transaction Log",
                 "dtl_location": "Location",
                 "dtl_mode": "Mode",
                 "dtl_modes": {
-                    "async": "Async",
-                    "nosync": "No Sync",
+                    "a_sync": "Async",
+                    "no_sync": "No Sync",
                     "sync": "Sync"
                 },
-                "dtl_options": {
-                    "false": "No",
-                    "true": "Yes"
-                },
+                "readcache_limit": "Read cache limit",
                 "sco_size": "SCO size",
                 "strategy": "Strategy",
                 "volume": "Volumes",
@@ -304,9 +301,9 @@
         "dtl_location": "DTL Location",
         "dtl_mode": "DTL Mode",
         "freespace": "Free space",
-        "title": "vPools",
         "sco_size": "SCO Size",
         "statistics": "Statistics",
+        "title": "vPools",
         "write_buffer": "Write Buffer",
         "detail": {
             "title": "vPool",

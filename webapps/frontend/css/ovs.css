@@ -18,7 +18,7 @@
     margin: 0;
 }
 
-:not(a) {
+:not(a):not(.disabled):not(.hand) {
     cursor: default;
 }
 button * {

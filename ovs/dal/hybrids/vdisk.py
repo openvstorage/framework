@@ -39,8 +39,7 @@ class VDisk(DataObject):
                     Property('order', int, mandatory=False, doc='Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
                     Property('volume_id', str, mandatory=False, doc='ID of the vDisk in the Open vStorage Volume Driver.'),
                     Property('parentsnapshot', str, mandatory=False, doc='Points to a parent storage driver parent ID. None if there is no parent Snapshot'),
-                    Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder'),
-                    Property('configuration', dict, default=dict(), doc='Hypervisor/volumedriver specific configurations')]
+                    Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder')]
     __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
                    Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
@@ -48,8 +47,7 @@ class VDisk(DataObject):
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('storagedriver_id', str, 60),
-                  Dynamic('storagerouter_guid', str, 15),
-                  Dynamic('resolved_configuration', dict, 300, locked=True)]
+                  Dynamic('storagerouter_guid', str, 15)]
 
     def __init__(self, *args, **kwargs):
         """
@@ -152,20 +150,6 @@ class VDisk(DataObject):
         if len(storagedrivers) == 1:
             return storagedrivers[0].storagerouter_guid
         return None
-
-    def _resolved_configuration(self):
-        """
-        Returns resolved configuration for this vDisk, falling back to the vMachine and vPool
-        """
-        configuration = {}
-        keys = ['cache_strategy', 'dedupe_mode', 'dtl_enabled', 'dtl_mode', 'sco_size', 'write_buffer']
-        self.invalidate_cached_objects()
-        for key in keys:
-            if key in self.configuration:
-                configuration[key] = self.configuration[key]
-            elif self.vmachine is not None and key in self.vmachine.configuration:
-                configuration[key] = self.vmachine.configuration[key]
-        return configuration
 
     def reload_client(self):
         """

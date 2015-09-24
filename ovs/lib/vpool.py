@@ -23,10 +23,11 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.fs.exportfs import Nfsexports
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.hypervisor.factory import Factory
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.helpers.decorators import log
 from ovs.log.logHandler import LogHandler
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 
 logger = LogHandler.get('lib', name='vpool')
 
@@ -90,19 +91,6 @@ class VPoolController(object):
         if not vpool.storagedrivers or not vpool.storagedrivers[0].storagerouter:
             return {}
 
-        onread = 'CacheOnRead'
-        onwrite = 'CacheOnWrite'
-        deduped = 'ContentBased'
-        non_deduped = 'LocationBased'
-        cache_mapping = {None: 'none',
-                         onread: 'onread',
-                         onwrite: 'onwrite'}
-        dedupe_mapping = {deduped: 'dedupe',
-                          non_deduped: 'nondedupe'}
-        dtl_mode_mapping = {'': 'sync',
-                            '': 'async',
-                            '': 'nosync'}
-
         client = SSHClient(vpool.storagedrivers[0].storagerouter)
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
         storagedriver_config.load(client)
@@ -110,22 +98,23 @@ class VPoolController(object):
         volume_router = storagedriver_config.configuration.get('volume_router', {})
         volume_manager = storagedriver_config.configuration.get('volume_manager', {})
 
-        dedupe_mode = volume_manager.get('read_cache_default_mode', 'ContentBased')
-        cache_strategy = volume_manager.get('read_cache_default_behaviour', 'CacheOnRead')
+        dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_CONTENT_BASED)
+        cache_strategy = volume_manager.get('read_cache_default_behaviour', StorageDriverClient.VOLDRV_CACHE_ON_READ)
         sco_multiplier = volume_router.get('vrouter_sco_multiplier', 1024)
         tlog_multiplier = volume_manager.get('number_of_scos_in_tlog', 20)
         non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
 
         dtl_mode = storagedriver_config.configuration.get('', {}).get('', None)
         sco_size = sco_multiplier * 4 / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
-        dtl_enabled = storagedriver_config.configuration.get('', {}).get('', None)
+        dtl_enabled = storagedriver_config.configuration.get('', {}).get('', False)
         dtl_location = storagedriver_config.configuration.get('', {}).get('', None)
-        write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor / 1024.0  # SCO size is in MiB, but write buffer must be GiB
+        write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor
 
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
-                'dtl_enabled': dtl_enabled,  # @TODO: Must be boolean value once implemented correctly
-                'dedupe_mode': dedupe_mapping[dedupe_mode],
+                'dtl_enabled': dtl_enabled,
+                'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
                 'write_buffer': write_buffer,
                 'dtl_location': dtl_location,
-                'cache_strategy': cache_mapping[cache_strategy]}
+                'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],
+                'tlog_multiplier': tlog_multiplier}

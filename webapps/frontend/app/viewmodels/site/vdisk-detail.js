@@ -38,7 +38,6 @@ define([
         // Observables
         self.snapshotsInitialLoad = ko.observable(true);
         self.vDisk                = ko.observable();
-        self.dtlLocation          = ko.observable();
 
         // Functions
         self.load = function() {
@@ -92,7 +91,8 @@ define([
             if (self.vDisk() !== undefined) {
                 var vd = self.vDisk();
                 api.post('vdisks/' + vd.guid() + '/set_config_params', {
-                    data: { config_params: vd.newConfiguration() }
+                    data: { new_config_params: vd.configuration(),
+                            old_config_params: vd.oldConfiguration() }
                 })
                     .then(self.shared.tasks.wait)
                     .done(function () {
@@ -104,12 +104,15 @@ define([
                     .fail(function (error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:generic.messages.errorwhile_error', {
-                                what: $.t('ovs:vdisks.saveconfig.errormsg', { what: vd.name() }),
-                                error: error
+                            $.t('ovs:generic.messages.errorwhile', {
+                                what: $.t('ovs:vdisks.saveconfig.errormsg', { what: vd.name() })
                             })
                         );
+                    })
+                    .always(function() {
+                        vd.loadConfiguration(true);
                     });
+                vd.oldConfiguration($.extend({}, vd.configuration()));
             }
         };
 
