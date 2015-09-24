@@ -15,8 +15,7 @@
 define(['knockout', 'ovs/generic'], function(ko, generic) {
     "use strict";
     ko.extenders.numeric = function(target, settings) {
-        var computed;
-        computed = ko.computed({
+        var computed = ko.computed({
             read: target,
             write: function(newValue) {
                 var parsedValue = parseInt(newValue, 10);
@@ -28,11 +27,11 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                     }
                     parsedValue = 0;
                 }
-                if (settings.hasOwnProperty('min')) {
-                    parsedValue = Math.max(settings.min, parsedValue);
+                if (computed.hasOwnProperty('min') && computed.min !== undefined) {
+                    parsedValue = Math.max(computed.min, parsedValue);
                 }
-                if (settings.hasOwnProperty('max')) {
-                    parsedValue = Math.min(settings.max, parsedValue);
+                if (computed.hasOwnProperty('max') && computed.max !== undefined) {
+                    parsedValue = Math.min(computed.max, parsedValue);
                 }
                 if ((target() !== undefined ? target().toString() : 'undefined') !== newValue) {
                     target(parsedValue);
@@ -40,9 +39,9 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                 }
             }
         }).extend({ notify: 'always' });
-        computed(target());
         computed.min = generic.tryGet(settings, 'min', undefined);
         computed.max = generic.tryGet(settings, 'max', undefined);
+        computed(target());
         return computed;
     };
     ko.extenders.smooth = function(target, settings) {

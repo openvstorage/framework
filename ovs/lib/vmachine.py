@@ -642,24 +642,6 @@ class VMachineController(object):
             raise
 
     @staticmethod
-    @celery.task(name='ovs.machine.set_config_params')
-    def set_config_params(vmachine_guid, config_params):
-        """
-        Sets configuration parameters to a given vmachine/vdisk.
-        """
-        vmachine = VMachine(vmachine_guid)
-        resolved_configs = dict((vdisk.guid, vdisk.resolved_configuration) for vdisk in vmachine.vdisks)
-        vmachine.configuration = config_params
-        vmachine.save()
-        for vdisk in vmachine.vdisks:
-            vdisk.invalidate_dynamics(['resolved_configuration'])
-            old_resolved_config = resolved_configs[vdisk.guid]
-            new_resolved_config = vdisk.resolved_configuration
-            for key, value in config_params.iteritems():
-                if old_resolved_config.get(key) != new_resolved_config.get(key):
-                    logger.info('Updating property {0} on vDisk {1} to {2}'.format(key, vdisk.guid, new_resolved_config.get(key)))
-
-    @staticmethod
     @celery.task(name='ovs.machine.update_vmachine_name')
     def update_vmachine_name(instance_id, old_name, new_name):
         """

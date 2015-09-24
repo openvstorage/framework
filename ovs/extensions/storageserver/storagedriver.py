@@ -13,18 +13,26 @@
 # limitations under the License.
 
 """
-Wrapper class for the storagedriverclient of the voldrv team
+Wrapper class for the storagedriver client of the voldrv team
 """
 
 import os
 import json
 import copy
-from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient, LocalStorageRouterClient as LSRClient, MDSClient, MDSNodeConfig
-from volumedriver.storagerouter.storagerouterclient import ClusterContact, Statistics, VolumeInfo
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.remote import Remote
 from ovs.log.logHandler import LogHandler
+from volumedriver.storagerouter import storagerouterclient
+from volumedriver.storagerouter.storagerouterclient import ClusterContact
+from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient as LSRClient
+from volumedriver.storagerouter.storagerouterclient import MDSClient
+from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
+from volumedriver.storagerouter.storagerouterclient import ReadCacheBehaviour
+from volumedriver.storagerouter.storagerouterclient import ReadCacheMode
+from volumedriver.storagerouter.storagerouterclient import Statistics
+from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient
+from volumedriver.storagerouter.storagerouterclient import VolumeInfo
+
 
 logger = LogHandler.get('extensions', name='storagedriver')
 storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
@@ -37,8 +45,64 @@ mdsclient_service_cache = {}
 
 class StorageDriverClient(object):
     """
-    Client to access storagedriverclient
+    Client to access storagedriver client
     """
+    VOLDRV_DTL_SYNC = ''
+    VOLDRV_DTL_ASYNC = ''
+    VOLDRV_DTL_NOSYNC = ''
+    VOLDRV_NO_CACHE = 'NoCache'
+    VOLDRV_CACHE_ON_READ = 'CacheOnRead'
+    VOLDRV_CONTENT_BASED = 'ContentBased'
+    VOLDRV_CACHE_ON_WRITE = 'CacheOnWrite'
+    VOLDRV_LOCATION_BASED = 'LocationBased'
+
+    FRAMEWORK_DTL_SYNC = 'sync'
+    FRAMEWORK_DTL_ASYNC = 'async'
+    FRAMEWORK_DTL_NOSYNC = 'no_sync'
+    FRAMEWORK_NO_CACHE = 'none'
+    FRAMEWORK_CACHE_ON_READ = 'on_read'
+    FRAMEWORK_CONTENT_BASED = 'dedupe'
+    FRAMEWORK_CACHE_ON_WRITE = 'on_write'
+    FRAMEWORK_LOCATION_BASED = 'non_dedupe'
+
+    VDISK_CACHE_MAP = {FRAMEWORK_NO_CACHE: ReadCacheBehaviour.NO_CACHE,
+                       FRAMEWORK_CACHE_ON_READ: ReadCacheBehaviour.CACHE_ON_READ,
+                       FRAMEWORK_CACHE_ON_WRITE: ReadCacheBehaviour.CACHE_ON_WRITE}
+    VPOOL_CACHE_MAP = {FRAMEWORK_NO_CACHE: VOLDRV_NO_CACHE,
+                       FRAMEWORK_CACHE_ON_READ: VOLDRV_CACHE_ON_READ,
+                       FRAMEWORK_CACHE_ON_WRITE: VOLDRV_CACHE_ON_WRITE}
+    VDISK_DEDUPE_MAP = {FRAMEWORK_CONTENT_BASED: ReadCacheMode.CONTENT_BASED,
+                        FRAMEWORK_LOCATION_BASED: ReadCacheMode.LOCATION_BASED}
+    VPOOL_DEDUPE_MAP = {FRAMEWORK_CONTENT_BASED: VOLDRV_CONTENT_BASED,
+                        FRAMEWORK_LOCATION_BASED: VOLDRV_LOCATION_BASED}
+    VDISK_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: '',
+                          FRAMEWORK_DTL_ASYNC: '',
+                          FRAMEWORK_DTL_NOSYNC: ''}
+    VPOOL_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: VOLDRV_DTL_SYNC,
+                          FRAMEWORK_DTL_ASYNC: VOLDRV_DTL_ASYNC,
+                          FRAMEWORK_DTL_NOSYNC: VOLDRV_DTL_NOSYNC}
+    REVERSE_CACHE_MAP = {VOLDRV_NO_CACHE: FRAMEWORK_NO_CACHE,
+                         VOLDRV_CACHE_ON_READ: FRAMEWORK_CACHE_ON_READ,
+                         VOLDRV_CACHE_ON_WRITE: FRAMEWORK_CACHE_ON_WRITE,
+                         ReadCacheBehaviour.NO_CACHE: FRAMEWORK_NO_CACHE,
+                         ReadCacheBehaviour.CACHE_ON_READ: FRAMEWORK_CACHE_ON_READ,
+                         ReadCacheBehaviour.CACHE_ON_WRITE: FRAMEWORK_CACHE_ON_WRITE}
+    REVERSE_DEDUPE_MAP = {VOLDRV_CONTENT_BASED: FRAMEWORK_CONTENT_BASED,
+                          VOLDRV_LOCATION_BASED: FRAMEWORK_LOCATION_BASED,
+                          ReadCacheMode.CONTENT_BASED: FRAMEWORK_CONTENT_BASED,
+                          ReadCacheMode.LOCATION_BASED: FRAMEWORK_LOCATION_BASED}
+    REVERSE_DTL_MODE_MAP = {VOLDRV_DTL_SYNC: FRAMEWORK_DTL_SYNC,
+                            VOLDRV_DTL_ASYNC: FRAMEWORK_DTL_ASYNC,
+                            VOLDRV_DTL_NOSYNC: FRAMEWORK_DTL_NOSYNC,
+                            '': FRAMEWORK_DTL_SYNC,
+                            '': FRAMEWORK_DTL_ASYNC,
+                            '': FRAMEWORK_DTL_NOSYNC}
+    TLOG_MULTIPLIER_MAP = {4: 16,
+                           8: 8,
+                           16: 4,
+                           32: 2,
+                           64: 1,
+                           128: 1}
 
     foc_status = {'': 0,
                   'ok_standalone': 10,
