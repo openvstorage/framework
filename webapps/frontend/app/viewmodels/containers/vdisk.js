@@ -146,7 +146,7 @@ define([
             generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);
-                self.dtlMode(data.info.dtl_mode.toLowerCase() || 'unknown');
+                self.dtlMode(data.info.failover_mode.toLowerCase() || 'unknown');
                 self.namespace(data.info.namespace);
             }
             if (data.hasOwnProperty('statistics')) {

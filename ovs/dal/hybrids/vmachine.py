@@ -119,7 +119,7 @@ class VMachine(DataObject):
         status = 'UNKNOWN'
         status_code = 0
         for vdisk in self.vdisks:
-            mode = vdisk.info['dtl_mode']
+            mode = vdisk.info['failover_mode']
             current_status_code = StorageDriverClient.DTL_STATUS[mode.lower()]
             if current_status_code > status_code:
                 status = mode
