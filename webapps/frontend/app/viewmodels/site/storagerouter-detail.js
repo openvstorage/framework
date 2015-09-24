@@ -59,6 +59,11 @@ define([
                                 self.pMachineCache[pMachineGuid] = pm;
                             }
                             storageRouter.pMachine(self.pMachineCache[pMachineGuid]);
+                        } else if (pMachineGuid && storageRouter.pMachine() !== undefined && storageRouter.pMachine().loaded() === false) {
+                            if (!self.pMachineCache.hasOwnProperty(storageRouter.pMachine().guid())) {
+                                self.pMachineCache[storageRouter.pMachine().guid()] = storageRouter.pMachine();
+                            }
+                            storageRouter.pMachine().load();
                         }
                         // Move child guids to the observables for easy display
                         storageRouter.vPools(storageRouter.vPoolGuids);

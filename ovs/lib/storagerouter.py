@@ -147,30 +147,18 @@ class StorageRouterController(object):
         """
         Add a vPool to the machine this task is running on
         """
-        onread = 'CacheOnRead'
-        onwrite = 'CacheOnWrite'
-        deduped = 'ContentBased'
-        non_deduped = 'LocationBased'
-        cache_mapping = {'none': None,
-                         'onread': onread,
-                         'onwrite': onwrite}
-        dedupe_mapping = {'dedupe': deduped,
-                          'nondedupe': non_deduped}
-        dtl_mode_mapping = {'sync': '',
-                            'async': '',
-                            'nosync': ''}
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
                            'storagerouter_ip': (str, Toolbox.regex_ip),
                            'integratemgmt': (bool, None)}
         required_params_for_new_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
-                                         'config_params': (dict, {'dtl_mode': (str, dtl_mode_mapping.keys()),
-                                                                  'sco_size': (int, None),
-                                                                  'dedupe_mode': (str, dedupe_mapping.keys()),
+                                         'config_params': (dict, {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
+                                                                  'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
+                                                                  'dedupe_mode': (str, StorageDriverClient.VPOOL_DEDUPE_MAP.keys()),
                                                                   'dtl_enabled': (bool, None),
                                                                   'dtl_location': (str, None),
-                                                                  'write_buffer': (int, None, False),
-                                                                  'cache_strategy': (str, cache_mapping.keys())}),
+                                                                  'write_buffer': (int, {'min': 128, 'max': 10240}),
+                                                                  'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys())}),
                                          'connection_host': (str, Toolbox.regex_ip, False),
                                          'connection_port': (int, None),
                                          'connection_backend': (dict, None),
@@ -239,6 +227,11 @@ class StorageRouterController(object):
                 Toolbox.verify_required_params(required_params_for_new_local_vpool, parameters)
             else:
                 Toolbox.verify_required_params(required_params_for_new_vpool, parameters)
+                sco_size = parameters['config_params']['sco_size']
+                write_buffer = parameters['config_params']['write_buffer']
+                if sco_size not in StorageDriverClient.TLOG_MULTIPLIER_MAP or (sco_size == 128 and write_buffer < 256) or not (128 <= write_buffer <= 10240):
+                    raise ValueError('Incorrect storagedriver configuration settings specified')
+
             vpool = VPool()
             backend_type = BackendTypeList.get_backend_type_by_code(parameters['type'])
             vpool.backend_type = backend_type
@@ -575,23 +568,14 @@ class StorageRouterController(object):
 
         if 'config_params' in parameters:
             sco_size = parameters['config_params']['sco_size']
-            if 'write_buffer' in parameters['config_params']:
-                # sco_factor = write buffer (in GiB) / tlog multiplier (default 20) / sco size (in MiB)
-                sco_factor = parameters['config_params']['write_buffer'] * 1024.0 / 20 / sco_size
-            else:
-                # Below table makes sure the write buffer is always between 1 and 5 GiG
-                sco_factor = {4: 12,
-                              8: 12,
-                              16: 12,
-                              32: 6,
-                              64: 3,
-                              128: 2}[sco_size]
-
+            tlog_multiplier = StorageDriverClient.TLOG_MULTIPLIER_MAP[sco_size]
+            sco_factor = float(parameters['config_params']['write_buffer']) / tlog_multiplier / sco_size  # sco_factor = write buffer / tlog multiplier (default 20) / sco size (in MiB)
             dedupe_mode = parameters['config_params']['dedupe_mode']
             cache_strategy = parameters['config_params']['cache_strategy']
         else:
             sco_size = current_storage_driver_config['sco_size']
-            sco_factor = current_storage_driver_config['write_buffer'] * 1024.0 / 20 / sco_size
+            tlog_multiplier = current_storage_driver_config['tlog_multiplier']
+            sco_factor = float(current_storage_driver_config['write_buffer']) / tlog_multiplier / sco_size
             dedupe_mode = current_storage_driver_config['dedupe_mode']
             cache_strategy = current_storage_driver_config['cache_strategy']
 
@@ -606,8 +590,9 @@ class StorageRouterController(object):
                                                       metadata_path=metadatapath,
                                                       tlog_path=tlogpath,
                                                       foc_throttle_usecs=4000,
-                                                      read_cache_default_mode=dedupe_mapping[dedupe_mode],
-                                                      read_cache_default_behaviour=cache_mapping[cache_strategy],
+                                                      read_cache_default_mode=StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode],
+                                                      read_cache_default_behaviour=StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy],
+                                                      number_of_scos_in_tlog=tlog_multiplier,
                                                       non_disposable_scos_factor=sco_factor)
         storagedriver_config.configure_volume_router(vrouter_id=vrouter_id,
                                                      vrouter_redirect_timeout_ms='5000',

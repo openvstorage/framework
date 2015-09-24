@@ -136,7 +136,7 @@ limitations under the License.
             <li class="active" data-bind="tooltip: 'ovs:generic.snapshots'">
                 <a href="#snapshots" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.snapshot"></a>
             </li>
-            <li data-bind="tooltip: 'ovs:generic.management', visible: false">
+            <li data-bind="tooltip: 'ovs:generic.management', visible: $root.shared.user.roles().contains('manage'), click: loadAllConfigurations">
                 <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
             </li>
         </ul>
@@ -191,47 +191,29 @@ limitations under the License.
                                                     <tr>
                                                         <td style="width: 20%; padding: 0;">
                                                             <div style="margin-top: 5px;">
-                                                                <span data-i18n="ovs:storagedrivers.configuration.general.dtl_enable"></span>:
+                                                                <label class="control-label"
+                                                                       for="enableDTL"
+                                                                       style="padding: inherit; font-weight: inherit; margin-bottom: inherit;"
+                                                                       data-i18n="ovs:storagedrivers.configuration.general.dtl_enable">
+                                                                </label>:
                                                             </div>
                                                         </td>
-                                                        <td style="width: 15%; padding: 0;">
-                                                            <span data-bind="dropdown: {
-                                                                                 items: dtlOptions,
-                                                                                 target: dtlEnable,
-                                                                                 text: function(item) {
-                                                                                     if (item === undefined) {
-                                                                                         return '-';
-                                                                                     }
-                                                                                     return $.t('ovs:storagedrivers.configuration.general.dtl_options.' + item.value);
-                                                                                 },
-                                                                                 key: 'value',
-                                                                                 keyisfunction: false,
-                                                                                 small: true
-                                                                             }">
-                                                            </span>
+                                                        <td style="width: 16%; padding: 0;">
+                                                            <input type="checkbox" id="enableDTL" data-bind="checked: dtlEnabled">
                                                         </td>
                                                         <td style="padding: 0;">
-                                                            <!-- ko if: dtlEnable() === undefined && fallbackConfig().dtl_enabled !== undefined -->
-                                                                <span data-i18n="ovs:generic.fallbackvalue"></span>: <span data-bind="translate: 'ovs:storagedrivers.configuration.general.dtl_options.' + fallbackConfig().dtl_enabled[0]"></span>
-                                                                (<span data-i18n="ovs:generic.inheritedfrom"></span>
-                                                                <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().dtl_enabled[1] === 'machine',
-                                                                                  attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
-                                                                </span>
-                                                                <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded', undefinedLoading: false }">
-                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().dtl_enabled[1] === 'vpool',
-                                                                                  attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
-                                                                </span>)
+                                                            <!-- ko if: configuration() !== undefined  && parentConfiguration() !== undefined && configuration().dtl_enabled === parentConfiguration().dtl_enabled -->
+                                                                <span data-i18n="ovs:generic.default"></span>
                                                             <!-- /ko -->
                                                         </td>
                                                     </tr>
                                                     <!--<tr>-->
-                                                        <!--<td style="width: 20%; padding: 0;">-->
+                                                        <!--<td style="padding: 0;">-->
                                                             <!--<div style="margin-top: 5px;">-->
                                                                 <!--<span data-i18n="ovs:storagedrivers.configuration.general.dtl_mode"></span>:-->
                                                             <!--</div>-->
                                                         <!--</td>-->
-                                                        <!--<td style="width: 15%; padding: 0;">-->
+                                                        <!--<td style="padding: 0;">-->
                                                             <!--<span data-bind="dropdown: {-->
                                                                                  <!--items: dtlModes,-->
                                                                                  <!--target: dtlMode,-->
@@ -263,12 +245,12 @@ limitations under the License.
                                                         <!--</td>-->
                                                     <!--</tr>-->
                                                     <!--<tr>-->
-                                                        <!--<td style="width: 20%; padding: 0;">-->
+                                                        <!--<td style="padding: 0;">-->
                                                             <!--<div style="margin-top: 5px;">-->
                                                                 <!--<span data-i18n="ovs:storagedrivers.configuration.general.dtl_location"></span>:-->
                                                             <!--</div>-->
                                                         <!--</td>-->
-                                                        <!--<td style="width: 15%; padding: 0;">-->
+                                                        <!--<td style="padding: 0;">-->
                                                             <!--<span data-bind="dropdown: {-->
                                                                                  <!--items: $parent.storageRouters,   not yet defined-->
                                                                                  <!--target: $parent.dtlLocation,-->
@@ -289,7 +271,7 @@ limitations under the License.
                                             </table>
                                         </div>
                                     </li>
-                                    <li>
+                                    <li style="margin-top: 10px;">
                                         <span data-i18n="ovs:storagedrivers.configuration.general.caching"></span>
                                         <div>
                                             <table class="table table-condensed" style="margin-left: 20px; margin-bottom: 0; width: 100%;">
@@ -300,39 +282,25 @@ limitations under the License.
                                                                 <span data-i18n="ovs:storagedrivers.configuration.general.strategy"></span>:
                                                             </div>
                                                         </td>
-                                                        <td style="width: 15%; padding: 0;">
+                                                        <td style="width: 16%; padding: 0;">
                                                             <span data-bind="dropdown: {
                                                                                  items: cacheStrategies,
-                                                                                 target: configCacheStrategy,
+                                                                                 target: cacheStrategy,
                                                                                  text: function(item) {
-                                                                                     if (item === undefined) {
-                                                                                         return '-';
-                                                                                     }
-                                                                                     return $.t('ovs:storagedrivers.configuration.general.cache_strategies.' + item.name);
+                                                                                     return $.t('ovs:storagedrivers.configuration.general.cache_strategies.' + item);
                                                                                  },
-                                                                                 key: 'name',
-                                                                                 keyisfunction: false,
                                                                                  small: true
                                                                              }">
                                                             </span>
                                                         </td>
                                                         <td style="padding: 0;">
-                                                            <!-- ko if: configCacheStrategy() === undefined && fallbackConfig().cache_strategy !== undefined -->
-                                                                <span data-i18n="ovs:generic.fallbackvalue"></span>: <span data-bind="translate: 'ovs:storagedrivers.configuration.general.cache_strategies.' + fallbackConfig().cache_strategy[0]"></span>
-                                                                (<span data-i18n="ovs:generic.inheritedfrom"></span>
-                                                                <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().cache_strategy[1] === 'machine',
-                                                                                  attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
-                                                                </span>
-                                                                <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded', undefinedLoading: false }">
-                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().cache_strategy[1] === 'vpool',
-                                                                                  attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
-                                                                </span>)
+                                                            <!-- ko if: configuration() !== undefined  && parentConfiguration() !== undefined && configuration().cache_strategy === parentConfiguration().cache_strategy -->
+                                                                <span data-i18n="ovs:generic.default"></span>
                                                             <!-- /ko -->
                                                         </td>
                                                     </tr>
                                                     <tr >
-                                                        <td style="width: 20%; padding: 0;">
+                                                        <td style="padding: 0;">
                                                             <div style="margin-top: 5px;">
                                                                 <span data-i18n="ovs:storagedrivers.configuration.general.dedupe"></span>:
                                                                 <a data-bind="popover: {
@@ -351,35 +319,34 @@ limitations under the License.
                                                                 </span>
                                                             </div>
                                                         </td>
-                                                        <td style="width: 15%; padding: 0;">
+                                                        <td style="padding: 0;">
                                                             <span data-bind="dropdown: {
                                                                                  items: dedupeModes,
                                                                                  target: dedupeMode,
                                                                                  text: function(item) {
-                                                                                     if (item === undefined) {
-                                                                                         return '-';
-                                                                                     }
                                                                                      return $.t('ovs:storagedrivers.configuration.general.dedupe_modes.' + item.name);
                                                                                  },
-                                                                                 key: 'name',
-                                                                                 keyisfunction: false,
                                                                                  small: true
                                                                              }">
                                                             </span>
                                                         </td>
                                                         <td style="padding: 0;">
-                                                            <!-- ko if: dedupeMode() === undefined && fallbackConfig().dedupe_mode !== undefined -->
-                                                                <span data-i18n="ovs:generic.fallbackvalue"></span>: <span data-bind="translate: 'ovs:storagedrivers.configuration.general.dedupe_modes.' + fallbackConfig().dedupe_mode[0]"></span>
-                                                                (<span data-i18n="ovs:generic.inheritedfrom"></span>
-                                                                <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().dedupe_mode[1] === 'machine',
-                                                                                  attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
-                                                                </span>
-                                                                <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded', undefinedLoading: false }">
-                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().dedupe_mode[1] === 'vpool',
-                                                                                  attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
-                                                                </span>)
+                                                            <!-- ko if: configuration() !== undefined  && parentConfiguration() !== undefined && configuration().dedupe_mode === parentConfiguration().dedupe_mode -->
+                                                                <span data-i18n="ovs:generic.default"></span>
                                                             <!-- /ko -->
+                                                        </td>
+                                                    </tr>
+                                                    <tr data-bind="visible: dedupeMode() !== undefined && dedupeMode().name === 'non_dedupe'">
+                                                        <td style="padding: 0;">
+                                                            <div>
+                                                                <span data-i18n="ovs:storagedrivers.configuration.general.readcache_limit"></span>:
+                                                            </div>
+                                                        </td>
+                                                        <td style="padding: 0;">
+                                                            <input data-bind="value: readCacheLimit, valueUpdate: 'afterkeydown'"
+                                                                   size="5"
+                                                                   style="height: 25px; text-align: center;"/>
+                                                            <span data-i18n="ovs:generic.gib"></span>
                                                         </td>
                                                     </tr>
                                                 </tbody>
@@ -397,59 +364,38 @@ limitations under the License.
                                                                 <span data-i18n="ovs:storagedrivers.configuration.general.sco_size"></span>:
                                                             </div>
                                                         </td>
-                                                        <td style="width: 15%; padding: 0;">
+                                                        <td style="width: 16%; padding: 0;">
                                                             <span data-bind="dropdown: {
                                                                                  items: scoSizes,
                                                                                  target: scoSize,
                                                                                  text: function(item) {
-                                                                                     if (item === undefined || item === null) {
-                                                                                         return '-';
-                                                                                     }
-                                                                                     return item + ' ' + $.t('ovs:generic.m') + $.t('ovs:generic.b');
+                                                                                     return item + ' ' + $.t('ovs:generic.mib');
                                                                                  },
                                                                                  small: true
                                                                              }">
                                                             </span>
                                                         </td>
                                                         <td style="padding: 0;">
-                                                            <!-- ko if: scoSize() === undefined && fallbackConfig().sco_size !== undefined -->
-                                                                <span data-i18n="ovs:generic.fallbackvalue"></span>: <span data-bind="text: fallbackConfig().sco_size[0]"></span> MB
-                                                                (<span data-i18n="ovs:generic.inheritedfrom"></span>
-                                                                <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().sco_size[1] === 'machine',
-                                                                                  attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
-                                                                </span>
-                                                                <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded', undefinedLoading: false }">
-                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().sco_size[1] === 'vpool',
-                                                                                  attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
-                                                                </span>)
+                                                            <!-- ko if: configuration() !== undefined  && parentConfiguration() !== undefined && configuration().sco_size === parentConfiguration().sco_size -->
+                                                                <span data-i18n="ovs:generic.default"></span>
                                                             <!-- /ko -->
                                                         </td>
                                                     </tr>
                                                     <tr>
-                                                        <td style="width: 20%; padding: 0;">
+                                                        <td style="padding: 0;">
                                                             <div style="margin-top: 5px;">
                                                                 <span data-i18n="ovs:storagedrivers.configuration.general.write_buffer"></span>:
                                                             </div>
                                                         </td>
-                                                        <td style="width: 15%; padding: 0;">
-                                                            <input data-bind="value: writeBuffer, valueUpdate: 'afterkeydown'"
+                                                        <td style="padding: 0;">
+                                                            <input data-bind="value: writeBuffer"
                                                                    size="5"
                                                                    style="height: 25px; text-align: center;"/>
-                                                            <span data-bind="text: ' GB'"></span>
+                                                            <span data-i18n="ovs:generic.mib"></span>
                                                         </td>
                                                         <td style="padding: 0;">
-                                                            <!-- ko if: writeBuffer() === undefined && fallbackConfig().write_buffer !== undefined -->
-                                                                <span data-i18n="ovs:generic.fallbackvalue"></span>: <span data-bind="text: fallbackConfig().write_buffer[0]"></span> GB
-                                                                (<span data-i18n="ovs:generic.inheritedfrom"></span>
-                                                                <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().write_buffer[1] === 'machine',
-                                                                                  attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
-                                                                </span>
-                                                                <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded', undefinedLoading: false }">
-                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().write_buffer[1] === 'vpool',
-                                                                                  attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
-                                                                </span>)
+                                                            <!-- ko if: configuration() !== undefined  && parentConfiguration() !== undefined && configuration().write_buffer === parentConfiguration().write_buffer -->
+                                                                <span data-i18n="ovs:generic.default"></span>
                                                             <!-- /ko -->
                                                         </td>
                                                     </tr>

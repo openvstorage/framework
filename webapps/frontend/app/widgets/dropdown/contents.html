@@ -1,24 +1,26 @@
 <ul class="dropdown-menu" role="menu" style="max-height: 250px; overflow: auto; z-index: 6000;"
     data-bind="visible: items().length > 0, css: { 'dropdown-menu-right': side == 'right' }">
     <!-- ko foreach: items -->
-        <li data-bind="css: {
+        <li class="hand"
+            data-bind="css: {
                            active: $parent.multi() ? false : !$parent.useFree() && (
                                $data !== undefined && $parent.target() !== undefined && $parent.key() !== undefined ? (
                                    $parent.keyIsFunction() ? $parent.target() !== undefined && $parent.target()[$parent.key()]() === $data[$parent.key()]() :
                                                              $parent.target() !== undefined && $parent.target()[$parent.key()] === $data[$parent.key()]
                                ) : $parent.target() === $data
-                           )
+                           ),
+                           disabled: $data !== undefined && $data.hasOwnProperty('disabled') && $data.disabled === true
                        },
-                       click: function() { $parent.useFree(false); $parent.set($data); },
-                       attr: { id: ($parent.target.hasOwnProperty('identifier') ? ('dropdown-button-' + $parent.target.identifier + '-' + $data.replace(/\//g, '')) : undefined) }" class="hand">
+                       click: function() { if ($data === undefined || !$data.hasOwnProperty('disabled') || $data.disabled !== true) { $parent.useFree(false); $parent.set($data); } },
+                       attr: { id: ($parent.target.hasOwnProperty('identifier') ? ('dropdown-button-' + $parent.target.identifier + '-' + $data.replace(/\//g, '')) : undefined) }">
             <a style="white-space: nowrap;">
-                <span data-bind="visible: $parent.multi()">
-                    <span data-bind="visible: $parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.checked"></span>
-                    <span data-bind="visible: !$parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.notchecked"></span>
+                <span data-bind="visible: $parent.multi()" style="cursor: inherit;">
+                    <span data-bind="visible: $parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.checked" style="cursor: inherit;"></span>
+                    <span data-bind="visible: !$parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.notchecked" style="cursor: inherit;"></span>
                     &nbsp;
                 </span>
-                <span data-part="list-item"></span>
-                <span data-bind="html: $parent.text($data)"></span>
+                <span data-part="list-item" style="cursor: inherit;"></span>
+                <span data-bind="html: $parent.text($data)" style="cursor: inherit;"></span>
             </a>
         </li>
     <!-- /ko -->

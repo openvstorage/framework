@@ -73,11 +73,11 @@ define([
             mgmtcenterName:   ko.observable(),
             mgmtcenterLoaded: ko.observable(false),
             mountpointRegex:  mountpointRegex,
-            dtlModes:         ko.observableArray(['nosync', 'async', 'sync']),
-            cacheStrategies:  ko.observableArray(['onread', 'onwrite', 'none']),
-            dedupeModes:      ko.observableArray(['dedupe', 'nondedupe']),
+            dtlModes:         ko.observableArray(['no_sync', 'a_sync', 'sync']),
+            cacheStrategies:  ko.observableArray(['on_read', 'on_write', 'none']),
+            dedupeModes:      ko.observableArray(['dedupe', 'non_dedupe']),
             scoSizes:         ko.observableArray([4, 8, 16, 32, 64, 128]),
-            writeBuffer:      ko.observable().extend({ numeric: { min: 0, max: 1024, allowUndefined: true } }),
+            writeBuffer:      ko.observable(128).extend({numeric: {min: 128, max: 10240}}),
         }, resetAlbaBackends = function() {
             wizardData.albaBackends(undefined);
             wizardData.albaBackend(undefined);
@@ -94,6 +94,14 @@ define([
             wizardData.accesskey('');
             wizardData.secretkey('');
             resetAlbaBackends();
+        });
+        wizardData.scoSize.subscribe(function(size) {
+            if (size < 128) {
+                wizardData.writeBuffer.min = 128;
+            } else {
+                wizardData.writeBuffer.min = 256;
+            }
+            wizardData.writeBuffer(wizardData.writeBuffer());
         });
 
         return wizardData;
