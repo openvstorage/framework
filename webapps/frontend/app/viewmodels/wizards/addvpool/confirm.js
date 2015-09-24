@@ -47,7 +47,7 @@ define([
                         mountpoint_md: self.data.mtptMD(),
                         mountpoint_readcaches: self.data.mtptReadCaches(),
                         mountpoint_writecaches: self.data.mtptWriteCaches(),
-                        mountpoint_foc: self.data.mtptFOC(),
+                        mountpoint_dtl: self.data.mtptDTL(),
                         storage_ip: self.data.storageIP(),
                         integratemgmt: self.data.integratemgmt()
                     }

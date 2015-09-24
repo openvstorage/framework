@@ -46,7 +46,7 @@ define([
             mtptWriteCaches:  ko.observableArray([]), // Final target containing write caches
             mtptCustomWCs:    ko.observableArray([]),
             mtptCustomWC:     ko.observable(),
-            mtptFOC:          ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-foc' }),
+            mtptDTL:          ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-dtl' }),
             storageIP:        ko.observable().extend({ regex: ipRegex, identifier: 'storageip' }),
             name:             ko.observable('').extend({ regex: nameRegex }),
             host:             ko.observable('').extend({ regex: hostRegex }),
@@ -102,10 +102,10 @@ define([
             wizardData.mtptReadCaches.push(element);
         };
         wizardData.readCacheDistributor.remove = function(element) {
-            if ($.inArray(element, wizardData.mtptCustomRCs()) !== -1) {
+            if (wizardData.mtptCustomRCs().contains(element)) {
                 wizardData.mtptCustomRCs.remove(element);
             }
-            if ($.inArray(element, wizardData.mtptReadCaches()) !== -1) {
+            if (wizardData.mtptReadCaches().contains(element)) {
                 wizardData.mtptReadCaches.remove(element);
             }
         };
@@ -129,10 +129,10 @@ define([
             wizardData.mtptWriteCaches.push(element);
         };
         wizardData.writeCacheDistributor.remove = function(element) {
-            if ($.inArray(element, wizardData.mtptCustomWCs()) !== -1) {
+            if (wizardData.mtptCustomWCs().contains(element)) {
                 wizardData.mtptCustomWCs.remove(element);
             }
-            if ($.inArray(element, wizardData.mtptWriteCaches()) !== -1) {
+            if (wizardData.mtptWriteCaches().contains(element)) {
                 wizardData.mtptWriteCaches.remove(element);
             }
         };

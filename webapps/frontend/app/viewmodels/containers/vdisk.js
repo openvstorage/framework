@@ -54,7 +54,7 @@ define([
         self.storageRouterGuid = ko.observable();
         self.vpoolGuid         = ko.observable();
         self.vMachineGuid      = ko.observable();
-        self.failoverMode      = ko.observable();
+        self.dtlMode           = ko.observable();
         self.cacheStrategies   = ko.observableArray([undefined, { name: 'onread' }, { name: 'onwrite' }, { name: 'none' }]);
         self.dtlModes          = ko.observableArray([undefined, { name: 'nosync' }, { name: 'async' }, { name: 'sync' }]);
         self.dedupeModes       = ko.observableArray([undefined, { name: 'dedupe' }, { name: 'nondedupe' }]);
@@ -265,7 +265,7 @@ define([
             }
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);
-                self.failoverMode(data.info.failover_mode.toLowerCase() || 'unknown');
+                self.dtlMode(data.info.dtl_mode.toLowerCase() || 'unknown');
                 self.namespace(data.info.namespace);
             }
             if (data.hasOwnProperty('statistics')) {

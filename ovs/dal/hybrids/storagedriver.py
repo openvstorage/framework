@@ -30,7 +30,7 @@ class StorageDriver(DataObject):
     """
     __properties = [Property('name', str, doc='Name of the Storage Driver.'),
                     Property('description', str, mandatory=False, doc='Description of the Storage Driver.'),
-                    Property('ports', list, doc='Ports on which the Storage Driver is listening [mgmt, xmlrpc, foc].'),
+                    Property('ports', list, doc='Ports on which the Storage Driver is listening [mgmt, xmlrpc, dtl].'),
                     Property('cluster_ip', str, doc='IP address on which the Storage Driver is listening.'),
                     Property('storage_ip', str, doc='IP address on which the vpool is shared to hypervisor'),
                     Property('storagedriver_id', str, doc='ID of the Storage Driver as known by the Storage Drivers.'),
@@ -41,7 +41,7 @@ class StorageDriver(DataObject):
                     Property('mountpoint_fragmentcache', str, doc='Mountpoint for fragment cache'),
                     Property('mountpoint_readcaches', list, doc='Read cache mountpoints'),
                     Property('mountpoint_writecaches', list, doc='Write cache mountpoints'),
-                    Property('mountpoint_foc', str, doc='Mountpoint for failover cache'),
+                    Property('mountpoint_dtl', str, doc='Mountpoint for DTL cache'),
                     Property('startup_counter', int, default=0, doc='StorageDriver startup counter')]
     __relations = [Relation('vpool', VPool, 'storagedrivers'),
                    Relation('storagerouter', StorageRouter, 'storagedrivers')]
@@ -62,7 +62,7 @@ class StorageDriver(DataObject):
         """
         client = StorageDriverClient()
         vdiskstatsdict = {}
-        for key in client.stat_keys:
+        for key in client.STAT_KEYS:
             vdiskstatsdict[key] = 0
             vdiskstatsdict['{0}_ps'.format(key)] = 0
         if self.vpool is not None:

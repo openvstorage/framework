@@ -94,9 +94,9 @@ class VDisk(DataObject):
             try:
                 vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id))
             except:
-                vdiskinfo = StorageDriverClient.empty_info()
+                vdiskinfo = StorageDriverClient.EMPTY_INFO()
         else:
-            vdiskinfo = StorageDriverClient.empty_info()
+            vdiskinfo = StorageDriverClient.EMPTY_INFO()
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
@@ -120,7 +120,7 @@ class VDisk(DataObject):
         Fetches the Statistics for the vDisk.
         """
         statistics = {}
-        for key in StorageDriverClient.stat_keys:
+        for key in StorageDriverClient.STAT_KEYS:
             statistics[key] = 0
             statistics['{0}_ps'.format(key)] = 0
         for key, value in self.fetch_statistics().iteritems():
@@ -186,11 +186,11 @@ class VDisk(DataObject):
                 vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id))
                 vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id))
             except:
-                vdiskstats = StorageDriverClient.empty_statistics()
-                vdiskinfo = StorageDriverClient.empty_info()
+                vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
+                vdiskinfo = StorageDriverClient.EMPTY_INFO()
         else:
-            vdiskstats = StorageDriverClient.empty_statistics()
-            vdiskinfo = StorageDriverClient.empty_info()
+            vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
+            vdiskinfo = StorageDriverClient.EMPTY_INFO()
         # Load volumedriver data in dictionary
         vdiskstatsdict = {}
         try:
@@ -213,7 +213,7 @@ class VDisk(DataObject):
             vdiskstatsdict['4k_read_operations'] = vdiskstatsdict['data_read'] / block_size
             vdiskstatsdict['4k_write_operations'] = vdiskstatsdict['data_written'] / block_size
             # Pre-calculate sums
-            for key, items in StorageDriverClient.stat_sums.iteritems():
+            for key, items in StorageDriverClient.STAT_SUMS.iteritems():
                 vdiskstatsdict[key] = 0
                 for item in items:
                     vdiskstatsdict[key] += vdiskstatsdict[item]
@@ -230,7 +230,7 @@ class VDisk(DataObject):
         prev_key = '{0}_{1}'.format(key, 'statistics_previous')
         previous_stats = volatile.get(prev_key, default={})
         for key in current_stats.keys():
-            if key in StorageDriverClient.stat_keys:
+            if key in StorageDriverClient.STAT_KEYS:
                 delta = current_stats['timestamp'] - previous_stats.get('timestamp', current_stats['timestamp'])
                 if delta < 0:
                     current_stats['{0}_ps'.format(key)] = 0

@@ -40,8 +40,8 @@ define([
                 if (storageDriver.mountpointMD() !== undefined) {
                     storagedriver_mountpoints.push(storageDriver.mountpointMD());
                 }
-                if (storageDriver.mountpointFOC() !== undefined) {
-                    storagedriver_mountpoints.push(storageDriver.mountpointFOC());
+                if (storageDriver.mountpointDTL() !== undefined) {
+                    storagedriver_mountpoints.push(storageDriver.mountpointDTL());
                 }
                 if (storageDriver.mountpointTemp() !== undefined) {
                     storagedriver_mountpoints.push(storageDriver.mountpointTemp());
@@ -120,7 +120,7 @@ define([
                     fields.push('readcache');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', {what: $.t('ovs:wizards.addvpool.gathermountpoints.readcachename')}));
                 }
-                if (self.data.mtptBFS() === mp || self.data.mtptFOC() === mp || self.data.mtptMD() === mp || self.data.mtptTemp() === mp || self.data.mtptWriteCaches().contains(mp)) {
+                if (self.data.mtptBFS() === mp || self.data.mtptDTL() === mp || self.data.mtptMD() === mp || self.data.mtptTemp() === mp || self.data.mtptWriteCaches().contains(mp)) {
                     fields.push('readcache');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.uniquemtpt', {what: $.t('ovs:wizards.addvpool.gathermountpoints.readcachename')}));
                 }
@@ -146,14 +146,14 @@ define([
                 }
             });
 
-            // FOC mountpoint checks
-            if (self.data.mtptFOC() !== '' && storagedriver_mountpoints.contains(self.data.mtptFOC())) {
-                fields.push('foc');
-                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', {what: $.t('ovs:wizards.addvpool.gathermountpoints.focname')}));
+            // DTL mountpoint checks
+            if (self.data.mtptDTL() !== '' && storagedriver_mountpoints.contains(self.data.mtptDTL())) {
+                fields.push('dtl');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', {what: $.t('ovs:wizards.addvpool.gathermountpoints.dtl_name')}));
             }
-            if (!self.data.mtptFOC.valid()) {
-                fields.push('foc');
-                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:wizards.addvpool.gathermountpoints.focname') }));
+            if (!self.data.mtptDTL.valid()) {
+                fields.push('dtl');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:wizards.addvpool.gathermountpoints.dtl_name') }));
             }
 
             // vPool check
@@ -246,7 +246,7 @@ define([
                                         }
                                         if (self.data.writecaches().length >= 1) {
                                             self.data.mtptMD(self.data.writecaches()[0]);
-                                            self.data.mtptFOC(self.data.writecaches()[0]);
+                                            self.data.mtptDTL(self.data.writecaches()[0]);
                                         }
                                         if (self.data.readcaches().length >= 1) {
                                             if (!self.data.mtptReadCaches().contains(self.data.readcaches()[0])) {

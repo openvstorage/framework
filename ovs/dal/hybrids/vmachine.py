@@ -44,7 +44,7 @@ class VMachine(DataObject):
                   Dynamic('hypervisor_status', str, 300),
                   Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('stored_data', int, 60),
-                  Dynamic('failover_mode', str, 60),
+                  Dynamic('dtl_mode', str, 60),
                   Dynamic('storagerouters_guids', list, 15),
                   Dynamic('vpools_guids', list, 15)]
 
@@ -97,7 +97,7 @@ class VMachine(DataObject):
         """
         from ovs.dal.hybrids.vdisk import VDisk
         statistics = {}
-        for key in StorageDriverClient.stat_keys:
+        for key in StorageDriverClient.STAT_KEYS:
             statistics[key] = 0
             statistics['{0}_ps'.format(key)] = 0
         for vdisk in self.vdisks:
@@ -113,15 +113,15 @@ class VMachine(DataObject):
         """
         return sum([vdisk.info['stored'] for vdisk in self.vdisks])
 
-    def _failover_mode(self):
+    def _dtl_mode(self):
         """
-        Gets the aggregated failover mode
+        Gets the aggregated DTL mode
         """
         status = 'UNKNOWN'
         status_code = 0
         for vdisk in self.vdisks:
-            mode = vdisk.info['failover_mode']
-            current_status_code = StorageDriverClient.foc_status[mode.lower()]
+            mode = vdisk.info['dtl_mode']
+            current_status_code = StorageDriverClient.DTL_STATUS[mode.lower()]
             if current_status_code > status_code:
                 status = mode
                 status_code = current_status_code

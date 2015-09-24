@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# storage driver / failovercache rotate on daily basis
+# storage driver / dtl rotate on daily basis
 # all files ending in a date format: YYYY-MM-DD will be compressed
 # nr of days to keep files = nr of files itself
 NR_OF_FILES_TO_KEEP=15
