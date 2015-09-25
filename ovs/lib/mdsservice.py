@@ -18,9 +18,9 @@ MDSService module
 import time
 import random
 
-from ovs.lib.helpers.decorators import ensure_single
 from celery.schedules import crontab
 from ovs.celery_run import celery
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
 from ovs.dal.hybrids.service import Service as DalService
 from ovs.dal.hybrids.j_mdsservice import MDSService
@@ -31,6 +31,7 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, MetadataServerClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.lib.helpers.decorators import ensure_single
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig, MDSMetaDataBackendConfig
 from volumedriver.storagerouter import storagerouterclient
@@ -96,10 +97,10 @@ class MDSServiceController(object):
                 if mds_service.vpool_guid == vpool.guid:
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints['md'],
+                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.MD],
                                                                                vpool.name,
                                                                                mds_service.number),
-                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints['tmp'],
+                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.TMP],
                                                                                     vpool.name,
                                                                                     mds_service.number)})
 
@@ -137,10 +138,10 @@ class MDSServiceController(object):
                 if mds_service.vpool_guid == vpool.guid:
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints['md'],
+                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.MD],
                                                                                vpool.name,
                                                                                mds_service.number),
-                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints['temp'],
+                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.TMP],
                                                                                     vpool.name,
                                                                                     mds_service.number)})
 
@@ -155,10 +156,10 @@ class MDSServiceController(object):
         cleaned = False
         while tries > 0 and cleaned is False:
             try:
-                client.dir_delete(['{0}/mds_{1}_{2}'.format(storagedriver.mountpoints['md'],
+                client.dir_delete(['{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.MD],
                                                             vpool.name,
                                                             this_service_number),
-                                   '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints['tmp'],
+                                   '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.TMP],
                                                             vpool.name,
                                                             this_service_number)])
                 logger.debug('MDS files cleaned up')
@@ -445,7 +446,7 @@ class MDSServiceController(object):
     @staticmethod
     def get_mds_load(mds_service):
         """
-        Gets a 'load' for an MDS service based on its capacity and the amount of assinged VDisks
+        Gets a 'load' for an MDS service based on its capacity and the amount of assigned VDisks
         """
         service_capacity = float(mds_service.capacity)
         if service_capacity < 0:

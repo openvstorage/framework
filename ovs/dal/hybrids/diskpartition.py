@@ -24,7 +24,7 @@ class DiskPartition(DataObject):
     """
     The DiskPartition class represents a partition on a physical Disk
     """
-    ROLES = ['bfs', 'db', 'dtl', 'fragment', 'md', 'read', 'scrub', 'tmp', 'write']
+    ROLES = DataObject.enumerator('Role', ['BFS', 'DB', 'DTL', 'FRAGMENT', 'MD', 'READ', 'SCRUB', 'TMP', 'WRITE'])
 
     __properties = [Property('id', str, doc='The partition identifier'),
                     Property('filesystem', str, mandatory=False, doc='The filesystem used on the partition'),
@@ -32,8 +32,8 @@ class DiskPartition(DataObject):
                     Property('inode', int, mandatory=False, doc='The partitions inode'),
                     Property('offset', int, doc='Offset of the partition'),
                     Property('size', int, doc='Size of the partition'),
-                    Property('mountpoint', str, mandatory=False, doc='Mountpoint of partition, None if not mounted'),
+                    Property('mountpoint', str, mandatory=False, doc='Mountpoint of the partition, None if not mounted'),
                     Property('path', str, doc='The partition path'),
-                    Property('roles', list, default=list(), doc='A list of claimed roles')]
+                    Property('roles', list, default=[], doc='A list of claimed roles')]
     __relations = [Relation('disk', Disk, 'partitions')]
     __dynamics = []

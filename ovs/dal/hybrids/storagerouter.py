@@ -144,9 +144,9 @@ class StorageRouter(DataObject):
         Returns a dict with all partition information of a given storagerouter
         """
         from ovs.dal.hybrids.diskpartition import DiskPartition
-        dataset = dict((usage, []) for usage in DiskPartition.ROLES)
+        dataset = dict((role, []) for role in DiskPartition.ROLES)
         for disk in self.disks:
             for partition in disk.partitions:
-                for role in partition.role:
+                for role in partition.roles:
                     dataset[role].append(partition.guid)
         return dataset

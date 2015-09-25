@@ -30,27 +30,18 @@ class StorageDriverPartition(DataObject):
     * my_storagedriver.partitions[0].partition
     * my_partition.storagedrivers[0].storagedriver
     """
-    __properties = [Property('number', int, doc='Number of the service in case there are more than one'),
+    __properties = [Property('number', int, doc='Number of the service in case there is more than one'),
                     Property('size', long, doc='Size in bytes configured for use'),
-                    Property('usage', DiskPartition.ROLES, doc='Usage of partition')]
+                    Property('role', DiskPartition.ROLES.keys(), doc='Role of the partition')]
     __relations = [Relation('partition', DiskPartition, 'storagedrivers'),
                    Relation('storagedriver', StorageDriver, 'partitions')]
-    __dynamics = [Dynamic('path', str, 86400),
-                  Dynamic('mountpoint', str, 86400)]
+    __dynamics = [Dynamic('path', str, 86400)]
 
     def _path(self):
         """
         Actual path on filesystem
         """
-        if self.partition.mountpoint == '/':
-            return '/'.join([VIRTUAL_STORAGE_LOCATION, self.usage + str(self.number) + '_' +
-                         self.storagedriver.vpool.name])
-        else:
-            return '/'.join([self.partition.mountpoint, self.usage + str(self.number) + '_' +
-                         self.storagedriver.vpool.name])
-
-    def _mountpoint(self):
-        """
-        Mountpoint on storagedriver
-        """
-        return self.partition.mountpoint
+        return '{0}/{1}{2}_{3}'.format(VIRTUAL_STORAGE_LOCATION if self.partition.mountpoint == '/' else self.partition.mountpoint,
+                                       self.role,
+                                       self.number,
+                                       self.storagedriver.vpool.name)

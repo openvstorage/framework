@@ -138,14 +138,6 @@ class StorageRouterController(object):
         vpool_name = parameters['vpool_name']
         storage_ip = parameters['storage_ip']
 
-        # @todo: make sure to pass in mountpoint + size requested for further calculation
-        read_partitions = list()
-        for readcache in parameters['mountpoint_readcaches']:
-            read_partitions.append(DiskPartitionList.get_partition_for(readcache))
-        write_partitions = list()
-        for writecache in parameters['mountpoint_writecaches']:
-            write_partitions.append(DiskPartitionList.get_partition_for(writecache))
-
         client = SSHClient(ip)
         root_client = SSHClient(ip, username='root')
         unique_id = System.get_my_machine_id(client)
@@ -270,7 +262,7 @@ class StorageRouterController(object):
         mountpoint_fcache = write_partitions[0].mountpoint
         mountpoint_fragmentcache = read_partitions[0].mountpoint if vpool.backend_type.code == 'alba' else ''
 
-        # Check inodes and count the usages (to divide available space later on)
+        # Check inodes and count the roles (to divide available space later on)
         all_mountpoints = list()
         for disk_partition in [bfs_partition, tmp_partition, md_partition, dtl_partition]:
             if disk_partition:
@@ -453,17 +445,17 @@ class StorageRouterController(object):
         storagedriver.storagerouter = storagerouter
         storagedriver.storagedriver_id = vrouter_id
         storagedriver.save()
-        md_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, md_partition, 'md')
-        dtl_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, 'dtl')
-        bfs_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, 'bfs')
-        tmp_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, 'tmp')
+        md_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, md_partition, DiskPartition.ROLES.MD)
+        dtl_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, DiskPartition.ROLES.DTL)
+        bfs_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, DiskPartition.ROLES.BFS)
+        tmp_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, DiskPartition.ROLES.TMP)
         readcaches_sdps = list()
         for read_partition in read_partitions:
-            readcaches_sdps.append(StorageRouterController._get_storagedriverpartition(storagedriver, read_partition, 'read'))
+            readcaches_sdps.append(StorageRouterController._get_storagedriverpartition(storagedriver, read_partition, DiskPartition.ROLES.READ))
         writecaches_sdps = list()
         for write_partition in write_partitions:
-            writecaches_sdps.append(StorageRouterController._get_storagedriverpartition(storagedriver, write_partition, 'write'))
-        fragment_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, 'fragment')
+            writecaches_sdps.append(StorageRouterController._get_storagedriverpartition(storagedriver, write_partition, DiskPartition.ROLES.WRITE))
+        fragment_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, DiskPartition.ROLES.FRAGMENT)
         storagedriver.save()
 
         config_dir = '{0}/storagedriver/storagedriver'.format(client.config_read('ovs.core.cfgdir'))
@@ -914,10 +906,10 @@ class StorageRouterController(object):
         DiskController.sync_with_reality(storagerouter.guid)
         for disk in storagerouter.disks:
             for partition in disk.partitions:
-                partition.usage = [usage for usage in partition.usage
-                                   if 'relation' not in usage or
-                                   usage['relation'][0] != 'storagedriver' or
-                                   usage['relation'][1] != storagedriver.guid]
+                partition.role = [role for role in partition.role
+                                  if 'relation' not in role or
+                                  role['relation'][0] != 'storagedriver' or
+                                  role['relation'][1] != storagedriver.guid]
                 partition.save()
 
         # First model cleanup
@@ -1310,19 +1302,19 @@ class StorageRouterController(object):
         return ports if number != 1 else ports[0]
 
     @staticmethod
-    def _get_storagedriverpartition(storagedriver, partition, usage):
+    def _get_storagedriverpartition(storagedriver, partition, role):
         """
         Returns new storagedriver partition object with correct number
         """
         highest_number = 0
         for existing_sdp in storagedriver.partitions:
-            if existing_sdp.storagedriver.mountpoint == storagedriver.mountpoint and existing_sdp.usage == usage:
+            if existing_sdp.storagedriver.mountpoint == storagedriver.mountpoint and existing_sdp.role == role:
                     highest_number = max(existing_sdp.number, highest_number)
         sdp = StorageDriverPartition()
         sdp.number = highest_number + 1
         sdp.storagedriver = storagedriver
         sdp.partition = partition
-        sdp.usage = usage
+        sdp.role = role
         sdp.save()
 
         return sdp

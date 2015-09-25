@@ -35,21 +35,3 @@ class DiskPartitionList(object):
                                'query': {'type': DataList.where_operator.AND,
                                          'items': []}}).data
         return DataObjectList(partitions, DiskPartition)
-
-    @staticmethod
-    def get_partition_for(mountpoint):
-        """
-        Returns partition object for specific mountpoint
-        """
-        partitions = DataList({'object': DiskPartition,
-                               'data': DataList.select.GUIDS,
-                               'query': {'type': DataList.where_operator.AND,
-                                         'items': [('mountpoint', DataList.operator.EQUALS, mountpoint)]}}).data
-        if len(partitions) == 0:
-            # @todo special case when only using a directory which will get stored on the root filesystem
-            return DiskPartitionList.get_partition_for('/')
-        elif len(partitions) == 1:
-            return DataObjectList(partitions, DiskPartition)[0]
-        else:
-            raise RuntimeError('Only one partition allowed for specific mountpoint {0}, got: {1]'.format(mountpoint,
-                                                                                                         len(partitions)))

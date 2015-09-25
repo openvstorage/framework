@@ -48,11 +48,6 @@ logger = LogHandler.get('lib', name='setup')
 logger.logger.propagate = False
 
 
-# @TODO: Make the setup_node re-entrant
-# @TODO: Make it possible to run as a non-privileged user
-# @TODO: Node password identical for all nodes
-
-
 class SetupController(object):
     """
     This class contains all logic for setting up an environment, installed with system-native packages

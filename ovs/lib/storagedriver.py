@@ -109,12 +109,12 @@ class StorageDriverController(object):
                     remaining_ips.append(service.storagerouter.ip)
         if current_service is not None:
             print '* Shrink StorageDriver cluster'
-            ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, service.name)
-            if ServiceManager.has_service(service.name, client=client) is True:
-                ServiceManager.stop_service(service.name, client=client)
-                ServiceManager.remove_service(service.name, client=client)
-            ArakoonInstaller.restart_cluster_remove(service.name, remaining_ips)
-            service.delete()
+            ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, current_service.name)
+            if ServiceManager.has_service(current_service.name, client=client) is True:
+                ServiceManager.stop_service(current_service.name, client=client)
+                ServiceManager.remove_service(current_service.name, client=client)
+            ArakoonInstaller.restart_cluster_remove(current_service.name, remaining_ips)
+            current_service.delete()
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.voldrv_arakoon_checkup', bind=True, schedule=crontab(minute='30', hour='*'))

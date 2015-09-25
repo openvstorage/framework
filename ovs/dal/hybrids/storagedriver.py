@@ -80,26 +80,22 @@ class StorageDriver(DataObject):
 
     def _mountpoints(self):
         """
-        Returns all mountpoint used by this storagedriver
+        Returns all mountpoints used by this storagedriver
         """
-        result = dict()
+        result = {}
         for sd_partition in self.partitions:
-            if sd_partition:
-                if sd_partition.usage not in result:
-                    result[sd_partition.usage] = list()
-                else:
-                    result[sd_partition.usage].append(sd_partition.mountpoint)
+            if sd_partition.role not in result:
+                result[sd_partition.role] = []
+            result[sd_partition.role].append(sd_partition.mountpoint)
         return result
 
     def _paths(self):
         """
         Returns all actual paths used by this storagedriver
         """
-        result = dict()
+        result = {}
         for sd_partition in self.partitions:
-            if sd_partition:
-                if sd_partition.usage not in result:
-                    result[sd_partition.usage] = list()
-                else:
-                    result[sd_partition.usage].append(sd_partition.path)
+            if sd_partition.role not in result:
+                result[sd_partition.role] = []
+            result[sd_partition.role].append(sd_partition.path)
         return result
