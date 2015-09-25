@@ -129,7 +129,7 @@ class RPMPackager(object):
                       'after_install': after_install,
             }
 
-            command = """fpm -s dir -t rpm -n {package_name} -v {version} --description "{description}" --maintainer "{maintainer}" --license "{license}" --url {URL} -a {arch} --vendor "Open vStorage" {depends}{before_install}{after_install} --verbose {package_root}""".format(**params)
+            command = """fpm -s dir -t rpm -n {package_name} -v {version} --description "{description}" --maintainer "{maintainer}" --license "{license}" --url {URL} -a {arch} --vendor "Open vStorage" {depends}{before_install}{after_install} --verbose --prefix=/ -C {package_root}""".format(**params)
 
             print(command)
             print(SourceCollector.run(command,
@@ -139,7 +139,7 @@ class RPMPackager(object):
 
             #TODO: cron.d
 
-            
+
     @staticmethod
     def upload(source_metadata):
         """
