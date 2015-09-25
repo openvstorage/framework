@@ -24,6 +24,8 @@ class DiskPartition(DataObject):
     """
     The DiskPartition class represents a partition on a physical Disk
     """
+    ROLES = ['bfs', 'db', 'dtl', 'fragment', 'md', 'read', 'scrub', 'tmp', 'write']
+
     __properties = [Property('id', str, doc='The partition identifier'),
                     Property('filesystem', str, mandatory=False, doc='The filesystem used on the partition'),
                     Property('state', ['OK', 'ERROR', 'MISSING'], doc='State of the partition'),

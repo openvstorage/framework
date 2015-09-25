@@ -30,6 +30,7 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service as DalService
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
@@ -38,7 +39,6 @@ from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.diskpartitionlist import DiskPartitionList
-from ovs.dal.lists.storagedriverpartitionlist import StorageDriverPartitionList
 from ovs.extensions.api.client import OVSClient
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
@@ -80,14 +80,6 @@ class StorageRouterController(object):
         from ovs.lib.vpool import VPoolController
 
         storagerouter = StorageRouter(storagerouter_guid)
-        mountpoints = check_output('mount -v', shell=True).strip().splitlines()
-        mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2 and
-                       not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc') and
-                       not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run') and
-                       p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
-        arakoon_mountpoint = Configuration.get('ovs.arakoon.location')
-        if arakoon_mountpoint in mountpoints:
-            mountpoints.remove(arakoon_mountpoint)
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']
         else:
@@ -99,43 +91,16 @@ class StorageRouterController(object):
         for check_file in files:
             file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
 
-        # 'bfs', 'db', 'dtl', 'fragment', 'md', 'read', 'scrub', 'tmp', 'write'
-        partitions = {'bfs': list(),
-                      'db': list(),
-                      'dtl': list(),
-                      'fragment': list(),
-                      'md': list(),
-                      'read': list(),
-                      'scrub': list(),
-                      'tmp': list(),
-                      'write': list()}
-
+        partitions = dict((role, []) for role in DiskPartition.ROLES)
         for disk_partition in DiskPartitionList.get_partitions():
             for role in disk_partition.roles:
                 logger.info('{0} {1} {2}'.format(role, disk_partition.size, disk_partition.guid))
-                partitions[role].append({disk_partition.guid, disk_partition.size})
-
-        # check if requirements for backend type are met:
-        backend_prereqs = {'bfs': False,
-                           'db': False,
-                           'dtl': False,
-                           'fragment': False,
-                           'md': False,
-                           'read': False,
-                           'scrub': False,
-                           'tmp': False,
-                           'write': False}
-        for backend_type in partitions.keys():
-            if len(partitions[backend_type]) > 0:
-                backend_prereqs[backend_type] = True
-
-        logger.info('mountpoints:{0}'.format(mountpoints))
+                partitions[role].append({'guid': disk_partition.guid,
+                                         'size': disk_partition.size,
+                                         'mountpoint': disk_partition.mountpoint})
         logger.info('partitions:{0}'.format(partitions))
-        logger.info('backend_prereqs:{0}'.format(backend_prereqs))
 
-        return {'mountpoints': mountpoints,
-                'partitions': partitions,
-                'backend_prereqs': backend_prereqs,
+        return {'partitions': partitions,
                 'ipaddresses': ipaddresses,
                 'files': file_existence,
                 'allow_vpool': allow_vpool}

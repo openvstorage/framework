@@ -32,7 +32,7 @@ class StorageDriverPartition(DataObject):
     """
     __properties = [Property('number', int, doc='Number of the service in case there are more than one'),
                     Property('size', long, doc='Size in bytes configured for use'),
-                    Property('usage', ['bfs', 'db', 'dtl', 'fragment', 'md', 'read', 'scrub', 'tmp', 'write'], doc='Usage of partition')]
+                    Property('usage', DiskPartition.ROLES, doc='Usage of partition')]
     __relations = [Relation('partition', DiskPartition, 'storagedrivers'),
                    Relation('storagedriver', StorageDriver, 'partitions')]
     __dynamics = [Dynamic('path', str, 86400),

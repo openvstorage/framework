@@ -996,7 +996,7 @@ class SetupController(object):
         print 'Setting up Arakoon'
         logger.info('Setting up Arakoon')
         cluster_ip = target_client.ip
-        result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, [])
+        result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, [], target_client.config_read('ovs.core.ovsdb'))
         arakoon_ports = [result['client_port'], result['messaging_port']]
 
         SetupController._configure_logstash(target_client)
@@ -1060,9 +1060,8 @@ class SetupController(object):
         # Enable HA for the rabbitMQ queues
         SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
-        for service in ['watcher-framework', 'watcher-volumedriver']:
-            ServiceManager.enable_service(service, client=target_client)
-            SetupController._change_service_state(target_client, service, 'start')
+        ServiceManager.enable_service('watcher-framework', client=target_client)
+        SetupController._change_service_state(target_client, 'watcher-framework', 'start')
 
         logger.debug('Restarting workers')
         ServiceManager.enable_service('workers', client=target_client)
@@ -1143,9 +1142,8 @@ class SetupController(object):
         target_client.config_set('ovs.grid.ip', cluster_ip)
 
         print 'Starting services'
-        for service in ['watcher-framework', 'watcher-volumedriver']:
-            ServiceManager.enable_service(service, client=target_client)
-            SetupController._change_service_state(target_client, service, 'start')
+        ServiceManager.enable_service('watcher-framework', client=target_client)
+        SetupController._change_service_state(target_client, 'watcher-framework', 'start')
 
         logger.debug('Restarting workers')
         for node_client in ip_client_map.itervalues():
@@ -1203,7 +1201,7 @@ class SetupController(object):
         print 'Joining arakoon cluster'
         logger.info('Joining arakoon cluster')
         exclude_ports = ServiceList.get_ports_for_ip(cluster_ip)
-        result = ArakoonInstaller.extend_cluster(master_ip, cluster_ip, 'ovsdb', exclude_ports)
+        result = ArakoonInstaller.extend_cluster(master_ip, cluster_ip, 'ovsdb', exclude_ports, target_client.config_read('ovs.core.ovsdb'))
         arakoon_ports = [result['client_port'], result['messaging_port']]
 
         print 'Distribute configuration files'

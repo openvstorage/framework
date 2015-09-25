@@ -40,7 +40,7 @@ class StorageRouter(DataObject):
                   Dynamic('vpools_guids', list, 15),
                   Dynamic('vdisks_guids', list, 15),
                   Dynamic('status', str, 10),
-                  Dynamic('partitions_guids', dict, 3600)]
+                  Dynamic('partition_config', dict, 3600)]
 
     def _statistics(self, dynamic):
         """
@@ -139,11 +139,12 @@ class StorageRouter(DataObject):
                     return 'OK'
         return 'UNKNOWN'
 
-    def _partitions_guids(self):
+    def _partition_config(self):
         """
         Returns a dict with all partition information of a given storagerouter
         """
-        dataset = dict((usage, []) for usage in ['bfs', 'db', 'dtl', 'fragment', 'md', 'read', 'scrub', 'tmp', 'write'])
+        from ovs.dal.hybrids.diskpartition import DiskPartition
+        dataset = dict((usage, []) for usage in DiskPartition.ROLES)
         for disk in self.disks:
             for partition in disk.partitions:
                 for role in partition.role:

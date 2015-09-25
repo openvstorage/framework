@@ -21,6 +21,7 @@ from ovs.celery_run import celery
 from celery.schedules import crontab
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.service import Service
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
@@ -130,14 +131,20 @@ class StorageDriverController(object):
             if service.name == service_name:
                 current_services.append(service)
                 current_ips.append(service.storagerouter.ip)
-        available_storagerouters = []
+        available_storagerouters = {}
         for storagerouter in StorageRouterList.get_masters():
-            if 'db' in storagerouter.partitions_guids:
-                available_storagerouters.append(storagerouter)
+            if len(storagerouter.partition_config['db']) > 0:
+                available_storagerouters[storagerouter] = DiskPartition(storagerouter.partition_config['db'][0])
         if 0 < len(current_services) < len(available_storagerouters):
             for storagerouter in available_storagerouters:
                 ports_to_exclude = ServiceList.get_ports_for_ip(storagerouter.ip)
-                result = ArakoonInstaller.extend_cluster(current_services[0].storagerouter.ip, storagerouter.ip, service_name, ports_to_exclude)
+                result = ArakoonInstaller.extend_cluster(
+                    current_services[0].storagerouter.ip,
+                    storagerouter.ip,
+                    service_name,
+                    ports_to_exclude,
+                    available_storagerouters[storagerouter].mountpoint
+                )
                 ports = [result['client_port'], result['messaging_port']]
                 service = Service()
                 service.name = service_name

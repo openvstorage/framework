@@ -20,7 +20,6 @@ import os
 import time
 from subprocess import CalledProcessError
 from pyudev import Context
-from celery.schedules import crontab
 from ovs.celery_run import celery
 from ovs.log.logHandler import LogHandler
 from ovs.dal.hybrids.diskpartition import DiskPartition
@@ -29,7 +28,6 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.remote import Remote
-from ovs.lib.helpers.decorators import ensure_single
 
 logger = LogHandler.get('lib', name='disk')
 
@@ -40,8 +38,7 @@ class DiskController(object):
     """
 
     @staticmethod
-    @celery.task(name='ovs.disk.sync_with_reality', bind=True, schedule=crontab(minute='*/5'))
-    @ensure_single(['ovs.disk.sync_with_reality'])
+    @celery.task(name='ovs.disk.sync_with_reality')
     def sync_with_reality(storagerouter_guid=None):
         """
         Syncs the Disks from all StorageRouters with the reality.
