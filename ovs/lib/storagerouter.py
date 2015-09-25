@@ -91,8 +91,7 @@ class StorageRouterController(object):
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']
         else:
-            ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1",
-                                       shell=True).strip().splitlines()
+            ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
             ipaddresses = [ip.strip() for ip in ipaddresses]
             ipaddresses.remove('127.0.0.1')
         allow_vpool = VPoolController.can_be_served_on(storagerouter_guid)
@@ -340,12 +339,12 @@ class StorageRouterController(object):
             root_client.dir_chmod(parameters['mountpoint_bfs'], 0777)
 
         fdcache = '{0}/fd_{1}'.format(dtl_partition.mountpoint, vpool_name)
-        failovercache = '{0}/foc_{1}'.format(dtl_partition.mountpoint, vpool_name)
+        dtl = '{0}/dtl_{1}'.format(dtl_partition.mountpoint, vpool_name)
         metadatapath = '{0}/metadata_{1}'.format(md_partition.mountpoint, vpool_name)
         tlogpath = '{0}/tlogs_{1}'.format(md_partition.mountpoint, vpool_name)
         rsppath = '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool_name)
 
-        dirs2create = [failovercache, metadatapath, tlogpath, rsppath]
+        dirs2create = [dtl, metadatapath, tlogpath, rsppath]
         files2create = list()
         readcaches = list()
         writecaches = list()
@@ -521,7 +520,7 @@ class StorageRouterController(object):
                 config.add_section(section)
                 for key, value in vpool.metadata['metadata'][section].iteritems():
                     config.set(section, key, value)
-            cache_dir = '{}/fcache_{}'.format(mountpoint_fragmentcache, vpool_name)
+            cache_dir = '{0}/fcache_{1}'.format(mountpoint_fragmentcache, vpool_name)
             root_client.dir_create(cache_dir)
             System.write_config(config, '{0}/{1}_alba.cfg'.format(config_dir, vpool_name), client)
             inode = os.stat(cache_dir).st_dev
@@ -584,7 +583,7 @@ class StorageRouterController(object):
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
                                                 trigger_gap='1GB',
                                                 backoff_gap='2GB')
-        storagedriver_config.configure_failovercache(failovercache_path=failovercache)
+        storagedriver_config.configure_failovercache(failovercache_path=dtl)
         storagedriver_config.configure_filesystem(**filesystem_config)
         storagedriver_config.configure_volume_manager(clean_interval=1,
                                                       metadata_path=metadatapath,
@@ -637,9 +636,9 @@ class StorageRouterController(object):
 
         logger.info('volumedriver_mode: {0}'.format(volumedriver_mode))
         logger.info('backend_type: {0}'.format(vpool.backend_type.code))
-        foc_service = 'ovs-failovercache_{0}'.format(vpool.name)
-        ServiceManager.add_service(name='ovs-failovercache', params=params, client=root_client, target_name=foc_service)
-        ServiceManager.start_service(foc_service, client=root_client)
+        dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
+        ServiceManager.add_service(name='ovs-dtl', params=params, client=root_client, target_name=dtl_service)
+        ServiceManager.start_service(dtl_service, client=root_client)
         if vpool.backend_type.code == 'alba':
             alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
             ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name=alba_proxy_service)
@@ -769,7 +768,7 @@ class StorageRouterController(object):
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
 
         voldrv_service = 'volumedriver_{0}'.format(vpool.name)
-        foc_service = 'failovercache_{0}'.format(vpool.name)
+        dtl_service = 'dtl_{0}'.format(vpool.name)
         albaproxy_service = 'albaproxy_{0}'.format(vpool.name)
         removal_mdsservices = [mds_service for mds_service in vpool.mds_services
                                if mds_service.service.storagerouter_guid == storagerouter.guid]
@@ -804,9 +803,9 @@ class StorageRouterController(object):
         if ServiceManager.has_service(voldrv_service, client=client):
             ServiceManager.disable_service(voldrv_service, client=client)
             ServiceManager.stop_service(voldrv_service, client=client)
-        if ServiceManager.has_service(foc_service, client=client):
-            ServiceManager.disable_service(foc_service, client=client)
-            ServiceManager.stop_service(foc_service, client=client)
+        if ServiceManager.has_service(dtl_service, client=client):
+            ServiceManager.disable_service(dtl_service, client=client)
+            ServiceManager.stop_service(dtl_service, client=client)
 
         if not storagedrivers_left:
             try:
@@ -863,7 +862,7 @@ class StorageRouterController(object):
                     break
 
         # Remove services
-        services_to_remove = [voldrv_service, foc_service]
+        services_to_remove = [voldrv_service, dtl_service]
         if storagedriver.alba_proxy is not None:
             services_to_remove.append(albaproxy_service)
         for service in services_to_remove:
@@ -901,8 +900,8 @@ class StorageRouterController(object):
             dir_name = '{0}/sco_{1}'.format(writecache, vpool.name)
             dirs_to_remove.append(dir_name)
 
-        dirs_to_remove.extend(['{0}/foc_{1}'.format(storagedriver.mountpoint_foc, vpool.name),
-                               '{0}/fd_{1}'.format(storagedriver.mountpoint_foc, vpool.name),
+        dirs_to_remove.extend(['{0}/dtl_{1}'.format(storagedriver.mountpoint_dtl, vpool.name),
+                               '{0}/fd_{1}'.format(storagedriver.mountpoint_dtl, vpool.name),
                                '{0}/fcache_{1}'.format(storagedriver.mountpoint_fragmentcache, vpool.name),
                                '{0}/metadata_{1}'.format(storagedriver.mountpoint_md, vpool.name),
                                '{0}/tlogs_{1}'.format(storagedriver.mountpoint_md, vpool.name),
@@ -933,7 +932,7 @@ class StorageRouterController(object):
         dirs2remove.extend(storagedriver.mountpoint_readcaches)
         dirs2remove.extend(storagedriver.mountpoint_writecaches)
         dirs2remove.append(storagedriver.mountpoint_fragmentcache)
-        dirs2remove.append(storagedriver.mountpoint_foc)
+        dirs2remove.append(storagedriver.mountpoint_dtl)
         dirs2remove.append(storagedriver.mountpoint_md)
         dirs2remove.append(storagedriver.mountpoint)
 

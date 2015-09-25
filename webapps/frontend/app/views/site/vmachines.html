@@ -43,12 +43,12 @@ limitations under the License.
                 <td>
                     <div data-bind="status: {
                                         colors: {
-                                            green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
-                                            orange: failoverMode() == 'catch_up',
-                                            red: failoverMode() == 'degraded'
+                                            green: ['ok_standalone', 'ok_sync'].contains(dtlMode()),
+                                            orange: dtlMode() == 'catch_up',
+                                            red: dtlMode() == 'degraded'
                                         },
                                         defaultColor: 'lightgrey'
-                                    }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"
+                                    }, tooltip: 'ovs:generic.states.dtl.' + dtlMode()"
                          style="width: 14px; height: 14px;"></div>
                 </td>
             </tr>

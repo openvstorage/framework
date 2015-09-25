@@ -46,7 +46,7 @@ define([
             mtptWriteCaches:  ko.observableArray([]), // Final target containing write caches
             mtptCustomWCs:    ko.observableArray([]),
             mtptCustomWC:     ko.observable(),
-            mtptFOC:          ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-foc' }),
+            mtptDTL:          ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-dtl' }),
             storageIP:        ko.observable().extend({ regex: ipRegex, identifier: 'storageip' }),
             name:             ko.observable('').extend({ regex: nameRegex }),
             host:             ko.observable('').extend({ regex: hostRegex }),

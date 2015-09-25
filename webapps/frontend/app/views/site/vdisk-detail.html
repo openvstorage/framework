@@ -107,16 +107,16 @@ limitations under the License.
                             <td colspan="2">&nbsp;</td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.focstatus"></td>
+                            <td data-i18n="ovs:generic.dtl_status"></td>
                             <td>
                                 <div data-bind="status: {
                                                      colors: {
-                                                         green: ['ok_standalone', 'ok_sync'].contains(failoverMode()),
-                                                         orange: failoverMode() == 'catch_up',
-                                                         red: failoverMode() == 'degraded'
+                                                         green: ['ok_standalone', 'ok_sync'].contains(dtlMode()),
+                                                         orange: dtlMode() == 'catch_up',
+                                                         red: dtlMode() == 'degraded'
                                                      },
                                                      defaultColor: 'lightgrey'
-                                                 }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"
+                                                 }, tooltip: 'ovs:generic.states.dtl.' + dtlMode()"
                                      style="width: 14px; height: 14px;"></div>
                             </td>
                             <td colspan="2">&nbsp;</td>
@@ -181,7 +181,7 @@ limitations under the License.
                                                       }"
                                            class="hand fa noline"
                                            data-i18n="[html]ovs:icons.help"
-                                           style="margin-left: 5px; color: blue;"
+                                           style="margin-left: 5px; color: #377ca8;"
                                            role="button"
                                            tabindex="-1">
                                         </a>
@@ -309,7 +309,7 @@ limitations under the License.
                                                                               }"
                                                                    class="hand fa noline"
                                                                    data-i18n="[html]ovs:icons.help"
-                                                                   style="margin-left: 5px; color: blue;"
+                                                                   style="margin-left: 5px; color: #377ca8;"
                                                                    role="button"
                                                                    tabindex="-1">
                                                                 </a>

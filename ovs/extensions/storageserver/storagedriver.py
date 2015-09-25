@@ -104,26 +104,23 @@ class StorageDriverClient(object):
                            64: 1,
                            128: 1}
 
-    foc_status = {'': 0,
+    DTL_STATUS = {'': 0,
                   'ok_standalone': 10,
                   'ok_sync': 10,
                   'catch_up': 20,
                   'degraded': 30}
-    empty_statistics = staticmethod(lambda: Statistics())
-    empty_info = staticmethod(lambda: VolumeInfo())
-    stat_counters = ['backend_data_read', 'backend_data_written',
-                     'backend_read_operations', 'backend_write_operations',
-                     'cluster_cache_hits', 'cluster_cache_misses', 'data_read',
-                     'data_written', 'metadata_store_hits', 'metadata_store_misses',
-                     'read_operations', 'sco_cache_hits', 'sco_cache_misses',
-                     'write_operations']
-    extra_keys = ['4k_read_operations', '4k_write_operations']
-    stat_sums = {'operations': ['write_operations', 'read_operations'],
-                 '4k_operations': ['4k_read_operations', '4k_write_operations'],
+    EMPTY_STATISTICS = staticmethod(lambda: Statistics())
+    EMPTY_INFO = staticmethod(lambda: VolumeInfo())
+    STAT_SUMS = {'operations': ['write_operations', 'read_operations'],
                  'cache_hits': ['sco_cache_hits', 'cluster_cache_hits'],
                  'cache_misses': ['sco_cache_misses'],
+                 '4k_operations': ['4k_read_operations', '4k_write_operations'],
                  'data_transferred': ['data_written', 'data_read']}
-    stat_keys = stat_counters + extra_keys + stat_sums.keys()
+    STAT_KEYS = ['backend_data_read', 'backend_data_written', 'backend_read_operations', 'backend_write_operations',
+                 'cluster_cache_hits', 'cluster_cache_misses', 'data_read', 'data_written', 'metadata_store_hits',
+                 'metadata_store_misses', 'read_operations', 'sco_cache_hits', 'sco_cache_misses', 'write_operations',
+                 '4k_read_operations', '4k_write_operations']
+    STAT_KEYS.extend(STAT_SUMS.keys())
 
     def __init__(self):
         """
