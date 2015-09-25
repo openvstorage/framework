@@ -919,7 +919,7 @@ class DataObject(object):
         return not self.__eq__(other)
 
     @staticmethod
-    def enumerator(name, elements, lower_value=True):
+    def enumerator(name, items):
         """
         Generates an enumerator
         """
@@ -927,7 +927,12 @@ class DataObject(object):
             def __init__(self, *args, **kwargs):
                 super(Enumerator, self).__init__(*args, **kwargs)
 
-        enumerator = Enumerator((element, element.lower() if lower_value is True else element.upper()) for element in elements)
+        if isinstance(items, list):
+            enumerator = Enumerator(zip(items, items))
+        elif isinstance(items, dict):
+            enumerator = Enumerator(**items)
+        else:
+            raise ValueError("Argument 'items' should be a list or a dict. A '{0}' was given".format(type(items)))
         enumerator.__name__ = name
         for item in enumerator:
             setattr(enumerator, item, enumerator[item])

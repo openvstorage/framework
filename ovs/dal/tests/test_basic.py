@@ -1318,17 +1318,24 @@ class Basic(TestCase):
         Validates whether the internal enumerator generator works as expected
         """
         from ovs.dal.dataobject import DataObject
-        items = ['ONE', 'TWO', 'THREE']
-        enum = DataObject.enumerator('test', items)
-        for item in items:
+        list_items = ['ONE', 'TWO', 'THREE']
+        enum = DataObject.enumerator('ListTest', list_items)
+        self.assertEqual(enum.__name__, 'ListTest', 'Name should be ListTest')
+        for item in list_items:
             self.assertIn(item, enum, '{0} should be in the enumerator'.format(item))
             self.assertTrue(hasattr(enum, item), 'Enumerator should have property {0}'.format(item))
         self.assertNotIn('ZERO', enum, 'ZERO should not be in the enumerator')
         extract = [item for item in enum]
-        self.assertListEqual(sorted(items), sorted(extract), 'Iterating the enum should yield the initial list')
-        self.assertEqual(enum.ONE, 'one', 'Default value should be lowercase')
-        enum = DataObject.enumerator('test', items, lower_value=False)
-        self.assertEqual(enum.ONE, 'ONE', 'Value should be uppercase')
+        self.assertListEqual(sorted(list_items), sorted(extract), 'Iterating the enum should yield the initial list')
+        self.assertEqual(enum.ONE, 'ONE', 'Value should be correct')
+
+        dict_items = {'ONE': 'one', 'TWO': 'two', 'THREE': 'three'}
+        enum = DataObject.enumerator('DictTest', dict_items)
+        self.assertEqual(enum.__name__, 'DictTest', 'Name should be DictTest')
+        for key, value in dict_items.iteritems():
+            self.assertIn(key, enum, '{0} should be in the enumerator'.format(key))
+            self.assertEqual(getattr(enum, key), value, "Value for key '{0}' should be '{1}' instead of '{2}'".format(key, value, getattr(enum, key)))
+
 
 if __name__ == '__main__':
     import unittest
