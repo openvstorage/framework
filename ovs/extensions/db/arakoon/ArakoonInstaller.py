@@ -160,8 +160,8 @@ class ArakoonInstaller(object):
     class to dynamically install/(re)configure arakoon cluster
     """
     ARAKOON_LOG_DIR = '/var/log/arakoon/{0}'
-    ARAKOON_HOME_DIR = '{0}/arakoon/{1}'
-    ARAKOON_TLOG_DIR = '{0}/tlogs/{1}'
+    ARAKOON_HOME_DIR = '{0}/arakoon/{1}/db'
+    ARAKOON_TLOG_DIR = '{0}/arakoon/{1}/tlogs'
     ARAKOON_CONFIG_DIR = '/opt/OpenvStorage/config/arakoon'
     ARAKOON_CONFIG_FILE = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
 

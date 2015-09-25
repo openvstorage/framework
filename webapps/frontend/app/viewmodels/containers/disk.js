@@ -142,7 +142,7 @@ define([
                 if (generic.xhrCompleted(self.loadPartitions)) {
                     self.loadPartitions = api.get('diskpartitions', { queryparams: {
                         diskguid: self.guid(),
-                        contents: '_relations',
+                        contents: '_relations,_dynamics',
                         sort: 'offset'
                     }})
                         .done(function(data) {

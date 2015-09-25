@@ -151,6 +151,7 @@ class StorageDriverController(object):
                 service.type = servicetype
                 service.ports = ports
                 service.storagerouter = storagerouter
+                service.partition = available_storagerouters[storagerouter]
                 service.save()
                 ArakoonInstaller.restart_cluster_add(service_name, current_ips, storagerouter.ip)
                 current_ips.append(storagerouter.ip)

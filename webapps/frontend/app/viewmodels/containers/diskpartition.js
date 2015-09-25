@@ -36,7 +36,8 @@ define([
         self.size              = ko.observable();
         self.mountpoint        = ko.observable();
         self.path              = ko.observable();
-        self.role              = ko.observable();
+        self.usage             = ko.observable();
+        self.roles             = ko.observable();
 
         // Functions
         self.fillData = function(data) {
@@ -48,7 +49,8 @@ define([
             self.size(data.size);
             self.mountpoint(data.mountpoint);
             self.path(data.path);
-            self.role(data.role);
+            self.usage(generic.tryGet(data, 'usage', undefined));
+            self.roles(data.roles);
 
             self.loaded(true);
             self.loading(false);

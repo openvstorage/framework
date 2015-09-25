@@ -35,13 +35,17 @@ class StorageDriverPartition(DataObject):
                     Property('role', DiskPartition.ROLES.keys(), doc='Role of the partition')]
     __relations = [Relation('partition', DiskPartition, 'storagedrivers'),
                    Relation('storagedriver', StorageDriver, 'partitions')]
-    __dynamics = [Dynamic('path', str, 86400)]
+    __dynamics = [Dynamic('folder', str, 3600),
+                  Dynamic('path', str, 3600)]
+
+    def _folder(self):
+        """
+        Folder on the mountpoint
+        """
+        return '{0}{1}_{2}'.format(self.role, self.number, self.storagedriver.vpool.name)
 
     def _path(self):
         """
-        Actual path on filesystem
+        Actual path on filesystem, including mountpoint
         """
-        return '{0}/{1}{2}_{3}'.format(VIRTUAL_STORAGE_LOCATION if self.partition.mountpoint == '/' else self.partition.mountpoint,
-                                       self.role,
-                                       self.number,
-                                       self.storagedriver.vpool.name)
+        return '{0}/{1}'.format(VIRTUAL_STORAGE_LOCATION if self.partition.mountpoint == '/' else self.partition.mountpoint, self.folder)
