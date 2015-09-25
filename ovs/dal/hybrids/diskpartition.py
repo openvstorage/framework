@@ -32,6 +32,6 @@ class DiskPartition(DataObject):
                     Property('size', int, doc='Size of the partition'),
                     Property('mountpoint', str, mandatory=False, doc='Mountpoint of partition, None if not mounted'),
                     Property('path', str, doc='The partition path'),
-                    Property('usages', list, default=list(), doc='A list of claimed usages')]
+                    Property('roles', list, default=list(), doc='A list of claimed roles')]
     __relations = [Relation('disk', Disk, 'partitions')]
     __dynamics = []

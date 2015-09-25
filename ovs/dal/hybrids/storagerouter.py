@@ -39,7 +39,8 @@ class StorageRouter(DataObject):
                   Dynamic('vmachines_guids', list, 15),
                   Dynamic('vpools_guids', list, 15),
                   Dynamic('vdisks_guids', list, 15),
-                  Dynamic('status', str, 10)]
+                  Dynamic('status', str, 10),
+                  Dynamic('partitions_guids', dict, 3600)]
 
     def _statistics(self, dynamic):
         """
@@ -137,3 +138,14 @@ class StorageRouter(DataObject):
                 else:
                     return 'OK'
         return 'UNKNOWN'
+
+    def _partitions_guids(self):
+        """
+        Returns a dict with all partition information of a given storagerouter
+        """
+        dataset = dict((usage, []) for usage in ['bfs', 'db', 'dtl', 'fragment', 'md', 'read', 'scrub', 'tmp', 'write'])
+        for disk in self.disks:
+            for partition in disk.partitions:
+                for role in partition.role:
+                    dataset[role].append(partition.guid)
+        return dataset

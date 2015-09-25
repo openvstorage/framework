@@ -58,22 +58,14 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
-    ARAKOON_DB_MOUNTPOINT = '/opt/OpenvStorage/db'
-    ARAKOON_OVSDB = 'arakoon-ovsdb'
-    ARAKOON_VOLDRV = 'arakoon-voldrv'
-
-    # Arakoon
-    arakoon_clusters = {'ovsdb': ARAKOON_OVSDB,
-                        'voldrv': ARAKOON_VOLDRV}
-
     # Generic configfiles
     generic_configfiles = {'memcached': ('/opt/OpenvStorage/config/memcacheclient.cfg', 11211),
                            'rabbitmq': ('/opt/OpenvStorage/config/rabbitmqclient.cfg', 5672)}
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
 
     # Services
-    model_services = ['memcached', ARAKOON_OVSDB]
-    master_services = model_services + ['rabbitmq-server', ARAKOON_VOLDRV]
+    model_services = ['memcached', 'arakoon-ovsdb']
+    master_services = model_services + ['rabbitmq-server']
     extra_node_services = ['workers', 'volumerouter-consumer']
     master_node_services = master_services + ['scheduled-tasks', 'snmp', 'webapp-api', 'nginx',
                                               'volumerouter-consumer'] + extra_node_services
@@ -152,8 +144,7 @@ class SetupController(object):
                 ip = '127.0.0.1'
             if target_password is None:
                 node_string = 'this node' if ip == '127.0.0.1' else ip
-                target_node_password = SetupController._ask_validate_password(ip, username='root',
-                                                                              node_string=node_string)
+                target_node_password = SetupController._ask_validate_password(ip, username='root', node_string=node_string)
             else:
                 target_node_password = target_password
             target_client = SSHClient(ip, username='root', password=target_node_password)
@@ -386,9 +377,6 @@ class SetupController(object):
             print ''
             print Interactive.boxed_message(['Setup complete.',
                                              'Point your browser to https://{0} to use Open vStorage'.format(cluster_ip)])
-            from ovs.lib.disk import DiskController
-            from ovs.dal.lists.storagerouterlist import StorageRouterList
-            DiskController.sync_with_reality(StorageRouterList.get_by_ip(cluster_ip).guid)
             logger.info('Setup complete')
 
         except Exception as exception:
@@ -565,8 +553,7 @@ class SetupController(object):
             services_to_restart = []
             for service in all_services_to_restart:
                 if service not in services_to_restart:
-                    services_to_restart.append(service)  # Filter out duplicates maintaining the order of services
-                                                         # (eg: watcher-framework before memcached)
+                    services_to_restart.append(service)  # Filter out duplicates maintaining the order of services (eg: watcher-framework before memcached)
 
             SetupController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
             SetupController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
@@ -733,8 +720,7 @@ class SetupController(object):
             services_to_restart = []
             for service in all_services_to_restart:
                 if service not in services_to_restart:
-                    services_to_restart.append(service)  # Filter out duplicates keeping the order of services
-                                                         # (eg: watcher-framework before memcached)
+                    services_to_restart.append(service)  # Filter out duplicates keeping the order of services (eg: watcher-framework before memcached)
 
             SetupController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
             SetupController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
@@ -1010,13 +996,8 @@ class SetupController(object):
         print 'Setting up Arakoon'
         logger.info('Setting up Arakoon')
         cluster_ip = target_client.ip
-        target_client.config_set('ovs.arakoon.location', SetupController.ARAKOON_DB_MOUNTPOINT)
-        arakoon_ports = {}
-        exclude_ports = []
-        for cluster in SetupController.arakoon_clusters:
-            result = ArakoonInstaller.create_cluster(cluster, cluster_ip, exclude_ports)
-            arakoon_ports[cluster] = [result['client_port'], result['messaging_port']]
-            exclude_ports += arakoon_ports[cluster]
+        result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, [])
+        arakoon_ports = [result['client_port'], result['messaging_port']]
 
         SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
@@ -1057,14 +1038,12 @@ class SetupController(object):
 
         from ovs.dal.lists.servicetypelist import ServiceTypeList
         from ovs.dal.hybrids.service import Service
-        arakoonservice_type = ServiceTypeList.get_by_name('Arakoon')
-        for cluster, ports in arakoon_ports.iteritems():
-            service = Service()
-            service.name = SetupController.arakoon_clusters[cluster]
-            service.type = arakoonservice_type
-            service.ports = ports
-            service.storagerouter = storagerouter
-            service.save()
+        service = Service()
+        service.name = 'arakoon-ovsdb'
+        service.type = ServiceTypeList.get_by_name('Arakoon')
+        service.ports = arakoon_ports
+        service.storagerouter = storagerouter
+        service.save()
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
@@ -1131,8 +1110,7 @@ class SetupController(object):
 
         print 'Configuring services'
         logger.info('Copying client configurations')
-        for cluster in SetupController.arakoon_clusters:
-            ArakoonInstaller.deploy_to_slave(master_ip, cluster_ip, cluster)
+        ArakoonInstaller.deploy_to_slave(master_ip, cluster_ip, 'ovsdb')
         config_types = []
         if configure_rabbitmq:
             config_types.append('rabbitmq')
@@ -1209,13 +1187,11 @@ class SetupController(object):
         storagerouter.save()
 
         # Find other (arakoon) master nodes
-        master_nodes = []
-        for cluster in SetupController.arakoon_clusters:
-            config = ArakoonClusterConfig(cluster)
-            config.load_config(SSHClient(master_ip, username='root'))
-            master_nodes = [node.ip for node in config.nodes]
-            if cluster_ip in master_nodes:
-                master_nodes.remove(cluster_ip)
+        config = ArakoonClusterConfig('ovsdb')
+        config.load_config(SSHClient(master_ip, username='root'))
+        master_nodes = [node.ip for node in config.nodes]
+        if cluster_ip in master_nodes:
+            master_nodes.remove(cluster_ip)
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
@@ -1226,13 +1202,9 @@ class SetupController(object):
 
         print 'Joining arakoon cluster'
         logger.info('Joining arakoon cluster')
-        target_client.config_set('ovs.arakoon.location', SetupController.ARAKOON_DB_MOUNTPOINT)
-        arakoon_ports = {}
         exclude_ports = ServiceList.get_ports_for_ip(cluster_ip)
-        for cluster in SetupController.arakoon_clusters:
-            result = ArakoonInstaller.extend_cluster(master_ip, cluster_ip, cluster, exclude_ports)
-            arakoon_ports[cluster] = [result['client_port'], result['messaging_port']]
-            exclude_ports += arakoon_ports[cluster]
+        result = ArakoonInstaller.extend_cluster(master_ip, cluster_ip, 'ovsdb', exclude_ports)
+        arakoon_ports = [result['client_port'], result['messaging_port']]
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
@@ -1255,19 +1227,16 @@ class SetupController(object):
 
         print 'Restarting master node services'
         logger.info('Restarting master node services')
-        for cluster in SetupController.arakoon_clusters:
-            ArakoonInstaller.restart_cluster_add(cluster, master_nodes, cluster_ip)
+        ArakoonInstaller.restart_cluster_add('ovsdb', master_nodes, cluster_ip)
         PersistentFactory.store = None
         VolatileFactory.store = None
 
-        arakoonservice_type = ServiceTypeList.get_by_name('Arakoon')
-        for cluster, ports in arakoon_ports.iteritems():
-            service = Service()
-            service.name = SetupController.arakoon_clusters[cluster]
-            service.type = arakoonservice_type
-            service.ports = ports
-            service.storagerouter = storagerouter
-            service.save()
+        service = Service()
+        service.name = 'arakoon-ovsdb'
+        service.type = ServiceTypeList.get_by_name('Arakoon')
+        service.ports = arakoon_ports
+        service.storagerouter = storagerouter
+        service.save()
 
         if configure_rabbitmq:
             SetupController._configure_rabbitmq(target_client)
@@ -1334,20 +1303,17 @@ class SetupController(object):
         storagerouter.save()
 
         # Find other (arakoon) master nodes
-        master_nodes = []
-        for cluster in SetupController.arakoon_clusters:
-            config = ArakoonClusterConfig(cluster)
-            config.load_config(SSHClient(master_ip, username='root'))
-            master_nodes = [node.ip for node in config.nodes]
-            if cluster_ip in master_nodes:
-                master_nodes.remove(cluster_ip)
+        config = ArakoonClusterConfig('ovsdb')
+        config.load_config(SSHClient(master_ip, username='root'))
+        master_nodes = [node.ip for node in config.nodes]
+        if cluster_ip in master_nodes:
+            master_nodes.remove(cluster_ip)
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
         print 'Leaving arakoon cluster'
         logger.info('Leaving arakoon cluster')
-        for cluster in SetupController.arakoon_clusters:
-            ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, cluster)
+        ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'ovsdb')
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
@@ -1373,16 +1339,12 @@ class SetupController(object):
         remaining_nodes = ip_client_map.keys()[:]
         if cluster_ip in remaining_nodes:
             remaining_nodes.remove(cluster_ip)
-        for cluster in SetupController.arakoon_clusters:
-            ArakoonInstaller.restart_cluster_remove(cluster, remaining_nodes)
+        ArakoonInstaller.restart_cluster_remove('ovsdb', remaining_nodes)
         PersistentFactory.store = None
         VolatileFactory.store = None
 
-        service_names = []
-        for cluster in SetupController.arakoon_clusters:
-            service_names.append(SetupController.arakoon_clusters[cluster])
         for service in storagerouter.services:
-            if service.name in service_names:
+            if service.name == 'arakoon-ovsdb':
                 service.delete()
 
         if configure_rabbitmq:
@@ -1397,7 +1359,7 @@ class SetupController(object):
 
         print 'Removing services'
         logger.info('Removing services')
-        services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + [SetupController.ARAKOON_OVSDB, SetupController.ARAKOON_VOLDRV])]
+        services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + ['arakoon-ovsdb'])]
         if not configure_rabbitmq:
             services.remove('rabbitmq-server')
         if not configure_memcached:
@@ -1595,10 +1557,8 @@ EOF
     def _add_services(client, unique_id, node_type):
         if node_type == 'master':
             services = SetupController.master_node_services
-            if SetupController.ARAKOON_VOLDRV in services:
-                services.remove(SetupController.ARAKOON_VOLDRV)
-            if SetupController.ARAKOON_OVSDB in services:
-                services.remove(SetupController.ARAKOON_OVSDB)
+            if 'arakoon-ovsdb' in services:
+                services.remove('arakoon-ovsdb')
             worker_queue = '{0},ovs_masters'.format(unique_id)
         else:
             services = SetupController.extra_node_services
@@ -1624,6 +1584,7 @@ EOF
                                                  new_value='http://' + cluster_ip + ':9200')
 
         # Imports, not earlier than here, as all required config files should be in place.
+        from ovs.lib.disk import DiskController
         from ovs.dal.hybrids.pmachine import PMachine
         from ovs.dal.lists.pmachinelist import PMachineList
         from ovs.dal.hybrids.storagerouter import StorageRouter
@@ -1657,6 +1618,8 @@ EOF
         storagerouter.node_type = node_type
         storagerouter.pmachine = pmachine
         storagerouter.save()
+
+        DiskController.sync_with_reality(storagerouter.guid)
         return storagerouter
 
     @staticmethod
@@ -1780,7 +1743,7 @@ EOF
         functions = Toolbox.fetch_hooks('setup', hook_type)
         functions_found = len(functions) > 0
         if functions_found is True:
-            print '\n+++ Running plugin hooks +++\n'
+            print '\n+++ Running hooks +++\n'
         for function in functions:
             if master_ip is None:
                 function(cluster_ip=cluster_ip)

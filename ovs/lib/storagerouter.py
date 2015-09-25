@@ -112,9 +112,9 @@ class StorageRouterController(object):
                       'write': list()}
 
         for disk_partition in DiskPartitionList.get_partitions():
-            for usage in disk_partition.usages:
-                logger.info('{0} {1} {2}'.format(usage, disk_partition.size, disk_partition.guid))
-                partitions[usage].append({disk_partition.guid, disk_partition.size})
+            for role in disk_partition.roles:
+                logger.info('{0} {1} {2}'.format(role, disk_partition.size, disk_partition.guid))
+                partitions[role].append({disk_partition.guid, disk_partition.size})
 
         # check if requirements for backend type are met:
         backend_prereqs = {'bfs': False,
