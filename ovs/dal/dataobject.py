@@ -917,3 +917,18 @@ class DataObject(object):
         if not Descriptor.isinstance(other, self.__class__):
             return True
         return not self.__eq__(other)
+
+    @staticmethod
+    def enumerator(name, elements, lower_value=True):
+        """
+        Generates an enumerator
+        """
+        class Enumerator(dict):
+            def __init__(self, *args, **kwargs):
+                super(Enumerator, self).__init__(*args, **kwargs)
+
+        enumerator = Enumerator((element, element.lower() if lower_value is True else element.upper()) for element in elements)
+        enumerator.__name__ = name
+        for item in enumerator:
+            setattr(enumerator, item, enumerator[item])
+        return enumerator

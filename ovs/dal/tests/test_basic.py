@@ -1313,6 +1313,22 @@ class Basic(TestCase):
         value = disk.updatable
         self.assertEqual(value, 10, 'Dynamic should be 10 now ({0})'.format(value))
 
+    def test_enumerator(self):
+        """
+        Validates whether the internal enumerator generator works as expected
+        """
+        from ovs.dal.dataobject import DataObject
+        items = ['ONE', 'TWO', 'THREE']
+        enum = DataObject.enumerator('test', items)
+        for item in items:
+            self.assertIn(item, enum, '{0} should be in the enumerator'.format(item))
+            self.assertTrue(hasattr(enum, item), 'Enumerator should have property {0}'.format(item))
+        self.assertNotIn('ZERO', enum, 'ZERO should not be in the enumerator')
+        extract = [item for item in enum]
+        self.assertListEqual(sorted(items), sorted(extract), 'Iterating the enum should yield the initial list')
+        self.assertEqual(enum.ONE, 'one', 'Default value should be lowercase')
+        enum = DataObject.enumerator('test', items, lower_value=False)
+        self.assertEqual(enum.ONE, 'ONE', 'Value should be uppercase')
 
 if __name__ == '__main__':
     import unittest
