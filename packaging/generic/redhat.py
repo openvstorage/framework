@@ -19,7 +19,7 @@ import os
 import shutil
 from ConfigParser import RawConfigParser
 from sourcecollector import SourceCollector
-
+ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 
 class RPMPackager(object):
     """
@@ -41,7 +41,7 @@ class RPMPackager(object):
         """
         distribution, version_string, revision_date = source_metadata
 
-        root_path = os.path.dirname(os.path.abspath(__file__))
+        root_path = ROOT_PATH
         filename = '{0}/../settings.cfg'.format(root_path)
         settings = RawConfigParser()
         settings.read(filename)
