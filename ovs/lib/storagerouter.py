@@ -70,10 +70,12 @@ class StorageRouterController(object):
     """
 
     SUPPORT_AGENT = 'support-agent'
+    PARTITION_DEFAULT_UAGES = {DiskPartition.ROLES.DB: (20, 40),  # 1st number is exact size in GiB, 2nd number is percentage (highest of the 2 will be taken)
+                               DiskPartition.ROLES.SCRUB: (300, 0)}
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.get_physical_metadata')
-    def get_physical_metadata(files, storagerouter_guid):
+    @celery.task(name='ovs.storagerouter.get_metadata')
+    def get_metadata(storagerouter_guid):
         """
         Gets physical information about the machine this task is running on
         """
@@ -86,24 +88,54 @@ class StorageRouterController(object):
             ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
             ipaddresses = [ip.strip() for ip in ipaddresses]
             ipaddresses.remove('127.0.0.1')
-        allow_vpool = VPoolController.can_be_served_on(storagerouter_guid)
-        file_existence = {}
-        for check_file in files:
-            file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
+        mountpoints = check_output('mount -v', shell=True).strip().splitlines()
+        mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2 and
+                       not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc') and
+                       not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run') and
+                       p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
 
         partitions = dict((role, []) for role in DiskPartition.ROLES)
+        shared_size = 0
+        readcache_size = 0
+        writecache_size = 0
         for disk_partition in DiskPartitionList.get_partitions():
+            calculated_sizes = False
             for role in disk_partition.roles:
-                logger.info('{0} {1} {2}'.format(role, disk_partition.size, disk_partition.guid))
+                size = disk_partition.size
                 partitions[role].append({'guid': disk_partition.guid,
-                                         'size': disk_partition.size,
+                                         'size': size,
                                          'mountpoint': disk_partition.mountpoint})
-        logger.info('partitions:{0}'.format(partitions))
+
+                if calculated_sizes is False:
+                    if role in [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE]:
+                        calculated_sizes = True
+                        for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_UAGES.iteritems():
+                            if sub_role in disk_partition.roles:
+                                amount = required_size[0] * 1024**3
+                                percentage = required_size[1] * disk_partition.size / 100
+                                size -= max(amount, percentage)
+
+                        if size > 0:
+                            if DiskPartition.ROLES.READ in disk_partition.roles and DiskPartition.ROLES.WRITE in disk_partition.roles:
+                                shared_size += size
+                            elif role == DiskPartition.ROLES.READ:
+                                readcache_size += size
+                            elif role == DiskPartition.ROLES.WRITE:
+                                writecache_size += size
+
+        arakoon_service_found = False
+        for service in ServiceTypeList.get_by_name('Arakoon').services:
+            if service.name == 'arakoon-voldrv':
+                arakoon_service_found = True
+                break
 
         return {'partitions': partitions,
+                'mountpoints': mountpoints,
                 'ipaddresses': ipaddresses,
-                'files': file_existence,
-                'allow_vpool': allow_vpool}
+                'shared_size': shared_size,
+                'arakoon_found': arakoon_service_found,
+                'readcache_size': readcache_size,
+                'writecache_size': writecache_size}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.add_vpool')
@@ -445,17 +477,17 @@ class StorageRouterController(object):
         storagedriver.storagerouter = storagerouter
         storagedriver.storagedriver_id = vrouter_id
         storagedriver.save()
-        md_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, md_partition, DiskPartition.ROLES.MD)
-        dtl_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, DiskPartition.ROLES.DTL)
-        bfs_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, DiskPartition.ROLES.BFS)
-        tmp_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, DiskPartition.ROLES.TMP)
+        md_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, md_partition, DiskPartition.ROLES.DB)
+        dtl_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, DiskPartition.ROLES.WRITE)
+        # bfs_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, bfs_partition, DiskPartition.ROLES.BFS)
+        tmp_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, tmp_partition, DiskPartition.ROLES.WRITE)
         readcaches_sdps = list()
         for read_partition in read_partitions:
             readcaches_sdps.append(StorageRouterController._get_storagedriverpartition(storagedriver, read_partition, DiskPartition.ROLES.READ))
         writecaches_sdps = list()
         for write_partition in write_partitions:
             writecaches_sdps.append(StorageRouterController._get_storagedriverpartition(storagedriver, write_partition, DiskPartition.ROLES.WRITE))
-        fragment_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, DiskPartition.ROLES.FRAGMENT)
+        fragment_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, frag_partition, DiskPartition.ROLES.WRITE)
         storagedriver.save()
 
         config_dir = '{0}/storagedriver/storagedriver'.format(client.config_read('ovs.core.cfgdir'))
@@ -1318,4 +1350,3 @@ class StorageRouterController(object):
         sdp.save()
 
         return sdp
-

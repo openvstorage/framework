@@ -76,15 +76,6 @@ class VPoolController(object):
                 VMachineController.update_vmachine_config(vmachine, vm_object, pmachine)
 
     @staticmethod
-    def can_be_served_on(storagerouter_guid):
-        """
-        temporary check to avoid creating 2 ganesha nfs exported vpools
-        as this is not yet supported on storage driver level
-        """
-        _ = storagerouter_guid
-        return True
-
-    @staticmethod
     @celery.task(name='ovs.vpool.get_configuration')
     def get_configuration(vpool_guid):
         vpool = VPool(vpool_guid)

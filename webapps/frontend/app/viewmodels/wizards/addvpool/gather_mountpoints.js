@@ -45,10 +45,25 @@ define([
                 self.data.mtptBFS('');
             }
 
-            // vPool check
-            if (!self.data.allowVPool()) {
-                fields.push('vpool');
-                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.vpoolnotallowed'));
+            var readCacheSizeBytes = self.data.readCacheSize() * 1024 * 1024 * 1024;
+            var writeCacheSizeBytes = self.data.writeCacheSize() * 1024 * 1024 * 1024;
+            var readCacheSizeAvailableBytes = self.data.readCacheAvailableSize() + self.data.sharedSize();
+            var writeCacheSizeAvailableBytes = self.data.writeCacheAvailableSize() + self.data.sharedSize();
+            var sharedAvailableModulus = self.data.sharedSize() - self.data.sharedSize() % (1024 * 1024 * 1024);
+            var readCacheAvailableModulus = self.data.readCacheAvailableSize() - self.data.readCacheAvailableSize() % (1024 * 1024 * 1024);
+            var writeCacheAvailableModulues = self.data.writeCacheAvailableSize() - self.data.writeCacheAvailableSize() % (1024 * 1024 * 1024);
+            if (readCacheSizeBytes > readCacheSizeAvailableBytes) {
+                fields.push('readCacheSize');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.over_allocation'));
+            }
+            if (writeCacheSizeBytes > writeCacheSizeAvailableBytes) {
+                fields.push('writeCacheSize');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.over_allocation'));
+            }
+            if (readCacheSizeBytes + writeCacheSizeBytes > readCacheAvailableModulus + writeCacheAvailableModulues + sharedAvailableModulus) {
+                fields.push('readCacheSize');
+                fields.push('writeCacheSize');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.over_allocation'));
             }
             var valid = reasons.length === 0;
             var unique_fields = fields.filter(generic.arrayFilterUnique);
@@ -56,6 +71,7 @@ define([
             return { value: valid, reasons: unique_reasons, fields: unique_fields };
         });
 
+        // Functions
         self.addReadCache = function() {
             var value = self.data.mtptCustomRC();
             if (value !== undefined && value !== '') {
@@ -68,7 +84,6 @@ define([
                 self.data.mtptCustomRC('');
             }
         };
-
         self.addWriteCache = function() {
             var value = self.data.mtptCustomWC();
             if (value !== undefined && value !== '') {
@@ -81,7 +96,6 @@ define([
                 self.data.mtptCustomWC('');
             }
         };
-
         self.activate = function() {
             if (data.extendVpool() === true) {
                 self.loadStorageRoutersHandle = api.get('storagerouters', {
@@ -120,21 +134,6 @@ define([
                             self.data.vPool().backendType().load();
                             self.data.backend(self.data.vPool().backendType().name());
                             self.data.name(self.data.vPool().name());
-                            if (self.data.storageRouter() !== undefined) {
-                                api.post('storagerouters/' + self.data.storageRouter().guid() + '/get_physical_metadata')
-                                .then(self.shared.tasks.wait)
-                                .then(function(data) {
-                                        self.data.mountpoints(data.mountpoints);
-                                        self.data.partitions(data.partitions);
-                                        self.data.backend_prereqs(data.backend_prereqs);
-                                        self.data.ipAddresses(data.ipaddresses);
-                                        self.data.files(data.files);
-                                        self.data.allowVPool(data.allow_vpool);
-                                        if (self.data.mountpoints().length >= 1) {
-                                            self.data.mtptBFS(self.data.mountpoints()[0]);
-                                        }
-                                })
-                            }
                         })
                 }
             }

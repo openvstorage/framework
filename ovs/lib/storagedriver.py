@@ -133,8 +133,8 @@ class StorageDriverController(object):
                 current_ips.append(service.storagerouter.ip)
         available_storagerouters = {}
         for storagerouter in StorageRouterList.get_masters():
-            if len(storagerouter.partition_config['db']) > 0:
-                available_storagerouters[storagerouter] = DiskPartition(storagerouter.partition_config['db'][0])
+            if len(storagerouter.partition_config[DiskPartition.ROLES.DB]) > 0:
+                available_storagerouters[storagerouter] = DiskPartition(storagerouter.partition_config[DiskPartition.ROLES.DB][0])
         if 0 < len(current_services) < len(available_storagerouters):
             for storagerouter in available_storagerouters:
                 ports_to_exclude = ServiceList.get_ports_for_ip(storagerouter.ip)

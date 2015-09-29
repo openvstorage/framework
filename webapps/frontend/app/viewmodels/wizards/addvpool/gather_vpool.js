@@ -80,7 +80,6 @@ define([
                     fields.push('host');
                 }
             }
-
             if (preValidation.valid === false) {
                 showErrors = true;
                 reasons = reasons.concat(preValidation.reasons);
@@ -136,6 +135,46 @@ define([
                                 mtptDeferred.resolve();
                             })
                             .fail(mtptDeferred.reject);
+                    }).promise(),
+                    $.Deferred(function(physicalMetadataDeferred) {
+                        generic.xhrAbort(self.loadStorageRouterHandle);
+                        self.loadStorageRouterHandle = api.post('storagerouters/' + self.data.target().guid() + '/get_metadata')
+                            .then(self.shared.tasks.wait)
+                            .then(function(data) {
+                                self.data.mountpoints(data.mountpoints);
+                                self.data.partitions(data.partitions);
+                                self.data.ipAddresses(data.ipaddresses);
+                                self.data.arakoonFound(data.arakoon_found);
+                                self.data.sharedSize(data.shared_size);
+                                self.data.readCacheAvailableSize(data.readcache_size);
+                                self.data.writeCacheAvailableSize(data.writecache_size);
+                                self.data.readCacheSize(Math.floor(data.readcache_size / 1024 / 1024 / 1024));
+                                self.data.writeCacheSize(Math.floor((data.writecache_size + data.shared_size) / 1024 / 1024 / 1024));
+                            })
+                            .done(function() {
+                                var requiredRoles = ['READ', 'WRITE', 'SCRUB'];
+                                if (self.data.arakoonFound() === false) {
+                                    requiredRoles.push('DB');
+                                }
+                                $.each(self.data.partitions(), function(index, value) {
+                                    $.each(value, function(subIndex, subValue) {
+                                       if (requiredRoles.contains(index)) {
+                                           generic.removeElement(requiredRoles, index);
+                                       }
+                                    });
+                                });
+                                if (requiredRoles.contains('DB')) {
+                                    validationResult.valid = false;
+                                    validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_arakoon'));
+                                } else {
+                                    $.each(requiredRoles, function(index, role) {
+                                        validationResult.valid = false;
+                                        validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_role', { what: role }));
+                                    });
+                                }
+                                physicalMetadataDeferred.resolve();
+                            })
+                            .fail(physicalMetadataDeferred.reject);
                     }).promise()
                 ])
                     .always(function() {
@@ -150,23 +189,7 @@ define([
         };
         self.next = function() {
             return $.Deferred(function(deferred) {
-                var calls = [
-                    $.Deferred(function(mtptDeferred) {
-                        generic.xhrAbort(self.loadStorageRouterHandle);
-                        self.loadStorageRouterHandle = api.post('storagerouters/' + self.data.target().guid() + '/get_physical_metadata')
-                            .then(self.shared.tasks.wait)
-                            .then(function(data) {
-                                self.data.mountpoints(data.mountpoints);
-                                self.data.ipAddresses(data.ipaddresses);
-                                self.data.files(data.files);
-                                self.data.allowVPool(data.allow_vpool);
-                            })
-                            .done(function() {
-                                mtptDeferred.resolve();
-                            })
-                            .fail(mtptDeferred.reject);
-                    }).promise()
-                ];
+                var calls = [];
                 generic.crossFiller(
                     self.data.target().storageDriverGuids, self.data.storageDrivers,
                     function(guid) {

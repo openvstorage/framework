@@ -96,12 +96,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
-    def get_physical_metadata(self, storagerouter, files=None):
+    def get_metadata(self, storagerouter):
         """
         Returns a list of mountpoints on the given Storage Router
         """
-        files = [] if files is None else files.strip().split(',')
-        return StorageRouterController.get_physical_metadata.s(files, storagerouter.guid).apply_async(
+        return StorageRouterController.get_metadata.s(storagerouter.guid).apply_async(
             routing_key='sr.{0}'.format(storagerouter.machine_id)
         )
 

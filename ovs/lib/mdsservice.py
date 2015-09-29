@@ -97,10 +97,10 @@ class MDSServiceController(object):
                 if mds_service.vpool_guid == vpool.guid:
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.MD],
+                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.DB],
                                                                                vpool.name,
                                                                                mds_service.number),
-                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.TMP],
+                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.SCRUB],
                                                                                     vpool.name,
                                                                                     mds_service.number)})
 
@@ -138,10 +138,10 @@ class MDSServiceController(object):
                 if mds_service.vpool_guid == vpool.guid:
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.MD],
+                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.DB],
                                                                                vpool.name,
                                                                                mds_service.number),
-                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.TMP],
+                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.SCRUB],
                                                                                     vpool.name,
                                                                                     mds_service.number)})
 
@@ -156,10 +156,10 @@ class MDSServiceController(object):
         cleaned = False
         while tries > 0 and cleaned is False:
             try:
-                client.dir_delete(['{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.MD],
+                client.dir_delete(['{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.DB],
                                                             vpool.name,
                                                             this_service_number),
-                                   '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.TMP],
+                                   '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.SCRUB],
                                                             vpool.name,
                                                             this_service_number)])
                 logger.debug('MDS files cleaned up')

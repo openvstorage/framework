@@ -79,7 +79,6 @@ define([
 
             // Observables
             self.loaded         = ko.observable(false);
-            self.allowVPool     = ko.observable(true);
             self.mtptOK         = ko.observable(true);
             self.storageDrivers = ko.observableArray([]);
             self.mountpoints    = ko.observableArray([]);
@@ -170,11 +169,6 @@ define([
                         fields.push('ip');
                         reasons.push($.t('ovs:wizards.storageroutertovpool.confirm.ipnotavailable', { what: self.storageDriver().storageIP() }));
                     }
-                    if (!self.allowVPool() && !fields.contains('vpool')) {
-                        valid = false;
-                        fields.push('vpool');
-                        reasons.push($.t('ovs:wizards.storageroutertovpool.confirm.vpoolnotallowed'));
-                    }
                     if (!self.mtptOK()) {
                         valid = false;
                         fields.push('mtpt');
@@ -188,12 +182,11 @@ define([
             self.validate = function() {
                 var calls = [
                     $.Deferred(function(physicalDeferred) {
-                        api.post('storagerouters/' + self.storageRouter.guid() + '/get_physical_metadata')
+                        api.post('storagerouters/' + self.storageRouter.guid() + '/get_metadata')
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.mountpoints(data.mountpoints);
                                 self.ipAddresses(data.ipaddresses);
-                                self.allowVPool(data.allow_vpool);
                             })
                             .done(physicalDeferred.resolve)
                             .fail(physicalDeferred.reject);

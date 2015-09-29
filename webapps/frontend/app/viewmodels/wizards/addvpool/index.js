@@ -46,7 +46,7 @@ define([
         // Cleaning data
         data.accesskey('');
         data.secretkey('');
-        data.backend('local');
+        data.backend('alba');
         data.mtptTemp('/var/tmp');
         data.mtptBFS(undefined);
         data.mtptReadCaches([]);
@@ -56,7 +56,7 @@ define([
         data.host('');
         data.localHost(true);
         data.port(80);
-        data.backends(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed', 'alba']);
+        data.backends(['alba', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed', 'local']);
         data.storageRouters([]);
         data.storageDrivers([]);
         data.mountpoints([]);
