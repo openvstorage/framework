@@ -42,7 +42,7 @@ class StorageDriverPartition(DataObject):
         """
         Folder on the mountpoint
         """
-        return '{0}{1}_{2}'.format(self.role, self.number, self.storagedriver.vpool.name)
+        return '{0}{1}_{2}'.format(self.role.lower(), self.number, self.storagedriver.vpool.name)
 
     def _path(self):
         """

@@ -37,7 +37,7 @@ define([
         self.mountpoint        = ko.observable();
         self.path              = ko.observable();
         self.usage             = ko.observable();
-        self.roles             = ko.observable();
+        self.roles             = ko.observableArray([]);
 
         // Functions
         self.fillData = function(data) {

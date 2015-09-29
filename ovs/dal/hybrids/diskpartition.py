@@ -28,7 +28,7 @@ class DiskPartition(DataObject):
 
     __properties = [Property('id', str, doc='The partition identifier'),
                     Property('filesystem', str, mandatory=False, doc='The filesystem used on the partition'),
-                    Property('state', ['OK', 'ERROR', 'MISSING'], doc='State of the partition'),
+                    Property('state', ['OK', 'FAILURE', 'MISSING'], doc='State of the partition'),
                     Property('inode', int, mandatory=False, doc='The partitions inode'),
                     Property('offset', int, doc='Offset of the partition'),
                     Property('size', int, doc='Size of the partition'),

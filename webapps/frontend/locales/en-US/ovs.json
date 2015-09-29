@@ -42,7 +42,8 @@
             "disk": {
                 "ok": "OK",
                 "missing": "Missing",
-                "failure": "Failure"
+                "failure": "Failure",
+                "raw": "Raw disk"
             }
         },
         "messages": {
@@ -79,6 +80,12 @@
             "read": "Read cache",
             "write": "Write cache",
             "fragment": "Fragment cache"
+        },
+        "partitionroles": {
+            "db": "DB",
+            "read": "Read",
+            "scrub": "Scrub",
+            "write": "Write"
         },
         "username": "Username",
         "password": "Password",
@@ -217,7 +224,10 @@
         "tempspace": "Temporary files",
         "accept": "Accept",
         "warning": "Warning",
-        "inheritedfrom": "Inherited from"
+        "inheritedfrom": "Inherited from",
+        "state": "State",
+        "roles": "Roles",
+        "fs": "FS"
     },
     "storagerouters": {
         "title": "Storage Routers",

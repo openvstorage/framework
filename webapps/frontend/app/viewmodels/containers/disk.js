@@ -48,61 +48,68 @@ define([
         self.formattedSize = ko.computed(function() {
             return generic.formatBytes(self.size());
         });
-        self.enhancedPartitions = ko.computed(function() {
-            var data = [], size = 0, previousOffset = 0, hasMountpoint = false;
-            $.each(self.partitions(), function(index, partition) {
-                if (partition.loaded() === true) {
-                    data.push(partition);
-                    if (partition.mountpoint() !== null) {
-                        size += partition.size();
-                    }
-                }
-            });
-            $.each(data, function(index, partition) {
-                if (partition.mountpoint() !== null) {
-                    hasMountpoint = true;
-                    partition.filledOffset = previousOffset;
-                    partition.filledSize = self.size() / size * partition.size();
-                    previousOffset += partition.filledSize;
-                }
-            });
-            return data;
-        }).extend({ rateLimit: { method: 'notifyWhenChangesStop', timeout: 100 } });
-        self.emptySpaces = ko.computed(function() {
-            var data = [], previousPartition, partition;
+        self.fullPartitions = ko.computed(function() {
+            var data = [], minSize = 3,
+                previousPartition, partition, newPartition, runningIndex;
             if (self.partitions().length > 0) {
                 $.each(self.partitions(), function (index, partition) {
                     if (previousPartition === undefined) {
                         if (partition.offset() !== 0) {
-                            data.push({
-                                offset: 0,
-                                size: partition.offset()
-                            });
+                            newPartition = new Partition();
+                            newPartition.state('RAW');
+                            newPartition.offset(0);
+                            newPartition.size(partition.offset());
+                            data.push(newPartition);
                         }
                     } else if (previousPartition.offset() + previousPartition.size() < partition.offset()) {
-                        data.push({
-                            offset: previousPartition.offset() + previousPartition.size(),
-                            size: partition.offset() - previousPartition.offset() - previousPartition.size()
-                        });
+                        newPartition = new Partition();
+                        newPartition.state('RAW');
+                        newPartition.offset(previousPartition.offset() + previousPartition.size());
+                        newPartition.size(partition.offset() - previousPartition.offset() - previousPartition.size());
+                        data.push(newPartition);
                     }
+                    data.push(partition);
                     previousPartition = partition;
                 });
                 partition = self.partitions()[self.partitions().length - 1];
                 if (partition.offset() + partition.size() < self.size()) {
-                    data.push({
-                        offset: partition.offset() + partition.size(),
-                        size: self.size() - partition.offset() - partition.size()
-                    });
+                    newPartition = new Partition();
+                    newPartition.state('RAW');
+                    newPartition.offset(partition.offset() + partition.size());
+                    newPartition.size(self.size() - partition.offset() - partition.size());
+                    data.push(newPartition);
                 }
             } else {
-                data.push({
-                    offset: 0,
-                    size: self.size()
+                newPartition = new Partition();
+                newPartition.state('RAW');
+                newPartition.offset(0);
+                newPartition.size(self.size());
+                data.push(newPartition);
+            }
+            $.each(data, function(index, partition) {
+                partition.relativeSize = Math.round(partition.size() / self.size() * 100);
+                partition.small = false;
+            });
+            if (data.length > 1) {
+                $.each(data, function (index, partition) {
+                    if (partition.relativeSize < minSize) {
+                        runningIndex = index + 1;
+                        while(runningIndex !== index && partition.relativeSize < minSize) {
+                            if (runningIndex === data.length) {
+                                runningIndex = 0;
+                            }
+                            if (runningIndex !== index && data[runningIndex].relativeSize >= (minSize * 2)) {
+                                partition.relativeSize = minSize;
+                                partition.small = true;
+                                data[runningIndex].relativeSize -= minSize;
+                            }
+                            runningIndex += 1;
+                        }
+                    }
                 });
             }
             return data;
         }).extend({ rateLimit: { method: 'notifyWhenChangesStop', timeout: 100 } });
-        //
 
         // Functions
         self.fillData = function(data) {

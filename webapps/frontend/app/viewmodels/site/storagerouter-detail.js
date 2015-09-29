@@ -24,6 +24,7 @@ define([
         // Variables
         self.shared                   = shared;
         self.guard                    = { authenticated: true };
+        self.generic                  = generic;
         self.refresher                = new Refresher();
         self.widgets                  = [];
         self.pMachineCache            = {};
@@ -129,6 +130,12 @@ define([
                 });
                 deferred.resolve();
             }).promise();
+        };
+        self.isEmpty = generic.isEmpty;
+        self.configureRoles = function(partition) {
+            if (self.shared.user.roles().contains('manage')) {
+
+            }
         };
 
         // Durandal

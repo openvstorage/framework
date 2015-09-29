@@ -133,7 +133,7 @@ class DiskController(object):
                             try:
                                 client.run('touch {0}/{1}; rm {0}/{1}'.format(mountpoint, str(time.time())))
                             except CalledProcessError:
-                                partition_data['state'] = 'ERROR'
+                                partition_data['state'] = 'FAILURE'
                                 pass
                         if 'ID_FS_TYPE' in device:
                             partition_data['filesystem'] = device['ID_FS_TYPE']

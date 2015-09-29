@@ -85,7 +85,7 @@ define([
         });
         app.configurePlugins({
             widget: {
-                kinds: ['pager', 'lazyloader', 'lazylist', 'footer', 'dropdown', 'disk']
+                kinds: ['pager', 'lazyloader', 'lazylist', 'footer', 'dropdown']
             }
         });
         app.start().then(function() {
