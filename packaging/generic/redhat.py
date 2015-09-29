@@ -69,7 +69,7 @@ class RPMPackager(object):
             package_name = package_cfg.get('main', 'name')
             dirs = package_cfg.get('main', 'dirs')
             files = package_cfg.get('main', 'files')
-            depends_packages = package_cfg.get('main', 'depends').replace('$Version', version_string)
+            depends_packages = package_cfg.get('main', 'depends').replace('$Version', version_string.replace('-', '_'))
 
             depends = ""
             if depends_packages != '':
