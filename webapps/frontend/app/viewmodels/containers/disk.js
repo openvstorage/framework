@@ -38,56 +38,53 @@ define([
         self.diskModel         = ko.observable();
         self.state             = ko.observable();
         self.name              = ko.observable();
-        self.size              = ko.observable();
+        self.size              = ko.observable().extend({ format: generic.formatBytes });
         self.isSsd             = ko.observable();
         self.storageRouterGuid = ko.observable();
         self.partitionsLoaded  = ko.observable(false);
         self.partitions        = ko.observableArray([]);
 
         // Computed
-        self.formattedSize = ko.computed(function() {
-            return generic.formatBytes(self.size());
-        });
         self.fullPartitions = ko.computed(function() {
             var data = [], minSize = 3,
                 previousPartition, partition, newPartition, runningIndex;
             if (self.partitions().length > 0) {
                 $.each(self.partitions(), function (index, partition) {
                     if (previousPartition === undefined) {
-                        if (partition.offset() !== 0) {
+                        if (partition.offset.raw() !== 0) {
                             newPartition = new Partition();
                             newPartition.state('RAW');
                             newPartition.offset(0);
-                            newPartition.size(partition.offset());
+                            newPartition.size(partition.offset.raw());
                             data.push(newPartition);
                         }
-                    } else if (previousPartition.offset() + previousPartition.size() < partition.offset()) {
+                    } else if (previousPartition.offset.raw() + previousPartition.size.raw() < partition.offset.raw()) {
                         newPartition = new Partition();
                         newPartition.state('RAW');
-                        newPartition.offset(previousPartition.offset() + previousPartition.size());
-                        newPartition.size(partition.offset() - previousPartition.offset() - previousPartition.size());
+                        newPartition.offset(previousPartition.offset.raw() + previousPartition.size.raw());
+                        newPartition.size(partition.offset.raw() - previousPartition.offset.raw() - previousPartition.size.raw());
                         data.push(newPartition);
                     }
                     data.push(partition);
                     previousPartition = partition;
                 });
                 partition = self.partitions()[self.partitions().length - 1];
-                if (partition.offset() + partition.size() < self.size()) {
+                if (partition.offset.raw() + partition.size.raw() < self.size.raw()) {
                     newPartition = new Partition();
                     newPartition.state('RAW');
-                    newPartition.offset(partition.offset() + partition.size());
-                    newPartition.size(self.size() - partition.offset() - partition.size());
+                    newPartition.offset(partition.offset.raw() + partition.size.raw());
+                    newPartition.size(self.size.raw() - partition.offset.raw() - partition.size.raw());
                     data.push(newPartition);
                 }
             } else {
                 newPartition = new Partition();
                 newPartition.state('RAW');
                 newPartition.offset(0);
-                newPartition.size(self.size());
+                newPartition.size(self.size.raw());
                 data.push(newPartition);
             }
             $.each(data, function(index, partition) {
-                partition.relativeSize = Math.round(partition.size() / self.size() * 100);
+                partition.relativeSize = Math.round(partition.size.raw() / self.size.raw() * 100);
                 partition.small = false;
             });
             if (data.length > 1) {

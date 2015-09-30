@@ -63,7 +63,7 @@ define([
             mtptTemp:                ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-temp' }),
             mtptWriteCaches:         ko.observableArray([]), // Final target containing write caches
             name:                    ko.observable('').extend({ regex: nameRegex }),
-            partitions:              ko.observableArray([]),
+            partitions:              ko.observable(),
             port:                    ko.observable(80).extend({ numeric: { min: 1, max: 65536 } }),
             readCacheSize:           ko.observable(1).extend({numeric: {min: 1, max: 10240}}),
             readCacheAvailableSize:  ko.observable(),

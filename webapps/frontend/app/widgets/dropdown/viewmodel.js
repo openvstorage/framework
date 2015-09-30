@@ -60,7 +60,7 @@ define([
         self.set = function(item) {
             if (self.multi()) {
                 if (self.contains(item)) {
-                    self.target.remove(item);
+                    self.remove(item);
                 } else {
                     self.target.push(item);
                 }
@@ -71,8 +71,42 @@ define([
                 }
             }
         };
+        self.remove = function(item) {
+            if (self.key() === undefined) {
+                return self.target.remove(item);
+            }
+            var itemIndex = -1;
+            $.each(self.target(), function(index, targetItem) {
+                if (self.keyIsFunction()) {
+                    if (item[self.key()]() === targetItem[self.key()]()) {
+                        itemIndex = index;
+                        return false;
+                    }
+                } else if (item[self.key()] === targetItem[self.key()]) {
+                    itemIndex = index;
+                    return false;
+                }
+                return true;
+            });
+            self.target.splice(itemIndex, 1);
+        };
         self.contains = function(item) {
-            return $.inArray(item, self.target()) !== -1;
+            if (self.key() === undefined) {
+                return self.target().contains(item);
+            }
+            var result = false, found;
+            $.each(self.target(), function(index, targetItem) {
+                if (self.keyIsFunction()) {
+                    found = item[self.key()]() === targetItem[self.key()]();
+                    result |= found;
+                    return !found;
+                } else {
+                    found = item[self.key()] === targetItem[self.key()];
+                    result |= found;
+                    return !found;
+                }
+            });
+            return result;
         };
         self.translate = function() {
             window.setTimeout(function() { $('html').i18n(); }, 250);

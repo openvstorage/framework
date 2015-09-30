@@ -13,10 +13,11 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'knockout',
+    'jquery', 'knockout', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver'
-], function($, ko, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver) {
+    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver',
+    '../wizards/configurepartition/index'
+], function($, ko, dialog, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver, ConfigurePartitionWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -24,7 +25,6 @@ define([
         // Variables
         self.shared                   = shared;
         self.guard                    = { authenticated: true };
-        self.generic                  = generic;
         self.refresher                = new Refresher();
         self.widgets                  = [];
         self.pMachineCache            = {};
@@ -134,7 +134,11 @@ define([
         self.isEmpty = generic.isEmpty;
         self.configureRoles = function(partition) {
             if (self.shared.user.roles().contains('manage')) {
-
+                dialog.show(new ConfigurePartitionWizard({
+                    modal: true,
+                    partition: partition,
+                    storageRouter: self.storageRouter()
+                }));
             }
         };
 

@@ -79,8 +79,6 @@ class StorageRouterController(object):
         """
         Gets physical information about the machine this task is running on
         """
-        from ovs.lib.vpool import VPoolController
-
         storagerouter = StorageRouter(storagerouter_guid)
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']
@@ -98,36 +96,46 @@ class StorageRouterController(object):
         shared_size = 0
         readcache_size = 0
         writecache_size = 0
-        for disk_partition in DiskPartitionList.get_partitions():
-            calculated_sizes = False
-            for role in disk_partition.roles:
-                size = disk_partition.size
-                partitions[role].append({'guid': disk_partition.guid,
-                                         'size': size,
-                                         'mountpoint': disk_partition.mountpoint})
-
-                if calculated_sizes is False:
-                    if role in [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE]:
-                        calculated_sizes = True
-                        for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_UAGES.iteritems():
-                            if sub_role in disk_partition.roles:
-                                amount = required_size[0] * 1024**3
-                                percentage = required_size[1] * disk_partition.size / 100
-                                size -= max(amount, percentage)
-
-                        if size > 0:
-                            if DiskPartition.ROLES.READ in disk_partition.roles and DiskPartition.ROLES.WRITE in disk_partition.roles:
-                                shared_size += size
-                            elif role == DiskPartition.ROLES.READ:
-                                readcache_size += size
-                            elif role == DiskPartition.ROLES.WRITE:
-                                writecache_size += size
+        for disk in storagerouter.disks:
+            for disk_partition in disk.partitions:
+                calculated_sizes = False
+                for role in disk_partition.roles:
+                    size = disk_partition.size
+                    partitions[role].append({'guid': disk_partition.guid,
+                                             'size': size,
+                                             'mountpoint': disk_partition.mountpoint,
+                                             'storagerouter_guid': disk_partition.disk.storagerouter_guid,
+                                             'in_use': any(junction for junction in disk_partition.storagedrivers
+                                                           if junction.role == role)})
+                    if calculated_sizes is False:
+                        if role in [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE]:
+                            calculated_sizes = True
+                            for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_UAGES.iteritems():
+                                if sub_role in disk_partition.roles:
+                                    amount = required_size[0] * 1024**3
+                                    percentage = required_size[1] * disk_partition.size / 100
+                                    size -= max(amount, percentage)
+                            if size > 0:
+                                if DiskPartition.ROLES.READ in disk_partition.roles and DiskPartition.ROLES.WRITE in disk_partition.roles:
+                                    shared_size += size
+                                elif role == DiskPartition.ROLES.READ:
+                                    readcache_size += size
+                                elif role == DiskPartition.ROLES.WRITE:
+                                    writecache_size += size
 
         arakoon_service_found = False
         for service in ServiceTypeList.get_by_name('Arakoon').services:
+            if service.name == 'arakoon-ovsdb':
+                continue
+            for partition in partitions[DiskPartition.ROLES.DB]:
+                if service.storagerouter_guid == partition['storagerouter_guid']:
+                    partition['in_use'] = True
             if service.name == 'arakoon-voldrv':
                 arakoon_service_found = True
-                break
+        for service in ServiceTypeList.get_by_name('MetadataServer').services:
+            for partition in partitions[DiskPartition.ROLES.DB]:
+                if service.storagerouter_guid == partition['storagerouter_guid']:
+                    partition['in_use'] = True
 
         return {'partitions': partitions,
                 'mountpoints': mountpoints,

@@ -32,8 +32,8 @@ define([
         self.filesystem        = ko.observable();
         self.state             = ko.observable();
         self.inode             = ko.observable();
-        self.offset            = ko.observable();
-        self.size              = ko.observable();
+        self.offset            = ko.observable().extend({ format: generic.formatBytes });
+        self.size              = ko.observable().extend({ format: generic.formatBytes });
         self.mountpoint        = ko.observable();
         self.path              = ko.observable();
         self.usage             = ko.observable();

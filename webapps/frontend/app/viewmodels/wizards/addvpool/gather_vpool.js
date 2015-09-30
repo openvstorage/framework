@@ -156,12 +156,10 @@ define([
                                 if (self.data.arakoonFound() === false) {
                                     requiredRoles.push('DB');
                                 }
-                                $.each(self.data.partitions(), function(index, value) {
-                                    $.each(value, function(subIndex, subValue) {
-                                       if (requiredRoles.contains(index)) {
-                                           generic.removeElement(requiredRoles, index);
-                                       }
-                                    });
+                                $.each(self.data.partitions(), function(role, partitions) {
+                                   if (requiredRoles.contains(role) && partitions.length > 0) {
+                                       generic.removeElement(requiredRoles, role);
+                                   }
                                 });
                                 if (requiredRoles.contains('DB')) {
                                     validationResult.valid = false;
