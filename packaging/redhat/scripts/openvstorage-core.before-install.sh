@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -x
 
 if [[ ! -z "$2" && ! -f /etc/ready_for_upgrade ]]
 then

@@ -113,6 +113,8 @@ class RPMPackager(object):
             after_install_script_path = os.path.join(script_root, after_install_script)
             if os.path.exists(after_install_script_path):
                 after_install = ' --after-install {0} '.format(after_install_script_path)
+                SourceCollector.run(command="sed -i -e 's/$Version/{0}/g' {1}".format(version_string, after_install_script_path),
+                                    working_directory='{0}'.format(script_root))
             print(before_install_script_path, after_install_script_path)
             params = {'version' : version_string,
                       'package_name' : package_cfg.get('main', 'name'),

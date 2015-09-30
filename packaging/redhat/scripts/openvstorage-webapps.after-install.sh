@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
-pip install djangorestframework >= 2.3.9
+pip install djangorestframework>=2.3.12
 
-python /opt/OpenvStorage/scripts/install/openvstorage-webapps.postinst.py "__NEW_VERSION__" "$@"
+mkdir -p /etc/nginx/sites-enabled
+
+python /opt/OpenvStorage/scripts/install/openvstorage-webapps.postinst.py "$Version" "$@"
+
+cp /etc/nginx/sites-enabled/* /etc/nginx/conf.d/
+chmod 777 /etc/nginx/conf.d/*
+service nginx restart
