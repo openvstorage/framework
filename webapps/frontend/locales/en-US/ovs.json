@@ -942,6 +942,12 @@
                 "filesystem": "Filesystem",
                 "size": "Size",
                 "offset": "Offset"
+            },
+            "confirm": {
+                "creating": "configuring the partition",
+                "success": "Partition configured",
+                "started": "Configuration started",
+                "inprogress": "The partition is now being configured."
             }
         }
     },

@@ -31,6 +31,7 @@ from ovs.dal.hybrids.j_albaproxy import AlbaProxy
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service as DalService
 from ovs.dal.hybrids.diskpartition import DiskPartition
+from ovs.dal.hybrids.disk import Disk
 from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
@@ -50,6 +51,7 @@ from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.extensions.packages.package import PackageManager
+from ovs.extensions.generic.disk import DiskTools
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
@@ -1330,6 +1332,59 @@ class StorageRouterController(object):
         root_client = SSHClient(storagerouter_ip,
                                 username='root')
         root_client.run('ovs update volumedriver')
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.configure_disk')
+    def configure_disk(storagerouter_guid, disk_guid, partition_guid, offset, size, roles):
+        """
+        Configures a partition
+        """
+        for role in roles:
+            if role not in DiskPartition.ROLES:
+                raise RuntimeError('Invalid role specified: {0}'.format(role))
+        DiskController.sync_with_reality(storagerouter_guid)
+        disk = Disk(disk_guid)
+        if disk.storagerouter_guid != storagerouter_guid:
+            raise RuntimeError('The given Disk is not on the given StorageRouter')
+        if partition_guid is None:
+            # New partition
+            found_previous = offset == 0
+            found_next = offset + size == disk.size
+            for partition in disk.partitions:
+                if partition.offset + partition.size == offset:
+                    found_previous = True
+                if partition.offset == offset + size:
+                    found_next = True
+            if not found_previous or not found_next:
+                raise RuntimeError('Given offset/size do not fit into the given Disk')
+            DiskTools.create_partition(disk.path, offset, size)
+            DiskController.sync_with_reality(storagerouter_guid)
+            disk = Disk(disk_guid)
+            partition = None
+            for possible_partition in disk.partitions:
+                if possible_partition.offset == offset and possible_partition.size == size:
+                    partition = possible_partition
+                    break
+            if partition is None:
+                raise RuntimeError('Could not locate partition')
+        else:
+            # Existing partition
+            partition = DiskPartition(partition_guid)
+            if partition.disk_guid != disk_guid:
+                raise RuntimeError('The given DiskPartition is not on the given Disk')
+        if partition.filesystem is None:
+            DiskTools.make_fs(partition.device, 'ext4')
+            DiskController.sync_with_reality(storagerouter_guid)
+            partition = DiskPartition(partition.guid)
+            if partition.filesystem != 'ext4':
+                raise RuntimeError('Unexpected filesystem')
+        if partition.mountpoint is None:
+            # @TODO: Figure out correct mountpoint for the given partition
+            # @TODO: Mount the partition and add to fstab etc
+            DiskController.sync_with_reality(storagerouter_guid)
+            # @TODO: Validate expected results
+        partition.roles = roles
+        partition.save()
 
     @staticmethod
     def _get_free_ports(client, ports_in_use, number):

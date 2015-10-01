@@ -213,7 +213,7 @@ limitations under the License.
                                                         <span data-bind="if: roles().length > 0">
                                                             <span class="fa" data-i18n="[html]ovs:icons.separator"></span>
                                                             <span data-i18n="ovs:generic.roles"></span>: <span data-bind="foreach: roles()">
-                                                                <span data-bind="translate: 'ovs:generic.partitionroles.' + $data.toLowerCase()"></span>
+                                                                <span data-bind="translate: 'ovs:generic.partitionroles.' + $data.toLowerCase()"></span><span data-bind="if: $index() < ($parent.roles().length - 1)">,</span>
                                                             </span>
                                                         </span>
                                                         <span data-bind="if: state() !== 'OK' && state() !== undefined">
@@ -224,7 +224,8 @@ limitations under the License.
                                                     <span style="position: absolute; top: 0; right: 7px;"
                                                           data-bind="visible: !small && $root.shared.user.roles().contains('manage')">
                                                         <span data-bind="position: absolute; top: 0; left: 0">
-                                                            <span class="fa hand" data-bind="click: $root.configureRoles" data-i18n="[html]ovs:icons.configuration"></span>
+                                                            <span class="fa hand" data-bind="click: function(partition) { $root.configureRoles(partition, $parent); }"
+                                                                  data-i18n="[html]ovs:icons.configuration"></span>
                                                         </span>
                                                     </span>
                                                     <span data-bind="visible: small">

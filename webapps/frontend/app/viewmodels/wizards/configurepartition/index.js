@@ -28,6 +28,7 @@ define([
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.configurepartition.title')));
         self.modal(generic.tryGet(options, 'modal', false));
         self.data.partition(options.partition);
+        self.data.disk(options.disk);
         self.data.storageRouter(options.storageRouter);
         self.steps([new Gather(self)]);
         self.activateStep();

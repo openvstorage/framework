@@ -17,6 +17,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic){
     var singleton = function() {
         var data = {
             partition:     ko.observable(),
+            disk:          ko.observable(),
             storageRouter: ko.observable(),
             roles:         ko.observableArray([]),
             currentUsage:  ko.observable()

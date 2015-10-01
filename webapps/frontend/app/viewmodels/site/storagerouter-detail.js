@@ -132,11 +132,12 @@ define([
             }).promise();
         };
         self.isEmpty = generic.isEmpty;
-        self.configureRoles = function(partition) {
+        self.configureRoles = function(partition, disk) {
             if (self.shared.user.roles().contains('manage')) {
                 dialog.show(new ConfigurePartitionWizard({
                     modal: true,
                     partition: partition,
+                    disk: disk,
                     storageRouter: self.storageRouter()
                 }));
             }

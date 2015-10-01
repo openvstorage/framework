@@ -261,3 +261,16 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Initiate a task on 1 storagerouter to update the volumedriver on ALL storagerouters
         """
         return StorageRouterController.update_volumedriver.delay(storagerouter.ip)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def configure_disk(self, storagerouter, disk_guid, partition_guid, offset, size, roles):
+        """
+        Configures a disk on a StorageRouter
+        """
+        return StorageRouterController.configure_disk.s(
+            storagerouter.guid, disk_guid, partition_guid, offset, size, roles
+        ).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
