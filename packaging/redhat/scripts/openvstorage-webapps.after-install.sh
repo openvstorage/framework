@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-pip install djangorestframework>=2.3.12
+pip install djangorestframework==2.3.12
 
 mkdir -p /etc/nginx/sites-enabled
 
