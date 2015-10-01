@@ -170,6 +170,10 @@ define([
                                         validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_role', { what: role }));
                                     });
                                 }
+                                if (self.data.backend() === 'distributed' && self.data.mountpoints().length === 0) {
+                                    validationResult.valid = false;
+                                    validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_mountpoints'));
+                                }
                                 physicalMetadataDeferred.resolve();
                             })
                             .fail(physicalMetadataDeferred.reject);

@@ -16,6 +16,13 @@ limitations under the License.
 <div>
     <form role="form form-horizontal" class="form-horizontal">
         <p data-i18n="ovs:wizards.addvpool.gathermountpoints.basicinfo"></p>
+        <div class="form-group" style="padding-left: 40px;" data-bind="visible: data.backend() === 'distributed'">
+            <label class="col-lg-2 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.mountpoint">
+                   style="text-align: left; padding-right: 0;"></label>
+            <div class="col-lg-6">
+                <span data-bind="dropdown: { items: data.mountpoints, target: data.distributedMtpt }"></span>
+            </div>
+        </div>
         <div class="form-group" style="padding-left: 40px;" data-bind="css: { 'has-error': canContinue().fields.contains('readCacheSize') }">
             <label class="col-lg-2 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.readcache_size"
                    style="text-align: left; padding-right: 0;"></label>

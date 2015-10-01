@@ -43,7 +43,9 @@ define([
                         connection_backend: {'backend': (self.data.backend() === 'alba' ? self.data.albaBackend().guid : undefined),
                                              'metadata': (self.data.backend() === 'alba' ? self.data.albaPreset().name : undefined)},
                         storage_ip: self.data.storageIP(),
-                        integratemgmt: self.data.integratemgmt()
+                        integratemgmt: self.data.integratemgmt(),
+                        readcache_size: self.data.readCacheSize(),
+                        writecache_size: self.data.writeCacheSize()
                     }
                 };
                 var configParams = undefined;
@@ -57,6 +59,9 @@ define([
                         'write_buffer': self.data.writeBuffer(),
                         'cache_strategy': self.data.cacheStrategy()
                     }
+                }
+                if (self.data.backend() === 'distributed') {
+                    post_data.call_parameters.distributed_mountpoint = self.data.distributedMtpt();
                 }
                 post_data.call_parameters.config_params = configParams;
                 var target_guid;

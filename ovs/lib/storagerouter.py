@@ -16,6 +16,7 @@
 StorageRouter module
 """
 import os
+import re
 import copy
 import uuid
 import json
@@ -24,34 +25,33 @@ from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
 
 from ovs.celery_run import celery
-from ovs.dal.hybrids.storagedriver import StorageDriver
-from ovs.dal.hybrids.storagerouter import StorageRouter
-from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.hybrids.disk import Disk
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service as DalService
-from ovs.dal.hybrids.diskpartition import DiskPartition
-from ovs.dal.hybrids.disk import Disk
+from ovs.dal.hybrids.storagedriver import StorageDriver
+from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.clientlist import ClientList
-from ovs.dal.lists.vpoollist import VPoolList
+from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.vmachinelist import VMachineList
-from ovs.dal.lists.servicetypelist import ServiceTypeList
-from ovs.dal.lists.diskpartitionlist import DiskPartitionList
+from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.api.client import OVSClient
-from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.system import System
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.system import System
 from ovs.extensions.hypervisor.factory import Factory
+from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
-from ovs.extensions.packages.package import PackageManager
-from ovs.extensions.generic.disk import DiskTools
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
@@ -70,9 +70,8 @@ class StorageRouterController(object):
     """
     Contains all BLL related to StorageRouter
     """
-
     SUPPORT_AGENT = 'support-agent'
-    PARTITION_DEFAULT_UAGES = {DiskPartition.ROLES.DB: (20, 40),  # 1st number is exact size in GiB, 2nd number is percentage (highest of the 2 will be taken)
+    PARTITION_DEFAULT_UAGES = {DiskPartition.ROLES.DB: (20, 10),  # 1st number is exact size in GiB, 2nd number is percentage (highest of the 2 will be taken)
                                DiskPartition.ROLES.SCRUB: (300, 0)}
 
     @staticmethod
@@ -100,30 +99,39 @@ class StorageRouterController(object):
         writecache_size = 0
         for disk in storagerouter.disks:
             for disk_partition in disk.partitions:
-                calculated_sizes = False
-                for role in disk_partition.roles:
+                claimed_space = 0
+                for storagedriver_partition in disk_partition.storagedrivers:
+                    claimed_space += storagedriver_partition.size
+
+                shared = False
+                for index, role in enumerate(disk_partition.roles):
                     size = disk_partition.size
-                    partitions[role].append({'guid': disk_partition.guid,
+                    available = size
+                    # Subtract size for competing roles on the same partition
+                    for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_UAGES.iteritems():
+                        if sub_role in disk_partition.roles and sub_role != role:
+                            amount = required_size[0] * 1024 ** 3
+                            percentage = required_size[1] * disk_partition.size / 100
+                            available -= max(amount, percentage)
+
+                    # Subtract size for roles which have already been claimed by other vpools (but not necessarily already been fully used)
+                    available -= claimed_space
+
+                    if available > 0:
+                        if DiskPartition.ROLES.READ in disk_partition.roles and DiskPartition.ROLES.WRITE in disk_partition.roles and shared is False:
+                            shared_size += available
+                            shared = True
+                        if role == DiskPartition.ROLES.READ and shared is False:
+                            readcache_size += available
+                        if role == DiskPartition.ROLES.WRITE and shared is False:
+                            writecache_size += available
+                    else:
+                        available = 0
+                    partitions[role].append({'ssd': disk.is_ssd,
+                                             'guid': disk_partition.guid,
                                              'size': size,
-                                             'mountpoint': disk_partition.mountpoint,
-                                             'storagerouter_guid': disk_partition.disk.storagerouter_guid,
-                                             'in_use': any(junction for junction in disk_partition.storagedrivers
-                                                           if junction.role == role)})
-                    if calculated_sizes is False:
-                        if role in [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE]:
-                            calculated_sizes = True
-                            for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_UAGES.iteritems():
-                                if sub_role in disk_partition.roles:
-                                    amount = required_size[0] * 1024**3
-                                    percentage = required_size[1] * disk_partition.size / 100
-                                    size -= max(amount, percentage)
-                            if size > 0:
-                                if DiskPartition.ROLES.READ in disk_partition.roles and DiskPartition.ROLES.WRITE in disk_partition.roles:
-                                    shared_size += size
-                                elif role == DiskPartition.ROLES.READ:
-                                    readcache_size += size
-                                elif role == DiskPartition.ROLES.WRITE:
-                                    writecache_size += size
+                                             'available': available,
+                                             'mountpoint': disk_partition.mountpoint})
 
         arakoon_service_found = False
         for service in ServiceTypeList.get_by_name('Arakoon').services:
@@ -153,47 +161,79 @@ class StorageRouterController(object):
         """
         Add a vPool to the machine this task is running on
         """
+        sd_config_params = (dict, {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
+                                   'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
+                                   'dedupe_mode': (str, StorageDriverClient.VPOOL_DEDUPE_MAP.keys()),
+                                   'dtl_enabled': (bool, None),
+                                   'dtl_location': (str, None),
+                                   'write_buffer': (int, {'min': 128, 'max': 10240}),
+                                   'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys())})
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
                            'storagerouter_ip': (str, Toolbox.regex_ip),
-                           'integratemgmt': (bool, None)}
+                           'integratemgmt': (bool, None),
+                           'readcache_size': (int, {'min': 1, 'max': 10240}),
+                           'writecache_size': (int, {'min': 1, 'max': 10240})}
         required_params_for_new_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
-                                         'config_params': (dict, {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
-                                                                  'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
-                                                                  'dedupe_mode': (str, StorageDriverClient.VPOOL_DEDUPE_MAP.keys()),
-                                                                  'dtl_enabled': (bool, None),
-                                                                  'dtl_location': (str, None),
-                                                                  'write_buffer': (int, {'min': 128, 'max': 10240}),
-                                                                  'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys())}),
+                                         'config_params': sd_config_params,
                                          'connection_host': (str, Toolbox.regex_ip, False),
                                          'connection_port': (int, None),
                                          'connection_backend': (dict, None),
                                          'connection_username': (str, None),
                                          'connection_password': (str, None)}
-        required_params_for_new_local_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3'])}
+        required_params_for_new_distributed_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
+                                                     'config_params': sd_config_params,
+                                                     'distributed_mountpoint': (str, None)}
 
+        ###############
+        # VALIDATIONS #
+        ###############
+        ip = parameters['storagerouter_ip']
+        vpool_name = parameters['vpool_name']
+
+        client = SSHClient(ip)
+        unique_id = System.get_my_machine_id(client)
+
+        # 1. Check parameters
         if not isinstance(parameters, dict):
             raise ValueError('Parameters should be of type "dict"')
         Toolbox.verify_required_params(required_params, parameters)
 
-        ip = parameters['storagerouter_ip']
-        vpool_name = parameters['vpool_name']
-        storage_ip = parameters['storage_ip']
+        # 2. Check vPool name validity
+        vpool = VPoolList.get_vpool_by_name(vpool_name)
+        name_regex = "^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$"
+        if not re.match(name_regex, vpool_name):
+            raise RuntimeError("Invalid name for vpool")
 
-        client = SSHClient(ip)
-        root_client = SSHClient(ip, username='root')
-        unique_id = System.get_my_machine_id(client)
+        # 3. Check parameters for new vPool
+        backend_type = BackendTypeList.get_backend_type_by_code(parameters['type'])
+        if vpool is None:
+            sco_size = parameters['config_params']['sco_size']
+            write_buffer = parameters['config_params']['write_buffer']
+            if (sco_size == 128 and write_buffer < 256) or not (128 <= write_buffer <= 10240):
+                raise ValueError('Incorrect storagedriver configuration settings specified')
 
+            if parameters['type'] in ['local', 'distributed']:
+                Toolbox.verify_required_params(required_params_for_new_distributed_vpool, parameters)
+            else:
+                Toolbox.verify_required_params(required_params_for_new_vpool, parameters)
+
+        # 4. Check backend type existence
+        if backend_type.code not in ['alba', 'distributed', 'ceph_s3', 'amazon_s3', 'swift_s3', 'local']:
+            raise ValueError('Unsupported backend type specified: "{0}"'.format(backend_type.code))
+
+        # 5. Check storagerouter existence
         storagerouter = None
         for current_storagerouter in StorageRouterList.get_storagerouters():
             if current_storagerouter.ip == ip and current_storagerouter.machine_id == unique_id:
                 storagerouter = current_storagerouter
                 break
         if storagerouter is None:
-            raise RuntimeError('Could not find Storage Router with given ip address')
+            raise RuntimeError('Could not find Storage Router with given IP address')
 
-        vpool = VPoolList.get_vpool_by_name(vpool_name)
+        # 6. Check duplicate vPool name
         storagedriver = None
+        all_storagerouters = [storagerouter]
         current_storage_driver_config = {}
         if vpool is not None:
             current_storage_driver_config = VPoolController.get_configuration(vpool.guid)
@@ -205,12 +245,9 @@ class StorageRouterController(object):
                 if vpool_storagedriver.storagerouter_guid == storagerouter.guid:
                     # The vPool is already added to this Storage Router and this might be a cleanup/recovery
                     storagedriver = vpool_storagedriver
-
-        all_storagerouters = [storagerouter]
-        if vpool is not None:
             all_storagerouters += [sd.storagerouter for sd in vpool.storagedrivers]
 
-        # Fetch clients services
+        # 7. Check storagerouter connectivity
         ip_client_map = {}
         try:
             for sr in all_storagerouters:
@@ -219,19 +256,69 @@ class StorageRouterController(object):
         except UnableToConnectException:
             raise RuntimeError('Not all StorageRouters are reachable')
 
-        # Keep in mind that if the Storage Driver exists, the vPool does as well
-        if vpool is None:
-            if parameters['type'] == 'local':
-                Toolbox.verify_required_params(required_params_for_new_local_vpool, parameters)
-            else:
-                Toolbox.verify_required_params(required_params_for_new_vpool, parameters)
-                sco_size = parameters['config_params']['sco_size']
-                write_buffer = parameters['config_params']['write_buffer']
-                if sco_size not in StorageDriverClient.TLOG_MULTIPLIER_MAP or (sco_size == 128 and write_buffer < 256) or not (128 <= write_buffer <= 10240):
-                    raise ValueError('Incorrect storagedriver configuration settings specified')
+        # 8. Check over-allocation for read, write cache
+        metadata = StorageRouterController.get_metadata(storagerouter.guid)
+        shared_size_available = metadata['shared_size']
+        readcache_size_available = metadata['readcache_size']
+        readcache_size_requested = parameters['readcache_size'] * 1024 ** 3
+        writecache_size_available = metadata['writecache_size']
+        writecache_size_requested = parameters['writecache_size'] * 1024 ** 3
+        if readcache_size_requested > readcache_size_available + shared_size_available:
+            raise ValueError('Too much space request for {0} cache. Available: {1:.2f} GiB, Requested: {2:.2f} GiB'.format(DiskPartition.ROLES.READ,
+                                                                                                                           (readcache_size_available + shared_size_available) / 1024.0 ** 3,
+                                                                                                                           readcache_size_requested / 1024.0 ** 3))
+        if writecache_size_requested > writecache_size_available + shared_size_available:
+            raise ValueError('Too much space request for {0} cache. Available: {1:.2f} GiB, Requested: {2:.2f} GiB'.format(DiskPartition.ROLES.WRITE,
+                                                                                                                           (writecache_size_available + shared_size_available) / 1024.0 ** 3,
+                                                                                                                           writecache_size_requested / 1024.0 ** 3))
+        if readcache_size_requested + writecache_size_requested > readcache_size_available + writecache_size_available + shared_size_available:
+            raise ValueError('Too much space request. Available: {0:.2f} GiB, Requested: {1:.2f} GiB'.format((readcache_size_available + writecache_size_available + shared_size_available) / 1024.0 ** 3,
+                                                                                                             (readcache_size_requested + writecache_size_requested) / 1024.0 ** 3))
 
+        # 9. Check partition role presence
+        arakoon_service_found = False
+        for service in ServiceTypeList.get_by_name('Arakoon').services:
+            if service.name == 'arakoon-voldrv':
+                arakoon_service_found = True
+                break
+
+        required_roles = [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.SCRUB]
+        if arakoon_service_found is False:
+            required_roles.append(DiskPartition.ROLES.DB)
+
+        partition_info = metadata['partitions']
+        error_messages = []
+        minimum_scrub_size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.SCRUB][0]
+        for required_role in [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.SCRUB]:
+            if required_role not in partition_info:
+                error_messages.append('Missing required partition role {0}'.format(required_role))
+            elif len(partition_info[required_role]) == 0:
+                error_messages.append('At least 1 {0} partition role is required'.format(required_role))
+            elif required_role == DiskPartition.ROLES.SCRUB:
+                if partition_info[DiskPartition.ROLES.SCRUB][0]['available'] < minimum_scrub_size * 1024 ** 3:
+                    error_messages.append('Not enough free space detected on {0} partition. Available: {1:.2f} GiB, required: {2} GiB'.format(required_role,
+                                                                                                                                              partition_info[DiskPartition.ROLES.SCRUB][0]['available'] / 1024.0**3,
+                                                                                                                                              minimum_scrub_size))
+
+        # 10. Check mountpoints are mounted
+        for role, part_info in partition_info.iteritems():
+            for part in part_info:
+                if not os.path.ismount(part['mountpoint']):
+                    error_messages.append('Mountpoint {0} is not mounted'.format(part['mountpoint']))
+
+        if arakoon_service_found is False and (DiskPartition.ROLES.DB not in partition_info or len(partition_info[DiskPartition.ROLES.DB]) == 0):
+            error_messages.append('DB partition role required')
+
+        if error_messages:
+            raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
+
+        #  @TODO: Add check when no DB partition present, but arakoon service found --> retrieve mountpoint from voldrv config??
+
+        ######################
+        # START ADDING VPOOL #
+        ######################
+        if vpool is None:  # Keep in mind that if the Storage Driver exists, the vPool does as well
             vpool = VPool()
-            backend_type = BackendTypeList.get_backend_type_by_code(parameters['type'])
             vpool.backend_type = backend_type
             connection_host = parameters.get('connection_host', '')
             connection_port = parameters.get('connection_port', '')
@@ -239,7 +326,7 @@ class StorageRouterController(object):
             connection_password = parameters.get('connection_password', '')
             if vpool.backend_type.code in ['local', 'distributed']:
                 vpool.metadata = {'backend_type': 'LOCAL',
-                                  'local_connection_path': bfs_partition.mountpoint}
+                                  'local_connection_path': parameters.get('distributed_mountpoint', '/tmp')}
             elif vpool.backend_type.code == 'alba':
                 if connection_host == '':
                     connection_host = StorageRouterList.get_masters()[0].ip
@@ -286,8 +373,6 @@ class StorageRouterController(object):
                                   's3_connection_strict_consistency': strict_consistency,
                                   's3_connection_verbose_logging': 1,
                                   'backend_type': 'S3'}
-            else:
-                raise ValueError('Unsupported backend type specified: "{0}"'.format(vpool.backend_type.code))
 
             vpool.name = vpool_name
             vpool.login = connection_username
@@ -295,110 +380,6 @@ class StorageRouterController(object):
             vpool.connection = '{0}:{1}'.format(connection_host, connection_port) if connection_host else None
             vpool.description = '{0} {1}'.format(vpool.backend_type.code, vpool_name)
             vpool.save()
-
-        if len(read_partitions) == 0:
-            raise RuntimeError('No read cache mountpoints specified')
-        if len(write_partitions) == 0:
-            raise RuntimeError('No write cache mountpoints specified')
-
-        mountpoint_fcache = write_partitions[0].mountpoint
-        mountpoint_fragmentcache = read_partitions[0].mountpoint if vpool.backend_type.code == 'alba' else ''
-
-        # Check inodes and count the roles (to divide available space later on)
-        all_mountpoints = list()
-        for disk_partition in [bfs_partition, tmp_partition, md_partition, dtl_partition]:
-            if disk_partition:
-                all_mountpoints.append(disk_partition.mountpoint)
-        all_mountpoints.append(mountpoint_fragmentcache)
-        all_mountpoints.append(mountpoint_fcache)
-
-        for read_partition in read_partitions:
-            all_mountpoints.append(read_partition.mountpoint)
-        for write_partition in write_partitions:
-            all_mountpoints.append(write_partition.mountpoint)
-        for mountpoint in all_mountpoints[:]:
-            if not mountpoint:  # Eg: when bfs mountpoint is not used, the value is ''
-                all_mountpoints.remove(mountpoint)
-                continue
-        root_client.dir_create(set(all_mountpoints))
-
-        directory_usage = {}
-
-        root_inode = os.stat('/').st_dev
-        inode_count = {}
-        mountpoint_inode_mapping = {}
-        for mountpoint in all_mountpoints:
-            inode = os.stat(mountpoint).st_dev
-            if inode not in inode_count:
-                inode_count[inode] = 0
-            inode_count[inode] += 1
-            mountpoint_inode_mapping[mountpoint] = inode
-
-        if vpool.backend_type.code in ['local', 'distributed']:
-            root_client.dir_chmod(parameters['mountpoint_bfs'], 0777)
-
-        fdcache = '{0}/fd_{1}'.format(dtl_partition.mountpoint, vpool_name)
-        dtl = '{0}/dtl_{1}'.format(dtl_partition.mountpoint, vpool_name)
-        metadatapath = '{0}/metadata_{1}'.format(md_partition.mountpoint, vpool_name)
-        tlogpath = '{0}/tlogs_{1}'.format(md_partition.mountpoint, vpool_name)
-        rsppath = '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool_name)
-
-        dirs2create = [dtl, metadatapath, tlogpath, rsppath]
-        files2create = list()
-        readcaches = list()
-        writecaches = list()
-        readcache_size = 0
-        frag_size = None
-
-        # Create same inode count mapping, but for mountpoints now
-        mountpoint_count_mapping = {}
-        for mountpoint in set(all_mountpoints):
-            inode = os.stat(mountpoint).st_dev
-            mountpoint_count_mapping[mountpoint] = inode_count[inode]
-
-        # Calculate available space for read-, write- and fragmentcache
-        for mountpoint, count in mountpoint_count_mapping.iteritems():
-            if mountpoint_inode_mapping[mountpoint] == root_inode:
-                # Divide by 2 because we don't want to allow root running full, so we only take 50% of available space
-                available_size = os.statvfs(mountpoint).f_bavail * os.statvfs(mountpoint).f_bsize / count / 2
-            else:
-                available_size = os.statvfs(mountpoint).f_bavail * os.statvfs(mountpoint).f_bsize / count
-
-            if mountpoint in parameters['mountpoint_readcaches']:
-                if mountpoint == mountpoint_fragmentcache and vpool.backend_type.code == 'alba':
-                    # Multiply by 2 again because we don't want to divide available space evenly between
-                    # fragment cache and readcache
-                    r_size = int(available_size * 2 * 0.88 / 1024 / 4096) * 4096  # KiB
-                    frag_size = int(available_size * 2 * .10)  # Bytes
-                else:
-                    r_size = int(available_size * 0.98 / 1024 / 4096) * 4096
-                readcache_size += r_size
-                readcaches.append({'path': '{0}/read_{1}'.format(mountpoint, vpool_name),
-                                   'size': '{0}KiB'.format(r_size)})
-                files2create.append('{0}/read_{1}'.format(mountpoint, vpool_name))
-                inode = os.stat(mountpoint).st_dev
-                if inode not in directory_usage:
-                    directory_usage[inode] = []
-                directory_usage[inode].append({'type': 'cache',
-                                               'metadata': {'type': 'read'},
-                                               'size': r_size * 1024})
-            elif mountpoint in parameters['mountpoint_writecaches']:
-                w_size = int(available_size * .98 / 1024 / 4096) * 4096
-                dir2create = '{0}/sco_{1}'.format(mountpoint, vpool_name)
-                writecaches.append({'path': dir2create,
-                                    'size': '{0}KiB'.format(w_size)})
-                dirs2create.append(dir2create)
-                inode = os.stat(mountpoint).st_dev
-                if inode not in directory_usage:
-                    directory_usage[inode] = []
-                directory_usage[inode].append({'type': 'cache',
-                                               'metadata': {'type': 'write'},
-                                               'size': w_size * 1024})
-
-        if vpool.backend_type.code == 'alba' and frag_size is None:
-            raise ValueError('Something went wrong trying to calculate the fragment cache size')
-
-        logger.info('all_locations: {0}'.format(mountpoint_count_mapping.keys()))
 
         model_ports_in_use = []
         for port_storagedriver in StorageDriverList.get_storagedrivers():
@@ -425,11 +406,8 @@ class StorageRouterController(object):
         if grid_ip in ipaddresses:
             ipaddresses.remove(grid_ip)
         if not ipaddresses:
-            raise RuntimeError('No available ip addresses found suitable for Storage Router storage ip')
-        if storagerouter.pmachine.hvtype == 'KVM':
-            volumedriver_storageip = '127.0.0.1'
-        else:
-            volumedriver_storageip = storage_ip
+            raise RuntimeError('No available IP addresses found suitable for Storage Router storage IP')
+
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
         voldrv_arakoon_cluster_id = 'voldrv'
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
@@ -455,51 +433,127 @@ class StorageRouterController(object):
             node_configs.append(ClusterNodeConfig(vrouter_id, str(grid_ip), ports[0], ports[1], ports[2]))
         vrouter_clusterregistry.set_node_configs(node_configs)
 
-        # Possible modes: ['classic', 'ganesha']
-        if storagerouter.pmachine.hvtype == 'VMWARE':
-            volumedriver_mode = Configuration.get('ovs.storagedriver.vmware_mode')
-        else:
-            volumedriver_mode = 'classic'
-
         filesystem_config = StorageDriverConfiguration.build_filesystem_by_hypervisor(storagerouter.pmachine.hvtype)
         filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
                                   'fs_metadata_backend_mds_nodes': [],
                                   'fs_metadata_backend_type': 'MDS'})
-        queue_protocol = Configuration.get('ovs.core.broker.protocol')
-        queue_login = Configuration.get('ovs.core.broker.login')
-        queue_password = Configuration.get('ovs.core.broker.password')
-        queue_volumerouterqueue = Configuration.get('ovs.core.broker.queues.storagedriver')
-        queue_urls = []
-        for current_storagerouter in StorageRouterList.get_masters():
-            queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(queue_protocol,
-                                                                      queue_login,
-                                                                      queue_password,
-                                                                      current_storagerouter.ip)})
 
         # Updating the model
         storagedriver.name = vrouter_id.replace('_', ' ')
         storagedriver.ports = ports
         storagedriver.vpool = vpool
         storagedriver.cluster_ip = grid_ip
-        storagedriver.storage_ip = volumedriver_storageip
+        storagedriver.storage_ip = '127.0.0.1' if storagerouter.pmachine.hvtype == 'KVM' else parameters['storage_ip']
         storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
         storagedriver.description = storagedriver.name
         storagedriver.storagerouter = storagerouter
         storagedriver.storagedriver_id = vrouter_id
         storagedriver.save()
-        md_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, md_partition, DiskPartition.ROLES.DB)
-        dtl_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, DiskPartition.ROLES.WRITE)
-        # bfs_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, bfs_partition, DiskPartition.ROLES.BFS)
-        tmp_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, tmp_partition, DiskPartition.ROLES.WRITE)
-        readcaches_sdps = list()
-        for read_partition in read_partitions:
-            readcaches_sdps.append(StorageRouterController._get_storagedriverpartition(storagedriver, read_partition, DiskPartition.ROLES.READ))
-        writecaches_sdps = list()
-        for write_partition in write_partitions:
-            writecaches_sdps.append(StorageRouterController._get_storagedriverpartition(storagedriver, write_partition, DiskPartition.ROLES.WRITE))
-        fragment_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, frag_partition, DiskPartition.ROLES.WRITE)
-        storagedriver.save()
 
+        ##############################
+        # CREATE PARTITIONS IN MODEL #
+        ##############################
+
+        # 1. Retrieve largest write mountpoint (SSD > SATA)
+        largest_ssd_write_mountpoint = None
+        largest_sata_write_mountpoint = None
+        if backend_type.code == 'alba':  # We need largest SSD to put fragment cache on
+            largest_ssd = 0
+            largest_sata = 0
+            for role, info in partition_info.iteritems():
+                if role == DiskPartition.ROLES.WRITE:
+                    for part in info:
+                        if part['ssd'] is True and part['available'] > largest_ssd:
+                            largest_ssd = part['available']
+                            largest_ssd_write_mountpoint = part['mountpoint']
+                        elif part['ssd'] is False and part['available'] > largest_sata:
+                            largest_sata = part['available']
+                            largest_sata_write_mountpoint = part['mountpoint']
+
+        largest_write_mountpoint = largest_ssd_write_mountpoint or largest_sata_write_mountpoint or partition_info[DiskPartition.ROLES.WRITE][0]['mountpoint']
+        mountpoint_fragment_cache = None
+        if backend_type.code == 'alba':
+            mountpoint_fragment_cache = largest_write_mountpoint
+
+        # 2. Calculate WRITE / FRAG cache
+        # IMPORTANT: Available size in partition_info has already been subtracted with competing roles (DB, SCRUB) and claimed space by other vpools
+        #   - Creation of partitions is important:  1st WRITE, 2nd READ, 3rd DB/SCRUB
+        #   - Example: Partition with DB and READ role
+        #   - If we would first create SCRUB and DB storagedriver partition and request the partition_info again, this already claimed space would be taken into account
+        #   - and the competing DB role would also be taken into account again, resulting READ space would be (total - 2 x DB space)
+        frag_size = None
+        dirs2create = list()
+        writecaches = list()
+        writecache_information = partition_info[DiskPartition.ROLES.WRITE]
+        total_available = sum([part['available'] for part in writecache_information])
+        for writecache_info in writecache_information:
+            available = writecache_info['available']
+            mountpoint = writecache_info['mountpoint']
+            proportion = available * 100.0 / total_available
+            size_to_be_used = proportion * writecache_size_requested / 100
+            if mountpoint_fragment_cache is not None and mountpoint == mountpoint_fragment_cache:
+                frag_size = int(size_to_be_used * 0.10)  # Bytes
+                w_size = int(size_to_be_used * 0.88 / 1024 / 4096) * 4096  # KiB
+            else:
+                w_size = int(size_to_be_used * 0.98 / 1024 / 4096) * 4096
+            dir2create = '{0}/sco_{1}'.format(mountpoint, vpool_name)
+            writecaches.append({'path': dir2create,
+                                'size': '{0}KiB'.format(w_size)})
+            dirs2create.append(dir2create)
+            StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
+                                                                                'role': DiskPartition.ROLES.WRITE,
+                                                                                'partition': DiskPartition(writecache_info['guid'])})
+
+        # 3. Calculate READ cache
+        if shared_size_available > 0:  # If READ, WRITE are shared, WRITE will have taken up space by now
+            partition_info = StorageRouterController.get_metadata(storagerouter.guid)['partitions']
+        readcaches = list()
+        files2create = list()
+        readcache_size = 0
+        readcache_information = partition_info[DiskPartition.ROLES.READ]
+        total_available = sum([part['available'] for part in readcache_information])
+        for readcache_info in readcache_information:
+            available = readcache_info['available']
+            proportion = available * 100.0 / total_available
+            size_to_be_used = proportion * readcache_size_requested / 100
+            r_size = int(size_to_be_used * 0.98 / 1024 / 4096) * 4096  # KiB
+            readcache_size += r_size
+            readcaches.append({'path': '{0}/read_{1}'.format(mountpoint, vpool_name),
+                               'size': '{0}KiB'.format(r_size)})
+            files2create.append('{0}/read_{1}'.format(mountpoint, vpool_name))
+            StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
+                                                                                'role': DiskPartition.ROLES.READ,
+                                                                                'partition': DiskPartition(readcache_info['guid'])})
+
+        # 4. Assign SCRUB
+        scrub_info = partition_info[DiskPartition.ROLES.SCRUB][0]
+        StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(minimum_scrub_size * 1024 ** 3),
+                                                                            'role': DiskPartition.ROLES.SCRUB,
+                                                                            'partition': DiskPartition(scrub_info['guid'])})
+
+        # 5. Assign DB
+        if arakoon_service_found is False:
+            db_info = partition_info[DiskPartition.ROLES.DB][0]
+            size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3
+            percentage = db_info['available'] * StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][1] / 100.0
+            mountpoint_db = db_info['mountpoint']
+            StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
+                                                                                'role': DiskPartition.ROLES.DB,
+                                                                                'partition': DiskPartition(db_info['guid'])})
+        else:
+            mountpoint_db = None
+
+        fdcache = '{0}/fd_{1}'.format(largest_write_mountpoint, vpool_name)
+        dtl = '{0}/dtl_{1}'.format(largest_write_mountpoint, vpool_name)
+        metadatapath = '{0}/metadata_{1}'.format(mountpoint_db, vpool_name)
+        tlogpath = '{0}/tlogs_{1}'.format(mountpoint_db, vpool_name)
+        rsppath = '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool_name)
+        dirs2create.extend([dtl, metadatapath, tlogpath, rsppath])
+
+        if backend_type.code == 'alba' and frag_size is None:
+            raise ValueError('Something went wrong trying to calculate the fragment cache size')
+
+        root_client = SSHClient(ip, username='root')
         config_dir = '{0}/storagedriver/storagedriver'.format(client.config_read('ovs.core.cfgdir'))
         client.dir_create(config_dir)
         alba_proxy = storagedriver.alba_proxy
@@ -519,16 +573,9 @@ class StorageRouterController(object):
                 config.add_section(section)
                 for key, value in vpool.metadata['metadata'][section].iteritems():
                     config.set(section, key, value)
-            cache_dir = '{0}/fcache_{1}'.format(mountpoint_fragmentcache, vpool_name)
+            cache_dir = '{0}/fcache_{1}'.format(mountpoint_fragment_cache, vpool_name)
             root_client.dir_create(cache_dir)
             System.write_config(config, '{0}/{1}_alba.cfg'.format(config_dir, vpool_name), client)
-            inode = os.stat(cache_dir).st_dev
-            if inode not in directory_usage:
-                directory_usage[inode] = []
-            directory_usage[inode].append({'type': 'cache',
-                                           'metadata': {'type': 'fragment'},
-                                           'size': frag_size,
-                                           'relation': ('storagedriver', storagedriver.guid)})
 
             # manifest cache is in memory
             client.file_write('{0}/{1}_alba.json'.format(config_dir, vpool_name), json.dumps({
@@ -541,6 +588,8 @@ class StorageRouterController(object):
                 'albamgr_cfg_file': '{0}/{1}_alba.cfg'.format(config_dir, vpool_name)
             }))
 
+        # Possible modes: ['classic', 'ganesha']
+        volumedriver_mode = Configuration.get('ovs.storagedriver.vmware_mode') if storagerouter.pmachine.hvtype == 'VMWARE' else 'classic'
         if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'ganesha':
             ganesha_config = '/opt/OpenvStorage/config/storagedriver/storagedriver/{0}_ganesha.conf'.format(vpool_name)
             contents = ''
@@ -552,17 +601,6 @@ class StorageRouterController(object):
             for key, value in params.iteritems():
                 contents = contents.replace('<{0}>'.format(key), value)
             client.file_write(ganesha_config, contents)
-
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
-        storagedriver_config.load(client)
-        storagedriver_config.clean()  # Clean out obsolete values
-        if vpool.backend_type.code == 'alba':
-            storagedriver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
-                                                                      alba_connection_port=alba_proxy.service.ports[0],
-                                                                      alba_connection_preset=vpool.metadata['preset'],
-                                                                      backend_type='ALBA')
-        else:
-            storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
 
         if 'config_params' in parameters:
             sco_size = parameters['config_params']['sco_size']
@@ -577,6 +615,23 @@ class StorageRouterController(object):
             dedupe_mode = current_storage_driver_config['dedupe_mode']
             cache_strategy = current_storage_driver_config['cache_strategy']
 
+        queue_urls = []
+        for current_storagerouter in StorageRouterList.get_masters():
+            queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(Configuration.get('ovs.core.broker.protocol'),
+                                                                      Configuration.get('ovs.core.broker.login'),
+                                                                      Configuration.get('ovs.core.broker.password'),
+                                                                      current_storagerouter.ip)})
+
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
+        storagedriver_config.load(client)
+        storagedriver_config.clean()  # Clean out obsolete values
+        if vpool.backend_type.code == 'alba':
+            storagedriver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
+                                                                      alba_connection_port=alba_proxy.service.ports[0],
+                                                                      alba_connection_preset=vpool.metadata['preset'],
+                                                                      backend_type='ALBA')
+        else:
+            storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
         storagedriver_config.configure_content_addressed_cache(clustercache_mount_points=readcaches,
                                                                read_cache_serialization_path=rsppath)
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
@@ -610,7 +665,7 @@ class StorageRouterController(object):
         storagedriver_config.configure_file_driver(fd_cache_path=fdcache,
                                                    fd_extent_cache_capacity='1024',
                                                    fd_namespace='fd-{0}-{1}'.format(vpool_name, vpool.guid))
-        storagedriver_config.configure_event_publisher(events_amqp_routing_key=queue_volumerouterqueue,
+        storagedriver_config.configure_event_publisher(events_amqp_routing_key=Configuration.get('ovs.core.broker.queues.storagedriver'),
                                                        events_amqp_uris=queue_urls)
         storagedriver_config.configure_threadpool_component(num_threads=16)
         storagedriver_config.save(client, reload_config=False)
@@ -1397,19 +1452,21 @@ class StorageRouterController(object):
         return ports if number != 1 else ports[0]
 
     @staticmethod
-    def _get_storagedriverpartition(storagedriver, partition, role):
+    def _add_storagedriverpartition(storagedriver, partition_info):
         """
-        Returns new storagedriver partition object with correct number
+        Stores new storagedriver partition object with correct number
         """
+        role = partition_info['role']
+        size = partition_info['size']
+        partition = partition_info['partition']
         highest_number = 0
         for existing_sdp in storagedriver.partitions:
-            if existing_sdp.storagedriver.mountpoint == storagedriver.mountpoint and existing_sdp.role == role:
+            if existing_sdp.partition_guid == partition.guid and existing_sdp.role == role:
                     highest_number = max(existing_sdp.number, highest_number)
         sdp = StorageDriverPartition()
-        sdp.number = highest_number + 1
-        sdp.storagedriver = storagedriver
-        sdp.partition = partition
         sdp.role = role
+        sdp.size = size
+        sdp.number = highest_number + 1
+        sdp.partition = partition
+        sdp.storagedriver = storagedriver
         sdp.save()
-
-        return sdp
