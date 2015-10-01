@@ -58,7 +58,6 @@ class RPMPackager(object):
         os.mkdir(redhat_folder)
 
         # load config
-        print(root_path)
         config_dir = '{0}/../redhat/cfgs'.format(root_path)
         packages = os.listdir(config_dir)
         for package in packages:
@@ -115,7 +114,7 @@ class RPMPackager(object):
                 after_install = ' --after-install {0} '.format(after_install_script_path)
                 SourceCollector.run(command="sed -i -e 's/$Version/{0}/g' {1}".format(version_string, after_install_script_path),
                                     working_directory='{0}'.format(script_root))
-            print(before_install_script_path, after_install_script_path)
+
             params = {'version' : version_string,
                       'package_name' : package_cfg.get('main', 'name'),
                       'summary' : package_cfg.get('main', 'summary'),
@@ -133,13 +132,9 @@ class RPMPackager(object):
 
             command = """fpm -s dir -t rpm -n {package_name} -v {version} --description "{description}" --maintainer "{maintainer}" --license "{license}" --url {URL} -a {arch} --vendor "Open vStorage" {depends}{before_install}{after_install} --verbose --prefix=/ -C {package_root}""".format(**params)
 
-            print(command)
             print(SourceCollector.run(command,
                                       working_directory = redhat_folder))
-
             print(os.listdir(redhat_folder))
-
-            #TODO: cron.d
 
 
     @staticmethod
@@ -148,13 +143,26 @@ class RPMPackager(object):
         Uploads a given set of packages
         """
 
-        filename = '{0}/../settings.cfg'.format(os.path.dirname(os.path.abspath(__file__)))
+        root_path = ROOT_PATH
+        filename = '{0}/../settings.cfg'.format(root_path)
         settings = RawConfigParser()
         settings.read(filename)
 
         package_name = settings.get('packaging', 'package_name')
         package_path = SourceCollector.package_path.format(settings.get('packaging', 'working_dir'), package_name)
 
-        version_string = source_metadata[1]
+        redhat_folder = '{0}/redhat'.format(package_path)
+        destination_folder = '/data/www/rpm/unstable'
+        destination_server = 'packages.cloudfounders.com'
+        user = 'ovs-apt'
 
-        #@TODO
+
+        packages = os.listdir(redhat_folder)
+        for package in packages:
+            package_source_path = os.path.join(redhat_folder, package)
+
+            print(package_source_path)
+            #SCP:
+            command = 'scp {0} {1}@{2}:{3}'.format(package_source_path, user, destination_server, destination_folder)
+            print(SourceCollector.run(command,
+                                      working_directory = redhat_folder))
