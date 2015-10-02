@@ -97,6 +97,7 @@ class StorageRouterController(object):
         shared_size = 0
         readcache_size = 0
         writecache_size = 0
+
         for disk in storagerouter.disks:
             for disk_partition in disk.partitions:
                 claimed_space = 0
@@ -130,8 +131,11 @@ class StorageRouterController(object):
                     partitions[role].append({'ssd': disk.is_ssd,
                                              'guid': disk_partition.guid,
                                              'size': size,
+                                             'in_use': any(junction for junction in disk_partition.storagedrivers
+                                                           if junction.role == role),
                                              'available': available,
-                                             'mountpoint': disk_partition.mountpoint})
+                                             'mountpoint': disk_partition.mountpoint,
+                                             'storagerouter_guid': disk_partition.disk.storagerouter_guid})
 
         arakoon_service_found = False
         for service in ServiceTypeList.get_by_name('Arakoon').services:

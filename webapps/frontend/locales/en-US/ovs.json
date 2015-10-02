@@ -696,7 +696,7 @@
             },
             "gathervpool": {
                 "accesskey": "Access key:",
-                "albabackend": "Backend",
+                "albabackend": "Backend:",
                 "albapreset": "Preset",
                 "basicinfo": "Add basic vPool information",
                 "backendtype": "BackendType:",
@@ -937,7 +937,7 @@
             "title": "Configure partitions",
             "gather": {
                 "basicinfo": "Configure the selected partition or raw disk space. Where required, a partition will be created, adding a filesystem and mounting it.",
-                "roleinfo": "Update/select the required roles for the partition. Roles in use cannot be removed. Only one DB and one SCRUB role can be assigned to one of the partitions.",
+                "roleinfo": "Update/select the required roles for the partition. Roles in use cannot be removed. Only one DB and one SCRUB role can be assigned to any of the partitions.",
                 "roles": "Roles",
                 "device": "Device",
                 "mountpoint": "Mountpoint",
