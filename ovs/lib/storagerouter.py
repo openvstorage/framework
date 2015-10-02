@@ -1379,10 +1379,18 @@ class StorageRouterController(object):
             if partition.filesystem != 'ext4':
                 raise RuntimeError('Unexpected filesystem')
         if partition.mountpoint is None:
-            # @TODO: Figure out correct mountpoint for the given partition
-            # @TODO: Mount the partition and add to fstab etc
+            counter = 1
+            while True:
+                mountpoint = '/mnt/{0}{1}'.format('ssd' if disk.is_ssd else 'hdd', counter)
+                counter += 1
+                if not DiskTools.mountpoint_exists(mountpoint):
+                    break
+            DiskTools.add_fstab(partition.device, mountpoint)
+            DiskTools.mount(mountpoint)
             DiskController.sync_with_reality(storagerouter_guid)
-            # @TODO: Validate expected results
+            partition = DiskPartition(partition.guid)
+            if partition.mountpoint != mountpoint:
+                raise RuntimeError('Unexpected mountpoint')
         partition.roles = roles
         partition.save()
 

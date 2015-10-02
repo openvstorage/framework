@@ -15,7 +15,9 @@
 Disk module
 """
 
+import re
 from subprocess import check_output
+from ovs.extensions.os.os import OSManager
 
 
 class DiskTools(object):
@@ -41,3 +43,29 @@ class DiskTools(object):
             check_output('mkfs.ext4 -q {0}'.format(partition), shell=True)
         else:
             raise RuntimeError('Unsupported filesystem')
+
+    @staticmethod
+    def add_fstab(device, mountpoint):
+        new_content = []
+        with open('/etc/fstab', 'r') as fstab_file:
+            lines = [line.strip() for line in fstab_file.readlines()]
+        for line in lines:
+            if line.startswith(device) and re.match('^{0}\s+'.format(re.escape(device)), line):
+                new_content.append(OSManager.get_fstab_entry(device, mountpoint))
+            else:
+                new_content.append(line)
+        with open('/etc/fstab', 'w') as fstab_file:
+            fstab_file.write('\n'.join(new_content))
+
+    @staticmethod
+    def mountpoint_exists(mountpoint):
+        with open('/etc/fstab', 'r') as fstab_file:
+            for line in fstab_file.readlines():
+                if re.match('\s+{0}\s+'.format(re.escape(mountpoint)), line):
+                    return True
+        return False
+
+    @staticmethod
+    def mount(mountpoint):
+        check_output('mkdir -p {0}'.format(mountpoint), shell=True)
+        check_output('mount {0}'.format(mountpoint), shell=True)
