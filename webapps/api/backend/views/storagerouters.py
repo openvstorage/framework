@@ -17,16 +17,16 @@ StorageRouter module
 """
 
 import json
-from rest_framework import status, viewsets
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action, link
-from rest_framework.exceptions import NotAcceptable
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.storagedriver import StorageDriverController
+from ovs.lib.disk import DiskController
 from backend.decorators import required_roles, return_list, return_object, return_task, return_plain, load, log
 
 
@@ -267,10 +267,21 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def configure_disk(self, storagerouter, disk_guid, partition_guid, offset, size, roles):
+    def configure_disk(self, storagerouter, disk_guid, offset, size, roles, partition_guid=None):
         """
         Configures a disk on a StorageRouter
         """
         return StorageRouterController.configure_disk.s(
             storagerouter.guid, disk_guid, partition_guid, offset, size, roles
         ).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def rescan_disks(self, storagerouter):
+        """
+        Triggers a disk sync on the given storagerouter
+        """
+        return DiskController.sync_with_reality.delay(storagerouter.guid)

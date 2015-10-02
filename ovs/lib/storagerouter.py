@@ -1409,6 +1409,7 @@ class StorageRouterController(object):
         """
         Configures a partition
         """
+        storagerouter = StorageRouter(storagerouter_guid)
         for role in roles:
             if role not in DiskPartition.ROLES:
                 raise RuntimeError('Invalid role specified: {0}'.format(role))
@@ -1417,7 +1418,7 @@ class StorageRouterController(object):
         if disk.storagerouter_guid != storagerouter_guid:
             raise RuntimeError('The given Disk is not on the given StorageRouter')
         if partition_guid is None:
-            # New partition
+            logger.debug('Creating new partition: {0}, {1}, {2}'.format(offset, size, roles))
             found_previous = offset == 0
             found_next = offset + size == disk.size
             for partition in disk.partitions:
@@ -1427,34 +1428,56 @@ class StorageRouterController(object):
                     found_next = True
             if not found_previous or not found_next:
                 raise RuntimeError('Given offset/size do not fit into the given Disk')
-            DiskTools.create_partition(disk.path, offset, size)
+            if offset == 0:
+                offset = 1024**2
+                size -= offset
+            size -= 1
+            with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
+                remote.DiskTools.create_partition(disk.path, offset, size)
             DiskController.sync_with_reality(storagerouter_guid)
             disk = Disk(disk_guid)
             partition = None
             for possible_partition in disk.partitions:
-                if possible_partition.offset == offset and possible_partition.size == size:
+                if possible_partition.offset == offset:
                     partition = possible_partition
                     break
             if partition is None:
                 raise RuntimeError('Could not locate partition')
+            logger.debug('Partition created')
         else:
-            # Existing partition
+            logger.debug('Using existing partition')
             partition = DiskPartition(partition_guid)
             if partition.disk_guid != disk_guid:
                 raise RuntimeError('The given DiskPartition is not on the given Disk')
         if partition.filesystem is None:
-            DiskTools.make_fs(partition.device, 'ext4')
-            DiskController.sync_with_reality(storagerouter_guid)
-            partition = DiskPartition(partition.guid)
-            if partition.filesystem not in ['ext4', 'xfs']:
-                raise RuntimeError('Unexpected filesystem')
+            logger.debug('Creating filesystem')
+            with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
+                remote.DiskTools.make_fs(partition.path, 'ext4')
+                DiskController.sync_with_reality(storagerouter_guid)
+                partition = DiskPartition(partition.guid)
+                if partition.filesystem not in ['ext4', 'xfs']:
+                    raise RuntimeError('Unexpected filesystem')
+            logger.debug('Filesystem created')
         if partition.mountpoint is None:
-            # @TODO: Figure out correct mountpoint for the given partition
-            # @TODO: Mount the partition and add to fstab etc
-            DiskController.sync_with_reality(storagerouter_guid)
-            # @TODO: Validate expected results
+            logger.debug('Configuring mountpoint')
+            with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
+                counter = 1
+                while True:
+                    mountpoint = '/mnt/{0}{1}'.format('ssd' if disk.is_ssd else 'hdd', counter)
+                    counter += 1
+                    if not remote.DiskTools.mountpoint_exists(mountpoint):
+                        break
+                logger.debug('Found mountpoint: {0}'.format(mountpoint))
+                remote.DiskTools.add_fstab(partition.path, mountpoint)
+                remote.DiskTools.mount(mountpoint)
+                DiskController.sync_with_reality(storagerouter_guid)
+                partition = DiskPartition(partition.guid)
+                if partition.mountpoint != mountpoint:
+                    raise RuntimeError('Unexpected mountpoint')
+            logger.debug('Mountpoint configured')
         partition.roles = roles
         partition.save()
+        logger.debug('Partition configured')
 
     @staticmethod
     def _get_free_ports(client, ports_in_use, number):

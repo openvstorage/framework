@@ -40,8 +40,8 @@ define([
                 var roles = [], post_data = {
                     disk_guid: self.data.disk().guid(),
                     partition_guid: self.data.partition().guid(),
-                    offset: self.data.partition().offset(),
-                    size: self.data.partition().size()
+                    offset: self.data.partition().offset.raw(),
+                    size: self.data.partition().size.raw()
                 };
                 $.each(self.data.roles(), function(index, roleInfo) {
                     roles.push(roleInfo.name.toUpperCase());

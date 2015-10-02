@@ -20,6 +20,7 @@ from subprocess import CalledProcessError
 from subprocess import check_output
 from ovs.extensions.generic.configuration import Configuration
 
+
 class Centos(object):
     """
     Contains all logic related to Centos specific
@@ -38,8 +39,8 @@ class Centos(object):
         return path
 
     @staticmethod
-    def get_fstab_entry(label, mp):
-        return 'LABEL={0}    {1}         ext4    defaults,nofail,noatime,discard    0    2'.format(label, mp)
+    def get_fstab_entry(device, mp):
+        return '{0}    {1}         ext4    defaults,nofail,noatime,discard    0    2'.format(device, mp)
 
     @staticmethod
     def get_ssh_service_name():
