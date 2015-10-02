@@ -316,8 +316,6 @@ class StorageRouterController(object):
         if error_messages:
             raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
 
-        #  @TODO: Add check when no DB partition present, but arakoon service found --> retrieve mountpoint from voldrv config??
-
         ######################
         # START ADDING VPOOL #
         ######################
