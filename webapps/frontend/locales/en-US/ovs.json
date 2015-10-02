@@ -229,7 +229,8 @@
         "roles": "Roles",
         "fs": "FS",
         "unavailable": "Unavailable",
-        "loadingdata": "Loading data..."
+        "loadingdata": "Loading data...",
+        "rescan": "Rescan"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -254,7 +255,13 @@
             "updateserving": "Save changes",
             "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
             "disks": {
-                "title": "Physical disks"
+                "title": "Physical disks",
+                "rescan": {
+                    "success": "Rescan finished",
+                    "scanning": "rescanning",
+                    "started": "Rescan started",
+                    "inprogress": "The disks of this StorageRouter are being rescanned"
+                }
             }
         }
     },

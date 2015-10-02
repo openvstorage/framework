@@ -173,7 +173,12 @@ limitations under the License.
                         <tr style="padding-bottom: 10px;">
                             <td style="width: 110px;">&nbsp;</td>
                             <td>
-                                <h4 data-i18n="ovs:storagerouters.detail.disks.title"></h4>
+                                <h4 class="pull-left" data-i18n="ovs:storagerouters.detail.disks.title"></h4>
+                                <button class="btn btn-default pull-right hand" id="buttonRescanDisks"
+                                        data-bind="click: $root.rescanDisks, enable: $.inArray('manage', $root.shared.user.roles()) !== -1">
+                                    <span class="fa hand" data-i18n="[html]ovs:icons.load"></span>&nbsp;
+                                    <span data-i18n="ovs:generic.rescan" class="hand"></span>
+                                </button>
                             </td>
                         </tr>
                         <!-- ko foreach: disks -->

@@ -168,6 +168,9 @@ define([
                                     partition.fillData(pdata[partition.guid()]);
                                 }
                             });
+                            self.partitions.sort(function(a, b) {
+                                return a.offset.raw() - b.offset.raw();
+                            });
                             self.partitionsLoaded(true);
                             self.trigger(generic.getTimestamp());
                             deferred.resolve();

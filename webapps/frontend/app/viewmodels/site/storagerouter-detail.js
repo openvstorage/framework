@@ -142,6 +142,17 @@ define([
                 }));
             }
         };
+        self.rescanDisks = function() {
+            api.post('storagerouters/' + self.storageRouter().guid() + '/rescan_disks')
+                    .then(shared.tasks.wait)
+                    .done(function() {
+                        generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:storagerouters.detail.disks.rescan.success'));
+                    })
+                    .fail(function() {
+                        generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:storagerouters.detail.disks.rescan.scanning') }));
+                    });
+            generic.alertInfo($.t('ovs:storagerouters.detail.disks.rescan.started'), $.t('ovs:storagerouters.detail.disks.rescan.inprogress'));
+        };
 
         // Durandal
         self.activate = function(mode, guid) {
