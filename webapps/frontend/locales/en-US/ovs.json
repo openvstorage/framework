@@ -739,14 +739,12 @@
                 "over_allocation": "Over allocation detected",
                 "portinuse": "The ports are already in use.",
                 "readcaches": "Read Caches:",
-                "readcache_available": "available for Read Cache.",
                 "readcache_size": "Read Cache:",
-                "shared_available": "available which can be divided among Read and Write Cache.",
+                "shared_available": "Shared between Read and Write Cache:",
                 "tempfs": "Temporary FS:",
                 "tempname": "Temporary FS",
                 "uniquemtpt": "The __what__ mountpoint needs to be uniquely defined",
                 "writecaches": "Write Caches:",
-                "writecache_available": "available for Write Cache.",
                 "writecache_size": "Write Cache:"
             },
             "integratemgmtcenter": {

@@ -17,8 +17,8 @@ StorageDriver module
 """
 
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
-from ovs.celery_run import celery
 from celery.schedules import crontab
+from ovs.celery_run import celery
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.diskpartition import DiskPartition
@@ -135,12 +135,11 @@ class StorageDriverController(object):
 
     @staticmethod
     def _voldrv_arakoon_checkup(create_cluster):
-        def add_service(service_storagerouter, service_partition, arakoon_result):
+        def add_service(service_storagerouter, arakoon_result):
             new_service = Service()
             new_service.name = service_name
             new_service.type = service_type
             new_service.ports = [arakoon_result['client_port'], arakoon_result['messaging_port']]
-            new_service.partition = service_partition
             new_service.storagerouter = service_storagerouter
             new_service.save()
 
@@ -157,14 +156,13 @@ class StorageDriverController(object):
             storagerouter.invalidate_dynamics(['partition_config'])
             if len(storagerouter.partition_config[DiskPartition.ROLES.DB]) > 0:
                 available_storagerouters[storagerouter] = DiskPartition(storagerouter.partition_config[DiskPartition.ROLES.DB][0])
-        if create_cluster is True and 0 < len(current_services) < len(available_storagerouters):
+        if create_cluster is True and len(current_services) == 0 and len(available_storagerouters) > 0:
             storagerouter, partition = available_storagerouters.items()[0]
-            result = ArakoonInstaller.create_cluster(cluster_name = service_name,
-                                                     ip = storagerouter.ip,
-                                                     exclude_ports = ServiceList.get_ports_for_ip(storagerouter.ip),
-                                                     base_dir = partition.mountpoint,
-                                                     plugins = None)
-            add_service(storagerouter, partition, result)
+            result = ArakoonInstaller.create_cluster(cluster_name='voldrv',
+                                                     ip=storagerouter.ip,
+                                                     exclude_ports=ServiceList.get_ports_for_ip(storagerouter.ip),
+                                                     base_dir=partition.mountpoint)
+            add_service(storagerouter, result)
             ArakoonInstaller.restart_cluster_add(service_name, current_ips, storagerouter.ip)
             current_ips.append(storagerouter.ip)
 
@@ -179,6 +177,6 @@ class StorageDriverController(object):
                     ServiceList.get_ports_for_ip(storagerouter.ip),
                     partition.mountpoint
                 )
-                add_service(storagerouter, partition, result)
+                add_service(storagerouter, result)
                 ArakoonInstaller.restart_cluster_add(service_name, current_ips, storagerouter.ip)
                 current_ips.append(storagerouter.ip)

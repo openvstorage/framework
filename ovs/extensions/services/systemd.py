@@ -21,6 +21,7 @@ from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('extensions', name='servicemanager')
 
+
 class Systemd(object):
     """
     Contains all logic related to Systemd services
@@ -66,7 +67,7 @@ class Systemd(object):
         template_service = '/opt/OpenvStorage/config/templates/systemd/{0}.service'
 
         if not client.file_exists(template_service.format(name)):
-            # Given template doesn't exist so we are problably using system
+            # Given template doesn't exist so we are probably using system
             # init scripts
             return
 

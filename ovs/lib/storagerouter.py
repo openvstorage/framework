@@ -56,6 +56,8 @@ from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
+from ovs.lib.setup import SetupController
+from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.vpool import VPoolController
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
@@ -186,8 +188,7 @@ class StorageRouterController(object):
                                          'connection_username': (str, None),
                                          'connection_password': (str, None)}
         required_params_for_new_distributed_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
-                                                     'config_params': sd_config_params,
-                                                     'distributed_mountpoint': (str, None)}
+                                                     'config_params': sd_config_params}  # 'distributed_mountpoint': (str, None)}  @TODO: Enable again once local has been removed
 
         ###############
         # VALIDATIONS #
@@ -315,6 +316,18 @@ class StorageRouterController(object):
 
         if error_messages:
             raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
+
+        ###################
+        # CREATE SERVICES #
+        ###################
+        if arakoon_service_found is False:
+            StorageDriverController.manual_voldrv_arakoon_checkup()
+
+        watcher_volumedriver_service = 'watcher-volumedriver'
+        if not ServiceManager.has_service(watcher_volumedriver_service, client=client):
+            ServiceManager.add_service(watcher_volumedriver_service, client=client)
+            ServiceManager.enable_service(watcher_volumedriver_service, client=client)
+            SetupController.change_service_state(client, watcher_volumedriver_service, 'start')
 
         ######################
         # START ADDING VPOOL #
@@ -1433,7 +1446,7 @@ class StorageRouterController(object):
             DiskTools.make_fs(partition.device, 'ext4')
             DiskController.sync_with_reality(storagerouter_guid)
             partition = DiskPartition(partition.guid)
-            if partition.filesystem != 'ext4':
+            if partition.filesystem not in ['ext4', 'xfs']:
                 raise RuntimeError('Unexpected filesystem')
         if partition.mountpoint is None:
             # @TODO: Figure out correct mountpoint for the given partition

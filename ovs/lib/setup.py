@@ -968,9 +968,9 @@ class SetupController(object):
                     if ServiceManager.has_service(service_name, client=ssh_client):
                         SetupController._log_message('{0} service {1}'.format(description.capitalize(), service_name),
                                                      ssh_client.ip)
-                        SetupController._change_service_state(client=ssh_client,
-                                                              name=service_name,
-                                                              state=action)
+                        SetupController.change_service_state(client=ssh_client,
+                                                             name=service_name,
+                                                             state=action)
                         SetupController._log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started' if action == 'start' else 'Restarted', service_name), ssh_client.ip)
                 except Exception as exc:
                     SetupController._log_message('Something went wrong {0} service {1}: {2}'.format(description, service_name, exc), ssh_client.ip, severity='warning')
@@ -1020,7 +1020,7 @@ class SetupController(object):
         for service in SetupController.model_services:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                SetupController._change_service_state(target_client, service, 'restart')
+                SetupController.change_service_state(target_client, service, 'restart')
 
         print 'Start model migration'
         logger.debug('Start model migration')
@@ -1051,16 +1051,16 @@ class SetupController(object):
         for service in SetupController.master_services:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                SetupController._change_service_state(target_client, service, 'start')
+                SetupController.change_service_state(target_client, service, 'start')
         # Enable HA for the rabbitMQ queues
         SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
         ServiceManager.enable_service('watcher-framework', client=target_client)
-        SetupController._change_service_state(target_client, 'watcher-framework', 'start')
+        SetupController.change_service_state(target_client, 'watcher-framework', 'start')
 
         logger.debug('Restarting workers')
         ServiceManager.enable_service('workers', client=target_client)
-        SetupController._change_service_state(target_client, 'workers', 'restart')
+        SetupController.change_service_state(target_client, 'workers', 'restart')
 
         SetupController._run_hooks('firstnode', cluster_ip)
 
@@ -1078,7 +1078,7 @@ class SetupController(object):
             service = 'support-agent'
             ServiceManager.add_service(service, client=target_client)
             ServiceManager.enable_service(service, client=target_client)
-            SetupController._change_service_state(target_client, service, 'start')
+            SetupController.change_service_state(target_client, service, 'start')
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -1127,7 +1127,7 @@ class SetupController(object):
             service = 'support-agent'
             ServiceManager.add_service(service, client=target_client)
             ServiceManager.enable_service(service, client=target_client)
-            SetupController._change_service_state(target_client, service, 'start')
+            SetupController.change_service_state(target_client, service, 'start')
 
         node_name = target_client.run('hostname')
         SetupController._finalize_setup(target_client, node_name, 'EXTRA', hypervisor_info, unique_id)
@@ -1138,12 +1138,12 @@ class SetupController(object):
 
         print 'Starting services'
         ServiceManager.enable_service('watcher-framework', client=target_client)
-        SetupController._change_service_state(target_client, 'watcher-framework', 'start')
+        SetupController.change_service_state(target_client, 'watcher-framework', 'start')
 
         logger.debug('Restarting workers')
         for node_client in ip_client_map.itervalues():
             ServiceManager.enable_service('workers', client=node_client)
-            SetupController._change_service_state(node_client, 'workers', 'restart')
+            SetupController.change_service_state(node_client, 'workers', 'restart')
 
         SetupController._run_hooks('extranode', cluster_ip, master_ip)
 
@@ -1247,7 +1247,7 @@ class SetupController(object):
             target_client.run('rabbitmqctl stop; sleep 5;')
 
             # Enable HA for the rabbitMQ queues
-            SetupController._change_service_state(target_client, 'rabbitmq-server', 'start')
+            SetupController.change_service_state(target_client, 'rabbitmq-server', 'start')
             SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
         SetupController._configure_amqp_to_volumedriver(ip_client_map)
@@ -1257,7 +1257,7 @@ class SetupController(object):
         for service in SetupController.master_services:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                SetupController._change_service_state(target_client, service, 'start')
+                SetupController.change_service_state(target_client, service, 'start')
 
         print 'Restarting services'
         SetupController._restart_framework_and_memcache_services(ip_client_map)
@@ -1347,7 +1347,7 @@ class SetupController(object):
                 target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
                 target_client.run('rabbitmqctl reset; sleep 5;')
                 target_client.run('rabbitmqctl stop; sleep 5;')
-                SetupController._change_service_state(target_client, 'rabbitmq-server', 'stop')
+                SetupController.change_service_state(target_client, 'rabbitmq-server', 'stop')
                 target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
         print 'Removing services'
@@ -1360,7 +1360,7 @@ class SetupController(object):
         for service in services:
             if ServiceManager.has_service(service, client=target_client):
                 logger.debug('Removing service {0}'.format(service))
-                SetupController._change_service_state(target_client, service, 'stop')
+                SetupController.change_service_state(target_client, service, 'stop')
                 ServiceManager.remove_service(service, client=target_client)
 
         if ServiceManager.has_service('workers', client=target_client):
@@ -1393,7 +1393,7 @@ class SetupController(object):
             for node_client in ip_client_map.itervalues():
                 if memcached_exclude_client is not None and memcached_exclude_client.ip == node_client.ip and service_info[0] == 'memcached':
                     continue  # Skip memcached for demoted nodes, because they don't run that service
-                SetupController._change_service_state(node_client, service_info[0], service_info[1])
+                SetupController.change_service_state(node_client, service_info[0], service_info[1])
         VolatileFactory.store = None
 
     @staticmethod
@@ -1422,7 +1422,7 @@ EOF
 """.format(rabbitmq_port, rabbitmq_login, rabbitmq_password))
         rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
         if rabbitmq_running is True:
-            SetupController._change_service_state(client, 'rabbitmq-server', 'stop')
+            SetupController.change_service_state(client, 'rabbitmq-server', 'stop')
 
         client.run('rabbitmq-server -detached 2> /dev/null; sleep 5;')
 
@@ -1449,7 +1449,7 @@ EOF
             raise RuntimeError('Service rabbitmq-server has not been added on node {0}'.format(client.ip))
         rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
         if rabbitmq_running is False or same_process is False:
-            SetupController._change_service_state(client, 'rabbitmq-server', 'restart')
+            SetupController.change_service_state(client, 'rabbitmq-server', 'restart')
 
         client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
 
@@ -1522,7 +1522,7 @@ EOF
         logger.info('Configuring logstash')
         if ServiceManager.has_service('logstash', client) is False:
             ServiceManager.add_service('logstash', client)
-        SetupController._change_service_state(client, 'logstash', 'restart')
+        SetupController.change_service_state(client, 'logstash', 'restart')
 
     @staticmethod
     def _configure_avahi(client, cluster_name, node_name, node_type):
@@ -1544,7 +1544,7 @@ EOF
 EOF
 """.format(cluster_name, node_name, node_type, SetupController.avahi_filename, client.ip.replace('.', '_')))
         client.run('avahi-daemon --reload')
-        SetupController._change_service_state(client, 'avahi-daemon', 'restart')
+        SetupController.change_service_state(client, 'avahi-daemon', 'restart')
 
     @staticmethod
     def _add_services(client, unique_id, node_type):
@@ -1561,7 +1561,7 @@ EOF
         logger.info('Adding services')
         params = {'MEMCACHE_NODE_IP': client.ip,
                   'WORKER_QUEUE': worker_queue}
-        for service in services + ['watcher-framework', 'watcher-volumedriver']:
+        for service in services + ['watcher-framework']:
             logger.debug('Adding service {0}'.format(service))
             ServiceManager.add_service(service, params=params, client=client)
 
@@ -1570,7 +1570,7 @@ EOF
         cluster_ip = client.ip
         client.dir_create('/opt/OpenvStorage/webapps/frontend/logging')
         if SetupController._logstash_installed(client):
-            SetupController._change_service_state(client, 'logstash', 'restart')
+            SetupController.change_service_state(client, 'logstash', 'restart')
         SetupController._replace_param_in_config(client=client,
                                                  config_file='/opt/OpenvStorage/webapps/frontend/logging/config.js',
                                                  old_value='http://"+window.location.hostname+":9200',
@@ -1618,8 +1618,8 @@ EOF
     @staticmethod
     def _discover_nodes(client):
         nodes = {}
-        SetupController._change_service_state(client, 'dbus', 'start')
-        SetupController._change_service_state(client, 'avahi-daemon', 'start')
+        SetupController.change_service_state(client, 'dbus', 'start')
+        SetupController.change_service_state(client, 'avahi-daemon', 'start')
         discover_result = client.run('timeout -k 60 45 avahi-browse -artp 2> /dev/null | grep ovs_cluster || true')
         for entry in discover_result.splitlines():
             entry_parts = entry.split(';')
@@ -1657,7 +1657,7 @@ EOF
             client.file_write(config_file, contents)
 
     @staticmethod
-    def _change_service_state(client, name, state):
+    def change_service_state(client, name, state):
         """
         Starts/stops/restarts a service
         """
