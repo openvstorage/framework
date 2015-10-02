@@ -40,18 +40,13 @@ define([
                 return true;
             });
 
-            // BFS mountpoint checks
-            if (self.data.backend() !== 'local' && self.data.backend() !== 'distributed') {
-                self.data.mtptBFS('');
-            }
-
             var readCacheSizeBytes = self.data.readCacheSize() * 1024 * 1024 * 1024;
             var writeCacheSizeBytes = self.data.writeCacheSize() * 1024 * 1024 * 1024;
             var readCacheSizeAvailableBytes = self.data.readCacheAvailableSize() + self.data.sharedSize();
             var writeCacheSizeAvailableBytes = self.data.writeCacheAvailableSize() + self.data.sharedSize();
             var sharedAvailableModulus = self.data.sharedSize() - self.data.sharedSize() % (1024 * 1024 * 1024);
             var readCacheAvailableModulus = self.data.readCacheAvailableSize() - self.data.readCacheAvailableSize() % (1024 * 1024 * 1024);
-            var writeCacheAvailableModulues = self.data.writeCacheAvailableSize() - self.data.writeCacheAvailableSize() % (1024 * 1024 * 1024);
+            var writeCacheAvailableModulus = self.data.writeCacheAvailableSize() - self.data.writeCacheAvailableSize() % (1024 * 1024 * 1024);
             if (readCacheSizeBytes > readCacheSizeAvailableBytes) {
                 fields.push('readCacheSize');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.over_allocation'));
@@ -60,7 +55,7 @@ define([
                 fields.push('writeCacheSize');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.over_allocation'));
             }
-            if (readCacheSizeBytes + writeCacheSizeBytes > readCacheAvailableModulus + writeCacheAvailableModulues + sharedAvailableModulus) {
+            if (readCacheSizeBytes + writeCacheSizeBytes > self.data.readCacheAvailableSize() + self.data.writeCacheAvailableSize() + sharedAvailableModulus) {
                 fields.push('readCacheSize');
                 fields.push('writeCacheSize');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.over_allocation'));

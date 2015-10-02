@@ -35,6 +35,7 @@ define([
             cacheStrategy:           ko.observable(''),
             dedupeMode:              ko.observable(''),
             dedupeModes:             ko.observableArray(['dedupe', 'non_dedupe']),
+            distributedMtpt:         ko.observable(),
             dtlEnabled:              ko.observable(true),
             dtlLocation:             ko.observable(''),
             dtlMode:                 ko.observable(''),

@@ -37,12 +37,6 @@ VPOOL_CLEANUP = False  # should the vpool be removed during tearDownClass
 VPOOL_NAME = 'local'  # string, lowercase no strange characters
 VPOOL_MOUNTPOINT = '/mnt/{0}'.format(VPOOL_NAME)
 VPOOL_ROOT_DIR = '/mnt'
-VPOOL_BFS = '{0}/bfs'.format(VPOOL_ROOT_DIR)
-VPOOL_TEMP = '{0}/temp'.format(VPOOL_ROOT_DIR)
-VPOOL_MD = '{0}/md'.format(VPOOL_ROOT_DIR)
-VPOOL_READCACHE = '{0}/cache1/readcache'.format(VPOOL_ROOT_DIR)
-VPOOL_WRITECACHE = '{0}/cache1/writecache'.format(VPOOL_ROOT_DIR)
-VPOOL_DTL = '{0}/cache1/dtl'.format(VPOOL_ROOT_DIR)
 VPOOL_PORT = 12326  # make sure it is available (!) Todo: get highest available
 
 FILE_TYPE = 'raw'  # should not be changed unless volumedriver changes

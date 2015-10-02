@@ -117,42 +117,68 @@ class StorageDriverController(object):
             current_service.delete()
 
     @staticmethod
-    @celery.task(name='ovs.storagedriver.voldrv_arakoon_checkup', bind=True, schedule=crontab(minute='30', hour='*'))
+    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', bind=True, schedule=crontab(minute='30', hour='*'))
     @ensure_single(['alba.nsm_checkup'])
-    def voldrv_arakoon_checkup():
+    def scheduled_voldrv_arakoon_checkup():
         """
         Makes sure the volumedriver arakoon is on all available master nodes
         """
+        StorageDriverController._voldrv_arakoon_checkup(False)
+
+    @staticmethod
+    @celery.task(name='ovs.storagedriver.manual_voldrv_arakoon_checkup')
+    def manual_voldrv_arakoon_checkup():
+        """
+        Creates a new Arakoon Cluster if required and extends cluster if possible on all available master nodes
+        """
+        StorageDriverController._voldrv_arakoon_checkup(True)
+
+    @staticmethod
+    def _voldrv_arakoon_checkup(create_cluster):
+        def add_service(service_storagerouter, service_partition, arakoon_result):
+            new_service = Service()
+            new_service.name = service_name
+            new_service.type = service_type
+            new_service.ports = [arakoon_result['client_port'], arakoon_result['messaging_port']]
+            new_service.partition = service_partition
+            new_service.storagerouter = service_storagerouter
+            new_service.save()
+
         service_name = 'arakoon-voldrv'
-        servicetype = ServiceTypeList.get_by_name('Arakoon')
+        service_type = ServiceTypeList.get_by_name('Arakoon')
         current_services = []
         current_ips = []
-        for service in servicetype.services:
+        for service in service_type.services:
             if service.name == service_name:
                 current_services.append(service)
                 current_ips.append(service.storagerouter.ip)
         available_storagerouters = {}
         for storagerouter in StorageRouterList.get_masters():
+            storagerouter.invalidate_dynamics(['partition_config'])
             if len(storagerouter.partition_config[DiskPartition.ROLES.DB]) > 0:
                 available_storagerouters[storagerouter] = DiskPartition(storagerouter.partition_config[DiskPartition.ROLES.DB][0])
+        if create_cluster is True and 0 < len(current_services) < len(available_storagerouters):
+            storagerouter, partition = available_storagerouters.items()[0]
+            result = ArakoonInstaller.create_cluster(cluster_name = service_name,
+                                                     ip = storagerouter.ip,
+                                                     exclude_ports = ServiceList.get_ports_for_ip(storagerouter.ip),
+                                                     base_dir = partition.mountpoint,
+                                                     plugins = None)
+            add_service(storagerouter, partition, result)
+            ArakoonInstaller.restart_cluster_add(service_name, current_ips, storagerouter.ip)
+            current_ips.append(storagerouter.ip)
+
         if 0 < len(current_services) < len(available_storagerouters):
-            for storagerouter in available_storagerouters:
-                ports_to_exclude = ServiceList.get_ports_for_ip(storagerouter.ip)
+            for storagerouter, partition in available_storagerouters.iteritems():
+                if storagerouter.ip in current_ips:
+                    continue
                 result = ArakoonInstaller.extend_cluster(
                     current_services[0].storagerouter.ip,
                     storagerouter.ip,
                     service_name,
-                    ports_to_exclude,
-                    available_storagerouters[storagerouter].mountpoint
+                    ServiceList.get_ports_for_ip(storagerouter.ip),
+                    partition.mountpoint
                 )
-                ports = [result['client_port'], result['messaging_port']]
-                service = Service()
-                service.name = service_name
-                service.type = servicetype
-                service.ports = ports
-                service.storagerouter = storagerouter
-                service.partition = available_storagerouters[storagerouter]
-                service.save()
+                add_service(storagerouter, partition, result)
                 ArakoonInstaller.restart_cluster_add(service_name, current_ips, storagerouter.ip)
                 current_ips.append(storagerouter.ip)
-                current_services.append(service)

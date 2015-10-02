@@ -92,7 +92,7 @@ define([
         };
         self.contains = function(item) {
             if (self.key() === undefined) {
-                return self.target().contains(item);
+                return $.inArray(item, self.target()) !== -1;
             }
             var result = false, found;
             $.each(self.target(), function(index, targetItem) {
