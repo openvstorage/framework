@@ -222,7 +222,9 @@ limitations under the License.
                                                         </span>
                                                     </span>
                                                     <span style="position: absolute; top: 0; right: 7px;"
-                                                          data-bind="visible: !small && $root.shared.user.roles().contains('manage')">
+                                                          data-bind="visible: !small
+                                                                              && $root.shared.user.roles().contains('manage')
+                                                                              && filesystem() !== 'swap'">
                                                         <span data-bind="position: absolute; top: 0; left: 0">
                                                             <span class="fa hand" data-bind="click: function(partition) { $root.configureRoles(partition, $parent); }"
                                                                   data-i18n="[html]ovs:icons.configuration"></span>

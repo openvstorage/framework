@@ -267,7 +267,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def configure_disk(self, storagerouter, disk_guid, partition_guid, offset, size, roles):
+    def configure_disk(self, storagerouter, disk_guid, offset, size, roles, partition_guid=None):
         """
         Configures a disk on a StorageRouter
         """
