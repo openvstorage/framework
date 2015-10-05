@@ -152,9 +152,9 @@ class RPMPackager(object):
         package_path = SourceCollector.package_path.format(settings.get('packaging', 'working_dir'), package_name)
 
         redhat_folder = '{0}/redhat'.format(package_path)
-        destination_folder = '/data/www/rpm/unstable'
-        destination_server = 'packages.cloudfounders.com'
-        user = 'ovs-apt'
+        destination_folder = '/usr/share/repo/CentOS/7/x86_64/'
+        destination_server = '172.20.3.17'
+        user = 'upload'
 
 
         packages = os.listdir(redhat_folder)
@@ -164,5 +164,9 @@ class RPMPackager(object):
             print(package_source_path)
             #SCP:
             command = 'scp {0} {1}@{2}:{3}'.format(package_source_path, user, destination_server, destination_folder)
+            print(SourceCollector.run(command,
+                                      working_directory = redhat_folder))
+        if len(packages) > 0:
+            command = 'ssh {0}@{1} createrepo --update {2}'.format(user, destination_server, destination_folder)
             print(SourceCollector.run(command,
                                       working_directory = redhat_folder))
