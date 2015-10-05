@@ -91,16 +91,22 @@ class MDSServiceController(object):
         mds_service.save()
 
         mds_nodes = []
+        db_mountpoint = [partition.partition.mountpoint for partition in storagedriver.partitions if partition.role == DiskPartition.ROLES.DB][0]
+        scrub_mountpoint = [partition.partition.mountpoint for partition in storagedriver.partitions if partition.role == DiskPartition.ROLES.SCRUB][0]
+        if db_mountpoint == '/':
+            db_mountpoint = ''
+        if scrub_mountpoint == '/':
+            scrub_mountpoint = ''
         for service in mdsservice_type.services:
             if service.storagerouter_guid == storagerouter.guid:
                 mds_service = service.mds_service
                 if mds_service.vpool_guid == vpool.guid:
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.DB],
+                                      'db_directory': '{0}/mds_{1}_{2}'.format(db_mountpoint,
                                                                                vpool.name,
                                                                                mds_service.number),
-                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.SCRUB],
+                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(scrub_mountpoint,
                                                                                     vpool.name,
                                                                                     mds_service.number)})
 

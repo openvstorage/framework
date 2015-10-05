@@ -323,11 +323,12 @@ class StorageRouterController(object):
         if arakoon_service_found is False:
             StorageDriverController.manual_voldrv_arakoon_checkup()
 
+        root_client = ip_client_map[storagerouter.ip]['root']
         watcher_volumedriver_service = 'watcher-volumedriver'
-        if not ServiceManager.has_service(watcher_volumedriver_service, client=client):
-            ServiceManager.add_service(watcher_volumedriver_service, client=client)
-            ServiceManager.enable_service(watcher_volumedriver_service, client=client)
-            SetupController.change_service_state(client, watcher_volumedriver_service, 'start')
+        if not ServiceManager.has_service(watcher_volumedriver_service, client=root_client):
+            ServiceManager.add_service(watcher_volumedriver_service, client=root_client)
+            ServiceManager.enable_service(watcher_volumedriver_service, client=root_client)
+            SetupController.change_service_state(root_client, watcher_volumedriver_service, 'start')
 
         ######################
         # START ADDING VPOOL #
@@ -529,6 +530,7 @@ class StorageRouterController(object):
         total_available = sum([part['available'] for part in readcache_information])
         for readcache_info in readcache_information:
             available = readcache_info['available']
+            mountpoint = readcache_info['mountpoint']
             proportion = available * 100.0 / total_available
             size_to_be_used = proportion * readcache_size_requested / 100
             r_size = int(size_to_be_used * 0.98 / 1024 / 4096) * 4096  # KiB
@@ -547,6 +549,8 @@ class StorageRouterController(object):
                                                                             'partition': DiskPartition(scrub_info['guid'])})
 
         # 5. Assign DB
+        volume_manager_config = {"clean_interval": 1,
+                                 "foc_throttle_usecs": 4000}
         if arakoon_service_found is False:
             db_info = partition_info[DiskPartition.ROLES.DB][0]
             size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3
@@ -555,20 +559,24 @@ class StorageRouterController(object):
             StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
                                                                                 'role': DiskPartition.ROLES.DB,
                                                                                 'partition': DiskPartition(db_info['guid'])})
-        else:
-            mountpoint_db = None
+            metadatapath = '{0}/metadata_{1}'.format(mountpoint_db, vpool_name)
+            tlogpath = '{0}/tlogs_{1}'.format(mountpoint_db, vpool_name)
+            volume_manager_config["tlog_path"] = tlogpath
+            volume_manager_config["metadata_path"] = metadatapath
+            dirs2create.append(tlogpath)
+            dirs2create.append(metadatapath)
 
         fdcache = '{0}/fd_{1}'.format(largest_write_mountpoint, vpool_name)
         dtl = '{0}/dtl_{1}'.format(largest_write_mountpoint, vpool_name)
-        metadatapath = '{0}/metadata_{1}'.format(mountpoint_db, vpool_name)
-        tlogpath = '{0}/tlogs_{1}'.format(mountpoint_db, vpool_name)
         rsppath = '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool_name)
-        dirs2create.extend([dtl, metadatapath, tlogpath, rsppath])
+        dirs2create.append(dtl)
+        dirs2create.append(fdcache)
+        dirs2create.append(rsppath)
+        dirs2create.append(storagedriver.mountpoint)
 
         if backend_type.code == 'alba' and frag_size is None:
             raise ValueError('Something went wrong trying to calculate the fragment cache size')
 
-        root_client = SSHClient(ip, username='root')
         config_dir = '{0}/storagedriver/storagedriver'.format(client.config_read('ovs.core.cfgdir'))
         client.dir_create(config_dir)
         alba_proxy = storagedriver.alba_proxy
@@ -630,6 +638,11 @@ class StorageRouterController(object):
             dedupe_mode = current_storage_driver_config['dedupe_mode']
             cache_strategy = current_storage_driver_config['cache_strategy']
 
+        volume_manager_config["read_cache_default_mode"] = StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode]
+        volume_manager_config["read_cache_default_behaviour"] = StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy]
+        volume_manager_config["number_of_scos_in_tlog"] = tlog_multiplier
+        volume_manager_config["non_disposable_scos_factor"] = sco_factor
+
         queue_urls = []
         for current_storagerouter in StorageRouterList.get_masters():
             queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(Configuration.get('ovs.core.broker.protocol'),
@@ -654,14 +667,7 @@ class StorageRouterController(object):
                                                 backoff_gap='2GB')
         storagedriver_config.configure_failovercache(failovercache_path=dtl)
         storagedriver_config.configure_filesystem(**filesystem_config)
-        storagedriver_config.configure_volume_manager(clean_interval=1,
-                                                      metadata_path=metadatapath,
-                                                      tlog_path=tlogpath,
-                                                      foc_throttle_usecs=4000,
-                                                      read_cache_default_mode=StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode],
-                                                      read_cache_default_behaviour=StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy],
-                                                      number_of_scos_in_tlog=tlog_multiplier,
-                                                      non_disposable_scos_factor=sco_factor)
+        storagedriver_config.configure_volume_manager(**volume_manager_config)
         storagedriver_config.configure_volume_router(vrouter_id=vrouter_id,
                                                      vrouter_redirect_timeout_ms='5000',
                                                      vrouter_routing_retries=10,
@@ -688,9 +694,6 @@ class StorageRouterController(object):
         DiskController.sync_with_reality(storagerouter.guid)
 
         MDSServiceController.prepare_mds_service(client, storagerouter, vpool, reload_config=False)
-
-        dirs2create.append(storagedriver.mountpoint)
-        dirs2create.append(fdcache)
 
         root_client.dir_create(dirs2create)
         root_client.file_create(files2create)
@@ -853,11 +856,6 @@ class StorageRouterController(object):
 
         client = SSHClient(ip, username='root')
         configuration_dir = client.config_read('ovs.core.cfgdir')
-        # Possible modes: ['classic', 'ganesha']
-        if storagerouter.pmachine.hvtype == 'VMWARE':
-            volumedriver_mode = Configuration.get('ovs.storagedriver.vmware_mode')
-        else:
-            volumedriver_mode = 'classic'
 
         voldrv_arakoon_cluster_id = 'voldrv'
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
@@ -959,32 +957,30 @@ class StorageRouterController(object):
             MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool, reload_config=False)
 
         # Cleanup directories/files
-        files_to_remove = list()
-        dirs_to_remove = list()
-        for readcache in storagedriver.mountpoint_readcaches:
-            file_name = '{0}/read_{1}'.format(readcache, vpool.name)
-            files_to_remove.append(file_name)
+        top_dirs_to_remove = [storagedriver.mountpoint]
+        dirs_to_remove = ['{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool.name)]
+        files_to_remove = ['{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name)]
+        for partition in storagedriver.partitions:
+            if partition.role == DiskPartition.ROLES.READ:
+                top_dirs_to_remove.append(partition.partition.mountpoint)
+                files_to_remove.append('{0}/read_{1}'.format(partition.partition.mountpoint, vpool.name))
+            elif partition.role == DiskPartition.ROLES.WRITE:
+                top_dirs_to_remove.append(partition.partition.mountpoint)
+                dirs_to_remove.append('{0}/fd_{1}'.format(partition.partition.mountpoint, vpool.name))
+                dirs_to_remove.append('{0}/dtl_{1}'.format(partition.partition.mountpoint, vpool.name))
+                dirs_to_remove.append('{0}/sco_{1}'.format(partition.partition.mountpoint, vpool.name))
+                dirs_to_remove.append('{0}/fcache_{1}'.format(partition.partition.mountpoint, vpool.name))
+            elif partition.role == DiskPartition.ROLES.DB:
+                top_dirs_to_remove.append(partition.partition.mountpoint)
+                dirs_to_remove.append('{0}/tlogs_{1}'.format(partition.partition.mountpoint, vpool.name))
+                dirs_to_remove.append('{0}/metadata_{1}'.format(partition.partition.mountpoint, vpool.name))
+            partition.delete()
 
-        for writecache in storagedriver.mountpoint_writecaches:
-            dir_name = '{0}/sco_{1}'.format(writecache, vpool.name)
-            dirs_to_remove.append(dir_name)
-
-        dirs_to_remove.extend(['{0}/dtl_{1}'.format(storagedriver.mountpoint_dtl, vpool.name),
-                               '{0}/fd_{1}'.format(storagedriver.mountpoint_dtl, vpool.name),
-                               '{0}/fcache_{1}'.format(storagedriver.mountpoint_fragmentcache, vpool.name),
-                               '{0}/metadata_{1}'.format(storagedriver.mountpoint_md, vpool.name),
-                               '{0}/tlogs_{1}'.format(storagedriver.mountpoint_md, vpool.name),
-                               '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool.name)])
-
-        files_to_remove.append('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
         if vpool.backend_type.code == 'alba':
-            files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.cfg'.format(configuration_dir,
-                                                                                         vpool.name))
-            files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.json'.format(configuration_dir,
-                                                                                          vpool.name))
-        if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'ganesha':
-            files_to_remove.append('{0}/storagedriver/storagedriver/{1}_ganesha.conf'.format(configuration_dir,
-                                                                                             vpool.name))
+            files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.cfg'.format(configuration_dir, vpool.name))
+            files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.json'.format(configuration_dir, vpool.name))
+        if storagerouter.pmachine.hvtype == 'VMWARE' and Configuration.get('ovs.storagedriver.vmware_mode') == 'ganesha':
+            files_to_remove.append('{0}/storagedriver/storagedriver/{1}_ganesha.conf'.format(configuration_dir, vpool.name))
 
         for file_name in files_to_remove:
             if file_name and client.file_exists(file_name):
@@ -996,33 +992,17 @@ class StorageRouterController(object):
                 client.dir_delete(dir_name)
                 logger.info('Recursively removed {0}'.format(dir_name))
 
-        # Remove top directories
-        dirs2remove = []
-        dirs2remove.extend(storagedriver.mountpoint_readcaches)
-        dirs2remove.extend(storagedriver.mountpoint_writecaches)
-        dirs2remove.append(storagedriver.mountpoint_fragmentcache)
-        dirs2remove.append(storagedriver.mountpoint_dtl)
-        dirs2remove.append(storagedriver.mountpoint_md)
-        dirs2remove.append(storagedriver.mountpoint)
-
         mountpoints = client.run('mount -v').strip().splitlines()
         mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2 and
                        not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc') and
                        not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run') and
                        p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
 
-        for directory in set(dirs2remove):
+        for directory in set(top_dirs_to_remove):
             if directory and directory not in mountpoints:
                 client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(directory))
 
         DiskController.sync_with_reality(storagerouter.guid)
-        for disk in storagerouter.disks:
-            for partition in disk.partitions:
-                partition.role = [role for role in partition.role
-                                  if 'relation' not in role or
-                                  role['relation'][0] != 'storagedriver' or
-                                  role['relation'][1] != storagedriver.guid]
-                partition.save()
 
         # First model cleanup
         if storagedriver.alba_proxy is not None:
@@ -1462,6 +1442,7 @@ class StorageRouterController(object):
             logger.debug('Configuring mountpoint')
             with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
                 counter = 1
+                mountpoint = None
                 while True:
                     mountpoint = '/mnt/{0}{1}'.format('ssd' if disk.is_ssd else 'hdd', counter)
                     counter += 1

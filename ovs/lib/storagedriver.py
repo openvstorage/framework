@@ -143,6 +143,7 @@ class StorageDriverController(object):
             new_service.storagerouter = service_storagerouter
             new_service.save()
 
+        cluster_name = 'voldrv'
         service_name = 'arakoon-voldrv'
         service_type = ServiceTypeList.get_by_name('Arakoon')
         current_services = []
@@ -158,12 +159,12 @@ class StorageDriverController(object):
                 available_storagerouters[storagerouter] = DiskPartition(storagerouter.partition_config[DiskPartition.ROLES.DB][0])
         if create_cluster is True and len(current_services) == 0 and len(available_storagerouters) > 0:
             storagerouter, partition = available_storagerouters.items()[0]
-            result = ArakoonInstaller.create_cluster(cluster_name='voldrv',
+            result = ArakoonInstaller.create_cluster(cluster_name=cluster_name,
                                                      ip=storagerouter.ip,
                                                      exclude_ports=ServiceList.get_ports_for_ip(storagerouter.ip),
                                                      base_dir=partition.mountpoint)
             add_service(storagerouter, result)
-            ArakoonInstaller.restart_cluster_add(service_name, current_ips, storagerouter.ip)
+            ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
             current_ips.append(storagerouter.ip)
 
         if 0 < len(current_services) < len(available_storagerouters):
