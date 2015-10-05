@@ -91,22 +91,25 @@ define([
             self.target.splice(itemIndex, 1);
         };
         self.contains = function(item) {
-            if (self.key() === undefined) {
-                return $.inArray(item, self.target()) !== -1;
-            }
-            var result = false, found;
-            $.each(self.target(), function(index, targetItem) {
-                if (self.keyIsFunction()) {
-                    found = item[self.key()]() === targetItem[self.key()]();
-                    result |= found;
-                    return !found;
-                } else {
-                    found = item[self.key()] === targetItem[self.key()];
-                    result |= found;
-                    return !found;
+            if (self.multi()) {
+                if (self.key() === undefined) {
+                    return self.target().contains(item);
                 }
-            });
-            return result;
+                var result = false, found;
+                $.each(self.target(), function (index, targetItem) {
+                    if (self.keyIsFunction()) {
+                        found = item[self.key()]() === targetItem[self.key()]();
+                        result |= found;
+                        return !found;
+                    } else {
+                        found = item[self.key()] === targetItem[self.key()];
+                        result |= found;
+                        return !found;
+                    }
+                });
+                return result;
+            }
+            return false;
         };
         self.translate = function() {
             window.setTimeout(function() { $('html').i18n(); }, 250);
