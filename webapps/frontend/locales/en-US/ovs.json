@@ -75,12 +75,6 @@
             "PASSWORD": "Password Credentials",
             "CLIENT_CREDENTIALS": "Client Credentials"
         },
-        "caches": {
-            "dtl": "DTL",
-            "read": "Read cache",
-            "write": "Write cache",
-            "fragment": "Fragment cache"
-        },
         "partitionroles": {
             "db": "DB",
             "read": "Read",
@@ -182,10 +176,6 @@
         "default": "Default",
         "errorsfound": "Errors were found. Please check the contents of all fields.",
         "followingerrorsfound": "Following errors were found:",
-        "cachefs": "Cache",
-        "bfs": "BFS",
-        "tempfs": "Temporary",
-        "mdfs": "Metadata",
         "management": "Management actions",
         "usedports": "Used Ports",
         "xmlrpcport": "XML-RPC",
@@ -699,7 +689,6 @@
             "title": "Add new vPool",
             "gatherconfig": {
                 "basicinfo": "Specify the configurations for the vPool",
-                "incorrect_write_buffer": "Write buffer must be a positive number or empty"
             },
             "gathervpool": {
                 "accesskey": "Access key:",
@@ -717,7 +706,6 @@
                 "invalidalbainfo": "The entered connection info and credentials are invalid",
                 "invalidhost": "Invalid host (should be a FQDN or IP address)",
                 "invalidname": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
-                "invalidpassword": "Invalid Storage Router root password",
                 "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
                 "localhost": "Use local Open vStorage backends",
                 "missing_arakoon": "Arakoon should either be installed or a DB partition role should be defined",
@@ -731,27 +719,14 @@
                 "secretkey": "Secret key:"
             },
             "gathermountpoints": {
-                "atleastone": "At least 1 __what__ mountpoint location needs to be specified",
                 "basicinfo": "Enter/select the requested information.",
-                "bfs": "Backend FS:",
-                "dtl": "DTL:",
-                "dtl_name": "DTL",
                 "information": "Information about the available space for:",
                 "ipaddress": "Storage IP:",
-                "md": "Metadata:",
-                "mdname": "Metadata",
                 "mountpoint": "Mountpoint:",
-                "mtptinfo": "Required locations:",
-                "mtptinuse": "The __what__ mountpoint location is already in use on this Storage Router",
                 "over_allocation": "Over allocation detected",
                 "portinuse": "The ports are already in use.",
-                "readcaches": "Read Caches:",
                 "readcache_size": "Read Cache:",
                 "shared_available": "Shared between Read and Write Cache:",
-                "tempfs": "Temporary FS:",
-                "tempname": "Temporary FS",
-                "uniquemtpt": "The __what__ mountpoint needs to be uniquely defined",
-                "writecaches": "Write Caches:",
                 "writecache_size": "Write Cache:"
             },
             "integratemgmtcenter": {

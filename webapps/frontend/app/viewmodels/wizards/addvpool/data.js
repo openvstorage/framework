@@ -16,10 +16,9 @@ define([
     'knockout', 'jquery'
 ], function(ko, $){
     "use strict";
-    var nameRegex, hostRegex, mountpointRegex, ipRegex, singleton;
+    var nameRegex, hostRegex, ipRegex, singleton;
     nameRegex = /^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$/;
     hostRegex = /^((((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|((([a-z0-9]+[\.\-])*[a-z0-9]+\.)+[a-z]{2,4}))$/;
-    mountpointRegex = /^(\/[a-zA-Z0-9\-_\.]+)+\/?$/;
     ipRegex = /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/;
 
     singleton = function() {
@@ -51,18 +50,7 @@ define([
             mgmtcenterName:          ko.observable(),
             mgmtcenterType:          ko.observable(),
             mgmtcenterUser:          ko.observable(),
-            mountpointRegex:         mountpointRegex,
             mountpoints:             ko.observableArray([]),
-            mtptBFS:                 ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-bfs' }),
-            mtptCustomRC:            ko.observable(),
-            mtptCustomRCs:           ko.observableArray([]),
-            mtptCustomWC:            ko.observable(),
-            mtptCustomWCs:           ko.observableArray([]),
-            mtptDTL:                 ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-dtl' }),
-            mtptMD:                  ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-md' }),
-            mtptReadCaches:          ko.observableArray([]), // Final target containing read caches
-            mtptTemp:                ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-temp' }),
-            mtptWriteCaches:         ko.observableArray([]), // Final target containing write caches
             name:                    ko.observable('').extend({ regex: nameRegex }),
             partitions:              ko.observable(),
             port:                    ko.observable(80).extend({ numeric: { min: 1, max: 65536 } }),

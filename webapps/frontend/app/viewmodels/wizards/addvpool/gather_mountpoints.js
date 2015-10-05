@@ -26,20 +26,7 @@ define([
 
         // Computed
         self.canContinue = ko.computed(function() {
-            var reasons = [], fields = [], storagedriver_mountpoints = [], bfs_mountpoints = [];
-
-            // Collect previously configured storagedriver mountpoints
-            $.each(self.data.storageDrivers(), function(index, storageDriver) {
-                if (self.data.target() !== undefined && storageDriver.storageDriverID() === (self.data.name() + self.data.target().machineId())) {
-                    return true;
-                }
-                if (storageDriver.mountpointBFS() !== undefined && storageDriver.mountpointBFS() !== "") {
-                    bfs_mountpoints.push(storageDriver.mountpointBFS());
-                    storagedriver_mountpoints.push(storageDriver.mountpointBFS());
-                }
-                return true;
-            });
-
+            var reasons = [], fields = [];
             var readCacheSizeBytes = self.data.readCacheSize() * 1024 * 1024 * 1024;
             var writeCacheSizeBytes = self.data.writeCacheSize() * 1024 * 1024 * 1024;
             var readCacheSizeAvailableBytes = self.data.readCacheAvailableSize() + self.data.sharedSize();
@@ -66,31 +53,6 @@ define([
             return { value: valid, reasons: unique_reasons, fields: unique_fields };
         });
 
-        // Functions
-        self.addReadCache = function() {
-            var value = self.data.mtptCustomRC();
-            if (value !== undefined && value !== '') {
-                if (!self.data.mtptCustomRCs().contains(value)) {
-                    self.data.mtptCustomRCs.push(value);
-                }
-                if (!self.data.mtptReadCaches().contains(value)) {
-                    self.data.mtptReadCaches.push(value);
-                }
-                self.data.mtptCustomRC('');
-            }
-        };
-        self.addWriteCache = function() {
-            var value = self.data.mtptCustomWC();
-            if (value !== undefined && value !== '') {
-                if (!self.data.mtptCustomWCs().contains(value)) {
-                    self.data.mtptCustomWCs.push(value);
-                }
-                if (!self.data.mtptWriteCaches().contains(value)) {
-                    self.data.mtptWriteCaches.push(value);
-                }
-                self.data.mtptCustomWC('');
-            }
-        };
         self.activate = function() {
             if (data.extendVpool() === true) {
                 self.loadStorageRoutersHandle = api.get('storagerouters', {
