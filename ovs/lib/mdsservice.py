@@ -22,6 +22,7 @@ from celery.schedules import crontab
 from ovs.celery_run import celery
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
+from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service as DalService
 from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.lists.servicelist import ServiceList
@@ -32,6 +33,7 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguratio
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.lib.helpers.decorators import ensure_single
+from ovs.lib.storagedriver import StorageDriverController
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig, MDSMetaDataBackendConfig
 from volumedriver.storagerouter import storagerouterclient
@@ -91,24 +93,24 @@ class MDSServiceController(object):
         mds_service.save()
 
         mds_nodes = []
-        db_mountpoint = [sd_partition.partition.mountpoint for sd_partition in storagedriver.partitions if sd_partition.role == DiskPartition.ROLES.DB][0]
-        scrub_mountpoint = [sd_partition.partition.mountpoint for sd_partition in storagedriver.partitions if sd_partition.role == DiskPartition.ROLES.SCRUB][0]
-        if db_mountpoint == '/':
-            db_mountpoint = ''
-        if scrub_mountpoint == '/':
-            scrub_mountpoint = ''
+        db_partition = [sd_partition.partition for sd_partition in storagedriver.partitions if sd_partition.role == DiskPartition.ROLES.DB][0]
+        scrub_partition = [sd_partition.partition for sd_partition in storagedriver.partitions if sd_partition.role == DiskPartition.ROLES.SCRUB][0]
         for service in mdsservice_type.services:
             if service.storagerouter_guid == storagerouter.guid:
                 mds_service = service.mds_service
                 if mds_service.vpool_guid == vpool.guid:
+                    sdp_mds_db = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                                    'role': DiskPartition.ROLES.DB,
+                                                                                                    'sub_role': StorageDriverPartition.SUBROLE.MDS,
+                                                                                                    'partition': db_partition})
+                    sdp_mds_scrub = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                                       'role': DiskPartition.ROLES.SCRUB,
+                                                                                                       'sub_role': StorageDriverPartition.SUBROLE.MDS,
+                                                                                                       'partition': scrub_partition})
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': '{0}/mds_{1}_{2}'.format(db_mountpoint,
-                                                                               vpool.name,
-                                                                               mds_service.number),
-                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(scrub_mountpoint,
-                                                                                    vpool.name,
-                                                                                    mds_service.number)})
+                                      'db_directory': sdp_mds_db.path,
+                                      'scratch_directory': sdp_mds_scrub.path})
 
         # Generate the correct section in the Storage Driver's configuration
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)

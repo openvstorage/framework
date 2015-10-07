@@ -482,12 +482,12 @@ class StorageRouterController(object):
                     for part in info:
                         if part['ssd'] is True and part['available'] > largest_ssd:
                             largest_ssd = part['available']
-                            largest_ssd_write_mountpoint = part['mountpoint']
+                            largest_ssd_write_mountpoint = part['guid']
                         elif part['ssd'] is False and part['available'] > largest_sata:
                             largest_sata = part['available']
-                            largest_sata_write_mountpoint = part['mountpoint']
+                            largest_sata_write_mountpoint = part['guid']
 
-        largest_write_mountpoint = largest_ssd_write_mountpoint or largest_sata_write_mountpoint or partition_info[DiskPartition.ROLES.WRITE][0]['mountpoint']
+        largest_write_mountpoint = DiskPartition(largest_ssd_write_mountpoint or largest_sata_write_mountpoint or partition_info[DiskPartition.ROLES.WRITE][0]['guid'])
         mountpoint_fragment_cache = None
         if backend_type.code == 'alba':
             mountpoint_fragment_cache = largest_write_mountpoint
@@ -499,28 +499,36 @@ class StorageRouterController(object):
         #   - If we would first create SCRUB and DB storagedriver partition and request the partition_info again, this already claimed space would be taken into account
         #   - and the competing DB role would also be taken into account again, resulting READ space would be (total - 2 x DB space)
         frag_size = None
+        sdp_frag = None
         dirs2create = list()
         writecaches = list()
         writecache_information = partition_info[DiskPartition.ROLES.WRITE]
         total_available = sum([part['available'] for part in writecache_information])
         for writecache_info in writecache_information:
             available = writecache_info['available']
-            mountpoint = writecache_info['mountpoint']
+            partition = DiskPartition(writecache_info['guid'])
             proportion = available * 100.0 / total_available
             size_to_be_used = proportion * writecache_size_requested / 100
-            if mountpoint_fragment_cache is not None and mountpoint == mountpoint_fragment_cache:
+            if mountpoint_fragment_cache is not None and partition == mountpoint_fragment_cache:
                 frag_size = int(size_to_be_used * 0.10)  # Bytes
                 w_size = int(size_to_be_used * 0.88 / 1024 / 4096) * 4096  # KiB
+                sdp_frag = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                              'role': DiskPartition.ROLES.WRITE,
+                                                                                              'sub_role': StorageDriverPartition.SUBROLE.FCACHE,
+                                                                                              'partition': DiskPartition(writecache_info['guid'])})
+                sdp_write = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
+                                                                                               'role': DiskPartition.ROLES.WRITE,
+                                                                                               'sub_role': StorageDriverPartition.SUBROLE.SCO,
+                                                                                               'partition': DiskPartition(writecache_info['guid'])})
             else:
                 w_size = int(size_to_be_used * 0.98 / 1024 / 4096) * 4096
-
-            sdp = StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
-                                                                                      'role': DiskPartition.ROLES.WRITE,
-                                                                                      'partition': DiskPartition(writecache_info['guid'])})
-            dir2create = '{0}/sco_{1}'.format(sdp.path, vpool_name)
-            writecaches.append({'path': dir2create,
+                sdp_write = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
+                                                                                               'role': DiskPartition.ROLES.WRITE,
+                                                                                               'sub_role': StorageDriverPartition.SUBROLE.SCO,
+                                                                                               'partition': DiskPartition(writecache_info['guid'])})
+            writecaches.append({'path': sdp_write.path,
                                 'size': '{0}KiB'.format(w_size)})
-            dirs2create.append(dir2create)
+            dirs2create.append(sdp_write.path)
 
         # 3. Calculate READ cache
         if shared_size_available > 0:  # If READ, WRITE are shared, WRITE will have taken up space by now
@@ -537,18 +545,18 @@ class StorageRouterController(object):
             r_size = int(size_to_be_used * 0.98 / 1024 / 4096) * 4096  # KiB
             readcache_size += r_size
 
-            sdp = StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
-                                                                                      'role': DiskPartition.ROLES.READ,
-                                                                                      'partition': DiskPartition(readcache_info['guid'])})
-            readcaches.append({'path': '{0}/read_{1}'.format(sdp.path, vpool_name),
+            sdp_read = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
+                                                                                          'role': DiskPartition.ROLES.READ,
+                                                                                          'partition': DiskPartition(readcache_info['guid'])})
+            readcaches.append({'path': '{0}/read.bin'.format(sdp_read.path),
                                'size': '{0}KiB'.format(r_size)})
-            files2create.append('{0}/read_{1}'.format(sdp.path, vpool_name))
+            files2create.append('{0}/read.bin'.format(sdp_read.path))
 
         # 4. Assign SCRUB
         scrub_info = partition_info[DiskPartition.ROLES.SCRUB][0]
-        StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(minimum_scrub_size * 1024 ** 3),
-                                                                            'role': DiskPartition.ROLES.SCRUB,
-                                                                            'partition': DiskPartition(scrub_info['guid'])})
+        StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                           'role': DiskPartition.ROLES.SCRUB,
+                                                                           'partition': DiskPartition(scrub_info['guid'])})
 
         # 5. Assign DB
         volume_manager_config = {"clean_interval": 1,
@@ -557,21 +565,31 @@ class StorageRouterController(object):
             db_info = partition_info[DiskPartition.ROLES.DB][0]
             size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3
             percentage = db_info['available'] * StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][1] / 100.0
-            sdp = StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
-                                                                                      'role': DiskPartition.ROLES.DB,
-                                                                                      'partition': DiskPartition(db_info['guid'])})
-            metadatapath = '{0}/metadata_{1}'.format(sdp.path, vpool_name)
-            tlogpath = '{0}/tlogs_{1}'.format(sdp.path, vpool_name)
-            volume_manager_config["tlog_path"] = tlogpath
-            volume_manager_config["metadata_path"] = metadatapath
-            dirs2create.append(tlogpath)
-            dirs2create.append(metadatapath)
+            sdp_tlogs = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                           'role': DiskPartition.ROLES.DB,
+                                                                                           'sub_role': StorageDriverPartition.SUBROLE.TLOG,
+                                                                                           'partition': DiskPartition(db_info['guid'])})
+            sdp_metadata = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
+                                                                                              'role': DiskPartition.ROLES.DB,
+                                                                                              'sub_role': StorageDriverPartition.SUBROLE.MD,
+                                                                                              'partition': DiskPartition(db_info['guid'])})
 
-        fdcache = '{0}/fd_{1}'.format(largest_write_mountpoint, vpool_name)
-        dtl = '{0}/dtl_{1}'.format(largest_write_mountpoint, vpool_name)
+            volume_manager_config["tlog_path"] = sdp_tlogs.path
+            volume_manager_config["metadata_path"] = sdp_metadata.path
+            dirs2create.append(sdp_tlogs.path)
+            dirs2create.append(sdp_metadata.path)
+
+        sdp_fd = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                    'role': DiskPartition.ROLES.WRITE,
+                                                                                    'sub_role': StorageDriverPartition.SUBROLE.FD,
+                                                                                    'partition': largest_write_mountpoint})
+        sdp_dtl = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                     'role': DiskPartition.ROLES.WRITE,
+                                                                                     'sub_role': StorageDriverPartition.SUBROLE.DTL,
+                                                                                     'partition': largest_write_mountpoint})
         rsppath = '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool_name)
-        dirs2create.append(dtl)
-        dirs2create.append(fdcache)
+        dirs2create.append(sdp_dtl.path)
+        dirs2create.append(sdp_fd.path)
         dirs2create.append(rsppath)
         dirs2create.append(storagedriver.mountpoint)
 
@@ -597,7 +615,7 @@ class StorageRouterController(object):
                 config.add_section(section)
                 for key, value in vpool.metadata['metadata'][section].iteritems():
                     config.set(section, key, value)
-            cache_dir = '{0}/fcache_{1}'.format(mountpoint_fragment_cache, vpool_name)
+            cache_dir = sdp_frag.path
             root_client.dir_create(cache_dir)
             System.write_config(config, '{0}/{1}_alba.cfg'.format(config_dir, vpool_name), client)
 
@@ -668,7 +686,7 @@ class StorageRouterController(object):
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
                                                 trigger_gap='1GB',
                                                 backoff_gap='2GB')
-        storagedriver_config.configure_failovercache(failovercache_path=dtl)
+        storagedriver_config.configure_failovercache(failovercache_path=sdp_dtl.path)
         storagedriver_config.configure_filesystem(**filesystem_config)
         storagedriver_config.configure_volume_manager(**volume_manager_config)
         storagedriver_config.configure_volume_router(vrouter_id=vrouter_id,
@@ -686,7 +704,7 @@ class StorageRouterController(object):
         storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
         storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=voldrv_arakoon_cluster_id,
                                                        vregistry_arakoon_cluster_nodes=arakoon_nodes)
-        storagedriver_config.configure_file_driver(fd_cache_path=fdcache,
+        storagedriver_config.configure_file_driver(fd_cache_path=sdp_fd.path,
                                                    fd_extent_cache_capacity='1024',
                                                    fd_namespace='fd-{0}-{1}'.format(vpool_name, vpool.guid))
         storagedriver_config.configure_event_publisher(events_amqp_routing_key=Configuration.get('ovs.core.broker.queues.storagedriver'),
@@ -1472,24 +1490,3 @@ class StorageRouterController(object):
         ports = System.get_free_ports(port_range, ports_in_use, number, client)
 
         return ports if number != 1 else ports[0]
-
-    @staticmethod
-    def _add_storagedriverpartition(storagedriver, partition_info):
-        """
-        Stores new storagedriver partition object with correct number
-        """
-        role = partition_info['role']
-        size = partition_info['size']
-        partition = partition_info['partition']
-        highest_number = 0
-        for existing_sdp in storagedriver.partitions:
-            if existing_sdp.partition_guid == partition.guid and existing_sdp.role == role:
-                highest_number = max(existing_sdp.number, highest_number)
-        sdp = StorageDriverPartition()
-        sdp.role = role
-        sdp.size = size
-        sdp.number = highest_number + 1
-        sdp.partition = partition
-        sdp.storagedriver = storagedriver
-        sdp.save()
-        return sdp

@@ -28,7 +28,7 @@ class StorageDriverPartition(DataObject):
     * my_storagedriver.partitions[0].partition
     * my_partition.storagedrivers[0].storagedriver
     """
-    SUBROLE = DataObject.enumerator('Role', ['TLOG', 'MD', 'READ', 'SCO', 'DTL', 'FD', 'FCACHE'])
+    SUBROLE = DataObject.enumerator('Role', ['TLOG', 'MD', 'SCO', 'DTL', 'FD', 'FCACHE'])
 
     __properties = [Property('number', int, doc='Number of the service in case there is more than one'),
                     Property('size', long, mandatory=False, doc='Size in bytes configured for use'),
@@ -43,7 +43,10 @@ class StorageDriverPartition(DataObject):
         """
         Folder on the mountpoint
         """
-        return '{0}_{1}_{2}_{3}'.format(self.storagedriver.vpool.name, self.role.lower(), self.sub_role.lower(), self.number)
+        if self.sub_role:
+            return '{0}_{1}_{2}_{3}'.format(self.storagedriver.vpool.name, self.role.lower(), self.sub_role.lower(), self.number)
+        else:
+            return '{0}_{1}_{2}'.format(self.storagedriver.vpool.name, self.role.lower(), self.number)
 
     def _path(self):
         """

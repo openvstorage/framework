@@ -19,6 +19,7 @@ StorageDriver module
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from celery.schedules import crontab
 from ovs.celery_run import celery
+from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.diskpartition import DiskPartition
@@ -181,3 +182,26 @@ class StorageDriverController(object):
                 add_service(storagerouter, result)
                 ArakoonInstaller.restart_cluster_add(service_name, current_ips, storagerouter.ip)
                 current_ips.append(storagerouter.ip)
+
+    @staticmethod
+    def add_storagedriverpartition(storagedriver, partition_info):
+        """
+        Stores new storagedriver partition object with correct number
+        """
+        role = partition_info['role']
+        size = partition_info.get('size')
+        sub_role = partition_info.get('sub_role')
+        partition = partition_info['partition']
+        highest_number = 0
+        for existing_sdp in storagedriver.partitions:
+            if existing_sdp.partition_guid == partition.guid and existing_sdp.role == role and existing_sdp.sub_role == sub_role:
+                highest_number = max(existing_sdp.number, highest_number)
+        sdp = StorageDriverPartition()
+        sdp.role = role
+        sdp.size = size
+        sdp.number = highest_number + 1
+        sdp.sub_role = sub_role
+        sdp.partition = partition
+        sdp.storagedriver = storagedriver
+        sdp.save()
+        return sdp
