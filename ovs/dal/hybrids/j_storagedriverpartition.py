@@ -28,9 +28,12 @@ class StorageDriverPartition(DataObject):
     * my_storagedriver.partitions[0].partition
     * my_partition.storagedrivers[0].storagedriver
     """
+    SUBROLE = DataObject.enumerator('Role', ['TLOG', 'MD', 'READ', 'SCO', 'DTL', 'FD', 'FCACHE'])
+
     __properties = [Property('number', int, doc='Number of the service in case there is more than one'),
                     Property('size', long, mandatory=False, doc='Size in bytes configured for use'),
-                    Property('role', DiskPartition.ROLES.keys(), doc='Role of the partition')]
+                    Property('role', DiskPartition.ROLES.keys(), doc='Role of the partition'),
+                    Property('sub_role', SUBROLE.keys(), mandatory=False, doc='Subrole of this StorageDriverPartition')]
     __relations = [Relation('partition', DiskPartition, 'storagedrivers'),
                    Relation('storagedriver', StorageDriver, 'partitions')]
     __dynamics = [Dynamic('folder', str, 3600),
@@ -40,7 +43,7 @@ class StorageDriverPartition(DataObject):
         """
         Folder on the mountpoint
         """
-        return '{0}{1}_{2}'.format(self.role.lower(), self.number, self.storagedriver.vpool.name)
+        return '{0}_{1}_{2}_{3}'.format(self.storagedriver.vpool.name, self.role.lower(), self.sub_role.lower(), self.number)
 
     def _path(self):
         """
