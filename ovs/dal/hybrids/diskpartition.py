@@ -25,6 +25,7 @@ class DiskPartition(DataObject):
     The DiskPartition class represents a partition on a physical Disk
     """
     ROLES = DataObject.enumerator('Role', ['DB', 'READ', 'SCRUB', 'WRITE'])
+    VIRTUAL_STORAGE_LOCATION = '/mnt/storage'
 
     __properties = [Property('id', str, doc='The partition identifier'),
                     Property('filesystem', str, mandatory=False, doc='The filesystem used on the partition'),
@@ -36,7 +37,8 @@ class DiskPartition(DataObject):
                     Property('path', str, doc='The partition path'),
                     Property('roles', list, default=[], doc='A list of claimed roles')]
     __relations = [Relation('disk', Disk, 'partitions')]
-    __dynamics = [Dynamic('usage', list, 120)]
+    __dynamics = [Dynamic('usage', list, 120),
+                  Dynamic('folder', str, 3600)]
 
     def _usage(self):
         """
@@ -50,3 +52,9 @@ class DiskPartition(DataObject):
                             'relation': junction.storagedriver_guid,
                             'folder': junction.folder})
         return dataset
+
+    def _folder(self):
+        """
+        Corrected mountpoint
+        """
+        return DiskPartition.VIRTUAL_STORAGE_LOCATION if self.mountpoint == '/' else self.mountpoint

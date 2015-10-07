@@ -20,8 +20,6 @@ from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagedriver import StorageDriver
 
-VIRTUAL_STORAGE_LOCATION = '/mnt/storage'
-
 
 class StorageDriverPartition(DataObject):
     """
@@ -48,4 +46,4 @@ class StorageDriverPartition(DataObject):
         """
         Actual path on filesystem, including mountpoint
         """
-        return '{0}/{1}'.format(VIRTUAL_STORAGE_LOCATION if self.partition.mountpoint == '/' else self.partition.mountpoint, self.folder)
+        return '{0}/{1}'.format(self.partition.folder, self.folder)

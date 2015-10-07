@@ -136,7 +136,7 @@ class StorageRouterController(object):
                                              'in_use': any(junction for junction in disk_partition.storagedrivers
                                                            if junction.role == role),
                                              'available': available,
-                                             'mountpoint': disk_partition.mountpoint,
+                                             'mountpoint': disk_partition.folder,  # Equals to mountpoint unless mountpoint is root ('/'), then we pre-pend mountpoint with '/mnt/storage'
                                              'storagerouter_guid': disk_partition.disk.storagerouter_guid})
 
         arakoon_service_found = False
@@ -287,10 +287,6 @@ class StorageRouterController(object):
                 arakoon_service_found = True
                 break
 
-        required_roles = [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.SCRUB]
-        if arakoon_service_found is False:
-            required_roles.append(DiskPartition.ROLES.DB)
-
         partition_info = metadata['partitions']
         error_messages = []
         minimum_scrub_size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.SCRUB][0]
@@ -308,7 +304,7 @@ class StorageRouterController(object):
         # 10. Check mountpoints are mounted
         for role, part_info in partition_info.iteritems():
             for part in part_info:
-                if not os.path.ismount(part['mountpoint']):
+                if not os.path.ismount(part['mountpoint']) and part['mountpoint'] != DiskPartition.VIRTUAL_STORAGE_LOCATION:
                     error_messages.append('Mountpoint {0} is not mounted'.format(part['mountpoint']))
 
         if arakoon_service_found is False and (DiskPartition.ROLES.DB not in partition_info or len(partition_info[DiskPartition.ROLES.DB]) == 0):
@@ -517,13 +513,14 @@ class StorageRouterController(object):
                 w_size = int(size_to_be_used * 0.88 / 1024 / 4096) * 4096  # KiB
             else:
                 w_size = int(size_to_be_used * 0.98 / 1024 / 4096) * 4096
-            dir2create = '{0}/sco_{1}'.format(mountpoint, vpool_name)
+
+            sdp = StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
+                                                                                      'role': DiskPartition.ROLES.WRITE,
+                                                                                      'partition': DiskPartition(writecache_info['guid'])})
+            dir2create = '{0}/sco_{1}'.format(sdp.path, vpool_name)
             writecaches.append({'path': dir2create,
                                 'size': '{0}KiB'.format(w_size)})
             dirs2create.append(dir2create)
-            StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
-                                                                                'role': DiskPartition.ROLES.WRITE,
-                                                                                'partition': DiskPartition(writecache_info['guid'])})
 
         # 3. Calculate READ cache
         if shared_size_available > 0:  # If READ, WRITE are shared, WRITE will have taken up space by now
@@ -535,17 +532,17 @@ class StorageRouterController(object):
         total_available = sum([part['available'] for part in readcache_information])
         for readcache_info in readcache_information:
             available = readcache_info['available']
-            mountpoint = readcache_info['mountpoint']
             proportion = available * 100.0 / total_available
             size_to_be_used = proportion * readcache_size_requested / 100
             r_size = int(size_to_be_used * 0.98 / 1024 / 4096) * 4096  # KiB
             readcache_size += r_size
-            readcaches.append({'path': '{0}/read_{1}'.format(mountpoint, vpool_name),
+
+            sdp = StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
+                                                                                      'role': DiskPartition.ROLES.READ,
+                                                                                      'partition': DiskPartition(readcache_info['guid'])})
+            readcaches.append({'path': '{0}/read_{1}'.format(sdp.path, vpool_name),
                                'size': '{0}KiB'.format(r_size)})
-            files2create.append('{0}/read_{1}'.format(mountpoint, vpool_name))
-            StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
-                                                                                'role': DiskPartition.ROLES.READ,
-                                                                                'partition': DiskPartition(readcache_info['guid'])})
+            files2create.append('{0}/read_{1}'.format(sdp.path, vpool_name))
 
         # 4. Assign SCRUB
         scrub_info = partition_info[DiskPartition.ROLES.SCRUB][0]
@@ -560,12 +557,11 @@ class StorageRouterController(object):
             db_info = partition_info[DiskPartition.ROLES.DB][0]
             size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3
             percentage = db_info['available'] * StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][1] / 100.0
-            mountpoint_db = db_info['mountpoint']
-            StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
-                                                                                'role': DiskPartition.ROLES.DB,
-                                                                                'partition': DiskPartition(db_info['guid'])})
-            metadatapath = '{0}/metadata_{1}'.format(mountpoint_db, vpool_name)
-            tlogpath = '{0}/tlogs_{1}'.format(mountpoint_db, vpool_name)
+            sdp = StorageRouterController._add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
+                                                                                      'role': DiskPartition.ROLES.DB,
+                                                                                      'partition': DiskPartition(db_info['guid'])})
+            metadatapath = '{0}/metadata_{1}'.format(sdp.path, vpool_name)
+            tlogpath = '{0}/tlogs_{1}'.format(sdp.path, vpool_name)
             volume_manager_config["tlog_path"] = tlogpath
             volume_manager_config["metadata_path"] = metadatapath
             dirs2create.append(tlogpath)
@@ -967,21 +963,21 @@ class StorageRouterController(object):
         top_dirs_to_remove = [storagedriver.mountpoint]
         dirs_to_remove = ['{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool.name)]
         files_to_remove = ['{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name)]
-        for partition in storagedriver.partitions:
-            if partition.role == DiskPartition.ROLES.READ:
-                top_dirs_to_remove.append(partition.partition.mountpoint)
-                files_to_remove.append('{0}/read_{1}'.format(partition.partition.mountpoint, vpool.name))
-            elif partition.role == DiskPartition.ROLES.WRITE:
-                top_dirs_to_remove.append(partition.partition.mountpoint)
-                dirs_to_remove.append('{0}/fd_{1}'.format(partition.partition.mountpoint, vpool.name))
-                dirs_to_remove.append('{0}/dtl_{1}'.format(partition.partition.mountpoint, vpool.name))
-                dirs_to_remove.append('{0}/sco_{1}'.format(partition.partition.mountpoint, vpool.name))
-                dirs_to_remove.append('{0}/fcache_{1}'.format(partition.partition.mountpoint, vpool.name))
-            elif partition.role == DiskPartition.ROLES.DB:
-                top_dirs_to_remove.append(partition.partition.mountpoint)
-                dirs_to_remove.append('{0}/tlogs_{1}'.format(partition.partition.mountpoint, vpool.name))
-                dirs_to_remove.append('{0}/metadata_{1}'.format(partition.partition.mountpoint, vpool.name))
-            partition.delete()
+        for sd_partition in storagedriver.partitions:
+            if sd_partition.role == DiskPartition.ROLES.READ:
+                top_dirs_to_remove.append(sd_partition.partition.folder)
+                files_to_remove.append('{0}/read_{1}'.format(sd_partition.partition.folder, vpool.name))
+            elif sd_partition.role == DiskPartition.ROLES.WRITE:
+                top_dirs_to_remove.append(sd_partition.partition.folder)
+                dirs_to_remove.append('{0}/fd_{1}'.format(sd_partition.partition.folder, vpool.name))
+                dirs_to_remove.append('{0}/dtl_{1}'.format(sd_partition.partition.folder, vpool.name))
+                dirs_to_remove.append('{0}/sco_{1}'.format(sd_partition.partition.folder, vpool.name))
+                dirs_to_remove.append('{0}/fcache_{1}'.format(sd_partition.partition.folder, vpool.name))
+            elif sd_partition.role == DiskPartition.ROLES.DB:
+                top_dirs_to_remove.append(sd_partition.partition.folder)
+                dirs_to_remove.append('{0}/tlogs_{1}'.format(sd_partition.partition.folder, vpool.name))
+                dirs_to_remove.append('{0}/metadata_{1}'.format(sd_partition.partition.folder, vpool.name))
+            sd_partition.delete()
 
         if vpool.backend_type.code == 'alba':
             files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.cfg'.format(configuration_dir, vpool.name))
@@ -1496,3 +1492,4 @@ class StorageRouterController(object):
         sdp.partition = partition
         sdp.storagedriver = storagedriver
         sdp.save()
+        return sdp

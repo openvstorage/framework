@@ -677,18 +677,22 @@
         "addbackend": {
             "title": "Add new Backend",
             "gather": {
-                "basicinfo": "Enter the requested information",
-                "name": "Name",
                 "backendtype": "Backend type",
-                "invalidname": "The name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
+                "basicinfo": "Enter the requested information",
                 "duplicatename": "This name already exists.",
-                "failed": "The backend could not be created."
+                "failed": "The backend could not be created.",
+                "invalidname": "The name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
+                "missing_arakoon": "A partition with DB role should be defined",
+                "missing_role": "Missing role",
+                "name": "Name",
+                "role_check": "Role check",
+                "unable_to_determine_roles": "Failed to determine all required roles"
             }
         },
         "addvpool": {
             "title": "Add new vPool",
             "gatherconfig": {
-                "basicinfo": "Specify the configurations for the vPool",
+                "basicinfo": "Specify the configurations for the vPool"
             },
             "gathervpool": {
                 "accesskey": "Access key:",
@@ -956,7 +960,9 @@
         "add": "&#xf067;",
         "ban": "&#xf05e;",
         "cancel": "&#xf00d;",
+        "cancel_circle": "&#xf057;",
         "checked": "&#xf046;",
+        "check_circle": "&#xf058;",
         "cog": "&#xf013;",
         "collapse": "&#xf147;",
         "configuration": "&#xf013;",

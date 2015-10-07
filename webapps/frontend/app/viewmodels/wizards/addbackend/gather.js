@@ -24,10 +24,13 @@ define([
         var self = this;
 
         // Variables
-        self.data                   = data;
-        self.shared                 = shared;
-        self.loadBackendTypesHandle = undefined;
-        self.loadBackendsHandle     = undefined;
+        self.data   = data;
+        self.shared = shared;
+
+        //Handles
+        self.loadBackendsHandle       = undefined;
+        self.loadBackendTypesHandle   = undefined;
+        self.loadStorageRoutersHandle = undefined;
 
         // Computed
         self.canContinue = ko.computed(function() {
@@ -36,6 +39,13 @@ define([
                 valid = false;
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.addbackend.gather.invalidname'));
+            }
+            if (self.data.validStorageRouterFound() === false) {
+                valid = false;
+                reasons.push($.t('ovs:wizards.addbackend.gather.missing_arakoon'));
+            }
+            if (self.data.storageRoutersChecked() !== true) {
+                valid = false;
             }
             $.each(self.data.backends(), function(index, backend) {
                 if (backend.name() === self.data.name() && !fields.contains('name')) {
@@ -95,6 +105,36 @@ define([
                                 backend.fillData(bdata[backend.guid()]);
                             }
                         });
+                    });
+            }
+            if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
+                self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: { contents: '' } })
+                    .done(function(data) {
+                        var subcalls = [];
+                        $.each(data.data, function(index, item) {
+                            subcalls.push($.Deferred(function(deferred) {
+                                api.post('storagerouters/' + item.guid + '/get_metadata')
+                                    .then(self.shared.tasks.wait)
+                                    .done(function(metadata) {
+                                        $.each(metadata.partitions, function(role, partitions) {
+                                            if (role === 'DB' && partitions.length > 0) {
+                                                self.data.validStorageRouterFound(true);
+                                            }
+                                        });
+                                        deferred.resolve();
+                                    })
+                                    .fail(deferred.resolve);
+                                }).promise());
+                        });
+                        $.when.apply($, subcalls)
+                            .done(function(){
+                                if (self.data.validStorageRouterFound() === undefined) {
+                                    self.data.validStorageRouterFound(false);
+                                }
+                            })
+                            .always(function() {
+                                self.data.storageRoutersChecked(true);
+                            });
                     });
             }
             return $.Deferred(function(deferred) {

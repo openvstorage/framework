@@ -91,8 +91,8 @@ class MDSServiceController(object):
         mds_service.save()
 
         mds_nodes = []
-        db_mountpoint = [partition.partition.mountpoint for partition in storagedriver.partitions if partition.role == DiskPartition.ROLES.DB][0]
-        scrub_mountpoint = [partition.partition.mountpoint for partition in storagedriver.partitions if partition.role == DiskPartition.ROLES.SCRUB][0]
+        db_mountpoint = [sd_partition.partition.mountpoint for sd_partition in storagedriver.partitions if sd_partition.role == DiskPartition.ROLES.DB][0]
+        scrub_mountpoint = [sd_partition.partition.mountpoint for sd_partition in storagedriver.partitions if sd_partition.role == DiskPartition.ROLES.SCRUB][0]
         if db_mountpoint == '/':
             db_mountpoint = ''
         if scrub_mountpoint == '/':

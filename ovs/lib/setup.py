@@ -1262,7 +1262,7 @@ class SetupController(object):
         print 'Restarting services'
         SetupController._restart_framework_and_memcache_services(ip_client_map)
 
-        if SetupController._run_hooks('promote', cluster_ip, master_ip):
+        if SetupController._run_hooks('promote', cluster_ip):
             print 'Restarting services'
             SetupController._restart_framework_and_memcache_services(ip_client_map)
 
