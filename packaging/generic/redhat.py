@@ -21,6 +21,7 @@ from ConfigParser import RawConfigParser
 from sourcecollector import SourceCollector
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 
+
 class RPMPackager(object):
     """
     RPMPackager class
@@ -50,7 +51,6 @@ class RPMPackager(object):
         repo_path_code = SourceCollector.repo_path_code.format(settings.get('packaging', 'working_dir'), package_name)
         package_path = SourceCollector.package_path.format(settings.get('packaging', 'working_dir'), package_name)
 
-
         # Prepare
         redhat_folder = '{0}/redhat'.format(package_path)
         if os.path.exists(redhat_folder):
@@ -76,7 +76,6 @@ class RPMPackager(object):
                 for depends_package in depends_packages.split(','):
                     depends.append('-d "{}"'.format(depends_package.strip()))
                 depends = ' '.join(depends)
-
 
             package_root_path = os.path.join(package_path, package_name)
             if os.path.exists(package_root_path):
@@ -112,19 +111,20 @@ class RPMPackager(object):
             after_install_script_path = os.path.join(script_root, after_install_script)
             if os.path.exists(after_install_script_path):
                 after_install = ' --after-install {0} '.format(after_install_script_path)
-                SourceCollector.run(command="sed -i -e 's/$Version/{0}/g' {1}".format(version_string, after_install_script_path),
+                SourceCollector.run(command="sed -i -e 's/$Version/{0}/g' {1}".format(version_string,
+                                                                                      after_install_script_path),
                                     working_directory='{0}'.format(script_root))
 
-            params = {'version' : version_string,
-                      'package_name' : package_cfg.get('main', 'name'),
-                      'summary' : package_cfg.get('main', 'summary'),
-                      'license' : package_cfg.get('main', 'license'),
-                      'URL' : package_cfg.get('main', 'URL'),
-                      'source' : package_cfg.get('main', 'source'),
-                      'arch' : package_cfg.get('main', 'arch'),
-                      'description' : package_cfg.get('main', 'description'),
-                      'maintainer' : package_cfg.get('main', 'maintainer'),
-                      'depends' : depends,
+            params = {'version': version_string,
+                      'package_name': package_cfg.get('main', 'name'),
+                      'summary': package_cfg.get('main', 'summary'),
+                      'license': package_cfg.get('main', 'license'),
+                      'URL': package_cfg.get('main', 'URL'),
+                      'source': package_cfg.get('main', 'source'),
+                      'arch': package_cfg.get('main', 'arch'),
+                      'description': package_cfg.get('main', 'description'),
+                      'maintainer': package_cfg.get('main', 'maintainer'),
+                      'depends': depends,
                       'package_root': package_root_path,
                       'before_install': before_install,
                       'after_install': after_install,
@@ -133,16 +133,15 @@ class RPMPackager(object):
             command = """fpm -s dir -t rpm -n {package_name} -v {version} --description "{description}" --maintainer "{maintainer}" --license "{license}" --url {URL} -a {arch} --vendor "Open vStorage" {depends}{before_install}{after_install} --verbose --prefix=/ -C {package_root}""".format(**params)
 
             print(SourceCollector.run(command,
-                                      working_directory = redhat_folder))
+                                      working_directory=redhat_folder))
             print(os.listdir(redhat_folder))
-
 
     @staticmethod
     def upload(source_metadata):
         """
         Uploads a given set of packages
         """
-
+        _ = source_metadata
         root_path = ROOT_PATH
         filename = '{0}/../settings.cfg'.format(root_path)
         settings = RawConfigParser()
@@ -156,17 +155,14 @@ class RPMPackager(object):
         destination_server = '172.20.3.17'
         user = 'upload'
 
-
         packages = os.listdir(redhat_folder)
         for package in packages:
             package_source_path = os.path.join(redhat_folder, package)
-
             print(package_source_path)
-            #SCP:
             command = 'scp {0} {1}@{2}:{3}'.format(package_source_path, user, destination_server, destination_folder)
             print(SourceCollector.run(command,
-                                      working_directory = redhat_folder))
+                                      working_directory=redhat_folder))
         if len(packages) > 0:
             command = 'ssh {0}@{1} createrepo --update {2}'.format(user, destination_server, destination_folder)
             print(SourceCollector.run(command,
-                                      working_directory = redhat_folder))
+                                      working_directory=redhat_folder))
