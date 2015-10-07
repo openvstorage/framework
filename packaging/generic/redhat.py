@@ -158,11 +158,12 @@ class RPMPackager(object):
         packages = os.listdir(redhat_folder)
         for package in packages:
             package_source_path = os.path.join(redhat_folder, package)
-            print(package_source_path)
+
             command = 'scp {0} {1}@{2}:{3}'.format(package_source_path, user, destination_server, destination_folder)
-            print(SourceCollector.run(command,
-                                      working_directory=redhat_folder))
+            print('Uploading package {0}'.format(package))
+            SourceCollector.run(command,
+                                working_directory=redhat_folder)
         if len(packages) > 0:
             command = 'ssh {0}@{1} createrepo --update {2}'.format(user, destination_server, destination_folder)
-            print(SourceCollector.run(command,
-                                      working_directory=redhat_folder))
+            SourceCollector.run(command,
+                                working_directory=redhat_folder)
