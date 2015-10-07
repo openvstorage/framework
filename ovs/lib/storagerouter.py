@@ -341,8 +341,7 @@ class StorageRouterController(object):
             connection_username = parameters.get('connection_username', '')
             connection_password = parameters.get('connection_password', '')
             if vpool.backend_type.code in ['local', 'distributed']:
-                vpool.metadata = {'backend_type': 'LOCAL',
-                                  'local_connection_path': parameters.get('distributed_mountpoint', '/tmp')}
+                vpool.metadata = {'backend_type': 'LOCAL'}
             elif vpool.backend_type.code == 'alba':
                 if connection_host == '':
                     connection_host = StorageRouterList.get_masters()[0].ip
@@ -396,6 +395,11 @@ class StorageRouterController(object):
             vpool.connection = '{0}:{1}'.format(connection_host, connection_port) if connection_host else None
             vpool.description = '{0} {1}'.format(vpool.backend_type.code, vpool_name)
             vpool.save()
+
+        local_backend_data = {}
+        if vpool.backend_type.code in ['local', 'distributed']:
+            local_backend_data = {'backend_type': 'LOCAL',
+                                  'local_connection_path': parameters.get('distributed_mountpoint', '/tmp')}
 
         model_ports_in_use = []
         for port_storagedriver in StorageDriverList.get_storagedrivers():
@@ -461,6 +465,7 @@ class StorageRouterController(object):
         storagedriver.cluster_ip = grid_ip
         storagedriver.storage_ip = '127.0.0.1' if storagerouter.pmachine.hvtype == 'KVM' else parameters['storage_ip']
         storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
+        storagedriver.mountpoint_dfs = local_backend_data.get('local_connection_path')
         storagedriver.description = storagedriver.name
         storagedriver.storagerouter = storagerouter
         storagedriver.storagedriver_id = vrouter_id
@@ -658,6 +663,8 @@ class StorageRouterController(object):
                                                                       alba_connection_port=alba_proxy.service.ports[0],
                                                                       alba_connection_preset=vpool.metadata['preset'],
                                                                       backend_type='ALBA')
+        elif vpool.backend_type.code in ['local', 'distributed']:
+            storagedriver_config.configure_backend_connection_manager(**local_backend_data)
         else:
             storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
         storagedriver_config.configure_content_addressed_cache(clustercache_mount_points=readcaches,
@@ -1481,7 +1488,7 @@ class StorageRouterController(object):
         highest_number = 0
         for existing_sdp in storagedriver.partitions:
             if existing_sdp.partition_guid == partition.guid and existing_sdp.role == role:
-                    highest_number = max(existing_sdp.number, highest_number)
+                highest_number = max(existing_sdp.number, highest_number)
         sdp = StorageDriverPartition()
         sdp.role = role
         sdp.size = size

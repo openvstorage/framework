@@ -223,4 +223,57 @@ class OVSMigrator(object):
 
             working_version = 3
 
+        # Version 4 introduced:
+        # - Flexible SSD layout
+        if working_version < 4:
+            import os
+            from ovs.dal.lists.storagedriverlist import StorageDriverList
+            from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
+            from ovs.dal.hybrids.diskpartition import DiskPartition
+            for storagedriver in StorageDriverList.get_storagedrivers():
+                processed_keys = []
+                for disk in storagedriver.storagerouter.disks:
+                    for partition in disk.partitions:
+                        # Process all mountpoints that are unique and don't have a specified size
+                        for key, role in {'mountpoint_md': DiskPartition.ROLES.DB,
+                                          'mountpoint_temp': DiskPartition.ROLES.SCRUB,
+                                          'mountpoint_fragmentcache': DiskPartition.ROLES.READ,
+                                          'mountpoint_foc': DiskPartition.ROLES.WRITE,
+                                          'mountpoint_dtl': DiskPartition.ROLES.WRITE,
+                                          'mountpoint_readcaches': DiskPartition.ROLES.READ,
+                                          'mountpoint_writecaches': DiskPartition.ROLES.WRITE}.iteritems():
+                            if key in storagedriver._data:
+                                entries = storagedriver._data[key] if isinstance(storagedriver._data[key], list) else [storagedriver._data[key]]
+                                for entry in entries:
+                                    if partition.inode == os.stat(entry).st_dev:
+                                        if role not in partition.roles:
+                                            partition.roles.append(role)
+                                            partition.save()
+                                        number = 0
+                                        for sd_partition in storagedriver.partitions:
+                                            if sd_partition.partition_guid == partition.guid and sd_partition.role == role:
+                                                number = max(sd_partition.number, number)
+                                        sd_partition = StorageDriverPartition()
+                                        sd_partition.role = role
+                                        sd_partition.partition = partition
+                                        sd_partition.storagedriver = storagedriver
+                                        sd_partition.size = None
+                                        sd_partition.number = number + 1
+                                        # Store some metadata for physical migration later on
+                                        sd_partition._original['_original_mountpoint'] = None
+                                        sd_partition._data['_original_mountpoint'] = entry
+                                        sd_partition.save()
+                                processed_keys.append(key)
+                for key in processed_keys:
+                    del storagedriver._data[key]
+                storagedriver.save()
+                if 'mountpoint_bfs' in storagedriver._data:
+                    storagedriver.mountpoint_dfs = storagedriver._data['mountpoint_bfs']
+                    if not storagedriver.mountpoint_dfs:
+                        storagedriver.mountpoint_dfs = None
+                    del storagedriver._data['mountpoint_bfs']
+                    storagedriver.save()
+
+            working_version = 4
+
         return working_version

@@ -539,6 +539,11 @@ class DataObject(object):
                         data[attribute] = self._data[attribute]
                 elif attribute not in data:
                     data[attribute] = self._data[attribute]
+            for attribute in data.keys():
+                if attribute == '_version':
+                    continue
+                if attribute not in self._data:
+                    del data[attribute]
             if data_conflicts:
                 raise ConcurrencyException('Got field conflicts while saving {0}. Conflicts: {1}'.format(
                     self._classname, ', '.join(data_conflicts)
