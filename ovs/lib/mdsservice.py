@@ -175,7 +175,7 @@ class MDSServiceController(object):
         cleaned = False
         while tries > 0 and cleaned is False:
             try:
-                client.dir_delete([directories_to_clean])
+                client.dir_delete(directories_to_clean)
                 logger.debug('MDS files cleaned up')
                 cleaned = True
             except Exception:

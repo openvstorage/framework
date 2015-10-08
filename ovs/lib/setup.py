@@ -341,17 +341,6 @@ class SetupController(object):
                                                   configure_rabbitmq=configure_rabbitmq)
             else:
                 # Deciding master/extra
-                print 'Analyzing cluster layout'
-                logger.info('Analyzing cluster layout')
-                promote = False
-                for cluster in SetupController.arakoon_clusters:
-                    config = ArakoonClusterConfig(cluster)
-                    config.load_config(SSHClient(master_ip, username='root', password=known_passwords[master_ip]))
-                    logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), cluster))
-                    if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
-                        promote = True
-                        break
-
                 SetupController._setup_extra_node(cluster_ip=cluster_ip,
                                                   master_ip=master_ip,
                                                   cluster_name=cluster_name,
@@ -360,7 +349,13 @@ class SetupController(object):
                                                   hypervisor_info=hypervisor_info,
                                                   configure_memcached=configure_memcached,
                                                   configure_rabbitmq=configure_rabbitmq)
-                if promote:
+
+                print 'Analyzing cluster layout'
+                logger.info('Analyzing cluster layout')
+                config = ArakoonClusterConfig('ovsdb')
+                config.load_config(SSHClient(master_ip, username='root', password=known_passwords[master_ip]))
+                logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), 'ovsdb'))
+                if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
                     SetupController._promote_node(cluster_ip=cluster_ip,
                                                   master_ip=master_ip,
                                                   cluster_name=cluster_name,
@@ -1261,10 +1256,6 @@ class SetupController(object):
 
         print 'Restarting services'
         SetupController._restart_framework_and_memcache_services(ip_client_map)
-
-        if SetupController._run_hooks('promote', cluster_ip):
-            print 'Restarting services'
-            SetupController._restart_framework_and_memcache_services(ip_client_map)
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')

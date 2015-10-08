@@ -104,11 +104,11 @@ class StorageRouterController(object):
             for disk_partition in disk.partitions:
                 claimed_space = 0
                 for storagedriver_partition in disk_partition.storagedrivers:
-                    claimed_space += storagedriver_partition.size
+                    claimed_space += storagedriver_partition.size if storagedriver_partition.size is not None else 0
 
                 shared = False
                 for index, role in enumerate(disk_partition.roles):
-                    size = disk_partition.size
+                    size = disk_partition.size if disk_partition.size is not None else 0
                     available = size
                     # Subtract size for competing roles on the same partition
                     for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_UAGES.iteritems():
@@ -132,7 +132,7 @@ class StorageRouterController(object):
                         available = 0
                     partitions[role].append({'ssd': disk.is_ssd,
                                              'guid': disk_partition.guid,
-                                             'size': size,
+                                             'size': size or 0,
                                              'in_use': any(junction for junction in disk_partition.storagedrivers
                                                            if junction.role == role),
                                              'available': available,
@@ -970,23 +970,11 @@ class StorageRouterController(object):
             MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool, reload_config=False)
 
         # Cleanup directories/files
-        top_dirs_to_remove = [storagedriver.mountpoint]
-        dirs_to_remove = ['{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool.name)]
+        dirs_to_remove = [storagedriver.mountpoint,
+                          '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool.name)]
         files_to_remove = ['{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name)]
         for sd_partition in storagedriver.partitions:
-            if sd_partition.role == DiskPartition.ROLES.READ:
-                top_dirs_to_remove.append(sd_partition.partition.folder)
-                files_to_remove.append('{0}/read_{1}'.format(sd_partition.partition.folder, vpool.name))
-            elif sd_partition.role == DiskPartition.ROLES.WRITE:
-                top_dirs_to_remove.append(sd_partition.partition.folder)
-                dirs_to_remove.append('{0}/fd_{1}'.format(sd_partition.partition.folder, vpool.name))
-                dirs_to_remove.append('{0}/dtl_{1}'.format(sd_partition.partition.folder, vpool.name))
-                dirs_to_remove.append('{0}/sco_{1}'.format(sd_partition.partition.folder, vpool.name))
-                dirs_to_remove.append('{0}/fcache_{1}'.format(sd_partition.partition.folder, vpool.name))
-            elif sd_partition.role == DiskPartition.ROLES.DB:
-                top_dirs_to_remove.append(sd_partition.partition.folder)
-                dirs_to_remove.append('{0}/tlogs_{1}'.format(sd_partition.partition.folder, vpool.name))
-                dirs_to_remove.append('{0}/metadata_{1}'.format(sd_partition.partition.folder, vpool.name))
+            dirs_to_remove.append(sd_partition.path)
             sd_partition.delete()
 
         if vpool.backend_type.code == 'alba':
@@ -1000,20 +988,16 @@ class StorageRouterController(object):
                 client.file_delete(file_name)
                 logger.info('Removed file {0}'.format(file_name))
 
-        for dir_name in dirs_to_remove:
-            if dir_name and client.dir_exists(dir_name):
-                client.dir_delete(dir_name)
-                logger.info('Recursively removed {0}'.format(dir_name))
-
         mountpoints = client.run('mount -v').strip().splitlines()
         mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2 and
                        not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc') and
                        not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run') and
                        p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
 
-        for directory in set(top_dirs_to_remove):
-            if directory and directory not in mountpoints:
-                client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(directory))
+        for dir_name in dirs_to_remove:
+            if dir_name and client.dir_exists(dir_name) and dir_name not in mountpoints and dir_name != '/':
+                client.dir_delete(dir_name)
+                logger.info('Recursively removed {0}'.format(dir_name))
 
         DiskController.sync_with_reality(storagerouter.guid)
 
