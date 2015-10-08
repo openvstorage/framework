@@ -50,7 +50,7 @@ define([
         data.albaPreset(undefined);
         data.arakoonFound(false);
         data.backend('alba');
-        data.backends(['alba', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed', 'local']);
+        data.backends(['alba', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']);
         data.cacheStrategies(['on_read', 'on_write', 'none']);
         data.cacheStrategy('on_read');
         data.dedupeMode('dedupe');

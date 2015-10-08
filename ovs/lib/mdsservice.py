@@ -33,7 +33,6 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguratio
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.lib.helpers.decorators import ensure_single
-from ovs.lib.storagedriver import StorageDriverController
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig, MDSMetaDataBackendConfig
 from volumedriver.storagerouter import storagerouterclient
@@ -58,6 +57,8 @@ class MDSServiceController(object):
         Assumes the StorageRouter and VPool are already configured with a StorageDriver and that all model-wise
         configuration regarding both is completed.
         """
+        from ovs.lib.storagedriver import StorageDriverController
+
         mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
         storagedriver = [sd for sd in vpool.storagedrivers if sd.storagerouter_guid == storagerouter.guid][0]
 

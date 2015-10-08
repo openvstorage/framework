@@ -28,12 +28,12 @@ class StorageDriverPartition(DataObject):
     * my_storagedriver.partitions[0].partition
     * my_partition.storagedrivers[0].storagedriver
     """
-    SUBROLE = DataObject.enumerator('Role', ['TLOG', 'MD', 'SCO', 'DTL', 'FD', 'FCACHE'])
+    SUBROLE = DataObject.enumerator('Role', ['TLOG', 'MD', 'MDS', 'SCO', 'DTL', 'FD', 'FCACHE'])
 
     __properties = [Property('number', int, doc='Number of the service in case there is more than one'),
                     Property('size', long, mandatory=False, doc='Size in bytes configured for use'),
                     Property('role', DiskPartition.ROLES.keys(), doc='Role of the partition'),
-                    Property('sub_role', SUBROLE.keys(), mandatory=False, doc='Subrole of this StorageDriverPartition')]
+                    Property('sub_role', SUBROLE.keys(), mandatory=False, doc='Sub-role of this StorageDriverPartition')]
     __relations = [Relation('partition', DiskPartition, 'storagedrivers'),
                    Relation('storagedriver', StorageDriver, 'partitions')]
     __dynamics = [Dynamic('folder', str, 3600),
@@ -45,8 +45,7 @@ class StorageDriverPartition(DataObject):
         """
         if self.sub_role:
             return '{0}_{1}_{2}_{3}'.format(self.storagedriver.vpool.name, self.role.lower(), self.sub_role.lower(), self.number)
-        else:
-            return '{0}_{1}_{2}'.format(self.storagedriver.vpool.name, self.role.lower(), self.number)
+        return '{0}_{1}_{2}'.format(self.storagedriver.vpool.name, self.role.lower(), self.number)
 
     def _path(self):
         """
