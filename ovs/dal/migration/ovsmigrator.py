@@ -232,6 +232,8 @@ class OVSMigrator(object):
             from ovs.dal.hybrids.diskpartition import DiskPartition
             from ovs.dal.lists.servicetypelist import ServiceTypeList
             from ovs.extensions.generic.remote import Remote
+            from ovs.extensions.generic.sshclient import SSHClient
+            from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
             for service in ServiceTypeList.get_by_name('MetadataServer').services:
                 mds_service = service.mds_service
                 storagedriver = None
@@ -266,7 +268,7 @@ class OVSMigrator(object):
                                 migrated = False
                                 for sd_partition in storagedriver.partitions:
                                     if sd_partition.role == role and sd_partition.sub_role == subrole:
-                                        if sd_partition._data.get('_original_mountpoint') == directory:
+                                        if sd_partition.mds_service == mds_service:
                                             migrated = True
                                             break
                                         if sd_partition.partition_guid == partition.guid:
@@ -280,21 +282,30 @@ class OVSMigrator(object):
                                     sd_partition.mds_service = mds_service
                                     sd_partition.size = None
                                     sd_partition.number = number + 1
-                                    # Store some metadata for physical migration later on
-                                    sd_partition._original['_original_mountpoint'] = None
-                                    sd_partition._data['_original_mountpoint'] = directory
                                     sd_partition.save()
+                                    client = SSHClient(storagedriver.storagerouter, username='root')
+                                    path = sd_partition.path.rsplit('/', 1)[0]
+                                    if path:
+                                        client.dir_create(path)
+                                        client.dir_chown(path, 'ovs', 'ovs')
+                                    client.dir_create(directory)
+                                    client.dir_chown(directory, 'ovs', 'ovs')
+                                    client.symlink({sd_partition.path: directory})
             for storagedriver in StorageDriverList.get_storagedrivers():
+                migrated_objects = {}
                 for disk in storagedriver.storagerouter.disks:
                     for partition in disk.partitions:
                         # Process all mountpoints that are unique and don't have a specified size
-                        for key, (role, subrole) in {'mountpoint_md': (DiskPartition.ROLES.DB, StorageDriverPartition.SUBROLE.MD),
-                                                     'mountpoint_temp': (DiskPartition.ROLES.SCRUB, None),
-                                                     'mountpoint_fragmentcache': (DiskPartition.ROLES.WRITE, StorageDriverPartition.SUBROLE.FCACHE),
-                                                     'mountpoint_foc': (DiskPartition.ROLES.WRITE, StorageDriverPartition.SUBROLE.DTL),
-                                                     'mountpoint_dtl': (DiskPartition.ROLES.WRITE, StorageDriverPartition.SUBROLE.DTL),
-                                                     'mountpoint_readcaches': (DiskPartition.ROLES.READ, None),
-                                                     'mountpoint_writecaches': (DiskPartition.ROLES.WRITE, StorageDriverPartition.SUBROLE.SCO)}.iteritems():
+                        for key, (role, sr_info) in {'mountpoint_md': (DiskPartition.ROLES.DB, {'metadata_{0}': StorageDriverPartition.SUBROLE.MD,
+                                                                                                'tlogs_{0}': StorageDriverPartition.SUBROLE.TLOG}),
+                                                     'mountpoint_temp': (DiskPartition.ROLES.SCRUB, {'': None}),
+                                                     'mountpoint_fragmentcache': (DiskPartition.ROLES.WRITE, {'fcache_{0}': StorageDriverPartition.SUBROLE.FCACHE}),
+                                                     'mountpoint_foc': (DiskPartition.ROLES.WRITE, {'fd_{0}': StorageDriverPartition.SUBROLE.FD,
+                                                                                                    'dtl_{0}': StorageDriverPartition.SUBROLE.DTL}),
+                                                     'mountpoint_dtl': (DiskPartition.ROLES.WRITE, {'fd_{0}': StorageDriverPartition.SUBROLE.FD,
+                                                                                                    'dtl_{0}': StorageDriverPartition.SUBROLE.DTL}),
+                                                     'mountpoint_readcaches': (DiskPartition.ROLES.READ, {'': None}),
+                                                     'mountpoint_writecaches': (DiskPartition.ROLES.WRITE, {'sco_{0}': StorageDriverPartition.SUBROLE.SCO})}.iteritems():
                             if key in storagedriver._data:
                                 is_list = isinstance(storagedriver._data[key], list)
                                 entries = storagedriver._data[key][:] if is_list is True else [storagedriver._data[key]]
@@ -313,27 +324,33 @@ class OVSMigrator(object):
                                             if role not in partition.roles:
                                                 partition.roles.append(role)
                                                 partition.save()
-                                            number = 0
-                                            migrated = False
-                                            for sd_partition in storagedriver.partitions:
-                                                if sd_partition.role == role and sd_partition.sub_role == subrole:
-                                                    if sd_partition._data.get('_original_mountpoint') == entry:
-                                                        migrated = True
-                                                        break
-                                                    if sd_partition.partition_guid == partition.guid:
-                                                        number = max(sd_partition.number, number)
-                                            if migrated is False:
-                                                sd_partition = StorageDriverPartition()
-                                                sd_partition.role = role
-                                                sd_partition.sub_role = subrole
-                                                sd_partition.partition = partition
-                                                sd_partition.storagedriver = storagedriver
-                                                sd_partition.size = None
-                                                sd_partition.number = number + 1
-                                                # Store some metadata for physical migration later on
-                                                sd_partition._original['_original_mountpoint'] = None
-                                                sd_partition._data['_original_mountpoint'] = entry
-                                                sd_partition.save()
+                                            for folder, subrole in sr_info.iteritems():
+                                                number = 0
+                                                migrated = False
+                                                for sd_partition in storagedriver.partitions:
+                                                    if sd_partition.role == role and sd_partition.sub_role == subrole:
+                                                        if sd_partition.partition_guid == partition.guid:
+                                                            number = max(sd_partition.number, number)
+                                                if migrated is False:
+                                                    sd_partition = StorageDriverPartition()
+                                                    sd_partition.role = role
+                                                    sd_partition.sub_role = subrole
+                                                    sd_partition.partition = partition
+                                                    sd_partition.storagedriver = storagedriver
+                                                    sd_partition.size = None
+                                                    sd_partition.number = number + 1
+                                                    sd_partition.save()
+                                                    if folder:
+                                                        source = '{0}/{1}'.format(entry, folder.format(storagedriver.vpool.name))
+                                                    else:
+                                                        source = entry
+                                                    client = SSHClient(storagedriver.storagerouter, username='root')
+                                                    path = sd_partition.path.rsplit('/', 1)[0]
+                                                    if path:
+                                                        client.dir_create(path)
+                                                        client.dir_chown(path, 'ovs', 'ovs')
+                                                    client.symlink({sd_partition.path: source})
+                                                    migrated_objects[source] = sd_partition
                                             if is_list:
                                                 storagedriver._data[key].remove(entry)
                                                 if len(storagedriver._data[key]) == 0:
@@ -347,6 +364,22 @@ class OVSMigrator(object):
                         storagedriver.mountpoint_dfs = None
                     del storagedriver._data['mountpoint_bfs']
                     storagedriver.save()
+                if migrated_objects:
+                    print 'Loading sizes'
+                    config = StorageDriverConfiguration('storagedriver', storagedriver.vpool.name)
+                    config.load(SSHClient(storagedriver.storagerouter, username='ovs'))
+                    for readcache in config.configuration.get('content_addressed_cache', {}).get('clustercache_mount_points', []):
+                        path = readcache.get('path', '').rsplit('/', 1)[0]
+                        size = int(readcache['size'].strip('KiB')) * 1024 if 'size' in readcache else None
+                        if path in migrated_objects:
+                            migrated_objects[path].size = long(size)
+                            migrated_objects[path].save()
+                    for writecache in config.configuration.get('scocache', {}).get('scocache_mount_points', []):
+                        path = writecache.get('path', '')
+                        size = int(writecache['size'].strip('KiB')) * 1024 if 'size' in writecache else None
+                        if path in migrated_objects:
+                            migrated_objects[path].size = long(size)
+                            migrated_objects[path].save()
 
             working_version = 4
 
