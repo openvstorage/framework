@@ -31,6 +31,8 @@ There are 5 distributions:
 from optparse import OptionParser
 from sourcecollector import SourceCollector
 from debian import DebianPackager
+from redhat import RPMPackager
+
 
 if __name__ == '__main__':
     parser = OptionParser(description='Open vStorage packager')
@@ -56,3 +58,6 @@ if __name__ == '__main__':
         #    - Debian
         DebianPackager.package(source_metadata)
         DebianPackager.upload(source_metadata)
+        #    - RPM
+        RPMPackager.package(source_metadata)
+        RPMPackager.upload(source_metadata)
