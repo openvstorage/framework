@@ -29,6 +29,7 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.mdsservice import MDSServiceController
@@ -199,6 +200,14 @@ class ScheduledTaskController(object):
         failed = 0
         skipped = 0
         storagedrivers = {}
+        scrub_location = None
+        storagerouter = System.get_my_storagerouter()
+        for disk in storagerouter.disks:
+            for partition in disk.partiitons:
+                if DiskPartition.ROLES.SCRUB in partition.roles:
+                    scrub_location = partition.folder
+        if scrub_location is None:
+            raise RuntimeError('No scrub location on StorageRouter {0}'.format(storagerouter.name))
         for vdisk in vdisks:
             try:
                 total += 1
@@ -226,8 +235,7 @@ class ScheduledTaskController(object):
                         continue
                 work_units = vdisk.storagedriver_client.get_scrubbing_workunits(str(vdisk.volume_id))
                 for work_unit in work_units:
-                    scrub_mountpoint = [sd_partition.path for sd_partition in storagedriver.partitions if sd_partition.role == DiskPartition.ROLES.SCRUB][0]
-                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, str(scrub_mountpoint))
+                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, str(scrub_location))
                     vdisk.storagedriver_client.apply_scrubbing_result(scrubbing_result)
             except Exception, ex:
                 failed += 1

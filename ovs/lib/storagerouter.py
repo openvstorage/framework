@@ -552,13 +552,7 @@ class StorageRouterController(object):
                                'size': '{0}KiB'.format(r_size)})
             files2create.append('{0}/read.dat'.format(sdp_read.path))
 
-        # 4. Assign SCRUB
-        scrub_info = partition_info[DiskPartition.ROLES.SCRUB][0]
-        StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
-                                                                           'role': DiskPartition.ROLES.SCRUB,
-                                                                           'partition': DiskPartition(scrub_info['guid'])})
-
-        # 5. Assign DB
+        # 4. Assign DB
         db_info = partition_info[DiskPartition.ROLES.DB][0]
         size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3
         percentage = db_info['available'] * StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][1] / 100.0

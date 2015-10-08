@@ -92,8 +92,16 @@ class MDSServiceController(object):
         mds_service.vpool = vpool
         mds_service.number = service_number
         mds_service.save()
-        db_partition = [sd_partition.partition for sd_partition in storagedriver.partitions if sd_partition.role == DiskPartition.ROLES.DB][0]
-        scrub_partition = [sd_partition.partition for sd_partition in storagedriver.partitions if sd_partition.role == DiskPartition.ROLES.SCRUB][0]
+        scrub_partition = None
+        db_partition = None
+        for disk in storagerouter.disks:
+            for partition in disk.partitions:
+                if DiskPartition.ROLES.DB in partition.roles:
+                    db_partition = partition
+                if DiskPartition.ROLES.SCRUB in partition.roles:
+                    scrub_partition = partition
+        if scrub_partition is None or db_partition is None:
+            raise RuntimeError('Could not find DB or SCRUB partition on StorageRouter {0}'.format(storagerouter.name))
         StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
                                                                            'role': DiskPartition.ROLES.DB,
                                                                            'sub_role': StorageDriverPartition.SUBROLE.MDS,
@@ -111,8 +119,10 @@ class MDSServiceController(object):
                 if mds_service.vpool_guid == vpool.guid:
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.DB][0],
-                                      'scratch_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.SCRUB][0]})
+                                      'db_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions
+                                                       if sd_partition.role == DiskPartition.ROLES.DB and sd_partition.sub_role == StorageDriverPartition.SUBROLE.MDS][0],
+                                      'scratch_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions
+                                                            if sd_partition.role == DiskPartition.ROLES.SCRUB and sd_partition.sub_role == StorageDriverPartition.SUBROLE.MDS][0]})
 
         # Generate the correct section in the Storage Driver's configuration
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)

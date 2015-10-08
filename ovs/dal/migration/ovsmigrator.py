@@ -298,7 +298,6 @@ class OVSMigrator(object):
                         # Process all mountpoints that are unique and don't have a specified size
                         for key, (role, sr_info) in {'mountpoint_md': (DiskPartition.ROLES.DB, {'metadata_{0}': StorageDriverPartition.SUBROLE.MD,
                                                                                                 'tlogs_{0}': StorageDriverPartition.SUBROLE.TLOG}),
-                                                     'mountpoint_temp': (DiskPartition.ROLES.SCRUB, {'': None}),
                                                      'mountpoint_fragmentcache': (DiskPartition.ROLES.WRITE, {'fcache_{0}': StorageDriverPartition.SUBROLE.FCACHE}),
                                                      'mountpoint_foc': (DiskPartition.ROLES.WRITE, {'fd_{0}': StorageDriverPartition.SUBROLE.FD,
                                                                                                     'dtl_{0}': StorageDriverPartition.SUBROLE.DTL}),
@@ -363,6 +362,9 @@ class OVSMigrator(object):
                     if not storagedriver.mountpoint_dfs:
                         storagedriver.mountpoint_dfs = None
                     del storagedriver._data['mountpoint_bfs']
+                    storagedriver.save()
+                if 'mountpoint_temp' in storagedriver._data:
+                    del storagedriver._data['mountpoint_temp']
                     storagedriver.save()
                 if migrated_objects:
                     print 'Loading sizes'
