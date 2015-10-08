@@ -92,26 +92,27 @@ class MDSServiceController(object):
         mds_service.vpool = vpool
         mds_service.number = service_number
         mds_service.save()
-
-        mds_nodes = []
         db_partition = [sd_partition.partition for sd_partition in storagedriver.partitions if sd_partition.role == DiskPartition.ROLES.DB][0]
         scrub_partition = [sd_partition.partition for sd_partition in storagedriver.partitions if sd_partition.role == DiskPartition.ROLES.SCRUB][0]
+        StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                           'role': DiskPartition.ROLES.DB,
+                                                                           'sub_role': StorageDriverPartition.SUBROLE.MDS,
+                                                                           'partition': db_partition,
+                                                                           'mds_service': mds_service})
+        StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                           'role': DiskPartition.ROLES.SCRUB,
+                                                                           'sub_role': StorageDriverPartition.SUBROLE.MDS,
+                                                                           'partition': scrub_partition,
+                                                                           'mds_service': mds_service})
+        mds_nodes = []
         for service in mdsservice_type.services:
             if service.storagerouter_guid == storagerouter.guid:
                 mds_service = service.mds_service
                 if mds_service.vpool_guid == vpool.guid:
-                    sdp_mds_db = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
-                                                                                                    'role': DiskPartition.ROLES.DB,
-                                                                                                    'sub_role': StorageDriverPartition.SUBROLE.MDS,
-                                                                                                    'partition': db_partition})
-                    sdp_mds_scrub = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
-                                                                                                       'role': DiskPartition.ROLES.SCRUB,
-                                                                                                       'sub_role': StorageDriverPartition.SUBROLE.MDS,
-                                                                                                       'partition': scrub_partition})
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': sdp_mds_db.path,
-                                      'scratch_directory': sdp_mds_scrub.path})
+                                      'db_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.DB][0],
+                                      'scratch_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.SCRUB][0]})
 
         # Generate the correct section in the Storage Driver's configuration
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
@@ -131,10 +132,13 @@ class MDSServiceController(object):
             raise RuntimeError('Cannot remove MDSService that is still serving disks')
 
         mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
-        storagedriver = [sd for sd in vpool.storagedrivers if sd.storagerouter_guid == storagerouter.guid][0]
 
         # Clean up model
-        this_service_number = mds_service.number
+        directories_to_clean = []
+        for sd_partition in mds_service.storagedriver_partitions:
+            directories_to_clean.append(sd_partition.path)
+            sd_partition.delete()
+
         service = mds_service.service
         mds_service.delete()
         service.delete()
@@ -147,12 +151,8 @@ class MDSServiceController(object):
                 if mds_service.vpool_guid == vpool.guid:
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.DB],
-                                                                               vpool.name,
-                                                                               mds_service.number),
-                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.SCRUB],
-                                                                                    vpool.name,
-                                                                                    mds_service.number)})
+                                      'db_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.DB][0],
+                                      'scratch_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.SCRUB][0]})
 
         # Generate the correct section in the Storage Driver's configuration
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
@@ -165,12 +165,7 @@ class MDSServiceController(object):
         cleaned = False
         while tries > 0 and cleaned is False:
             try:
-                client.dir_delete(['{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.DB],
-                                                            vpool.name,
-                                                            this_service_number),
-                                   '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints[DiskPartition.ROLES.SCRUB],
-                                                            vpool.name,
-                                                            this_service_number)])
+                client.dir_delete([directories_to_clean])
                 logger.debug('MDS files cleaned up')
                 cleaned = True
             except Exception:

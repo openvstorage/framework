@@ -18,6 +18,7 @@ StorageDriverPartition module
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.diskpartition import DiskPartition
+from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.hybrids.storagedriver import StorageDriver
 
 
@@ -35,7 +36,8 @@ class StorageDriverPartition(DataObject):
                     Property('role', DiskPartition.ROLES.keys(), doc='Role of the partition'),
                     Property('sub_role', SUBROLE.keys(), mandatory=False, doc='Sub-role of this StorageDriverPartition')]
     __relations = [Relation('partition', DiskPartition, 'storagedrivers'),
-                   Relation('storagedriver', StorageDriver, 'partitions')]
+                   Relation('storagedriver', StorageDriver, 'partitions'),
+                   Relation('mds_service', MDSService, 'storagedriver_partitions', mandatory=False)]
     __dynamics = [Dynamic('folder', str, 3600),
                   Dynamic('path', str, 3600)]
 

@@ -192,6 +192,7 @@ class StorageDriverController(object):
         size = partition_info.get('size')
         sub_role = partition_info.get('sub_role')
         partition = partition_info['partition']
+        mds_service = partition_info.get('mds_service')
         highest_number = 0
         for existing_sdp in storagedriver.partitions:
             if existing_sdp.partition_guid == partition.guid and existing_sdp.role == role and existing_sdp.sub_role == sub_role:
@@ -202,6 +203,7 @@ class StorageDriverController(object):
         sdp.number = highest_number + 1
         sdp.sub_role = sub_role
         sdp.partition = partition
+        sdp.mds_service = mds_service
         sdp.storagedriver = storagedriver
         sdp.save()
         return sdp

@@ -548,9 +548,9 @@ class StorageRouterController(object):
             sdp_read = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
                                                                                           'role': DiskPartition.ROLES.READ,
                                                                                           'partition': DiskPartition(readcache_info['guid'])})
-            readcaches.append({'path': '{0}/read.bin'.format(sdp_read.path),
+            readcaches.append({'path': '{0}/read.dat'.format(sdp_read.path),
                                'size': '{0}KiB'.format(r_size)})
-            files2create.append('{0}/read.bin'.format(sdp_read.path))
+            files2create.append('{0}/read.dat'.format(sdp_read.path))
 
         # 4. Assign SCRUB
         scrub_info = partition_info[DiskPartition.ROLES.SCRUB][0]
@@ -559,25 +559,23 @@ class StorageRouterController(object):
                                                                            'partition': DiskPartition(scrub_info['guid'])})
 
         # 5. Assign DB
-        volume_manager_config = {"clean_interval": 1,
+        db_info = partition_info[DiskPartition.ROLES.DB][0]
+        size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3
+        percentage = db_info['available'] * StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][1] / 100.0
+        sdp_tlogs = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                       'role': DiskPartition.ROLES.DB,
+                                                                                       'sub_role': StorageDriverPartition.SUBROLE.TLOG,
+                                                                                       'partition': DiskPartition(db_info['guid'])})
+        sdp_metadata = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
+                                                                                          'role': DiskPartition.ROLES.DB,
+                                                                                          'sub_role': StorageDriverPartition.SUBROLE.MD,
+                                                                                          'partition': DiskPartition(db_info['guid'])})
+        volume_manager_config = {"tlog_path": sdp_tlogs.path,
+                                 "metadata_path": sdp_metadata.path,
+                                 "clean_interval": 1,
                                  "foc_throttle_usecs": 4000}
-        if arakoon_service_found is False:
-            db_info = partition_info[DiskPartition.ROLES.DB][0]
-            size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3
-            percentage = db_info['available'] * StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][1] / 100.0
-            sdp_tlogs = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
-                                                                                           'role': DiskPartition.ROLES.DB,
-                                                                                           'sub_role': StorageDriverPartition.SUBROLE.TLOG,
-                                                                                           'partition': DiskPartition(db_info['guid'])})
-            sdp_metadata = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
-                                                                                              'role': DiskPartition.ROLES.DB,
-                                                                                              'sub_role': StorageDriverPartition.SUBROLE.MD,
-                                                                                              'partition': DiskPartition(db_info['guid'])})
-
-            volume_manager_config["tlog_path"] = sdp_tlogs.path
-            volume_manager_config["metadata_path"] = sdp_metadata.path
-            dirs2create.append(sdp_tlogs.path)
-            dirs2create.append(sdp_metadata.path)
+        dirs2create.append(sdp_tlogs.path)
+        dirs2create.append(sdp_metadata.path)
 
         sdp_fd = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
                                                                                     'role': DiskPartition.ROLES.WRITE,

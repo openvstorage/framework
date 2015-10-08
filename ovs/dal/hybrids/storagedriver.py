@@ -42,9 +42,7 @@ class StorageDriver(DataObject):
                    Relation('storagerouter', StorageRouter, 'storagedrivers')]
     __dynamics = [Dynamic('status', str, 30),
                   Dynamic('statistics', dict, 0),
-                  Dynamic('stored_data', int, 60),
-                  Dynamic('mountpoints', dict, 3600),
-                  Dynamic('paths', dict, 3600)]
+                  Dynamic('stored_data', int, 60)]
 
     def _status(self):
         """
@@ -78,25 +76,3 @@ class StorageDriver(DataObject):
         if self.vpool is not None:
             return sum([disk.info['stored'] for disk in self.vpool.vdisks])
         return 0
-
-    def _mountpoints(self):
-        """
-        Returns all mountpoints used by this storagedriver
-        """
-        result = {}
-        for sd_partition in self.partitions:
-            if sd_partition.role not in result:
-                result[sd_partition.role] = []
-            result[sd_partition.role].append(sd_partition.mountpoint)
-        return result
-
-    def _paths(self):
-        """
-        Returns all actual paths used by this storagedriver
-        """
-        result = {}
-        for sd_partition in self.partitions:
-            if sd_partition.role not in result:
-                result[sd_partition.role] = []
-            result[sd_partition.role].append(sd_partition.path)
-        return result
