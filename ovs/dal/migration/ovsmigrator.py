@@ -230,43 +230,117 @@ class OVSMigrator(object):
             from ovs.dal.lists.storagedriverlist import StorageDriverList
             from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
             from ovs.dal.hybrids.diskpartition import DiskPartition
+            from ovs.dal.lists.servicetypelist import ServiceTypeList
+            from ovs.extensions.generic.remote import Remote
+            for service in ServiceTypeList.get_by_name('MetadataServer').services:
+                mds_service = service.mds_service
+                storagedriver = None
+                for current_storagedriver in service.storagerouter.storagedrivers:
+                    if current_storagedriver.vpool_guid == mds_service.vpool_guid:
+                        storagedriver = current_storagedriver
+                        break
+                tasks = {}
+                if storagedriver._data.get('mountpoint_md'):
+                    tasks['{0}/mds_{1}_{2}'.format(storagedriver._data.get('mountpoint_md'),
+                                                   storagedriver.vpool.name,
+                                                   mds_service.number)] = (DiskPartition.ROLES.DB, StorageDriverPartition.SUBROLE.MDS)
+                if storagedriver._data.get('mountpoint_temp'):
+                    tasks['{0}/mds_{1}_{2}'.format(storagedriver._data.get('mountpoint_temp'),
+                                                   storagedriver.vpool.name,
+                                                   mds_service.number)] = (DiskPartition.ROLES.SCRUB, StorageDriverPartition.SUBROLE.MDS)
+                for disk in service.storagerouter.disks:
+                    for partition in disk.partitions:
+                        for directory, (role, subrole) in tasks.iteritems():
+                            with Remote(storagedriver.storagerouter.ip, [os], username='root') as remote:
+                                stat_dir = directory
+                                while not remote.os.path.exists(stat_dir) and stat_dir != '/':
+                                    stat_dir = stat_dir.rsplit('/', 1)[0]
+                                    if not stat_dir:
+                                        stat_dir = '/'
+                                inode = remote.os.stat(stat_dir).st_dev
+                            if partition.inode == inode:
+                                if role not in partition.roles:
+                                    partition.roles.append(role)
+                                    partition.save()
+                                number = 0
+                                migrated = False
+                                for sd_partition in storagedriver.partitions:
+                                    if sd_partition.role == role and sd_partition.sub_role == subrole:
+                                        if sd_partition._data.get('_original_mountpoint') == directory:
+                                            migrated = True
+                                            break
+                                        if sd_partition.partition_guid == partition.guid:
+                                            number = max(sd_partition.number, number)
+                                if migrated is False:
+                                    sd_partition = StorageDriverPartition()
+                                    sd_partition.role = role
+                                    sd_partition.sub_role = subrole
+                                    sd_partition.partition = partition
+                                    sd_partition.storagedriver = storagedriver
+                                    sd_partition.mds_service = mds_service
+                                    sd_partition.size = None
+                                    sd_partition.number = number + 1
+                                    # Store some metadata for physical migration later on
+                                    sd_partition._original['_original_mountpoint'] = None
+                                    sd_partition._data['_original_mountpoint'] = directory
+                                    sd_partition.save()
             for storagedriver in StorageDriverList.get_storagedrivers():
-                processed_keys = []
                 for disk in storagedriver.storagerouter.disks:
                     for partition in disk.partitions:
                         # Process all mountpoints that are unique and don't have a specified size
-                        for key, role in {'mountpoint_md': DiskPartition.ROLES.DB,
-                                          'mountpoint_temp': DiskPartition.ROLES.SCRUB,
-                                          'mountpoint_fragmentcache': DiskPartition.ROLES.READ,
-                                          'mountpoint_foc': DiskPartition.ROLES.WRITE,
-                                          'mountpoint_dtl': DiskPartition.ROLES.WRITE,
-                                          'mountpoint_readcaches': DiskPartition.ROLES.READ,
-                                          'mountpoint_writecaches': DiskPartition.ROLES.WRITE}.iteritems():
+                        for key, (role, subrole) in {'mountpoint_md': (DiskPartition.ROLES.DB, StorageDriverPartition.SUBROLE.MD),
+                                                     'mountpoint_temp': (DiskPartition.ROLES.SCRUB, None),
+                                                     'mountpoint_fragmentcache': (DiskPartition.ROLES.WRITE, StorageDriverPartition.SUBROLE.FCACHE),
+                                                     'mountpoint_foc': (DiskPartition.ROLES.WRITE, StorageDriverPartition.SUBROLE.DTL),
+                                                     'mountpoint_dtl': (DiskPartition.ROLES.WRITE, StorageDriverPartition.SUBROLE.DTL),
+                                                     'mountpoint_readcaches': (DiskPartition.ROLES.READ, None),
+                                                     'mountpoint_writecaches': (DiskPartition.ROLES.WRITE, StorageDriverPartition.SUBROLE.SCO)}.iteritems():
                             if key in storagedriver._data:
-                                entries = storagedriver._data[key] if isinstance(storagedriver._data[key], list) else [storagedriver._data[key]]
+                                is_list = isinstance(storagedriver._data[key], list)
+                                entries = storagedriver._data[key][:] if is_list is True else [storagedriver._data[key]]
                                 for entry in entries:
-                                    if partition.inode == os.stat(entry).st_dev:
-                                        if role not in partition.roles:
-                                            partition.roles.append(role)
-                                            partition.save()
-                                        number = 0
-                                        for sd_partition in storagedriver.partitions:
-                                            if sd_partition.partition_guid == partition.guid and sd_partition.role == role:
-                                                number = max(sd_partition.number, number)
-                                        sd_partition = StorageDriverPartition()
-                                        sd_partition.role = role
-                                        sd_partition.partition = partition
-                                        sd_partition.storagedriver = storagedriver
-                                        sd_partition.size = None
-                                        sd_partition.number = number + 1
-                                        # Store some metadata for physical migration later on
-                                        sd_partition._original['_original_mountpoint'] = None
-                                        sd_partition._data['_original_mountpoint'] = entry
-                                        sd_partition.save()
-                                processed_keys.append(key)
-                for key in processed_keys:
-                    del storagedriver._data[key]
-                storagedriver.save()
+                                    if not entry:
+                                        if is_list:
+                                            storagedriver._data[key].remove(entry)
+                                            if len(storagedriver._data[key]) == 0:
+                                                del storagedriver._data[key]
+                                        else:
+                                            del storagedriver._data[key]
+                                    else:
+                                        with Remote(storagedriver.storagerouter.ip, [os], username='root') as remote:
+                                            inode = remote.os.stat(entry).st_dev
+                                        if partition.inode == inode:
+                                            if role not in partition.roles:
+                                                partition.roles.append(role)
+                                                partition.save()
+                                            number = 0
+                                            migrated = False
+                                            for sd_partition in storagedriver.partitions:
+                                                if sd_partition.role == role and sd_partition.sub_role == subrole:
+                                                    if sd_partition._data.get('_original_mountpoint') == entry:
+                                                        migrated = True
+                                                        break
+                                                    if sd_partition.partition_guid == partition.guid:
+                                                        number = max(sd_partition.number, number)
+                                            if migrated is False:
+                                                sd_partition = StorageDriverPartition()
+                                                sd_partition.role = role
+                                                sd_partition.sub_role = subrole
+                                                sd_partition.partition = partition
+                                                sd_partition.storagedriver = storagedriver
+                                                sd_partition.size = None
+                                                sd_partition.number = number + 1
+                                                # Store some metadata for physical migration later on
+                                                sd_partition._original['_original_mountpoint'] = None
+                                                sd_partition._data['_original_mountpoint'] = entry
+                                                sd_partition.save()
+                                            if is_list:
+                                                storagedriver._data[key].remove(entry)
+                                                if len(storagedriver._data[key]) == 0:
+                                                    del storagedriver._data[key]
+                                            else:
+                                                del storagedriver._data[key]
+                                            storagedriver.save()
                 if 'mountpoint_bfs' in storagedriver._data:
                     storagedriver.mountpoint_dfs = storagedriver._data['mountpoint_bfs']
                     if not storagedriver.mountpoint_dfs:
