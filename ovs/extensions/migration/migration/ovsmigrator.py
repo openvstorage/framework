@@ -41,17 +41,13 @@ class OVSMigrator(object):
 
         working_version = previous_version
 
-        # Version 0.0.1 introduced:
+        # Version 1 introduced:
+        # - Flexible SSD layout
         if working_version < 1:
-            # Insert some code here
+            from ovs.extensions.generic.configuration import Configuration
+            Configuration.delete('ovs.arakoon', remove_root=True)
+            Configuration.set('ovs.core.ovsdb', '/opt/OpenvStorage/db')
 
-            # We're now at version 0.0.1
             working_version = 1
-
-        # Version 0.0.2 introduced:
-        if working_version < 2:
-            # Execute some code that upgrades to version 2
-            # working_version = 2
-            pass
 
         return working_version

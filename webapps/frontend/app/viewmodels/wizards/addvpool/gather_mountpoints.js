@@ -23,6 +23,7 @@ define([
         // Variables
         self.data = data;
         self.shared = shared;
+        self.activateResult = { valid: true, reasons: [], fields: [] };
 
         // Computed
         self.canContinue = ko.computed(function() {
@@ -32,8 +33,6 @@ define([
             var readCacheSizeAvailableBytes = self.data.readCacheAvailableSize() + self.data.sharedSize();
             var writeCacheSizeAvailableBytes = self.data.writeCacheAvailableSize() + self.data.sharedSize();
             var sharedAvailableModulus = self.data.sharedSize() - self.data.sharedSize() % (1024 * 1024 * 1024);
-            var readCacheAvailableModulus = self.data.readCacheAvailableSize() - self.data.readCacheAvailableSize() % (1024 * 1024 * 1024);
-            var writeCacheAvailableModulus = self.data.writeCacheAvailableSize() - self.data.writeCacheAvailableSize() % (1024 * 1024 * 1024);
             if (readCacheSizeBytes > readCacheSizeAvailableBytes) {
                 fields.push('readCacheSize');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.over_allocation'));
@@ -48,6 +47,11 @@ define([
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.over_allocation'));
             }
             var valid = reasons.length === 0;
+            if (self.activateResult.valid === false) {
+                valid = false;
+                fields.push.apply(fields, self.activateResult.fields);
+                reasons.push.apply(reasons, self.activateResult.reasons);
+            }
             var unique_fields = fields.filter(generic.arrayFilterUnique);
             var unique_reasons = reasons.filter(generic.arrayFilterUnique);
             return { value: valid, reasons: unique_reasons, fields: unique_fields };
@@ -55,12 +59,11 @@ define([
 
         self.activate = function() {
             if (data.extendVpool() === true) {
-                self.loadStorageRoutersHandle = api.get('storagerouters', {
-                        queryparams: {
+                self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: {
                         contents: 'storagedrivers',
                         sort: 'name'
-                    }
-                }).done(function(data) {
+                }})
+                    .done(function(data) {
                         var guids = [], srdata = {};
                         $.each(data.data, function(index, item) {
                             guids.push(item.guid);
@@ -75,11 +78,48 @@ define([
                         $.each(self.data.storageRouters(), function(index, storageRouter) {
                             storageRouter.fillData(srdata[storageRouter.guid()]);
                         });
-                        if (self.data.target() === undefined && self.data.storageRouter() !== undefined) {
-                            self.data.target(self.data.storageRouter);
+                    });
+                if (self.data.target() === undefined && self.data.storageRouter() !== undefined) {
+                    self.data.target(self.data.storageRouter);
+                }
+                api.post('storagerouters/' + self.data.target().guid() + '/get_metadata')
+                    .then(self.shared.tasks.wait)
+                    .then(function(data) {
+                        self.data.mountpoints(data.mountpoints);
+                        self.data.partitions(data.partitions);
+                        self.data.ipAddresses(data.ipaddresses);
+                        self.data.arakoonFound(data.arakoon_found);
+                        self.data.sharedSize(data.shared_size);
+                        self.data.readCacheAvailableSize(data.readcache_size);
+                        self.data.writeCacheAvailableSize(data.writecache_size);
+                        self.data.readCacheSize(Math.floor(data.readcache_size / 1024 / 1024 / 1024));
+                        self.data.writeCacheSize(Math.floor((data.writecache_size + data.shared_size) / 1024 / 1024 / 1024));
+                    })
+                    .done(function() {
+                        self.activateResult = { valid: true, reasons: [], fields: [] };
+                        var requiredRoles = ['READ', 'WRITE', 'SCRUB'];
+                        if (self.data.arakoonFound() === false) {
+                            requiredRoles.push('DB');
+                        }
+                        $.each(self.data.partitions(), function(role, partitions) {
+                           if (requiredRoles.contains(role) && partitions.length > 0) {
+                               generic.removeElement(requiredRoles, role);
+                           }
+                        });
+                        if (requiredRoles.contains('DB')) {
+                            self.activateResult.valid = false;
+                            self.activateResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_arakoon'));
+                            generic.removeElement(requiredRoles, 'DB');
+                        }
+                        $.each(requiredRoles, function(index, role) {
+                            self.activateResult.valid = false;
+                            self.activateResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_role', { what: role }));
+                        });
+                        if (self.data.backend() === 'distributed' && self.data.mountpoints().length === 0) {
+                            self.activateResult.valid = false;
+                            self.activateResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_mountpoints'));
                         }
                     });
-
                 if (data.vPool() !== undefined) {
                     self.data.vPool().load('storagedrivers', { skipDisks: true })
                         .then(function() {
@@ -89,7 +129,7 @@ define([
                                     self.data.storageIP(self.data.storageDriver().storageIP())
                                 });
                             self.data.vPool().backendType().load();
-                            self.data.backend(self.data.vPool().backendType().name());
+                            self.data.backend(self.data.vPool().backendType().name().toLowerCase());
                             self.data.name(self.data.vPool().name());
                         })
                 }

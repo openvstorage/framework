@@ -295,11 +295,6 @@ class StorageRouterController(object):
                 error_messages.append('Missing required partition role {0}'.format(required_role))
             elif len(partition_info[required_role]) == 0:
                 error_messages.append('At least 1 {0} partition role is required'.format(required_role))
-            elif required_role == DiskPartition.ROLES.SCRUB:
-                if partition_info[DiskPartition.ROLES.SCRUB][0]['available'] < minimum_scrub_size * 1024 ** 3:
-                    error_messages.append('Not enough free space detected on {0} partition. Available: {1:.2f} GiB, required: {2} GiB'.format(required_role,
-                                                                                                                                              partition_info[DiskPartition.ROLES.SCRUB][0]['available'] / 1024.0**3,
-                                                                                                                                              minimum_scrub_size))
 
         # 10. Check mountpoints are mounted
         for role, part_info in partition_info.iteritems():
@@ -1426,10 +1421,10 @@ class StorageRouterController(object):
             partition = DiskPartition(partition_guid)
             if partition.disk_guid != disk_guid:
                 raise RuntimeError('The given DiskPartition is not on the given Disk')
-        if partition.filesystem is None:
+        if partition.filesystem != 'ext4':
             logger.debug('Creating filesystem')
             with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
-                remote.DiskTools.make_fs(partition.path, 'ext4')
+                remote.DiskTools.make_fs(partition.path)
                 DiskController.sync_with_reality(storagerouter_guid)
                 partition = DiskPartition(partition.guid)
                 if partition.filesystem not in ['ext4', 'xfs']:

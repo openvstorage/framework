@@ -16,7 +16,7 @@ Disk module
 """
 
 import re
-from subprocess import check_output
+from subprocess import check_output, CalledProcessError
 from ovs.extensions.os.os import OSManager
 from ovs.log.logHandler import LogHandler
 
@@ -35,23 +35,27 @@ class DiskTools(object):
         """
         try:
             label = disk.split('/')[-1]
-            check_output('parted {0} -s mkpart {3} {1}B {2}B'.format(disk, offset, offset + size, label), shell=True)
-        except Exception as ex:
-            logger.exception('Error during partition creation: {0}'.format(ex))
-            raise
+            check_output('parted {0} -s mkpart {1} {2}B {3}B'.format(disk, label, offset, offset + size), shell=True)
+        except CalledProcessError as ex:
+            if 'unrecognised disk label' in ex.output:
+                try:
+                    check_output('parted {0} -s mklabel gpt'.format(disk), shell=True)
+                    label = disk.split('/')[-1]
+                    check_output('parted {0} -s mkpart {1} {2}B 100%'.format(disk, label, offset), shell=True)
+                except Exception as iex:
+                    logger.exception('Error during label/partition creation: {0}'.format(iex))
+                    raise
+            else:
+                logger.exception('Error during partition creation: {0}'.format(ex.output))
+                raise
 
     @staticmethod
-    def make_fs(partition, filesystem='ext4'):
+    def make_fs(partition):
         """
         Creates a filesystem
         """
         try:
-            if filesystem == 'xfs':
-                check_output('mkfs.xfs -qf {0}'.format(partition), shell=True)
-            elif filesystem == 'ext4':
-                check_output('mkfs.ext4 -q {0}'.format(partition), shell=True)
-            else:
-                raise RuntimeError('Unsupported filesystem')
+            check_output('mkfs.ext4 -q {0}'.format(partition), shell=True)
         except Exception as ex:
             logger.exception('Error during filesystem creation: {0}'.format(ex))
             raise
@@ -83,5 +87,10 @@ class DiskTools(object):
 
     @staticmethod
     def mount(mountpoint):
-        check_output('mkdir -p {0}'.format(mountpoint), shell=True)
-        check_output('mount {0}'.format(mountpoint), shell=True)
+        try:
+            check_output('mkdir -p {0}'.format(mountpoint), shell=True)
+            check_output('mount {0}'.format(mountpoint), shell=True)
+        except Exception as ex:
+            logger.exception('Error during mount: {0}'.format(ex))
+            raise
+

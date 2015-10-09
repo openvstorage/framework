@@ -45,12 +45,19 @@ limitations under the License.
         </div>
         <div class="form-group" style="padding-left: 40px;">
             <label class="col-lg-2 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.ipaddress" style="text-align: left; padding-right: 0;"></label>
-            <div class="col-lg-2">
-                <span data-bind="dropdown: { items: data.ipAddresses, target: data.storageIP }"></span>
+            <div class="col-lg-4">
+                <span data-bind="dropdown: {
+                                     items: data.ipAddresses,
+                                     target: data.storageIP,
+                                     emptyisloading: false
+                                 }"></span>
             </div>
         </div>
     </form>
-    <div class="alert alert-info">
+    <div class="alert alert-info"
+         data-bind="visible: (data.readCacheAvailableSize() !== undefined && data.readCacheAvailableSize() > 0) ||
+                             (data.writeCacheAvailableSize() !== undefined && data.writeCacheAvailableSize() > 0) ||
+                             (data.sharedSize() !== undefined && data.sharedSize() > 0)">
         <span data-i18n="ovs:wizards.addvpool.gathermountpoints.information"></span>
         <ul>
             <li data-bind="visible: data.readCacheAvailableSize() !== undefined && data.readCacheAvailableSize() > 0">

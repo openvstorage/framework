@@ -1257,6 +1257,10 @@ class SetupController(object):
         print 'Restarting services'
         SetupController._restart_framework_and_memcache_services(ip_client_map)
 
+        if SetupController._run_hooks('promote', cluster_ip, master_ip):
+            print 'Restarting services'
+            SetupController._restart_framework_and_memcache_services(ip_client_map)
+
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
         target_client.config_set('ovs.core.nodetype', 'MASTER')
