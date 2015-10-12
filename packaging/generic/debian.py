@@ -114,9 +114,9 @@ class DebianPackager(object):
         deb_packages = [filename for filename in os.listdir(debs_path) if filename.endswith('.deb')]
 
         create_releasename_command = "ssh {0}@{1} mkdir -p {2}".format(user, server, upload_path)
-        print(SourceCollector.run(command=create_releasename_command,
-                                  working_directory=debs_path))
-        
+        SourceCollector.run(command=create_releasename_command,
+                            working_directory=debs_path)
+
         for deb_package in deb_packages:
             source_path = os.path.join(debs_path, deb_package)
             destination_path = os.path.join(upload_path, deb_package)
@@ -132,8 +132,8 @@ class DebianPackager(object):
                     continue
             if upload:
                 scp_command = "scp {0} {1}@{2}:{3}".format(source_path, user, server, destination_path)
-                print(SourceCollector.run(command=scp_command,
-                                          working_directory=debs_path))
+                SourceCollector.run(command=scp_command,
+                                    working_directory=debs_path)
                 remote_command = "ssh {0}@{1} reprepro -Vb {2}/debian includedeb {3}-{4} {5}".format(user, server, repo_root_path, releasename, target, destination_path)
-                print(SourceCollector.run(command=remote_command,
-                                          working_directory=debs_path))
+                SourceCollector.run(command=remote_command,
+                                    working_directory=debs_path)
