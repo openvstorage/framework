@@ -1383,7 +1383,7 @@ class StorageRouterController(object):
         """
         storagerouter = StorageRouter(storagerouter_guid)
         for role in roles:
-            if role not in DiskPartition.ROLES:
+            if role not in DiskPartition.ROLES or role == DiskPartition.ROLES.BACKEND:
                 raise RuntimeError('Invalid role specified: {0}'.format(role))
         DiskController.sync_with_reality(storagerouter_guid)
         disk = Disk(disk_guid)

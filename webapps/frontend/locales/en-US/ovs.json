@@ -79,7 +79,8 @@
             "db": "DB",
             "read": "Read",
             "scrub": "Scrub",
-            "write": "Write"
+            "write": "Write",
+            "backend": "Backend"
         },
         "username": "Username",
         "password": "Password",

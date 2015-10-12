@@ -33,14 +33,16 @@ define(['knockout', 'ovs/generic'], function(ko, generic){
                 roles = [db, read, write, scrub],
                 dictionary = {DB: db, READ: read, WRITE: write, SCRUB: scrub};
             $.each(data.currentUsage(), function(role, partitions) {
-                $.each(partitions, function (index, partition) {
-                    if (partition.guid === data.partition().guid() && partition.in_use === true) {
-                        dictionary[role].disabled = true;
-                    }
-                    if (partition.guid === data.partition().guid() && partition.in_use === false) {
-                        dictionary[role].disabled = false;
-                    }
-                });
+                if (role !== 'BACKEND') {
+                    $.each(partitions, function (index, partition) {
+                        if (partition.guid === data.partition().guid() && partition.in_use === true) {
+                            dictionary[role].disabled = true;
+                        }
+                        if (partition.guid === data.partition().guid() && partition.in_use === false) {
+                            dictionary[role].disabled = false;
+                        }
+                    });
+                }
             });
             // @TODO: Make sure the DB and SCRUB role is disabled when there's already one on any of this storagerouter's partitions
             // @TODO: Also take into account that when not in use yet, they always have to be removable

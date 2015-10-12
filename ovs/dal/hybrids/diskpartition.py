@@ -24,7 +24,7 @@ class DiskPartition(DataObject):
     """
     The DiskPartition class represents a partition on a physical Disk
     """
-    ROLES = DataObject.enumerator('Role', ['DB', 'READ', 'SCRUB', 'WRITE'])
+    ROLES = DataObject.enumerator('Role', ['DB', 'READ', 'SCRUB', 'WRITE', 'BACKEND'])
     VIRTUAL_STORAGE_LOCATION = '/mnt/storage'
 
     __properties = [Property('id', str, doc='The partition identifier'),
