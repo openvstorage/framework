@@ -112,6 +112,11 @@ class DebianPackager(object):
         print("Uploading {0} {1}".format(package_name, version_string))
         debs_path = os.path.join(package_path, 'debian')
         deb_packages = [filename for filename in os.listdir(debs_path) if filename.endswith('.deb')]
+
+        create_releasename_command = "ssh {0}@{1} mkdir -p {2}".format(user, server, upload_path)
+        print(SourceCollector.run(command=create_releasename_command,
+                                  working_directory=debs_path))
+        
         for deb_package in deb_packages:
             source_path = os.path.join(debs_path, deb_package)
             destination_path = os.path.join(upload_path, deb_package)
