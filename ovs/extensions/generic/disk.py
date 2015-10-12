@@ -61,19 +61,19 @@ class DiskTools(object):
             raise
 
     @staticmethod
-    def add_fstab(device, mountpoint):
+    def add_fstab(device, mountpoint, filesystem):
         new_content = []
         with open('/etc/fstab', 'r') as fstab_file:
             lines = [line.strip() for line in fstab_file.readlines()]
         found = False
         for line in lines:
             if line.startswith(device) and re.match('^{0}\s+'.format(re.escape(device)), line):
-                new_content.append(OSManager.get_fstab_entry(device, mountpoint))
+                new_content.append(OSManager.get_fstab_entry(device, mountpoint, filesystem))
                 found = True
             else:
                 new_content.append(line)
         if found is False:
-            new_content.append(OSManager.get_fstab_entry(device, mountpoint))
+            new_content.append(OSManager.get_fstab_entry(device, mountpoint, filesystem))
         with open('/etc/fstab', 'w') as fstab_file:
             fstab_file.write('{0}\n'.format('\n'.join(new_content)))
 

@@ -1421,7 +1421,7 @@ class StorageRouterController(object):
             partition = DiskPartition(partition_guid)
             if partition.disk_guid != disk_guid:
                 raise RuntimeError('The given DiskPartition is not on the given Disk')
-        if partition.filesystem != 'ext4':
+        if partition.filesystem is None:
             logger.debug('Creating filesystem')
             with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
                 remote.DiskTools.make_fs(partition.path)
@@ -1441,7 +1441,7 @@ class StorageRouterController(object):
                     if not remote.DiskTools.mountpoint_exists(mountpoint):
                         break
                 logger.debug('Found mountpoint: {0}'.format(mountpoint))
-                remote.DiskTools.add_fstab(partition.path, mountpoint)
+                remote.DiskTools.add_fstab(partition.path, mountpoint, partition.filesystem)
                 remote.DiskTools.mount(mountpoint)
                 DiskController.sync_with_reality(storagerouter_guid)
                 partition = DiskPartition(partition.guid)

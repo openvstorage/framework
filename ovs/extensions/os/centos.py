@@ -39,8 +39,8 @@ class Centos(object):
         return path
 
     @staticmethod
-    def get_fstab_entry(device, mp):
-        return '{0}    {1}         ext4    defaults,nofail,noatime,discard    0    2'.format(device, mp)
+    def get_fstab_entry(device, mp, filesystem='ext4'):
+        return '{0}    {1}         {2}    defaults,nofail,noatime,discard    0    2'.format(device, mp, filesystem)
 
     @staticmethod
     def get_ssh_service_name():
