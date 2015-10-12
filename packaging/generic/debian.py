@@ -119,14 +119,16 @@ class DebianPackager(object):
             check_package_command = "ssh {0}@{1} ls {2}".format(user, server, upload_path)
             existing_packages = SourceCollector.run(command=check_package_command,
                                                     working_directory=debs_path).split()
+            upload = True
             for package in existing_packages:
                 if package == deb_package:
                     print("Package already uploaded, done...")
+                    upload = False
                     continue
-
-            scp_command = "scp {0} {1}@{2}:{3}".format(source_path, user, server, destination_path)
-            print(SourceCollector.run(command=scp_command,
-                                      working_directory=debs_path))
-            remote_command = "ssh {0}@{1} reprepro -Vb {2}/debian includedeb {3}-{4} {5}".format(user, server, repo_root_path, releasename, target, destination_path)
-            print(SourceCollector.run(command=remote_command,
-                                      working_directory=debs_path))
+            if upload:
+                scp_command = "scp {0} {1}@{2}:{3}".format(source_path, user, server, destination_path)
+                print(SourceCollector.run(command=scp_command,
+                                          working_directory=debs_path))
+                remote_command = "ssh {0}@{1} reprepro -Vb {2}/debian includedeb {3}-{4} {5}".format(user, server, repo_root_path, releasename, target, destination_path)
+                print(SourceCollector.run(command=remote_command,
+                                          working_directory=debs_path))
