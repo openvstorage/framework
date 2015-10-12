@@ -107,24 +107,25 @@ class DebianPackager(object):
         user = "upload"
         server = "172.20.3.16"
         repo_root_path = "/usr/share/repo"
-
         upload_path = os.path.join(repo_root_path, target, releasename)
 
-        existing_packages = SourceCollector.run(command="ssh {0}@{1} ls {2}".format(user, server, upload_path),
-                                                working_directory=os.getcwd())
-
-        for package in existing_packages:
-            if package_name in package and version_string in package:
-                print("Package already uploaded, done...")
-                return
         print("Uploading {0} {1}".format(package_name, version_string))
         debs_path = os.path.join(package_path, 'debian')
         deb_packages = [filename for filename in os.listdir(debs_path) if filename.endswith('.deb')]
         for deb_package in deb_packages:
             source_path = os.path.join(debs_path, deb_package)
             destination_path = os.path.join(upload_path, deb_package)
-            command = "scp {0} {1}@{2}:{3}".format(source_path, user, server, destination_path)
-            print(SourceCollector.run(command=command,
+
+            check_package_command = "ssh {0}@{1} ls {2}".format(user, server, upload_path)
+            existing_packages = SourceCollector.run(command=check_package_command,
+                                                    working_directory=debs_path).split()
+            for package in existing_packages:
+                if package == deb_package:
+                    print("Package already uploaded, done...")
+                    continue
+
+            scp_command = "scp {0} {1}@{2}:{3}".format(source_path, user, server, destination_path)
+            print(SourceCollector.run(command=scp_command,
                                       working_directory=debs_path))
             remote_command = "ssh {0}@{1} reprepro -Vb {2}/debian includedeb {3}-{4} {5}".format(user, server, repo_root_path, releasename, target, destination_path)
             print(SourceCollector.run(command=remote_command,
