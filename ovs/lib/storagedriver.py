@@ -129,6 +129,22 @@ class StorageDriverController(object):
             StorageDriverController._configure_arakoon_to_volumedriver()
 
     @staticmethod
+    @add_hooks('setup', 'extranode')
+    def on_extranode(cluster_ip, master_ip=None):
+        """
+        An extra node is added, make sure it has the voldrv arakoon client file if possible
+        """
+        _ = master_ip  # The master_ip will be passed in by caller
+        servicetype = ServiceTypeList.get_by_name('Arakoon')
+        current_service = None
+        for service in servicetype.services:
+            if service.name == 'arakoon-voldrv':
+                current_service = service
+                break
+        if current_service is not None:
+            ArakoonInstaller.deploy_to_slave(current_service.storagerouter.ip, cluster_ip, 'voldrv')
+
+    @staticmethod
     @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', bind=True, schedule=crontab(minute='30', hour='*'))
     @ensure_single(['ovs.storagedriver.scheduled_voldrv_arakoon_checkup'])
     def scheduled_voldrv_arakoon_checkup():
@@ -193,12 +209,12 @@ class StorageDriverController(object):
                 result = ArakoonInstaller.extend_cluster(
                     current_services[0].storagerouter.ip,
                     storagerouter.ip,
-                    service_name,
+                    cluster_name,
                     ServiceList.get_ports_for_ip(storagerouter.ip),
                     partition.folder
                 )
                 add_service(storagerouter, result)
-                ArakoonInstaller.restart_cluster_add(service_name, current_ips, storagerouter.ip)
+                ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
                 current_ips.append(storagerouter.ip)
             for sr_ip in all_sr_ips:
                 if sr_ip not in current_ips:
