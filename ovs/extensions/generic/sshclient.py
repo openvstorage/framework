@@ -321,6 +321,8 @@ print json.dumps(os.path.isdir('{0}'))""".format(self._shell_safe(directory))
 
             filename = self._shell_safe(filename)
             if self.is_local is True:
+                if not self.dir_exists(directory=os.path.dirname(filename)):
+                    self.dir_create(os.path.dirname(filename))
                 if not os.path.exists(filename):
                     open(filename, 'a').close()
             else:

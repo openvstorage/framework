@@ -136,13 +136,10 @@ class StorageDriverController(object):
         """
         _ = master_ip  # The master_ip will be passed in by caller
         servicetype = ServiceTypeList.get_by_name('Arakoon')
-        current_service = None
         for service in servicetype.services:
             if service.name == 'arakoon-voldrv':
-                current_service = service
+                ArakoonInstaller.deploy_to_slave(service.storagerouter.ip, cluster_ip, 'voldrv')
                 break
-        if current_service is not None:
-            ArakoonInstaller.deploy_to_slave(current_service.storagerouter.ip, cluster_ip, 'voldrv')
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', bind=True, schedule=crontab(minute='30', hour='*'))

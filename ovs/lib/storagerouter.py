@@ -74,7 +74,7 @@ class StorageRouterController(object):
     """
     SUPPORT_AGENT = 'support-agent'
     PARTITION_DEFAULT_UAGES = {DiskPartition.ROLES.DB: (20, 10),  # 1st number is exact size in GiB, 2nd number is percentage (highest of the 2 will be taken)
-                               DiskPartition.ROLES.SCRUB: (300, 0)}
+                               DiskPartition.ROLES.SCRUB: (0, 0)}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_metadata')
@@ -83,13 +83,14 @@ class StorageRouterController(object):
         Gets physical information about the machine this task is running on
         """
         storagerouter = StorageRouter(storagerouter_guid)
+        client = SSHClient(storagerouter)
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']
         else:
-            ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
-            ipaddresses = [ip.strip() for ip in ipaddresses]
+            ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
+            ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses]
             ipaddresses.remove('127.0.0.1')
-        mountpoints = check_output('mount -v', shell=True).strip().splitlines()
+        mountpoints = client.run('mount -v').strip().splitlines()
         mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2 and
                        not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc') and
                        not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run') and
@@ -107,9 +108,9 @@ class StorageRouterController(object):
                     claimed_space += storagedriver_partition.size if storagedriver_partition.size is not None else 0
 
                 shared = False
-                for index, role in enumerate(disk_partition.roles):
+                for role in disk_partition.roles:
                     size = disk_partition.size if disk_partition.size is not None else 0
-                    available = size
+                    available = size - claimed_space  # Subtract size for roles which have already been claimed by other vpools (but not necessarily already been fully used)
                     # Subtract size for competing roles on the same partition
                     for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_UAGES.iteritems():
                         if sub_role in disk_partition.roles and sub_role != role:
@@ -117,16 +118,13 @@ class StorageRouterController(object):
                             percentage = required_size[1] * disk_partition.size / 100
                             available -= max(amount, percentage)
 
-                    # Subtract size for roles which have already been claimed by other vpools (but not necessarily already been fully used)
-                    available -= claimed_space
-
                     if available > 0:
-                        if DiskPartition.ROLES.READ in disk_partition.roles and DiskPartition.ROLES.WRITE in disk_partition.roles and shared is False:
+                        if (role == DiskPartition.ROLES.READ or role == DiskPartition.ROLES.WRITE) and DiskPartition.ROLES.READ in disk_partition.roles and DiskPartition.ROLES.WRITE in disk_partition.roles and shared is False:
                             shared_size += available
                             shared = True
-                        if role == DiskPartition.ROLES.READ and shared is False:
+                        elif role == DiskPartition.ROLES.READ and shared is False:
                             readcache_size += available
-                        if role == DiskPartition.ROLES.WRITE and shared is False:
+                        elif role == DiskPartition.ROLES.WRITE and shared is False:
                             writecache_size += available
                     else:
                         available = 0
@@ -289,12 +287,15 @@ class StorageRouterController(object):
 
         partition_info = metadata['partitions']
         error_messages = []
-        minimum_scrub_size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.SCRUB][0]
         for required_role in [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.SCRUB]:
             if required_role not in partition_info:
                 error_messages.append('Missing required partition role {0}'.format(required_role))
             elif len(partition_info[required_role]) == 0:
                 error_messages.append('At least 1 {0} partition role is required'.format(required_role))
+            else:
+                total_available = [part['available'] for part in partition_info[required_role]]
+                if total_available == 0:
+                    error_messages.append('Not enough available space for {0}'.format(required_role))
 
         # 10. Check mountpoints are mounted
         for role, part_info in partition_info.iteritems():
@@ -307,6 +308,14 @@ class StorageRouterController(object):
 
         if error_messages:
             raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
+
+        # 11. check available IP addresses
+        ipaddresses = metadata['ipaddresses']
+        grid_ip = client.config_read('ovs.grid.ip')
+        if grid_ip in ipaddresses:
+            ipaddresses.remove(grid_ip)
+        if not ipaddresses:
+            raise RuntimeError('No available IP addresses found suitable for Storage Router storage IP')
 
         ###################
         # CREATE SERVICES #
@@ -409,15 +418,6 @@ class StorageRouterController(object):
         else:
             ports = storagedriver.ports
         model_ports_in_use += ports
-
-        cmd = "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
-        ipaddresses = client.run(cmd).strip().splitlines()
-        ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses]
-        grid_ip = client.config_read('ovs.grid.ip')
-        if grid_ip in ipaddresses:
-            ipaddresses.remove(grid_ip)
-        if not ipaddresses:
-            raise RuntimeError('No available IP addresses found suitable for Storage Router storage IP')
 
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
         voldrv_arakoon_cluster_id = 'voldrv'
