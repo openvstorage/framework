@@ -1467,12 +1467,6 @@ EOF
                     uris.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(protocol, login, password, cfg.get(node,
                                                                                                            'location'))})
 
-                arakoon_cluster_config = remote.ArakoonManagementEx().getCluster('voldrv').getClientConfig()
-                arakoon_nodes = []
-                for node_id, node_config in arakoon_cluster_config.iteritems():
-                    arakoon_nodes.append({'host': node_config[0][0],
-                                          'port': node_config[1],
-                                          'node_id': node_id})
                 configuration_dir = '{0}/storagedriver/storagedriver'.format(remote.Configuration.get('ovs.core.cfgdir'))
                 if not remote.os.path.exists(configuration_dir):
                     remote.os.makedirs(configuration_dir)
@@ -1483,8 +1477,6 @@ EOF
                             continue  # There's also a .cfg file, so this is an alba_proxy configuration file
                         storagedriver_config = remote.StorageDriverConfiguration('storagedriver', vpool_name)
                         storagedriver_config.load()
-                        storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id='voldrv',
-                                                                       vregistry_arakoon_cluster_nodes=arakoon_nodes)
                         storagedriver_config.configure_event_publisher(events_amqp_routing_key=remote.Configuration.get('ovs.core.broker.queues.storagedriver'),
                                                                        events_amqp_uris=uris)
                         storagedriver_config.save()
