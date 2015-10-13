@@ -33,12 +33,6 @@ define([
         self.storageIP             = ko.observable();
         self.storageDriverID       = ko.observable();
         self.mountpoint            = ko.observable();
-        self.mountpointTemp        = ko.observable();
-        self.mountpointBFS         = ko.observable();
-        self.mountpointMD          = ko.observable();
-        self.mountpointReadCaches  = ko.observable();
-        self.mountpointWriteCaches = ko.observable();
-        self.mountpointDTL         = ko.observable();
 
         // Functions
         self.fillData = function(data) {
@@ -48,12 +42,6 @@ define([
             self.storageIP(data.storage_ip);
             self.storageDriverID(data.storageDriverID);
             self.mountpoint(data.mountpoint);
-            self.mountpointTemp(data.mountpoint_temp);
-            self.mountpointBFS(data.mountpoint_bfs);
-            self.mountpointMD(data.mountpoint_md);
-            self.mountpointReadCaches(data.mountpoint_readcaches);
-            self.mountpointWriteCaches(data.mountpoint_writecaches);
-            self.mountpointDTL(data.mountpoint_dtl);
             self.loaded(true);
             self.loading(false);
         };

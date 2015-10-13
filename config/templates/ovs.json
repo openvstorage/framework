@@ -2,6 +2,7 @@
     "core": {
         "basedir": "/opt/OpenvStorage",
         "cfgdir": "/opt/OpenvStorage/config",
+        "ovsdb": "/opt/OpenvStorage/db",
         "broker": {
             "protocol": "amqp",
             "login": "ovs",
@@ -50,9 +51,6 @@
     },
     "grid": {
         "ip": ""
-    },
-    "arakoon": {
-        "location": "/mnt/db"
     },
     "support": {
         "enabled": false,

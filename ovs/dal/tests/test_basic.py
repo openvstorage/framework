@@ -1313,6 +1313,29 @@ class Basic(TestCase):
         value = disk.updatable
         self.assertEqual(value, 10, 'Dynamic should be 10 now ({0})'.format(value))
 
+    def test_enumerator(self):
+        """
+        Validates whether the internal enumerator generator works as expected
+        """
+        from ovs.dal.dataobject import DataObject
+        list_items = ['ONE', 'TWO', 'THREE']
+        enum = DataObject.enumerator('ListTest', list_items)
+        self.assertEqual(enum.__name__, 'ListTest', 'Name should be ListTest')
+        for item in list_items:
+            self.assertIn(item, enum, '{0} should be in the enumerator'.format(item))
+            self.assertTrue(hasattr(enum, item), 'Enumerator should have property {0}'.format(item))
+        self.assertNotIn('ZERO', enum, 'ZERO should not be in the enumerator')
+        extract = [item for item in enum]
+        self.assertListEqual(sorted(list_items), sorted(extract), 'Iterating the enum should yield the initial list')
+        self.assertEqual(enum.ONE, 'ONE', 'Value should be correct')
+
+        dict_items = {'ONE': 'one', 'TWO': 'two', 'THREE': 'three'}
+        enum = DataObject.enumerator('DictTest', dict_items)
+        self.assertEqual(enum.__name__, 'DictTest', 'Name should be DictTest')
+        for key, value in dict_items.iteritems():
+            self.assertIn(key, enum, '{0} should be in the enumerator'.format(key))
+            self.assertEqual(getattr(enum, key), value, "Value for key '{0}' should be '{1}' instead of '{2}'".format(key, value, getattr(enum, key)))
+
 
 if __name__ == '__main__':
     import unittest

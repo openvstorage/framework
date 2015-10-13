@@ -172,18 +172,77 @@ limitations under the License.
                     <tbody>
                         <tr style="padding-bottom: 10px;">
                             <td style="width: 110px;">&nbsp;</td>
-                            <td style="padding: 0;">
-                                <h4 data-i18n="ovs:storagerouters.detail.disks.title"></h4>
+                            <td>
+                                <h4 class="pull-left" data-i18n="ovs:storagerouters.detail.disks.title"></h4>
+                                <button class="btn btn-default pull-right hand" id="buttonRescanDisks"
+                                        data-bind="click: $root.rescanDisks, enable: $.inArray('manage', $root.shared.user.roles()) !== -1">
+                                    <span class="fa hand" data-i18n="[html]ovs:icons.load"></span>&nbsp;
+                                    <span data-i18n="ovs:generic.rescan" class="hand"></span>
+                                </button>
                             </td>
                         </tr>
                         <!-- ko foreach: disks -->
                             <tr>
-                                <td style="vertical-align: middle; padding: 0 0 15px 0;">
+                                <td style="vertical-align: middle;">
                                     /dev/<span data-bind="text: name"></span><br />
-                                    <span data-bind="text: formattedSize"></span>
+                                    <span data-bind="text: size"></span>
                                 </td>
-                                <td style="padding: 0 0 15px 0;">
-                                    <div data-bind="disk: { disk: $data, width: 1000 }"></div>
+                                <td style="vertical-align: middle;">
+                                    <div class="progress" style="width: 1000px; margin-bottom: inherit;">
+                                        <!-- ko foreach: fullPartitions() -->
+                                            <div class="progress-bar" role="progressbar" style="position: relative;"
+                                                 data-bind="style: {
+                                                                width: ((relativeSize * 10) - ($index() > 0 ? 2 : 0)) + 'px',
+                                                                marginLeft: $index() > 0 ? '2px' : 'inherit'
+                                                            },
+                                                            css: {
+                                                                'progress-bar-success': state() === 'OK',
+                                                                'progress-bar-danger': ['FAILURE', 'MISSING'].contains(state()),
+                                                                'progress-bar-info': state() === 'RAW'
+                                                            }">
+                                                <div>
+                                                    <span data-bind="visible: !small" style="position: absolute; top: 0; left: 7px;">
+                                                        <span data-i18n="ovs:generic.size"></span>: <span data-bind="text: size()"></span>
+                                                        <span data-bind="if: !$root.isEmpty(filesystem()) || !$root.isEmpty(mountpoint())">
+                                                            <span class="fa" data-i18n="[html]ovs:icons.separator"></span>
+                                                            <span data-bind="if: $root.isEmpty(mountpoint())">
+                                                                <span data-i18n="ovs:generic.fs"></span>:
+                                                            </span>
+                                                            <span data-bind="text: filesystem()"></span>
+                                                            <span data-bind="if: !$root.isEmpty(filesystem()) && !$root.isEmpty(mountpoint())">@</span>
+                                                            <span data-bind="if: $root.isEmpty(filesystem())">
+                                                                <span data-i18n="ovs:generic.mountpoint"></span>:
+                                                            </span>
+                                                            <span data-bind="text: mountpoint()"></span>
+                                                        </span>
+                                                        <span data-bind="if: roles().length > 0">
+                                                            <span class="fa" data-i18n="[html]ovs:icons.separator"></span>
+                                                            <span data-i18n="ovs:generic.roles"></span>: <span data-bind="foreach: roles()">
+                                                                <span data-bind="translate: 'ovs:generic.partitionroles.' + $data.toLowerCase()"></span><span data-bind="if: $index() < ($parent.roles().length - 1)">,</span>
+                                                            </span>
+                                                        </span>
+                                                        <span data-bind="if: state() !== 'OK' && state() !== undefined">
+                                                            <span class="fa" data-i18n="[html]ovs:icons.separator"></span>
+                                                            <span data-bind="translate: 'ovs:generic.states.disk.' + state().toLowerCase()"></span>
+                                                        </span>
+                                                    </span>
+                                                    <span style="position: absolute; top: 0; right: 7px;"
+                                                          data-bind="visible: !small
+                                                                              && $root.shared.user.roles().contains('manage')
+                                                                              && filesystem() !== 'swap'
+                                                                              && !roles().contains('BACKEND')">
+                                                        <span data-bind="position: absolute; top: 0; left: 0">
+                                                            <span class="fa hand" data-bind="click: function(partition) { $root.configureRoles(partition, $parent); }"
+                                                                  data-i18n="[html]ovs:icons.configuration"></span>
+                                                        </span>
+                                                    </span>
+                                                    <span data-bind="visible: small">
+                                                        <span data-bind="tooltip: size()">&hellip;</span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        <!-- /ko -->
+                                    </div>
                                 </td>
                             </tr>
                         <!-- /ko -->

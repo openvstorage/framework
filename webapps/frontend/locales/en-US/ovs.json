@@ -42,7 +42,8 @@
             "disk": {
                 "ok": "OK",
                 "missing": "Missing",
-                "failure": "Failure"
+                "failure": "Failure",
+                "raw": "Raw disk"
             }
         },
         "messages": {
@@ -74,11 +75,12 @@
             "PASSWORD": "Password Credentials",
             "CLIENT_CREDENTIALS": "Client Credentials"
         },
-        "caches": {
-            "dtl": "DTL",
-            "read": "Read cache",
-            "write": "Write cache",
-            "fragment": "Fragment cache"
+        "partitionroles": {
+            "db": "DB",
+            "read": "Read",
+            "scrub": "Scrub",
+            "write": "Write",
+            "backend": "Backend"
         },
         "username": "Username",
         "password": "Password",
@@ -175,14 +177,10 @@
         "default": "Default",
         "errorsfound": "Errors were found. Please check the contents of all fields.",
         "followingerrorsfound": "Following errors were found:",
-        "cachefs": "Cache",
-        "bfs": "BFS",
-        "tempfs": "Temporary",
-        "mdfs": "Metadata",
         "management": "Management actions",
         "usedports": "Used Ports",
         "xmlrpcport": "XML-RPC",
-        "dtl_port": "DTL",
+        "dtl_port": "DTL Port",
         "mgmtport": "Management",
         "templatehaschildren": "This vTemplate does have children",
         "clone": "Create clones",
@@ -217,7 +215,13 @@
         "tempspace": "Temporary files",
         "accept": "Accept",
         "warning": "Warning",
-        "inheritedfrom": "Inherited from"
+        "inheritedfrom": "Inherited from",
+        "state": "State",
+        "roles": "Roles",
+        "fs": "FS",
+        "unavailable": "Unavailable",
+        "loadingdata": "Loading data...",
+        "rescan": "Rescan"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -242,7 +246,13 @@
             "updateserving": "Save changes",
             "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
             "disks": {
-                "title": "Physical disks"
+                "title": "Physical disks",
+                "rescan": {
+                    "success": "Rescan finished",
+                    "scanning": "rescanning",
+                    "started": "Rescan started",
+                    "inprogress": "The disks of this StorageRouter are being rescanned"
+                }
             }
         }
     },
@@ -668,71 +678,61 @@
         "addbackend": {
             "title": "Add new Backend",
             "gather": {
-                "basicinfo": "Enter the requested information",
-                "name": "Name",
                 "backendtype": "Backend type",
-                "invalidname": "The name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
+                "basicinfo": "Enter the requested information",
                 "duplicatename": "This name already exists.",
-                "failed": "The backend could not be created."
+                "failed": "The backend could not be created.",
+                "invalidname": "The name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
+                "missing_arakoon": "A partition with DB role should be defined",
+                "missing_role": "Missing role",
+                "name": "Name",
+                "role_check": "Role check",
+                "unable_to_determine_roles": "Failed to determine all required roles"
             }
         },
         "addvpool": {
             "title": "Add new vPool",
             "gatherconfig": {
-                "basicinfo": "Specify the configurations for the vPool",
-                "incorrect_write_buffer": "Write buffer must be a positive number or empty"
+                "basicinfo": "Specify the configurations for the vPool"
             },
             "gathervpool": {
-                "basicinfo": "Add basic vPool information",
-                "name": "Name:",
-                "invalidname": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
-                "backendtype": "BackendType:",
-                "host": "Host (FQDN/IP):",
-                "port": "Port:",
                 "accesskey": "Access key:",
-                "secretkey": "Secret key:",
-                "invalidhost": "Invalid host (should be a FQDN or IP address)",
-                "nocredentials": "No credentials were entered",
-                "extendedinfo": "Extended vPool information",
-                "initialstoragerouter": "Storage Router:",
-                "invalidpassword": "Invalid Storage Router root password",
-                "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
-                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use.",
+                "albabackend": "Backend:",
+                "albapreset": "Preset",
+                "basicinfo": "Add basic vPool information",
+                "backendtype": "BackendType:",
+                "choosebackend": "Choose one of the available backends",
                 "clientid": "Client ID",
                 "clientsecret": "Client secret",
-                "albabackend": "Backend",
-                "albapreset": "Preset",
-                "nobackends": "No backends found.",
-                "choosebackend": "Choose one of the available backends",
+                "duplicatename": "This name already exists",
+                "extendedinfo": "Extended vPool information",
+                "host": "Host (FQDN/IP):",
+                "initialstoragerouter": "Storage Router:",
                 "invalidalbainfo": "The entered connection info and credentials are invalid",
+                "invalidhost": "Invalid host (should be a FQDN or IP address)",
+                "invalidname": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
+                "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
                 "localhost": "Use local Open vStorage backends",
-                "duplicatename": "This name already exists"
+                "missing_arakoon": "Arakoon should either be installed or a DB partition role should be defined",
+                "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
+                "missing_role": "Missing required partition role: __what__",
+                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use.",
+                "name": "Name:",
+                "nobackends": "No backends found.",
+                "nocredentials": "No credentials were entered",
+                "port": "Port:",
+                "secretkey": "Secret key:"
             },
             "gathermountpoints": {
-                "atleastone": "At least 1 __what__ mountpoint location needs to be specified",
-                "basicinfo": "Enter/select the requested information. It will be shared accross all Storage Routers serving this vPool.",
-                "bfs": "Backend FS:",
-                "bfsname": "Backend FS",
-                "bfsinfo": "Backend Filesystem location which will contain all data for this vPool:",
-                "bfsnotshared": "The Backend FS mountpoint should not be shared between vPools",
-                "dtl": "DTL:",
-                "dtl_name": "DTL",
-                "invalidmtpt": "The __what__ mountpoint is invalid",
+                "basicinfo": "Enter/select the requested information.",
+                "information": "Information about the available space for:",
                 "ipaddress": "Storage IP:",
-                "mtptinfo": "Required locations:",
-                "otherinfo": "Other information:",
-                "md": "Metadata:",
-                "mdname": "Metadata",
-                "mtptinuse": "The __what__ mountpoint location is already in use on this Storage Router",
+                "mountpoint": "Mountpoint:",
+                "over_allocation": "Over allocation detected",
                 "portinuse": "The ports are already in use.",
-                "readcachename": "Read Cache",
-                "readcaches": "Read Caches:",
-                "tempfs": "Temporary FS:",
-                "tempname": "Temporary FS",
-                "uniquemtpt": "The __what__ mountpoint needs to be uniquely defined",
-                "vpoolnotallowed": "A vPool cannot be added to this Storage Router: Prerequisites not met.",
-                "writecachename": "Write Cache",
-                "writecaches": "Write Caches:"
+                "readcache_size": "Read Cache:",
+                "shared_available": "Shared between Read and Write Cache:",
+                "writecache_size": "Write Cache:"
             },
             "integratemgmtcenter": {
                 "integratemgmt": "Automatically configure the vPool on the Hypervisor.",
@@ -742,12 +742,12 @@
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
+                "cache_sizing": "Validate whether the required cache sizes and connection information are correct.",
                 "configuration": "Validate the configuration settings.",
                 "creating": "creating the vPool",
                 "dtl_location": "DTL Location:",
                 "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
                 "inprogress": "Creation of vPool __what__ is started.",
-                "mountpoints": "Validate whether mountpoints and connection information are correct.",
                 "started": "Creation started",
                 "storagerouterinfo": "Validate whether the correct Storage Router was selected.",
                 "success": "Creation of vPool __what__ finished."
@@ -774,7 +774,6 @@
                 "somefailed": "The vPool was added to or removed from some the selected Storage Routers. Some tasks failed.",
                 "allfailed": "The vPool could not be added to or removed from any of the selected Storage Routers",
                 "inuse": "The vPool is in use at this Storage Router",
-                "vpoolnotallowed": "A vPool cannot be added to this Storage Router: Prerequisites not met.",
                 "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
             }
         },
@@ -918,6 +917,25 @@
         },
         "update": {
             "title": "Update __what__"
+        },
+        "configurepartition": {
+            "title": "Configure partitions",
+            "gather": {
+                "basicinfo": "Configure the selected partition or raw disk space. Where required, a partition will be created, adding a filesystem and mounting it.",
+                "roleinfo": "Update/select the required roles for the partition. Roles in use cannot be removed. Only one DB and one SCRUB role can be assigned to any of the partitions.",
+                "roles": "Roles",
+                "device": "Device",
+                "mountpoint": "Mountpoint",
+                "filesystem": "Filesystem",
+                "size": "Size",
+                "offset": "Offset"
+            },
+            "confirm": {
+                "creating": "configuring the partition",
+                "success": "Partition configured",
+                "started": "Configuration started",
+                "inprogress": "The partition is now being configured."
+            }
         }
     },
     "footer" : {
@@ -943,7 +961,9 @@
         "add": "&#xf067;",
         "ban": "&#xf05e;",
         "cancel": "&#xf00d;",
+        "cancel_circle": "&#xf057;",
         "checked": "&#xf046;",
+        "check_circle": "&#xf058;",
         "cog": "&#xf013;",
         "collapse": "&#xf147;",
         "configuration": "&#xf013;",

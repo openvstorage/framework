@@ -18,10 +18,11 @@ MDSService module
 import time
 import random
 
-from ovs.lib.helpers.decorators import ensure_single
 from celery.schedules import crontab
 from ovs.celery_run import celery
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
+from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service as DalService
 from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.lists.servicelist import ServiceList
@@ -31,6 +32,7 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, MetadataServerClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.lib.helpers.decorators import ensure_single
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig, MDSMetaDataBackendConfig
 from volumedriver.storagerouter import storagerouterclient
@@ -55,6 +57,8 @@ class MDSServiceController(object):
         Assumes the StorageRouter and VPool are already configured with a StorageDriver and that all model-wise
         configuration regarding both is completed.
         """
+        from ovs.lib.storagedriver import StorageDriverController
+
         mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
         storagedriver = [sd for sd in vpool.storagedrivers if sd.storagerouter_guid == storagerouter.guid][0]
 
@@ -88,7 +92,26 @@ class MDSServiceController(object):
         mds_service.vpool = vpool
         mds_service.number = service_number
         mds_service.save()
-
+        scrub_partition = None
+        db_partition = None
+        for disk in storagerouter.disks:
+            for partition in disk.partitions:
+                if DiskPartition.ROLES.DB in partition.roles:
+                    db_partition = partition
+                if DiskPartition.ROLES.SCRUB in partition.roles:
+                    scrub_partition = partition
+        if scrub_partition is None or db_partition is None:
+            raise RuntimeError('Could not find DB or SCRUB partition on StorageRouter {0}'.format(storagerouter.name))
+        StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                           'role': DiskPartition.ROLES.DB,
+                                                                           'sub_role': StorageDriverPartition.SUBROLE.MDS,
+                                                                           'partition': db_partition,
+                                                                           'mds_service': mds_service})
+        StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                           'role': DiskPartition.ROLES.SCRUB,
+                                                                           'sub_role': StorageDriverPartition.SUBROLE.MDS,
+                                                                           'partition': scrub_partition,
+                                                                           'mds_service': mds_service})
         mds_nodes = []
         for service in mdsservice_type.services:
             if service.storagerouter_guid == storagerouter.guid:
@@ -96,12 +119,10 @@ class MDSServiceController(object):
                 if mds_service.vpool_guid == vpool.guid:
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md,
-                                                                               vpool.name,
-                                                                               mds_service.number),
-                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp,
-                                                                                    vpool.name,
-                                                                                    mds_service.number)})
+                                      'db_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions
+                                                       if sd_partition.role == DiskPartition.ROLES.DB and sd_partition.sub_role == StorageDriverPartition.SUBROLE.MDS][0],
+                                      'scratch_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions
+                                                            if sd_partition.role == DiskPartition.ROLES.SCRUB and sd_partition.sub_role == StorageDriverPartition.SUBROLE.MDS][0]})
 
         # Generate the correct section in the Storage Driver's configuration
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
@@ -121,10 +142,13 @@ class MDSServiceController(object):
             raise RuntimeError('Cannot remove MDSService that is still serving disks')
 
         mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
-        storagedriver = [sd for sd in vpool.storagedrivers if sd.storagerouter_guid == storagerouter.guid][0]
 
         # Clean up model
-        this_service_number = mds_service.number
+        directories_to_clean = []
+        for sd_partition in mds_service.storagedriver_partitions:
+            directories_to_clean.append(sd_partition.path)
+            sd_partition.delete()
+
         service = mds_service.service
         mds_service.delete()
         service.delete()
@@ -137,12 +161,8 @@ class MDSServiceController(object):
                 if mds_service.vpool_guid == vpool.guid:
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md,
-                                                                               vpool.name,
-                                                                               mds_service.number),
-                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp,
-                                                                                    vpool.name,
-                                                                                    mds_service.number)})
+                                      'db_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.DB][0],
+                                      'scratch_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.SCRUB][0]})
 
         # Generate the correct section in the Storage Driver's configuration
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
@@ -155,12 +175,7 @@ class MDSServiceController(object):
         cleaned = False
         while tries > 0 and cleaned is False:
             try:
-                client.dir_delete(['{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md,
-                                                            vpool.name,
-                                                            this_service_number),
-                                   '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp,
-                                                            vpool.name,
-                                                            this_service_number)])
+                client.dir_delete(directories_to_clean)
                 logger.debug('MDS files cleaned up')
                 cleaned = True
             except Exception:
@@ -445,7 +460,7 @@ class MDSServiceController(object):
     @staticmethod
     def get_mds_load(mds_service):
         """
-        Gets a 'load' for an MDS service based on its capacity and the amount of assinged VDisks
+        Gets a 'load' for an MDS service based on its capacity and the amount of assigned VDisks
         """
         service_capacity = float(mds_service.capacity)
         if service_capacity < 0:

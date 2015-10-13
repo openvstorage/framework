@@ -20,6 +20,7 @@ from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+
 import time
 
 
@@ -35,13 +36,7 @@ class StorageDriver(DataObject):
                     Property('storage_ip', str, doc='IP address on which the vpool is shared to hypervisor'),
                     Property('storagedriver_id', str, doc='ID of the Storage Driver as known by the Storage Drivers.'),
                     Property('mountpoint', str, doc='Mountpoint from which the Storage Driver serves data'),
-                    Property('mountpoint_temp', str, doc='Mountpoint for temporary workload (scrubbing etc)'),
-                    Property('mountpoint_bfs', str, mandatory=False, doc='Mountpoint for backend filesystem (local or distributed fs)'),
-                    Property('mountpoint_md', str, doc='Mountpoint for metadata'),
-                    Property('mountpoint_fragmentcache', str, doc='Mountpoint for fragment cache'),
-                    Property('mountpoint_readcaches', list, doc='Read cache mountpoints'),
-                    Property('mountpoint_writecaches', list, doc='Write cache mountpoints'),
-                    Property('mountpoint_dtl', str, doc='Mountpoint for DTL cache'),
+                    Property('mountpoint_dfs', str, mandatory=False, doc='Location of the backend in case of a distributed FS'),
                     Property('startup_counter', int, default=0, doc='StorageDriver startup counter')]
     __relations = [Relation('vpool', VPool, 'storagedrivers'),
                    Relation('storagerouter', StorageRouter, 'storagedrivers')]

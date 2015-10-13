@@ -206,12 +206,6 @@ class OVSPluginTestCase(test.TestCase):
         parameters = {'storagerouter_ip': IP,
                       'vpool_name': VPOOL_NAME,
                       'type': 'local',
-                      'mountpoint_bfs': VPOOL_BFS,
-                      'mountpoint_temp': VPOOL_TEMP,
-                      'mountpoint_md': VPOOL_MD,
-                      'mountpoint_readcaches': [VPOOL_READCACHE],
-                      'mountpoint_writecaches': [VPOOL_WRITECACHE],
-                      'mountpoint_dtl': VPOOL_DTL,
                       'storage_ip': '127.0.0.1',  # KVM
                       'vrouter_port': VPOOL_PORT,
                       'integrate_vpool': True,
@@ -220,6 +214,8 @@ class OVSPluginTestCase(test.TestCase):
                       'connection_username': '',
                       'connection_password': '',
                       'connection_backend': {},
+                      'readcache_size': 50,
+                      'writecache_size': 50
                       }
         StorageRouterController.add_vpool(parameters)
         attempt = 0
