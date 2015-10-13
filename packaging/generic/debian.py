@@ -101,13 +101,39 @@ class DebianPackager(object):
 
         package_name = settings.get('packaging', 'package_name')
         package_path = SourceCollector.package_path.format(settings.get('packaging', 'working_dir'), package_name)
+        releasename = settings.get('version', 'releasename').lower()
+        target, version_string, _ = source_metadata
 
-        version_string = source_metadata[1]
-        new_package = version_string not in SourceCollector.run(command='ssh ovs-apt@packages.cloudfounders.com "grep \'{0}_{1}-1_amd64\' /data/www/apt/*/Packages" || true'.format(package_name,
-                                                                                                                                                                                    version_string),
-                                                                working_directory=package_path)
-        print 'Uploading {0} package: {1}'.format('new' if new_package else 'existing', '{0}_{1}-1_amd64'.format(package_name, version_string))
-        SourceCollector.run(command='dput -c {0}/debian/dput.cfg ovs-apt {0}/debian/{1}_{2}-1_amd64.changes'.format(package_path, package_name, version_string),
-                            working_directory=package_path)
-        SourceCollector.run(command='ssh ovs-apt@packages.cloudfounders.com "mini-dinstall -b{0}"'.format('' if new_package else ' --no-db'),
-                            working_directory=package_path)
+        user = "upload"
+        server = "172.20.3.16"
+        repo_root_path = "/usr/share/repo"
+        upload_path = os.path.join(repo_root_path, target, releasename)
+
+        print("Uploading {0} {1}".format(package_name, version_string))
+        debs_path = os.path.join(package_path, 'debian')
+        deb_packages = [filename for filename in os.listdir(debs_path) if filename.endswith('.deb')]
+
+        create_releasename_command = "ssh {0}@{1} mkdir -p {2}".format(user, server, upload_path)
+        SourceCollector.run(command=create_releasename_command,
+                            working_directory=debs_path)
+
+        for deb_package in deb_packages:
+            source_path = os.path.join(debs_path, deb_package)
+            destination_path = os.path.join(upload_path, deb_package)
+
+            check_package_command = "ssh {0}@{1} ls {2}".format(user, server, upload_path)
+            existing_packages = SourceCollector.run(command=check_package_command,
+                                                    working_directory=debs_path).split()
+            upload = True
+            for package in existing_packages:
+                if package == deb_package:
+                    print("Package already uploaded, done...")
+                    upload = False
+                    continue
+            if upload:
+                scp_command = "scp {0} {1}@{2}:{3}".format(source_path, user, server, destination_path)
+                SourceCollector.run(command=scp_command,
+                                    working_directory=debs_path)
+                remote_command = "ssh {0}@{1} reprepro -Vb {2}/debian includedeb {3}-{4} {5}".format(user, server, repo_root_path, releasename, target, destination_path)
+                SourceCollector.run(command=remote_command,
+                                    working_directory=debs_path)
