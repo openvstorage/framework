@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <section>
-    <h2><span data-i18n="ovs:about.product"></span> <span data-bind="text: version"></span></h2>
+    <h2><span data-i18n="ovs:about.product"></span> <span data-i18n="ovs:releasename"></span></h2>
     <p>&nbsp;</p>
     <div class="row">
         <div class="col-md-12">
@@ -34,8 +34,28 @@ limitations under the License.
                                     <span data-bind="text: versions().openvstorage"></span>
                                 </li>
                                 <li>
-                                    <span data-i18n="ovs:about.volumedriver"></span>
+                                    <span data-i18n="ovs:about.openvstoragebackend"></span>
+                                    <span data-bind="text: versions()['openvstorage-backend']"></span>
+                                </li>
+                                <li>
+                                    <span data-i18n="ovs:about.openvstoragesdm"></span>
+                                    <span data-bind="text: versions()['openvstorage-sdm']"></span>
+                                </li>
+                                <li>
+                                    <span data-i18n="ovs:about.volumedriverbase"></span>
                                     <span data-bind="text: versions()['volumedriver-base']"></span>
+                                </li>
+                                <li>
+                                    <span data-i18n="ovs:about.volumedriverserver"></span>
+                                    <span data-bind="text: versions()['volumedriver-server']"></span>
+                                </li>
+                                <li>
+                                    <span data-i18n="ovs:about.alba"></span>
+                                    <span data-bind="text: versions().alba"></span>
+                                </li>
+                                <li>
+                                    <span data-i18n="ovs:about.arakoon"></span>
+                                    <span data-bind="text: versions().arakoon"></span>
                                 </li>
                             </ul>
                         </li>

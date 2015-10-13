@@ -29,7 +29,9 @@ class DebianPackage(object):
     Contains all logic related to Debian packages (used in e.g. Debian, Ubuntu)
     """
 
-    OVS_PACKAGE_NAMES = ['openvstorage', 'openvstorage-backend', 'volumedriver-server', 'volumedriver-base', 'alba', 'openvstorage-sdm']
+    OVS_PACKAGE_NAMES = ['openvstorage', 'openvstorage-core', 'openvstorage-webapps', 'openvstorage-sdm',
+                         'openvstorage-backend', 'openvstorage-backend-core', 'openvstorage-backend-webapps',
+                         'volumedriver-server', 'volumedriver-base', 'alba', 'alba-asdmanager', 'arakoon']
     APT_CONFIG_STRING = '-o Dir::Etc::sourcelist="sources.list.d/ovsaptrepo.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"'
 
     @staticmethod

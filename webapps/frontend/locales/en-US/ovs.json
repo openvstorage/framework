@@ -1,4 +1,5 @@
 {
+    "releasename": "Chicago",
     "license": [
         "Copyright 2014 Open vStorage NV",
         "",
@@ -474,7 +475,14 @@
         "openvstorage": "Open vStorage:",
         "openvstoragecore": "Open vStorage - Core:",
         "openvstoragewebapps": "Open vStorage - Webapps:",
-        "volumedriver": "Storage Driver:"
+        "openvstoragebackend": "Open vStorage - Backend:",
+        "openvstoragebackendcore": "Open vStorage - Backend - Core:",
+        "openvstoragebackendwebapps": "Open vStorage - Backend - Webapps:",
+        "openvstoragesdm": "Open vStorage - SDM:",
+        "volumedriverbase": "Storage Driver - Base:",
+        "volumedriverserver": "Storage Driver - Server:",
+        "alba": "Alba:",
+        "arakoon": "Arakoon"
     },
     "pmachines": {
         "title": "Hypervisor Mgmt.",
