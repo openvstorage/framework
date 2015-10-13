@@ -1423,19 +1423,31 @@ EOF
 
         # Sometimes/At random the rabbitmq server takes longer than 5 seconds to start,
         #  and the next command fails so the best solution is to retry several times
+        #Also retry the add_user/set_permissions, and validate the result
+        retry = 0
+        while retry < 10:
+            users = Toolbox.retry_client_run(client,
+                                             'rabbitmqctl list_users',
+                                             logger=logger).splitlines()[1:-1]
+            users = [usr.split('\t')[0] for usr in users]
+            logger.debug('Rabbitmq users {0}'.format(users))
+            if 'ovs' in users:
+                logger.debug('User ovs configured in rabbitmq')
+                break
+            else:
+                logger.debug(Toolbox.retry_client_run(client,
+                                                      'rabbitmqctl add_user {0} {1}'.format(rabbitmq_login, rabbitmq_password),
+                                                      logger=logger))
+                logger.debug(Toolbox.retry_client_run(client,
+                                                      'rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(rabbitmq_login),
+                                                      logger=logger))
+                retry += 1
+                time.sleep(1)
         users = Toolbox.retry_client_run(client,
                                          'rabbitmqctl list_users',
                                          logger=logger).splitlines()[1:-1]
         users = [usr.split('\t')[0] for usr in users]
-
-        if 'ovs' not in users:
-            Toolbox.retry_client_run(client,
-                                     'rabbitmqctl add_user {0} {1}'.format(rabbitmq_login, rabbitmq_password),
-                                     logger=logger)
-            Toolbox.retry_client_run(client,
-                                     'rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(rabbitmq_login),
-                                     logger=logger)
-
+        logger.debug('Rabbitmq users {0}'.format(users))
         client.run('rabbitmqctl stop; sleep 5;')
 
     @staticmethod
