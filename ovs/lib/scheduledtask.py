@@ -16,26 +16,28 @@
 ScheduledTaskController module
 """
 
-from celery.schedules import crontab
 import copy
 import time
 import os
 import traceback
-from time import mktime
+from celery.schedules import crontab
 from datetime import datetime, timedelta
-from ovs.extensions.generic.configuration import Configuration
 from ovs.celery_run import celery
-from ovs.lib.vmachine import VMachineController
-from ovs.lib.vdisk import VDiskController
-from ovs.lib.mdsservice import MDSServiceController
-from ovs.lib.helpers.decorators import ensure_single
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
+from ovs.lib.vmachine import VMachineController
+from ovs.lib.vdisk import VDiskController
+from ovs.lib.mdsservice import MDSServiceController
+from ovs.lib.helpers.decorators import ensure_single
+from ovs.log.logHandler import LogHandler
+from time import mktime
 from volumedriver.storagerouter.storagerouterclient import Scrubber
 from volumedriver.storagerouter import storagerouterclient
-from ovs.log.logHandler import LogHandler
 
 _storagedriver_scrubber = Scrubber()
 logger = LogHandler.get('lib', name='scheduled tasks')
@@ -69,9 +71,7 @@ class ScheduledTaskController(object):
                 success.append(machine.guid)
             except:
                 fail.append(machine.guid)
-        logger.info('[SSA] {0} vMachines were snapshotted, {1} failed.'.format(
-            len(success), len(fail)
-        ))
+        logger.info('[SSA] {0} vMachines were snapshotted, {1} failed.'.format(len(success), len(fail)))
 
     @staticmethod
     @celery.task(name='ovs.scheduled.deletescrubsnapshots', bind=True, schedule=crontab(minute='0', hour='2'))
@@ -200,6 +200,14 @@ class ScheduledTaskController(object):
         failed = 0
         skipped = 0
         storagedrivers = {}
+        scrub_location = None
+        storagerouter = System.get_my_storagerouter()
+        for disk in storagerouter.disks:
+            for partition in disk.partiitons:
+                if DiskPartition.ROLES.SCRUB in partition.roles:
+                    scrub_location = partition.folder
+        if scrub_location is None:
+            raise RuntimeError('No scrub location on StorageRouter {0}'.format(storagerouter.name))
         for vdisk in vdisks:
             try:
                 total += 1
@@ -223,23 +231,17 @@ class ScheduledTaskController(object):
                         raise RuntimeError('Could not load MDS configuration')
                     if configs[0]['ip'] != storagedriver.storagerouter.ip:
                         skipped += 1
-                        logger.info('Skipping scrubbing work unit for volume {0}: MDS master is not local'.format(
-                            vdisk.volume_id
-                        ))
+                        logger.info('Skipping scrubbing work unit for volume {0}: MDS master is not local'.format(vdisk.volume_id))
                         continue
                 work_units = vdisk.storagedriver_client.get_scrubbing_workunits(str(vdisk.volume_id))
                 for work_unit in work_units:
-                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, str(storagedriver.mountpoint_temp))
+                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, str(scrub_location))
                     vdisk.storagedriver_client.apply_scrubbing_result(scrubbing_result)
             except Exception, ex:
                 failed += 1
-                logger.info('Failed scrubbing work unit for volume {0}: {1}'.format(
-                    vdisk.volume_id, ex
-                ))
+                logger.info('Failed scrubbing work unit for volume {0}: {1}'.format(vdisk.volume_id, ex))
 
-        logger.info('Scrubbing finished. {0} volumes: {1} success, {2} failed, {3} skipped.'.format(
-            total, (total - failed - skipped), failed, skipped
-        ))
+        logger.info('Scrubbing finished. {0} volumes: {1} success, {2} failed, {3} skipped.'.format(total, (total - failed - skipped), failed, skipped))
 
     @staticmethod
     @celery.task(name='ovs.scheduled.collapse_arakoon', bind=True, schedule=crontab(minute='30', hour='0'))
@@ -257,9 +259,8 @@ class ScheduledTaskController(object):
                 try:
                     cluster_instance.remoteCollapse(node, 2)  # Keep 2 tlogs
                 except Exception as e:
-                    logger.info(
-                        'Error during collapsing cluster {} node {}: {}\n{}'.format(
-                            cluster, node, str(e), traceback.format_exc()
-                        )
-                    )
+                    logger.info('Error during collapsing cluster {} node {}: {}\n{}'.format(cluster,
+                                                                                            node,
+                                                                                            str(e),
+                                                                                            traceback.format_exc()))
         logger.info('Arakoon collapse finished')

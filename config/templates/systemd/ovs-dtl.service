@@ -1,0 +1,14 @@
+[Unit]
+Description=ovs dtl
+Requires=ovs-watcher-volumedriver.service
+After=ovs-watcher-volumedriver.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/failovercachehelper --config-file=/opt/OpenvStorage/config/storagedriver/storagedriver/<VPOOL_NAME>.json --logrotation --logfile=/var/log/ovs/volumedriver/dtl_<VPOOL_NAME>.log
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

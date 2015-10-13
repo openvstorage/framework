@@ -62,6 +62,27 @@ class Configuration(object):
             config_file.write(contents)
 
     @staticmethod
+    def delete(key, remove_root=False):
+        filename, path = key.split('.', 1)
+        with open(Configuration.FILE.format(filename), 'r') as config_file:
+            config = json.loads(config_file.read())
+            temp_config = config
+            entries = path.split('.')
+            if len(entries) > 1:
+                for entry in entries[:-1]:
+                    if entry in temp_config:
+                        temp_config = temp_config[entry]
+                    else:
+                        temp_config[entry] = {}
+                        temp_config = temp_config[entry]
+                del temp_config[entries[-1]]
+            if len(entries) == 1 and remove_root is True:
+                del config[entries[0]]
+        contents = json.dumps(config, indent=4)
+        with open(Configuration.FILE.format(filename), 'w') as config_file:
+            config_file.write(contents)
+
+    @staticmethod
     def exists(key):
         try:
             _ = Configuration.get(key)

@@ -17,16 +17,16 @@ StorageRouter module
 """
 
 import json
-from rest_framework import status, viewsets
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action, link
-from rest_framework.exceptions import NotAcceptable
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.storagedriver import StorageDriverController
+from ovs.lib.disk import DiskController
 from backend.decorators import required_roles, return_list, return_object, return_task, return_plain, load, log
 
 
@@ -96,12 +96,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
-    def get_physical_metadata(self, storagerouter, files=None):
+    def get_metadata(self, storagerouter):
         """
         Returns a list of mountpoints on the given Storage Router
         """
-        files = [] if files is None else files.strip().split(',')
-        return StorageRouterController.get_physical_metadata.s(files, storagerouter.guid).apply_async(
+        return StorageRouterController.get_metadata.s(storagerouter.guid).apply_async(
             routing_key='sr.{0}'.format(storagerouter.machine_id)
         )
 
@@ -262,3 +261,27 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Initiate a task on 1 storagerouter to update the volumedriver on ALL storagerouters
         """
         return StorageRouterController.update_volumedriver.delay(storagerouter.ip)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def configure_disk(self, storagerouter, disk_guid, offset, size, roles, partition_guid=None):
+        """
+        Configures a disk on a StorageRouter
+        """
+        return StorageRouterController.configure_disk.s(
+            storagerouter.guid, disk_guid, partition_guid, offset, size, roles
+        ).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def rescan_disks(self, storagerouter):
+        """
+        Triggers a disk sync on the given storagerouter
+        """
+        return DiskController.sync_with_reality.delay(storagerouter.guid)

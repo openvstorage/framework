@@ -113,12 +113,6 @@ class VPoolViewSet(viewsets.ViewSet):
                       'connection_port': None if vpool.connection is None else int(vpool.connection.split(':')[1]),
                       'connection_username': vpool.login,
                       'connection_password': vpool.password,
-                      'mountpoint_bfs': storagedriver.mountpoint_bfs,
-                      'mountpoint_temp': storagedriver.mountpoint_temp,
-                      'mountpoint_md': storagedriver.mountpoint_md,
-                      'mountpoint_readcaches': storagedriver.mountpoint_readcaches,
-                      'mountpoint_writecaches': storagedriver.mountpoint_writecaches,
-                      'mountpoint_foc': storagedriver.mountpoint_foc,
                       'storage_ip': storagedriver.storage_ip,
                       'type': vpool.backend_type.code,
                       'vpool_name': vpool.name}

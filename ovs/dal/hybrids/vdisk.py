@@ -39,8 +39,7 @@ class VDisk(DataObject):
                     Property('order', int, mandatory=False, doc='Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
                     Property('volume_id', str, mandatory=False, doc='ID of the vDisk in the Open vStorage Volume Driver.'),
                     Property('parentsnapshot', str, mandatory=False, doc='Points to a parent storage driver parent ID. None if there is no parent Snapshot'),
-                    Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder'),
-                    Property('configuration', dict, default=dict(), doc='Hypervisor/volumedriver specific configurations')]
+                    Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder')]
     __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
                    Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
@@ -48,8 +47,7 @@ class VDisk(DataObject):
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('storagedriver_id', str, 60),
-                  Dynamic('storagerouter_guid', str, 15),
-                  Dynamic('resolved_configuration', dict, 300, locked=True)]
+                  Dynamic('storagerouter_guid', str, 15)]
 
     def __init__(self, *args, **kwargs):
         """
@@ -94,9 +92,9 @@ class VDisk(DataObject):
             try:
                 vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id))
             except:
-                vdiskinfo = StorageDriverClient.empty_info()
+                vdiskinfo = StorageDriverClient.EMPTY_INFO()
         else:
-            vdiskinfo = StorageDriverClient.empty_info()
+            vdiskinfo = StorageDriverClient.EMPTY_INFO()
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
@@ -120,7 +118,7 @@ class VDisk(DataObject):
         Fetches the Statistics for the vDisk.
         """
         statistics = {}
-        for key in StorageDriverClient.stat_keys:
+        for key in StorageDriverClient.STAT_KEYS:
             statistics[key] = 0
             statistics['{0}_ps'.format(key)] = 0
         for key, value in self.fetch_statistics().iteritems():
@@ -153,20 +151,6 @@ class VDisk(DataObject):
             return storagedrivers[0].storagerouter_guid
         return None
 
-    def _resolved_configuration(self):
-        """
-        Returns resolved configuration for this vDisk, falling back to the vMachine and vPool
-        """
-        configuration = {}
-        keys = ['cache_strategy', 'dedupe_mode', 'dtl_enabled', 'dtl_mode', 'sco_size', 'write_buffer']
-        self.invalidate_cached_objects()
-        for key in keys:
-            if key in self.configuration:
-                configuration[key] = self.configuration[key]
-            elif self.vmachine is not None and key in self.vmachine.configuration:
-                configuration[key] = self.vmachine.configuration[key]
-        return configuration
-
     def reload_client(self):
         """
         Reloads the StorageDriver Client
@@ -186,11 +170,11 @@ class VDisk(DataObject):
                 vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id))
                 vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id))
             except:
-                vdiskstats = StorageDriverClient.empty_statistics()
-                vdiskinfo = StorageDriverClient.empty_info()
+                vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
+                vdiskinfo = StorageDriverClient.EMPTY_INFO()
         else:
-            vdiskstats = StorageDriverClient.empty_statistics()
-            vdiskinfo = StorageDriverClient.empty_info()
+            vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
+            vdiskinfo = StorageDriverClient.EMPTY_INFO()
         # Load volumedriver data in dictionary
         vdiskstatsdict = {}
         try:
@@ -213,7 +197,7 @@ class VDisk(DataObject):
             vdiskstatsdict['4k_read_operations'] = vdiskstatsdict['data_read'] / block_size
             vdiskstatsdict['4k_write_operations'] = vdiskstatsdict['data_written'] / block_size
             # Pre-calculate sums
-            for key, items in StorageDriverClient.stat_sums.iteritems():
+            for key, items in StorageDriverClient.STAT_SUMS.iteritems():
                 vdiskstatsdict[key] = 0
                 for item in items:
                     vdiskstatsdict[key] += vdiskstatsdict[item]
@@ -230,7 +214,7 @@ class VDisk(DataObject):
         prev_key = '{0}_{1}'.format(key, 'statistics_previous')
         previous_stats = volatile.get(prev_key, default={})
         for key in current_stats.keys():
-            if key in StorageDriverClient.stat_keys:
+            if key in StorageDriverClient.STAT_KEYS:
                 delta = current_stats['timestamp'] - previous_stats.get('timestamp', current_stats['timestamp'])
                 if delta < 0:
                     current_stats['{0}_ps'.format(key)] = 0

@@ -13,10 +13,11 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'knockout',
+    'jquery', 'knockout', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver'
-], function($, ko, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver) {
+    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver',
+    '../wizards/configurepartition/index'
+], function($, ko, dialog, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver, ConfigurePartitionWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -59,6 +60,11 @@ define([
                                 self.pMachineCache[pMachineGuid] = pm;
                             }
                             storageRouter.pMachine(self.pMachineCache[pMachineGuid]);
+                        } else if (pMachineGuid && storageRouter.pMachine() !== undefined && storageRouter.pMachine().loaded() === false) {
+                            if (!self.pMachineCache.hasOwnProperty(storageRouter.pMachine().guid())) {
+                                self.pMachineCache[storageRouter.pMachine().guid()] = storageRouter.pMachine();
+                            }
+                            storageRouter.pMachine().load();
                         }
                         // Move child guids to the observables for easy display
                         storageRouter.vPools(storageRouter.vPoolGuids);
@@ -124,6 +130,28 @@ define([
                 });
                 deferred.resolve();
             }).promise();
+        };
+        self.isEmpty = generic.isEmpty;
+        self.configureRoles = function(partition, disk) {
+            if (self.shared.user.roles().contains('manage')) {
+                dialog.show(new ConfigurePartitionWizard({
+                    modal: true,
+                    partition: partition,
+                    disk: disk,
+                    storageRouter: self.storageRouter()
+                }));
+            }
+        };
+        self.rescanDisks = function() {
+            api.post('storagerouters/' + self.storageRouter().guid() + '/rescan_disks')
+                    .then(shared.tasks.wait)
+                    .done(function() {
+                        generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:storagerouters.detail.disks.rescan.success'));
+                    })
+                    .fail(function() {
+                        generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:storagerouters.detail.disks.rescan.scanning') }));
+                    });
+            generic.alertInfo($.t('ovs:storagerouters.detail.disks.rescan.started'), $.t('ovs:storagerouters.detail.disks.rescan.inprogress'));
         };
 
         // Durandal

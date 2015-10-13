@@ -56,7 +56,7 @@ define([
         self.backendWritten   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendRead      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.bandwidthSaved   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.failoverMode     = ko.observable();
+        self.dtlMode          = ko.observable();
         self.vDisks           = ko.observableArray([]);
         self.availableActions = ko.observableArray([]);
         self.downloadLogState = ko.observable($.t('ovs:support.downloadlogs'));
@@ -188,7 +188,7 @@ define([
             generic.trySet(self.ipAddress, data, 'ip');
             generic.trySet(self.machineId, data, 'machineid');
             generic.trySet(self.status, data, 'status', generic.lower);
-            generic.trySet(self.failoverMode, data, 'failover_mode', generic.lower);
+            generic.trySet(self.dtlMode, data, 'dtl_mode', generic.lower);
             generic.trySet(self.nodeType, data, 'node_type');
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids = data.vpools_guids;

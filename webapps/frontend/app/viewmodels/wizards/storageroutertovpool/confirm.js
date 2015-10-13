@@ -30,7 +30,7 @@ define([
         self.storageDriver = ko.observable();
 
         // Objects
-        self.RemoveValidation = function(storageDriverGuid) {
+        self.removeValidation = function(storageDriverGuid) {
             var self = this;
 
             // Variables
@@ -67,7 +67,7 @@ define([
                     });
             };
         };
-        self.AddValidation = function(storageDriver, storageRouter, storageDriverDeferred, data) {
+        self.addValidation = function(storageDriver, storageRouter, storageDriverDeferred, data) {
             var self = this;
 
             // Variables
@@ -79,12 +79,9 @@ define([
 
             // Observables
             self.loaded         = ko.observable(false);
-            self.allowVPool     = ko.observable(true);
             self.mtptOK         = ko.observable(true);
             self.storageDrivers = ko.observableArray([]);
             self.mountpoints    = ko.observableArray([]);
-            self.readcaches     = ko.observableArray([]);
-            self.writecaches    = ko.observableArray([]);
             self.ipAddresses    = ko.observableArray([]);
 
             // Computed
@@ -97,67 +94,6 @@ define([
                     reasons.push($.t('ovs:wizards.storageroutertovpool.confirm.errorvalidating'));
                 } else {
                     $.each(self.storageDrivers(), function(index, storageDriver) {
-                        var storagedriver_mountpoints = [];
-                        if (storageDriver.mountpointBFS() !== undefined) {
-                            storagedriver_mountpoints.push(storageDriver.mountpointBFS());
-                        }
-                        if (storageDriver.mountpointMD() !== undefined) {
-                            storagedriver_mountpoints.push(storageDriver.mountpointMD());
-                        }
-                        if (storageDriver.mountpointFOC() !== undefined) {
-                            storagedriver_mountpoints.push(storageDriver.mountpointFOC());
-                        }
-                        if (storageDriver.mountpointTemp() !== undefined) {
-                            storagedriver_mountpoints.push(storageDriver.mountpointTemp());
-                        }
-                        if (storageDriver.mountpointReadCaches() !== undefined) {
-                            $.each(storageDriver.mountpointReadCaches(), function (i, e) {
-                                storagedriver_mountpoints.push(e.substring(0, e.lastIndexOf('/')));
-                            });
-                        }
-                        if (storageDriver.mountpointWriteCaches() !== undefined) {
-                            $.each(storageDriver.mountpointWriteCaches(), function (i, e) {
-                                storagedriver_mountpoints.push(e.substring(0, e.lastIndexOf('/')));
-                            });
-                        }
-                        if (storagedriver_mountpoints.contains(self.storageDriver().mountpointBFS()) && !fields.contains('bfs') && (self.data.vPool().backendType() === 'local' || self.data.vPool().backendType() === 'distributed')) {
-                            valid = false;
-                            fields.push('bfs');
-                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', {what: $.t('ovs:generic.bfs')}));
-                        }
-                        if (storagedriver_mountpoints.contains(self.storageDriver().mountpointMD()) && !fields.contains('md')) {
-                            valid = false;
-                            fields.push('md');
-                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', {what: $.t('ovs:generic.mdfs')}));
-                        }
-                        if (storagedriver_mountpoints.contains(self.storageDriver().mountpointTemp()) && !fields.contains('temp')) {
-                            valid = false;
-                            fields.push('temp');
-                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', {what: $.t('ovs:generic.tempfs')}));
-                        }
-                        if (storagedriver_mountpoints.contains(self.storageDriver().mountpointFOC()) && !fields.contains('foc')) {
-                            valid = false;
-                            fields.push('foc');
-                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', {what: $.t('ovs:generic.foc')}));
-                        }
-                        if (self.storageDriver().mountpointReadCaches() !== undefined) {
-                            $.each(self.storageDriver().mountpointReadCaches(), function (i, e) {
-                                if (storagedriver_mountpoints.contains(e) && !fields.contains('readcache')) {
-                                    valid = false;
-                                    fields.push('readcache');
-                                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', {what: $.t('ovs:generic.cachefs')}));
-                                }
-                            });
-                        }
-                        if (self.storageDriver().mountpointWriteCaches() !== undefined) {
-                            $.each(self.storageDriver().mountpointWriteCaches(), function (i, e) {
-                                if (storagedriver_mountpoints.contains(e) && !fields.contains('writecache')) {
-                                    valid = false;
-                                    fields.push('writecache');
-                                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', {what: $.t('ovs:generic.cachefs')}));
-                                }
-                            });
-                        }
                         if (generic.overlap(self.storageDriver().ports(), storageDriver.ports()) && !fields.contains('port')) {
                             valid = false;
                             fields.push('port');
@@ -169,11 +105,6 @@ define([
                         valid = false;
                         fields.push('ip');
                         reasons.push($.t('ovs:wizards.storageroutertovpool.confirm.ipnotavailable', { what: self.storageDriver().storageIP() }));
-                    }
-                    if (!self.allowVPool() && !fields.contains('vpool')) {
-                        valid = false;
-                        fields.push('vpool');
-                        reasons.push($.t('ovs:wizards.storageroutertovpool.confirm.vpoolnotallowed'));
                     }
                     if (!self.mtptOK()) {
                         valid = false;
@@ -188,14 +119,11 @@ define([
             self.validate = function() {
                 var calls = [
                     $.Deferred(function(physicalDeferred) {
-                        api.post('storagerouters/' + self.storageRouter.guid() + '/get_physical_metadata')
+                        api.post('storagerouters/' + self.storageRouter.guid() + '/get_metadata')
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.mountpoints(data.mountpoints);
-                                self.readcaches(data.readcaches);
-                                self.writecaches(data.writecaches);
                                 self.ipAddresses(data.ipaddresses);
-                                self.allowVPool(data.allow_vpool);
                             })
                             .done(physicalDeferred.resolve)
                             .fail(physicalDeferred.reject);
@@ -248,7 +176,7 @@ define([
         self.addValidations = ko.computed(function() {
             $.each(self.data.pendingStorageRouters(), function(index, storageRouter) {
                 if (!self._addValidations.hasOwnProperty(storageRouter.guid())) {
-                    self._addValidations[storageRouter.guid()] = new self.AddValidation(self.storageDriver, storageRouter, self.storageDriverLoading, self.data);
+                    self._addValidations[storageRouter.guid()] = new self.addValidation(self.storageDriver, storageRouter, self.storageDriverLoading, self.data);
                     self._addValidations[storageRouter.guid()].validate();
                 }
             });
@@ -267,7 +195,7 @@ define([
                     });
                 });
                 if (foundStorageDriverGuid !== undefined && !self._removeValidations.hasOwnProperty(storageRouter.guid())) {
-                    self._removeValidations[storageRouter.guid()] = new self.RemoveValidation(foundStorageDriverGuid);
+                    self._removeValidations[storageRouter.guid()] = new self.removeValidation(foundStorageDriverGuid);
                     self._removeValidations[storageRouter.guid()].validate();
                 }
             });

@@ -32,11 +32,12 @@ define([
         self.filesystem        = ko.observable();
         self.state             = ko.observable();
         self.inode             = ko.observable();
-        self.offset            = ko.observable();
-        self.size              = ko.observable();
+        self.offset            = ko.observable().extend({ format: generic.formatBytes });
+        self.size              = ko.observable().extend({ format: generic.formatBytes });
         self.mountpoint        = ko.observable();
         self.path              = ko.observable();
         self.usage             = ko.observable();
+        self.roles             = ko.observableArray([]);
 
         // Functions
         self.fillData = function(data) {
@@ -48,7 +49,8 @@ define([
             self.size(data.size);
             self.mountpoint(data.mountpoint);
             self.path(data.path);
-            self.usage(data.usage);
+            self.usage(generic.tryGet(data, 'usage', undefined));
+            self.roles(data.roles);
 
             self.loaded(true);
             self.loading(false);

@@ -32,14 +32,14 @@ define([
         self.storageRouterCache = {};
         self.pMachineCache      = {};
         self.vDiskHeaders       = [
-            { key: 'name',         value: $.t('ovs:generic.name'),         width: undefined },
-            { key: 'size',         value: $.t('ovs:generic.size'),         width: 100       },
-            { key: 'storedData',   value: $.t('ovs:generic.storeddata'),   width: 110       },
-            { key: 'cacheRatio',   value: $.t('ovs:generic.cache'),        width: 100       },
-            { key: 'iops',         value: $.t('ovs:generic.iops'),         width: 55        },
-            { key: 'readSpeed',    value: $.t('ovs:generic.read'),         width: 100       },
-            { key: 'writeSpeed',   value: $.t('ovs:generic.write'),        width: 100       },
-            { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),    width: 50        }
+            { key: 'name',       value: $.t('ovs:generic.name'),         width: undefined },
+            { key: 'size',       value: $.t('ovs:generic.size'),         width: 100       },
+            { key: 'storedData', value: $.t('ovs:generic.storeddata'),   width: 110       },
+            { key: 'cacheRatio', value: $.t('ovs:generic.cache'),        width: 100       },
+            { key: 'iops',       value: $.t('ovs:generic.iops'),         width: 55        },
+            { key: 'readSpeed',  value: $.t('ovs:generic.read'),         width: 100       },
+            { key: 'writeSpeed', value: $.t('ovs:generic.write'),        width: 100       },
+            { key: 'dtlMode',    value: $.t('ovs:generic.dtl_status'),   width: 50        }
         ];
         self.snapshotHeaders    = [
             { key: 'label',         value: $.t('ovs:generic.description'), width: undefined },
@@ -55,7 +55,6 @@ define([
         // Observables
         self.snapshotsInitialLoad = ko.observable(true);
         self.vMachine             = ko.observable();
-        self.dtlLocation          = ko.observable();
 
         // Functions
         self.load = function() {
@@ -186,30 +185,6 @@ define([
                             }
                         });
                 }
-            }
-        };
-        self.saveConfiguration = function() {
-            if (self.vMachine() !== undefined) {
-                var vm = self.vMachine();
-                api.post('vmachines/' + vm.guid() + '/set_config_params', {
-                    data: { config_params: vm.newConfiguration() }
-                })
-                    .then(self.shared.tasks.wait)
-                    .done(function () {
-                        generic.alertSuccess(
-                            $.t('ovs:vmachines.saveconfig.done'),
-                            $.t('ovs:vmachines.saveconfig.donemsg', { what: vm.name() })
-                        );
-                    })
-                    .fail(function (error) {
-                        generic.alertError(
-                            $.t('ovs:generic.error'),
-                            $.t('ovs:generic.messages.errorwhile_error', {
-                                what: $.t('ovs:vmachines.saveconfig.errormsg', { what: vm.name() }),
-                                error: error
-                            })
-                        );
-                    });
             }
         };
 

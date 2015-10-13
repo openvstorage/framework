@@ -304,6 +304,14 @@ print json.dumps(os.path.isdir('{0}'))""".format(self._shell_safe(directory))
                 recursive_str = '-R' if recursive is True else ''
                 self.run('chown {0} {1}:{2} {3}'.format(recursive_str, user, group, directory))
 
+    def symlink(self, links):
+        if self.is_local is True:
+            for link_name, source in links.iteritems():
+                os.symlink(source, link_name)
+        else:
+            for link_name, source in links.iteritems():
+                self.run('ln -s {0} {1}'.format(self._shell_safe(source), self._shell_safe(link_name)))
+
     def file_create(self, filenames):
         if isinstance(filenames, basestring):
             filenames = [filenames]
@@ -313,6 +321,8 @@ print json.dumps(os.path.isdir('{0}'))""".format(self._shell_safe(directory))
 
             filename = self._shell_safe(filename)
             if self.is_local is True:
+                if not self.dir_exists(directory=os.path.dirname(filename)):
+                    self.dir_create(os.path.dirname(filename))
                 if not os.path.exists(filename):
                     open(filename, 'a').close()
             else:

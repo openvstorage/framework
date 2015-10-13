@@ -19,15 +19,11 @@ Module for SetupController
 import os
 import re
 import sys
-import copy
 import json
 import time
-import glob
 import base64
 import urllib2
 import subprocess
-from string import digits
-from pyudev import Context
 from paramiko import AuthenticationException
 
 from ConfigParser import RawConfigParser
@@ -46,15 +42,10 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.os.os import OSManager
 from ovs.extensions.generic.filemutex import FileMutex
 
 logger = LogHandler.get('lib', name='setup')
 logger.logger.propagate = False
-
-# @TODO: Make the setup_node re-entrant
-# @TODO: Make it possible to run as a non-privileged user
-# @TODO: Node password identical for all nodes
 
 
 class SetupController(object):
@@ -62,22 +53,14 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
-    ARAKOON_OVSDB = 'arakoon-ovsdb'
-    ARAKOON_VOLDRV = 'arakoon-voldrv'
-    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1', 'type': 'storage', 'ssd': False}
-
-    # Arakoon
-    arakoon_clusters = {'ovsdb': ARAKOON_OVSDB,
-                        'voldrv': ARAKOON_VOLDRV}
-
     # Generic configfiles
     generic_configfiles = {'memcached': ('/opt/OpenvStorage/config/memcacheclient.cfg', 11211),
                            'rabbitmq': ('/opt/OpenvStorage/config/rabbitmqclient.cfg', 5672)}
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
 
     # Services
-    model_services = ['memcached', ARAKOON_OVSDB]
-    master_services = model_services + ['rabbitmq-server', ARAKOON_VOLDRV]
+    model_services = ['memcached', 'arakoon-ovsdb']
+    master_services = model_services + ['rabbitmq-server']
     extra_node_services = ['workers', 'volumerouter-consumer']
     master_node_services = master_services + ['scheduled-tasks', 'snmp', 'webapp-api', 'nginx',
                                               'volumerouter-consumer'] + extra_node_services
@@ -112,9 +95,6 @@ class SetupController(object):
         hypervisor_username = 'root'
         known_passwords = {}
         master_ip = None
-        auto_config = None
-        disk_layout = None
-        arakoon_mountpoint = None
         join_cluster = False
         configure_memcached = True
         configure_rabbitmq = True
@@ -136,9 +116,6 @@ class SetupController(object):
             hypervisor_ip = config.get('setup', 'hypervisor_ip')
             hypervisor_username = config.get('setup', 'hypervisor_username')
             hypervisor_password = config.get('setup', 'hypervisor_password')
-            arakoon_mountpoint = config.get('setup', 'arakoon_mountpoint')
-            auto_config = config.getboolean('setup', 'auto_config')
-            disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
             configure_memcached = config.getboolean('setup', 'configure_memcached')
             configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
@@ -344,42 +321,26 @@ class SetupController(object):
                 for node in nodes:
                     known_passwords[node] = target_password
 
-            mountpoints, hypervisor_info, writecaches, ip_client_map = SetupController._prepare_node(cluster_ip=cluster_ip,
-                                                                                                     nodes=nodes,
-                                                                                                     known_passwords=known_passwords,
-                                                                                                     ip_client_map=ip_client_map,
-                                                                                                     hypervisor_info={'type': hypervisor_type,
-                                                                                                                      'name': hypervisor_name,
-                                                                                                                      'username': hypervisor_username,
-                                                                                                                      'ip': hypervisor_ip,
-                                                                                                                      'password': hypervisor_password},
-                                                                                                     auto_config=auto_config,
-                                                                                                     disk_layout=disk_layout)
+            hypervisor_info, ip_client_map = SetupController._prepare_node(cluster_ip=cluster_ip,
+                                                                           nodes=nodes,
+                                                                           known_passwords=known_passwords,
+                                                                           ip_client_map=ip_client_map,
+                                                                           hypervisor_info={'type': hypervisor_type,
+                                                                                            'name': hypervisor_name,
+                                                                                            'username': hypervisor_username,
+                                                                                            'ip': hypervisor_ip,
+                                                                                            'password': hypervisor_password})
             if first_node is True:
                 SetupController._setup_first_node(target_client=ip_client_map[cluster_ip],
                                                   unique_id=unique_id,
-                                                  mountpoints=mountpoints,
                                                   cluster_name=cluster_name,
                                                   node_name=node_name,
                                                   hypervisor_info=hypervisor_info,
-                                                  arakoon_mountpoint=arakoon_mountpoint,
                                                   enable_heartbeats=enable_heartbeats,
                                                   configure_memcached=configure_memcached,
-                                                  configure_rabbitmq=configure_rabbitmq,
-                                                  writecaches=writecaches)
+                                                  configure_rabbitmq=configure_rabbitmq)
             else:
                 # Deciding master/extra
-                print 'Analyzing cluster layout'
-                logger.info('Analyzing cluster layout')
-                promote = False
-                for cluster in SetupController.arakoon_clusters:
-                    config = ArakoonClusterConfig(cluster)
-                    config.load_config(SSHClient(master_ip, username='root', password=known_passwords[master_ip]))
-                    logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), cluster))
-                    if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
-                        promote = True
-                        break
-
                 SetupController._setup_extra_node(cluster_ip=cluster_ip,
                                                   master_ip=master_ip,
                                                   cluster_name=cluster_name,
@@ -388,17 +349,20 @@ class SetupController(object):
                                                   hypervisor_info=hypervisor_info,
                                                   configure_memcached=configure_memcached,
                                                   configure_rabbitmq=configure_rabbitmq)
-                if promote:
+
+                print 'Analyzing cluster layout'
+                logger.info('Analyzing cluster layout')
+                config = ArakoonClusterConfig('ovsdb')
+                config.load_config(SSHClient(master_ip, username='root', password=known_passwords[master_ip]))
+                logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), 'ovsdb'))
+                if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
                     SetupController._promote_node(cluster_ip=cluster_ip,
                                                   master_ip=master_ip,
                                                   cluster_name=cluster_name,
                                                   ip_client_map=ip_client_map,
                                                   unique_id=unique_id,
-                                                  mountpoints=mountpoints,
-                                                  arakoon_mountpoint=arakoon_mountpoint,
                                                   configure_memcached=configure_memcached,
-                                                  configure_rabbitmq=configure_rabbitmq,
-                                                  writecaches=writecaches)
+                                                  configure_rabbitmq=configure_rabbitmq)
 
             print ''
             print Interactive.boxed_message(['Setup complete.',
@@ -445,7 +409,8 @@ class SetupController(object):
             elif node_type not in ['MASTER', 'EXTRA']:
                 raise RuntimeError('This node is not correctly configured.')
 
-            target_password = SetupController._ask_validate_password('127.0.0.1', username='root', node_string='this node')
+            target_password = SetupController._ask_validate_password('127.0.0.1', username='root',
+                                                                     node_string='this node')
             target_client = SSHClient('127.0.0.1', username='root', password=target_password)
 
             unique_id = System.get_my_machine_id(target_client)
@@ -506,11 +471,8 @@ class SetupController(object):
                                               cluster_name=cluster_name,
                                               ip_client_map=ip_client_map,
                                               unique_id=unique_id,
-                                              mountpoints=None,
-                                              arakoon_mountpoint=None,
                                               configure_memcached=configure_memcached,
-                                              configure_rabbitmq=configure_rabbitmq,
-                                              writecaches=None)
+                                              configure_rabbitmq=configure_rabbitmq)
             else:
                 SetupController._demote_node(cluster_ip=ip,
                                              master_ip=master_ip,
@@ -560,15 +522,16 @@ class SetupController(object):
             # 0. Create locks
             SetupController._log_message('Creating lock files', client_ip=this_client.ip)
             for client in ssh_clients:
-                client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually install or upgrade individual packages
-                client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
+                client.run('touch {0}'.format(upgrade_file))  # Prevents manual install or upgrade individual packages
+                client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Prevents clicking x times on 'Update' btn
 
             # 1. Check requirements
             packages_to_update = set()
             all_services_to_restart = []
             for client in ssh_clients:
                 for function in Toolbox.fetch_hooks('update', 'metadata'):
-                    SetupController._log_message('Executing function {0}'.format(function.__name__), client_ip=client.ip)
+                    SetupController._log_message('Executing function {0}'.format(function.__name__),
+                                                 client_ip=client.ip)
                     output = function(client)
                     for key, value in output.iteritems():
                         if key != 'framework':
@@ -580,7 +543,7 @@ class SetupController(object):
             services_to_restart = []
             for service in all_services_to_restart:
                 if service not in services_to_restart:
-                    services_to_restart.append(service)  # Filter out duplicates keeping the order of services (eg: watcher-framework before memcached)
+                    services_to_restart.append(service)  # Filter out duplicates maintaining the order of services (eg: watcher-framework before memcached)
 
             SetupController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
             SetupController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
@@ -589,7 +552,8 @@ class SetupController(object):
             if SetupController._change_services_state(services=services_to_restart,
                                                       ssh_clients=ssh_clients,
                                                       action='stop') is False:
-                SetupController._log_message('Stopping all services on every node failed, cannot continue', client_ip=this_client.ip, severity='warning')
+                SetupController._log_message('Stopping all services on every node failed, cannot continue',
+                                             client_ip=this_client.ip, severity='warning')
                 SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
 
                 # Start services again if a service could not be stopped
@@ -598,7 +562,8 @@ class SetupController(object):
                                                        ssh_clients=ssh_clients,
                                                        action='start')
 
-                SetupController._log_message('Failed to stop all required services, aborting update', client_ip=this_client.ip, severity='error')
+                SetupController._log_message('Failed to stop all required services, aborting update',
+                                             client_ip=this_client.ip, severity='error')
                 return
 
             # 3. Update packages
@@ -615,13 +580,15 @@ class SetupController(object):
                         SetupController._log_message('Installed {0}'.format(package), client.ip)
                     client.file_delete(upgrade_file)
                 except subprocess.CalledProcessError as cpe:
-                    SetupController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip, 'error')
+                    SetupController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip,
+                                                 'error')
                     failed_clients.append(client)
                     break
 
             if failed_clients:
                 SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-                SetupController._log_message('Error occurred. Attempting to start all services again', client_ip=this_client.ip, severity='error')
+                SetupController._log_message('Error occurred. Attempting to start all services again',
+                                             client_ip=this_client.ip, severity='error')
                 SetupController._change_services_state(services=services_to_restart,
                                                        ssh_clients=ssh_clients,
                                                        action='start')
@@ -649,7 +616,8 @@ class SetupController(object):
                 SetupController._log_message('Finished model migration', client_ip=this_client.ip)
             except Exception as ex:
                 SetupController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
-                SetupController._log_message('An unexpected error occurred: {0}'.format(ex), client_ip=this_client.ip, severity='error')
+                SetupController._log_message('An unexpected error occurred: {0}'.format(ex), client_ip=this_client.ip,
+                                             severity='error')
                 return
 
             for client in ssh_clients:
@@ -668,12 +636,15 @@ class SetupController(object):
             for client in ssh_clients:
                 with Remote(client.ip, [Toolbox, SSHClient]) as remote:
                     for function in remote.Toolbox.fetch_hooks('update', 'postupgrade'):
-                        SetupController._log_message('Executing action {0}'.format(function.__name__), client_ip=client.ip)
+                        SetupController._log_message('Executing action {0}'.format(function.__name__),
+                                                     client_ip=client.ip)
                         try:
                             function(remote.SSHClient(client.ip, username='root'))
-                            SetupController._log_message('Executing action {0} completed'.format(function.__name__), client_ip=client.ip)
+                            SetupController._log_message('Executing action {0} completed'.format(function.__name__),
+                                                         client_ip=client.ip)
                         except Exception as ex:
-                            SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex), client.ip, 'error')
+                            SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex),
+                                                         client.ip, 'error')
 
             # 7. Start watcher and restart support-agent
             SetupController._change_services_state(services=services_to_restart,
@@ -718,15 +689,16 @@ class SetupController(object):
             # 0. Create locks
             SetupController._log_message('Creating lock files', client_ip=this_client.ip)
             for client in ssh_clients:
-                client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually install or upgrade individual packages
-                client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
+                client.run('touch {0}'.format(upgrade_file))  # Prevents manual install or upgrade individual packages
+                client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Prevents clicking x times on 'Update' btn
 
             # 1. Check requirements
             packages_to_update = set()
             all_services_to_restart = []
             for client in ssh_clients:
                 for function in Toolbox.fetch_hooks('update', 'metadata'):
-                    SetupController._log_message('Executing function {0}'.format(function.__name__), client_ip=client.ip)
+                    SetupController._log_message('Executing function {0}'.format(function.__name__),
+                                                 client_ip=client.ip)
                     output = function(client)
                     for key, value in output.iteritems():
                         if key != 'volumedriver':
@@ -747,14 +719,16 @@ class SetupController(object):
             if SetupController._change_services_state(services=services_to_restart,
                                                       ssh_clients=ssh_clients,
                                                       action='stop') is False:
-                SetupController._log_message('Stopping all services on every node failed, cannot continue', client_ip=this_client.ip, severity='warning')
+                SetupController._log_message('Stopping all services on every node failed, cannot continue',
+                                             client_ip=this_client.ip, severity='warning')
                 SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
 
                 SetupController._log_message('Attempting to start the services again', client_ip=this_client.ip)
                 SetupController._change_services_state(services=services_to_restart,
                                                        ssh_clients=ssh_clients,
                                                        action='start')
-                SetupController._log_message('Failed to stop all required services, update aborted', client_ip=this_client.ip, severity='error')
+                SetupController._log_message('Failed to stop all required services, update aborted',
+                                             client_ip=this_client.ip, severity='error')
                 return
 
             # 2. Update packages
@@ -770,13 +744,15 @@ class SetupController(object):
                         SetupController._log_message('Installed {0}'.format(package_name), client.ip)
                     client.file_delete(upgrade_file)
                 except subprocess.CalledProcessError as cpe:
-                    SetupController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip, 'error')
+                    SetupController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip,
+                                                 'error')
                     failed_clients.append(client)
                     break
 
             if failed_clients:
                 SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-                SetupController._log_message('Error occurred. Attempting to start all services again', client_ip=this_client.ip, severity='error')
+                SetupController._log_message('Error occurred. Attempting to start all services again',
+                                             client_ip=this_client.ip, severity='error')
                 SetupController._change_services_state(services=services_to_restart,
                                                        ssh_clients=ssh_clients,
                                                        action='start')
@@ -791,7 +767,8 @@ class SetupController(object):
                     try:
                         function(client)
                     except Exception as ex:
-                        SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex), client.ip, 'error')
+                        SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex),
+                                                     client.ip, 'error')
 
             # 4. Start services
             SetupController._log_message('Starting services', client_ip=this_client.ip)
@@ -814,12 +791,11 @@ class SetupController(object):
             file_mutex.release()
 
     @staticmethod
-    def _prepare_node(cluster_ip, nodes, known_passwords, ip_client_map, hypervisor_info, auto_config, disk_layout):
+    def _prepare_node(cluster_ip, nodes, known_passwords, ip_client_map, hypervisor_info):
         """
         Prepares a node:
         - Exchange SSH keys
         - Update hosts files
-        - Partitioning
         - Request hypervisor information
         """
 
@@ -846,7 +822,8 @@ class SetupController(object):
                 if node not in ip_client_map:
                     ip_client_map[node] = SSHClient(node, username='root', password=prev_node_password)
             else:
-                this_node_password = SetupController._ask_validate_password(node, username='root', previous=prev_node_password)
+                this_node_password = SetupController._ask_validate_password(node, username='root',
+                                                                            previous=prev_node_password)
                 passwords[node] = this_node_password
                 prev_node_password = this_node_password
                 if node not in ip_client_map:
@@ -896,36 +873,13 @@ class SetupController(object):
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
             cmd = 'cp {1} {1}.tmp; ssh-keyscan -t rsa {0} {2} 2> /dev/null >> {1}.tmp; cat {1}.tmp | sort -u - > {1}'
-            node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(root_ssh_folder), ' '.join(all_hostnames)))
+            node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(root_ssh_folder),
+                                       ' '.join(all_hostnames)))
             cmd = 'su - ovs -c "cp {1} {1}.tmp; ssh-keyscan -t rsa {0} {2} 2> /dev/null  >> {1}.tmp; cat {1}.tmp | sort -u - > {1}"'
-            node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(ovs_ssh_folder), ' '.join(all_hostnames)))
-
-        # Creating filesystems
-        print 'Creating filesystems'
-        logger.info('Creating filesystems')
+            node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(ovs_ssh_folder),
+                                       ' '.join(all_hostnames)))
 
         target_client = ip_client_map[cluster_ip]
-        disk_layout = SetupController.apply_flexible_disk_layout(target_client, auto_config, disk_layout)
-
-        readcaches = list()
-        writecaches = list()
-        storage = list()
-        for mountpoint, details in disk_layout.iteritems():
-            if 'readcache' in details['type']:
-                readcaches.append(mountpoint)
-                continue
-            elif 'writecache' in details['type']:
-                writecaches.append(mountpoint)
-                continue
-            else:
-                storage.append(mountpoint)
-
-        target_client.config_set('ovs.partitions.readcaches', map(str, readcaches))
-        target_client.config_set('ovs.partitions.writecaches', map(str, writecaches))
-        target_client.config_set('ovs.partitions.storage', map(str, storage))
-
-        mountpoints = disk_layout.keys()
-        mountpoints.sort()
 
         print 'Collecting hypervisor information'
         logger.info('Collecting hypervisor information')
@@ -974,7 +928,7 @@ class SetupController(object):
             hypervisor_info['username'] = 'root'
         logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
 
-        return mountpoints, hypervisor_info, writecaches, ip_client_map
+        return hypervisor_info, ip_client_map
 
     @staticmethod
     def _log_message(message, client_ip=None, severity='info'):
@@ -1007,10 +961,11 @@ class SetupController(object):
                 description = 'stopping' if action == 'stop' else 'starting' if action == 'start' else 'restarting'
                 try:
                     if ServiceManager.has_service(service_name, client=ssh_client):
-                        SetupController._log_message('{0} service {1}'.format(description.capitalize(), service_name), ssh_client.ip)
-                        SetupController._change_service_state(client=ssh_client,
-                                                              name=service_name,
-                                                              state=action)
+                        SetupController._log_message('{0} service {1}'.format(description.capitalize(), service_name),
+                                                     ssh_client.ip)
+                        SetupController.change_service_state(client=ssh_client,
+                                                             name=service_name,
+                                                             state=action)
                         SetupController._log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started' if action == 'start' else 'Restarted', service_name), ssh_client.ip)
                 except Exception as exc:
                     SetupController._log_message('Something went wrong {0} service {1}: {2}'.format(description, service_name, exc), ssh_client.ip, severity='warning')
@@ -1019,7 +974,8 @@ class SetupController(object):
         return True
 
     @staticmethod
-    def _setup_first_node(target_client, unique_id, mountpoints, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats, configure_memcached, configure_rabbitmq, writecaches):
+    def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats,
+                          configure_memcached, configure_rabbitmq):
         """
         Sets up the first node services. This node is always a master
         """
@@ -1029,18 +985,9 @@ class SetupController(object):
 
         print 'Setting up Arakoon'
         logger.info('Setting up Arakoon')
-        # Loading arakoon mountpoint
         cluster_ip = target_client.ip
-        if arakoon_mountpoint is None:
-            arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
-                                                        default_value=writecaches[0] if writecaches else '')
-        target_client.config_set('ovs.arakoon.location', arakoon_mountpoint)
-        arakoon_ports = {}
-        exclude_ports = []
-        for cluster in SetupController.arakoon_clusters:
-            result = ArakoonInstaller.create_cluster(cluster, cluster_ip, exclude_ports)
-            arakoon_ports[cluster] = [result['client_port'], result['messaging_port']]
-            exclude_ports += arakoon_ports[cluster]
+        result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, [], target_client.config_read('ovs.core.ovsdb'))
+        arakoon_ports = [result['client_port'], result['messaging_port']]
 
         SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
@@ -1068,7 +1015,7 @@ class SetupController(object):
         for service in SetupController.model_services:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                SetupController._change_service_state(target_client, service, 'restart')
+                SetupController.change_service_state(target_client, service, 'restart')
 
         print 'Start model migration'
         logger.debug('Start model migration')
@@ -1081,14 +1028,12 @@ class SetupController(object):
 
         from ovs.dal.lists.servicetypelist import ServiceTypeList
         from ovs.dal.hybrids.service import Service
-        arakoonservice_type = ServiceTypeList.get_by_name('Arakoon')
-        for cluster, ports in arakoon_ports.iteritems():
-            service = Service()
-            service.name = SetupController.arakoon_clusters[cluster]
-            service.type = arakoonservice_type
-            service.ports = ports
-            service.storagerouter = storagerouter
-            service.save()
+        service = Service()
+        service.name = 'arakoon-ovsdb'
+        service.type = ServiceTypeList.get_by_name('Arakoon')
+        service.ports = arakoon_ports
+        service.storagerouter = storagerouter
+        service.save()
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
@@ -1101,17 +1046,16 @@ class SetupController(object):
         for service in SetupController.master_services:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                SetupController._change_service_state(target_client, service, 'start')
+                SetupController.change_service_state(target_client, service, 'start')
         # Enable HA for the rabbitMQ queues
         SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
-        for service in ['watcher-framework', 'watcher-volumedriver']:
-            ServiceManager.enable_service(service, client=target_client)
-            SetupController._change_service_state(target_client, service, 'start')
+        ServiceManager.enable_service('watcher-framework', client=target_client)
+        SetupController.change_service_state(target_client, 'watcher-framework', 'start')
 
         logger.debug('Restarting workers')
         ServiceManager.enable_service('workers', client=target_client)
-        SetupController._change_service_state(target_client, 'workers', 'restart')
+        SetupController.change_service_state(target_client, 'workers', 'restart')
 
         SetupController._run_hooks('firstnode', cluster_ip)
 
@@ -1129,7 +1073,7 @@ class SetupController(object):
             service = 'support-agent'
             ServiceManager.add_service(service, client=target_client)
             ServiceManager.enable_service(service, client=target_client)
-            SetupController._change_service_state(target_client, service, 'start')
+            SetupController.change_service_state(target_client, service, 'start')
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -1140,7 +1084,8 @@ class SetupController(object):
         logger.info('First node complete')
 
     @staticmethod
-    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map, hypervisor_info, configure_memcached, configure_rabbitmq):
+    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map, hypervisor_info,
+                          configure_memcached, configure_rabbitmq):
         """
         Sets up an additional node
         """
@@ -1154,8 +1099,7 @@ class SetupController(object):
 
         print 'Configuring services'
         logger.info('Copying client configurations')
-        for cluster in SetupController.arakoon_clusters:
-            ArakoonInstaller.deploy_to_slave(master_ip, cluster_ip, cluster)
+        ArakoonInstaller.deploy_to_slave(master_ip, cluster_ip, 'ovsdb')
         config_types = []
         if configure_rabbitmq:
             config_types.append('rabbitmq')
@@ -1178,7 +1122,7 @@ class SetupController(object):
             service = 'support-agent'
             ServiceManager.add_service(service, client=target_client)
             ServiceManager.enable_service(service, client=target_client)
-            SetupController._change_service_state(target_client, service, 'start')
+            SetupController.change_service_state(target_client, service, 'start')
 
         node_name = target_client.run('hostname')
         SetupController._finalize_setup(target_client, node_name, 'EXTRA', hypervisor_info, unique_id)
@@ -1188,14 +1132,13 @@ class SetupController(object):
         target_client.config_set('ovs.grid.ip', cluster_ip)
 
         print 'Starting services'
-        for service in ['watcher-framework', 'watcher-volumedriver']:
-            ServiceManager.enable_service(service, client=target_client)
-            SetupController._change_service_state(target_client, service, 'start')
+        ServiceManager.enable_service('watcher-framework', client=target_client)
+        SetupController.change_service_state(target_client, 'watcher-framework', 'start')
 
         logger.debug('Restarting workers')
         for node_client in ip_client_map.itervalues():
             ServiceManager.enable_service('workers', client=node_client)
-            SetupController._change_service_state(node_client, 'workers', 'restart')
+            SetupController.change_service_state(node_client, 'workers', 'restart')
 
         SetupController._run_hooks('extranode', cluster_ip, master_ip)
 
@@ -1207,7 +1150,8 @@ class SetupController(object):
         logger.info('Extra node complete')
 
     @staticmethod
-    def _promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, mountpoints, arakoon_mountpoint, configure_memcached, configure_rabbitmq, writecaches):
+    def _promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached,
+                      configure_rabbitmq):
         """
         Promotes a given node
         """
@@ -1231,13 +1175,11 @@ class SetupController(object):
         storagerouter.save()
 
         # Find other (arakoon) master nodes
-        master_nodes = []
-        for cluster in SetupController.arakoon_clusters:
-            config = ArakoonClusterConfig(cluster)
-            config.load_config(SSHClient(master_ip, username='root'))
-            master_nodes = [node.ip for node in config.nodes]
-            if cluster_ip in master_nodes:
-                master_nodes.remove(cluster_ip)
+        config = ArakoonClusterConfig('ovsdb')
+        config.load_config(SSHClient(master_ip, username='root'))
+        master_nodes = [node.ip for node in config.nodes]
+        if cluster_ip in master_nodes:
+            master_nodes.remove(cluster_ip)
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
@@ -1248,31 +1190,9 @@ class SetupController(object):
 
         print 'Joining arakoon cluster'
         logger.info('Joining arakoon cluster')
-        # Loading arakoon mountpoint
-        if arakoon_mountpoint is None:
-            if mountpoints:
-                manual = 'Enter custom path'
-                mountpoints.sort()
-                mountpoints = [manual] + mountpoints
-                arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
-                                                            default_value=writecaches[0] if len(writecaches) > 0 else None,
-                                                            sort_choices=False)
-                if arakoon_mountpoint == manual:
-                    arakoon_mountpoint = None
-            if arakoon_mountpoint is None:
-                while True:
-                    arakoon_mountpoint = Interactive.ask_string('Enter arakoon database path').strip().rstrip('/')
-                    if target_client.dir_exists(arakoon_mountpoint):
-                        break
-                    else:
-                        print '  Invalid path, please retry'
-        target_client.config_set('ovs.arakoon.location', arakoon_mountpoint)
-        arakoon_ports = {}
         exclude_ports = ServiceList.get_ports_for_ip(cluster_ip)
-        for cluster in SetupController.arakoon_clusters:
-            result = ArakoonInstaller.extend_cluster(master_ip, cluster_ip, cluster, exclude_ports)
-            arakoon_ports[cluster] = [result['client_port'], result['messaging_port']]
-            exclude_ports += arakoon_ports[cluster]
+        result = ArakoonInstaller.extend_cluster(master_ip, cluster_ip, 'ovsdb', exclude_ports, target_client.config_read('ovs.core.ovsdb'))
+        arakoon_ports = [result['client_port'], result['messaging_port']]
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
@@ -1295,19 +1215,16 @@ class SetupController(object):
 
         print 'Restarting master node services'
         logger.info('Restarting master node services')
-        for cluster in SetupController.arakoon_clusters:
-            ArakoonInstaller.restart_cluster_add(cluster, master_nodes, cluster_ip)
+        ArakoonInstaller.restart_cluster_add('ovsdb', master_nodes, cluster_ip)
         PersistentFactory.store = None
         VolatileFactory.store = None
 
-        arakoonservice_type = ServiceTypeList.get_by_name('Arakoon')
-        for cluster, ports in arakoon_ports.iteritems():
-            service = Service()
-            service.name = SetupController.arakoon_clusters[cluster]
-            service.type = arakoonservice_type
-            service.ports = ports
-            service.storagerouter = storagerouter
-            service.save()
+        service = Service()
+        service.name = 'arakoon-ovsdb'
+        service.type = ServiceTypeList.get_by_name('Arakoon')
+        service.ports = arakoon_ports
+        service.storagerouter = storagerouter
+        service.save()
 
         if configure_rabbitmq:
             SetupController._configure_rabbitmq(target_client)
@@ -1325,7 +1242,7 @@ class SetupController(object):
             target_client.run('rabbitmqctl stop; sleep 5;')
 
             # Enable HA for the rabbitMQ queues
-            SetupController._change_service_state(target_client, 'rabbitmq-server', 'start')
+            SetupController.change_service_state(target_client, 'rabbitmq-server', 'start')
             SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
         SetupController._configure_amqp_to_volumedriver(ip_client_map)
@@ -1335,7 +1252,7 @@ class SetupController(object):
         for service in SetupController.master_services:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                SetupController._change_service_state(target_client, service, 'start')
+                SetupController.change_service_state(target_client, service, 'start')
 
         print 'Restarting services'
         SetupController._restart_framework_and_memcache_services(ip_client_map)
@@ -1352,7 +1269,8 @@ class SetupController(object):
         logger.info('Promote complete')
 
     @staticmethod
-    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached, configure_rabbitmq):
+    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached,
+                     configure_rabbitmq):
         """
         Demotes a given node
         """
@@ -1373,20 +1291,17 @@ class SetupController(object):
         storagerouter.save()
 
         # Find other (arakoon) master nodes
-        master_nodes = []
-        for cluster in SetupController.arakoon_clusters:
-            config = ArakoonClusterConfig(cluster)
-            config.load_config(SSHClient(master_ip, username='root'))
-            master_nodes = [node.ip for node in config.nodes]
-            if cluster_ip in master_nodes:
-                master_nodes.remove(cluster_ip)
+        config = ArakoonClusterConfig('ovsdb')
+        config.load_config(SSHClient(master_ip, username='root'))
+        master_nodes = [node.ip for node in config.nodes]
+        if cluster_ip in master_nodes:
+            master_nodes.remove(cluster_ip)
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
         print 'Leaving arakoon cluster'
         logger.info('Leaving arakoon cluster')
-        for cluster in SetupController.arakoon_clusters:
-            ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, cluster)
+        ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'ovsdb')
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
@@ -1412,16 +1327,12 @@ class SetupController(object):
         remaining_nodes = ip_client_map.keys()[:]
         if cluster_ip in remaining_nodes:
             remaining_nodes.remove(cluster_ip)
-        for cluster in SetupController.arakoon_clusters:
-            ArakoonInstaller.restart_cluster_remove(cluster, remaining_nodes)
+        ArakoonInstaller.restart_cluster_remove('ovsdb', remaining_nodes)
         PersistentFactory.store = None
         VolatileFactory.store = None
 
-        service_names = []
-        for cluster in SetupController.arakoon_clusters:
-            service_names.append(SetupController.arakoon_clusters[cluster])
         for service in storagerouter.services:
-            if service.name in service_names:
+            if service.name == 'arakoon-ovsdb':
                 service.delete()
 
         if configure_rabbitmq:
@@ -1431,12 +1342,12 @@ class SetupController(object):
                 target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
                 target_client.run('rabbitmqctl reset; sleep 5;')
                 target_client.run('rabbitmqctl stop; sleep 5;')
-                SetupController._change_service_state(target_client, 'rabbitmq-server', 'stop')
+                SetupController.change_service_state(target_client, 'rabbitmq-server', 'stop')
                 target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
         print 'Removing services'
         logger.info('Removing services')
-        services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + [SetupController.ARAKOON_OVSDB, SetupController.ARAKOON_VOLDRV])]
+        services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + ['arakoon-ovsdb'])]
         if not configure_rabbitmq:
             services.remove('rabbitmq-server')
         if not configure_memcached:
@@ -1444,7 +1355,7 @@ class SetupController(object):
         for service in services:
             if ServiceManager.has_service(service, client=target_client):
                 logger.debug('Removing service {0}'.format(service))
-                SetupController._change_service_state(target_client, service, 'stop')
+                SetupController.change_service_state(target_client, service, 'stop')
                 ServiceManager.remove_service(service, client=target_client)
 
         if ServiceManager.has_service('workers', client=target_client):
@@ -1477,7 +1388,7 @@ class SetupController(object):
             for node_client in ip_client_map.itervalues():
                 if memcached_exclude_client is not None and memcached_exclude_client.ip == node_client.ip and service_info[0] == 'memcached':
                     continue  # Skip memcached for demoted nodes, because they don't run that service
-                SetupController._change_service_state(node_client, service_info[0], service_info[1])
+                SetupController.change_service_state(node_client, service_info[0], service_info[1])
         VolatileFactory.store = None
 
     @staticmethod
@@ -1506,7 +1417,7 @@ EOF
 """.format(rabbitmq_port, rabbitmq_login, rabbitmq_password))
         rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
         if rabbitmq_running is True:
-            SetupController._change_service_state(client, 'rabbitmq-server', 'stop')
+            SetupController.change_service_state(client, 'rabbitmq-server', 'stop')
 
         client.run('rabbitmq-server -detached 2> /dev/null; sleep 5;')
 
@@ -1533,7 +1444,7 @@ EOF
             raise RuntimeError('Service rabbitmq-server has not been added on node {0}'.format(client.ip))
         rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
         if rabbitmq_running is False or same_process is False:
-            SetupController._change_service_state(client, 'rabbitmq-server', 'restart')
+            SetupController.change_service_state(client, 'rabbitmq-server', 'restart')
 
         client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
 
@@ -1542,7 +1453,8 @@ EOF
         print 'Update existing vPools'
         logger.info('Update existing vPools')
         for node_ip in node_ips:
-            with Remote(node_ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration, ArakoonManagementEx], 'ovs') as remote:
+            with Remote(node_ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration, ArakoonManagementEx],
+                        'ovs') as remote:
                 login = remote.Configuration.get('ovs.core.broker.login')
                 password = remote.Configuration.get('ovs.core.broker.password')
                 protocol = remote.Configuration.get('ovs.core.broker.protocol')
@@ -1552,14 +1464,9 @@ EOF
 
                 uris = []
                 for node in [n.strip() for n in cfg.get('main', 'nodes').split(',')]:
-                    uris.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(protocol, login, password, cfg.get(node, 'location'))})
+                    uris.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(protocol, login, password, cfg.get(node,
+                                                                                                           'location'))})
 
-                arakoon_cluster_config = remote.ArakoonManagementEx().getCluster('voldrv').getClientConfig()
-                arakoon_nodes = []
-                for node_id, node_config in arakoon_cluster_config.iteritems():
-                    arakoon_nodes.append({'host': node_config[0][0],
-                                          'port': node_config[1],
-                                          'node_id': node_id})
                 configuration_dir = '{0}/storagedriver/storagedriver'.format(remote.Configuration.get('ovs.core.cfgdir'))
                 if not remote.os.path.exists(configuration_dir):
                     remote.os.makedirs(configuration_dir)
@@ -1570,8 +1477,6 @@ EOF
                             continue  # There's also a .cfg file, so this is an alba_proxy configuration file
                         storagedriver_config = remote.StorageDriverConfiguration('storagedriver', vpool_name)
                         storagedriver_config.load()
-                        storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id='voldrv',
-                                                                       vregistry_arakoon_cluster_nodes=arakoon_nodes)
                         storagedriver_config.configure_event_publisher(events_amqp_routing_key=remote.Configuration.get('ovs.core.broker.queues.storagedriver'),
                                                                        events_amqp_uris=uris)
                         storagedriver_config.save()
@@ -1604,7 +1509,7 @@ EOF
         logger.info('Configuring logstash')
         if ServiceManager.has_service('logstash', client) is False:
             ServiceManager.add_service('logstash', client)
-        SetupController._change_service_state(client, 'logstash', 'restart')
+        SetupController.change_service_state(client, 'logstash', 'restart')
 
     @staticmethod
     def _configure_avahi(client, cluster_name, node_name, node_type):
@@ -1626,16 +1531,14 @@ EOF
 EOF
 """.format(cluster_name, node_name, node_type, SetupController.avahi_filename, client.ip.replace('.', '_')))
         client.run('avahi-daemon --reload')
-        SetupController._change_service_state(client, 'avahi-daemon', 'restart')
+        SetupController.change_service_state(client, 'avahi-daemon', 'restart')
 
     @staticmethod
     def _add_services(client, unique_id, node_type):
         if node_type == 'master':
             services = SetupController.master_node_services
-            if SetupController.ARAKOON_VOLDRV in services:
-                services.remove(SetupController.ARAKOON_VOLDRV)
-            if SetupController.ARAKOON_OVSDB in services:
-                services.remove(SetupController.ARAKOON_OVSDB)
+            if 'arakoon-ovsdb' in services:
+                services.remove('arakoon-ovsdb')
             worker_queue = '{0},ovs_masters'.format(unique_id)
         else:
             services = SetupController.extra_node_services
@@ -1645,7 +1548,7 @@ EOF
         logger.info('Adding services')
         params = {'MEMCACHE_NODE_IP': client.ip,
                   'WORKER_QUEUE': worker_queue}
-        for service in services + ['watcher-framework', 'watcher-volumedriver']:
+        for service in services + ['watcher-framework']:
             logger.debug('Adding service {0}'.format(service))
             ServiceManager.add_service(service, params=params, client=client)
 
@@ -1654,13 +1557,14 @@ EOF
         cluster_ip = client.ip
         client.dir_create('/opt/OpenvStorage/webapps/frontend/logging')
         if SetupController._logstash_installed(client):
-            SetupController._change_service_state(client, 'logstash', 'restart')
+            SetupController.change_service_state(client, 'logstash', 'restart')
         SetupController._replace_param_in_config(client=client,
                                                  config_file='/opt/OpenvStorage/webapps/frontend/logging/config.js',
                                                  old_value='http://"+window.location.hostname+":9200',
                                                  new_value='http://' + cluster_ip + ':9200')
 
         # Imports, not earlier than here, as all required config files should be in place.
+        from ovs.lib.disk import DiskController
         from ovs.dal.hybrids.pmachine import PMachine
         from ovs.dal.lists.pmachinelist import PMachineList
         from ovs.dal.hybrids.storagerouter import StorageRouter
@@ -1694,608 +1598,15 @@ EOF
         storagerouter.node_type = node_type
         storagerouter.pmachine = pmachine
         storagerouter.save()
+
+        DiskController.sync_with_reality(storagerouter.guid)
         return storagerouter
-
-    @staticmethod
-    def _get_disk_configuration(client):
-        """
-        Connect to target host and retrieve sata/ssd/raid configuration
-        """
-        with Remote(client.ip, [glob, os, Context]) as remote:
-            def get_value(location):
-                file_open = remote.os.open(location, remote.os.O_RDONLY)
-                file_content = remote.os.read(file_open, 10240)
-                remote.os.close(file_open)
-                return str(file_content)
-
-            content = get_value('/etc/mtab')
-            boot_device = None
-            for line in content.splitlines():
-                if ' / ' in line:
-                    boot_partition = line.split()[0]
-                    boot_device = boot_partition.lstrip('/dev/').translate(None, digits)
-
-            blk_devices = dict()
-            devices = [remote.os.path.basename(device_path) for device_path in remote.glob.glob('/sys/block/*')]
-            matching_devices = [device for device in devices if re.match('^(?:sd|fio|vd|xvd|nvme).*', device)]
-
-            for matching_device in matching_devices:
-                model = ''
-                sectors = get_value('/sys/block/{0}/size'.format(matching_device))
-                sector_size = get_value('/sys/block/{0}/queue/hw_sector_size'.format(matching_device))
-                rotational = get_value('/sys/block/{0}/queue/rotational'.format(matching_device))
-                context = remote.Context()
-                devices = context.list_devices(subsystem='block')
-                is_raid_member = False
-
-                for entry in devices:
-                    if matching_device not in entry['DEVNAME']:
-                        continue
-
-                    if entry['DEVTYPE'] == 'partition' and 'ID_FS_USAGE' in entry:
-                        if 'raid' in entry['ID_FS_USAGE'].lower():
-                            is_raid_member = True
-
-                    if entry['DEVTYPE'] == 'disk' and 'ID_MODEL' in entry:
-                        model = str(entry['ID_MODEL'])
-
-                if 'fio' in matching_device:
-                    model = 'FUSIONIO'
-
-                device_details = {'size': float(sectors) * float(sector_size),
-                                  'type': 'disk' if '1' in rotational else 'ssd',
-                                  'software_raid': is_raid_member,
-                                  'model': model,
-                                  'boot_device': matching_device == boot_device}
-
-                blk_devices[matching_device] = device_details
-
-        # cross-check ssd devices - flawed detection on vmware
-        for disk in blk_devices.keys():
-            output = str(client.run("hdparm -I {0} 2> /dev/null | grep 'Solid State' || true".format('/dev/' + disk)).strip())
-            if 'Solid State' in output and blk_devices[disk]['type'] == 'disk':
-                print 'Updating device type for /dev/{0} to ssd'.format(disk)
-                blk_devices[disk]['type'] = 'ssd'
-
-        return blk_devices
-
-    @staticmethod
-    def _generate_default_partition_layout(blk_devices):
-        """
-        Process detected block devices while
-        - ignoring bootdevice unless it's the only one
-        - ignoring devices part of a software raid
-
-        """
-
-        mps_to_allocate = {'/mnt/cache1': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'cache1', 'type': 'writecache'},
-                           '/mnt/cache2': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'cache2', 'type': 'readcache'},
-                           '/mnt/bfs': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'backendfs', 'type': 'storage'},
-                           '/var/tmp': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'tempfs', 'type': 'storage'}}
-
-        selected_devices = dict(blk_devices)
-        skipped_devices = set()
-        for device, values in blk_devices.iteritems():
-            if values['boot_device']:
-                skipped_devices.add(device)
-            if values['software_raid']:
-                skipped_devices.add(device)
-
-        for device in skipped_devices:
-            selected_devices.pop(device)
-
-        ssd_devices = list()
-        disk_devices = list()
-
-        for device, values in selected_devices.iteritems():
-            if values['type'] == 'ssd':
-                ssd_devices.append('/dev/' + device)
-            if values['type'] == 'disk':
-                disk_devices.append('/dev/' + device)
-
-        nr_of_ssds = len(ssd_devices)
-        nr_of_disks = len(disk_devices)
-
-        print '{0} ssd devices: {1}'.format(nr_of_ssds, str(ssd_devices))
-        print '{0} sata drives: {1}'.format(nr_of_disks, str(disk_devices))
-        print
-
-        if nr_of_ssds == 1:
-            mps_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
-            mps_to_allocate['/mnt/cache1']['percentage'] = 50
-            mps_to_allocate['/mnt/cache1']['label'] = 'cache1'
-            mps_to_allocate['/mnt/cache1']['type'] = 'writecache'
-            mps_to_allocate['/mnt/cache2']['device'] = ssd_devices[0]
-            mps_to_allocate['/mnt/cache2']['percentage'] = 50
-            mps_to_allocate['/mnt/cache2']['label'] = 'cache2'
-            mps_to_allocate['/mnt/cache2']['type'] = 'readcache'
-
-        elif nr_of_ssds > 1:
-            for count in xrange(nr_of_ssds):
-                marker = '/mnt/cache' + str(count + 1)
-                mps_to_allocate[marker] = dict()
-                mps_to_allocate[marker]['device'] = ssd_devices[count]
-                mps_to_allocate[marker]['type'] = 'readcache' if count > 0 else 'writecache'
-                mps_to_allocate[marker]['percentage'] = 100
-                mps_to_allocate[marker]['label'] = 'cache' + str(count + 1)
-
-        for mp, values in mps_to_allocate.iteritems():
-            if values['device'] in ssd_devices:
-                mps_to_allocate[mp]['ssd'] = True
-            else:
-                mps_to_allocate[mp]['ssd'] = False
-
-        return mps_to_allocate, skipped_devices
-
-    @staticmethod
-    def _partition_disks(client, partition_layout):
-        fstab_separator = ('# BEGIN Open vStorage', '# END Open vStorage')  # Don't change, for backwards compatibility
-        mounted = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 2").strip().splitlines()]
-
-        boot_disk = ''
-        unique_disks = set()
-        for mp, values in partition_layout.iteritems():
-            unique_disks.add(values['device'])
-            if 'boot_device' in values and values['boot_device']:
-                boot_disk = values['device']
-                print 'Boot disk {0} will not be cleared'.format(boot_disk)
-            # Umount partitions
-            if mp in mounted and values['device'] != 'DIR_ONLY':
-                print 'Unmounting {0}'.format(mp)
-                client.run('umount -l {0}'.format(mp))
-
-        mounted_devices = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 1").strip().splitlines()]
-
-        for mounted_device in mounted_devices:
-            for chosen_device in unique_disks:
-                if boot_disk in mounted_device:
-                    continue
-                if chosen_device in mounted_device:
-                    print 'Unmounting {0}'.format(mounted_device)
-                    client.run('umount -l {0}'.format(mounted_device))
-
-        # Wipe disks
-        for disk in unique_disks:
-            if disk == 'DIR_ONLY':
-                continue
-            if disk == boot_disk:
-                continue
-
-            print "Partitioning disk {0}".format(disk)
-            client.run('parted {0} -s mklabel gpt'.format(disk))
-
-        # Pre process partition info (disk as key)
-        mountpoints = partition_layout.keys()
-        mountpoints.sort()
-        partitions_by_disk = dict()
-        for mp in mountpoints:
-            partition = partition_layout[mp]
-            disk = partition['device']
-            percentage = partition['percentage']
-            label = partition['label']
-            if disk in partitions_by_disk:
-                partitions_by_disk[disk].append((mp, percentage, label))
-            else:
-                partitions_by_disk[disk] = [(mp, percentage, label)]
-
-        # Partition and format disks
-        mpts_to_mount = []
-        fstab_entries = ['{0} - Do not edit anything in this block'.format(fstab_separator[0])]
-        for disk, partitions in partitions_by_disk.iteritems():
-            if disk == 'DIR_ONLY':
-                for directory, _, _ in partitions:
-                    client.dir_create(directory)
-                continue
-
-            if disk == boot_disk:
-                for mp, percentage, label in partitions:
-                    print 'Partitioning free space on bootdisk: {0}'.format(disk)
-                    command = """parted {0} """.format(boot_disk)
-                    command += """unit % print free | grep 'Free Space' | tail -n1 | awk '{print $1}'"""
-                    start = int(float(client.run(command).split('%')[0])) + 1
-                    nr_of_partitions = int(client.run('lsblk {0} | grep part | wc -l'.format(boot_disk))) + 1
-                    client.run('parted -s -a optimal {0} unit % mkpart primary ext4 {1}% 100%'.format(disk, start))
-                    fstab_entry = OSManager.get_fstab_entry(label, mp)
-                    fstab_entries.append(fstab_entry)
-                    if 'nvme' in disk:
-                        client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + 'p' + str(nr_of_partitions), label))
-                    else:
-                        client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + str(nr_of_partitions), label))
-                    mpts_to_mount.append(mp)
-                continue
-
-            start = '2MB'
-            count = 1
-            for mp, percentage, label in partitions:
-                if start == '2MB':
-                    size_in_percentage = int(percentage)
-                    client.run('parted {0} -s mkpart {1} {2} {3}%'.format(disk, label, start, size_in_percentage))
-                else:
-                    size_in_percentage = int(start) + int(percentage)
-                    client.run('parted {0} -s mkpart {1} {2}% {3}%'.format(disk, label, start, size_in_percentage))
-                if 'nvme' in disk:
-                    client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + 'p' + str(count), label))
-                else:
-                    client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + str(count), label))
-                fstab_entry = OSManager.get_fstab_entry(label, mp)
-                fstab_entries.append(fstab_entry)
-                mpts_to_mount.append(mp)
-                count += 1
-                start = size_in_percentage
-
-        fstab_entries.append(fstab_separator[1])
-
-        # Update fstab
-        original_content = [line.strip() for line in client.file_read('/etc/fstab').strip().splitlines()]
-        new_content = []
-        skip = False
-        for line in original_content:
-            if skip is False:
-                if line.startswith(fstab_separator[0]):
-                    skip = True
-                else:
-                    new_content.append(line)
-            elif line.startswith(fstab_separator[1]):
-                skip = False
-        new_content += fstab_entries
-        client.file_write('/etc/fstab', '{0}\n'.format('\n'.join(new_content)))
-
-        print 'Mounting all partitions ...'
-        output = client.run('mount -l || true')
-        for mp in mpts_to_mount:
-            client.dir_create(mp)
-            if mp not in output:
-                client.run('mount {0}'.format(mp))
-
-        client.run('chmod 1777 /var/tmp')
-
-    @staticmethod
-    def apply_flexible_disk_layout(client, auto_config=False, default=None):
-        def print_and_sleep(message, sleep_count=1):
-            if not message.startswith('\n>>>'):
-                message = '\n>>> {0}'.format(message)
-            if not message.endswith('\n'):
-                message = '{0}\n'.format(message)
-            print message
-            time.sleep(sleep_count)
-
-        def show_layout(proposed):
-            print
-            print 'Proposed partition layout:'
-            print
-            print '! Mark fastest ssd device as writecache'
-            print '! Leave /mnt/bfs as DIR_ONLY when not using a local vpool'
-            print
-            key_map = list()
-            longest_mp = max([len(mp) for mp in proposed])
-            for mp in sorted(proposed):
-                key_map.append(mp)
-                if not proposed[mp]['device'] or proposed[mp]['device'] == 'DIR_ONLY':
-                    print "{0:{1}} :  device : DIR_ONLY".format(mp, longest_mp)
-                    continue
-
-                mp_values = ''
-                for dict_key in sorted(proposed[mp]):
-                    value = str(proposed[mp][dict_key])
-                    if dict_key == 'device' and value and value != 'DIR_ONLY':
-                        size = device_size_map[value]
-                        size_in_gb = int(size / 1000.0 / 1000.0 / 1000.0)
-                        value = value + ' ({0} GB)'.format(size_in_gb)
-                    if dict_key == 'device':
-                        mp_values += ' {0} : {1:20}'.format(dict_key, value)
-                    elif dict_key == 'label':
-                        mp_values += ' {0} : {1:10}'.format(dict_key, value)
-                    else:
-                        mp_values += ' {0} : {1:5}'.format(dict_key, value)
-
-                print "{0:{1}} : {2}".format(mp, longest_mp, mp_values)
-
-            return key_map
-
-        def check_percentages(percentage_mapping, device_to_check):
-            total_percentage_assigned = sum([perc for perc in percentage_mapping[device_to_check].itervalues()])
-            if total_percentage_assigned > 100:
-                print_and_sleep('More than 100% specified for device {0}, please update manually'.format(device_to_check))
-            elif total_percentage_assigned < 100:
-                print_and_sleep('Less than 100% specified for device {0}, please update manually if required'.format(device_to_check))
-
-        # use the partition layout already defined in the openvstorage_preconfig.cfg
-        if auto_config is True and default is not None:
-            SetupController._partition_disks(client, default)
-            return default
-
-        blk_devices = SetupController._get_disk_configuration(client)
-        boot_disk = ''
-        # check for free space on bootdevice
-        if auto_config is False:
-            for disk, values in blk_devices.iteritems():
-                if values['boot_device'] and values['type'] in ['ssd']:
-                    boot_disk += disk
-                    break
-
-            if not boot_disk:
-                print 'No SSD boot disk detected ...'
-                print 'Skipping partitioning of free space on boot disk ...'
-            else:
-                command = """parted /dev/{0} """.format(boot_disk)
-                command += """unit GB print free | grep 'Free Space' | tail -n1 | awk '{print $3}'"""
-                free_space = float(client.run(command).split('GB')[0])
-
-                if free_space < 1.0:
-                    print 'Skipping auto partitioning of free space on bootdisk as it is < 1 GiB'
-                    print 'If required partition and mount manually for use in add vpool'
-                    boot_disk = ''
-
-        skipped = set()
-        if default is None:
-            default, skipped = SetupController._generate_default_partition_layout(blk_devices)
-
-        ssd_devices = set([mountpoint_info['device'] for mountpoint_info in default.itervalues() if mountpoint_info.get('ssd', False) is True])
-
-        print 'Excluded: {0}'.format(skipped)
-        print '-> bootdisk or part of software RAID configuration'
-        print
-
-        if boot_disk:
-            print 'Adding free space on boot disk - only mountpoint, label and type can be changed!'
-            default['/mnt/os_cache'] = {'device': "/dev/{0}".format(boot_disk), 'ssd': True, 'boot_device': True, 'percentage': 100, 'label': 'os_cache', 'type': 'readcache'}
-
-        device_size_map = dict()
-        for key, values in blk_devices.iteritems():
-            device_size_map['/dev/' + key] = values['size']
-
-        if auto_config is True:
-            SetupController._partition_disks(client, default)
-            return default
-
-        choices = show_layout(default)
-        percentage_map = {}
-        for mountpoint, info in default.iteritems():
-            device = info.get('device')
-            if device == 'DIR_ONLY':
-                continue
-
-            if device not in percentage_map:
-                percentage_map[device] = {mountpoint: 0}
-            elif mountpoint not in percentage_map[device]:
-                percentage_map[device][mountpoint] = 0
-            percentage_map[device][mountpoint] += info['percentage']
-
-        while True:
-            menu_actions = ['Add', 'Remove', 'Update', 'Print', 'Apply', 'Quit']
-            chosen = Interactive.ask_choice(menu_actions, 'Make a choice', sort_choices=False)
-
-            if chosen == 'Add':
-                to_add = Interactive.ask_string('Enter mountpoint to add')
-                if to_add in default:
-                    print_and_sleep('Mountpoint {0} already exists'.format(to_add))
-                else:
-                    # Calculcate new default labelname
-                    label_counters = []
-                    for mountpoint_info in default.itervalues():
-                        if re.match('^cache[0-9]{1,2}$', mountpoint_info['label'].strip()):
-                            label_counters.append(int(mountpoint_info['label'].strip().split('cache')[1]))
-
-                    new_label = None
-                    for new_counter in xrange(1, 1000):
-                        if new_counter in label_counters:
-                            continue
-                        new_label = 'cache{0}'.format(new_counter)
-                        break
-                    default[to_add] = dict(SetupController.PARTITION_DEFAULTS)
-                    default[to_add]['label'] = new_label
-
-                choices = show_layout(default)
-
-            elif chosen == 'Remove':
-                to_remove = Interactive.ask_string('Enter mountpoint to remove')
-                if to_remove in default:
-                    copied_map = copy.deepcopy(percentage_map)
-                    for device, mp_info in copied_map.iteritems():
-                        for mountp in copied_map[device]:
-                            if mountp == to_remove:
-                                percentage_map[device].pop(to_remove)
-                    default.pop(to_remove)
-                else:
-                    print_and_sleep('Mountpoint {0} not found, no action taken'.format(to_remove))
-                choices = show_layout(default)
-
-            elif chosen == 'Quit':
-                return 'QUIT'
-
-            elif chosen == 'Print':
-                show_layout(default)
-
-            elif chosen == 'Update':
-                to_update = Interactive.ask_choice(choices)
-                subitem = default[to_update]
-                is_boot_device = 'boot_device' in subitem and subitem['boot_device'] is True
-                submenu_items = subitem.keys()
-                if 'boot_device' in submenu_items:
-                    submenu_items.remove('boot_device')
-                submenu_items.remove('ssd')
-                submenu_items.append('mountpoint')
-                submenu_items.append('finish')
-
-                while True:
-                    for sub_key in sorted(subitem):
-                        print "{0:15} : {1}".format(sub_key, subitem[sub_key])
-                    print "{0:15} : {1}".format('mountpoint', to_update)
-                    print
-
-                    subitem_chosen = Interactive.ask_choice(submenu_items, sort_choices=False)
-                    if subitem_chosen == 'finish':
-                        break
-                    elif is_boot_device and subitem_chosen not in ['type', 'label']:
-                        print '\nOnly mountpoint, label and type can be changed for a boot device'
-                        print 'All free space will be allocated to the new partition'
-                        time.sleep(1)
-                    elif subitem_chosen == 'percentage':
-                        answer = Interactive.ask_integer('Please specify the percentage: ', 1, 100)
-                        subitem['percentage'] = answer
-                        device = subitem['device']
-                        # Recalculate percentages
-                        if device in percentage_map:
-                            percentage_map[device][to_update] = answer
-                            if len(percentage_map[device]) != 2:
-                                check_percentages(percentage_map, device)
-                            else:
-                                total_percentage = sum([percent for percent in percentage_map[device].itervalues()])
-                                if total_percentage > 100:
-                                    for mountp in percentage_map[device].iterkeys():
-                                        if mountp != to_update:
-                                            percentage_map[device][mountp] = 100 - answer
-                                            default[mountp]['percentage'] = 100 - answer
-                                            print_and_sleep('Overallocation detected, updated {0} on device {1} to {2}%'.format(mountp, device, 100 - answer))
-                    elif subitem_chosen == 'type':
-                        answer = Interactive.ask_choice(['readcache', 'writecache', 'storage'], 'Please set the type', 'storage', False)
-                        subitem['type'] = answer
-                    elif subitem_chosen == 'label':
-                        answer = Interactive.ask_string('Please set the label')
-                        if not re.match('^[a-z]+[0-9]*', answer):
-                            print_and_sleep('Invalid entry {0} for label'.format(answer))
-                        else:
-                            subitem['label'] = answer
-                    elif subitem_chosen == 'mountpoint':
-                        answer = Interactive.ask_string('Please set the mountpoint')
-                        if not re.match('^/(?:[a-zA-Z0-9_-]+/)*[a-zA-Z0-9_-]+$', answer):
-                            print_and_sleep('Invalid entry {0} for mountpoint'.format(answer))
-                        elif answer in default:
-                            print_and_sleep('New mountpoint already exists!')
-                        else:
-                            default.pop(to_update)
-                            default[answer] = subitem
-                            for dev, mp_info in percentage_map.iteritems():
-                                for mountp in mp_info.iterkeys():
-                                    if mountp == to_update:
-                                        percentage = percentage_map[dev].pop(mountp)
-                                        percentage_map[dev][answer] = percentage
-                            to_update = answer
-                    elif subitem_chosen == 'device':
-                        answer = Interactive.ask_string('Please set the device')
-                        if not re.match('^/dev/[a-z]{3}$', answer):
-                            print_and_sleep('Invalid entry {0} for device'.format(answer))
-                        elif answer not in device_size_map:
-                            print_and_sleep('Device {0} does not exist'.format(answer))
-                        elif answer == subitem['device']:
-                            print_and_sleep('Same device specified, nothing will be updated')
-                        else:
-                            mountpoint = to_update
-                            orig_device = subitem['device']
-                            percentage = subitem['percentage']
-                            subitem['ssd'] = answer in ssd_devices
-                            subitem['device'] = answer
-
-                            if orig_device in percentage_map:
-                                # Update original device
-                                percentage_map[orig_device].pop(mountpoint)
-                                if len(percentage_map[orig_device]) > 1:
-                                    check_percentages(percentage_map, orig_device)
-
-                                # Update new device
-                                if answer in percentage_map:
-                                    percentage_map[answer][mountpoint] = percentage
-                                    if len(percentage_map[answer]) == 2:
-                                        default[mountpoint]['percentage'] = percentage
-                                        total_percentage = sum([percent for percent in percentage_map[answer].itervalues()])
-                                        if total_percentage > 100:
-                                            for mountp in percentage_map[answer].iterkeys():
-                                                if mountp != mountpoint:
-                                                    percentage_map[answer][mountp] = 100 - percentage
-                                                    default[mountp]['percentage'] = 100 - percentage
-                                                    print_and_sleep('Overallocation detected, updated {0} on device {1} to {2}%'.format(mountp, answer, 100 - percentage))
-                                    elif len(percentage_map[answer]) > 2:
-                                        check_percentages(percentage_map, answer)
-
-                            if answer not in percentage_map:
-                                percentage_map[answer] = {mountpoint: percentage if isinstance(percentage, int) else 0}
-                            elif mountpoint not in percentage_map[answer]:
-                                percentage_map[answer][mountpoint] = percentage if isinstance(percentage, int) else 0
-                                check_percentages(percentage_map, answer)
-
-                choices = show_layout(default)
-
-            elif chosen == 'Apply':
-                total = dict()
-                valid_percentages = True
-                for details in default.itervalues():
-                    device = details['device']
-                    if device == 'DIR_ONLY':
-                        continue
-                    if details['percentage'] == 'NA' or details['percentage'] == 0:
-                        print '>>> Invalid percentage value for device: {0}'.format(device)
-                        print
-                        time.sleep(1)
-                        valid_percentages = False
-                        break
-                    percentage = int(details['percentage'])
-                    if device in total:
-                        total[device] += percentage
-                    else:
-                        total[device] = percentage
-
-                if valid_percentages is True:
-                    for device, percentage in total.iteritems():
-                        if 0 < percentage <= 100:
-                            continue
-                        else:
-                            print '>>> Invalid total {0}% for device: {1}'.format(percentage, device)
-                            print
-                            time.sleep(1)
-                            valid_percentages = False
-                            break
-
-                if valid_percentages is False:
-                    choices = show_layout(default)
-                    continue
-
-                has_read = False
-                has_write = False
-                for details in default.itervalues():
-                    disk_type = details['type']
-                    if disk_type == 'readcache':
-                        has_read = True
-                    elif disk_type == 'writecache':
-                        has_write = True
-                if has_read is False or has_write is False:
-                    print
-                    print '>>> At least one readcache partition and one writecache partition must be configured'
-                    print
-                    time.sleep(1)
-                    choices = show_layout(default)
-                    continue
-
-                valid_labels = True
-                partitions = set()
-                nr_of_labels = 0
-                for details in default.itervalues():
-                    if 'DIR_ONLY' not in details['device']:
-                        partitions.add(details['label'])
-                        nr_of_labels += 1
-                if len(partitions) < nr_of_labels:
-                    print '! Partition labels should be unique across partitions'
-                    print
-                    time.sleep(1)
-                    valid_labels = False
-
-                if valid_labels is False:
-                    choices = show_layout(default)
-                    continue
-
-                show_layout(default)
-                confirmation = Interactive.ask_yesno('Please confirm the partition layout, ALL DATA WILL BE ERASED ON THE DISKS ABOVE!', False)
-                if confirmation is True:
-                    print 'Applying partition layout ...'
-                    SetupController._partition_disks(client, default)
-                    return default
-                else:
-                    print 'Please confirm by typing "y"'
 
     @staticmethod
     def _discover_nodes(client):
         nodes = {}
-        SetupController._change_service_state(client, 'dbus', 'start')
-        SetupController._change_service_state(client, 'avahi-daemon', 'start')
+        SetupController.change_service_state(client, 'dbus', 'start')
+        SetupController.change_service_state(client, 'avahi-daemon', 'start')
         discover_result = client.run('timeout -k 60 45 avahi-browse -artp 2> /dev/null | grep ovs_cluster || true')
         for entry in discover_result.splitlines():
             entry_parts = entry.split(';')
@@ -2333,7 +1644,7 @@ EOF
             client.file_write(config_file, contents)
 
     @staticmethod
-    def _change_service_state(client, name, state):
+    def change_service_state(client, name, state):
         """
         Starts/stops/restarts a service
         """
@@ -2390,7 +1701,8 @@ EOF
                     rabbitmq_running = True
                     rabbitmq_pid_ctl = match_groups['pid']
 
-        if ServiceManager.has_service('rabbitmq-server', client) and ServiceManager.get_service_status('rabbitmq-server', client):
+        if ServiceManager.has_service('rabbitmq-server', client) \
+                and ServiceManager.get_service_status('rabbitmq-server', client):
             rabbitmq_running = True
             rabbitmq_pid_sm = ServiceManager.get_service_pid('rabbitmq-server', client)
 
@@ -2411,7 +1723,7 @@ EOF
         functions = Toolbox.fetch_hooks('setup', hook_type)
         functions_found = len(functions) > 0
         if functions_found is True:
-            print '\n+++ Running plugin hooks +++\n'
+            print '\n+++ Running hooks +++\n'
         for function in functions:
             if master_ip is None:
                 function(cluster_ip=cluster_ip)

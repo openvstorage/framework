@@ -52,7 +52,7 @@ class VPool(DataObject):
         """
         from ovs.dal.hybrids.vdisk import VDisk
         statistics = {}
-        for key in StorageDriverClient.stat_keys:
+        for key in StorageDriverClient.STAT_KEYS:
             statistics[key] = 0
             statistics['{0}_ps'.format(key)] = 0
         for vdisk in self.vdisks:

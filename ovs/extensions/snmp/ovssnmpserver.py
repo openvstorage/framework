@@ -18,15 +18,15 @@ OVS SNMP bootstrap module
 from ovs.extensions.snmp.server import SNMPServer
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
-from ovs.extensions.generic.configuration import Configuration
 from ovs.dal.dataobjectlist import DataObjectList
-
-import signal, time
+import time
+import signal
 
 STORAGE_PREFIX = "ovs_snmp"
 NAMING_SCHEME = "1.3.6.1.4.1.29961.%s.%s.%s"
 
-class OVSSNMPServer():
+
+class OVSSNMPServer:
     """
     Bootstrap the SNMP Server, hook into ovs
     """
@@ -54,7 +54,7 @@ class OVSSNMPServer():
         """
         Returns all saved users from the database
         """
-        user_prefix = "{}_user_".format(STORAGE_PREFIX)
+        user_prefix = "{0}_user_".format(STORAGE_PREFIX)
         users = self.persistent.prefix(user_prefix)
         return [self.persistent.get(user) for user in users]
 
@@ -62,7 +62,7 @@ class OVSSNMPServer():
         """
         Adds an snmp v3 user to the database
         """
-        storage_key = "{}_user_{}".format(STORAGE_PREFIX, username)
+        storage_key = "{0}_user_{1}".format(STORAGE_PREFIX, username)
         value = (username, password, privatekey, 'authPriv')
         self.persistent.set(storage_key, value)
 
@@ -71,21 +71,21 @@ class OVSSNMPServer():
         Store/Update a key in persistent storage
         e.g "dal", "enabled", True
         """
-        storage_key = "{}_config_{}_{}".format(STORAGE_PREFIX, group, key)
+        storage_key = "{0}_config_{1}_{2}".format(STORAGE_PREFIX, group, key)
         self.persistent.set(storage_key, value)
 
     def _save_model_oid(self, guid, oid, attribute):
         """
         Store the mapping between oid and object guid
         """
-        key = "{}_dal2oid_{}_{}".format(STORAGE_PREFIX, guid, attribute)
+        key = "{0}_dal2oid_{1}_{2}".format(STORAGE_PREFIX, guid, attribute)
         self.persistent.set(key, oid)
 
     def _get_model_oid(self, guid, attribute):
         """
         Return the oid for a specific guid/attribute
         """
-        key = "{}_dal2oid_{}_{}".format(STORAGE_PREFIX, guid, attribute)
+        key = "{0}_dal2oid_{1}_{2}".format(STORAGE_PREFIX, guid, attribute)
         try:
             return self.persistent.get(key)
         except KeyNotFoundException:
@@ -96,13 +96,13 @@ class OVSSNMPServer():
         Return the oids and the attributes - dict
         """
         mapping = {}
-        key = "{}_dal2oid_{}_".format(STORAGE_PREFIX, guid)
+        key = "{0}_dal2oid_{1}_".format(STORAGE_PREFIX, guid)
         keys = self.persistent.prefix(key)
         for key in keys:
             oid = self.persistent.get(key)
             attr_name = key.replace(STORAGE_PREFIX, '').replace('_dal2oid_', '')
             guid = attr_name.split('_')[0]
-            attr_name = attr_name.replace('{}_'.format(guid), '')
+            attr_name = attr_name.replace('{0}_'.format(guid), '')
             mapping[oid] = attr_name
         return mapping
 
@@ -122,19 +122,20 @@ class OVSSNMPServer():
         """
         self.model_oids.add(model_object.guid)
 
-        if not class_id in self.assigned_oids:
+        if class_id not in self.assigned_oids:
             self.assigned_oids[class_id] = []
             self.instance_oid = 0
 
-        if not model_object.guid in self.assigned_oids[class_id]:
+        if model_object.guid not in self.assigned_oids[class_id]:
             self.assigned_oids[class_id].append(model_object.guid)
 
         def get_function():
-            print('[DEBUG] Get function for %s %s %s' % (model_object.guid, attribute, str(key)))
+            print('[DEBUG] Get function for {0} {1} {2}'.format(model_object.guid, attribute, str(key)))
             if func:
-                print('[DEBUG] Calling lambda function %s' % func)
+                print('[DEBUG] Calling lambda function {0}'.format(func))
                 return func(model_object)
 
+            value = None
             try:
                 value = getattr(model_object, attribute)
                 if key and isinstance(value, dict):
@@ -144,7 +145,7 @@ class OVSSNMPServer():
                 elif not key and (isinstance(value, list) or isinstance(value, DataObjectList)):
                     value = len(value)
             except Exception as ex:
-                print('[EXCEPTION] %s' % (str(ex)))
+                print('[EXCEPTION] {0}'.format(str(ex)))
                 if atype == int:
                     value = -1
                 elif atype == str:
@@ -152,13 +153,12 @@ class OVSSNMPServer():
             try:
                 return atype(value)
             except Exception as ex:
-                print('[EXCEPTION 2] %s' % (str(ex)))
+                print('[EXCEPTION 2] {0}'.format(str(ex)))
                 return 0
 
         oid = self.server.register_custom_oid(class_id, self.instance_oid, attrb_oid, get_function, atype)
-        self._save_model_oid(model_object.guid, oid, "{}_{}".format(attribute, key) if key else attribute)
+        self._save_model_oid(model_object.guid, oid, "{0}_{1}".format(attribute, key) if key else attribute)
         return oid
-
 
     def _bootstrap_dal_models(self):
         """
@@ -166,12 +166,12 @@ class OVSSNMPServer():
         """
         _guids = set()
 
-        enabled_key = "{}_config_dal_enabled".format(STORAGE_PREFIX)
+        enabled_key = "{0}_config_dal_enabled".format(STORAGE_PREFIX)
         self.instance_oid = 0
         try:
             enabled = self.persistent.get(enabled_key)
         except KeyNotFoundException:
-            enabled = True # Enabled by default, can be disabled by setting the key
+            enabled = True  # Enabled by default, can be disabled by setting the key
         if enabled:
             from ovs.dal.lists.vdisklist import VDiskList
             from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -188,7 +188,7 @@ class OVSSNMPServer():
                     self._register_dal_model(10, storagerouter, 'pmachine', "3", key = 'host_status')
                     self._register_dal_model(10, storagerouter, 'description', "4")
                     self._register_dal_model(10, storagerouter, 'devicename', "5")
-                    self._register_dal_model(10, storagerouter, 'failover_mode', "6")
+                    self._register_dal_model(10, storagerouter, 'dtl_mode', "6")
                     self._register_dal_model(10, storagerouter, 'ip', "8")
                     self._register_dal_model(10, storagerouter, 'machineid', "9")
                     self._register_dal_model(10, storagerouter, 'status', "10")
@@ -209,6 +209,7 @@ class OVSSNMPServer():
                     if vm.is_vtemplate:
                         self._register_dal_model(11, vm, 'guid', "0")
                         self._register_dal_model(11, vm, 'name', "1")
+
                         def _children(vmt):
                             children = 0
                             disks = [vd.guid for vd in vmt.vdisks]
@@ -264,14 +265,14 @@ class OVSSNMPServer():
                         self._register_dal_model(0, vm, 'stored_data', "3", atype = int)
                         self._register_dal_model(0, vm, 'description', "4")
                         self._register_dal_model(0, vm, 'devicename', "5")
-                        self._register_dal_model(0, vm, 'failover_mode', "6")
+                        self._register_dal_model(0, vm, 'dtl_mode', "6")
                         self._register_dal_model(0, vm, 'hypervisorid', "7")
                         self._register_dal_model(0, vm, 'ip', "8")
                         self._register_dal_model(0, vm, 'status', "10")
                         self._register_dal_model(0, vm, 'stored_data', "10", atype = int)
                         self._register_dal_model(0, vm, 'snapshots', "11", atype = int)
                         self._register_dal_model(0, vm, 'vdisks', "12", atype = int)
-                        self._register_dal_model(0, vm, 'FOC', '13',
+                        self._register_dal_model(0, vm, 'DTL', '13',
                                                  func = lambda vm: 'DEGRADED' if all(item == 'DEGRADED' for item in [vd.info['failover_mode'] for vd in vm.vdisks]) else 'OK')
                     self.instance_oid += 1
 
@@ -386,7 +387,7 @@ class OVSSNMPServer():
 
             reload = False
             for object_guid in list(self.model_oids):
-                if not object_guid in _guids:
+                if object_guid not in _guids:
                     self.model_oids.remove(object_guid)
                     reload = True
             if reload:
@@ -395,10 +396,10 @@ class OVSSNMPServer():
     def _polling_functions(self):
         def _poll(timestamp_float):
             start = time.time()
-            print('[POLLING] %s' % (str(timestamp_float)))
+            print('[POLLING] {0}'.format(str(timestamp_float)))
             self._bootstrap_dal_models()
-            print('[DONE POLLING] %s' % (time.time() - start))
-        self.server.register_polling_function(_poll, 300) #5 minutes
+            print('[DONE POLLING] {0}'.format(time.time() - start))
+        self.server.register_polling_function(_poll, 300)  # 5 minutes
 
     def _reload_snmp(self):
         """
@@ -429,7 +430,7 @@ class OVSSNMPServer():
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description = 'SNMP server for OVS',
-                                    formatter_class = argparse.RawDescriptionHelpFormatter)
+                                     formatter_class = argparse.RawDescriptionHelpFormatter)
 
     parser.add_argument('--port', dest='port', type=int,
                         help='SNMP Port')

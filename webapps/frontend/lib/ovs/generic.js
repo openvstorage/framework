@@ -470,6 +470,9 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function removeCookie(name) {
         setCookie(name, '', -1);
     }
+    function isEmpty(value) {
+        return ['', null, undefined].contains(value) || value === null;
+    }
 
     Array.prototype.equals = function(array) {
         return arrayEquals(this, array);
@@ -523,6 +526,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         trySet: trySet,
         validate: validate,
         xhrAbort: xhrAbort,
-        xhrCompleted: xhrCompleted
+        xhrCompleted: xhrCompleted,
+        isEmpty: isEmpty
     };
 });

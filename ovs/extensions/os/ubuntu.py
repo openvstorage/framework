@@ -20,6 +20,7 @@ from subprocess import CalledProcessError
 from subprocess import check_output
 from ovs.extensions.generic.configuration import Configuration
 
+
 class Ubuntu(object):
     """
     Contains all logic related to Ubuntu specific
@@ -38,8 +39,8 @@ class Ubuntu(object):
         return path
 
     @staticmethod
-    def get_fstab_entry(label, mp):
-        return 'LABEL={0}    {1}         ext4    defaults,nobootwait,noatime,discard    0    2'.format(label, mp)
+    def get_fstab_entry(device, mp, filesystem='ext4'):
+        return '{0}    {1}         {2}    defaults,nobootwait,noatime,discard    0    2'.format(device, mp, filesystem)
 
     @staticmethod
     def get_ssh_service_name():

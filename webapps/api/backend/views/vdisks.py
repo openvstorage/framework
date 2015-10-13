@@ -18,7 +18,7 @@ VDisk module
 
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action
+from rest_framework.decorators import action, link
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
@@ -77,8 +77,18 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(VDisk)
-    def set_config_params(self, vdisk, config_params):
+    def set_config_params(self, vdisk, new_config_params, old_config_params):
         """
         Sets configuration parameters to a given vdisk.
         """
-        return VDiskController.set_config_params.delay(vdisk_guid=vdisk.guid, config_params=config_params)
+        return VDiskController.set_config_params.delay(vdisk_guid=vdisk.guid, new_config_params=new_config_params, old_config_params=old_config_params)
+
+    @link()
+    @required_roles(['read'])
+    @return_task()
+    @load(VDisk)
+    def get_config_params(self, vdisk):
+        """
+        Retrieve the configuration parameters for the given disk from the storagedriver.
+        """
+        return VDiskController.get_config_params.delay(vdisk_guid=vdisk.guid)

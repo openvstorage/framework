@@ -539,6 +539,11 @@ class DataObject(object):
                         data[attribute] = self._data[attribute]
                 elif attribute not in data:
                     data[attribute] = self._data[attribute]
+            for attribute in data.keys():
+                if attribute == '_version':
+                    continue
+                if attribute not in self._data:
+                    del data[attribute]
             if data_conflicts:
                 raise ConcurrencyException('Got field conflicts while saving {0}. Conflicts: {1}'.format(
                     self._classname, ', '.join(data_conflicts)
@@ -917,3 +922,23 @@ class DataObject(object):
         if not Descriptor.isinstance(other, self.__class__):
             return True
         return not self.__eq__(other)
+
+    @staticmethod
+    def enumerator(name, items):
+        """
+        Generates an enumerator
+        """
+        class Enumerator(dict):
+            def __init__(self, *args, **kwargs):
+                super(Enumerator, self).__init__(*args, **kwargs)
+
+        if isinstance(items, list):
+            enumerator = Enumerator(zip(items, items))
+        elif isinstance(items, dict):
+            enumerator = Enumerator(**items)
+        else:
+            raise ValueError("Argument 'items' should be a list or a dict. A '{0}' was given".format(type(items)))
+        enumerator.__name__ = name
+        for item in enumerator:
+            setattr(enumerator, item, enumerator[item])
+        return enumerator

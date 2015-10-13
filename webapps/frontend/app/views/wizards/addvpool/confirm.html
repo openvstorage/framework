@@ -39,24 +39,21 @@ limitations under the License.
         <ul>
             <li><b data-i18n="ovs:wizards.addvpool.gathervpool.initialstoragerouter"></b> <span data-bind="text: data.target() !== undefined ? data.target().name() : ''"></span></li>
         </ul>
-        <p data-i18n="ovs:wizards.addvpool.confirm.mountpoints"></p>
+        <p data-i18n="ovs:wizards.addvpool.confirm.cache_sizing"></p>
         <ul>
-            <li data-bind="visible: data.backend() === 'local' || data.backend() === 'distributed'">
-                <b data-i18n="ovs:wizards.addvpool.gathermountpoints.bfs"></b> <span data-bind="text: data.mtptBFS"></span>
+            <li data-bind="visible: data.backend() === 'distributed'">
+                <b data-i18n="ovs:wizards.addvpool.gathermountpoints.mountpoint"></b> <span data-bind="text: data.distributedMtpt()"></span>
             </li>
-            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.tempfs"></b> <span data-bind="text: data.mtptTemp"></span></li>
-            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.md"></b> <span data-bind="text: data.mtptMD"></span></li>
-            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.readcaches"></b> <span data-bind="text: data.mtptReadCaches"></span></li>
-            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.writecaches"></b> <span data-bind="text: data.mtptWriteCaches"></span></li>
-            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.foc"></b> <span data-bind="text: data.mtptFOC"></span></li>
+            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.readcache_size"></b> <span data-bind="text: data.readCacheSize()"></span> <span data-i18n="ovs:generic.gib"></span></li>
+            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.writecache_size"></b> <span data-bind="text: data.writeCacheSize()"></span> <span data-i18n="ovs:generic.gib"></span></li>
             <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.ipaddress"></b> <span data-bind="text: data.storageIP"></span></li>
         </ul>
         <p data-i18n="ovs:wizards.addvpool.confirm.configuration"></p>
         <ul>
             <li><b data-i18n="ovs:vpools.cache_strategy"></b>: <span data-bind="translate: data.cacheStrategy() !== undefined ? 'ovs:storagedrivers.configuration.general.cache_strategies.' + data.cacheStrategy() : ''"></span></li>
             <li><b data-i18n="ovs:vpools.dedupe_mode"></b>: <span data-bind="translate: data.dedupeMode() !== undefined ? 'ovs:storagedrivers.configuration.general.dedupe_modes.' + data.dedupeMode() : ''"></span></li>
-            <li><b data-i18n="ovs:vpools.sco_size"></b>: <span data-bind="text: data.scoSize() !== undefined ? data.scoSize() : ''"></span><span data-i18n="ovs:generic.mib"></span></li>
-            <li><b data-i18n="ovs:vpools.write_buffer"></b>: <span data-bind="text: data.writeBuffer() !== undefined ? data.writeBuffer() : ''"></span><span data-i18n="ovs:generic.gib" data-bind="visible: data.writeBuffer() !== undefined"></span></li>
+            <li><b data-i18n="ovs:vpools.sco_size"></b>: <span data-bind="text: data.scoSize() !== undefined ? data.scoSize() : ''"></span> <span data-i18n="ovs:generic.mib"></span></li>
+            <li><b data-i18n="ovs:vpools.write_buffer"></b>: <span data-bind="text: data.writeBuffer() !== undefined ? data.writeBuffer() : ''"></span> <span data-i18n="ovs:generic.mib"></span></li>
             <li>
                 <b data-bind="translate: 'ovs:vpools.' + (data.dtlEnabled() === true ? 'dtl_mode' : 'dtl')"></b>:
                 <span data-bind="translate: (data.dtlEnabled() === true ? 'ovs:storagedrivers.configuration.general.dtl_modes.' + data.dtlMode() : 'ovs:vpools.dtl_disabled')"></span>

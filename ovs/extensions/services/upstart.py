@@ -68,7 +68,7 @@ class Upstart(object):
         template_conf = '/opt/OpenvStorage/config/templates/upstart/{0}.conf'
 
         if not client.file_exists(template_conf.format(name)):
-            # Given template doesn't exist so we are problably using system
+            # Given template doesn't exist so we are probably using system
             # init scripts
             return
 

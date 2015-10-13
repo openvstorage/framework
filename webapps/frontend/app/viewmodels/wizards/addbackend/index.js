@@ -31,7 +31,10 @@ define([
         self.activateStep();
 
         // Cleaning data
-        data.name('');
         data.backends([]);
+        data.backendTypes([]);
+        data.name('');
+        data.storageRoutersChecked(false);
+        data.validStorageRouterFound();
     };
 });

@@ -14,7 +14,6 @@
 
 import os
 import time
-import logging
 import tempfile
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
@@ -161,8 +160,8 @@ class ArakoonInstaller(object):
     class to dynamically install/(re)configure arakoon cluster
     """
     ARAKOON_LOG_DIR = '/var/log/arakoon/{0}'
-    ARAKOON_HOME_DIR = '{0}/arakoon/{1}'
-    ARAKOON_TLOG_DIR = '{0}/tlogs/{1}'
+    ARAKOON_HOME_DIR = '{0}/arakoon/{1}/db'
+    ARAKOON_TLOG_DIR = '{0}/arakoon/{1}/tlogs'
     ARAKOON_CONFIG_DIR = '/opt/OpenvStorage/config/arakoon'
     ARAKOON_CONFIG_FILE = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
 
@@ -173,13 +172,13 @@ class ArakoonInstaller(object):
         raise RuntimeError('ArakoonInstaller is a complete static helper class')
 
     @staticmethod
-    def create_cluster(cluster_name, ip, exclude_ports, plugins=None):
+    def create_cluster(cluster_name, ip, exclude_ports, base_dir, plugins=None):
         """
         Creates a cluster
         """
         logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
         client = SSHClient(ip)
-        base_dir = client.config_read('ovs.arakoon.location').rstrip('/')
+        base_dir = base_dir.rstrip('/')
         port_range = client.config_read('ovs.ports.arakoon')
         ports = System.get_free_ports(port_range, exclude_ports, 2, client)
         node_name = System.get_my_machine_id(client)
@@ -213,7 +212,7 @@ class ArakoonInstaller(object):
         logger.debug('Deleting cluster {0} on {1} completed'.format(cluster_name, ip))
 
     @staticmethod
-    def extend_cluster(master_ip, new_ip, cluster_name, exclude_ports):
+    def extend_cluster(master_ip, new_ip, cluster_name, exclude_ports, base_dir):
         """
         Extends a cluster to a given new node
         """
@@ -223,7 +222,7 @@ class ArakoonInstaller(object):
         config.load_config(client)
 
         client = SSHClient(new_ip)
-        base_dir = client.config_read('ovs.arakoon.location').rstrip('/')
+        base_dir = base_dir.rstrip('/')
         port_range = client.config_read('ovs.ports.arakoon')
         ports = System.get_free_ports(port_range, exclude_ports, 2, client)
         node_name = System.get_my_machine_id(client)
