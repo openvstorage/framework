@@ -13,7 +13,7 @@ for root, dirs, _files in os.walk('/opt/OpenvStorage'):
                         os.system('ovs unittest {0} 20 20'.format(test_file))
                     elif file_name == 'test_arakoonInstaller.py':
                         if len(sys.argv) < 3:
-                            print 'Skipping {0} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'.format(test_file)
+                            print 'Skipping {0} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'.format(test_file)
                             continue
                         os.system('ovs unittest {0} {1}'.format(test_file, " ".join(sys.argv[1:])))
                     else:
