@@ -44,9 +44,21 @@ class SupportAgent(object):
         self._enable_support = Configuration.get('ovs.support.enablesupport')
         self.interval = int(Configuration.get('ovs.support.interval'))
         self._url = 'https://monitoring.openvstorage.com/api/support/heartbeat/'
+        init_info = check_output('cat /proc/1/comm', shell=True)
+        # All service classes used in below code should share the exact same interface!
+        if 'init' in init_info:
+            version_info = check_output('init --version', shell=True)
+            if 'upstart' in version_info:
+                self.servicemanager = 'upstart'
+            else:
+                RuntimeError('There was no known service manager detected in /proc/1/comm')
+        elif 'systemd' in init_info:
+            self.servicemanager = 'systemd'
+        else:
+            raise RuntimeError('There was no known service manager detected in /proc/1/comm')
 
     @staticmethod
-    def get_heartbeat_data():
+    def get_heartbeat_data(servicemanager):
         """
         Returns heartbeat data
         """
@@ -61,18 +73,10 @@ class SupportAgent(object):
         except Exception, ex:
             data['errors'].append(str(ex))
         try:
-            init_info = check_output('cat /proc/1/comm', shell=True)
-            # All service classes used in below code should share the exact same interface!
-            if 'init' in init_info:
-                version_info = check_output('init --version', shell=True)
-                if 'upstart' in version_info:
-                    services = check_output("initctl list | grep ovs", shell=True).strip().split('\n')
-                else:
-                    RuntimeError('There was no known service manager detected in /proc/1/comm')
-            elif 'systemd' in init_info:
-                services = check_output("systemctl -a | grep ovs", shell=True).strip().split('\n')
+            if servicemanager == 'upstart':
+                services = check_output("initctl list | grep ovs", shell=True).strip().split('\n')
             else:
-                raise RuntimeError('There was no known service manager detected in /proc/1/comm')
+                services = check_output("systemctl -l | grep ovs", shell=True).strip().split('\n')
             # Service status
             servicedata = dict((service.split(' ')[0].strip(), service.split(' ', 1)[1].strip()) for service in services)
             data['metadata']['services'] = servicedata
@@ -103,21 +107,33 @@ class SupportAgent(object):
             config.write(config_file)
 
     @staticmethod
-    def _process_task(task, metadata):
+    def _process_task(task, metadata, servicemanager):
         """
         Processes a task
         """
         try:
             logger.debug('Processing: {0}'.format(task))
+            cid = Configuration.get('ovs.support.cid')
+            nid = Configuration.get('ovs.support.nid')
+
             if task == 'OPEN_TUNNEL':
-                check_output('service openvpn stop', shell=True)
+                if servicemanager == 'upstart':
+                    check_output('service openvpn stop', shell=True)
+                else:
+                    check_output('systemctl stop openvpn@ovs_{0}-{1} || true'.format(cid, nid), shell=True)
                 check_output('rm -f /etc/openvpn/ovs_*', shell=True)
                 for filename, contents in metadata['files'].iteritems():
                     with open(filename, 'w') as the_file:
                         the_file.write(base64.b64decode(contents))
-                check_output('service openvpn start', shell=True)
+                if servicemanager == 'upstart':
+                    check_output('service openvpn start', shell=True)
+                else:
+                    check_output('systemctl start openvpn@ovs_{0}-{1}'.format(cid, nid), shell=True)
             elif task == 'CLOSE_TUNNEL':
-                check_output('service openvpn stop', shell=True)
+                if servicemanager == 'upstart':
+                    check_output('service openvpn stop', shell=True)
+                else:
+                    check_output('systemctl stop openvpn@ovs_{0}-{1}'.format(cid, nid), shell=True)
                 check_output('rm -f /etc/openvpn/ovs_*', shell=True)
             elif task == 'UPLOAD_LOGFILES':
                 logfile = check_output('ovs collect logs', shell=True).strip()
@@ -140,7 +156,7 @@ class SupportAgent(object):
 
         try:
             response = requests.post(self._url,
-                                     data={'data': json.dumps(SupportAgent.get_heartbeat_data())},
+                                     data={'data': json.dumps(SupportAgent.get_heartbeat_data(self.servicemanager))},
                                      headers={'Accept': 'application/json; version=1'})
             if response.status_code != 200:
                 raise RuntimeError('Received invalid status code: {0} - {1}'.format(response.status_code, response.text))
@@ -152,7 +168,7 @@ class SupportAgent(object):
         if self._enable_support:
             try:
                 for task in return_data['tasks']:
-                    self._process_task(task['code'], task['metadata'])
+                    self._process_task(task['code'], task['metadata'], self.servicemanager)
             except Exception, ex:
                 logger.exception('Unexpected error processing tasks: {0}'.format(ex))
                 raise
