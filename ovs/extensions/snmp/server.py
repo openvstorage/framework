@@ -16,13 +16,13 @@
 SNMP Server module
 """
 
+import sys
 from pysnmp.entity import engine, config
 from pysnmp.entity.rfc3413 import cmdrsp, context
 from pysnmp.carrier import error
 from pysnmp.carrier.asynsock.dgram import udp
 from pysnmp.proto.api import v2c
 from pysnmp.smi.error import SmiError
-
 
 class SNMPServer():
     """
@@ -144,7 +144,8 @@ class SNMPServer():
         Register a custom oid - agnostic
         """
         return_types = {str: v2c.OctetString,
-                        int: v2c.Counter32}
+                        int: v2c.Integer,
+                        long: v2c.Counter64}
 
         oid = self.naming_scheme % (class_oid, instance_oid, attribute_oid)
         return_type = return_types.get(atype, v2c.OctetString)
