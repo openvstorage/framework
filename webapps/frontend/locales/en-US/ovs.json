@@ -228,10 +228,17 @@
         "title": "Storage Routers",
         "details": "Storage Router Details",
         "detail": {
-            "title": "Storage Router",
+            "disks": {
+                "title": "Physical disks",
+                "rescan": {
+                    "success": "Rescan finished",
+                    "scanning": "rescanning",
+                    "started": "Rescan started",
+                    "inprogress": "The disks of this StorageRouter are being rescanned"
+                }
+            },
             "hostip": "Host IP",
-            "moveawaytitle": "Move all vDisks",
-            "moveawaymsg": "Move all vDisks away from this Storage Router and start them on other Storage Routers.",
+            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
             "moveaway": {
                 "warning": "Are you sure you want to move all vDisks away?",
                 "title": "Are you sure",
@@ -243,18 +250,12 @@
                 "donemsg": "All vDisks have been moved away from __what__",
                 "errormsg": "moving away all vDisks from __what__"
             },
+            "moveawaymsg": "Move all vDisks away from this Storage Router and start them on other Storage Routers.",
+            "moveawaytitle": "Move all vDisks",
+            "rdma_capable": "RDMA Capable",
             "storageroutervpoollink": "vPools served by this Storage Router",
-            "updateserving": "Save changes",
-            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
-            "disks": {
-                "title": "Physical disks",
-                "rescan": {
-                    "success": "Rescan finished",
-                    "scanning": "rescanning",
-                    "started": "Rescan started",
-                    "inprogress": "The disks of this StorageRouter are being rescanned"
-                }
-            }
+            "title": "Storage Router",
+            "updateserving": "Save changes"
         }
     },
     "storagedrivers": {
@@ -287,6 +288,11 @@
                     "no_sync": "No Sync",
                     "sync": "Sync"
                 },
+                "dtl_transport": "Transport Mode",
+                "dtl_transport_modes": {
+                    "rdma": "RDMA",
+                    "tcp": "TCP"
+                },
                 "readcache_limit": "Read cache limit",
                 "sco_size": "SCO size",
                 "strategy": "Strategy",
@@ -311,6 +317,7 @@
         "dtl_disabled": "Disabled",
         "dtl_location": "DTL Location",
         "dtl_mode": "DTL Mode",
+        "dtl_transport": "DTL Transport",
         "freespace": "Free space",
         "sco_size": "SCO Size",
         "statistics": "Statistics",
@@ -754,6 +761,7 @@
                 "configuration": "Validate the configuration settings.",
                 "creating": "creating the vPool",
                 "dtl_location": "DTL Location:",
+                "dtl_transport": "DTL Transport Mode:",
                 "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
                 "inprogress": "Creation of vPool __what__ is started.",
                 "started": "Creation started",

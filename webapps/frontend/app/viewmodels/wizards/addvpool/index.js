@@ -55,6 +55,7 @@ define([
         data.dtlEnabled(false);
         data.dtlLocation('');
         data.dtlMode('no_sync');
+        data.dtlTransportMode({name: 'tcp'});
         data.hasMgmtCenter(false);
         data.host('');
         data.integratemgmt(false);
@@ -69,6 +70,7 @@ define([
         data.name('');
         data.partitions(undefined);
         data.port(80);
+        data.rdmaEnabled(false);
         data.scoSize(4);
         data.secretkey('');
         data.storageDrivers([]);

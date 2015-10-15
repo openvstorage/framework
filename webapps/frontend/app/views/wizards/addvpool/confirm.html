@@ -62,6 +62,10 @@ limitations under the License.
                 <b data-i18n="ovs:wizards.addvpool.confirm.dtl_location" data-bind="visible: data.dtlEnabled() === true"></b>
                 <span data-bind="text: data.dtlLocation() !== undefined ? data.dtlLocation() : ''"></span>
             </li>
+            <li data-bind="visible: data.dtlEnabled() === true">
+                <b data-i18n="ovs:wizards.addvpool.confirm.dtl_transport" data-bind="visible: data.dtlEnabled() === true"></b>
+                <span data-bind="translate: data.dtlTransportMode() !== undefined ? 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + data.dtlTransportMode().name : ''"></span>
+            </li>
         </ul>
         <p data-i18n="[html]ovs:wizards.addvpool.confirm.extra"></p>
     </form>

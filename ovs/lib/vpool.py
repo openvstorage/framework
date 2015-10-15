@@ -86,10 +86,12 @@ class VPoolController(object):
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
         storagedriver_config.load(client)
 
+        dtl = storagedriver_config.configuration.get('failovercache', {})
         volume_router = storagedriver_config.configuration.get('volume_router', {})
         volume_manager = storagedriver_config.configuration.get('volume_manager', {})
 
         dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_CONTENT_BASED)
+        dtl_transport = dtl.get('failovercache_transport', StorageDriverClient.VOLDRV_DTL_TRANSPORT_TCP)
         cache_strategy = volume_manager.get('read_cache_default_behaviour', StorageDriverClient.VOLDRV_CACHE_ON_READ)
         sco_multiplier = volume_router.get('vrouter_sco_multiplier', 1024)
         tlog_multiplier = volume_manager.get('number_of_scos_in_tlog', 20)
@@ -107,5 +109,6 @@ class VPoolController(object):
                 'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
                 'write_buffer': write_buffer,
                 'dtl_location': dtl_location,
+                'dtl_transport': StorageDriverClient.REVERSE_DTL_TRANSPORT_MAP[dtl_transport],
                 'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],
                 'tlog_multiplier': tlog_multiplier}

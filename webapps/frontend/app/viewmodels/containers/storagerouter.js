@@ -38,31 +38,32 @@ define([
         self.vMachines = ko.observableArray([]);
 
         // Observables
-        self.guid             = ko.observable(guid);
-        self.loading          = ko.observable(false);
-        self.loaded           = ko.observable(false);
-        self.pMachineGuid     = ko.observable();
-        self.name             = ko.observable();
-        self.machineId        = ko.observable();
-        self.ipAddress        = ko.observable();
-        self.status           = ko.observable();
-        self.nodeType         = ko.observable();
-        self.iops             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.storedData       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.availableActions = ko.observableArray([]);
+        self.backendRead      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendWritten   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.cacheHits        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.cacheMisses      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.readSpeed        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.writeSpeed       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendWritten   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.backendRead      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.bandwidthSaved   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.dtlMode          = ko.observable();
-        self.vDisks           = ko.observableArray([]);
-        self.availableActions = ko.observableArray([]);
-        self.downloadLogState = ko.observable($.t('ovs:support.downloadlogs'));
         self.disks            = ko.observableArray([]);
         self.disksLoaded      = ko.observable(false);
+        self.downloadLogState = ko.observable($.t('ovs:support.downloadlogs'));
+        self.dtlMode          = ko.observable();
+        self.guid             = ko.observable(guid);
+        self.iops             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.ipAddress        = ko.observable();
+        self.loaded           = ko.observable(false);
+        self.loading          = ko.observable(false);
+        self.machineId        = ko.observable();
+        self.name             = ko.observable();
+        self.nodeType         = ko.observable();
+        self.pMachineGuid     = ko.observable();
+        self.rdmaCapable      = ko.observable(false);
+        self.readSpeed        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.status           = ko.observable();
+        self.storedData       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.updates          = ko.observable();
+        self.vDisks           = ko.observableArray([]);
+        self.writeSpeed       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -190,6 +191,7 @@ define([
             generic.trySet(self.status, data, 'status', generic.lower);
             generic.trySet(self.dtlMode, data, 'dtl_mode', generic.lower);
             generic.trySet(self.nodeType, data, 'node_type');
+            generic.trySet(self.rdmaCapable, data, 'rdma_capable');
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids = data.vpools_guids;
             }

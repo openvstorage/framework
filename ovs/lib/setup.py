@@ -1423,7 +1423,7 @@ EOF
 
         # Sometimes/At random the rabbitmq server takes longer than 5 seconds to start,
         #  and the next command fails so the best solution is to retry several times
-        #Also retry the add_user/set_permissions, and validate the result
+        # Also retry the add_user/set_permissions, and validate the result
         retry = 0
         while retry < 10:
             users = Toolbox.retry_client_run(client,

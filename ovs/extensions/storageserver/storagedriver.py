@@ -55,6 +55,8 @@ class StorageDriverClient(object):
     VOLDRV_CONTENT_BASED = 'ContentBased'
     VOLDRV_CACHE_ON_WRITE = 'CacheOnWrite'
     VOLDRV_LOCATION_BASED = 'LocationBased'
+    VOLDRV_DTL_TRANSPORT_TCP = 'TCP'
+    VOLDRV_DTL_TRANSPORT_RSOCKET = 'RSocket'
 
     FRAMEWORK_DTL_SYNC = 'sync'
     FRAMEWORK_DTL_ASYNC = 'async'
@@ -64,6 +66,8 @@ class StorageDriverClient(object):
     FRAMEWORK_CONTENT_BASED = 'dedupe'
     FRAMEWORK_CACHE_ON_WRITE = 'on_write'
     FRAMEWORK_LOCATION_BASED = 'non_dedupe'
+    FRAMEWORK_DTL_TRANSPORT_TCP = 'tcp'
+    FRAMEWORK_DTL_TRANSPORT_RSOCKET = 'rdma'
 
     VDISK_CACHE_MAP = {FRAMEWORK_NO_CACHE: ReadCacheBehaviour.NO_CACHE,
                        FRAMEWORK_CACHE_ON_READ: ReadCacheBehaviour.CACHE_ON_READ,
@@ -81,6 +85,8 @@ class StorageDriverClient(object):
     VPOOL_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: VOLDRV_DTL_SYNC,
                           FRAMEWORK_DTL_ASYNC: VOLDRV_DTL_ASYNC,
                           FRAMEWORK_DTL_NOSYNC: VOLDRV_DTL_NOSYNC}
+    VPOOL_DTL_TRANSPORT_MAP = {FRAMEWORK_DTL_TRANSPORT_TCP: VOLDRV_DTL_TRANSPORT_TCP,
+                               FRAMEWORK_DTL_TRANSPORT_RSOCKET: VOLDRV_DTL_TRANSPORT_RSOCKET}
     REVERSE_CACHE_MAP = {VOLDRV_NO_CACHE: FRAMEWORK_NO_CACHE,
                          VOLDRV_CACHE_ON_READ: FRAMEWORK_CACHE_ON_READ,
                          VOLDRV_CACHE_ON_WRITE: FRAMEWORK_CACHE_ON_WRITE,
@@ -97,6 +103,8 @@ class StorageDriverClient(object):
                             '': FRAMEWORK_DTL_SYNC,
                             '': FRAMEWORK_DTL_ASYNC,
                             '': FRAMEWORK_DTL_NOSYNC}
+    REVERSE_DTL_TRANSPORT_MAP = {VOLDRV_DTL_TRANSPORT_TCP: FRAMEWORK_DTL_TRANSPORT_TCP,
+                                 VOLDRV_DTL_TRANSPORT_RSOCKET: FRAMEWORK_DTL_TRANSPORT_RSOCKET}
     TLOG_MULTIPLIER_MAP = {4: 16,
                            8: 8,
                            16: 4,
@@ -211,7 +219,7 @@ class StorageDriverConfiguration(object):
             },
             'failovercache': {
                 'optional': [],
-                'mandatory': ['failovercache_path', ]
+                'mandatory': ['failovercache_path', 'failovercache_transport', ]
             },
             'file_driver': {
                 'optional': ['fd_extent_cache_capacity', ],

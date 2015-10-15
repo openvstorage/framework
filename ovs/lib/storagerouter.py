@@ -171,6 +171,7 @@ class StorageRouterController(object):
                                    'dtl_enabled': (bool, None),
                                    'dtl_location': (str, None),
                                    'write_buffer': (int, {'min': 128, 'max': 10240}),
+                                   'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
                                    'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys())})
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
@@ -394,6 +395,7 @@ class StorageRouterController(object):
             vpool.password = connection_password
             vpool.connection = '{0}:{1}'.format(connection_host, connection_port) if connection_host else None
             vpool.description = '{0} {1}'.format(vpool.backend_type.code, vpool_name)
+            vpool.rdma_enabled = parameters['config_params']['dtl_transport'] == StorageDriverClient.FRAMEWORK_DTL_TRANSPORT_RSOCKET
             vpool.save()
 
         local_backend_data = {}
@@ -637,12 +639,14 @@ class StorageRouterController(object):
             sco_factor = float(parameters['config_params']['write_buffer']) / tlog_multiplier / sco_size  # sco_factor = write buffer / tlog multiplier (default 20) / sco size (in MiB)
             dedupe_mode = parameters['config_params']['dedupe_mode']
             cache_strategy = parameters['config_params']['cache_strategy']
+            dtl_transport = StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[parameters['config_params']['dtl_transport']]
         else:
             sco_size = current_storage_driver_config['sco_size']
             tlog_multiplier = current_storage_driver_config['tlog_multiplier']
             sco_factor = float(current_storage_driver_config['write_buffer']) / tlog_multiplier / sco_size
             dedupe_mode = current_storage_driver_config['dedupe_mode']
             cache_strategy = current_storage_driver_config['cache_strategy']
+            dtl_transport = current_storage_driver_config['failovercache_transport']
 
         volume_manager_config["read_cache_default_mode"] = StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode]
         volume_manager_config["read_cache_default_behaviour"] = StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy]
@@ -673,7 +677,8 @@ class StorageRouterController(object):
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
                                                 trigger_gap='1GB',
                                                 backoff_gap='2GB')
-        storagedriver_config.configure_failovercache(failovercache_path=sdp_dtl.path)
+        storagedriver_config.configure_failovercache(failovercache_path=sdp_dtl.path,
+                                                     failovercache_transport=dtl_transport)
         storagedriver_config.configure_filesystem(**filesystem_config)
         storagedriver_config.configure_volume_manager(**volume_manager_config)
         storagedriver_config.configure_volume_router(vrouter_id=vrouter_id,

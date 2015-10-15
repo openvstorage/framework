@@ -24,7 +24,7 @@ from ovs.extensions.storageserver.storagedriver import MetadataServerClient
 
 class MDSService(DataObject):
     """
-    The MDSService class represents the junction table between the (metadataserver)Service and VPool.
+    The MDSService class represents the junction table between the (metadata server) Service and VPool.
     Examples:
     * my_vpool.mds_services[0].service
     * my_service.mds_service.vpool

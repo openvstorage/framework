@@ -27,6 +27,24 @@
                                     <input type="checkbox" id="enableDTL" data-bind="checked: data.dtlEnabled" style="margin-top: 8px;">
                                 </td>
                             </tr>
+                            <tr data-bind="visible: data.dtlEnabled()">
+                                <td style="width: 40%; padding: 0; border: 0">
+                                    <div style="margin-top: 5px;">
+                                        <span data-i18n="ovs:storagedrivers.configuration.general.dtl_transport"></span>:
+                                    </div>
+                                </td>
+                                <td style="padding: 0; border: 0">
+                                    <span data-bind="dropdown: {
+                                                         items: data.dtlTransportModes,
+                                                         target: data.dtlTransportMode,
+                                                         text: function(item) {
+                                                             return $.t('ovs:storagedrivers.configuration.general.dtl_transport_modes.' + item.name);
+                                                         },
+                                                         small: true
+                                                     }">
+                                    </span>
+                                </td>
+                            </tr>
                             <!--<tr>-->
                                 <!--<td style="width: 40%; padding: 0; border: 0;">-->
                                     <!--<div style="margin-top: 5px;">-->

@@ -24,11 +24,13 @@ define([
         // Variables
         self.shared                   = shared;
         self.data                     = data;
-        self.loadStorageRoutersHandle = undefined;
+
+        //Handles
         self.checkS3Handle            = undefined;
         self.checkMtptHandle          = undefined;
         self.fetchAlbaVPoolHandle     = undefined;
         self.loadStorageRouterHandle  = undefined;
+        self.loadStorageRoutersHandle = undefined;
         self.loadStorageDriversHandle = {};
 
         // Observables

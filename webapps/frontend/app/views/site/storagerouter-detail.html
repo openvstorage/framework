@@ -76,10 +76,22 @@ limitations under the License.
                             <td><span data-bind="text: readSpeed"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.nrofvpools"></td>
-                            <td><span data-bind="text: vPools().length"></span></td>
+                            <td data-i18n="ovs:storagerouters.detail.rdma_capable"></td>
+                            <td>
+                                <!-- ko if: rdmaCapable() === false -->
+                                    <span class="fa" data-i18n="[html]ovs:icons.cancel_circle" style="color: red;"></span>
+                                <!-- /ko -->
+                                <!-- ko if: rdmaCapable() === true -->
+                                    <span class="fa" data-i18n="[html]ovs:icons.check_circle" style="color: green;"></span>
+                                <!-- /ko -->
+                            </td>
                             <td data-i18n="ovs:generic.writespeed"></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.nrofvpools"></td>
+                            <td><span data-bind="text: vPools().length"></span></td>
+                            <td colspan="2"></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.nrofvmachines"></td>
