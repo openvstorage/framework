@@ -192,14 +192,15 @@ class StorageDriverController(object):
                                                      exclude_ports=ServiceList.get_ports_for_ip(storagerouter.ip),
                                                      base_dir=partition.folder)
             current_services.append(add_service(storagerouter, result))
-            ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
-            current_ips.append(storagerouter.ip)
             for sr_ip in all_sr_ips:
                 if sr_ip not in current_ips:
                     ArakoonInstaller.deploy_to_slave(storagerouter.ip, sr_ip, cluster_name)
+            ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
+            current_ips.append(storagerouter.ip)
             StorageDriverController._configure_arakoon_to_volumedriver()
 
         if 0 < len(current_services) < len(available_storagerouters):
+            distributed = False
             for storagerouter, partition in available_storagerouters.iteritems():
                 if storagerouter.ip in current_ips:
                     continue
@@ -211,11 +212,13 @@ class StorageDriverController(object):
                     partition.folder
                 )
                 add_service(storagerouter, result)
-                ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
                 current_ips.append(storagerouter.ip)
-            for sr_ip in all_sr_ips:
-                if sr_ip not in current_ips:
-                    ArakoonInstaller.deploy_to_slave(current_services[0].storagerouter.ip, sr_ip, cluster_name)
+                if distributed is False:
+                    distributed = True
+                    for sr_ip in all_sr_ips:
+                        if sr_ip not in current_ips:
+                            ArakoonInstaller.deploy_to_slave(current_services[0].storagerouter.ip, sr_ip, cluster_name)
+                ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
             StorageDriverController._configure_arakoon_to_volumedriver()
 
     @staticmethod
