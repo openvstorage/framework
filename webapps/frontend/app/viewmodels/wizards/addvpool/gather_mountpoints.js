@@ -129,7 +129,7 @@ define([
                                     self.data.storageIP(self.data.storageDriver().storageIP())
                                 });
                             self.data.vPool().backendType().load();
-                            self.data.backend(self.data.vPool().backendType().name().toLowerCase());
+                            self.data.backend(self.data.vPool().backendType().code().toLowerCase());
                             self.data.name(self.data.vPool().name());
                         })
                 }
