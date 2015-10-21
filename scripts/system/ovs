@@ -106,12 +106,8 @@ elif [ "$1" = "collect" ] ; then
         show_help
     fi
 elif [ "$1" = "unittest" ] ; then
-    if [ "$#" -ne 2 ] ; then
-        show_help
-    else
-        shift
-        python $@
-    fi
+    shift
+    python $@
 else
     ipython
 fi

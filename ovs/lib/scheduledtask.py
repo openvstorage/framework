@@ -203,7 +203,7 @@ class ScheduledTaskController(object):
         scrub_location = None
         storagerouter = System.get_my_storagerouter()
         for disk in storagerouter.disks:
-            for partition in disk.partiitons:
+            for partition in disk.partitions:
                 if DiskPartition.ROLES.SCRUB in partition.roles:
                     scrub_location = partition.folder
         if scrub_location is None:
