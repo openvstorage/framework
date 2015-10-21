@@ -21,6 +21,7 @@ from time import mktime
 from datetime import datetime, timedelta
 from unittest import TestCase
 from ovs.lib.tests.mockups import StorageDriverModule
+from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -32,16 +33,19 @@ class DeleteSnapshots(TestCase):
     This test class will validate the various scenarios of the delete snapshots logic
     """
 
+    Disk = None
     VDisk = None
+    VPool = None
     VMachine = None
     PMachine = None
-    VPool = None
-    BackendType = None
-    VolatileMutex = None
-    VMachineController = None
-    VDiskController = None
-    ScheduledTaskController = None
     logLevel = None
+    BackendType = None
+    DiskPartition = None
+    StorageRouter = None
+    VolatileMutex = None
+    VDiskController = None
+    VMachineController = None
+    ScheduledTaskController = None
 
     @classmethod
     def setUpClass(cls):
@@ -55,27 +59,33 @@ class DeleteSnapshots(TestCase):
         # Replace mocked classes
         sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriverModule
         # Import required modules/classes after mocking is done
-        from ovs.dal.hybrids.vmachine import VMachine
-        from ovs.dal.hybrids.vdisk import VDisk
-        from ovs.dal.hybrids.pmachine import PMachine
-        from ovs.dal.hybrids.vpool import VPool
         from ovs.dal.hybrids.backendtype import BackendType
+        from ovs.dal.hybrids.disk import Disk
+        from ovs.dal.hybrids.diskpartition import DiskPartition
+        from ovs.dal.hybrids.pmachine import PMachine
+        from ovs.dal.hybrids.storagerouter import StorageRouter
+        from ovs.dal.hybrids.vdisk import VDisk
+        from ovs.dal.hybrids.vmachine import VMachine
+        from ovs.dal.hybrids.vpool import VPool
         from ovs.extensions.generic.volatilemutex import VolatileMutex
         from ovs.lib.vmachine import VMachineController
         from ovs.lib.vdisk import VDiskController
         from ovs.lib.scheduledtask import ScheduledTaskController
         # Globalize mocked classes
+        global Disk
         global VDisk
         global VMachine
         global PMachine
         global VPool
         global BackendType
+        global DiskPartition
+        global StorageRouter
         global VolatileMutex
         global VMachineController
         global VDiskController
         global ScheduledTaskController
         _ = VDisk(), VolatileMutex('dummy'), VMachine(), PMachine(), VPool(), BackendType(), \
-            VMachineController, VDiskController, ScheduledTaskController
+            VMachineController, VDiskController, ScheduledTaskController, StorageRouter(), Disk(), DiskPartition()
 
         # Cleaning storage
         VolatileFactory.store.clean()
@@ -93,8 +103,8 @@ class DeleteSnapshots(TestCase):
 
     def test_happypath(self):
         """
-        Validates the happy path; Hourly snapshots are taken with a few manual consistents
-        every now an then. The delelete policy is exectued every day
+        Validates the happy path; Hourly snapshots are taken with a few manual consistent
+        every now an then. The delete policy is executed every day
         """
         # Setup
         # There are 2 machines; one with two disks, one with one disk and an additional disk
@@ -112,6 +122,30 @@ class DeleteSnapshots(TestCase):
         pmachine.ip = '127.0.0.1'
         pmachine.hvtype = 'VMWARE'
         pmachine.save()
+        storage_router = StorageRouter()
+        storage_router.name = 'storage_router'
+        storage_router.ip = '127.0.0.1'
+        storage_router.pmachine = pmachine
+        storage_router.machine_id = System.get_my_machine_id()
+        storage_router.save()
+        disk = Disk()
+        disk.name = 'physical_disk_1'
+        disk.path = '/dev/non-existent'
+        disk.size = 500 * 1024 ** 3
+        disk.state = 'OK'
+        disk.is_ssd = True
+        disk.storagerouter = storage_router
+        disk.save()
+        disk_partition = DiskPartition()
+        disk_partition.id = 'disk_partition_id'
+        disk_partition.disk = disk
+        disk_partition.path = '/dev/disk/non-existent'
+        disk_partition.size = 400 * 1024 ** 3
+        disk_partition.state = 'OK'
+        disk_partition.offset = 1024
+        disk_partition.roles = [DiskPartition.ROLES.SCRUB]
+        disk_partition.mountpoint = '/var/tmp'
+        disk_partition.save()
         vmachine_1 = VMachine()
         vmachine_1.name = 'vmachine_1'
         vmachine_1.devicename = 'dummy'
@@ -172,9 +206,7 @@ class DeleteSnapshots(TestCase):
         for d in xrange(0, amount_of_days):
             base_timestamp = DeleteSnapshots._make_timestamp(base, day * d)
             print ''
-            print 'Day cycle: {}: {}'.format(
-                d, datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')
-            )
+            print 'Day cycle: {0}: {1}'.format(d, datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d'))
 
             # At the start of the day, delete snapshot policy runs at 00:30
             print '- Deleting snapshots'
