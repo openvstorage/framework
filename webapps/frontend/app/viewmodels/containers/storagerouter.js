@@ -58,11 +58,9 @@ define([
         self.nodeType               = ko.observable();
         self.pMachineGuid           = ko.observable();
         self.primaryFailureDomain   = ko.observable();
-        self.primaryFD              = ko.observable();
         self.rdmaCapable            = ko.observable(false);
         self.readSpeed              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.secondaryFailureDomain = ko.observable();
-        self.secondaryFD            = ko.observable();
         self.status                 = ko.observable();
         self.storedData             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.updates                = ko.observable();
@@ -234,7 +232,7 @@ define([
             if (data.hasOwnProperty('primary_failure_domain_guid')) {
                 if (data.primary_failure_domain_guid === null || data.primary_failure_domain_guid === undefined) {
                     self.primaryFailureDomain(undefined);
-                } else if (self.primaryFailureDomain() === undefined) {
+                } else {
                     var primary = new FailureDomain(data.primary_failure_domain_guid);
                     primary.load();
                     self.primaryFailureDomain(primary);
@@ -243,7 +241,7 @@ define([
             if (data.hasOwnProperty('secondary_failure_domain_guid')) {
                 if (data.secondary_failure_domain_guid === null || data.secondary_failure_domain_guid === undefined) {
                     self.secondaryFailureDomain(undefined);
-                } else if (self.secondaryFailureDomain() === undefined) {
+                } else {
                     var secondary = new FailureDomain(data.secondary_failure_domain_guid);
                     secondary.load();
                     self.secondaryFailureDomain(secondary);
