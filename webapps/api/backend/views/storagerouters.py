@@ -61,7 +61,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def retrieve(self, storagerouter):
         """
-        Load information about a given vMachine
+        Load information about a given storage router
         """
         return storagerouter
 

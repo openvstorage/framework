@@ -53,7 +53,7 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
-    # Generic configfiles
+    # Generic configuration files
     generic_configfiles = {'memcached': ('/opt/OpenvStorage/config/memcacheclient.cfg', 11211),
                            'rabbitmq': ('/opt/OpenvStorage/config/rabbitmqclient.cfg', 5672)}
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
@@ -1578,8 +1578,9 @@ EOF
         # Imports, not earlier than here, as all required config files should be in place.
         from ovs.lib.disk import DiskController
         from ovs.dal.hybrids.pmachine import PMachine
-        from ovs.dal.lists.pmachinelist import PMachineList
         from ovs.dal.hybrids.storagerouter import StorageRouter
+        from ovs.dal.lists.failuredomainlist import FailureDomainList
+        from ovs.dal.lists.pmachinelist import PMachineList
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
         print 'Configuring/updating model'
@@ -1602,6 +1603,7 @@ EOF
             if current_storagerouter.ip == cluster_ip and current_storagerouter.machine_id == unique_id:
                 storagerouter = current_storagerouter
                 break
+        default_failure_domains = [domain for domain in FailureDomainList.get_failure_domains() if domain.name == 'Default']
         if storagerouter is None:
             storagerouter = StorageRouter()
             storagerouter.name = node_name
@@ -1609,6 +1611,8 @@ EOF
             storagerouter.ip = cluster_ip
         storagerouter.node_type = node_type
         storagerouter.pmachine = pmachine
+        storagerouter.primary_failure_domain = default_failure_domains[0] if default_failure_domains and node_type == 'MASTER' else None
+        storagerouter.save()
         storagerouter.save()
 
         DiskController.sync_with_reality(storagerouter.guid)

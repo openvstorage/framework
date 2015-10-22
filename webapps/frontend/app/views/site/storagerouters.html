@@ -14,7 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <section>
-    <h2 data-i18n="ovs:storagerouters.title"></h2>
+    <div>
+        <h2 class="pull-left" data-i18n="ovs:storagerouters.title"></h2>
+        <button class="btn btn-default pull-right"
+                data-bind="click: addEditFailureDomains, enable: $root.shared.user.roles().contains('manage')"
+                id="buttonAddEditFailureDomains"
+                style="margin-top: 20px; margin-bottom: 10px; ">
+            <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
+            <span data-i18n="ovs:storagerouters.add_edit_failure_domains"></span>
+        </button>
+    </div>
     <div data-bind="pager: { loadData: loadStorageRouters, headers: storageRoutersHeaders, refreshInterval: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem" data-bind="attr: { id: 'storagerouter_' + guid() }">
@@ -46,6 +55,8 @@ limitations under the License.
                 <td><span data-bind="text: iops"></span></td>
                 <td><span data-bind="text: readSpeed"></span></td>
                 <td><span data-bind="text: writeSpeed"></span></td>
+                <td><span data-bind="text: primaryFailureDomain() === undefined ? '-' : primaryFailureDomain().name()"></span></td>
+                <td><span data-bind="text: secondaryFailureDomain() === undefined ? '-' : secondaryFailureDomain().name()"></span></td>
             </tr>
         </table>
     </div>

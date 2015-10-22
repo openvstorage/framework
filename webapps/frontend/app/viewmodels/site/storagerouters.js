@@ -13,10 +13,11 @@
 // limitations under the License.
 /*global define*/
 define([
-    'jquery', 'knockout',
+    'jquery', 'knockout', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vpool', '../containers/storagerouter', '../containers/pmachine'
-], function($, ko, shared, generic, Refresher, api, VPool, StorageRouter, PMachine) {
+    '../containers/vpool', '../containers/storagerouter', '../containers/pmachine', '../containers/failuredomain',
+    '../wizards/addeditfailuredomains/index'
+], function($, ko, dialog, shared, generic, Refresher, api, VPool, StorageRouter, PMachine, FailureDomain, AddEditFailureDomainsWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -28,25 +29,31 @@ define([
         self.widgets               = [];
         self.pMachineCache         = {};
         self.storageRoutersHeaders = [
-            { key: 'status',     value: $.t('ovs:generic.status'),     width: 55  },
-            { key: 'name',       value: $.t('ovs:generic.name'),       width: 100 },
-            { key: 'ip',         value: $.t('ovs:generic.ip'),         width: 100 },
-            { key: 'host',       value: $.t('ovs:generic.host'),       width: 55  },
-            { key: 'type',       value: $.t('ovs:generic.type'),       width: 55  },
-            { key: 'vdisks',     value: $.t('ovs:generic.vdisks'),     width: 55  },
-            { key: 'storedData', value: $.t('ovs:generic.storeddata'), width: 100 },
-            { key: 'cacheRatio', value: $.t('ovs:generic.cache'),      width: 100 },
-            { key: 'iops',       value: $.t('ovs:generic.iops'),       width: 55  },
-            { key: 'readSpeed',  value: $.t('ovs:generic.read'),       width: 100 },
-            { key: 'writeSpeed', value: $.t('ovs:generic.write'),      width: 100 }
+            { key: 'status',      value: $.t('ovs:generic.status'),                width: 60        },
+            { key: 'name',        value: $.t('ovs:generic.name'),                  width: 100       },
+            { key: 'ip',          value: $.t('ovs:generic.ip'),                    width: 100       },
+            { key: 'host',        value: $.t('ovs:generic.host'),                  width: 55        },
+            { key: 'type',        value: $.t('ovs:generic.type'),                  width: 55        },
+            { key: 'vdisks',      value: $.t('ovs:generic.vdisks'),                width: 55        },
+            { key: 'storedData',  value: $.t('ovs:generic.storeddata'),            width: 96        },
+            { key: 'cacheRatio',  value: $.t('ovs:generic.cache'),                 width: 80        },
+            { key: 'iops',        value: $.t('ovs:generic.iops'),                  width: 55        },
+            { key: 'readSpeed',   value: $.t('ovs:generic.read'),                  width: 100       },
+            { key: 'writeSpeed',  value: $.t('ovs:generic.write'),                 width: 100       },
+            { key: 'primaryFD',   value: $.t('ovs:generic.failure_domain'),        width: 100       },
+            { key: 'secondaryFD', value: $.t('ovs:generic.backup_failure_domain'), width: undefined }
         ];
 
         // Observables
-        self.vPools = ko.observableArray([]);
+        self.vPools         = ko.observableArray([]);
+        self.failureDomains = ko.observableArray([]);
+        self.storageRouters = ko.observableArray([]);
 
         // Handles
         self.storageRoutersHandle = {};
         self.vPoolsHandle         = undefined;
+        self.failureDomainHandle  = undefined;
+        self.storageRouterHandle  = undefined;
 
         // Functions
         self.loadStorageRouters = function(page) {
@@ -88,6 +95,11 @@ define([
                 }
             }).promise();
         };
+        self.addEditFailureDomains = function() {
+            var wizard = dialog.show(new AddEditFailureDomainsWizard({
+                modal: true,
+            }));
+        };
 
         // Durandal
         self.activate = function() {
@@ -109,6 +121,56 @@ define([
                             $.each(self.vPools(), function(index, item) {
                                 if (vpdata.hasOwnProperty(item.guid())) {
                                     item.fillData(vpdata[item.guid()]);
+                                }
+                            });
+                        });
+                }
+                if (generic.xhrCompleted(self.failureDomainHandle)) {
+                    var options = {
+                        sort: 'name',
+                        contents: ''
+                    };
+                    self.failureDomainHandle = api.get('failure_domain', { queryparams: options })
+                        .done(function(data) {
+                            var guids = [], fdData = {};
+                            $.each(data.data, function(index, item) {
+                                guids.push(item.guid);
+                                fdData[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.failureDomains,
+                                function(guid) {
+                                    return new FailureDomain(guid);
+                                }, 'guid'
+                            );
+                            $.each(self.failureDomains(), function(index, item) {
+                                if (fdData.hasOwnProperty(item.guid())) {
+                                    item.fillData(fdData[item.guid()]);
+                                }
+                            });
+                        });
+                }
+                if (generic.xhrCompleted(self.storageRouterHandle)) {
+                    var options = {
+                        sort: 'name',
+                        contents: '_relations'
+                    };
+                    self.storageRouterHandle = api.get('storagerouters', { queryparams: options })
+                        .done(function(data) {
+                            var guids = [], srData = {};
+                            $.each(data.data, function(index, item) {
+                                guids.push(item.guid);
+                                srData[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.storageRouters,
+                                function(guid) {
+                                    return new StorageRouter(guid);
+                                }, 'guid'
+                            );
+                            $.each(self.storageRouters(), function(index, item) {
+                                if (srData.hasOwnProperty(item.guid())) {
+                                    item.fillData(srData[item.guid()]);
                                 }
                             });
                         });

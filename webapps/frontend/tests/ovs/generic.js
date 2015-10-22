@@ -29,7 +29,7 @@ define([
         });
 
         it('getBytesByHuman should format correctly', function() {
-            var namespace = 'ovs:generic.';
+            var namespace = 'ovs:generic.units.';
             expect(generic.formatBytes(1)).toBe('1.00 ' + namespace + 'b');
             expect(generic.formatBytes(1000)).toBe('0.98 ' + namespace + 'kib');
             expect(generic.formatBytes(2 * 1000)).toBe('1.95 ' + namespace + 'kib');

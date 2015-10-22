@@ -1,0 +1,118 @@
+<!--
+Copyright 2015 Open vStorage NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<div>
+    <form id="form.addeditfailuredomain" role="form form-horizontal" class="form-horizontal">
+        <div class="form-group">
+            <label class="col-lg-4 control-label" for="createNew" data-i18n="ovs:wizards.add_edit_failure_domains.create_new" style="padding: 0;"></label>
+            <div class="col-lg-7">
+                <input type="checkbox" data-bind="checked: data.newFailureDomain" id="createNew">
+            </div>
+        </div>
+        <div class="form-group" data-bind="visible: data.newFailureDomain() ? false : true">
+            <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_edit_failure_domains.failure_domain" style="padding-right: 0;"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: {
+                                     items: data.failureDomains, target: data.failureDomain,
+                                     text: function(item) {
+                                         return item.name();
+                                     }
+                                 }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_edit_failure_domains.name" style="padding-right: 0;"></label>
+            <div class="col-lg-7">
+                <input type="text" id="inputFailureDomainName" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'input'" />
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_edit_failure_domains.address" style="padding-right: 0;"></label>
+            <div class="col-lg-7">
+                <input type="text" id="inputFailureDomainAddress" class="autofocus form-control" data-bind="value: data.address, valueUpdate: 'input'" />
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_edit_failure_domains.city" style="padding-right: 0;"></label>
+            <div class="col-lg-7">
+                <input type="text" id="inputFailureDomainCity" class="autofocus form-control" data-bind="value: data.city, valueUpdate: 'input'" />
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_edit_failure_domains.country" style="padding-right: 0;"></label>
+            <div class="col-lg-7">
+                <input type="text" id="inputFailureDomainCountry" class="autofocus form-control" data-bind="value: data.country, valueUpdate: 'input'" />
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-lg-4" style="padding-right: 0;">
+                <label data-i18n="ovs:wizards.add_edit_failure_domains.primary" style="padding-right: 0; float: right; margin-top: 5px;"></label>
+                <a data-bind="popover: {
+                                  title: 'ovs:wizards.add_edit_failure_domains.primary_tooltip_title',
+                                  content: 'ovs:wizards.add_edit_failure_domains.primary_tooltip',
+                              }"
+                   class="hand fa noline"
+                   data-i18n="[html]ovs:icons.help"
+                   style="margin-right: 5px; margin-top: 8px; color: #377ca8; float: right;"
+                   role="button"
+                   tabindex="-1">
+                </a>
+            </div>
+            <div class="col-lg-7">
+                <span id="primaryStorageRoutersID"
+                      data-bind="dropdown: {
+                                     items: data.availablePrimary, target: data.primaryStorageRouters, key: 'guid',
+                                     text: function(item) {
+                                         return item.name;
+                                     }
+                                 }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-lg-4" style="padding-right: 0;">
+                <label data-i18n="ovs:wizards.add_edit_failure_domains.secondary" style="padding-right: 0; float: right; margin-top: 5px;"></label>
+                <a data-bind="popover: {
+                                  title: 'ovs:wizards.add_edit_failure_domains.secondary_tooltip_title',
+                                  content: 'ovs:wizards.add_edit_failure_domains.secondary_tooltip',
+                              }"
+                   class="hand fa noline"
+                   data-i18n="[html]ovs:icons.help"
+                   style="margin-right: 5px; margin-top: 8px; color: #377ca8; float: right;"
+                   role="button"
+                   tabindex="-1">
+                </a>
+            </div>
+            <div class="col-lg-7">
+                <span id="secondaryStorageRoutersID"
+                      data-bind="dropdown: {
+                                     items: data.availableSecondary, target: data.secondaryStorageRouters, key: 'guid',
+                                     text: function(item) {
+                                         return item.name;
+                                     }
+                                 }">
+                </span>
+            </div>
+        </div>
+    </form>
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors" style="margin-bottom: -10px;">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>

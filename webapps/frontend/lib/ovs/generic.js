@@ -72,7 +72,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
             value = value / 1024;
             counter += 1;
         }
-        return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.' + units[counter]);
+        return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.units.' + units[counter]);
     }
     function formatSpeed(value) {
         var units, counter;
@@ -82,7 +82,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
             value = value / 1024;
             counter += 1;
         }
-        return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.' + units[counter] + 's');
+        return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.units.' + units[counter] + 's');
     }
     function formatRatio(value) {
         return setDecimals(round(value, 2), 2) + ' %';
@@ -97,7 +97,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         returnValue = setDecimals(round(value, 2), 2);
         if (counter > 0) {
-            returnValue += ' ' + $.t('ovs:generic.' + units[counter - 1]);
+            returnValue += ' ' + $.t('ovs:generic.units.' + units[counter - 1]);
         }
         return returnValue;
     }

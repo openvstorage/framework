@@ -346,7 +346,7 @@ limitations under the License.
                                                             <input data-bind="value: readCacheLimit, valueUpdate: 'afterkeydown'"
                                                                    size="5"
                                                                    style="height: 25px; text-align: center;"/>
-                                                            <span data-i18n="ovs:generic.gib"></span>
+                                                            <span data-i18n="ovs:generic.units.gib"></span>
                                                         </td>
                                                     </tr>
                                                 </tbody>
@@ -369,7 +369,7 @@ limitations under the License.
                                                                                  items: scoSizes,
                                                                                  target: scoSize,
                                                                                  text: function(item) {
-                                                                                     return item + ' ' + $.t('ovs:generic.mib');
+                                                                                     return item + ' ' + $.t('ovs:generic.units.mib');
                                                                                  },
                                                                                  small: true
                                                                              }">
@@ -391,7 +391,7 @@ limitations under the License.
                                                             <input data-bind="value: writeBuffer"
                                                                    size="5"
                                                                    style="height: 25px; text-align: center;"/>
-                                                            <span data-i18n="ovs:generic.mib"></span>
+                                                            <span data-i18n="ovs:generic.units.mib"></span>
                                                         </td>
                                                         <td style="padding: 0;">
                                                             <!-- ko if: configuration() !== undefined  && parentConfiguration() !== undefined && configuration().write_buffer === parentConfiguration().write_buffer -->

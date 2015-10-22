@@ -37,7 +37,7 @@ class OVSMigrator(object):
         """
         Migrates from any version to any version, running all migrations required
         If previous_version is for example 0 and this script is at
-        verison 3 it will execute two steps:
+        version 3 it will execute two steps:
           - 1 > 2
           - 2 > 3
         @param previous_version: The previous version from which to start the migration.
@@ -52,6 +52,7 @@ class OVSMigrator(object):
             from ovs.dal.hybrids.group import Group
             from ovs.dal.hybrids.role import Role
             from ovs.dal.hybrids.client import Client
+            from ovs.dal.hybrids.failuredomain import FailureDomain
             from ovs.dal.hybrids.j_rolegroup import RoleGroup
             from ovs.dal.hybrids.j_roleclient import RoleClient
             from ovs.dal.hybrids.backendtype import BackendType
@@ -146,7 +147,7 @@ class OVSMigrator(object):
                 service_type.name = service_type_info
                 service_type.save()
 
-            # Brandings
+            # Branding
             branding = Branding()
             branding.name = 'Default'
             branding.description = 'Default bootstrap theme'
@@ -161,6 +162,11 @@ class OVSMigrator(object):
             slate.productname = 'Open vStorage'
             slate.is_default = False
             slate.save()
+
+            # Failure Domain
+            failure_domain = FailureDomain()
+            failure_domain.name = 'Default'
+            failure_domain.save()
 
             # We're now at version 1
             working_version = 1
