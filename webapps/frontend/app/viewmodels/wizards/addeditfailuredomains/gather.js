@@ -84,13 +84,18 @@ define([
             return secondary;
         });
         self.canContinue = ko.computed(function() {
-            var value = true, reasons = [], fields = [];
+            var value = true, reasons = [], fields = [], domainNames = [];
             $.each(self.data.failureDomains(), function(index, failureDomain) {
-                if (failureDomain !== undefined && failureDomain.name() !== undefined && failureDomain.name().toLowerCase() === self.data.name()) {
-                    value = false;
-                    reasons.push($.t('ovs:wizards.add_edit_failure_domains.duplicate_name'));
+                if (failureDomain !== undefined && failureDomain.name() !== undefined && self.data.name() !== "") {
+                    if (self.data.name() !== self.data.failureDomain().name()) {
+                        domainNames.push(failureDomain.name().toLowerCase());
+                    }
                 }
             });
+            if (domainNames.contains(self.data.name())) {
+                value = false;
+                reasons.push($.t('ovs:wizards.add_edit_failure_domains.duplicate_name'));
+            }
             if (self.data.primaryStorageRouters().length === 0) {
                 value = false;
                 reasons.push($.t('ovs:wizards.add_edit_failure_domains.missing_primary'));
