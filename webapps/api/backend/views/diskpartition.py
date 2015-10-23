@@ -47,7 +47,7 @@ class DiskPartitionViewSet(viewsets.ViewSet):
 
     @log()
     @required_roles(['read'])
-    @return_object(Disk)
+    @return_object(DiskPartition)
     @load(DiskPartition)
     def retrieve(self, diskpartition):
         """
