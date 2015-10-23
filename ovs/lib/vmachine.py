@@ -622,7 +622,7 @@ class VMachineController(object):
                             mutex.release()
                         if ensure_safety:
                             MDSServiceController.ensure_safety(vdisk)
-                        vdisk = VDiskList.get_by_devicename_and_vpool(disk['filename'], datastores[datastore].vpool)
+                        
                         # Update the disk with information from the hypervisor
                         if vdisk.vmachine is None:
                             MessageController.fire(MessageController.Type.EVENT,
