@@ -137,13 +137,14 @@ class VDiskController(object):
                 disk = VDiskList.get_by_devicename_and_vpool(volumepath, storagedriver.vpool)
                 if disk is None:
                     disk = VDisk()
+            disk.devicename = volumepath
+            disk.volume_id = volumename
+            disk.size = volumesize
+            disk.vpool = storagedriver.vpool
+            disk.save()
         finally:
             mutex.release()
-        disk.devicename = volumepath
-        disk.volume_id = volumename
-        disk.size = volumesize
-        disk.vpool = storagedriver.vpool
-        disk.save()
+
         VDiskController.sync_with_mgmtcenter(disk, pmachine, storagedriver)
         MDSServiceController.ensure_safety(disk)
 
