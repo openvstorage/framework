@@ -101,7 +101,13 @@ class DebianPackager(object):
 
         package_name = settings.get('packaging', 'package_name')
         package_path = SourceCollector.package_path.format(settings.get('packaging', 'working_dir'), package_name)
-        releasename = settings.get('version', 'releasename').lower()
+
+        # Get release name from the repo code settings.cfg not master settings.cfg
+        repo_path_code = SourceCollector.repo_path_code.format(settings.get('packaging', 'working_dir'), settings.get('packaging', 'package_name'))
+        filename = '{0}/packaging/settings.cfg'.format(repo_path_code)
+        code_settings = RawConfigParser()
+        code_settings.read(filename)
+        releasename = code_settings.get('version', 'releasename').lower()
         target, version_string, _ = source_metadata
 
         user = "upload"
