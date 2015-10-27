@@ -310,7 +310,7 @@ class StorageRouterController(object):
         if error_messages:
             raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
 
-        # 11. check available IP addresses
+        # 11. Check available IP addresses
         ipaddresses = metadata['ipaddresses']
         grid_ip = client.config_read('ovs.grid.ip')
         if grid_ip in ipaddresses:
@@ -646,7 +646,7 @@ class StorageRouterController(object):
             sco_factor = float(current_storage_driver_config['write_buffer']) / tlog_multiplier / sco_size
             dedupe_mode = current_storage_driver_config['dedupe_mode']
             cache_strategy = current_storage_driver_config['cache_strategy']
-            dtl_transport = current_storage_driver_config['failovercache_transport']
+            dtl_transport = StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[current_storage_driver_config['dtl_transport']]
 
         volume_manager_config["read_cache_default_mode"] = StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode]
         volume_manager_config["read_cache_default_behaviour"] = StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy]
@@ -706,7 +706,10 @@ class StorageRouterController(object):
 
         DiskController.sync_with_reality(storagerouter.guid)
 
-        MDSServiceController.prepare_mds_service(client, storagerouter, vpool, reload_config=False)
+        MDSServiceController.prepare_mds_service(storagerouter=storagerouter,
+                                                 vpool=vpool,
+                                                 fresh_only=True,
+                                                 reload_config=False)
 
         root_client.dir_create(dirs2create)
         root_client.file_create(files2create)
@@ -778,7 +781,7 @@ class StorageRouterController(object):
             raise RuntimeError('StorageDriver service failed to start (got no event)')
         logger.debug('StorageDriver running')
 
-        mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool)
+        mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool=vpool)
         for sr in all_storagerouters:
             node_client = ip_client_map[sr.ip]['ovs']
             storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
@@ -799,7 +802,7 @@ class StorageRouterController(object):
         vpool.save()
 
         for vdisk in vpool.vdisks:
-            MDSServiceController.ensure_safety(vdisk)
+            MDSServiceController.ensure_safety(vdisk=vdisk)
 
         mgmt_center = Factory.get_mgmtcenter(storagerouter.pmachine)
         if mgmt_center:
@@ -865,7 +868,8 @@ class StorageRouterController(object):
                 vdisks.append(junction.vdisk)
         for vdisk in vdisks:
             if vdisk.storagedriver_id:
-                MDSServiceController.ensure_safety(vdisk, [storagerouter])
+                MDSServiceController.ensure_safety(vdisk=vdisk,
+                                                   excluded_storagerouters=[storagerouter])
 
         client = SSHClient(ip, username='root')
         configuration_dir = client.config_read('ovs.core.cfgdir')
@@ -967,7 +971,10 @@ class StorageRouterController(object):
 
         for mds_service in removal_mdsservices:
             # All MDSServiceVDisk object should have been deleted above
-            MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool, reload_config=False)
+            MDSServiceController.remove_mds_service(mds_service=mds_service,
+                                                    storagerouter=storagerouter,
+                                                    vpool=vpool,
+                                                    reload_config=False)
 
         # Cleanup directories/files
         dirs_to_remove = [storagedriver.mountpoint,
