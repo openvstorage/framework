@@ -598,20 +598,31 @@ class VMachineController(object):
             storagedrivers = StorageDriverList.get_storagedrivers()
             datastores = dict([('{0}:{1}'.format(storagedriver.storage_ip, storagedriver.mountpoint), storagedriver) for storagedriver in storagedrivers])
             vdisk_guids = []
+            mutex = VolatileMutex('{0}_{1}'.format(vmachine.name, vmachine.devicename))
             for disk in vm_object['disks']:
+                ensure_safety = False
                 if disk['datastore'] in vm_object['datastores']:
                     datastore = vm_object['datastores'][disk['datastore']]
                     if datastore in datastores:
-                        vdisk = VDiskList.get_by_devicename_and_vpool(disk['filename'], datastores[datastore].vpool)
-                        if vdisk is None:
-                            # The disk couldn't be located, but is in our datastore. We might be in a recovery scenario
-                            vdisk = VDisk()
-                            vdisk.vpool = datastores[datastore].vpool
-                            vdisk.reload_client()
-                            vdisk.devicename = disk['filename']
-                            vdisk.volume_id = vdisk.storagedriver_client.get_volume_id(str(disk['backingfilename']))
-                            vdisk.size = vdisk.info['volume_size']
+                        try:
+                            mutex.acquire(wait=10)
+                            vdisk = VDiskList.get_by_devicename_and_vpool(disk['filename'], datastores[datastore].vpool)
+                            if vdisk is None:
+                                # The disk couldn't be located, but is in our datastore. We might be in a recovery scenario
+                                vdisk = VDisk()
+                                vdisk.vpool = datastores[datastore].vpool
+                                vdisk.reload_client()
+                                vdisk.devicename = disk['filename']
+                                vdisk.volume_id = vdisk.storagedriver_client.get_volume_id(str(disk['backingfilename']))
+                                vdisk.size = vdisk.info['volume_size']
+                                # Create the disk in a locked context, but don't execute long running-task in same context
+                                vdisk.save()
+                                ensure_safety = True
+                        finally:
+                            mutex.release()
+                        if ensure_safety:
                             MDSServiceController.ensure_safety(vdisk)
+                        
                         # Update the disk with information from the hypervisor
                         if vdisk.vmachine is None:
                             MessageController.fire(MessageController.Type.EVENT,
