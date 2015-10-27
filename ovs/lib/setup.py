@@ -1603,25 +1603,26 @@ EOF
             if current_storagerouter.ip == cluster_ip and current_storagerouter.machine_id == unique_id:
                 storagerouter = current_storagerouter
                 break
-        failure_domain_usages = sys.maxint
-        default_failure_domain = None
-        least_used_failure_domain = None
-        for failure_domain in FailureDomainList.get_failure_domains():
-            if failure_domain.name == 'Default':
-                default_failure_domain = failure_domain
-            if len(failure_domain.primary_storagerouters) < failure_domain_usages:
-                least_used_failure_domain = failure_domain
 
         if storagerouter is None:
+            failure_domains = FailureDomainList.get_failure_domains()
+            failure_domain_usages = sys.maxint
+            failure_domain = None
+            for current_failure_domain in failure_domains:
+                current_failure_domain_usages = len(current_failure_domain.primary_storagerouters)
+                if current_failure_domain_usages < failure_domain_usages:
+                    failure_domain = current_failure_domain
+                    failure_domain_usages = current_failure_domain_usages
+            if failure_domain is None:
+                failure_domain = failure_domains[0]
+
             storagerouter = StorageRouter()
             storagerouter.name = node_name
             storagerouter.machine_id = unique_id
             storagerouter.ip = cluster_ip
-            storagerouter.primary_failure_domain = FailureDomainList.get_failure_domains()[0]
+            storagerouter.primary_failure_domain = failure_domain
         storagerouter.node_type = node_type
         storagerouter.pmachine = pmachine
-        storagerouter.primary_failure_domain = least_used_failure_domain if least_used_failure_domain else default_failure_domain
-        storagerouter.save()
         storagerouter.save()
 
         DiskController.sync_with_reality(storagerouter.guid)
