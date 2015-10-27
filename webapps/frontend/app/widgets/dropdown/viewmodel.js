@@ -35,6 +35,7 @@ define([
         self._freeValue     = ko.observable();
         self.useFree        = ko.observable(false);
         self.emptyIsLoading = ko.observable(true);
+        self.enabled        = ko.observable(true);
 
         // Computed
         self.selected  = ko.computed(function() {
@@ -57,6 +58,7 @@ define([
         });
 
         // Functions
+        self.extract = generic.extract;
         self.set = function(item) {
             if (self.multi()) {
                 if (self.contains(item)) {
@@ -125,6 +127,7 @@ define([
             }
             self.items = settings.items;
             self.target = settings.target;
+            self.enabled = generic.tryGet(settings, 'enabled', ko.observable(true));
             self.key(generic.tryGet(settings, 'key', undefined));
             self.small(generic.tryGet(settings, 'small', false));
             self.keyIsFunction(generic.tryGet(settings, 'keyisfunction', false));

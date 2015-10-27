@@ -243,13 +243,13 @@ define([
                             }
                             generic.crossFiller(keys, self.container(), dataset.loader, self.key, false);
                             $.each(self.container()(), function (index, item) {
-                                if ($.inArray(item[self.key](), keys) !== -1) {
+                                if ($.inArray(item[self.key](), keys) !== -1 && (self.skipOn === undefined || !item[self.skipOn]())) {
                                     item.fillData(idata[item[self.key]()]);
-                                    item.loading(false);
                                     if (dataset.dependencyLoader !== undefined) {
                                         dataset.dependencyLoader(item);
                                     }
                                 }
+                                item.loading(false);
                             });
                             if (dataset.overviewLoader !== undefined) {
                                 dataset.overviewLoader(keys);
@@ -315,6 +315,7 @@ define([
             self.loadData = generic.tryGet(settings, 'loadData');
             self.refresh = parseInt(generic.tryGet(settings, 'refreshInterval', '5000'), 10);
             self.key = generic.tryGet(settings, 'key', 'guid');
+            self.skipOn = generic.tryGet(settings, 'skipon', undefined);
             self.settings(settings);
             self.headers(settings.headers);
             self.preloading(generic.tryGet(settings, 'preloading', false));

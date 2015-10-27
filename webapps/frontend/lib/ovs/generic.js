@@ -473,6 +473,12 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function isEmpty(value) {
         return ['', null, undefined].contains(value) || value === null;
     }
+    function extract(object) {
+        if (!!(object && object.constructor && object.call && object.apply)) {
+            return object();
+        }
+        return object
+    }
 
     Array.prototype.equals = function(array) {
         return arrayEquals(this, array);
@@ -482,6 +488,9 @@ define(['jquery', 'jqp/pnotify'], function($) {
     };
     Array.prototype.contains = function(element) {
         return arrayHasElement(this, element);
+    };
+    Array.prototype.remove = function(element) {
+        return removeElement(this, element);
     };
     String.prototype.startsWith = function(searchString) {
         return stringStartsWith(this, searchString);
@@ -527,6 +536,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         validate: validate,
         xhrAbort: xhrAbort,
         xhrCompleted: xhrCompleted,
-        isEmpty: isEmpty
+        isEmpty: isEmpty,
+        extract: extract
     };
 });

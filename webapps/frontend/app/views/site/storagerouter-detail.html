@@ -27,6 +27,17 @@ limitations under the License.
                     <span style="padding-left: 5px;" data-bind="text: name, visible: name() !== undefined"></span>
                 </a>
             </li>
+            <li class="actions">
+                <span data-i18n="ovs:generic.actions"></span>:
+                <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="buttonEdit"
+                        data-bind="click: function() { if (edit()) { save() } else { edit(true); } },
+                                   enable: loaded(),
+                                   enable: $root.shared.user.roles().contains('manage')">
+                    <span class="hand fa" data-bind="visible: edit() && !saving()" data-i18n="[html]ovs:icons.save"></span>
+                    <span class="hand fa fa-spin" data-bind="visible: edit() && saving()" data-i18n="[html]ovs:icons.loading"></span>
+                    <span class="hand fa" data-bind="visible: !edit()" data-i18n="[html]ovs:icons.edit"></span>
+                </button>
+            </li>
         </ul>
         <div class="tab-content">
             <div class="tab-pane active" id="information" style="padding: 15px;">
@@ -39,10 +50,10 @@ limitations under the License.
                     </thead>
                     <tbody>
                         <tr>
-                            <td style="width: 15%;" data-i18n="ovs:generic.ip"></td>
-                            <td style="width: 35%;"><span data-bind="text: ipAddress"></span></td>
-                            <td style="width: 15%;" data-i18n="ovs:generic.storeddata"></td>
-                            <td style="width: 35%;"><span data-bind="text: storedData"></span></td>
+                            <td style="width: 20%;" data-i18n="ovs:generic.ip"></td>
+                            <td style="width: 30%;"><span data-bind="text: ipAddress"></span></td>
+                            <td style="width: 20%;" data-i18n="ovs:generic.nrofvpools"></td>
+                            <td style="width: 30%;"><span data-bind="text: vPools().length"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.host"></td>
@@ -51,8 +62,8 @@ limitations under the License.
                                     <span data-part="lazy-entry" data-bind="text: item().name()"></span>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.cache"></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
+                            <td data-i18n="ovs:generic.nrofvmachines"></td>
+                            <td><span data-bind="text: vMachines().length"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:storagerouters.detail.hostip"></td>
@@ -61,8 +72,8 @@ limitations under the License.
                                     <span data-part="lazy-entry" data-bind="text: item().ipAddress()"></span>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
+                            <td data-i18n="ovs:generic.nrofvdisks"></td>
+                            <td><span data-bind="text: vDisks().length"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.type"></td>
@@ -72,8 +83,8 @@ limitations under the License.
                                           data-bind="text: $.t('ovs:generic.hypervisors.' + item().hvtype())"></span>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:generic.storeddata"></td>
+                            <td><span data-bind="text: storedData"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:storagerouters.detail.rdma_capable"></td>
@@ -85,23 +96,55 @@ limitations under the License.
                                     <span class="fa" data-i18n="[html]ovs:icons.check_circle" style="color: green;"></span>
                                 <!-- /ko -->
                             </td>
+                            <td data-i18n="ovs:generic.cache"></td>
+                            <td><span data-bind="text: cacheRatio"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.failure_domain"></td>
+                            <td>
+                                <span data-bind="visible: !edit()">
+                                    <span data-bind="text: primaryFailureDomain().name()"></span>
+                                </span>
+                                <span data-bind="visible: edit()">
+                                    <span data-bind="dropdown: {
+                                                         enabled: $root.canChangePFD,
+                                                         items: $root.failureDomains, target: primaryFailureDomain,
+                                                         text: function(item) {
+                                                             return item.name();
+                                                         },
+                                                         key: 'guid', keyisfunction: true, small: true
+                                                     }">
+                                    </span>
+                                </span>
+                            </td>
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: iops"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.backup_failure_domain"></td>
+                            <td>
+                                <span data-bind="visible: !edit()">
+                                    <span data-bind="text: secondaryFailureDomain() !== undefined ? secondaryFailureDomain().name() : '-'"></span>
+                                </span>
+                                <span data-bind="visible: edit()">
+                                    <span data-bind="dropdown: {
+                                                         items: $root.availableSecondaryFailureDomains, target: secondaryFailureDomain,
+                                                         text: function(item) {
+                                                             if (item === undefined) { return '-'; }
+                                                             return item.name();
+                                                         },
+                                                         key: 'guid', keyisfunction: true, small: true
+                                                     }">
+                                    </span>
+                                </span>
+                            </td>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2"></td>
                             <td data-i18n="ovs:generic.writespeed"></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
-                        </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.nrofvpools"></td>
-                            <td><span data-bind="text: vPools().length"></span></td>
-                            <td colspan="2"></td>
-                        </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.nrofvmachines"></td>
-                            <td><span data-bind="text: vMachines().length"></span></td>
-                            <td colspan="2"></td>
-                        </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.nrofvdisks"></td>
-                            <td><span data-bind="text: vDisks().length"></span></td>
-                            <td colspan="2"></td>
                         </tr>
                     </tbody>
                 </table>

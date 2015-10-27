@@ -48,6 +48,7 @@ define([
         self.disksLoaded            = ko.observable(false);
         self.downloadLogState       = ko.observable($.t('ovs:support.downloadlogs'));
         self.dtlMode                = ko.observable();
+        self.edit                   = ko.observable(false);
         self.guid                   = ko.observable(guid);
         self.iops                   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.ipAddress              = ko.observable();
@@ -60,6 +61,7 @@ define([
         self.primaryFailureDomain   = ko.observable();
         self.rdmaCapable            = ko.observable(false);
         self.readSpeed              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.saving                 = ko.observable(false);
         self.secondaryFailureDomain = ko.observable();
         self.status                 = ko.observable();
         self.storedData             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
@@ -230,21 +232,25 @@ define([
                 );
             }
             if (data.hasOwnProperty('primary_failure_domain_guid')) {
-                if (data.primary_failure_domain_guid === null || data.primary_failure_domain_guid === undefined) {
+                var pfdGuid = data.primary_failure_domain_guid;
+                if (pfdGuid === null || pfdGuid === undefined) {
                     self.primaryFailureDomain(undefined);
                 } else {
-                    var primary = new FailureDomain(data.primary_failure_domain_guid);
-                    primary.load();
-                    self.primaryFailureDomain(primary);
+                    if (self.primaryFailureDomain() === undefined || self.primaryFailureDomain().guid() !== pfdGuid) {
+                        self.primaryFailureDomain(new FailureDomain(pfdGuid));
+                    }
+                    self.primaryFailureDomain().load();
                 }
             }
             if (data.hasOwnProperty('secondary_failure_domain_guid')) {
-                if (data.secondary_failure_domain_guid === null || data.secondary_failure_domain_guid === undefined) {
+                var sfdGuid = data.secondary_failure_domain_guid;
+                if (sfdGuid === null || sfdGuid === undefined) {
                     self.secondaryFailureDomain(undefined);
                 } else {
-                    var secondary = new FailureDomain(data.secondary_failure_domain_guid);
-                    secondary.load();
-                    self.secondaryFailureDomain(secondary);
+                    if (self.secondaryFailureDomain() === undefined || self.secondaryFailureDomain().guid() !== sfdGuid) {
+                        self.secondaryFailureDomain(new FailureDomain(sfdGuid));
+                    }
+                    self.secondaryFailureDomain().load();
                 }
             }
             if (data.hasOwnProperty('statistics')) {
@@ -282,6 +288,22 @@ define([
                 } else {
                     deferred.resolve();
                 }
+            }).promise();
+        };
+        self.save = function() {
+            return $.Deferred(function(deferred) {
+                self.saving(true);
+                var data = {
+                    primary_failure_domain_guid: self.primaryFailureDomain().guid(),
+                    secondary_failure_domain_guid: self.secondaryFailureDomain() === undefined ? null : self.secondaryFailureDomain().guid()
+                };
+                api.patch('storagerouters/' + self.guid(), { data: data })
+                    .done(deferred.resolve)
+                    .fail(deferred.reject)
+                    .always(function() {
+                        self.edit(false);
+                        self.saving(false);
+                    });
             }).promise();
         };
     };

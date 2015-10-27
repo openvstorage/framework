@@ -28,6 +28,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import NotAcceptable
 from rest_framework.response import Response
 
 
@@ -36,8 +37,8 @@ class FailureDomainViewSet(viewsets.ViewSet):
     Information about FailureDomains
     """
     permission_classes = (IsAuthenticated,)
-    prefix = r'failure_domain'
-    base_name = 'failure_domain'
+    prefix = r'failure_domains'
+    base_name = 'failure_domains'
 
     @log()
     @required_roles(['read'])
@@ -61,71 +62,44 @@ class FailureDomainViewSet(viewsets.ViewSet):
 
     @log()
     @required_roles(['read', 'write', 'manage'])
+    @load(FailureDomain)
+    def destroy(self, failuredomain):
+        """
+        Deletes a FailureDomain
+        """
+        if len(failuredomain.primary_storagerouters) > 0 or len(failuredomain.secondary_storagerouters) > 0:
+            raise NotAcceptable('The given FailureDomain is still in use')
+        failuredomain.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @log()
+    @required_roles(['read', 'write', 'manage'])
     @load()
-    def create(self, name, city, address, country, primary, secondary=None):
+    def create(self, request, contents=None):
         """
-        Creates a new failure domain
+        Creates a new Failure Domain
         """
-        if secondary is None:
-            secondary = []
+        contents = None if contents is None else contents.split(',')
+        serializer = FullSerializer(FailureDomain, contents=contents, instance=FailureDomain(), data=request.DATA)
+        if serializer.is_valid():
+            serializer.save()
 
-        failure_domain = FailureDomain()
-        failure_domain.name = name
-        failure_domain.city = city
-        failure_domain.address = address
-        failure_domain.country = country
-        failure_domain.save()
-
-        for storage_router in StorageRouterList.get_storagerouters():
-            if storage_router.guid in primary:
-                if storage_router.primary_failure_domain:
-                    raise RuntimeError('Primary domain for storagerouter {0} was already set to {1}'.format(storage_router.name, storage_router.primary_failure_domain.name))
-                storage_router.primary_failure_domain = failure_domain
-                storage_router.save()
-            elif storage_router.guid in secondary:
-                if storage_router.secondary_failure_domain:
-                    raise RuntimeError('Secondary domain for storagerouter {0} was already set to {1}'.format(storage_router.name, storage_router.secondary_failure_domain.name))
-                storage_router.secondary_failure_domain = failure_domain
-                storage_router.save()
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @log()
     @required_roles(['read', 'write', 'manage'])
     @load(FailureDomain)
-    def partial_update(self, contents, failuredomain, request, city, name, address, country, primary, secondary=None):
+    def partial_update(self, failuredomain, request, contents=None):
         """
         Update a Failure Domain
         """
         contents = None if contents is None else contents.split(',')
         serializer = FullSerializer(FailureDomain, contents=contents, instance=failuredomain, data=request.DATA)
         if serializer.is_valid():
-            primary = set(primary.split(','))
-            secondary = set(secondary.split(',')) if secondary is not None else set([])
-            if primary.intersection(secondary):
-                raise ValueError('A storagerouter cannot have the same failure domain for both primary and backup')
-
-            failuredomain.name = name
-            failuredomain.city = city
-            failuredomain.address = address
-            failuredomain.country = country
-            failuredomain.save()
-            for storage_router in StorageRouterList.get_storagerouters():
-                # Clear the failure domains from all storagerouter if equal to current failure domain
-                if storage_router.primary_failure_domain is not None and storage_router.primary_failure_domain.guid == failuredomain.guid:
-                    storage_router.primary_failure_domain = None
-                if storage_router.secondary_failure_domain is not None and storage_router.secondary_failure_domain.guid == failuredomain.guid:
-                    storage_router.secondary_failure_domain = None
-
-                if storage_router.guid in primary:
-                    if storage_router.primary_failure_domain:  # A storage router can only belong to 1 failure domain, which should have been cleared by now
-                        raise RuntimeError('Primary domain for storagerouter {0} was already set to {1}'.format(storage_router.name, storage_router.primary_failure_domain.name))
-                    storage_router.primary_failure_domain = failuredomain
-                elif storage_router.guid in secondary:
-                    if storage_router.secondary_failure_domain:
-                        raise RuntimeError('Secondary domain for storagerouter {0} was already set to {1}'.format(storage_router.name, storage_router.secondary_failure_domain.name))
-                    storage_router.secondary_failure_domain = failuredomain
-                storage_router.save()
-
             serializer.save()
+
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -15,9 +15,9 @@
 define([
     'jquery', 'knockout', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver',
+    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver', '../containers/failuredomain',
     '../wizards/configurepartition/index'
-], function($, ko, dialog, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver, ConfigurePartitionWizard) {
+], function($, ko, dialog, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver, FailureDomain, ConfigurePartitionWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -32,24 +32,73 @@ define([
         self.vMachineCache            = {};
         self.loadVPoolsHandle         = undefined;
         self.loadStorageDriversHandle = {};
+        self.loadFailureDomainsHandle = undefined;
 
         // Observables
-        self.storageRouter     = ko.observable();
-        self.vPoolsLoaded      = ko.observable(false);
-        self.vPools            = ko.observableArray([]);
-        self.checkedVPoolGuids = ko.observableArray([]);
+        self.storageRouter           = ko.observable();
+        self.vPoolsLoaded            = ko.observable(false);
+        self.vPools                  = ko.observableArray([]);
+        self.checkedVPoolGuids       = ko.observableArray([]);
+        self.failureDomains          = ko.observableArray([]);
+        self.secondaryFailureDomains = ko.observableArray([]);
+
+        // Computed
+        self.availableSecondaryFailureDomains = ko.computed(function() {
+            var domains = [undefined], primary, storageRouter = self.storageRouter(), secondary, guids;
+            if (storageRouter !== undefined) {
+                secondary = storageRouter.secondaryFailureDomain;
+                $.each(self.secondaryFailureDomains(), function (index, domain) {
+                    primary = storageRouter.primaryFailureDomain();
+                    if (domain.guid() === primary.guid()) {
+                        if (!domain.primarySRGuids().contains(storageRouter.guid())) {
+                            domain.primarySRGuids.push(storageRouter.guid());
+                        }
+                    } else {
+                        guids = domain.primarySRGuids();
+                        guids.remove(storageRouter.guid());
+                        domain.primarySRGuids(guids);
+                    }
+                    domain.disabled(
+                        domain.guid() === storageRouter.primaryFailureDomain().guid() ||
+                        domain.primarySRGuids().length === 0
+                    );
+                    domains.push(domain);
+                    if (secondary() !== undefined && domain.guid() === secondary().guid() && domain.disabled()) {
+                        secondary(undefined);
+                    }
+                });
+            }
+            return domains;
+        });
+        self.canChangePFD = ko.computed(function() {
+            var storageRouter = self.storageRouter(), primary;
+            if (storageRouter === undefined) {
+                return true;
+            }
+            primary = storageRouter.primaryFailureDomain();
+            if (primary === undefined) {
+                return true;
+            }
+            return !(
+                primary.primarySRGuids().length === 1 &&
+                primary.primarySRGuids()[0] == storageRouter.guid() &&
+                primary.secondarySRGuids().length > 0
+            );
+        });
 
         // Functions
         self.load = function() {
             return $.Deferred(function (deferred) {
-                var storageRouter = self.storageRouter();
-                $.when.apply($, [
-                        storageRouter.load('_dynamics,_relations'),
-                        storageRouter.getAvailableActions(),
-                        storageRouter.getDisks()
-                    ])
+                var storageRouter = self.storageRouter(), calls = [];
+                if (!storageRouter.edit()) {
+                    calls.push(storageRouter.load('_dynamics,_relations'))
+                }
+                calls.push(storageRouter.getAvailableActions());
+                calls.push(storageRouter.getDisks());
+                $.when.apply($, calls)
                     .then(self.loadStorageDrivers)
                     .then(self.loadVPools)
+                    .then(self.loadFailureDomains)
                     .done(function() {
                         self.checkedVPoolGuids(self.storageRouter().vPoolGuids);
                         var pMachineGuid = storageRouter.pMachineGuid(), pm;
@@ -131,6 +180,45 @@ define([
                 deferred.resolve();
             }).promise();
         };
+        self.loadFailureDomains = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadFailureDomainsHandle)) {
+                    self.loadFailureDomainsHandle = api.get('failure_domains', {
+                        queryparams: {
+                            sort: 'name',
+                            contents: '_relations'
+                        }
+                    })
+                        .done(function(data) {
+                            var guids = [], fddata = {};
+                            $.each(data.data, function(index, item) {
+                                guids.push(item.guid);
+                                fddata[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.failureDomains,
+                                function(guid) {
+                                    var domain = new FailureDomain(guid);
+                                    domain.fillData(fddata[guid]);
+                                    return domain;
+                                }, 'guid'
+                            );
+                            generic.crossFiller(
+                                guids, self.secondaryFailureDomains,
+                                function(guid) {
+                                    var domain = new FailureDomain(guid);
+                                    domain.fillData(fddata[guid]);
+                                    return domain;
+                                }, 'guid'
+                            );
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
         self.isEmpty = generic.isEmpty;
         self.configureRoles = function(partition, disk) {
             if (self.shared.user.roles().contains('manage')) {
@@ -158,7 +246,6 @@ define([
         self.activate = function(mode, guid) {
             self.storageRouter(new StorageRouter(guid));
             self.storageRouter().storageDrivers = ko.observableArray();
-
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();

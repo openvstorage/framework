@@ -110,6 +110,7 @@
         "api": "API",
         "areyousure": "Are you sure?",
         "backendtype": "Type",
+        "backup_failure_domain_short": "Backup <abbr title='Failure Domain'>FD</abbr>",
         "backup_failure_domain": "Backup Failure Domain",
         "bandwidth": "Bandwidth",
         "cache": "Cache",
@@ -134,6 +135,7 @@
         "elementsloading": "Items loading...",
         "error": "Error",
         "errorsfound": "Errors were found. Please check the contents of all fields.",
+        "failure_domain_short": "<abbr title='Failure Domain'>FD</abbr>",
         "failure_domain": "Failure Domain",
         "filesystem": "Filesystem",
         "finish": "Finish",
@@ -226,10 +228,12 @@
         "write": "Write",
         "writespeed": "Write Speed",
         "xmlrpcport": "XML-RPC",
-        "yes": "Yes"
+        "yes": "Yes",
+        "address": "Address",
+        "city": "City",
+        "country": "Country"
     },
     "storagerouters": {
-        "add_edit_failure_domains": "Add/Edit Failure Domains",
         "title": "Storage Routers",
         "details": "Storage Router Details",
         "detail": {
@@ -537,6 +541,25 @@
             "failed": "Updating __what__ failed: __why__"
         }
     },
+    "failuredomains": {
+        "title": "Failure domains",
+        "save": {
+            "complete": "Safe completed",
+            "success": "Failure Domain __what__ updated.",
+            "failed": "Updating __what__ failed: __why__"
+        },
+        "new": {
+            "complete": "Created",
+            "addsuccess": "Failure Domain created",
+            "addfailed": "Failure Domain could not be created: __why__"
+        },
+        "delete": {
+            "delete": "Are you sure you want to delete Failure Domain '__what__'?",
+            "complete": "Deleted",
+            "deletesuccess": "Failure Domain deleted",
+            "deletefailed": "Could not delete the Failure Domain: __why__"
+        }
+    },
     "users": {
         "title": "User Mgmt.",
         "users": {
@@ -709,29 +732,6 @@
                 "role_check": "Role check",
                 "unable_to_determine_roles": "Failed to determine all required roles"
             }
-        },
-        "add_edit_failure_domains": {
-            "address": "Address:",
-            "city": "City:",
-            "completed": "Completed",
-            "country": "Country:",
-            "create_new": "Create new failure domain?",
-            "duplicate_name": "This name already exists",
-            "failed": "__what__ Failure Domain __which__ failed",
-            "failure_domain": "Failure Domain:",
-            "invalid_name": "The failure domain name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 30 characters has to be maintained.",
-            "missing_primary": "At least 1 storagerouter must be assigned to this failure domain",
-            "name": "Name:",
-            "primary": "Primary:",
-            "primary_tooltip": "The selected storagerouters within this failure domain will configure the DTL and other backup services among eachother. If this fails, the storagerouters will use the backup services of the storagerouters in the secondary failure domain",
-            "primary_tooltip_title": "Primary",
-            "secondary": "Secondary:",
-            "secondary_tooltip": "The selected storagerouters within this failure domain will serve as backup for the storagerouters in the primary failure domain. In case the storagerouters within the primary failure domain fail to respond, these storagerouters will be used",
-            "secondary_tooltip_title": "Secondary",
-            "started": "Started",
-            "started_message": "__what__ Failure Domain __which__",
-            "success": "__what__ Failure Domain __which__",
-            "title": "Add / Edit Failure Domain"
         },
         "addvpool": {
             "title": "Add new vPool",

@@ -1,0 +1,104 @@
+<!--
+Copyright 2015 Open vStorage NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<section>
+    <div>
+        <h2 class="pull-left" data-i18n="ovs:failuredomains.users.title"></h2>
+    </div>
+    <div data-bind="pager: {
+                        loadData: loadDomains, headers: domainHeaders, refreshInterval: 5000, controls: true,
+                        container: domains, skipon: 'edit', trigger: trigger
+                    }" style="clear: both;">
+        <table data-dummy="dummy">
+            <tr data-part="vitem">
+                <td style="position: relative;">
+                    <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
+                       <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    </span>
+                    <span data-bind="visible: !edit()">
+                        <span data-bind="text: name"></span>
+                    </span>
+                    <span data-bind="visible: edit()">
+                        <input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/>
+                    </span>
+                </td>
+                <td>
+                    <span data-bind="visible: !edit()">
+                        <span data-bind="text: address"></span>
+                    </span>
+                    <span data-bind="visible: edit()">
+                        <input type="text" data-bind="value: address, valueUpdate: 'input'" style="width: 200px;"/>
+                    </span>
+                </td>
+                <td>
+                    <span data-bind="visible: !edit()">
+                        <span data-bind="text: city"></span>
+                    </span>
+                    <span data-bind="visible: edit()">
+                        <input type="text" data-bind="value: city, valueUpdate: 'input'" style="width: 200px;"/>
+                    </span>
+                </td>
+                <td>
+                    <span data-bind="visible: !edit()">
+                        <span data-bind="text: country"></span>
+                    </span>
+                    <span data-bind="visible: edit()">
+                        <input type="text" data-bind="value: country, valueUpdate: 'input'" style="width: 200px;"/>
+                    </span>
+                </td>
+                <td>
+                    <span data-bind="visible: !edit()">
+                        <i data-bind="click: function() {
+                                          edit(true);
+                                      }"
+                           class="hand fa fa-fw" data-i18n="[html]ovs:icons.edit"></i>
+                    </span>
+                    <span data-bind="visible: edit()">
+                        <i data-bind="click: function() {
+                                          if (canSave()) {
+                                              save();
+                                          }
+                                      },
+                                      style: { color: canSave() ? 'black' : 'lightgrey' }"
+                           class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
+                    </span>
+                    <i data-bind="click: function() {
+                                      if (canDelete()) {
+                                           $root.deleteDomain($data.guid());
+                                      }
+                                  },
+                                  style: { color: canDelete() ? 'black' : 'lightgrey' }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
+                </td>
+
+            </tr>
+            <tr data-part="vnew" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1, with: $root.newDomain()">
+                <td><input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
+                <td><input type="text" data-bind="value: address, valueUpdate: 'input'" style="width: 200px;"/></td>
+                <td><input type="text" data-bind="value: city, valueUpdate: 'input'" style="width: 200px;"/></td>
+                <td><input type="text" data-bind="value: country, valueUpdate: 'input'" style="width: 200px;"/></td>
+                <td>
+                    <i data-bind="click: function() {
+                                      if (canSave()) {
+                                          $root.createDomain();
+                                      }
+                                  },
+                                  style: { color: canSave() ? 'black' : 'lightgrey' }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
+                </td>
+            </tr>
+        </table>
+    </div>
+</section>

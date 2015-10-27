@@ -1603,16 +1603,15 @@ EOF
             if current_storagerouter.ip == cluster_ip and current_storagerouter.machine_id == unique_id:
                 storagerouter = current_storagerouter
                 break
-        default_failure_domains = [domain for domain in FailureDomainList.get_failure_domains() if domain.name == 'Default']
+
         if storagerouter is None:
             storagerouter = StorageRouter()
             storagerouter.name = node_name
             storagerouter.machine_id = unique_id
             storagerouter.ip = cluster_ip
+            storagerouter.primary_failure_domain = FailureDomainList.get_failure_domains()[0]
         storagerouter.node_type = node_type
         storagerouter.pmachine = pmachine
-        storagerouter.primary_failure_domain = default_failure_domains[0] if default_failure_domains and node_type == 'MASTER' else None
-        storagerouter.save()
         storagerouter.save()
 
         DiskController.sync_with_reality(storagerouter.guid)
