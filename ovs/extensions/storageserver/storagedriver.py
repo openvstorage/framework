@@ -191,9 +191,9 @@ class StorageDriverConfiguration(object):
     # DO NOT MAKE MANUAL CHANGES HERE
 
     parameters = {
-        # hg branch: 3.6-dev
-        # hg revision: 388879da12d6
-        # buildTime: Thu Sep 17 10:25:33 UTC 2015
+        # hg branch: (detached
+        # hg revision: e32a21486a90ac1a28f74383fd7948d94e0afcc4
+        # buildTime: Fri Oct 23 08:03:15 UTC 2015
         'metadataserver': {
             'backend_connection_manager': {
                 'optional': ['backend_connection_pool_capacity', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
@@ -218,15 +218,15 @@ class StorageDriverConfiguration(object):
                 'mandatory': []
             },
             'failovercache': {
-                'optional': [],
-                'mandatory': ['failovercache_path', 'failovercache_transport', ]
+                'optional': ['failovercache_transport', ],
+                'mandatory': ['failovercache_path', ]
             },
             'file_driver': {
                 'optional': ['fd_extent_cache_capacity', ],
                 'mandatory': ['fd_cache_path', 'fd_namespace', ]
             },
             'filesystem': {
-                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_cache_dentries', ],
+                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_cache_dentries', 'fs_dtl_config_mode', 'fs_dtl_host', 'fs_dtl_port', ],
                 'mandatory': ['fs_virtual_disk_format', ]
             },
             'metadata_server': {
@@ -250,7 +250,7 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['vregistry_arakoon_cluster_id', 'vregistry_arakoon_cluster_nodes', ]
             },
             'volume_router': {
-                'optional': ['vrouter_local_io_sleep_before_retry_usecs', 'vrouter_local_io_retries', 'vrouter_volume_read_threshold', 'vrouter_volume_write_threshold', 'vrouter_file_read_threshold', 'vrouter_file_write_threshold', 'vrouter_redirect_timeout_ms', 'vrouter_backend_sync_timeout_ms', 'vrouter_migrate_timeout_ms', 'vrouter_redirect_retries', 'vrouter_sco_multiplier', 'vrouter_routing_retries', 'vrouter_min_workers', 'vrouter_max_workers', 'vrouter_registry_cache_capacity', ],
+                'optional': ['vrouter_local_io_sleep_before_retry_usecs', 'vrouter_local_io_retries', 'vrouter_check_local_volume_potential_period', 'vrouter_volume_read_threshold', 'vrouter_volume_write_threshold', 'vrouter_file_read_threshold', 'vrouter_file_write_threshold', 'vrouter_redirect_timeout_ms', 'vrouter_backend_sync_timeout_ms', 'vrouter_migrate_timeout_ms', 'vrouter_redirect_retries', 'vrouter_sco_multiplier', 'vrouter_routing_retries', 'vrouter_min_workers', 'vrouter_max_workers', 'vrouter_registry_cache_capacity', ],
                 'mandatory': ['vrouter_id', ]
             },
             'volume_router_cluster': {
@@ -355,7 +355,8 @@ class StorageDriverConfiguration(object):
         """
         for section, entries in self.params[self.config_type].iteritems():
             if section in self.configuration:
-                for param in self.configuration[section]:
+                section_configuration = copy.deepcopy(self.configuration[section])
+                for param in section_configuration:
                     if param not in entries['mandatory'] and param not in entries['optional']:
                         del self.configuration[section][param]
 
