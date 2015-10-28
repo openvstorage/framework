@@ -45,7 +45,8 @@ class OVSMigrator(object):
         # - Flexible SSD layout
         if working_version < 1:
             from ovs.extensions.generic.configuration import Configuration
-            Configuration.delete('ovs.arakoon', remove_root=True)
+            if Configuration.exists('ovs.arakoon'):
+                Configuration.delete('ovs.arakoon', remove_root=True)
             Configuration.set('ovs.core.ovsdb', '/opt/OpenvStorage/db')
 
             working_version = 1
