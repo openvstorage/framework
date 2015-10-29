@@ -34,7 +34,8 @@ class StorageRouter(DataObject):
                     Property('machine_id', str, mandatory=False, doc='The hardware identifier of the vMachine'),
                     Property('ip', str, doc='IP Address of the vMachine, if available'),
                     Property('heartbeats', dict, default={}, doc='Heartbeat information of various monitors'),
-                    Property('node_type', ['MASTER', 'EXTRA'], default='EXTRA', doc='Indicates the node\'s type')]
+                    Property('node_type', ['MASTER', 'EXTRA'], default='EXTRA', doc='Indicates the node\'s type'),
+                    Property('rdma_capable', bool, doc='Is this StorageRouter RDMA capable')]
     __relations = [Relation('pmachine', PMachine, 'storagerouters'),
                    Relation('primary_failure_domain', FailureDomain, 'primary_storagerouters'),
                    Relation('secondary_failure_domain', FailureDomain, 'secondary_storagerouters', mandatory=False)]
@@ -45,8 +46,7 @@ class StorageRouter(DataObject):
                   Dynamic('vpools_guids', list, 15),
                   Dynamic('vdisks_guids', list, 15),
                   Dynamic('status', str, 10),
-                  Dynamic('partition_config', dict, 3600),
-                  Dynamic('rdma_capable', bool, 86400)]
+                  Dynamic('partition_config', dict, 3600)]
 
     def _statistics(self, dynamic):
         """
@@ -156,20 +156,3 @@ class StorageRouter(DataObject):
                 for role in partition.roles:
                     dataset[role].append(partition.guid)
         return dataset
-
-    @staticmethod
-    def _rdma_capable():
-        for root, dirs, files in os.walk('/sys/class/infiniband'):
-            for directory in dirs:
-                ports_dir = os.path.join(root, directory, 'ports')
-                if not os.path.exists(ports_dir):
-                    continue
-                for sub_root, sub_dirs, _ in os.walk(ports_dir):
-                    if sub_root != ports_dir:
-                        continue
-                    for sub_directory in sub_dirs:
-                        state_file = os.path.join(sub_root, sub_directory, 'state')
-                        if os.path.exists(state_file):
-                            if 'ACTIVE' in check_output('cat {0}'.format(state_file), shell=True):
-                                return True
-        return False

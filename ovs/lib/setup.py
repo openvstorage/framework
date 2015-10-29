@@ -1616,11 +1616,28 @@ EOF
             if failure_domain is None:
                 failure_domain = failure_domains[0]
 
+            rdma_capable = False
+            with Remote(client.ip, [os], username='root') as remote:
+                for root, dirs, files in remote.os.walk('/sys/class/infiniband'):
+                    for directory in dirs:
+                        ports_dir = remote.os.path.join(root, directory, 'ports')
+                        if not remote.os.path.exists(ports_dir):
+                            continue
+                        for sub_root, sub_dirs, _ in remote.os.walk(ports_dir):
+                            if sub_root != ports_dir:
+                                continue
+                            for sub_directory in sub_dirs:
+                                state_file = remote.os.path.join(sub_root, sub_directory, 'state')
+                                if remote.os.path.exists(state_file):
+                                    if 'ACTIVE' in client.run('cat {0}'.format(state_file)):
+                                        rdma_capable = True
+
             storagerouter = StorageRouter()
             storagerouter.name = node_name
             storagerouter.machine_id = unique_id
             storagerouter.ip = cluster_ip
             storagerouter.primary_failure_domain = failure_domain
+            storagerouter.rdma_capable = rdma_capable
         storagerouter.node_type = node_type
         storagerouter.pmachine = pmachine
         storagerouter.save()
