@@ -32,6 +32,7 @@ class MDSServices(TestCase):
     This test class will validate the various scenarios of the MDSService logic
     """
 
+    client = None
     BackendType = None
     FailureDomain = None
     MDSService = None
@@ -58,6 +59,7 @@ class MDSServices(TestCase):
         VolatileFactory.store = DummyVolatileStore()
         # Replace mocked classes
         sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriverModule
+        # Retrieve persistent factory client
         # Import required modules/classes after mocking is done
         from ovs.dal.hybrids.backendtype import BackendType
         from ovs.dal.hybrids.failuredomain import FailureDomain
@@ -73,6 +75,7 @@ class MDSServices(TestCase):
         from ovs.extensions.generic.volatilemutex import VolatileMutex
         from ovs.lib.mdsservice import MDSServiceController
         # Globalize mocked classes
+        global client
         global BackendType
         global FailureDomain
         global MDSService
@@ -86,14 +89,14 @@ class MDSServices(TestCase):
         global VDisk
         global VolatileMutex
         global VPool
+        client = PersistentFactory.get_client()
         _ = BackendType(), FailureDomain(), MDSService(), MDSServiceController, MDSServiceVDisk(), \
             PMachine(), Service(), ServiceType(), StorageDriver(), StorageRouter(), VDisk(), VolatileMutex('dummy'), VPool()
 
         # Configuration
         def _get(key):
-            c = PersistentFactory.get_client()
-            if c.exists(key):
-                return c.get(key)
+            if client.exists(key):
+                return client.get(key)
 
         Configuration.get = staticmethod(_get)
 
@@ -110,7 +113,7 @@ class MDSServices(TestCase):
         PersistentFactory.store.clean()
         VolatileFactory.store = DummyVolatileStore()
         VolatileFactory.store.clean()
-        client = PersistentFactory.get_client()
+
         client.set('ovs.logging.path', '/var/log/ovs')
         client.set('ovs.logging.level', 'DEBUG')
         client.set('ovs.logging.default_file', 'generic')
@@ -320,7 +323,7 @@ class MDSServices(TestCase):
             * Retrieve and validate preferred storage driver config for vpool2
             * Update capacity for 1 MDS service in vpool1 and validate changes in preferred storage driver config
         """
-        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', 3)
+        client.set('ovs.storagedriver.mds.safety', 3)
         vpools, storagerouters, storagedrivers, services, mds_services, _, _ = self._build_service_structure(
             {'vpools': [1, 2],
              'failure_domains': [1, 2],
@@ -510,9 +513,9 @@ class MDSServices(TestCase):
                     print l
             self.assertListEqual(reality_loads, _loads)
 
-        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', 3)
-        PersistentFactory.get_client().set('ovs.storagedriver.mds.maxload', 75)
-        PersistentFactory.get_client().set('ovs.storagedriver.mds.tlogs', 100)
+        client.set('ovs.storagedriver.mds.safety', 3)
+        client.set('ovs.storagedriver.mds.maxload', 75)
+        client.set('ovs.storagedriver.mds.tlogs', 100)
         vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = self._build_service_structure(
             {'vpools': [1],
              'failure_domains': [1, 2],
