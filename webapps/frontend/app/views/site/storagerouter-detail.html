@@ -31,11 +31,18 @@ limitations under the License.
                 <span data-i18n="ovs:generic.actions"></span>:
                 <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="buttonEdit"
                         data-bind="click: function() { if (edit()) { save() } else { edit(true); } },
-                                   enable: loaded(),
-                                   enable: $root.shared.user.roles().contains('manage')">
+                                   enable: loaded() && $root.shared.user.roles().contains('manage'),
+                                   tooltip: 'ovs:storagerouters.detail.edit'">
                     <span class="hand fa" data-bind="visible: edit() && !saving()" data-i18n="[html]ovs:icons.save"></span>
                     <span class="hand fa fa-spin" data-bind="visible: edit() && saving()" data-i18n="[html]ovs:icons.loading"></span>
                     <span class="hand fa" data-bind="visible: !edit()" data-i18n="[html]ovs:icons.edit"></span>
+                </button>
+                <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="buttonRefresh"
+                        data-bind="click: $root.refresh,
+                                   enable: $root.shared.user.roles().contains('manage'),
+                                   tooltip: 'ovs:storagerouters.detail.refreshtt'">
+                    <span class="hand fa" data-bind="visible: !$root.refreshing()" data-i18n="[html]ovs:icons.load"></span>
+                    <span class="hand fa fa-spin" data-bind="visible: $root.refreshing()" data-i18n="[html]ovs:icons.loading"></span>
                 </button>
             </li>
         </ul>

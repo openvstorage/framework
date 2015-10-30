@@ -318,3 +318,14 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Triggers a disk sync on the given storagerouter
         """
         return DiskController.sync_with_reality.delay(storagerouter.guid)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def refresh_hardware(self, storagerouter):
+        """
+        Refreshes all hardware parameters
+        """
+        return StorageRouterController.refresh_hardware.delay(storagerouter.guid)

@@ -35,6 +35,7 @@ define([
         self.loadFailureDomainsHandle = undefined;
 
         // Observables
+        self.refreshing              = ko.observable(false);
         self.storageRouter           = ko.observable();
         self.vPoolsLoaded            = ko.observable(false);
         self.vPools                  = ko.observableArray([]);
@@ -232,14 +233,29 @@ define([
         };
         self.rescanDisks = function() {
             api.post('storagerouters/' + self.storageRouter().guid() + '/rescan_disks')
-                    .then(shared.tasks.wait)
-                    .done(function() {
-                        generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:storagerouters.detail.disks.rescan.success'));
-                    })
-                    .fail(function() {
-                        generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:storagerouters.detail.disks.rescan.scanning') }));
-                    });
+                .then(shared.tasks.wait)
+                .done(function() {
+                    generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:storagerouters.detail.disks.rescan.success'));
+                })
+                .fail(function() {
+                    generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:storagerouters.detail.disks.rescan.scanning') }));
+                });
             generic.alertInfo($.t('ovs:storagerouters.detail.disks.rescan.started'), $.t('ovs:storagerouters.detail.disks.rescan.inprogress'));
+        };
+        self.refresh = function() {
+            self.refreshing(true);
+            api.post('storagerouters/' + self.storageRouter().guid() + '/refresh_hardware')
+                .then(shared.tasks.wait)
+                .done(function() {
+                    generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:storagerouters.detail.refresh.success'));
+                })
+                .fail(function() {
+                    generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:storagerouters.detail.refresh.refreshing') }));
+                })
+                .always(function() {
+                    self.refreshing(false);
+                });
+            generic.alertInfo($.t('ovs:storagerouters.detail.refresh.started'), $.t('ovs:storagerouters.detail.refresh.inprogress'));
         };
 
         // Durandal

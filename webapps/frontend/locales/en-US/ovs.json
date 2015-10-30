@@ -246,6 +246,12 @@
                     "inprogress": "The disks of this StorageRouter are being rescanned"
                 }
             },
+            "refresh": {
+                "success": "Refresh finished",
+                "refreshing": "refreshing",
+                "started": "Refresh started",
+                "inprogress": "The hardware capabilities of this StorageRouter are being refreshed"
+            },
             "hostip": "Host IP",
             "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
             "moveaway": {
@@ -264,7 +270,9 @@
             "rdma_capable": "RDMA Capable",
             "storageroutervpoollink": "vPools served by this Storage Router",
             "title": "Storage Router",
-            "updateserving": "Save changes"
+            "updateserving": "Save changes",
+            "edit": "Edit some properties of this StorageRouter",
+            "refreshtt": "Refresh the hardware capabilities of this StorageRouter"
         }
     },
     "storagedrivers": {

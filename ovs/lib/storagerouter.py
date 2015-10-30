@@ -1387,6 +1387,37 @@ class StorageRouterController(object):
         root_client.run('ovs update volumedriver')
 
     @staticmethod
+    @celery.task(name='ovs.storagerouter.refresh_hardware')
+    def refresh_hardware(storagerouter_guid):
+        """
+        Refreshes all hardware related information
+        """
+        StorageRouterController.set_rdma_capability(storagerouter_guid)
+        DiskController.sync_with_reality(storagerouter_guid)
+
+    @staticmethod
+    def set_rdma_capability(storagerouter_guid):
+        storagerouter = StorageRouter(storagerouter_guid)
+        client = SSHClient(storagerouter, username='root')
+        rdma_capable = False
+        with Remote(client.ip, [os], username='root') as remote:
+            for root, dirs, files in remote.os.walk('/sys/class/infiniband'):
+                for directory in dirs:
+                    ports_dir = remote.os.path.join(root, directory, 'ports')
+                    if not remote.os.path.exists(ports_dir):
+                        continue
+                    for sub_root, sub_dirs, _ in remote.os.walk(ports_dir):
+                        if sub_root != ports_dir:
+                            continue
+                        for sub_directory in sub_dirs:
+                            state_file = remote.os.path.join(sub_root, sub_directory, 'state')
+                            if remote.os.path.exists(state_file):
+                                if 'ACTIVE' in client.run('cat {0}'.format(state_file)):
+                                    rdma_capable = True
+        storagerouter.rdma_capable = rdma_capable
+        storagerouter.save()
+
+    @staticmethod
     @celery.task(name='ovs.storagerouter.configure_disk')
     def configure_disk(storagerouter_guid, disk_guid, partition_guid, offset, size, roles):
         """
