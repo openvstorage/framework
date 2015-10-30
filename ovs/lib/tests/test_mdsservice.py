@@ -254,6 +254,37 @@ class MDSServices(TestCase):
             vdisks[i] = disk
         return vdisks
 
+    def _check_reality(self, configs, loads, vdisks, mds_services, display=False):
+        """
+        Validates 'reality' with an expected config/load
+        """
+        reality_configs = [vdisk.info['metadata_backend_config'] for vdisk in vdisks.values()]
+        if display is True:
+            for c in reality_configs:
+                print c
+        self.assertListEqual(reality_configs, configs)
+        reality_loads = []
+        for _mds_service in mds_services.itervalues():
+            masters, slaves = 0, 0
+            for _junction in _mds_service.vdisks:
+                if _junction.is_master:
+                    masters += 1
+                else:
+                    slaves += 1
+            capacity = _mds_service.capacity
+            if capacity == -1:
+                capacity = 'infinite'
+            _load, _ = MDSServiceController.get_mds_load(_mds_service)
+            if _load == float('inf'):
+                _load = 'infinite'
+            else:
+                _load = round(_load, 2)
+            reality_loads.append([_mds_service.service.storagerouter.ip, _mds_service.service.ports[0], masters, slaves, capacity, _load])
+        if display is True:
+            for l in reality_loads:
+                print l
+        self.assertListEqual(reality_loads, loads)
+
     def test_load_calculation(self):
         """
         Validates whether the load calculation works
@@ -483,37 +514,6 @@ class MDSServices(TestCase):
             * Sub-Test 6
                 * Migrate a disk to another storagerouter and verify master follows
         """
-        def check_reality(_configs, _loads, _vdisks, _mds_services, display=False):
-            """
-            Validates 'reality' with an expected config/load
-            """
-            reality_configs = [vdisk.info['metadata_backend_config'] for vdisk in _vdisks.values()]
-            if display is True:
-                for c in reality_configs:
-                    print c
-            self.assertListEqual(reality_configs, _configs)
-            reality_loads = []
-            for _mds_service in _mds_services.itervalues():
-                masters, slaves = 0, 0
-                for _junction in _mds_service.vdisks:
-                    if _junction.is_master:
-                        masters += 1
-                    else:
-                        slaves += 1
-                capacity = _mds_service.capacity
-                if capacity == -1:
-                    capacity = 'infinite'
-                _load, _ = MDSServiceController.get_mds_load(_mds_service)
-                if _load == float('inf'):
-                    _load = 'infinite'
-                else:
-                    _load = round(_load, 2)
-                reality_loads.append([_mds_service.service.storagerouter.ip, _mds_service.service.ports[0], masters, slaves, capacity, _load])
-            if display is True:
-                for l in reality_loads:
-                    print l
-            self.assertListEqual(reality_loads, _loads)
-
         client.set('ovs.storagedriver.mds.safety', 3)
         client.set('ovs.storagedriver.mds.maxload', 75)
         client.set('ovs.storagedriver.mds.tlogs', 100)
@@ -547,7 +547,7 @@ class MDSServices(TestCase):
                  ['10.0.0.2', 2, 2, 0, 10, 20.0],
                  ['10.0.0.3', 3, 2, 0, 10, 20.0],
                  ['10.0.0.4', 4, 2, 0, 10, 20.0]]
-        check_reality(configs, loads, vdisks, mds_services)
+        self._check_reality(configs, loads, vdisks, mds_services)
 
         # Validate first run. Each disk should now have sufficient nodes, since there are plenty of MDS services available
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.3', 'port': 3}],
@@ -564,13 +564,13 @@ class MDSServices(TestCase):
                  ['10.0.0.4', 4, 2, 4, 10, 60.0]]
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
-        check_reality(configs, loads, vdisks, mds_services)
+        self._check_reality(configs, loads, vdisks, mds_services)
 
         # Sub-Test 2
         # Validate whether this extra (unnecessary) run doesn't change anything, preventing reconfiguring over and over again
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
-        check_reality(configs, loads, vdisks, mds_services)
+        self._check_reality(configs, loads, vdisks, mds_services)
 
         # Sub-Test 3
         # Validating whether an overloaded node is correctly rebalanced
@@ -595,7 +595,7 @@ class MDSServices(TestCase):
                  ['10.0.0.4', 4, 2, 5, 10, 70.0]]
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
-        check_reality(configs, loads, vdisks, mds_services)
+        self._check_reality(configs, loads, vdisks, mds_services)
 
         # Sub-Test 4
         # Validate whether the overloaded services are still handled
@@ -613,12 +613,12 @@ class MDSServices(TestCase):
                  ['10.0.0.4', 4, 2, 5, 10, 70.0]]
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
-        check_reality(configs, loads, vdisks, mds_services)
+        self._check_reality(configs, loads, vdisks, mds_services)
 
         # Again, validating whether a subsequent run doesn't give unexpected changes
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
-        check_reality(configs, loads, vdisks, mds_services)
+        self._check_reality(configs, loads, vdisks, mds_services)
 
         # Sub-Test 5
         # An MDS service will be added (next to the overloaded service), this should cause the expected to be rebalanced
@@ -651,14 +651,14 @@ class MDSServices(TestCase):
                  ['10.0.0.2', 5, 0, 5, 10, 50.0]]
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
-        check_reality(configs, loads, vdisks, mds_services)
+        self._check_reality(configs, loads, vdisks, mds_services)
 
         # If the tlogs are not caught up, nothing should be changed
         for vdisk_id in [3, 4]:
             StorageDriverClient.catch_up[vdisks[vdisk_id].volume_id] = 1000
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
-        check_reality(configs, loads, vdisks, mds_services)
+        self._check_reality(configs, loads, vdisks, mds_services)
 
         # The next run, after tlogs are caught up, a master switch should be executed
         for vdisk_id in [3, 4]:
@@ -678,7 +678,7 @@ class MDSServices(TestCase):
                  ['10.0.0.2', 5, 1, 3, 10, 40.0]]
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
-        check_reality(configs, loads, vdisks, mds_services)
+        self._check_reality(configs, loads, vdisks, mds_services)
 
         # Sub-Test 6
         # Validate whether a volume migration makes the master follow
@@ -698,13 +698,59 @@ class MDSServices(TestCase):
                  ['10.0.0.2', 5, 1, 3, 10, 40.0]]
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
-        check_reality(configs, loads, vdisks, mds_services)
+        self._check_reality(configs, loads, vdisks, mds_services)
 
         # Validates if a second run doesn't change anything
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
-        check_reality(configs, loads, vdisks, mds_services)
+        self._check_reality(configs, loads, vdisks, mds_services)
 
+    def test_ensure_safety_extended(self):
+        """
+        Same test as previous ensure_safety test, but with a bit more exotic use-cases
+        Eg:
+            * Update failure domain
+            * Update backup failure domain
+            * Add backup failure domain
+            * Remove backup failure domain
+            * Increase safety
+            * Decrease safety
+            * Overload multiple services
+        """
+        client.set('ovs.storagedriver.mds.safety', 3)
+        client.set('ovs.storagedriver.mds.maxload', 75)
+        client.set('ovs.storagedriver.mds.tlogs', 100)
+        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = self._build_service_structure(
+            {'vpools': [1],
+             'failure_domains': [1, 2, 3],
+             'storagerouters': [(1, 1, 2), (2, 1, 2), (3, 2, 1), (4, 2, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)]}  # (<id>, <storagedriver_id>)
+        )
+        vdisks = {}
+        for mds_service in mds_services.itervalues():
+            vdisks.update(self._create_vdisks_for_mds_service(2, len(vdisks) + 1, mds_service=mds_service))
+
+        # Sub-Test 1
+        # Validate the start configuration which is simple, each disk has only its default local master
+        # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY | LOAD (in percent) |
+        # |    1   |       1       |   1   |     1      |      2       |    10    |       20,0        |
+        # |    2   |       2       |   1   |     1      |      2       |    10    |       20,0        |
+        # |    3   |       3       |   1   |     2      |      1       |    10    |       20,0        |
+        # |    4   |       4       |   1   |     2      |      1       |    10    |       20,0        |
+        configs = [[{'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.4', 'port': 4}]]
+        loads = [['10.0.0.1', 1, 2, 0, 10, 20.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 2, 0, 10, 20.0],
+                 ['10.0.0.3', 3, 2, 0, 10, 20.0],
+                 ['10.0.0.4', 4, 2, 0, 10, 20.0]]
+        self._check_reality(configs, loads, vdisks, mds_services)
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(MDSServices)
