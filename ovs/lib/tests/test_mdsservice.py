@@ -55,8 +55,11 @@ class MDSServices(TestCase):
         This makes sure the unittests can be executed without those libraries installed
         """
         # Load dummy stores
-        PersistentFactory.store = DummyPersistentStore()
         VolatileFactory.store = DummyVolatileStore()
+        PersistentFactory.store = DummyPersistentStore()
+        DummyVolatileStore._keep_in_memory_only = True
+        DummyPersistentStore._keep_in_memory_only = True
+
         # Replace mocked classes
         sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriverModule
         # Retrieve persistent factory client
@@ -497,22 +500,28 @@ class MDSServices(TestCase):
         This test does:
             * Create 4 storagerouters, 4 storagedrivers, 4 MDS services
             * Create 2 vDisks for each MDS service
-            * Sub-Test 1
+            * Sub-Test 1:
                 * Run ensure_safety
                 * Validate updated configs
-            * Sub-Test 2
+            * Sub-Test 2:
                 * Run ensure safety again and validate configs, nothing should have changed
-            * Sub-Test 3
+            * Sub-Test 3:
                 * Overload an MDS service and validate configurations are rebalanced
-            * Sub-Test 4
+            * Sub-Test 4:
                 * Run ensure safety again and validate configurations
-            * Sub-Test 5
+            * Sub-Test 5:
                 * Add MDS service on storagerouter with overloaded service
                 * Verify an extra slave is added
                 * Set tlogs to > threshold and verify nothing changes in config while catch up is ongoing
                 * Set tlogs to < threshold and verify multiple MDS services on same storagerouter are removed
-            * Sub-Test 6
+            * Sub-Test 6:
                 * Migrate a disk to another storagerouter and verify master follows
+            * Sub-Test 7: Update failure domain
+            * Sub-Test 8: Update backup failure domain
+            * Sub-Test 9: Add backup failure domain
+            * Sub-Test 10: Remove backup failure domain
+            * Sub-Test 11: Increase safety and some more vDisks
+            * Sub-Test 12: Decrease safety
         """
         client.set('ovs.storagedriver.mds.safety', 3)
         client.set('ovs.storagedriver.mds.maxload', 75)
@@ -528,8 +537,7 @@ class MDSServices(TestCase):
         for mds_service in mds_services.itervalues():
             vdisks.update(self._create_vdisks_for_mds_service(2, len(vdisks) + 1, mds_service=mds_service))
 
-        # Sub-Test 1
-        # Validate the start configuration which is simple, each disk has only its default local master
+        # Sub-Test 1: Validate the start configuration which is simple, each disk has only its default local master
         # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY | LOAD (in percent) |
         # |    1   |       1       |   1   |     1      |      2       |    10    |       20,0        |
         # |    2   |       2       |   1   |     1      |      2       |    10    |       20,0        |
@@ -566,14 +574,12 @@ class MDSServices(TestCase):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs, loads, vdisks, mds_services)
 
-        # Sub-Test 2
-        # Validate whether this extra (unnecessary) run doesn't change anything, preventing reconfiguring over and over again
+        # Sub-Test 2: Validate whether this extra (unnecessary) run doesn't change anything, preventing reconfiguring over and over again
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs, loads, vdisks, mds_services)
 
-        # Sub-Test 3
-        # Validating whether an overloaded node is correctly rebalanced
+        # Sub-Test 3: Validating whether an overloaded node is correctly rebalanced
         # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY | LOAD (in percent) |
         # |    1   |       1       |   1   |     1      |      2       |    10    |       20,0        |
         # |    2   |       2       |   1   |     1      |      2       |    2     |      100,0        |
@@ -597,8 +603,7 @@ class MDSServices(TestCase):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs, loads, vdisks, mds_services)
 
-        # Sub-Test 4
-        # Validate whether the overloaded services are still handled
+        # Sub-Test 4: Validate whether the overloaded services are still handled
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}],  # 3 and 4 switch around again because load is identical and 3 will have been recycled now
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
@@ -620,8 +625,7 @@ class MDSServices(TestCase):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs, loads, vdisks, mds_services)
 
-        # Sub-Test 5
-        # An MDS service will be added (next to the overloaded service), this should cause the expected to be rebalanced
+        # Sub-Test 5: An MDS service will be added (next to the overloaded service), this should cause the expected to be rebalanced
         s_id = '{0}-5'.format(storagerouters[2].name)
         service = Service()
         service.name = s_id
@@ -680,8 +684,7 @@ class MDSServices(TestCase):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs, loads, vdisks, mds_services)
 
-        # Sub-Test 6
-        # Validate whether a volume migration makes the master follow
+        # Sub-Test 6: Validate whether a volume migration makes the master follow
         StorageDriverClient.vrouter_id[vdisks[1].volume_id] = storagedrivers[3].storagedriver_id
         configs = [[{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.2', 'port': 5}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.4', 'port': 4}],
@@ -705,51 +708,244 @@ class MDSServices(TestCase):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs, loads, vdisks, mds_services)
 
-    def test_ensure_safety_extended(self):
-        """
-        Same test as previous ensure_safety test, but with a bit more exotic use-cases
-        Eg:
-            * Update failure domain
-            * Update backup failure domain
-            * Add backup failure domain
-            * Remove backup failure domain
-            * Increase safety
-            * Decrease safety
-            * Overload multiple services
-        """
+        # Clean everything from here on out
+        PersistentFactory.store.clean()
+        VolatileFactory.store.clean()
         client.set('ovs.storagedriver.mds.safety', 3)
         client.set('ovs.storagedriver.mds.maxload', 75)
         client.set('ovs.storagedriver.mds.tlogs', 100)
+
         vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = self._build_service_structure(
             {'vpools': [1],
              'failure_domains': [1, 2, 3],
-             'storagerouters': [(1, 1, 2), (2, 1, 2), (3, 2, 1), (4, 2, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
-             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4)],  # (<id>, <vpool_id>, <storagerouter_id>)
-             'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)]}  # (<id>, <storagedriver_id>)
+             'storagerouters': [(1, 1, 2), (2, 1, 2), (3, 1, None), (4, 1, 3), (5, 2, 3), (6, 3, None), (7, 3, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4), (5, 1, 5), (6, 1, 6), (7, 1, 7)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1), (2, 2), (3, 2), (4, 3), (5, 4), (6, 5), (7, 5), (8, 6), (9, 7)]}  # (<id>, <storagedriver_id>)
         )
         vdisks = {}
         for mds_service in mds_services.itervalues():
-            vdisks.update(self._create_vdisks_for_mds_service(2, len(vdisks) + 1, mds_service=mds_service))
+            vdisks.update(self._create_vdisks_for_mds_service(1, len(vdisks) + 1, mds_service=mds_service))
 
-        # Sub-Test 1
         # Validate the start configuration which is simple, each disk has only its default local master
-        # | MDS ID | STORAGEROUTER | VPOOL | PRIMARY FD | SECONDARY FD | CAPACITY | LOAD (in percent) |
-        # |    1   |       1       |   1   |     1      |      2       |    10    |       20,0        |
-        # |    2   |       2       |   1   |     1      |      2       |    10    |       20,0        |
-        # |    3   |       3       |   1   |     2      |      1       |    10    |       20,0        |
-        # |    4   |       4       |   1   |     2      |      1       |    10    |       20,0        |
         configs = [[{'ip': '10.0.0.1', 'port': 1}],
-                   [{'ip': '10.0.0.1', 'port': 1}],
                    [{'ip': '10.0.0.2', 'port': 2}],
-                   [{'ip': '10.0.0.2', 'port': 2}],
-                   [{'ip': '10.0.0.3', 'port': 3}],
-                   [{'ip': '10.0.0.3', 'port': 3}],
-                   [{'ip': '10.0.0.4', 'port': 4}],
-                   [{'ip': '10.0.0.4', 'port': 4}]]
-        loads = [['10.0.0.1', 1, 2, 0, 10, 20.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
-                 ['10.0.0.2', 2, 2, 0, 10, 20.0],
-                 ['10.0.0.3', 3, 2, 0, 10, 20.0],
-                 ['10.0.0.4', 4, 2, 0, 10, 20.0]]
+                   [{'ip': '10.0.0.2', 'port': 3}],
+                   [{'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.4', 'port': 5}],
+                   [{'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.5', 'port': 7}],
+                   [{'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.7', 'port': 9}]]
+        loads = [['10.0.0.1', 1, 1, 0, 10, 10.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 0, 10, 10.0],
+                 ['10.0.0.2', 3, 1, 0, 10, 10.0],
+                 ['10.0.0.3', 4, 1, 0, 10, 10.0],
+                 ['10.0.0.4', 5, 1, 0, 10, 10.0],
+                 ['10.0.0.5', 6, 1, 0, 10, 10.0],
+                 ['10.0.0.5', 7, 1, 0, 10, 10.0],
+                 ['10.0.0.6', 8, 1, 0, 10, 10.0],
+                 ['10.0.0.7', 9, 1, 0, 10, 10.0]]
+        self._check_reality(configs, loads, vdisks, mds_services)
+
+        # Validate first run. Each disk should now have sufficient nodes, since there are plenty of MDS services available
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.5', 'port': 7}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.4', 'port': 5}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.2', 'port': 2}]]
+        loads = [['10.0.0.1', 1, 1, 2, 10, 30.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 2, 10, 30.0],
+                 ['10.0.0.2', 3, 1, 1, 10, 20.0],
+                 ['10.0.0.3', 4, 1, 1, 10, 20.0],
+                 ['10.0.0.4', 5, 1, 1, 10, 20.0],
+                 ['10.0.0.5', 6, 1, 2, 10, 30.0],
+                 ['10.0.0.5', 7, 1, 1, 10, 20.0],
+                 ['10.0.0.6', 8, 1, 4, 10, 50.0],
+                 ['10.0.0.7', 9, 1, 3, 10, 40.0]]
+        for vdisk_id in sorted(vdisks):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        self._check_reality(configs, loads, vdisks, mds_services)
+
+        # Sub-Test 7: Update 2 primary failure domains (Cannot be identical to secondary failure domains)
+        storagerouter2 = storagerouters[2]
+        storagerouter4 = storagerouters[4]
+        storagerouter2.primary_failure_domain = failure_domains[3]
+        storagerouter4.primary_failure_domain = failure_domains[2]
+        storagerouter2.save()
+        storagerouter4.save()
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 7}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 3}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 1, 2, 10, 30.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 1, 10, 20.0],
+                 ['10.0.0.2', 3, 1, 1, 10, 20.0],
+                 ['10.0.0.3', 4, 1, 1, 10, 20.0],
+                 ['10.0.0.4', 5, 1, 2, 10, 30.0],
+                 ['10.0.0.5', 6, 1, 2, 10, 30.0],
+                 ['10.0.0.5', 7, 1, 2, 10, 30.0],
+                 ['10.0.0.6', 8, 1, 3, 10, 40.0],
+                 ['10.0.0.7', 9, 1, 3, 10, 40.0]]
+        for vdisk_id in sorted(vdisks):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        self._check_reality(configs, loads, vdisks, mds_services)
+
+        # Sub-Test 8: Update a secondary failure domain (Cannot be identical to primary failure domain)
+        storagerouter5 = storagerouters[5]
+        storagerouter5.secondary_failure_domain = failure_domains[1]
+        storagerouter5.save()
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 7}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 3}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 1, 3, 10, 40.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 1, 10, 20.0],
+                 ['10.0.0.2', 3, 1, 1, 10, 20.0],
+                 ['10.0.0.3', 4, 1, 2, 10, 30.0],
+                 ['10.0.0.4', 5, 1, 2, 10, 30.0],
+                 ['10.0.0.5', 6, 1, 2, 10, 30.0],
+                 ['10.0.0.5', 7, 1, 2, 10, 30.0],
+                 ['10.0.0.6', 8, 1, 2, 10, 30.0],
+                 ['10.0.0.7', 9, 1, 2, 10, 30.0]]
+        for vdisk_id in sorted(vdisks):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        self._check_reality(configs, loads, vdisks, mds_services)
+
+        # Sub-Test 9: Add a secondary failure domain (Cannot be identical to primary failure domain)
+        storagerouter3 = storagerouters[3]
+        storagerouter3.secondary_failure_domain = failure_domains[3]
+        storagerouter3.save()
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 7}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 3}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 1, 3, 10, 40.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 2, 10, 30.0],
+                 ['10.0.0.2', 3, 1, 1, 10, 20.0],
+                 ['10.0.0.3', 4, 1, 2, 10, 30.0],
+                 ['10.0.0.4', 5, 1, 2, 10, 30.0],
+                 ['10.0.0.5', 6, 1, 2, 10, 30.0],
+                 ['10.0.0.5', 7, 1, 2, 10, 30.0],
+                 ['10.0.0.6', 8, 1, 2, 10, 30.0],
+                 ['10.0.0.7', 9, 1, 2, 10, 30.0]]
+        for vdisk_id in sorted(vdisks):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        self._check_reality(configs, loads, vdisks, mds_services)
+
+        # Sub-Test 10: Remove 2 secondary failure domains
+        storagerouter1 = storagerouters[1]
+        storagerouter7 = storagerouters[7]
+        storagerouter1.secondary_failure_domain = None
+        storagerouter7.secondary_failure_domain = None
+        storagerouter1.save()
+        storagerouter7.save()
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 7}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 3}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.6', 'port': 8}]]
+        loads = [['10.0.0.1', 1, 1, 2, 10, 30.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 2, 10, 30.0],
+                 ['10.0.0.2', 3, 1, 1, 10, 20.0],
+                 ['10.0.0.3', 4, 1, 2, 10, 30.0],
+                 ['10.0.0.4', 5, 1, 2, 10, 30.0],
+                 ['10.0.0.5', 6, 1, 1, 10, 20.0],
+                 ['10.0.0.5', 7, 1, 2, 10, 30.0],
+                 ['10.0.0.6', 8, 1, 3, 10, 40.0],
+                 ['10.0.0.7', 9, 1, 2, 10, 30.0]]
+        for vdisk_id in sorted(vdisks):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        self._check_reality(configs, loads, vdisks, mds_services)
+
+        # Sub-Test 11: Add some more vDisks and increase safety
+        client.set('ovs.storagedriver.mds.safety', 5)
+        for mds_service in mds_services.itervalues():
+            vdisks.update(self._create_vdisks_for_mds_service(1, len(vdisks) + 1, mds_service=mds_service))
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.4', 'port': 5}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.2', 'port': 3}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.5', 'port': 7}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 3}]]
+        loads = [['10.0.0.1', 1, 2, 5, 10, 70.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 2, 4, 10, 60.0],
+                 ['10.0.0.2', 3, 2, 4, 10, 60.0],
+                 ['10.0.0.3', 4, 2, 5, 10, 70.0],
+                 ['10.0.0.4', 5, 2, 5, 10, 70.0],
+                 ['10.0.0.5', 6, 2, 3, 10, 50.0],
+                 ['10.0.0.5', 7, 2, 3, 10, 50.0],
+                 ['10.0.0.6', 8, 2, 5, 10, 70.0],
+                 ['10.0.0.7', 9, 2, 5, 10, 70.0]]
+        for vdisk_id in sorted(vdisks):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        self._check_reality(configs, loads, vdisks, mds_services)
+
+        # Sub-Test 12: Reduce safety
+        client.set('ovs.storagedriver.mds.safety', 3)
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.4', 'port': 5}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.2', 'port': 3}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}]]
+        loads = [['10.0.0.1', 1, 2, 4, 10, 60.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 2, 4, 10, 60.0],
+                 ['10.0.0.2', 3, 2, 3, 10, 50.0],
+                 ['10.0.0.3', 4, 2, 4, 10, 60.0],
+                 ['10.0.0.4', 5, 2, 5, 10, 70.0],
+                 ['10.0.0.5', 6, 2, 3, 10, 50.0],
+                 ['10.0.0.5', 7, 2, 2, 10, 40.0],
+                 ['10.0.0.6', 8, 2, 5, 10, 70.0],
+                 ['10.0.0.7', 9, 2, 4, 10, 60.0]]
+        for vdisk_id in sorted(vdisks):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs, loads, vdisks, mds_services)
 
 if __name__ == '__main__':

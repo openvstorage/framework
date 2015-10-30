@@ -324,6 +324,8 @@ class MDSServiceController(object):
                 load = services_load[service][0]
                 if service.storagerouter in storage_router_failure_domain_dict:  # Services in use per failure domain
                     failure_domain_used_services_dict[storage_router_failure_domain_dict[service.storagerouter]].append(service)
+                else:
+                    reconfigure_reasons.append('Service {0} cannot be used anymore because storagerouter with IP {1} is not part of the failure domains'.format(service.name, service.storagerouter.ip))
             else:
                 load = services_load[service][1]
             services_load[service] = load
