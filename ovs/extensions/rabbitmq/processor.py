@@ -83,7 +83,7 @@ def process(queue, body, mapping):
                     dedupe = options.get('dedupe', False)
                     dedupe_key = options.get('dedupe_key', None)
                     if dedupe is True and dedupe_key is not None:  # We can't dedupe without a key
-                        key = dedupe_key
+                        key = 'ovs_dedupe_vevents_{0}'.format(dedupe_key)
                         key = key.replace('[EVENT_NAME]', extension.full_name)
                         key = key.replace('[TASK_NAME]', task.__class__.__name__)
                         for kwarg_key in kwargs:

@@ -17,18 +17,21 @@ StorageRouter module
 """
 
 import json
+from celery.task.control import revoke
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action, link
 from rest_framework.exceptions import NotAcceptable
 from rest_framework.response import Response
 from backend.serializers.serializers import FullSerializer
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.storagedriver import StorageDriverController
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.disk import DiskController
 from backend.decorators import required_roles, return_list, return_object, return_task, return_plain, load, log
 
@@ -77,6 +80,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         contents = None if contents is None else contents.split(',')
         previous_primary = storagerouter.primary_failure_domain
+        previous_secondary = storagerouter.secondary_failure_domain
         serializer = FullSerializer(StorageRouter, contents=contents, instance=storagerouter, data=request.DATA)
         if serializer.is_valid():
             primary = storagerouter.primary_failure_domain
@@ -91,8 +95,18 @@ class StorageRouterViewSet(viewsets.ViewSet):
             if len(previous_primary.secondary_storagerouters) > 0 and len(previous_primary.primary_storagerouters) == 1 and \
                     previous_primary.primary_storagerouters[0].guid == storagerouter.guid and previous_primary.guid != primary.guid:
                 raise NotAcceptable('Cannot change the primary FD as this StorageRouter is the only one serving it while it is used as secondary FD')
-
             serializer.save()
+            if previous_primary != primary or previous_secondary != secondary:
+                cache = VolatileFactory.get_client()
+                key = 'ovs_dedupe_fdchange_{0}'.format(storagerouter.guid)
+                task_id = cache.get(key)
+                if task_id:
+                    # Key exists, task was already scheduled
+                    # If task is already running, the revoke message will
+                    # be ignored
+                    revoke(task_id)
+                async_result = MDSServiceController.mds_checkup.s().apply_async(countdown=60)
+                cache.set(key, async_result.id, 600)  # Store the task id
 
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
