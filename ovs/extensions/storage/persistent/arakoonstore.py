@@ -1,10 +1,10 @@
-# Copyright 2014 Open vStorage NV
+# Copyright 2014 iNuron NV
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,13 +16,17 @@
 Arakoon store module
 """
 
+import os
 import json
 import time
-from threading import Lock
-
+import random
+from threading import Lock, current_thread
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.db.arakoon.arakoon.ArakoonExceptions import ArakoonNotFound, ArakoonSockReadNoBytes
 from ovs.extensions.storage.exceptions import KeyNotFoundException
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('extensions', name='arakoon_store')
 
 
 def locked():
@@ -56,6 +60,7 @@ class ArakoonStore(object):
         """
         self._cluster = ArakoonManagementEx().getCluster(cluster)
         self._client = self._cluster.getClient()
+        self._identifier = int(round(random.random() * 10000000))
         self._lock = Lock()
         self._batch_size = 100
 
@@ -65,7 +70,7 @@ class ArakoonStore(object):
         Retrieves a certain value for a given key
         """
         try:
-            return json.loads(ArakoonStore._try(self._client.get, key))
+            return json.loads(ArakoonStore._try(self._identifier, self._client.get, key))
         except ValueError:
             raise KeyNotFoundException('Could not parse JSON stored for {0}'.format(key))
         except ArakoonNotFound as field:
@@ -76,7 +81,7 @@ class ArakoonStore(object):
         """
         Sets the value for a key to a given value
         """
-        return ArakoonStore._try(self._client.set, key, json.dumps(value))
+        return ArakoonStore._try(self._identifier, self._client.set, key, json.dumps(value))
 
     @locked()
     def prefix(self, prefix):
@@ -86,7 +91,8 @@ class ArakoonStore(object):
         next_prefix = ArakoonStore._next_key(prefix)
         batch = None
         while batch is None or len(batch) > 0:
-            batch = ArakoonStore._try(self._client.range,
+            batch = ArakoonStore._try(self._identifier,
+                                      self._client.range,
                                       beginKey=prefix if batch is None else batch[-1],
                                       beginKeyIncluded=batch is None,
                                       endKey=next_prefix,
@@ -101,7 +107,7 @@ class ArakoonStore(object):
         Deletes a given key from the store
         """
         try:
-            return ArakoonStore._try(self._client.delete, key)
+            return ArakoonStore._try(self._identifier, self._client.delete, key)
         except ArakoonNotFound as field:
             raise KeyNotFoundException(field)
 
@@ -110,30 +116,37 @@ class ArakoonStore(object):
         """
         Executes a nop command
         """
-        return ArakoonStore._try(self._client.nop)
+        return ArakoonStore._try(self._identifier, self._client.nop)
 
     @locked()
     def exists(self, key):
         """
         Check if key exists
         """
-        return ArakoonStore._try(self._client.exists, key)
+        return ArakoonStore._try(self._identifier, self._client.exists, key)
 
     @staticmethod
-    def _try(method, *args, **kwargs):
+    def _try(identifier, method, *args, **kwargs):
         """
         Tries to call a given method, retry-ing if Arakoon is temporary unavailable
         """
-        last_exception = None
-        tries = 5
-        while tries > 0:
-            try:
-                return method(*args, **kwargs)
-            except ArakoonSockReadNoBytes as exception:
-                last_exception = exception
-                tries -= 1
-                time.sleep(1)
-        raise last_exception
+        try:
+            last_exception = None
+            tries = 5
+            while tries > 0:
+                try:
+                    return method(*args, **kwargs)
+                except ArakoonSockReadNoBytes as exception:
+                    logger.debug('Error during {0}, retry'.format(method.__name__))
+                    last_exception = exception
+                    tries -= 1
+                    time.sleep(1)
+            raise last_exception
+        except Exception:
+            logger.exception('Error during {0}. Process {1}, thread {2}, clientid {3}'.format(
+                method.__name__, os.getpid(), current_thread().ident, identifier
+            ))
+            raise
 
     @staticmethod
     def _next_key(key):
