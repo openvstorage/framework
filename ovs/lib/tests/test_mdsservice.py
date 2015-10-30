@@ -522,6 +522,8 @@ class MDSServices(TestCase):
             * Sub-Test 10: Remove backup failure domain
             * Sub-Test 11: Increase safety and some more vDisks
             * Sub-Test 12: Decrease safety
+            * Sub-Test 13: Change individual vdisk's secondary failure domain
+            * Sub-Test 14: Remove individual vdisk's secondary failure domain
         """
         client.set('ovs.storagedriver.mds.safety', 3)
         client.set('ovs.storagedriver.mds.maxload', 75)
@@ -943,6 +945,76 @@ class MDSServices(TestCase):
                  ['10.0.0.5', 6, 2, 3, 10, 50.0],
                  ['10.0.0.5', 7, 2, 2, 10, 40.0],
                  ['10.0.0.6', 8, 2, 5, 10, 70.0],
+                 ['10.0.0.7', 9, 2, 4, 10, 60.0]]
+        for vdisk_id in sorted(vdisks):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        self._check_reality(configs, loads, vdisks, mds_services)
+
+        # Sub-Test 13: Change individual vdisk's secondary failure domain
+        vdisk5 = vdisks[5]
+        vdisk5.secondary_failure_domain = failure_domains[1]
+        vdisk5.save()
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.4', 'port': 5}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.2', 'port': 3}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}]]
+        loads = [['10.0.0.1', 1, 2, 5, 10, 70.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 2, 4, 10, 60.0],
+                 ['10.0.0.2', 3, 2, 3, 10, 50.0],
+                 ['10.0.0.3', 4, 2, 4, 10, 60.0],
+                 ['10.0.0.4', 5, 2, 5, 10, 70.0],
+                 ['10.0.0.5', 6, 2, 3, 10, 50.0],
+                 ['10.0.0.5', 7, 2, 2, 10, 40.0],
+                 ['10.0.0.6', 8, 2, 4, 10, 60.0],
+                 ['10.0.0.7', 9, 2, 4, 10, 60.0]]
+        for vdisk_id in sorted(vdisks):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        self._check_reality(configs, loads, vdisks, mds_services)
+
+        # Sub-Test 14: Remove individual vdisk's secondary failure domain
+        vdisk5 = vdisks[5]
+        vdisk5.secondary_failure_domain = None
+        vdisk5.save()
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.2', 'port': 3}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.6', 'port': 8}],
+                   [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.4', 'port': 5}],
+                   [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
+                   [{'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.2', 'port': 3}],
+                   [{'ip': '10.0.0.5', 'port': 6}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.5', 'port': 7}, {'ip': '10.0.0.4', 'port': 5}, {'ip': '10.0.0.3', 'port': 4}],
+                   [{'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}],
+                   [{'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.6', 'port': 8}]]
+        loads = [['10.0.0.1', 1, 2, 4, 10, 60.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 2, 4, 10, 60.0],
+                 ['10.0.0.2', 3, 2, 4, 10, 60.0],
+                 ['10.0.0.3', 4, 2, 4, 10, 60.0],
+                 ['10.0.0.4', 5, 2, 5, 10, 70.0],
+                 ['10.0.0.5', 6, 2, 3, 10, 50.0],
+                 ['10.0.0.5', 7, 2, 2, 10, 40.0],
+                 ['10.0.0.6', 8, 2, 4, 10, 60.0],
                  ['10.0.0.7', 9, 2, 4, 10, 60.0]]
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
