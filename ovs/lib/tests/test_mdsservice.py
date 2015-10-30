@@ -181,6 +181,7 @@ class MDSServices(TestCase):
             storagerouter.name = str(sr_id)
             storagerouter.ip = '10.0.0.{0}'.format(sr_id)
             storagerouter.pmachine = pmachine
+            storagerouter.rdma_capable = False
             storagerouter.primary_failure_domain = failure_domains[fd_primary_id]
             if fd_secondary_id is not None:
                 storagerouter.secondary_failure_domain = failure_domains[fd_secondary_id]

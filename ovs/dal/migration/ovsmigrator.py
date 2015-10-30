@@ -391,4 +391,49 @@ class OVSMigrator(object):
 
             working_version = 4
 
+        # Version 5 introduced:
+        # - Failure Domains
+        if working_version < 5:
+            import os
+            from ovs.dal.hybrids.failuredomain import FailureDomain
+            from ovs.dal.lists.failuredomainlist import FailureDomainList
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
+            from ovs.extensions.generic.remote import Remote
+            from ovs.extensions.generic.sshclient import SSHClient
+            failure_domains = FailureDomainList.get_failure_domains()
+            if len(failure_domains) > 0:
+                failure_domain = failure_domains[0]
+            else:
+                failure_domain = FailureDomain()
+                failure_domain.name = 'Default'
+                failure_domain.save()
+            for storagerouter in StorageRouterList.get_storagerouters():
+                change = False
+                if storagerouter.primary_failure_domain is None:
+                    storagerouter.primary_failure_domain = failure_domain
+                    change = True
+                if storagerouter.rdma_capable is None:
+                    client = SSHClient(storagerouter, username='root')
+                    rdma_capable = False
+                    with Remote(client.ip, [os], username='root') as remote:
+                        for root, dirs, files in remote.os.walk('/sys/class/infiniband'):
+                            for directory in dirs:
+                                ports_dir = remote.os.path.join(root, directory, 'ports')
+                                if not remote.os.path.exists(ports_dir):
+                                    continue
+                                for sub_root, sub_dirs, _ in remote.os.walk(ports_dir):
+                                    if sub_root != ports_dir:
+                                        continue
+                                    for sub_directory in sub_dirs:
+                                        state_file = remote.os.path.join(sub_root, sub_directory, 'state')
+                                        if remote.os.path.exists(state_file):
+                                            if 'ACTIVE' in client.run('cat {0}'.format(state_file)):
+                                                rdma_capable = True
+                    storagerouter.rdma_capable = rdma_capable
+                    change = True
+                if change is True:
+                    storagerouter.save()
+
+            working_version = 5
+
         return working_version

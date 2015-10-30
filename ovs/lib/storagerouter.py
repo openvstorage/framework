@@ -56,7 +56,6 @@ from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.lib.setup import SetupController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.vpool import VPoolController
 from ovs.log.logHandler import LogHandler
@@ -329,7 +328,7 @@ class StorageRouterController(object):
         if not ServiceManager.has_service(watcher_volumedriver_service, client=root_client):
             ServiceManager.add_service(watcher_volumedriver_service, client=root_client)
             ServiceManager.enable_service(watcher_volumedriver_service, client=root_client)
-            SetupController.change_service_state(root_client, watcher_volumedriver_service, 'start')
+            ServiceManager.start_service(watcher_volumedriver_service, client=root_client)
 
         ######################
         # START ADDING VPOOL #
