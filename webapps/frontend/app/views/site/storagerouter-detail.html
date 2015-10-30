@@ -110,7 +110,9 @@ limitations under the License.
                             <td data-i18n="ovs:generic.failure_domain"></td>
                             <td>
                                 <span data-bind="visible: !edit()">
-                                    <span data-bind="text: primaryFailureDomain().name()"></span>
+                                    <span data-bind="lazyloader: { item: primaryFailureDomain, loadedObservable: 'loaded', undefinedLoading: true }">
+                                        <span data-part="lazy-entry" data-bind="text: item().name()"></span>
+                                    </span>
                                 </span>
                                 <span data-bind="visible: edit()">
                                     <span data-bind="dropdown: {
