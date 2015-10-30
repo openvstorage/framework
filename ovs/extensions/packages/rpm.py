@@ -1,10 +1,10 @@
 # Copyright 2015 CloudFounders NV
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +15,19 @@
 """
 Rpm Package module
 """
-
+import time
+from ovs.log.logHandler import LogHandler
 from subprocess import check_output
+from subprocess import CalledProcessError
 
+logger = LogHandler.get('lib', name='packager')
 
 class RpmPackage(object):
     """
     Contains all logic related to Rpm packages (used in e.g. Centos)
     """
 
-    OVS_PACKAGE_NAMES = ['volumedriver-server', 'volumedriver-base']
+    OVS_PACKAGE_NAMES = ['openvstorage', 'openvstorage-backend', 'volumedriver-server', 'volumedriver-base', 'alba', 'openvstorage-sdm']
 
     @staticmethod
     def _get_version(package_name):
@@ -41,12 +44,65 @@ class RpmPackage(object):
 
     @staticmethod
     def install(package_name, client, force=False):
-        raise NotImplementedError("Installing RPM packages not yet implemented")
+        counter = 0
+        max_counter = 3
+        while counter < max_counter:
+            counter += 1
+            try:
+                client.run('yum update -y {0}'.format(package_name))
+                break
+            except CalledProcessError as cpe:
+                # Retry 3 times if fail
+                if counter == max_counter:
+                    logger.error('Install {0} failed. Error: {1}'.format(package_name, cpe.output))
+                    raise cpe
+            except Exception as ex:
+                raise ex
+            time.sleep(1)
 
     @staticmethod
     def update(client):
-        raise NotImplementedError("Updating RPM packages not yet implemented")
+        try:
+            client.run('yum check-update')
+        except CalledProcessError as cpe:
+            # Returns exit value of 100 if there are packages available for an update
+            if cpe.returncode != 100:
+                logger.error('Update failed. Error: {0}'.format(cpe.output))
+                raise cpe
 
     @staticmethod
     def verify_update_required(packages, services, client):
-        raise NotImplementedError("Verifying RPM packages not yet implemented")
+        services_checked = []
+        update_info = {'version': '',
+                       'packages': [],
+                       'services': []}
+        for package_name in packages:
+            installed = None
+            candidate = None
+            for line in client.run("yum list {0}".format(package_name)).splitlines():
+                if line.startswith(package_name):
+                    version = line.split()
+                    if len(version) > 1:
+                        if not installed:
+                            installed = version[1]
+                        else:
+                            candidate = version[1]
+
+                if installed is not None and candidate is not None:
+                    break
+
+            if candidate is not None and candidate != installed:
+                update_info['packages'].append(package_name)
+                update_info['services'] = services
+                update_info['version'] = candidate
+            else:
+                for service in services:
+                    if service in services_checked:
+                        continue
+                    services_checked.append(service)
+                    if client.file_exists('/opt/OpenvStorage/run/{0}.version'.format(service)):
+                        running_version = client.file_read('/opt/OpenvStorage/run/{0}.version'.format(service)).strip()
+                        if candidate is not None and running_version not in candidate:
+                            update_info['services'].append(service)
+                            update_info['version'] = candidate
+        return update_info

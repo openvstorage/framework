@@ -1,10 +1,10 @@
-# Copyright 2014 Open vStorage NV
+# Copyright 2014 iNuron NV
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -45,7 +45,8 @@ class OVSMigrator(object):
         # - Flexible SSD layout
         if working_version < 1:
             from ovs.extensions.generic.configuration import Configuration
-            Configuration.delete('ovs.arakoon', remove_root=True)
+            if Configuration.exists('ovs.arakoon'):
+                Configuration.delete('ovs.arakoon', remove_root=True)
             Configuration.set('ovs.core.ovsdb', '/opt/OpenvStorage/db')
 
             working_version = 1
