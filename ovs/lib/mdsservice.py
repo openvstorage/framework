@@ -274,7 +274,10 @@ class MDSServiceController(object):
 
         vdisk_storagerouter = StorageRouter(vdisk.storagerouter_guid)
         primary_failure_domain = vdisk_storagerouter.primary_failure_domain
-        secondary_failure_domain = vdisk_storagerouter.secondary_failure_domain
+        if vdisk.secondary_failure_domain is not None:
+            secondary_failure_domain = vdisk.secondary_failure_domain
+        else:
+            secondary_failure_domain = vdisk_storagerouter.secondary_failure_domain
 
         failure_domain_load_dict = {primary_failure_domain: {}}
         failure_domain_used_services_dict = {primary_failure_domain: []}
