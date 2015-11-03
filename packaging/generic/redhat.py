@@ -171,6 +171,6 @@ class RPMPackager(object):
             SourceCollector.run(command,
                                 working_directory=redhat_folder)
         if len(packages) > 0:
-            command = 'ssh {0}@{1} createrepo --update {2}/{3}-{4}'.format(user, destination_server, destination_folder, releasename, target)
+            command = 'ssh {0}@{1} createrepo --update {2}/dists/{3}-{4}'.format(user, destination_server, destination_folder, releasename, target)
             SourceCollector.run(command,
                                 working_directory=redhat_folder)
