@@ -171,6 +171,10 @@ class RPMPackager(object):
             SourceCollector.run(command,
                                 working_directory=redhat_folder)
         if len(packages) > 0:
+            # Cleanup existing files
+            command = 'ssh {0}@{1} {2}/cleanup_repo.py {2}/pool/{3}/{4}'.format(user, destination_server, destination_folder, target, releasename)
+            print(SourceCollector.run(command,
+                                      working_directory=redhat_folder))
             command = 'ssh {0}@{1} createrepo --update {2}/dists/{3}-{4}'.format(user, destination_server, destination_folder, releasename, target)
             SourceCollector.run(command,
                                 working_directory=redhat_folder)
