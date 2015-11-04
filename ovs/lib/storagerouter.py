@@ -971,7 +971,6 @@ class StorageRouterController(object):
         for mds_service in removal_mdsservices:
             # All MDSServiceVDisk object should have been deleted above
             MDSServiceController.remove_mds_service(mds_service=mds_service,
-                                                    storagerouter=storagerouter,
                                                     vpool=vpool,
                                                     reload_config=False)
 
