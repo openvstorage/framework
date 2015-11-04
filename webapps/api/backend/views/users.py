@@ -124,7 +124,7 @@ class UserViewSet(viewsets.ViewSet):
             for junction in client.roles.itersafe():
                 junction.delete()
             client.delete()
-        user.delete(abandon=['logs'])  # Detach from the log entries
+        user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @log()

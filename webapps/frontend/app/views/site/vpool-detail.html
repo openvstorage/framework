@@ -86,7 +86,7 @@ limitations under the License.
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry">
                                         <span data-bind="text: item().sco_size"></span>
-                                        <span data-i18n="ovs:generic.mib"></span>
+                                        <span data-i18n="ovs:generic.units.mib"></span>
                                     </span>
                                 </span>
                             </td>
@@ -101,7 +101,7 @@ limitations under the License.
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry">
                                         <span data-bind="text: item().write_buffer"></span>
-                                        <span data-i18n="ovs:generic.mib"></span>
+                                        <span data-i18n="ovs:generic.units.mib"></span>
                                     </span>
                                 </span>
                             </td>
@@ -136,6 +136,21 @@ limitations under the License.
                             <td colspan="2">&nbsp;</td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry" data-i18n="ovs:vpools.dtl_transport"></span>
+                                </span>
+                            </td>
+                            <td>
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry" data-bind="translate: 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + item().dtl_transport"></span>
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.nrofvdisks"></td>
+                            <td><span data-bind="text: vDisks().length"></span></td>
+                            <td colspan="2">&nbsp;</td>
+                            <td>
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry" data-i18n="ovs:vpools.dtl_location" data-bind="visible: item().dtl_enabled === true"></span>
                                 </span>
                             </td>
@@ -144,11 +159,6 @@ limitations under the License.
                                     <span data-part="lazy-entry" data-bind="text: item().dtl_location, visible: item().dtl_enabled === true"></span>
                                 </span>
                             </td>
-                        </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.nrofvdisks"></td>
-                            <td><span data-bind="text: vDisks().length"></span></td>
-                            <td colspan="4">&nbsp;</td>
                         </tr>
                     </tbody>
                 </table>
@@ -261,7 +271,7 @@ limitations under the License.
                                     <thead>
                                         <tr>
                                             <th><span data-i18n="ovs:generic.storagerouter"></span></th>
-                                            <th style="width: 125px;"><span data-i18n="ovs:generic.actions"></span></th>
+                                            <th style="width: 70px;"><span data-i18n="ovs:generic.actions"></span></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -271,10 +281,11 @@ limitations under the License.
                                                 <!-- ko if: !$root.checkedStorageRouterGuids().contains(guid()) -->
                                                 <td>
                                                     <button type="button"
-                                                            class="btn btn-mini btn-default"
-                                                            data-bind="click: $root.addStorageRouter,
-                                                                       attr: { id: 'button_add_' + guid()},
-                                                                       visible: $root.updatingStorageRouters() === false ">
+                                                        class="btn btn-mini btn-default"
+                                                        data-bind="click: $root.addStorageRouter,
+                                                                   enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
+                                                                   attr: { id: 'button_add_' + guid()},
+                                                                   visible: $root.updatingStorageRouters() === false">
                                                         <span class="fa" data-i18n="[html]ovs:icons.add"></span>
                                                     </button>
                                                 </td>

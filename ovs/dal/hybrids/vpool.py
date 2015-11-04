@@ -33,7 +33,8 @@ class VPool(DataObject):
                     Property('login', str, mandatory=False, doc='Login/Username for the Storage BackendType.'),
                     Property('password', str, mandatory=False, doc='Password for the Storage BackendType.'),
                     Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domain name, Zone, ...) for the Storage BackendType.'),
-                    Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.')]
+                    Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.'),
+                    Property('rdma_enabled', bool, default=False, doc='Has the vpool been configured to use RDMA for DTL transport, which is only possible if all storagerouters are RDMA capable')]
     __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
     __dynamics = [Dynamic('status', str, 10),
                   Dynamic('statistics', dict, 4, locked=True),

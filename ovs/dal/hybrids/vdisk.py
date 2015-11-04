@@ -21,6 +21,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.hybrids.failuredomain import FailureDomain
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 import pickle
@@ -42,7 +43,8 @@ class VDisk(DataObject):
                     Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder')]
     __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
                    Relation('vpool', VPool, 'vdisks'),
-                   Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
+                   Relation('parent_vdisk', None, 'child_vdisks', mandatory=False),
+                   Relation('secondary_failure_domain', FailureDomain, 'secondary_vdisks', mandatory=False)]
     __dynamics = [Dynamic('snapshots', list, 60),
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4, locked=True),

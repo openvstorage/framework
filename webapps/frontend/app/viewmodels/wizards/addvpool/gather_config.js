@@ -13,14 +13,17 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'knockout', './data'
-], function ($, ko, data) {
+    'jquery', 'knockout', './data', 'ovs/api', 'ovs/generic', '../../containers/storagerouter'
+], function ($, ko, data, api, generic, StorageRouter) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
         self.data = data;
+
+        // Handles
+        self.loadStorageRoutersHandle = undefined;
 
         // Computed
         self.canContinue = ko.computed(function () {
@@ -31,5 +34,38 @@ define([
         self.next = function() {
             return true;
         };
+
+        // Durandal
+        self.activate = function() {
+            self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: {
+                    contents: 'storagedrivers',
+            }})
+                .done(function(data) {
+                    var guids = [], srdata = {};
+                    $.each(data.data, function(index, item) {
+                        guids.push(item.guid);
+                        srdata[item.guid] = item;
+                    });
+                    generic.crossFiller(
+                        guids, self.data.storageRouters,
+                        function(guid) {
+                            return new StorageRouter(guid);
+                        }, 'guid'
+                    );
+                    $.each(self.data.storageRouters(), function(index, storageRouter) {
+                        storageRouter.fillData(srdata[storageRouter.guid()]);
+                    });
+                });
+            $.each(self.data.storageRouters(), function(index, storageRouter) {
+                if (storageRouter === self.data.target()) {
+                    $.each(self.data.dtlTransportModes(), function (i, key) {
+                        if (key.name === 'rdma') {
+                            self.data.dtlTransportModes()[i].disabled = storageRouter.rdmaCapable() === undefined ? true : !storageRouter.rdmaCapable();
+                            return false;
+                        }
+                    });
+                }
+            });
+        }
     };
 });
