@@ -53,7 +53,7 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
-    # Generic configfiles
+    # Generic configuration files
     generic_configfiles = {'memcached': ('/opt/OpenvStorage/config/memcacheclient.cfg', 11211),
                            'rabbitmq': ('/opt/OpenvStorage/config/rabbitmqclient.cfg', 5672)}
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
@@ -1423,7 +1423,7 @@ EOF
 
         # Sometimes/At random the rabbitmq server takes longer than 5 seconds to start,
         #  and the next command fails so the best solution is to retry several times
-        #Also retry the add_user/set_permissions, and validate the result
+        # Also retry the add_user/set_permissions, and validate the result
         retry = 0
         while retry < 10:
             users = Toolbox.retry_client_run(client,
@@ -1577,9 +1577,11 @@ EOF
 
         # Imports, not earlier than here, as all required config files should be in place.
         from ovs.lib.disk import DiskController
+        from ovs.lib.storagerouter import StorageRouterController
         from ovs.dal.hybrids.pmachine import PMachine
-        from ovs.dal.lists.pmachinelist import PMachineList
         from ovs.dal.hybrids.storagerouter import StorageRouter
+        from ovs.dal.lists.failuredomainlist import FailureDomainList
+        from ovs.dal.lists.pmachinelist import PMachineList
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
         print 'Configuring/updating model'
@@ -1602,16 +1604,32 @@ EOF
             if current_storagerouter.ip == cluster_ip and current_storagerouter.machine_id == unique_id:
                 storagerouter = current_storagerouter
                 break
+
         if storagerouter is None:
+            failure_domains = FailureDomainList.get_failure_domains()
+            failure_domain_usages = sys.maxint
+            failure_domain = None
+            for current_failure_domain in failure_domains:
+                current_failure_domain_usages = len(current_failure_domain.primary_storagerouters)
+                if current_failure_domain_usages < failure_domain_usages:
+                    failure_domain = current_failure_domain
+                    failure_domain_usages = current_failure_domain_usages
+            if failure_domain is None:
+                failure_domain = failure_domains[0]
+
             storagerouter = StorageRouter()
             storagerouter.name = node_name
             storagerouter.machine_id = unique_id
             storagerouter.ip = cluster_ip
+            storagerouter.primary_failure_domain = failure_domain
+            storagerouter.rdma_capable = False
         storagerouter.node_type = node_type
         storagerouter.pmachine = pmachine
         storagerouter.save()
 
+        StorageRouterController.set_rdma_capability(storagerouter.guid)
         DiskController.sync_with_reality(storagerouter.guid)
+
         return storagerouter
 
     @staticmethod

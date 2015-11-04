@@ -72,7 +72,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
             value = value / 1024;
             counter += 1;
         }
-        return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.' + units[counter]);
+        return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.units.' + units[counter]);
     }
     function formatSpeed(value) {
         var units, counter;
@@ -82,7 +82,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
             value = value / 1024;
             counter += 1;
         }
-        return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.' + units[counter] + 's');
+        return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.units.' + units[counter] + 's');
     }
     function formatRatio(value) {
         return setDecimals(round(value, 2), 2) + ' %';
@@ -97,7 +97,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         returnValue = setDecimals(round(value, 2), 2);
         if (counter > 0) {
-            returnValue += ' ' + $.t('ovs:generic.' + units[counter - 1]);
+            returnValue += ' ' + $.t('ovs:generic.units.' + units[counter - 1]);
         }
         return returnValue;
     }
@@ -473,6 +473,12 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function isEmpty(value) {
         return ['', null, undefined].contains(value) || value === null;
     }
+    function extract(object) {
+        if (!!(object && object.constructor && object.call && object.apply)) {
+            return object();
+        }
+        return object
+    }
 
     Array.prototype.equals = function(array) {
         return arrayEquals(this, array);
@@ -482,6 +488,9 @@ define(['jquery', 'jqp/pnotify'], function($) {
     };
     Array.prototype.contains = function(element) {
         return arrayHasElement(this, element);
+    };
+    Array.prototype.remove = function(element) {
+        return removeElement(this, element);
     };
     String.prototype.startsWith = function(searchString) {
         return stringStartsWith(this, searchString);
@@ -527,6 +536,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         validate: validate,
         xhrAbort: xhrAbort,
         xhrCompleted: xhrCompleted,
-        isEmpty: isEmpty
+        isEmpty: isEmpty,
+        extract: extract
     };
 });

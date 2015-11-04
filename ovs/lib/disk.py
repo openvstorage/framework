@@ -42,6 +42,7 @@ class DiskController(object):
     def sync_with_reality(storagerouter_guid=None):
         """
         Syncs the Disks from all StorageRouters with the reality.
+        :param storagerouter_guid: Guid of the Storage Router to synchronize
         """
         storagerouters = []
         if storagerouter_guid is not None:
