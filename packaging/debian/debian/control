@@ -30,6 +30,6 @@ Description: openvStorage Web Applications
 
 Package: openvstorage
 Architecture: amd64
-Pre-Depends: openvstorage-core (= ${binary:Version}), openvstorage-webapps (= ${binary:Version})
+Pre-Depends: openvstorage-core (= ${binary:Version}), openvstorage-webapps (= ${binary:Version}), openvstorage-cinder-plugin
 Description: openvStorage
  Open vStorage umbrella package
