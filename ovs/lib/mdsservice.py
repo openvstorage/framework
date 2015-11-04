@@ -61,6 +61,10 @@ class MDSServiceController(object):
 
         Assumes the StorageRouter and VPool are already configured with a StorageDriver and that all model-wise
         configuration regarding both is completed.
+        :param storagerouter: Storagerouter on which MDS service will be created
+        :param vpool:         The vPool for which the MDS service will be created
+        :param fresh_only:    If True and no current mds services exist for this vpool on this storagerouter, a new 1 will be created
+        :param reload_config: If True, the volumedriver's updated configuration will be reloaded
         """
         # Fetch service sequence number based on MDS services for current vPool and current storage router
         service_number = -1
@@ -159,13 +163,17 @@ class MDSServiceController(object):
         return mds_service
 
     @staticmethod
-    def remove_mds_service(mds_service, storagerouter, vpool, reload_config):
+    def remove_mds_service(mds_service, vpool, reload_config):
         """
         Removes an MDS service
+        :param mds_service:   The MDS service to remove
+        :param vpool:         The vPool for which the MDS service will be removed
+        :param reload_config: If True, the volumedriver's updated configuration will be reloaded
         """
         if len(mds_service.vdisks_guids) > 0:
             raise RuntimeError('Cannot remove MDSService that is still serving disks')
 
+        storagerouter = mds_service.service.storagerouter
         client = SSHClient(storagerouter)
         mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
 
@@ -175,8 +183,8 @@ class MDSServiceController(object):
             directories_to_clean.append(sd_partition.path)
             sd_partition.delete()
 
-        mds_service.service.delete()
         mds_service.delete()
+        mds_service.service.delete()
 
         # Generate new mds_nodes section
         mds_nodes = []
@@ -197,21 +205,25 @@ class MDSServiceController(object):
         storagedriver_config.save(client, reload_config=reload_config)
 
         tries = 5
-        cleaned = False
-        while tries > 0 and cleaned is False:
+        while tries > 0:
             try:
-                client.dir_delete(directories_to_clean)
-                logger.debug('MDS files cleaned up')
-                cleaned = True
+                root_client = SSHClient(storagerouter, username='root')
+                root_client.dir_delete(directories_to_clean)
+                for dir_name in directories_to_clean:
+                    logger.debug('Recursively removed {0}'.format(dir_name))
+                break
             except Exception:
                 time.sleep(5)
                 logger.debug('Waiting for the MDS service to go down...')
                 tries -= 1
+                if tries == 0:
+                    raise
 
     @staticmethod
     def sync_vdisk_to_reality(vdisk):
         """
         Syncs a vdisk to reality (except hypervisor)
+        :param vdisk: vDisk to synchronize
         """
 
         vdisk.reload_client()
@@ -260,6 +272,8 @@ class MDSServiceController(object):
         * Prefer master/services to be on different hosts, a subsequent slave on the same node doesn't add safety
         * Don't actively overload services (e.g. configure an MDS as slave causing it to get overloaded)
         * Too much safety is not wanted (it adds loads to nodes while not required)
+        :param vdisk:                   vDisk to calculate a new safety for
+        :param excluded_storagerouters: Storagerouters to leave out of calculation (Eg: When 1 is down or unavailable)
         """
 
         logger.debug('Ensuring MDS safety for vDisk {0} with guid {1}'.format(vdisk.name, vdisk.guid))
@@ -549,6 +563,9 @@ class MDSServiceController(object):
     def get_preferred_mds(storagerouter, vpool, include_load=False):
         """
         Gets the MDS on this StorageRouter/VPool pair which is preferred to achieve optimal balancing
+        :param storagerouter: Storagerouter to retrieve the best MDS service for
+        :param vpool:         vPool to retrieve the best MDS service for
+        :param include_load:  Return the load of the best MDS service too
         """
 
         mds_service = None
@@ -565,6 +582,7 @@ class MDSServiceController(object):
     def get_mds_load(mds_service):
         """
         Gets a 'load' for an MDS service based on its capacity and the amount of assigned VDisks
+        :param mds_service: MDS service the get current load for
         """
         service_capacity = float(mds_service.capacity)
         if service_capacity < 0:
@@ -581,6 +599,7 @@ class MDSServiceController(object):
         * Primary MDS is the local one
         * All slaves are on different hosts
         * Maximum `mds.safety` nodes are returned
+        :param vpool: vPool to get storagedriver configuration for
         """
 
         mds_per_storagerouter = {}
@@ -648,7 +667,7 @@ class MDSServiceController(object):
                 has_room = False
                 for mds_service in mds_services[:]:
                     if mds_service.capacity == 0 and len(mds_service.vdisks_guids) == 0:
-                        MDSServiceController.remove_mds_service(mds_service, storagerouter, vpool, reload_config=True)
+                        MDSServiceController.remove_mds_service(mds_service, vpool, reload_config=True)
                         mds_services.remove(mds_service)
                 for mds_service in mds_services:
                     _, load = MDSServiceController.get_mds_load(mds_service)
