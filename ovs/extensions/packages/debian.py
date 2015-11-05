@@ -30,7 +30,7 @@ class DebianPackage(object):
     """
 
     OVS_PACKAGE_NAMES = ['openvstorage', 'openvstorage-core', 'openvstorage-webapps', 'openvstorage-sdm',
-                         'openvstorage-backend', 'openvstorage-backend-core', 'openvstorage-backend-webapps',
+                         'openvstorage-backend', 'openvstorage-backend-core', 'openvstorage-backend-webapps', 'openvstorage-cinder-plugin',
                          'volumedriver-server', 'volumedriver-base', 'alba', 'alba-asdmanager', 'arakoon']
     APT_CONFIG_STRING = '-o Dir::Etc::sourcelist="sources.list.d/ovsaptrepo.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"'
 
