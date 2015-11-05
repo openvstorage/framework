@@ -1118,7 +1118,7 @@ class StorageRouterController(object):
         """
         Returns support metadata for a given storagerouter. This should be a routed task!
         """
-        return SupportAgent.get_heartbeat_data()
+        return SupportAgent().get_heartbeat_data()
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_logfiles')
