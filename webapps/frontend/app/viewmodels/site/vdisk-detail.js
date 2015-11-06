@@ -16,8 +16,8 @@ define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter',
-    '../wizards/rollback/index', '../wizards/snapshot/index'
-], function($, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, RollbackWizard) {
+    '../wizards/rollback/index', '../wizards/clone/index'
+], function($, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, RollbackWizard, CloneWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -85,6 +85,14 @@ define([
                         guid: vdisk.guid()
                     }));
                 }
+            }
+        };
+        self.clone = function() {
+            if (self.vDisk() !== undefined) {
+                dialog.show(new CloneWizard({
+                    modal: true,
+                    vdisk: self.vDisk()
+                }));
             }
         };
         self.saveConfiguration = function() {

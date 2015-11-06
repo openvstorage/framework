@@ -149,14 +149,18 @@ class VMware(object):
         Builds the path for the file backing a given device/disk
         """
         _ = self
-        return '/{}/{}-flat.vmdk'.format(machinename.replace(' ', '_'), devicename)
+        if machinename is None:
+            return '/{0}-flat.vmdk'.format(devicename)
+        return '/{0}/{1}-flat.vmdk'.format(machinename.replace(' ', '_'), devicename)
 
     def get_disk_path(self, machinename, devicename):
         """
         Builds the path for the file backing a given device/disk
         """
         _ = self
-        return '/{}/{}.vmdk'.format(machinename.replace(' ', '_'), devicename)
+        if machinename is None:
+            return '/{0}.vmdk'.format(devicename)
+        return '/{0}/{1}.vmdk'.format(machinename.replace(' ', '_'), devicename)
 
     def clean_vmachine_filename(self, path):
         """
@@ -171,7 +175,7 @@ class VMware(object):
         """
         _ = self, storagerouter_machineid  # For compatibility purposes only
         machinename = machinename.replace(' ', '_')
-        return '/{}/{}.vmx'.format(machinename, machinename)
+        return '/{0}/{1}.vmx'.format(machinename, machinename)
 
     def get_rename_scenario(self, old_name, new_name):
         """
