@@ -15,7 +15,7 @@
 """
 Dummy persistent module
 """
-
+import os
 import json
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 
@@ -25,23 +25,29 @@ class DummyPersistentStore(object):
     This is a dummy persistent store that makes use of a local json file
     """
     _path = '/run/dummypersistent.json'
+    _keep_in_memory_only = False
+    _data = {}
 
     @staticmethod
     def clean():
         """
         Empties the store
         """
-        import os
-
-        try:
-            os.remove(DummyPersistentStore._path)
-        except OSError:
-            pass
+        if DummyPersistentStore._keep_in_memory_only is True:
+            DummyPersistentStore._data = {}
+        else:
+            try:
+                os.remove(DummyPersistentStore._path)
+            except OSError:
+                pass
 
     def _read(self):
         """
         Reads the local json file
         """
+        if DummyPersistentStore._keep_in_memory_only is True:
+            return DummyPersistentStore._data
+
         try:
             f = open(self._path, 'r')
             data = json.loads(f.read())
@@ -107,6 +113,9 @@ class DummyPersistentStore(object):
         """
         Saves the local json file
         """
-        f = open(self._path, 'w+')
-        f.write(json.dumps(data, sort_keys=True, indent=2))
-        f.close()
+        if DummyPersistentStore._keep_in_memory_only is True:
+            DummyPersistentStore._data = data
+        else:
+            f = open(self._path, 'w+')
+            f.write(json.dumps(data, sort_keys=True, indent=2))
+            f.close()

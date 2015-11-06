@@ -15,11 +15,14 @@
 """
 StorageRouter module
 """
+import os
 import time
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
+from ovs.dal.hybrids.failuredomain import FailureDomain
 from ovs.dal.hybrids.pmachine import PMachine
+from subprocess import check_output
 
 
 class StorageRouter(DataObject):
@@ -31,8 +34,11 @@ class StorageRouter(DataObject):
                     Property('machine_id', str, mandatory=False, doc='The hardware identifier of the vMachine'),
                     Property('ip', str, doc='IP Address of the vMachine, if available'),
                     Property('heartbeats', dict, default={}, doc='Heartbeat information of various monitors'),
-                    Property('node_type', ['MASTER', 'EXTRA'], default='EXTRA', doc='Indicates the node\'s type')]
-    __relations = [Relation('pmachine', PMachine, 'storagerouters')]
+                    Property('node_type', ['MASTER', 'EXTRA'], default='EXTRA', doc='Indicates the node\'s type'),
+                    Property('rdma_capable', bool, doc='Is this StorageRouter RDMA capable')]
+    __relations = [Relation('pmachine', PMachine, 'storagerouters'),
+                   Relation('primary_failure_domain', FailureDomain, 'primary_storagerouters'),
+                   Relation('secondary_failure_domain', FailureDomain, 'secondary_storagerouters', mandatory=False)]
     __dynamics = [Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('stored_data', int, 60),
                   Dynamic('dtl_mode', str, 60),

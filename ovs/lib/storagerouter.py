@@ -56,7 +56,6 @@ from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.lib.setup import SetupController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.vpool import VPoolController
 from ovs.log.logHandler import LogHandler
@@ -171,6 +170,7 @@ class StorageRouterController(object):
                                    'dtl_enabled': (bool, None),
                                    'dtl_location': (str, None),
                                    'write_buffer': (int, {'min': 128, 'max': 10240}),
+                                   'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
                                    'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys())})
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
@@ -309,7 +309,7 @@ class StorageRouterController(object):
         if error_messages:
             raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
 
-        # 11. check available IP addresses
+        # 11. Check available IP addresses
         ipaddresses = metadata['ipaddresses']
         grid_ip = client.config_read('ovs.grid.ip')
         if grid_ip in ipaddresses:
@@ -328,7 +328,7 @@ class StorageRouterController(object):
         if not ServiceManager.has_service(watcher_volumedriver_service, client=root_client):
             ServiceManager.add_service(watcher_volumedriver_service, client=root_client)
             ServiceManager.enable_service(watcher_volumedriver_service, client=root_client)
-            SetupController.change_service_state(root_client, watcher_volumedriver_service, 'start')
+            ServiceManager.start_service(watcher_volumedriver_service, client=root_client)
 
         ######################
         # START ADDING VPOOL #
@@ -394,6 +394,7 @@ class StorageRouterController(object):
             vpool.password = connection_password
             vpool.connection = '{0}:{1}'.format(connection_host, connection_port) if connection_host else None
             vpool.description = '{0} {1}'.format(vpool.backend_type.code, vpool_name)
+            vpool.rdma_enabled = parameters['config_params']['dtl_transport'] == StorageDriverClient.FRAMEWORK_DTL_TRANSPORT_RSOCKET
             vpool.save()
 
         local_backend_data = {}
@@ -637,12 +638,14 @@ class StorageRouterController(object):
             sco_factor = float(parameters['config_params']['write_buffer']) / tlog_multiplier / sco_size  # sco_factor = write buffer / tlog multiplier (default 20) / sco size (in MiB)
             dedupe_mode = parameters['config_params']['dedupe_mode']
             cache_strategy = parameters['config_params']['cache_strategy']
+            dtl_transport = StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[parameters['config_params']['dtl_transport']]
         else:
             sco_size = current_storage_driver_config['sco_size']
             tlog_multiplier = current_storage_driver_config['tlog_multiplier']
             sco_factor = float(current_storage_driver_config['write_buffer']) / tlog_multiplier / sco_size
             dedupe_mode = current_storage_driver_config['dedupe_mode']
             cache_strategy = current_storage_driver_config['cache_strategy']
+            dtl_transport = StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[current_storage_driver_config['dtl_transport']]
 
         volume_manager_config["read_cache_default_mode"] = StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode]
         volume_manager_config["read_cache_default_behaviour"] = StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy]
@@ -673,7 +676,8 @@ class StorageRouterController(object):
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
                                                 trigger_gap='1GB',
                                                 backoff_gap='2GB')
-        storagedriver_config.configure_failovercache(failovercache_path=sdp_dtl.path)
+        storagedriver_config.configure_failovercache(failovercache_path=sdp_dtl.path,
+                                                     failovercache_transport=dtl_transport)
         storagedriver_config.configure_filesystem(**filesystem_config)
         storagedriver_config.configure_volume_manager(**volume_manager_config)
         storagedriver_config.configure_volume_router(vrouter_id=vrouter_id,
@@ -701,7 +705,10 @@ class StorageRouterController(object):
 
         DiskController.sync_with_reality(storagerouter.guid)
 
-        MDSServiceController.prepare_mds_service(client, storagerouter, vpool, reload_config=False)
+        MDSServiceController.prepare_mds_service(storagerouter=storagerouter,
+                                                 vpool=vpool,
+                                                 fresh_only=True,
+                                                 reload_config=False)
 
         root_client.dir_create(dirs2create)
         root_client.file_create(files2create)
@@ -773,7 +780,7 @@ class StorageRouterController(object):
             raise RuntimeError('StorageDriver service failed to start (got no event)')
         logger.debug('StorageDriver running')
 
-        mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool)
+        mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool=vpool)
         for sr in all_storagerouters:
             node_client = ip_client_map[sr.ip]['ovs']
             storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
@@ -794,7 +801,7 @@ class StorageRouterController(object):
         vpool.save()
 
         for vdisk in vpool.vdisks:
-            MDSServiceController.ensure_safety(vdisk)
+            MDSServiceController.ensure_safety(vdisk=vdisk)
 
         mgmt_center = Factory.get_mgmtcenter(storagerouter.pmachine)
         if mgmt_center:
@@ -860,7 +867,8 @@ class StorageRouterController(object):
                 vdisks.append(junction.vdisk)
         for vdisk in vdisks:
             if vdisk.storagedriver_id:
-                MDSServiceController.ensure_safety(vdisk, [storagerouter])
+                MDSServiceController.ensure_safety(vdisk=vdisk,
+                                                   excluded_storagerouters=[storagerouter])
 
         client = SSHClient(ip, username='root')
         configuration_dir = client.config_read('ovs.core.cfgdir')
@@ -962,7 +970,9 @@ class StorageRouterController(object):
 
         for mds_service in removal_mdsservices:
             # All MDSServiceVDisk object should have been deleted above
-            MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool, reload_config=False)
+            MDSServiceController.remove_mds_service(mds_service=mds_service,
+                                                    vpool=vpool,
+                                                    reload_config=False)
 
         # Cleanup directories/files
         dirs_to_remove = [storagedriver.mountpoint,
@@ -1266,7 +1276,7 @@ class StorageRouterController(object):
         ovsdb_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == 'Arakoon' and ser.name == 'arakoon-ovsdb']
         downtime = [('ovs', 'ovsdb', None)] if len(ovsdb_cluster) < 3 and this_sr.guid in ovsdb_cluster else []
 
-        ovs_info = PackageManager.verify_update_required(packages=['openvstorage-core', 'openvstorage-webapps'],
+        ovs_info = PackageManager.verify_update_required(packages=['openvstorage-core', 'openvstorage-webapps', 'openvstorage-cinder-plugin'],
                                                          services=['watcher-framework', 'memcached'],
                                                          client=client)
         arakoon_info = PackageManager.verify_update_required(packages=['arakoon'],
@@ -1374,6 +1384,37 @@ class StorageRouterController(object):
         root_client = SSHClient(storagerouter_ip,
                                 username='root')
         root_client.run('ovs update volumedriver')
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.refresh_hardware')
+    def refresh_hardware(storagerouter_guid):
+        """
+        Refreshes all hardware related information
+        """
+        StorageRouterController.set_rdma_capability(storagerouter_guid)
+        DiskController.sync_with_reality(storagerouter_guid)
+
+    @staticmethod
+    def set_rdma_capability(storagerouter_guid):
+        storagerouter = StorageRouter(storagerouter_guid)
+        client = SSHClient(storagerouter, username='root')
+        rdma_capable = False
+        with Remote(client.ip, [os], username='root') as remote:
+            for root, dirs, files in remote.os.walk('/sys/class/infiniband'):
+                for directory in dirs:
+                    ports_dir = remote.os.path.join(root, directory, 'ports')
+                    if not remote.os.path.exists(ports_dir):
+                        continue
+                    for sub_root, sub_dirs, _ in remote.os.walk(ports_dir):
+                        if sub_root != ports_dir:
+                            continue
+                        for sub_directory in sub_dirs:
+                            state_file = remote.os.path.join(sub_root, sub_directory, 'state')
+                            if remote.os.path.exists(state_file):
+                                if 'ACTIVE' in client.run('cat {0}'.format(state_file)):
+                                    rdma_capable = True
+        storagerouter.rdma_capable = rdma_capable
+        storagerouter.save()
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.configure_disk')

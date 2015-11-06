@@ -55,6 +55,8 @@ class StorageDriverClient(object):
     VOLDRV_CONTENT_BASED = 'ContentBased'
     VOLDRV_CACHE_ON_WRITE = 'CacheOnWrite'
     VOLDRV_LOCATION_BASED = 'LocationBased'
+    VOLDRV_DTL_TRANSPORT_TCP = 'TCP'
+    VOLDRV_DTL_TRANSPORT_RSOCKET = 'RSocket'
 
     FRAMEWORK_DTL_SYNC = 'sync'
     FRAMEWORK_DTL_ASYNC = 'async'
@@ -64,6 +66,8 @@ class StorageDriverClient(object):
     FRAMEWORK_CONTENT_BASED = 'dedupe'
     FRAMEWORK_CACHE_ON_WRITE = 'on_write'
     FRAMEWORK_LOCATION_BASED = 'non_dedupe'
+    FRAMEWORK_DTL_TRANSPORT_TCP = 'tcp'
+    FRAMEWORK_DTL_TRANSPORT_RSOCKET = 'rdma'
 
     VDISK_CACHE_MAP = {FRAMEWORK_NO_CACHE: ReadCacheBehaviour.NO_CACHE,
                        FRAMEWORK_CACHE_ON_READ: ReadCacheBehaviour.CACHE_ON_READ,
@@ -81,6 +85,8 @@ class StorageDriverClient(object):
     VPOOL_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: VOLDRV_DTL_SYNC,
                           FRAMEWORK_DTL_ASYNC: VOLDRV_DTL_ASYNC,
                           FRAMEWORK_DTL_NOSYNC: VOLDRV_DTL_NOSYNC}
+    VPOOL_DTL_TRANSPORT_MAP = {FRAMEWORK_DTL_TRANSPORT_TCP: VOLDRV_DTL_TRANSPORT_TCP,
+                               FRAMEWORK_DTL_TRANSPORT_RSOCKET: VOLDRV_DTL_TRANSPORT_RSOCKET}
     REVERSE_CACHE_MAP = {VOLDRV_NO_CACHE: FRAMEWORK_NO_CACHE,
                          VOLDRV_CACHE_ON_READ: FRAMEWORK_CACHE_ON_READ,
                          VOLDRV_CACHE_ON_WRITE: FRAMEWORK_CACHE_ON_WRITE,
@@ -97,6 +103,8 @@ class StorageDriverClient(object):
                             '': FRAMEWORK_DTL_SYNC,
                             '': FRAMEWORK_DTL_ASYNC,
                             '': FRAMEWORK_DTL_NOSYNC}
+    REVERSE_DTL_TRANSPORT_MAP = {VOLDRV_DTL_TRANSPORT_TCP: FRAMEWORK_DTL_TRANSPORT_TCP,
+                                 VOLDRV_DTL_TRANSPORT_RSOCKET: FRAMEWORK_DTL_TRANSPORT_RSOCKET}
     TLOG_MULTIPLIER_MAP = {4: 16,
                            8: 8,
                            16: 4,
@@ -183,9 +191,9 @@ class StorageDriverConfiguration(object):
     # DO NOT MAKE MANUAL CHANGES HERE
 
     parameters = {
-        # hg branch: 3.6-dev
-        # hg revision: 388879da12d6
-        # buildTime: Thu Sep 17 10:25:33 UTC 2015
+        # hg branch: (detached
+        # hg revision: e32a21486a90ac1a28f74383fd7948d94e0afcc4
+        # buildTime: Fri Oct 23 08:03:15 UTC 2015
         'metadataserver': {
             'backend_connection_manager': {
                 'optional': ['backend_connection_pool_capacity', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
@@ -210,7 +218,7 @@ class StorageDriverConfiguration(object):
                 'mandatory': []
             },
             'failovercache': {
-                'optional': [],
+                'optional': ['failovercache_transport', ],
                 'mandatory': ['failovercache_path', ]
             },
             'file_driver': {
@@ -218,7 +226,7 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['fd_cache_path', 'fd_namespace', ]
             },
             'filesystem': {
-                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_cache_dentries', ],
+                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_cache_dentries', 'fs_dtl_config_mode', 'fs_dtl_host', 'fs_dtl_port', ],
                 'mandatory': ['fs_virtual_disk_format', ]
             },
             'metadata_server': {
@@ -242,7 +250,7 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['vregistry_arakoon_cluster_id', 'vregistry_arakoon_cluster_nodes', ]
             },
             'volume_router': {
-                'optional': ['vrouter_local_io_sleep_before_retry_usecs', 'vrouter_local_io_retries', 'vrouter_volume_read_threshold', 'vrouter_volume_write_threshold', 'vrouter_file_read_threshold', 'vrouter_file_write_threshold', 'vrouter_redirect_timeout_ms', 'vrouter_backend_sync_timeout_ms', 'vrouter_migrate_timeout_ms', 'vrouter_redirect_retries', 'vrouter_sco_multiplier', 'vrouter_routing_retries', 'vrouter_min_workers', 'vrouter_max_workers', 'vrouter_registry_cache_capacity', ],
+                'optional': ['vrouter_local_io_sleep_before_retry_usecs', 'vrouter_local_io_retries', 'vrouter_check_local_volume_potential_period', 'vrouter_volume_read_threshold', 'vrouter_volume_write_threshold', 'vrouter_file_read_threshold', 'vrouter_file_write_threshold', 'vrouter_redirect_timeout_ms', 'vrouter_backend_sync_timeout_ms', 'vrouter_migrate_timeout_ms', 'vrouter_redirect_retries', 'vrouter_sco_multiplier', 'vrouter_routing_retries', 'vrouter_min_workers', 'vrouter_max_workers', 'vrouter_registry_cache_capacity', ],
                 'mandatory': ['vrouter_id', ]
             },
             'volume_router_cluster': {
@@ -347,7 +355,8 @@ class StorageDriverConfiguration(object):
         """
         for section, entries in self.params[self.config_type].iteritems():
             if section in self.configuration:
-                for param in self.configuration[section]:
+                section_configuration = copy.deepcopy(self.configuration[section])
+                for param in section_configuration:
                     if param not in entries['mandatory'] and param not in entries['optional']:
                         del self.configuration[section][param]
 
