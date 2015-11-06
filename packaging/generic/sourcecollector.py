@@ -60,19 +60,19 @@ class SourceCollector(object):
 
         @param target: Specifies the pacakging target. Can be:
         * 'experimental' to package against a checked out repo/code
-        * 'unstable', 'alpha', 'beta' for automatic packaging for a certain branch
+        * 'unstable', 'community', 'beta' for automatic packaging for a certain branch
         * ('release', '<release branch>') for autoamtic packaging for a release branch
         @param revision: Specifies an exact target revision:
-        * Any existing tag for repackging 'alpha', 'beta' or 'release' packages
-        @param suffix: A suffix for release packages (such as 'alpha', 'beta', 'rc1', 'rtm', ...)
+        * Any existing tag for repackging 'community', 'beta' or 'release' packages
+        @param suffix: A suffix for release packages (such as 'community', 'beta', 'rc1', 'rtm', ...)
         """
         suffix_map = {'beta': 'beta',
-                      'alpha': 'alpha',
+                      'community': 'community',
                       'release': suffix,
                       'unstable': 'rev',
                       'experimental': 'exp'}
         branch_map = {'beta': 'stable',
-                      'alpha': 'test',
+                      'community': 'test',
                       'unstable': 'master'}
 
         filename = '{0}/../settings.cfg'.format(os.path.dirname(os.path.abspath(__file__)))
@@ -85,9 +85,9 @@ class SourceCollector(object):
 
         print 'Validating input parameters'
 
-        distribution = target  # experimental, unstable, alpha, beta, release
+        distribution = target  # experimental, unstable, community, beta, release
         if isinstance(target, basestring):
-            if target not in ['experimental', 'unstable', 'alpha', 'beta']:
+            if target not in ['experimental', 'unstable', 'community', 'beta']:
                 raise ValueError('Invalid target specified')
             suffix = suffix_map[target]
 
@@ -132,7 +132,7 @@ class SourceCollector(object):
 
         # Get parent branches
         branches = ['master']
-        if distribution == 'alpha':
+        if distribution == 'community':
             branches.append('test')
         elif distribution == 'beta':
             branches.extend(['test', 'stable'])
@@ -182,7 +182,7 @@ class SourceCollector(object):
         changes_found = False
         other_changes = False
         changelog = []
-        if target in ['alpha', 'beta', 'release']:
+        if target in ['community', 'beta', 'release']:
             print '  Generating changelog'
             changelog.append(settings.get('packaging', 'product_name'))
             changelog.append('=============')
@@ -250,7 +250,7 @@ class SourceCollector(object):
         # * Unstable branch
         #     1.2.0-rev.<revision>
         # * Test branch
-        #     1.2.0-alpha.<build>
+        #     1.2.0-community.<build>
         # * Stable branch
         #     1.2.0-beta.<build>
         # * Release branches (e.g. release_1_2)
@@ -264,7 +264,7 @@ class SourceCollector(object):
         print '  Full version: {0}'.format(version_string)
 
         # Tag revision
-        if distribution in ['alpha', 'beta', 'release'] and revision is None and increment_build is True:
+        if distribution in ['community', 'beta', 'release'] and revision is None and increment_build is True:
             print '  Tagging revision'
             SourceCollector.run(command='git tag -a {0} {1} -m "Added tag {0} for changeset {1}"'.format(version_string, revision_hash),
                                 working_directory=repo_path_metadata)

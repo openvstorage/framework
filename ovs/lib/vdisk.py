@@ -137,13 +137,14 @@ class VDiskController(object):
                 disk = VDiskList.get_by_devicename_and_vpool(volumepath, storagedriver.vpool)
                 if disk is None:
                     disk = VDisk()
+            disk.devicename = volumepath
+            disk.volume_id = volumename
+            disk.size = volumesize
+            disk.vpool = storagedriver.vpool
+            disk.save()
         finally:
             mutex.release()
-        disk.devicename = volumepath
-        disk.volume_id = volumename
-        disk.size = volumesize
-        disk.vpool = storagedriver.vpool
-        disk.save()
+
         VDiskController.sync_with_mgmtcenter(disk, pmachine, storagedriver)
         MDSServiceController.ensure_safety(disk)
 
@@ -607,14 +608,14 @@ class VDiskController(object):
             except Exception as ex:
                 logger.error('Failed to sync vdisk {0} with mgmt center {1}. {2}'.format(disk.name, pmachine.mgmtcenter.name, str(ex)))
 
-        if disk_name is None:
+        if disk_name is None and disk.vmachine is not None:
             logger.info('Sync vdisk with hypervisor on {0}'.format(pmachine.name))
             try:
                 hv = Factory.get(pmachine)
                 info = hv.get_vm_agnostic_object(disk.vmachine.hypervisor_id)
-                for disk in info['disks']:
-                    if disk['filename'] == disk.devicename:
-                        disk_name = disk['name']
+                for disk in info.get('disks', {}):
+                    if disk.get('filename', '') == disk.devicename:
+                        disk_name = disk.get('name', None)
                         break
             except Exception as ex:
                 logger.error('Failed to get vdisk info from hypervisor. %s' % ex)

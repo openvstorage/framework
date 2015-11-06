@@ -30,7 +30,7 @@ limitations under the License.
                 <input type="text" id="readCacheSize" class="form-control" data-bind="value: data.readCacheSize, valueUpdate: 'afterkeydown'" />
             </div>
             <div class="col-lg-6" style="padding: 0; margin-top: 8px;">
-                <span data-i18n="ovs:generic.gib"></span>
+                <span data-i18n="ovs:generic.units.gib"></span>
             </div>
         </div>
         <div class="form-group" style="padding-left: 40px;" data-bind="css: { 'has-error': canContinue().fields.contains('writeCacheSize') }">
@@ -40,7 +40,7 @@ limitations under the License.
                 <input type="text" id="writeCacheSize" class="form-control" data-bind="value: data.writeCacheSize, valueUpdate: 'afterkeydown'" />
             </div>
             <div class="col-lg-6" style="padding: 0; margin-top: 8px;">
-                <span data-i18n="ovs:generic.gib"></span>
+                <span data-i18n="ovs:generic.units.gib"></span>
             </div>
         </div>
         <div class="form-group" style="padding-left: 40px;">
@@ -63,17 +63,17 @@ limitations under the License.
             <li data-bind="visible: data.readCacheAvailableSize() !== undefined && data.readCacheAvailableSize() > 0">
                 <span data-i18n="ovs:wizards.addvpool.gathermountpoints.readcache_size"></span>
                 <span data-bind="text: Math.floor(data.readCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
-                <span data-i18n="ovs:generic.gib"></span>
+                <span data-i18n="ovs:generic.units.gib"></span>
             </li>
             <li data-bind="visible: data.writeCacheAvailableSize() !== undefined && data.writeCacheAvailableSize() > 0">
                 <span data-i18n="ovs:wizards.addvpool.gathermountpoints.writecache_size"></span>
                 <span data-bind="text: Math.floor(data.writeCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
-                <span data-i18n="ovs:generic.gib"></span>
+                <span data-i18n="ovs:generic.units.gib"></span>
             </li>
             <li data-bind="visible: data.sharedSize() !== undefined && data.sharedSize() > 0">
                 <span data-i18n="ovs:wizards.addvpool.gathermountpoints.shared_available"></span>
                 <span data-bind="text: Math.floor(data.sharedSize() / 1024 / 1024 / 1024)"></span>
-                <span data-i18n="ovs:generic.gib"></span>
+                <span data-i18n="ovs:generic.units.gib"></span>
             </li>
         </ul>
     </div>
