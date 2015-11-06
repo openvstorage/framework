@@ -28,53 +28,34 @@ define([
         self.canContinue = ko.observable({ value: true, reasons: [], fields: [] });
 
         // Functions
-        self._clone = function(i, vm, callData) {
-            var currentData = $.extend({}, callData);
-            currentData.name = self.data.amount() === 1 ? self.data.name() : self.data.name() + '-' + i;
+        self.finish = function() {
             return $.Deferred(function(deferred) {
-                api.post('vmachines/' + vm.guid() + '/clone', { data: currentData })
+                generic.alertInfo(
+                    $.t('ovs:wizards.clone.confirm.clonestarted'),
+                    $.t('ovs:wizards.clone.confirm.inprogress', { what: self.data.vDisk().name() })
+                );
+                var data = {
+                    name: self.data.name(),
+                    storagerouter_guid: self.data.storageRouter().guid()
+                };
+                if (self.data.snapshot() !== undefined) {
+                    data.snapshot_id = self.data.snapshot().guid;
+                }
+                api.post('vdisks/' + self.data.vDisk().guid() + '/clone', { data: data })
                     .then(self.shared.tasks.wait)
                     .done(function() {
-                        deferred.resolve(true);
+                        generic.alertSuccess(
+                            $.t('ovs:generic.finished'),
+                            $.t('ovs:wizards.clone.confirm.success',{ what: self.data.vDisk().name() })
+                        );
                     })
                     .fail(function(error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:generic.messages.errorwhile', {
-                                context: 'error',
-                                what: $.t('ovs:wizards.clone.confirm.cloning', { what: vm.name() }),
-                                error: error.responseText
-                            })
+                            $.t('ovs:wizards.clone.confirm.failed', { what: self.data.vDisk().name() })
                         );
-                        deferred.resolve(false);
                     });
-            }).promise();
-        };
-        self.finish = function() {
-            return $.Deferred(function(deferred) {
-                var i, clones = [],
-                    callData = {snapshot: self.data.snapshot().timestamp},
-                    vm = self.data.vm();
-                for (i = 1; i <= self.data.amount(); i += 1) {
-                    clones.push(self._clone(i, vm, callData));
-                }
-                generic.alertInfo($.t('ovs:wizards.clone.confirm.clonestarted'), $.t('ovs:wizards.clone.confirm.inprogress', { what: vm.name() }));
                 deferred.resolve();
-                $.when.apply($, clones)
-                    .done(function() {
-                        var i, args = Array.prototype.slice.call(arguments),
-                            success = 0;
-                        for (i = 0; i < args.length; i += 1) {
-                            success += (args[i] ? 1 : 0);
-                        }
-                        if (success === args.length) {
-                            generic.alertSuccess($.t('ovs:wizards.clone.confirm.complete'), $.t('ovs:wizards.clone.confirm.success', { what: vm.name() }));
-                        } else if (success > 0) {
-                            generic.alert($.t('ovs:wizards.clone.confirm.complete'), $.t('ovs:wizards.clone.confirm.somefailed', { what: vm.name() }));
-                        } else if (clones.length > 2) {
-                            generic.alertError($.t('ovs:generic.error'), $.t('ovs:wizards.clone.confirm.allfailed', { what: vm.name() }));
-                        }
-                    });
             }).promise();
         };
     };

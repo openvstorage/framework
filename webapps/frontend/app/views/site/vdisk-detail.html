@@ -37,13 +37,20 @@ limitations under the License.
             </li>
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
-                <button type="button" class="btn btn-mini btn-default"
+                <button type="button" class="btn btn-mini btn-default hand"
                         id="buttonVDiskRollback"
                         data-bind="click: function() { $root.rollback(); },
                                    style: { color: vMachine() !== undefined && vMachine().isRunning() ? 'lightgrey' : '#428bca' },
                                    tooltip: vMachine() !== undefined && vMachine().isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vdisks.detail.rollback',
                                    enable: $root.shared.user.roles().contains('write')">
-                    <span class="fa" data-i18n="[html]ovs:icons.rollback"></span>
+                    <span class="fa hand" data-i18n="[html]ovs:icons.rollback"></span>
+                </button>
+                <button type="button" class="btn btn-mini btn-default hand"
+                        id="buttonVDiskClone" style="color: #428bca;"
+                        data-bind="click: function() { $root.clone(); },
+                                   tooltip: 'ovs:vdisks.detail.clone',
+                                   enable: $root.shared.user.roles().contains('write')">
+                    <span class="fa hand" data-i18n="[html]ovs:icons.clone"></span>
                 </button>
             </li>
         </ul>

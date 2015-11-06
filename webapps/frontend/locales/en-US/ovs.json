@@ -30,7 +30,8 @@
                 "catch_up": "Rebuilding",
                 "degraded": "Degraded",
                 "unknown": "Unknown",
-                "undefined": "Unknown"
+                "undefined": "Unknown",
+                "null": "Unknown"
             },
             "backend": {
                 "new": "New",
@@ -440,7 +441,8 @@
             "snapshots": "Snapshots",
             "rollback": "Rollback",
             "configuration": "vDisk configuration",
-            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool."
+            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool.",
+            "clone": "Clone"
         },
         "saveconfig": {
             "done": "Save complete",
@@ -879,25 +881,23 @@
                 "title": "Please provide the required information",
                 "basicinfo": "Enter basic information",
                 "name": "Clone name",
-                "amount": "Number of clones",
                 "selectsnapshots": "Select the Snapshot from which you want to clone:",
-                "nomachine": "No machine loaded",
                 "noname": "No name was entered",
                 "nosnapshots": "Not all disks have Snapshots",
-                "snapshot": "Snapshots"
+                "snapshot": "Snapshots",
+                "storagerouters": "Storage Router:",
+                "snapshots": "Snapshot:",
+                "newsnapshot": "Create a new snapshot"
             },
             "confirm": {
                 "title": "Verify the entered information",
                 "clonename": "Name of the clone:",
-                "cloneamount": "Amount of clones:",
+                "storagerouter": "StorageRouter:",
                 "verifysnapshots": "Please validate the selected Snapshot below. It will be used for the clone:",
-                "cloning": "cloning __what__",
                 "clonestarted": "Clone started",
-                "inprogress": "Machine __what__ cloning in progress...",
+                "inprogress": "vDisk __what__ cloning in progress...",
                 "success": "Cloned __what__ successfully",
-                "somefailed": "Machine __what__ cloned. However, some of the clones could not be created.",
-                "allfailed": "All clones for machine __what__ failed.",
-                "complete": "Clones completed",
+                "failed": "Failed to clone vDisk __what__ failed.",
                 "snapshot": "Snapshot:"
             }
         },
@@ -1052,6 +1052,7 @@
         "vdisks": "&#xf0a0;",
         "vmachines": "&#xf0e8;",
         "vpools": "&#xf0c2;",
-        "warning": "&#xf071;"
+        "warning": "&#xf071;",
+        "clone": "&#xf24d;"
     }
 }
