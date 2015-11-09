@@ -59,7 +59,7 @@
         "cid": "",
         "nid": "",
         "enablesupport": false,
-        "interval": 60,
+        "interval": 60
     },
     "logging": {
         "level": "DEBUG",
