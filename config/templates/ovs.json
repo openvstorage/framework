@@ -20,7 +20,9 @@
             "keep": 30
         },
         "setupcompleted": false,
-        "nodetype": "UNCONFIGURED"
+        "nodetype": "UNCONFIGURED",
+        "registered": false,
+        "install_time": null
     },
     "webapps": {
         "main": {
@@ -57,7 +59,7 @@
         "cid": "",
         "nid": "",
         "enablesupport": false,
-        "interval": 60
+        "interval": 60,
     },
     "logging": {
         "level": "DEBUG",

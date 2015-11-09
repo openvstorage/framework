@@ -13,11 +13,14 @@
 // limitations under the License.
 /*global define */
 define([
-    'knockout', 'ovs/generic'
-], function(ko, generic) {
+    'knockout', 'ovs/generic', 'ovs/shared'
+], function(ko, generic, shared) {
     "use strict";
     return function() {
         var self = this;
+
+        // Variables
+        self.shared = shared;
 
         // Observables
         self.dataLoading     = ko.observable(false);
@@ -60,6 +63,9 @@ define([
                 total = self._fetchData(self.data()(), 'bandwidthSaved');
             }
             return generic.formatBytes(total);
+        });
+        self.unregistered = ko.computed(function() {
+            return shared.registration().registered === false && shared.registration().remaining > 0;
         });
 
         // Functions

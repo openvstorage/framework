@@ -23,7 +23,7 @@ define([
 
         // Variables
         self.shared               = shared;
-        self.guard                = { authenticated: true };
+        self.guard                = { authenticated: true, registered: true };
         self.counter              = 0;
         self.widgets              = [];
         self.fileSystemChecked    = false;  // Whether the filesystem has been checked for presence of upgrade lock
