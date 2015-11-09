@@ -52,6 +52,7 @@ define([
         self.guid                   = ko.observable(guid);
         self.iops                   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.ipAddress              = ko.observable();
+        self.lastHeartbeat          = ko.observable();
         self.loaded                 = ko.observable(false);
         self.loading                = ko.observable(false);
         self.machineId              = ko.observable();
@@ -67,6 +68,7 @@ define([
         self.storedData             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.updates                = ko.observable();
         self.vDisks                 = ko.observableArray([]);
+        self.versions               = ko.observable();
         self.writeSpeed             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
 
         // Computed
@@ -196,6 +198,9 @@ define([
             generic.trySet(self.dtlMode, data, 'dtl_mode', generic.lower);
             generic.trySet(self.nodeType, data, 'node_type');
             generic.trySet(self.rdmaCapable, data, 'rdma_capable');
+            if (data.hasOwnProperty('last_heartheat')) {
+                self.lastHeartbeat(data.last_heartheat === null ? undefined : data.last_heartheat);
+            }
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids = data.vpools_guids;
             }

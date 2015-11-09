@@ -12,11 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /*global define */
-define(function() {
+define(['ovs/shared'], function(shared) {
     "use strict";
     return {
         canActivate: function() {
-            return { redirect: '#full' };
+            var redirect = '#full';
+            if (shared.registration().registered === false && shared.registration().remaining > 0) {
+                redirect += '/register';
+            }
+            return {
+                redirect: redirect
+            };
         }
     };
 });

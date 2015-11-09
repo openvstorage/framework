@@ -20,7 +20,9 @@
             "keep": 30
         },
         "setupcompleted": false,
-        "nodetype": "UNCONFIGURED"
+        "nodetype": "UNCONFIGURED",
+        "registered": false,
+        "install_time": null
     },
     "webapps": {
         "main": {

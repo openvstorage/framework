@@ -1079,6 +1079,7 @@ class SetupController(object):
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
         target_client.config_set('ovs.core.setupcompleted', True)
         target_client.config_set('ovs.core.nodetype', 'MASTER')
+        target_client.config_set('ovs.core.install_time', time.time())
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
 
         logger.info('First node complete')
@@ -1114,10 +1115,12 @@ class SetupController(object):
         cid = master_client.config_read('ovs.support.cid')
         enabled = master_client.config_read('ovs.support.enabled')
         enablesupport = master_client.config_read('ovs.support.enablesupport')
+        registered = master_client.config_read('ovs.core.registered')
         target_client.config_set('ovs.support.nid', Toolbox.get_hash())
         target_client.config_set('ovs.support.cid', cid)
         target_client.config_set('ovs.support.enabled', enabled)
         target_client.config_set('ovs.support.enablesupport', enablesupport)
+        target_client.config_set('ovs.core.registered', registered)
         if enabled is True:
             service = 'support-agent'
             ServiceManager.add_service(service, client=target_client)
@@ -1146,6 +1149,7 @@ class SetupController(object):
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
         target_client.config_set('ovs.core.setupcompleted', True)
         target_client.config_set('ovs.core.nodetype', 'EXTRA')
+        target_client.config_set('ovs.core.install_time', time.time())
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
         logger.info('Extra node complete')
 

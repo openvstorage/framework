@@ -14,20 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <section>
-    <div class="container well well-sm" data-bind="visible: hasData()">
-        <span data-i18n="ovs:footer.cachereads"></span>
-        <span data-bind="text: cacheHits"></span>
-
-        <span class="fa" data-i18n="[html]ovs:icons.separator"></span>
-
-        <span data-i18n="ovs:footer.datawritten"></span>
-        <span data-bind="text: backendWritten"></span>
-
-        <span class="fa" data-i18n="[html]ovs:icons.separator"></span>
-
-        <span data-i18n="ovs:footer.bandwidthsaved"></span>
-        <span data-bind="text: bandwidthSaved"></span>
-
-        <i style="margin-left: 10px;" class="fa fa-spin" data-i18n="[html]ovs:icons.loading" data-bind="visible: dataLoading"></i>
+    <div class="container well well-sm" data-bind="visible: hasData() || unregistered()">
+        <span data-bind="visible: unregistered" style="font-weight: bold; margin-right: 20px;">
+            <a data-bind="attr: { href: $root.shared.routing.loadHash('register') }"
+               style="color: red; text-decoration: underline;">
+                <span data-i18n="ovs:footer.unregistered1"  class="hand"></span>
+                <span data-bind="text: Math.round(shared.registration().remaining)" class="hand"></span>
+                <span data-i18n="ovs:footer.unregistered2" class="hand"></span>
+            </a>
+        </span>
+        <span data-bind="visible: hasData()">
+            <span data-i18n="ovs:footer.cachereads"></span>
+            <span data-bind="text: cacheHits"></span>
+            <span class="fa" data-i18n="[html]ovs:icons.separator"></span>
+            <span data-i18n="ovs:footer.datawritten"></span>
+            <span data-bind="text: backendWritten"></span>
+            <span class="fa" data-i18n="[html]ovs:icons.separator"></span>
+            <span data-i18n="ovs:footer.bandwidthsaved"></span>
+            <span data-bind="text: bandwidthSaved"></span>
+            <i style="margin-left: 10px;" class="fa fa-spin" data-i18n="[html]ovs:icons.loading" data-bind="visible: dataLoading"></i>
+        </span>
     </div>
 </section>
