@@ -72,6 +72,7 @@ define([
         data.port(80);
         data.rdmaEnabled(false);
         data.scoSize(4);
+        data.scrubAvailable(false);
         data.secretkey('');
         data.storageDrivers([]);
         data.storageIP(undefined);

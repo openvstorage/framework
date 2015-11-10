@@ -94,15 +94,13 @@ class MDSServiceController(object):
 
         # 2. Partition check
         db_partition = None
-        scrub_partition = None
         for disk in storagerouter.disks:
             for partition in disk.partitions:
                 if DiskPartition.ROLES.DB in partition.roles:
                     db_partition = partition
-                if DiskPartition.ROLES.SCRUB in partition.roles:
-                    scrub_partition = partition
-        if scrub_partition is None or db_partition is None:
-            raise RuntimeError('Could not find DB and/or SCRUB partition on storage router {0}'.format(storagerouter.name))
+                    break
+        if db_partition is None:
+            raise RuntimeError('Could not find DB partition on storage router {0}'.format(storagerouter.name))
 
         # 3. Verify storage driver configured
         storagedrivers = [sd for sd in vpool.storagedrivers if sd.storagerouter_guid == storagerouter.guid]
@@ -126,18 +124,11 @@ class MDSServiceController(object):
 
         # 2. Storage driver partitions
         from ovs.lib.storagedriver import StorageDriverController
-
-        storagedriver = storagedrivers[0]
-        StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
-                                                                           'role': DiskPartition.ROLES.DB,
-                                                                           'sub_role': StorageDriverPartition.SUBROLE.MDS,
-                                                                           'partition': db_partition,
-                                                                           'mds_service': mds_service})
-        StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
-                                                                           'role': DiskPartition.ROLES.SCRUB,
-                                                                           'sub_role': StorageDriverPartition.SUBROLE.MDS,
-                                                                           'partition': scrub_partition,
-                                                                           'mds_service': mds_service})
+        sdp = StorageDriverController.add_storagedriverpartition(storagedrivers[0], {'size': None,
+                                                                                     'role': DiskPartition.ROLES.DB,
+                                                                                     'sub_role': StorageDriverPartition.SUBROLE.MDS,
+                                                                                     'partition': db_partition,
+                                                                                     'mds_service': mds_service})
 
         # CONFIGURATIONS
         # 1. Volumedriver
@@ -148,10 +139,8 @@ class MDSServiceController(object):
                 if mds_service.vpool_guid == vpool.guid:
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions
-                                                       if sd_partition.role == DiskPartition.ROLES.DB and sd_partition.sub_role == StorageDriverPartition.SUBROLE.MDS][0],
-                                      'scratch_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions
-                                                            if sd_partition.role == DiskPartition.ROLES.SCRUB and sd_partition.sub_role == StorageDriverPartition.SUBROLE.MDS][0]})
+                                      'db_directory': sdp.path,
+                                      'scratch_directory': sdp.path})
 
         # Generate the correct section in the Storage Driver's configuration
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
@@ -192,10 +181,11 @@ class MDSServiceController(object):
             if service.storagerouter_guid == storagerouter.guid:
                 mds_service = service.mds_service
                 if mds_service.vpool_guid == vpool.guid:
+                    sdp = [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.DB]
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.DB][0],
-                                      'scratch_directory': [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.SCRUB][0]})
+                                      'db_directory': sdp[0],
+                                      'scratch_directory': sdp[0]})
 
         # Generate the correct section in the Storage Driver's configuration
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
@@ -208,7 +198,8 @@ class MDSServiceController(object):
         while tries > 0:
             try:
                 root_client = SSHClient(storagerouter, username='root')
-                root_client.dir_delete(directories_to_clean)
+                root_client.dir_delete(directories=directories_to_clean,
+                                       follow_symlinks=True)
                 for dir_name in directories_to_clean:
                     logger.debug('Recursively removed {0}'.format(dir_name))
                 break

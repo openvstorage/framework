@@ -436,4 +436,32 @@ class OVSMigrator(object):
 
             working_version = 5
 
+        # Version 6
+        # Distributed scrubbing
+        if working_version < 6:
+            from ovs.dal.hybrids.diskpartition import DiskPartition
+            from ovs.dal.lists.servicetypelist import ServiceTypeList
+            from ovs.dal.lists.storagedriverlist import StorageDriverList
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
+            from ovs.extensions.generic.sshclient import SSHClient
+            from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+            for storage_driver in StorageDriverList.get_storagedrivers():
+                root_client = SSHClient(storage_driver.storagerouter, username='root')
+                for partition in storage_driver.partitions:
+                    if partition.role == DiskPartition.ROLES.SCRUB:
+                        old_path = partition.path
+                        partition.sub_role = None
+                        partition.save()
+                        partition.invalidate_dynamics(['folder', 'path'])
+                        if root_client.dir_exists(partition.path):
+                            continue  # New directory already exists
+                        if '_mds_' in old_path:
+                            if root_client.dir_exists(old_path):
+                                root_client.symlink({partition.path: old_path})
+                        if not root_client.dir_exists(partition.path):
+                            root_client.dir_create(partition.path)
+                        root_client.dir_chmod(partition.path, 0777)
+
+            working_version = 6
+
         return working_version

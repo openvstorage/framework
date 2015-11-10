@@ -60,6 +60,14 @@ limitations under the License.
                         <span data-part="lazy-entry-undefined">-</span>
                     </span>
                 </td>
+                <td>
+                    <!-- ko if: scrubCapable() === false -->
+                        <span class="fa" data-i18n="[html]ovs:icons.cancel_circle" style="color: red;"></span>
+                    <!-- /ko -->
+                    <!-- ko if: scrubCapable() === true -->
+                        <span class="fa" data-i18n="[html]ovs:icons.check_circle" style="color: green;"></span>
+                    <!-- /ko -->
+                </td>
             </tr>
         </table>
     </div>

@@ -59,6 +59,7 @@ define([
             rdmaEnabled:             ko.observable(false),
             readCacheSize:           ko.observable(1).extend({numeric: {min: 1, max: 10240}}),
             readCacheAvailableSize:  ko.observable(),
+            scrubAvailable:          ko.observable(false),
             scoSize:                 ko.observable(4),
             scoSizes:                ko.observableArray([4, 8, 16, 32, 64, 128]),
             secretkey:               ko.observable(''),
