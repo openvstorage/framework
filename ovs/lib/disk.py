@@ -129,7 +129,8 @@ class DiskController(object):
                         if partition_name in mount_mapping:
                             mountpoint = mount_mapping[partition_name]
                             partition_data['mountpoint'] = mountpoint
-                            partition_data['inode'] = remote.os.stat(mountpoint).st_dev
+                            if remote.os.path.exists(mountpoint):
+                                partition_data['inode'] = remote.os.stat(mountpoint).st_dev
                             del mount_mapping[partition_name]
                             try:
                                 client.run('touch {0}/{1}; rm {0}/{1}'.format(mountpoint, str(time.time())))
@@ -207,7 +208,10 @@ class DiskController(object):
         for prop in ['filesystem', 'offset', 'state', 'path', 'mountpoint', 'inode', 'size']:
             value = container[prop] if prop in container else None
             setattr(partition, prop, value)
-        partition.save()
+        try:
+            partition.save()
+        except Exception as ex:
+            logger.warning('Failed to update model. {0}'.format(ex))
 
     @staticmethod
     def _update_disk(disk, container):
