@@ -27,6 +27,7 @@ define([
         self.guard                    = { authenticated: true };
         self.refresher                = new Refresher();
         self.widgets                  = [];
+        self.fdCache                  = {};
         self.pMachineCache            = {};
         self.vPoolCache               = {};
         self.vMachineCache            = {};
@@ -45,12 +46,12 @@ define([
 
         // Computed
         self.availableSecondaryFailureDomains = ko.computed(function() {
-            var domains = [undefined], primary, storageRouter = self.storageRouter(), secondary, guids;
+            var domains = [undefined], primary_guid, storageRouter = self.storageRouter(), secondary, guids;
             if (storageRouter !== undefined) {
-                secondary = storageRouter.secondaryFailureDomain;
+                secondary = storageRouter.secondaryFailureDomainGuid;
                 $.each(self.secondaryFailureDomains(), function (index, domain) {
-                    primary = storageRouter.primaryFailureDomain();
-                    if (domain.guid() === primary.guid()) {
+                    primary_guid = storageRouter.primaryFailureDomainGuid();
+                    if (domain.guid() === primary_guid) {
                         if (!domain.primarySRGuids().contains(storageRouter.guid())) {
                             domain.primarySRGuids.push(storageRouter.guid());
                         }
@@ -60,11 +61,11 @@ define([
                         domain.primarySRGuids(guids);
                     }
                     domain.disabled(
-                        domain.guid() === storageRouter.primaryFailureDomain().guid() ||
+                        domain.guid() === storageRouter.primaryFailureDomainGuid() ||
                         domain.primarySRGuids().length === 0
                     );
                     domains.push(domain);
-                    if (secondary() !== undefined && domain.guid() === secondary().guid() && domain.disabled()) {
+                    if (secondary() !== undefined && domain.guid() === secondary() && domain.disabled()) {
                         secondary(undefined);
                     }
                 });
@@ -102,7 +103,9 @@ define([
                     .then(self.loadFailureDomains)
                     .done(function() {
                         self.checkedVPoolGuids(self.storageRouter().vPoolGuids);
-                        var pMachineGuid = storageRouter.pMachineGuid(), pm;
+                        var pMachineGuid = storageRouter.pMachineGuid(), pm, pfd, sfd,
+                            primaryFailureDomainGuid = storageRouter.primaryFailureDomainGuid(),
+                            secondaryFailureDomainGuid = storageRouter.secondaryFailureDomainGuid();
                         if (pMachineGuid && (storageRouter.pMachine() === undefined || storageRouter.pMachine().guid() !== pMachineGuid)) {
                             if (!self.pMachineCache.hasOwnProperty(pMachineGuid)) {
                                 pm = new PMachine(pMachineGuid);
@@ -115,6 +118,22 @@ define([
                                 self.pMachineCache[storageRouter.pMachine().guid()] = storageRouter.pMachine();
                             }
                             storageRouter.pMachine().load();
+                        }
+                        if (primaryFailureDomainGuid && (storageRouter.primaryFailureDomain() === undefined || storageRouter.primaryFailureDomainGuid() !== primaryFailureDomainGuid)) {
+                            if (!self.fdCache.hasOwnProperty(primaryFailureDomainGuid)) {
+                                pfd = new FailureDomain(primaryFailureDomainGuid);
+                                pfd.load();
+                                self.fdCache[primaryFailureDomainGuid] = pfd;
+                            }
+                            storageRouter.primaryFailureDomain(self.fdCache[primaryFailureDomainGuid]);
+                        }
+                        if (secondaryFailureDomainGuid && (storageRouter.secondaryFailureDomain() === undefined || storageRouter.secondaryFailureDomainGuid() !== secondaryFailureDomainGuid)) {
+                            if (!self.fdCache.hasOwnProperty(secondaryFailureDomainGuid)) {
+                                sfd = new FailureDomain(secondaryFailureDomainGuid);
+                                sfd.load();
+                                self.fdCache[secondaryFailureDomainGuid] = sfd;
+                            }
+                            storageRouter.secondaryFailureDomain(self.fdCache[secondaryFailureDomainGuid]);
                         }
                         // Move child guids to the observables for easy display
                         storageRouter.vPools(storageRouter.vPoolGuids);
