@@ -455,7 +455,6 @@ class OVSMigrator(object):
                         partition.save()
                         partition.invalidate_dynamics(['folder', 'path'])
                         if root_client.dir_exists(partition.path):
-                            print 'joat'
                             continue  # New directory already exists
                         if '_mds_' in old_path:
                             if root_client.dir_exists(old_path):
