@@ -443,7 +443,6 @@ class OVSMigrator(object):
             from ovs.dal.lists.servicetypelist import ServiceTypeList
             from ovs.dal.lists.storagedriverlist import StorageDriverList
             from ovs.dal.lists.storagerouterlist import StorageRouterList
-            from ovs.dal.lists.vpoollist import VPoolList
             from ovs.extensions.generic.sshclient import SSHClient
             from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
             for storage_driver in StorageDriverList.get_storagedrivers():
@@ -462,30 +461,6 @@ class OVSMigrator(object):
                         if not root_client.dir_exists(partition.path):
                             root_client.dir_create(partition.path)
                         root_client.dir_chmod(partition.path, 0777)
-
-            for vpool in VPoolList.get_vpools():
-                for storage_router in StorageRouterList.get_storagerouters():
-                    client = SSHClient(storage_router)
-                    mds_nodes = []
-                    mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
-                    for service in mdsservice_type.services:
-                        if service.storagerouter_guid == storage_router.guid:
-                            mds_service = service.mds_service
-                            if mds_service.vpool_guid == vpool.guid:
-                                sdp = [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.DB]
-                                if len(sdp) > 0:
-                                    mds_nodes.append({'host': service.storagerouter.ip,
-                                                      'port': service.ports[0],
-                                                      'db_directory': sdp[0],
-                                                      'scratch_directory': sdp[0]})
-
-                    storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
-                    storagedriver_config.load(client)
-                    storagedriver_config.clean()
-                    storagedriver_config.configure_metadata_server(mds_nodes=[])  # Updating existing not possible --> Remove / add
-                    storagedriver_config.save(client, reload_config=True)
-                    storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
-                    storagedriver_config.save(client, reload_config=True)
 
             working_version = 6
 
