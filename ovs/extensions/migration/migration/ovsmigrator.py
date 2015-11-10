@@ -51,4 +51,15 @@ class OVSMigrator(object):
 
             working_version = 1
 
+        # Version 2 introduced:
+        # - Registration
+        if working_version < 2:
+            import time
+            from ovs.extensions.generic.configuration import Configuration
+            if not Configuration.exists('ovs.core.registered'):
+                Configuration.set('ovs.core.registered', False)
+                Configuration.set('ovs.core.install_time', time.time())
+
+            working_version = 2
+
         return working_version

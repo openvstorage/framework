@@ -174,17 +174,44 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.clone')
-    def clone(diskguid, snapshotid, devicename, pmachineguid, machinename, machineguid=None):
+    def clone(diskguid, snapshotid, devicename, pmachineguid, machinename=None, machineguid=None, detached=False):
         """
         Clone a disk
         """
         pmachine = PMachine(pmachineguid)
         hypervisor = Factory.get(pmachine)
-        description = '{0} {1}'.format(machinename, devicename)
+        if machinename is None:
+            description = devicename
+        else:
+            description = '{0} {1}'.format(machinename, devicename)
         properties_to_clone = ['description', 'size', 'type', 'retentionpolicyguid',
                                'snapshotpolicyguid', 'autobackup']
         vdisk = VDisk(diskguid)
         location = hypervisor.get_backing_disk_path(machinename, devicename)
+
+        if machineguid is not None and detached is True:
+            raise ValueError('A vMachine GUID was specified while detached is True')
+
+        if snapshotid is None:
+            # Create a new snapshot
+            timestamp = str(int(time.time()))
+            metadata = {'label': '',
+                        'is_consistent': False,
+                        'timestamp': timestamp,
+                        'machineguid': machineguid,
+                        'is_automatic': True}
+            VDiskController.create_snapshot(diskguid, metadata)
+            tries = 25  # About 5 minutes
+            while snapshotid is None and tries > 0:
+                tries -= 1
+                time.sleep(25 - tries)
+                vdisk.invalidate_dynamics(['snapshots'])
+                snapshots = [snapshot for snapshot in vdisk.snapshots
+                             if snapshot['in_backend'] is True and snapshot['timestamp'] == timestamp]
+                if len(snapshots) == 1:
+                    snapshotid = snapshots[0]['guid']
+            if snapshotid is None:
+                raise RuntimeError('Could not find created snapshot in time')
 
         new_vdisk = VDisk()
         new_vdisk.copy(vdisk, include=properties_to_clone)
@@ -193,7 +220,8 @@ class VDiskController(object):
         new_vdisk.description = description
         new_vdisk.devicename = hypervisor.clean_backing_disk_filename(location)
         new_vdisk.parentsnapshot = snapshotid
-        new_vdisk.vmachine = VMachine(machineguid) if machineguid else vdisk.vmachine
+        if detached is False:
+            new_vdisk.vmachine = VMachine(machineguid) if machineguid else vdisk.vmachine
         new_vdisk.vpool = vdisk.vpool
         new_vdisk.save()
 

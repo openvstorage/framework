@@ -135,7 +135,7 @@ class KVM(object):
         """
         Builds the path for the file backing a given device/disk
         """
-        return self.get_disk_path(machinename.replace(' ', '_'), devicename)
+        return self.get_disk_path(machinename, devicename)
 
     def get_disk_path(self, machinename, devicename):
         """

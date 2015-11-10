@@ -98,7 +98,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @load(VMachine)
     def rollback(self, vmachine, timestamp):
         """
-        Clones a machine
+        Rolls back a machine
         """
         if vmachine.is_vtemplate:
             raise NotAcceptable('vMachine should not be a vTemplate')

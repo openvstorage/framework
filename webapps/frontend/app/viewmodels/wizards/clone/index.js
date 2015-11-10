@@ -27,21 +27,18 @@ define([
         // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.clone.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.data.machineGuid(options.machineguid);
+        self.data.vDisk(options.vdisk);
         self.steps([new Gather(), new Confirm()]);
         self.activateStep();
 
-        // Functions
-        self.compositionComplete = function() {
-            var amount = $("#amount");
-            amount.on('keypress', function(e) {
-                // Guard keypresses, only accepting numeric values
-                return !(e.which !== 8 && e.which !== 0 && (e.which < 48 || e.which > 57));
-            });
-            amount.on('change', function() {
-                // Guard ctrl+v
-                amount.val(Math.max(1, parseInt('0' + amount.val(), 10)));
-            });
-        };
+        if (self.data.storageRouters().length > 0) {
+            self.data.storageRouter(self.data.storageRouters()[0]);
+        } else {
+            self.data.storageRouter(undefined);
+        }
+        self.data.snapshot(undefined);
+        if (self.data.vDisk() !== undefined) {
+            self.data.name(self.data.vDisk().name().toLowerCase().replace(/ /, '-') + '-clone');
+        }
     };
 });

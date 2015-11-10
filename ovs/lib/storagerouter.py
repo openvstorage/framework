@@ -1147,7 +1147,7 @@ class StorageRouterController(object):
         """
         Returns support metadata for a given storagerouter. This should be a routed task!
         """
-        return SupportAgent.get_heartbeat_data()
+        return SupportAgent().get_heartbeat_data()
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_logfiles')
@@ -1314,7 +1314,7 @@ class StorageRouterController(object):
         ovsdb_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == 'Arakoon' and ser.name == 'arakoon-ovsdb']
         downtime = [('ovs', 'ovsdb', None)] if len(ovsdb_cluster) < 3 and this_sr.guid in ovsdb_cluster else []
 
-        ovs_info = PackageManager.verify_update_required(packages=['openvstorage-core', 'openvstorage-webapps'],
+        ovs_info = PackageManager.verify_update_required(packages=['openvstorage-core', 'openvstorage-webapps', 'openvstorage-cinder-plugin'],
                                                          services=['watcher-framework', 'memcached'],
                                                          client=client)
         arakoon_info = PackageManager.verify_update_required(packages=['arakoon'],
