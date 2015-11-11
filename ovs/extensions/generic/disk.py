@@ -48,7 +48,7 @@ class DiskTools(object):
                     logger.exception('Error during label/partition creation: {0}'.format(iex))
                     raise
             elif "The closest location we can manage is" in ex.output.splitlines()[-1]:
-                # We didn't manage to calculate correctly the partition, will retry
+                # We didn't manage to calculate correctly the partition, so retry
                 line = ex.output.splitlines()[-1]
                 hint = line[line.find('manage is ')+10:line.find('.')]
                 start, end = hint.split(' to ')
