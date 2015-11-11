@@ -68,7 +68,8 @@ class DiskController(object):
             with Remote(storagerouter.ip, [Context, os]) as remote:
                 context = remote.Context()
                 devices = [device for device in context.list_devices(subsystem='block')
-                           if 'ID_TYPE' in device and device['ID_TYPE'] == 'disk']
+                           if ('ID_TYPE' in device and device['ID_TYPE'] == 'disk')
+                           or ('DEVNAME' in device and 'nvme' in device['DEVNAME'])]
                 for device in devices:
                     is_partition = device['DEVTYPE'] == 'partition'
                     device_path = device['DEVNAME']
