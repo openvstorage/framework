@@ -41,9 +41,10 @@ class DiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.sync_with_reality')
-    def sync_with_reality(storagerouter_guid=None):
+    def async_sync_with_reality(storagerouter_guid=None):
         """
         Calls sync_with_reality, implements dedupe logic
+        Keep existing task as it is, some tasks depend on it being sync, call async explicitly
         - if task was already called for this storagerouter, revoke it and call a new one
         - ensures only 1 task runs for a storagerouter and only the last task is executed
         :param storagerouter_guid:
@@ -62,7 +63,7 @@ class DiskController(object):
         cache.set(key, async_result.id, 600)  # Store the task id
 
     @celery.task(name='ovs.disk.async_sync_with_reality')
-    def async_sync_with_reality(storagerouter_guid=None):
+    def sync_with_reality(storagerouter_guid=None):
         """
         Syncs the Disks from all StorageRouters with the reality.
         :param storagerouter_guid: Guid of the Storage Router to synchronize
