@@ -35,7 +35,9 @@ class DiskTools(object):
         """
         try:
             label = disk.split('/')[-1]
-            check_output('parted {0} -s mkpart {1} {2}B {3}B'.format(disk, label, offset, offset + size), shell=True)
+            start = "{0}GB".format(round(float(offset) / 1000**3, 2))
+            end = "{0}GB".format(round(float(offset+size) / 1000**3, 2))
+            check_output('parted {0} -s mkpart {1} {2}B {3}B'.format(disk, label, start, end), shell=True)
         except CalledProcessError as ex:
             if 'unrecognised disk label' in ex.output:
                 try:
@@ -45,6 +47,17 @@ class DiskTools(object):
                 except Exception as iex:
                     logger.exception('Error during label/partition creation: {0}'.format(iex))
                     raise
+            elif "The closest location we can manage is" in ex.output.splitlines()[-1]:
+                # We didn't manage to calculate correctly the partition, will retry
+                line = ex.output.splitlines()[-1]
+                hint = line[line.find('manage is ')+10:line.find('.')]
+                start, end = hint.split(' to ')
+                try:
+                    check_output('parted {0} -s mkpart {1} {2}B {3}B'.format(disk, label, start, end), shell=True)
+                except CalledProcessError as iex:
+                    logger.exception('Error during label/partition creation: {0}'.format(iex))
+                    raise
+
             else:
                 logger.exception('Error during partition creation: {0}'.format(ex.output))
                 raise
