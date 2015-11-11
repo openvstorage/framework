@@ -18,6 +18,7 @@ DiskController module
 import re
 import os
 import time
+from celery.task.control import revoke
 from subprocess import CalledProcessError
 from pyudev import Context
 from ovs.celery_run import celery
@@ -28,6 +29,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.remote import Remote
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 logger = LogHandler.get('lib', name='disk')
 
@@ -40,6 +42,27 @@ class DiskController(object):
     @staticmethod
     @celery.task(name='ovs.disk.sync_with_reality')
     def sync_with_reality(storagerouter_guid=None):
+        """
+        Calls sync_with_reality, implements dedupe logic
+        - if task was already called for this storagerouter, revoke it and call a new one
+        - ensures only 1 task runs for a storagerouter and only the last task is executed
+        :param storagerouter_guid:
+        :return:
+        """
+        cache = VolatileFactory.get_client()
+        key = 'ovs_dedupe_sync_with_reality_{0}'.format(storagerouter_guid)
+        task_id = cache.get(key)
+        if task_id:
+            # Key exists, task was already scheduled
+            # If task is already running, the revoke message will be ignored
+            revoke(task_id)
+            async_result = DiskController.async_sync_with_reality.s().apply_async(args=[storagerouter_guid], countdown=15)
+        else:
+            async_result = DiskController.async_sync_with_reality.s().apply_async(args=[storagerouter_guid])
+        cache.set(key, async_result.id, 600)  # Store the task id
+
+    @celery.task(name='ovs.disk.async_sync_with_reality')
+    def async_sync_with_reality(storagerouter_guid=None):
         """
         Syncs the Disks from all StorageRouters with the reality.
         :param storagerouter_guid: Guid of the Storage Router to synchronize
@@ -129,8 +152,7 @@ class DiskController(object):
                         if partition_name in mount_mapping:
                             mountpoint = mount_mapping[partition_name]
                             partition_data['mountpoint'] = mountpoint
-                            if remote.os.path.exists(mountpoint):
-                                partition_data['inode'] = remote.os.stat(mountpoint).st_dev
+                            partition_data['inode'] = remote.os.stat(mountpoint).st_dev
                             del mount_mapping[partition_name]
                             try:
                                 client.run('touch {0}/{1}; rm {0}/{1}'.format(mountpoint, str(time.time())))
@@ -208,10 +230,7 @@ class DiskController(object):
         for prop in ['filesystem', 'offset', 'state', 'path', 'mountpoint', 'inode', 'size']:
             value = container[prop] if prop in container else None
             setattr(partition, prop, value)
-        try:
-            partition.save()
-        except Exception as ex:
-            logger.warning('Failed to update model. {0}'.format(ex))
+        partition.save()
 
     @staticmethod
     def _update_disk(disk, container):
