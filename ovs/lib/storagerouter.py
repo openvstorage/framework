@@ -1085,7 +1085,7 @@ class StorageRouterController(object):
                         routing_key='sr.{0}'.format(storageappliance_machineid)
                     )
                     result.wait()
-            except Exception, ex:
+            except Exception as ex:
                 logger.error('{0}'.format(ex))
                 success = False
         # Remove Storage Drivers
@@ -1113,7 +1113,7 @@ class StorageRouterController(object):
                         routing_key='sr.{0}'.format(storagerouter_machineid)
                     )
                     result.wait()
-            except Exception, ex:
+            except Exception as ex:
                 logger.error('{0}'.format(ex))
                 success = False
         return success
@@ -1481,11 +1481,15 @@ class StorageRouterController(object):
             logger.debug('Creating new partition: {0}, {1}, {2}'.format(offset, size, roles))
             found_previous = offset == 0
             found_next = offset + size == disk.size
+            part_previous = None
+            part_next = None
             for partition in disk.partitions:
                 if partition.offset + partition.size == offset:
                     found_previous = True
+                    part_previous = partition
                 if partition.offset == offset + size:
                     found_next = True
+                    part_next = partition
             if not found_previous or not found_next:
                 raise RuntimeError('Given offset/size do not fit into the given Disk')
             if offset == 0:
@@ -1501,6 +1505,20 @@ class StorageRouterController(object):
                 if possible_partition.offset == offset:
                     partition = possible_partition
                     break
+            if partition is None:
+                if part_previous is not None and part_next is not None:
+                    for possible_partition in disk.partitions:
+                        if possible_partition.offset > (part_previous.size + part_previous.offset) and\
+                        (possible_partition.offset + possible_partition.size) < part_next.offset:
+                            partition = possible_partition
+                elif part_previous is None and part_next is not None:
+                    for possible_partition in disk.partitions:
+                        if (possible_partition.offset + possible_partition.size) < part_next.offset:
+                            partition = possible_partition
+                elif part_previous is not None and part_next is None:
+                    for possible_partition in disk.partitions:
+                        if possible_partition.offset > (part_previous.size + part_previous.offset):
+                            partition = possible_partition
             if partition is None:
                 raise RuntimeError('Could not locate partition')
             logger.debug('Partition created')
