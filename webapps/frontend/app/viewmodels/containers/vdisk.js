@@ -34,41 +34,41 @@ define([
         self.vpool         = ko.observable();
 
         // Observables
-        self.loading             = ko.observable(false);
-        self.loaded              = ko.observable(false);
-        self.guid                = ko.observable(guid);
-        self.name                = ko.observable();
-        self.order               = ko.observable(0);
-        self.snapshots           = ko.observableArray([]);
-        self.parentConfiguration = ko.observable();
-        self.oldConfiguration    = ko.observable();
-        self.size                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.storedData          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendRead         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendWritten      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.cacheHits           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.cacheMisses         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.iops                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.readSpeed           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.writeSpeed          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendWritten      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.backendRead         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.bandwidthSaved      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.namespace           = ko.observable();
-        self.storageRouterGuid   = ko.observable();
-        self.vpoolGuid           = ko.observable();
-        self.vMachineGuid        = ko.observable();
-        self.dtlMode             = ko.observable();
-        self.cacheStrategy       = ko.observable('on_read');
-        self.dtlEnabled          = ko.observable(false);
-        self.dtlLocation         = ko.observable();
-        self.scoSize             = ko.observable(4);
-        self.dtlMode             = ko.observable();
-        self.dedupeMode          = ko.observable();
-        self.writeBuffer         = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
-        self.readCacheLimit      = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});
         self.cacheStrategies     = ko.observableArray(['on_read', 'on_write', 'none']);
-        self.dtlModes            = ko.observableArray(['no_sync', 'a_sync', 'sync']);
+        self.cacheStrategy       = ko.observable('on_read');
+        self.dedupeMode          = ko.observable();
         self.dedupeModes         = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
+        self.dtlEnabled          = ko.observable(true);
+        self.dtlLocation         = ko.observable();
+        self.dtlMode             = ko.observable();
+        self.dtlModes            = ko.observableArray(['no_sync', 'a_sync', 'sync']);
+        self.dtlStatus           = ko.observable();
+        self.guid                = ko.observable(guid);
+        self.iops                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.loaded              = ko.observable(false);
+        self.loading             = ko.observable(false);
+        self.name                = ko.observable();
+        self.namespace           = ko.observable();
+        self.oldConfiguration    = ko.observable();
+        self.order               = ko.observable(0);
+        self.parentConfiguration = ko.observable();
+        self.readCacheLimit      = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});
+        self.readSpeed           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.scoSize             = ko.observable(4);
         self.scoSizes            = ko.observableArray([4, 8, 16, 32, 64, 128]);
+        self.size                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.snapshots           = ko.observableArray([]);
+        self.storageRouterGuid   = ko.observable();
+        self.storedData          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.vMachineGuid        = ko.observable();
+        self.vpoolGuid           = ko.observable();
+        self.writeSpeed          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.writeBuffer         = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -80,6 +80,19 @@ define([
                 total = 1;
             }
             return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
+        });
+        self.dtlModeChange = ko.computed({
+            read: function() {
+                return self.dtlMode();
+            },
+            write: function(mode) {
+                if (mode === 'no_sync') {
+                    self.dtlEnabled(false);
+                } else {
+                    self.dtlEnabled(true);
+                }
+                self.dtlMode(mode);
+            }
         });
         self.configuration = ko.computed({
             read: function() {
@@ -146,7 +159,7 @@ define([
             generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);
-                self.dtlMode(data.info.failover_mode.toLowerCase() || 'unknown');
+                self.dtlStatus(data.info.failover_mode.toLowerCase() || 'unknown');
                 self.namespace(data.info.namespace);
             }
             if (data.hasOwnProperty('statistics')) {

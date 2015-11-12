@@ -39,7 +39,7 @@ define([
             { key: 'iops',       value: $.t('ovs:generic.iops'),         width: 55        },
             { key: 'readSpeed',  value: $.t('ovs:generic.read'),         width: 100       },
             { key: 'writeSpeed', value: $.t('ovs:generic.write'),        width: 100       },
-            { key: 'dtlMode',    value: $.t('ovs:generic.dtl_status'),   width: 50        }
+            { key: 'dtlStatus',  value: $.t('ovs:generic.dtl_status'),   width: 50        }
         ];
         self.snapshotHeaders    = [
             { key: 'label',         value: $.t('ovs:generic.description'), width: undefined },

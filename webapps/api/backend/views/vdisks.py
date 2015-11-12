@@ -43,6 +43,8 @@ class VDiskViewSet(viewsets.ViewSet):
     def list(self, vmachineguid=None, vpoolguid=None):
         """
         Overview of all vDisks
+        :param vmachineguid: Guid of the virtual machine to retrieve its disks
+        :param vpoolguid: Guid of the vPool to retrieve its disks
         """
         if vmachineguid is not None:
             vmachine = VMachine(vmachineguid)
@@ -59,6 +61,7 @@ class VDiskViewSet(viewsets.ViewSet):
     def retrieve(self, vdisk):
         """
         Load information about a given vDisk
+        :param vdisk: Guid of the virtual disk to retrieve
         """
         return vdisk
 
@@ -70,6 +73,8 @@ class VDiskViewSet(viewsets.ViewSet):
     def rollback(self, vdisk, timestamp):
         """
         Rollbacks a vDisk to a given timestamp
+        :param vdisk: Guid of the virtual disk
+        :param timestamp: Timestamp of the snapshot to rollback to
         """
         return VDiskController.rollback.delay(diskguid=vdisk.guid,
                                               timestamp=timestamp)
@@ -78,11 +83,13 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(VDisk)
-    def set_config_params(self, vdisk, new_config_params, old_config_params):
+    def set_config_params(self, vdisk, new_config_params):
         """
         Sets configuration parameters to a given vdisk.
+        :param vdisk: Guid of the virtual disk to configure
+        :param new_config_params: Configuration settings for the virtual disk
         """
-        return VDiskController.set_config_params.delay(vdisk_guid=vdisk.guid, new_config_params=new_config_params, old_config_params=old_config_params)
+        return VDiskController.set_config_params.delay(vdisk_guid=vdisk.guid, new_config_params=new_config_params)
 
     @link()
     @required_roles(['read'])
@@ -91,6 +98,7 @@ class VDiskViewSet(viewsets.ViewSet):
     def get_config_params(self, vdisk):
         """
         Retrieve the configuration parameters for the given disk from the storagedriver.
+        :param vdisk: Guid of the virtual disk to retrieve its running configuration
         """
         return VDiskController.get_config_params.delay(vdisk_guid=vdisk.guid)
 
@@ -101,6 +109,10 @@ class VDiskViewSet(viewsets.ViewSet):
     def clone(self, vdisk, name, storagerouter_guid, snapshot_id=None):
         """
         Clones a vDisk
+        :param vdisk: Guid of the virtual disk to clone
+        :param name: Name for the clone
+        :param storagerouter_guid: Guid of the storagerouter hosting the virtual disk
+        :param snapshot_id: ID of the snapshot to clone from
         """
         storagerouter = StorageRouter(storagerouter_guid)
         return VDiskController.clone.delay(diskguid=vdisk.guid,

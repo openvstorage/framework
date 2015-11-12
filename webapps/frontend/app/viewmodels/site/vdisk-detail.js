@@ -99,8 +99,7 @@ define([
             if (self.vDisk() !== undefined) {
                 var vd = self.vDisk();
                 api.post('vdisks/' + vd.guid() + '/set_config_params', {
-                    data: { new_config_params: vd.configuration(),
-                            old_config_params: vd.oldConfiguration() }
+                    data: { new_config_params: vd.configuration() }
                 })
                     .then(self.shared.tasks.wait)
                     .done(function () {

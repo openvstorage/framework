@@ -129,12 +129,12 @@ limitations under the License.
                             <td>
                                 <div data-bind="status: {
                                                     colors: {
-                                                        green: ['ok_standalone', 'ok_sync'].contains(dtlMode()),
-                                                        orange: dtlMode() == 'catch_up',
-                                                        red: dtlMode() == 'degraded'
+                                                        green: ['ok_standalone', 'ok_sync'].contains(dtlStatus()),
+                                                        orange: dtlStatus() == 'catch_up',
+                                                        red: dtlStatus() == 'degraded'
                                                     },
                                                     defaultColor: 'lightgrey'
-                                                }, tooltip: 'ovs:generic.states.dtl.' + dtlMode()"
+                                                }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
                                      style="width: 14px; height: 14px;"></div>
                             </td>
                             <td colspan="2">&nbsp;</td>
@@ -175,12 +175,12 @@ limitations under the License.
                             <td>
                                 <div data-bind="status: {
                                                     colors: {
-                                                        green: ['ok_standalone', 'ok_sync'].contains(dtlMode()),
-                                                        orange: dtlMode() == 'catch_up',
-                                                        red: dtlMode() == 'degraded'
+                                                        green: ['ok_standalone', 'ok_sync'].contains(dtlStatus()),
+                                                        orange: dtlStatus() == 'catch_up',
+                                                        red: dtlStatus() == 'degraded'
                                                     },
                                                     defaultColor: 'lightgrey'
-                                                }, tooltip: 'ovs:generic.states.dtl.' + dtlMode()"
+                                                }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
                                      style="width: 14px; height: 14px;"></div>
                             </td>
                         </tr>
