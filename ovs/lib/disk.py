@@ -57,9 +57,9 @@ class DiskController(object):
             # Key exists, task was already scheduled
             # If task is already running, the revoke message will be ignored
             revoke(task_id)
-            async_result = DiskController.async_sync_with_reality.s().apply_async(args=[storagerouter_guid], countdown=15)
+            async_result = DiskController.sync_with_reality.s().apply_async(args=[storagerouter_guid], countdown=15)
         else:
-            async_result = DiskController.async_sync_with_reality.s().apply_async(args=[storagerouter_guid])
+            async_result = DiskController.sync_with_reality.s().apply_async(args=[storagerouter_guid])
         cache.set(key, async_result.id, 600)  # Store the task id
 
     @celery.task(name='ovs.disk.sync_with_reality')
