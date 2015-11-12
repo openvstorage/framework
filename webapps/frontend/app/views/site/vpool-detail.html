@@ -126,7 +126,7 @@ limitations under the License.
                             </td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="text: (item().dtl_enabled === true ? item().dtl_mode : $.t('ovs:vpools.dtl_disabled'))"></span>
+                                    <span data-part="lazy-entry" data-bind="text: $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item().dtl_mode)"></span>
                                 </span>
                             </td>
                         </tr>
@@ -136,29 +136,23 @@ limitations under the License.
                             <td colspan="2">&nbsp;</td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-i18n="ovs:vpools.dtl_transport"></span>
+                                    <span data-part="lazy-entry"
+                                          data-i18n="ovs:vpools.dtl_transport"
+                                          data-bind="visible: item().dtl_enabled === true"></span>
                                 </span>
                             </td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="translate: 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + item().dtl_transport"></span>
+                                    <span data-part="lazy-entry"
+                                          data-bind="visible: item().dtl_enabled === true,
+                                                     translate: 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + item().dtl_transport"></span>
                                 </span>
                             </td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.nrofvdisks"></td>
                             <td><span data-bind="text: vDisks().length"></span></td>
-                            <td colspan="2">&nbsp;</td>
-                            <td>
-                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-i18n="ovs:vpools.dtl_location" data-bind="visible: item().dtl_enabled === true"></span>
-                                </span>
-                            </td>
-                            <td>
-                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="text: item().dtl_location, visible: item().dtl_enabled === true"></span>
-                                </span>
-                            </td>
+                            <td colspan="4">&nbsp;</td>
                         </tr>
                     </tbody>
                 </table>

@@ -29,6 +29,19 @@ define([
         self.canContinue = ko.computed(function () {
             return { value: true, reasons: [], fields: [] };
         });
+        self.dtlMode = ko.computed({
+            write: function(mode) {
+                if (mode === 'no_sync') {
+                    self.data.dtlEnabled(false);
+                } else {
+                    self.data.dtlEnabled(true);
+                }
+                self.data.dtlMode(mode);
+            },
+            read: function() {
+                return self.data.dtlMode();
+            }
+        });
 
         // Functions
         self.next = function() {
@@ -37,9 +50,7 @@ define([
 
         // Durandal
         self.activate = function() {
-            self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: {
-                    contents: 'storagedrivers',
-            }})
+            self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: { contents: 'storagedrivers' }})
                 .done(function(data) {
                     var guids = [], srdata = {};
                     $.each(data.data, function(index, item) {

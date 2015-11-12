@@ -43,6 +43,8 @@ class VPoolController(object):
     def up_and_running(mountpoint, storagedriver_id):
         """
         Volumedriver informs us that the service is completely started. Post-start events can be executed
+        :param mountpoint: Mountpoint to check
+        :param storagedriver_id: ID of the storagedriver
         """
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         if storagedriver is None:
@@ -62,6 +64,7 @@ class VPoolController(object):
     def sync_with_hypervisor(vpool_guid):
         """
         Syncs all vMachines of a given vPool with the hypervisor
+        :param vpool_guid: Guid of the vPool to synchronize
         """
         vpool = VPool(vpool_guid)
         for storagedriver in vpool.storagedrivers:
@@ -78,6 +81,11 @@ class VPoolController(object):
     @staticmethod
     @celery.task(name='ovs.vpool.get_configuration')
     def get_configuration(vpool_guid):
+        """
+        Retrieve the running storagedriver configuration for the vPool
+        :param vpool_guid: Guid of the vPool to retrieve running configuration for
+        :return: Dictionary with configuration
+        """
         vpool = VPool(vpool_guid)
         if not vpool.storagedrivers or not vpool.storagedrivers[0].storagerouter:
             return {}
@@ -87,28 +95,32 @@ class VPoolController(object):
         storagedriver_config.load(client)
 
         dtl = storagedriver_config.configuration.get('failovercache', {})
+        file_system = storagedriver_config.configuration.get('filesystem', {})
         volume_router = storagedriver_config.configuration.get('volume_router', {})
         volume_manager = storagedriver_config.configuration.get('volume_manager', {})
 
+        dtl_mode = file_system.get('fs_dtl_mode', StorageDriverClient.VOLDRV_DTL_ASYNC)
         dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_CONTENT_BASED)
         dtl_transport = dtl.get('failovercache_transport', StorageDriverClient.VOLDRV_DTL_TRANSPORT_TCP)
         cache_strategy = volume_manager.get('read_cache_default_behaviour', StorageDriverClient.VOLDRV_CACHE_ON_READ)
         sco_multiplier = volume_router.get('vrouter_sco_multiplier', 1024)
+        dtl_config_mode = file_system.get('fs_dtl_config_mode', StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE)
         tlog_multiplier = volume_manager.get('number_of_scos_in_tlog', 20)
         non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
 
-        dtl_mode = storagedriver_config.configuration.get('', {}).get('', None)
         sco_size = sco_multiplier * 4 / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
-        dtl_enabled = storagedriver_config.configuration.get('', {}).get('', False)
-        dtl_location = storagedriver_config.configuration.get('', {}).get('', None)
         write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor
+
+        dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_mode]
+        dtl_enabled = dtl_config_mode == StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE
+        if dtl_enabled is False:
+            dtl_mode = StorageDriverClient.FRAMEWORK_DTL_NO_SYNC
 
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
-                'dtl_enabled': dtl_enabled,
                 'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
+                'dtl_enabled': dtl_enabled,
                 'write_buffer': write_buffer,
-                'dtl_location': dtl_location,
                 'dtl_transport': StorageDriverClient.REVERSE_DTL_TRANSPORT_MAP[dtl_transport],
                 'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],
                 'tlog_multiplier': tlog_multiplier}

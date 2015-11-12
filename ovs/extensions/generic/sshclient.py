@@ -383,7 +383,9 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
                 return os.path.realpath(path)
         else:
             try:
-                return self.run('readlink -f {0}'.format(path))
+                real_path = self.run('readlink {0}'.format(path))
+                if real_path:
+                    return "/".join(path.split('/')[:-1] + [real_path])
             except:
                 pass
 

@@ -60,6 +60,7 @@ class VDiskController(object):
     def list_volumes(vpool_guid=None):
         """
         List all known volumes on a specific vpool or on all
+        :param vpool_guid: Guid of the vPool to list the volumes for
         """
         if vpool_guid is not None:
             vpool = VPool(vpool_guid)
@@ -79,7 +80,8 @@ class VDiskController(object):
         """
         Delete a disk
         Triggered by volumedriver messages on the queue
-        @param volumename: volume id of the disk
+        :param volumename: volume id of the disk
+        :param storagedriver_id: ID of the storagedriver serving the volume to delete
         """
         _ = storagedriver_id  # For logging purposes
         disk = VDiskList.get_vdisk_by_volume_id(volumename)
@@ -121,9 +123,10 @@ class VDiskController(object):
         Resize a disk
         Triggered by volumedriver messages on the queue
 
-        @param volumepath: path on hypervisor to the volume
-        @param volumename: volume id of the disk
-        @param volumesize: size of the volume
+        :param volumename: volume id of the disk
+        :param volumesize: size of the volume
+        :param volumepath: path on hypervisor to the volume
+        :param storagedriver_id: ID of the storagedriver serving the volume to resize
         """
         pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
@@ -156,9 +159,10 @@ class VDiskController(object):
         Rename a disk
         Triggered by volumedriver messages
 
-        @param volumename: volume id of the disk
-        @param volume_old_path: old path on hypervisor to the volume
-        @param volume_new_path: new path on hypervisor to the volume
+        :param volumename: volume id of the disk
+        :param volume_old_path: old path on hypervisor to the volume
+        :param volume_new_path: new path on hypervisor to the volume
+        :param storagedriver_id: ID of the storagedriver serving the volume to rename
         """
         pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         hypervisor = Factory.get(pmachine)
@@ -177,6 +181,13 @@ class VDiskController(object):
     def clone(diskguid, snapshotid, devicename, pmachineguid, machinename=None, machineguid=None, detached=False):
         """
         Clone a disk
+        :param diskguid: Guid of the disk to clone
+        :param snapshotid: ID of the snapshot to clone from
+        :param devicename: Name of the device to use in clone's description
+        :param pmachineguid: Guid of the physical machine
+        :param machinename: Name of the machine the disk is attached to
+        :param machineguid: Guid of the machine
+        :param detached: Boolean indicating the disk is attached to a machine or not
         """
         pmachine = PMachine(pmachineguid)
         hypervisor = Factory.get(pmachine)
@@ -267,8 +278,9 @@ class VDiskController(object):
         """
         Create a disk snapshot
 
-        @param diskguid: guid of the disk
-        @param metadata: dict of metadata
+        :param diskguid: guid of the disk
+        :param metadata: dict of metadata
+        :param snapshotid: ID of the snapshot
         """
         disk = VDisk(diskguid)
         logger.info('Create snapshot for disk {0}'.format(disk.name))
@@ -317,6 +329,8 @@ class VDiskController(object):
     def rollback(diskguid, timestamp):
         """
         Rolls back a disk based on a given disk snapshot timestamp
+        :param diskguid: Guid of the disk to rollback
+        :param timestamp: Timestamp of the snapshot to rollback from
         """
         disk = VDisk(diskguid)
         snapshots = [snap for snap in disk.snapshots if snap['timestamp'] == timestamp]
@@ -333,9 +347,13 @@ class VDiskController(object):
         """
         Create a disk from a template
 
-        @param devicename: device file name for the disk (eg: my_disk-flat.vmdk)
-        @param machineguid: guid of the machine to assign disk to
-        @return diskguid: guid of new disk
+        :param diskguid: Guid of the disk
+        :param machinename: Name of the machine
+        :param devicename: Device file name for the disk (eg: my_disk-flat.vmdk)
+        :param pmachineguid: Guid of the physical machine hosting the template
+        :param machineguid: Guid of the machine to assign disk to
+        :param storagedriver_guid: Guid of the storagedriver serving the template
+        :return diskguid: Guid of new disk
         """
 
         pmachine = PMachine(pmachineguid)
@@ -467,6 +485,9 @@ class VDiskController(object):
     def update_vdisk_name(volume_id, old_name, new_name):
         """
         Update a vDisk name using Management Center: set new name
+        :param volume_id: ID of the volume to update its name
+        :param old_name: Old name of the volume
+        :param new_name: New name of the volume
         """
         vdisk = None
         for mgmt_center in MgmtCenterList.get_mgmtcenters():
@@ -500,6 +521,7 @@ class VDiskController(object):
     def get_config_params(vdisk_guid):
         """
         Retrieve the configuration parameters for the given disk from the storagedriver.
+        :param vdisk_guid: Guid of the virtual disk to retrieve the configuration for
         """
         vdisk = VDisk(vdisk_guid)
         vpool = VPool(vdisk.vpool_guid)
@@ -535,7 +557,6 @@ class VDiskController(object):
 
         return {'sco_size': sco_size,
                 'dtl_mode': None,
-                'dtl_enabled': False,
                 'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
                 'write_buffer': write_buffer,
                 'dtl_location': None,
@@ -547,12 +568,13 @@ class VDiskController(object):
     def set_config_params(vdisk_guid, new_config_params, old_config_params):
         """
         Sets configuration parameters for a given vdisk.
+        :param vdisk_guid: Guid of the virtual disk to set the configuration parameters for
+        :param new_config_params: New configuration parameters
+        :param old_config_params: Old configuration parameters
         """
-        required_params = {
-                           # 'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
+        required_params = {'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
                            'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
                            'dedupe_mode': (str, StorageDriverClient.VDISK_DEDUPE_MAP.keys()),
-                           'dtl_enabled': (bool, None),
                            # 'dtl_location': (str, None),
                            'write_buffer': (int, {'min': 128, 'max': 10 * 1024}),
                            'cache_strategy': (str, StorageDriverClient.VDISK_CACHE_MAP.keys()),

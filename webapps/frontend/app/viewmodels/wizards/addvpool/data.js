@@ -36,7 +36,6 @@ define([
             dedupeModes:             ko.observableArray(['dedupe', 'non_dedupe']),
             distributedMtpt:         ko.observable(),
             dtlEnabled:              ko.observable(true),
-            dtlLocation:             ko.observable(''),
             dtlMode:                 ko.observable(''),
             dtlModes:                ko.observableArray(['no_sync', 'a_sync', 'sync']),
             dtlTransportMode:        ko.observable({name: 'tcp'}),
