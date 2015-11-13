@@ -42,7 +42,7 @@ class DiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.async_sync_with_reality')
-    def async_sync_with_reality(storagerouter_guid=None, attempt=0):
+    def async_sync_with_reality(storagerouter_guid=None, max_attempts=3):
         """
         Calls sync_with_reality, implements dedupe logic
         Keep existing task as it is, some tasks depend on it being sync, call async explicitly
@@ -58,12 +58,12 @@ class DiskController(object):
             # Key exists, task was already scheduled
             # If task is already running, the revoke message will be ignored
             revoke(task_id)
-        async_result = DiskController.sync_with_reality.s().apply_async(args=[storagerouter_guid, attempt], countdown=15*(attempt+1))
+        async_result = DiskController.sync_with_reality.s().apply_async(args=[storagerouter_guid, max_attempts], countdown=15)
         cache.set(key, async_result.id, 600)  # Store the task id
 
     @staticmethod
     @celery.task(name='ovs.disk.sync_with_reality')
-    def sync_with_reality(storagerouter_guid=None):
+    def sync_with_reality(storagerouter_guid=None, max_attempts=3):
         """
         Try to run sync_with_reality, retry in case of failure
          always run sync, as tasks calling this expect this to be sync
@@ -74,8 +74,8 @@ class DiskController(object):
         mutex = VolatileMutex('ovs_disk_sync_with_reality_{0}'.format(storagerouter_guid))
 
         key = 'ovs_dedupe_sync_with_reality_{0}'.format(storagerouter_guid)
-        attempt = 0
-        while attempt < 2:
+        attempt = 1
+        while attempt < max_attempts:
             task_id = cache.get(key)
             if task_id:
                 revoke(task_id)
@@ -85,6 +85,7 @@ class DiskController(object):
             except Exception as ex:
                 logger.warning('Sync with reality failed. {0}'.format(ex))
                 attempt += 1
+                time.sleep(attempt*30)
             finally:
                 mutex.release()
 
