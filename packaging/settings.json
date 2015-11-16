@@ -1,7 +1,7 @@
 {
     "package_name": "openvstorage",
     "product_name": "Open vStorage",
-    "source_contents": "--transform 's,^,{0}-{1}/,' scripts/install scripts/system config ovs webapps *.txt"
+    "source_contents": "--transform 's,^,{0}-{1}/,' scripts/install scripts/system config ovs webapps *.txt",
     "version": {
         "major": 2,
         "minor": 6,
