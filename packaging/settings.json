@@ -4,7 +4,7 @@
     "source_contents": "--transform 's,^,{0}-{1}/,' scripts/install scripts/system config ovs webapps *.txt"
     "version": {
         "major": 2,
-        "minor": 5,
+        "minor": 6,
         "patch": 0
     }
 }
