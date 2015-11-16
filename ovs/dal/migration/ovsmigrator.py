@@ -37,7 +37,7 @@ class OVSMigrator(object):
         """
         Migrates from any version to any version, running all migrations required
         If previous_version is for example 0 and this script is at
-        verison 3 it will execute two steps:
+        version 3 it will execute two steps:
           - 1 > 2
           - 2 > 3
         @param previous_version: The previous version from which to start the migration.
@@ -52,6 +52,7 @@ class OVSMigrator(object):
             from ovs.dal.hybrids.group import Group
             from ovs.dal.hybrids.role import Role
             from ovs.dal.hybrids.client import Client
+            from ovs.dal.hybrids.failuredomain import FailureDomain
             from ovs.dal.hybrids.j_rolegroup import RoleGroup
             from ovs.dal.hybrids.j_roleclient import RoleClient
             from ovs.dal.hybrids.backendtype import BackendType
@@ -146,7 +147,7 @@ class OVSMigrator(object):
                 service_type.name = service_type_info
                 service_type.save()
 
-            # Brandings
+            # Branding
             branding = Branding()
             branding.name = 'Default'
             branding.description = 'Default bootstrap theme'
@@ -161,6 +162,11 @@ class OVSMigrator(object):
             slate.productname = 'Open vStorage'
             slate.is_default = False
             slate.save()
+
+            # Failure Domain
+            failure_domain = FailureDomain()
+            failure_domain.name = 'Default'
+            failure_domain.save()
 
             # We're now at version 1
             working_version = 1
@@ -384,5 +390,78 @@ class OVSMigrator(object):
                             migrated_objects[path].save()
 
             working_version = 4
+
+        # Version 5 introduced:
+        # - Failure Domains
+        if working_version < 5:
+            import os
+            from ovs.dal.hybrids.failuredomain import FailureDomain
+            from ovs.dal.lists.failuredomainlist import FailureDomainList
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
+            from ovs.extensions.generic.remote import Remote
+            from ovs.extensions.generic.sshclient import SSHClient
+            failure_domains = FailureDomainList.get_failure_domains()
+            if len(failure_domains) > 0:
+                failure_domain = failure_domains[0]
+            else:
+                failure_domain = FailureDomain()
+                failure_domain.name = 'Default'
+                failure_domain.save()
+            for storagerouter in StorageRouterList.get_storagerouters():
+                change = False
+                if storagerouter.primary_failure_domain is None:
+                    storagerouter.primary_failure_domain = failure_domain
+                    change = True
+                if storagerouter.rdma_capable is None:
+                    client = SSHClient(storagerouter, username='root')
+                    rdma_capable = False
+                    with Remote(client.ip, [os], username='root') as remote:
+                        for root, dirs, files in remote.os.walk('/sys/class/infiniband'):
+                            for directory in dirs:
+                                ports_dir = remote.os.path.join(root, directory, 'ports')
+                                if not remote.os.path.exists(ports_dir):
+                                    continue
+                                for sub_root, sub_dirs, _ in remote.os.walk(ports_dir):
+                                    if sub_root != ports_dir:
+                                        continue
+                                    for sub_directory in sub_dirs:
+                                        state_file = remote.os.path.join(sub_root, sub_directory, 'state')
+                                        if remote.os.path.exists(state_file):
+                                            if 'ACTIVE' in client.run('cat {0}'.format(state_file)):
+                                                rdma_capable = True
+                    storagerouter.rdma_capable = rdma_capable
+                    change = True
+                if change is True:
+                    storagerouter.save()
+
+            working_version = 5
+
+        # Version 6
+        # Distributed scrubbing
+        if working_version < 6:
+            from ovs.dal.hybrids.diskpartition import DiskPartition
+            from ovs.dal.lists.servicetypelist import ServiceTypeList
+            from ovs.dal.lists.storagedriverlist import StorageDriverList
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
+            from ovs.extensions.generic.sshclient import SSHClient
+            from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+            for storage_driver in StorageDriverList.get_storagedrivers():
+                root_client = SSHClient(storage_driver.storagerouter, username='root')
+                for partition in storage_driver.partitions:
+                    if partition.role == DiskPartition.ROLES.SCRUB:
+                        old_path = partition.path
+                        partition.sub_role = None
+                        partition.save()
+                        partition.invalidate_dynamics(['folder', 'path'])
+                        if root_client.dir_exists(partition.path):
+                            continue  # New directory already exists
+                        if '_mds_' in old_path:
+                            if root_client.dir_exists(old_path):
+                                root_client.symlink({partition.path: old_path})
+                        if not root_client.dir_exists(partition.path):
+                            root_client.dir_create(partition.path)
+                        root_client.dir_chmod(partition.path, 0777)
+
+            working_version = 6
 
         return working_version

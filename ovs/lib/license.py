@@ -174,20 +174,26 @@ class LicenseController(object):
         client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
 
     @staticmethod
-    @celery.task(name='ovs.license.get_free_license')
-    def get_free_license(registration_parameters):
+    @celery.task(name='ovs.license.register')
+    def register(name, email, company, phone, newsletter):
         """
-        Obtains a free license
+        Registers the environment
         """
         SupportAgent().run()  # Execute a single heartbeat run
-        client = OVSClient('monitoring.openvstorage.com', 443, credentials=None, verify=True)
-        client.post('/support/register/',
-                    data={'cluster_id': Configuration.get('ovs.support.cid'),
-                          'name': registration_parameters['name'],
-                          'email': registration_parameters['email'],
-                          'company': registration_parameters['company'],
-                          'phone': registration_parameters['phone'],
-                          'newsletter': registration_parameters['newsletter']})
+        client = OVSClient('monitoring.openvstorage.com', 443, credentials=None, verify=True, version=1)
+        task_id = client.post('/support/register/',
+                              data={'cluster_id': Configuration.get('ovs.support.cid'),
+                                    'name': name,
+                                    'email': email,
+                                    'company': company,
+                                    'phone': phone,
+                                    'newsletter': newsletter,
+                                    'register_only': True})
+        if task_id:
+            client.wait_for_task(task_id, timeout=120)
+        for storagerouter in StorageRouterList.get_storagerouters():
+            client = SSHClient(storagerouter)
+            client.config_set('ovs.core.registered', True)
 
     @staticmethod
     def _encode(data):

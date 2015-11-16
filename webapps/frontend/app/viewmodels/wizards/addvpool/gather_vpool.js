@@ -24,11 +24,13 @@ define([
         // Variables
         self.shared                   = shared;
         self.data                     = data;
-        self.loadStorageRoutersHandle = undefined;
+
+        //Handles
         self.checkS3Handle            = undefined;
         self.checkMtptHandle          = undefined;
         self.fetchAlbaVPoolHandle     = undefined;
         self.loadStorageRouterHandle  = undefined;
+        self.loadStorageRoutersHandle = undefined;
         self.loadStorageDriversHandle = {};
 
         // Observables
@@ -141,18 +143,25 @@ define([
                         self.loadStorageRouterHandle = api.post('storagerouters/' + self.data.target().guid() + '/get_metadata')
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
+                                var write;
                                 self.data.mountpoints(data.mountpoints);
                                 self.data.partitions(data.partitions);
                                 self.data.ipAddresses(data.ipaddresses);
                                 self.data.arakoonFound(data.arakoon_found);
                                 self.data.sharedSize(data.shared_size);
+                                self.data.scrubAvailable(data.scrub_available);
                                 self.data.readCacheAvailableSize(data.readcache_size);
                                 self.data.writeCacheAvailableSize(data.writecache_size);
                                 self.data.readCacheSize(Math.floor(data.readcache_size / 1024 / 1024 / 1024));
-                                self.data.writeCacheSize(Math.floor((data.writecache_size + data.shared_size) / 1024 / 1024 / 1024));
+                                if (self.data.readCacheAvailableSize() === 0) {
+                                    write = Math.floor((data.writecache_size + data.shared_size) / 1024 / 1024 / 1024) - 1;
+                                } else {
+                                    write = Math.floor((data.writecache_size + data.shared_size) / 1024 / 1024 / 1024);
+                                }
+                                self.data.writeCacheSize(write);
                             })
                             .done(function() {
-                                var requiredRoles = ['READ', 'WRITE', 'SCRUB'];
+                                var requiredRoles = ['READ', 'WRITE'];
                                 if (self.data.arakoonFound() === false) {
                                     requiredRoles.push('DB');
                                 }

@@ -37,6 +37,9 @@ CINDER_VOLUME_UPDATE_CACHE = {}
 def process(queue, body, mapping):
     """
     Processes the actual received body
+    :param queue:   Type of queue to be used
+    :param body:    Body of the message
+    :param mapping:
     """
     if queue == Configuration.get('ovs.core.broker.queues.storagedriver'):
         cache = VolatileFactory.get_client()
@@ -48,8 +51,8 @@ def process(queue, body, mapping):
         # Possible special tags used as `arguments` key:
         # - [NODE_ID]: Replaced by the storagedriver_id as reported by the event
         # - [CLUSTER_ID]: Replaced by the clusterid as reported by the event
-        # Possible deduping key tags:
-        # - [EVENT_NAME]: The name of the eventmessage type
+        # Possible dedupe key tags:
+        # - [EVENT_NAME]: The name of the event message type
         # - [TASK_NAME]: Task method name
         # - [<argument value>]: Any value of the `arguments` dictionary.
 
@@ -83,7 +86,7 @@ def process(queue, body, mapping):
                     dedupe = options.get('dedupe', False)
                     dedupe_key = options.get('dedupe_key', None)
                     if dedupe is True and dedupe_key is not None:  # We can't dedupe without a key
-                        key = dedupe_key
+                        key = 'ovs_dedupe_volumedriver_events_{0}'.format(dedupe_key)
                         key = key.replace('[EVENT_NAME]', extension.full_name)
                         key = key.replace('[TASK_NAME]', task.__class__.__name__)
                         for kwarg_key in kwargs:
@@ -158,7 +161,7 @@ def process(queue, body, mapping):
             logger.error('Processing notification failed {0}'.format(ex))
         logger.info('Processed notification from openstack.')
     else:
-        raise NotImplementedError('Queue {} is not yet implemented'.format(queue))
+        raise NotImplementedError('Queue {0} is not yet implemented'.format(queue))
 
 
 def _load_extensions():

@@ -32,31 +32,32 @@ define([
         self.storageRouterHandle = undefined;
 
         // Observables
-        self.loading            = ko.observable(false);
-        self.loaded             = ko.observable(false);
-        self.guid               = ko.observable(guid);
-        self.name               = ko.observable();
-        self.configuration      = ko.observable();
-        self.size               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.iops               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.storedData         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.cacheHits          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheMisses        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.readSpeed          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.writeSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendWriteSpeed  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendReadSpeed   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendWritten     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.backendRead        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.bandwidthSaved     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.backendTypeGuid    = ko.observable();
-        self.backendType        = ko.observable();
         self.backendConnection  = ko.observable();
         self.backendLogin       = ko.observable();
+        self.backendRead        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendReadSpeed   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendType        = ko.observable();
+        self.backendTypeGuid    = ko.observable();
+        self.backendWriteSpeed  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendWritten     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.cacheHits          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheMisses        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.configuration      = ko.observable();
+        self.guid               = ko.observable(guid);
+        self.iops               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.loaded             = ko.observable(false);
+        self.loading            = ko.observable(false);
+        self.name               = ko.observable();
+        self.rdmaEnabled        = ko.observable();
+        self.readSpeed          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.size               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.storageDriverGuids = ko.observableArray([]);
+        self.storageRouterGuids = ko.observableArray([]);
+        self.storedData         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.vDisks             = ko.observableArray([]);
         self.vMachines          = ko.observableArray([]);
-        self.storageRouterGuids = ko.observableArray([]);
-        self.storageDriverGuids = ko.observableArray([]);
+        self.writeSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -85,6 +86,7 @@ define([
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.backendConnection, data, 'connection');
             generic.trySet(self.backendLogin, data, 'login');
+            generic.trySet(self.rdmaEnabled, data, 'rdma_enabled');
             if (data.hasOwnProperty('backend_type_guid')) {
                 self.backendTypeGuid(data.backend_type_guid);
             } else {

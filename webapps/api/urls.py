@@ -48,9 +48,8 @@ def build_router_urls():
     return router.urls
 
 urlpatterns = patterns('',
-    url(r'^oauth2/token/',    OAuth2TokenView.as_view()),
-    url(r'^oauth2/redirect/', OAuth2RedirectView.as_view()),
-    url(r'^relay/',           relay),
-    url(r'^$',                MetadataView.as_view()),
-    url(r'',                  include(build_router_urls()))
-)
+                       url(r'^oauth2/token/', OAuth2TokenView.as_view()),
+                       url(r'^oauth2/redirect/', OAuth2RedirectView.as_view()),
+                       url(r'^relay/', relay),
+                       url(r'^$', MetadataView.as_view()),
+                       url(r'', include(build_router_urls())))

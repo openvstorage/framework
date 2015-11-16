@@ -142,8 +142,11 @@ class ArakoonStore(object):
                     tries -= 1
                     time.sleep(1)
             raise last_exception
+        except ArakoonNotFound:
+            # No extra logging for ArakoonNotFound
+            raise
         except Exception:
-            logger.exception('Error during {0}. Process {1}, thread {2}, clientid {3}'.format(
+            logger.error('Error during {0}. Process {1}, thread {2}, clientid {3}'.format(
                 method.__name__, os.getpid(), current_thread().ident, identifier
             ))
             raise

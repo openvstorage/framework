@@ -36,6 +36,7 @@ from volumedriver.storagerouter.storagerouterclient import VolumeInfo
 
 logger = LogHandler.get('extensions', name='storagedriver')
 storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+# noinspection PyArgumentList
 storagerouterclient.Logger.enableLogging()
 
 client_vpool_cache = {}
@@ -55,6 +56,8 @@ class StorageDriverClient(object):
     VOLDRV_CONTENT_BASED = 'ContentBased'
     VOLDRV_CACHE_ON_WRITE = 'CacheOnWrite'
     VOLDRV_LOCATION_BASED = 'LocationBased'
+    VOLDRV_DTL_TRANSPORT_TCP = 'TCP'
+    VOLDRV_DTL_TRANSPORT_RSOCKET = 'RSocket'
 
     FRAMEWORK_DTL_SYNC = 'sync'
     FRAMEWORK_DTL_ASYNC = 'async'
@@ -64,6 +67,8 @@ class StorageDriverClient(object):
     FRAMEWORK_CONTENT_BASED = 'dedupe'
     FRAMEWORK_CACHE_ON_WRITE = 'on_write'
     FRAMEWORK_LOCATION_BASED = 'non_dedupe'
+    FRAMEWORK_DTL_TRANSPORT_TCP = 'tcp'
+    FRAMEWORK_DTL_TRANSPORT_RSOCKET = 'rdma'
 
     VDISK_CACHE_MAP = {FRAMEWORK_NO_CACHE: ReadCacheBehaviour.NO_CACHE,
                        FRAMEWORK_CACHE_ON_READ: ReadCacheBehaviour.CACHE_ON_READ,
@@ -81,6 +86,8 @@ class StorageDriverClient(object):
     VPOOL_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: VOLDRV_DTL_SYNC,
                           FRAMEWORK_DTL_ASYNC: VOLDRV_DTL_ASYNC,
                           FRAMEWORK_DTL_NOSYNC: VOLDRV_DTL_NOSYNC}
+    VPOOL_DTL_TRANSPORT_MAP = {FRAMEWORK_DTL_TRANSPORT_TCP: VOLDRV_DTL_TRANSPORT_TCP,
+                               FRAMEWORK_DTL_TRANSPORT_RSOCKET: VOLDRV_DTL_TRANSPORT_RSOCKET}
     REVERSE_CACHE_MAP = {VOLDRV_NO_CACHE: FRAMEWORK_NO_CACHE,
                          VOLDRV_CACHE_ON_READ: FRAMEWORK_CACHE_ON_READ,
                          VOLDRV_CACHE_ON_WRITE: FRAMEWORK_CACHE_ON_WRITE,
@@ -97,6 +104,8 @@ class StorageDriverClient(object):
                             '': FRAMEWORK_DTL_SYNC,
                             '': FRAMEWORK_DTL_ASYNC,
                             '': FRAMEWORK_DTL_NOSYNC}
+    REVERSE_DTL_TRANSPORT_MAP = {VOLDRV_DTL_TRANSPORT_TCP: FRAMEWORK_DTL_TRANSPORT_TCP,
+                                 VOLDRV_DTL_TRANSPORT_RSOCKET: FRAMEWORK_DTL_TRANSPORT_RSOCKET}
     TLOG_MULTIPLIER_MAP = {4: 16,
                            8: 8,
                            16: 4,
@@ -133,6 +142,7 @@ class StorageDriverClient(object):
         """
         Initializes the wrapper given a vpool name for which it finds the corresponding Storage Driver
         Loads and returns the client
+        :param vpool: vPool for which the StorageRouterClient needs to be loaded
         """
 
         key = '{0}_{1}'.format(vpool.guid, '_'.join(guid for guid in vpool.storagedrivers_guids))
@@ -160,11 +170,13 @@ class MetadataServerClient(object):
     def load(service):
         """
         Loads a MDSClient
+        :param service: Service for which the MDSClient needs to be loaded
         """
 
         key = service.guid
         if key not in mdsclient_service_cache:
             try:
+                # noinspection PyArgumentList
                 client = MDSClient(MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0]))
                 mdsclient_service_cache[key] = client
             except RuntimeError as ex:
@@ -183,9 +195,9 @@ class StorageDriverConfiguration(object):
     # DO NOT MAKE MANUAL CHANGES HERE
 
     parameters = {
-        # hg branch: 3.6-dev
-        # hg revision: 388879da12d6
-        # buildTime: Thu Sep 17 10:25:33 UTC 2015
+        # hg branch: dev
+        # hg revision: 63d8c887a77f44365f8258a78caf889cbf5fd2bc
+        # buildTime: Mon Oct 12 08:55:42 UTC 2015
         'metadataserver': {
             'backend_connection_manager': {
                 'optional': ['backend_connection_pool_capacity', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
@@ -209,8 +221,12 @@ class StorageDriverConfiguration(object):
                 'optional': ['events_amqp_uris', 'events_amqp_exchange', 'events_amqp_routing_key', ],
                 'mandatory': []
             },
+            'distributed_lock_store': {
+                'optional': ['dls_type', 'dls_arakoon_timeout_ms', 'dls_arakoon_cluster_id', 'dls_arakoon_cluster_nodes', ],
+                'mandatory': []
+            },
             'failovercache': {
-                'optional': [],
+                'optional': ['failovercache_transport', ],
                 'mandatory': ['failovercache_path', ]
             },
             'file_driver': {
@@ -218,7 +234,7 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['fd_cache_path', 'fd_namespace', ]
             },
             'filesystem': {
-                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_cache_dentries', ],
+                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_cache_dentries', 'fs_dtl_config_mode', 'fs_dtl_host', 'fs_dtl_port', 'fs_dtl_mode', ],
                 'mandatory': ['fs_virtual_disk_format', ]
             },
             'metadata_server': {
@@ -242,7 +258,7 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['vregistry_arakoon_cluster_id', 'vregistry_arakoon_cluster_nodes', ]
             },
             'volume_router': {
-                'optional': ['vrouter_local_io_sleep_before_retry_usecs', 'vrouter_local_io_retries', 'vrouter_volume_read_threshold', 'vrouter_volume_write_threshold', 'vrouter_file_read_threshold', 'vrouter_file_write_threshold', 'vrouter_redirect_timeout_ms', 'vrouter_backend_sync_timeout_ms', 'vrouter_migrate_timeout_ms', 'vrouter_redirect_retries', 'vrouter_sco_multiplier', 'vrouter_routing_retries', 'vrouter_min_workers', 'vrouter_max_workers', 'vrouter_registry_cache_capacity', ],
+                'optional': ['vrouter_local_io_sleep_before_retry_usecs', 'vrouter_local_io_retries', 'vrouter_check_local_volume_potential_period', 'vrouter_volume_read_threshold', 'vrouter_volume_write_threshold', 'vrouter_file_read_threshold', 'vrouter_file_write_threshold', 'vrouter_redirect_timeout_ms', 'vrouter_backend_sync_timeout_ms', 'vrouter_migrate_timeout_ms', 'vrouter_redirect_retries', 'vrouter_sco_multiplier', 'vrouter_routing_retries', 'vrouter_min_workers', 'vrouter_max_workers', 'vrouter_registry_cache_capacity', ],
                 'mandatory': ['vrouter_id', ]
             },
             'volume_router_cluster': {
@@ -258,7 +274,10 @@ class StorageDriverConfiguration(object):
         """
 
         def make_configure(sct):
-            """ section closure """
+            """
+            section closure
+            :param sct: Section to create configure function for
+            """
             return lambda **kwargs: self._add(sct, **kwargs)
 
         if config_type not in ['storagedriver', 'metadataserver']:
@@ -285,6 +304,7 @@ class StorageDriverConfiguration(object):
     def load(self, client=None):
         """
         Loads the configuration from a given file, optionally a remote one
+        :param client: If provided, load remote configuration
         """
         contents = '{}'
         if client is None:
@@ -308,6 +328,8 @@ class StorageDriverConfiguration(object):
     def save(self, client=None, reload_config=True):
         """
         Saves the configuration to a given file, optionally a remote one
+        :param client: If provided, save remote configuration
+        :param reload_config: Reload the running Storage Driver configuration
         """
         self._validate()
         contents = json.dumps(self.configuration, indent=2)
@@ -347,7 +369,8 @@ class StorageDriverConfiguration(object):
         """
         for section, entries in self.params[self.config_type].iteritems():
             if section in self.configuration:
-                for param in self.configuration[section]:
+                section_configuration = copy.deepcopy(self.configuration[section])
+                for param in section_configuration:
                     if param not in entries['mandatory'] and param not in entries['optional']:
                         del self.configuration[section][param]
 
@@ -355,6 +378,7 @@ class StorageDriverConfiguration(object):
     def build_filesystem_by_hypervisor(hypervisor_type):
         """
         Builds a filesystem configuration dict, based on a given hypervisor
+        :param hypervisor_type: Hypervisor type for which to build a filesystem
         """
         if hypervisor_type == 'VMWARE':
             return {'fs_virtual_disk_format': 'vmdk',

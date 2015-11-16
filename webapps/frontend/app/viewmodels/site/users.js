@@ -25,7 +25,7 @@ define([
         // Variables
         self.widgets       = [];
         self.shared        = shared;
-        self.guard         = { authenticated: true };
+        self.guard         = { authenticated: true, registered: true };
         self.refresher     = new Refresher();
         self.userHeaders   = [
             { key: 'username', value: $.t('ovs:generic.username'), width: 250       },
