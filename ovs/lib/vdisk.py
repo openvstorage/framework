@@ -641,16 +641,16 @@ class VDiskController(object):
             try:
                 hv = Factory.get(pmachine)
                 info = hv.get_vm_agnostic_object(disk.vmachine.hypervisor_id)
-                for disk in info.get('disks', {}):
-                    if disk.get('filename', '') == disk.devicename:
-                        disk_name = disk.get('name', None)
+                for _disk in info.get('disks', {}):
+                    if _disk.get('filename', '') == disk.devicename:
+                        disk_name = _disk.get('name', None)
                         break
             except Exception as ex:
                 logger.error('Failed to get vdisk info from hypervisor. %s' % ex)
 
         if disk_name is None:
             logger.info('No info retrieved from hypervisor, using devicename')
-            disk_name = disk.devicename.split('/')[-1].split('.')[0]
+            disk_name = os.path.splitext(disk.devicename)[0]
 
         if disk_name is not None:
             disk.name = disk_name
