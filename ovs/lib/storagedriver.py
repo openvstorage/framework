@@ -56,6 +56,7 @@ class StorageDriverController(object):
     def move_away(storagerouter_guid):
         """
         Moves away all vDisks from all Storage Drivers this Storage Router is serving
+        :param storagerouter_guid: Guid of the Storage Router
         """
         storagedrivers = StorageRouter(storagerouter_guid).storagedrivers
         if len(storagedrivers) > 0:
@@ -71,6 +72,7 @@ class StorageDriverController(object):
         Sets Storage Driver offline in case hypervisor management Center
         reports the hypervisor pmachine related to this Storage Driver
         as unavailable.
+        :param storagedriver_id: ID of the storagedriver to update its status
         """
         pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         if pmachine.mgmtcenter:
@@ -93,6 +95,9 @@ class StorageDriverController(object):
     def volumedriver_error(code, volumename, storagedriver_id):
         """
         Handles error messages/events from the volumedriver
+        :param code: Volumedriver error code
+        :param volumename: Name of the volume throwing the error
+        :param storagedriver_id: ID of the storagedriver hosting the volume
         """
         _ = storagedriver_id  # Required for the @log decorator
         if code == VolumeDriverEvents.MDSFailover:
@@ -105,6 +110,8 @@ class StorageDriverController(object):
     def on_demote(cluster_ip, master_ip):
         """
         Handles the demote for the StorageDrivers
+        :param cluster_ip: IP of the node to demote
+        :param master_ip: IP of the master node
         """
         client = SSHClient(cluster_ip, username='root')
         servicetype = ServiceTypeList.get_by_name('Arakoon')
@@ -133,6 +140,8 @@ class StorageDriverController(object):
     def on_extranode(cluster_ip, master_ip=None):
         """
         An extra node is added, make sure it has the voldrv arakoon client file if possible
+        :param cluster_ip: IP of the extra node
+        :param master_ip: IP of the master node
         """
         _ = master_ip  # The master_ip will be passed in by caller
         servicetype = ServiceTypeList.get_by_name('Arakoon')
@@ -252,6 +261,8 @@ class StorageDriverController(object):
     def add_storagedriverpartition(storagedriver, partition_info):
         """
         Stores new storagedriver partition object with correct number
+        :param storagedriver: Storagedriver to create the partition for
+        :param partition_info: Partition information containing, role, size, sub_role, disk partition, MDS service
         """
         role = partition_info['role']
         size = partition_info.get('size')

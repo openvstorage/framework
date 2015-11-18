@@ -2,7 +2,7 @@
 
 Open vStorage is an open-source, scale-out, reliable, high performance, software based storage platform which offers a block & file interface on top of ethernet drives (Seagate Kinetic), object storage or a pool of traditional SATA drives. 
 
-Open vStorage is licensed under the [Open vStorage Non-Commercial License](http://www.openvstorage.org/OVS_NON_COMMERCIAL).
+Open vStorage is licensed under the [Modified Apache License](http://www.openvstorage.org/OVS_NON_COMMERCIAL).
 
 The Open vStorage Framework takes care of the communication between the different hosts in the Open vStorage cluster and the storage backends. The Framework allows to manage Open vStorage through an intuitive GUI and a complete REST API. It integrates with OpenStack (Cinder) and VMware vSphere.
 
