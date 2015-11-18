@@ -544,36 +544,35 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.set_config_params')
-    def set_config_params(vdisk_guid, new_config_params, old_config_params):
+    def set_config_params(vdisk_guid, new_config_params):
         """
         Sets configuration parameters for a given vdisk.
+        :param vdisk_guid: Guid of the virtual disk to set the configuration parameters for
+        :param new_config_params: New configuration parameters
         """
-        required_params = {
-                           # 'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
-                           'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
+        required_params = {'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
                            'dedupe_mode': (str, StorageDriverClient.VDISK_DEDUPE_MAP.keys()),
-                           'dtl_enabled': (bool, None),
-                           # 'dtl_location': (str, None),
                            'write_buffer': (int, {'min': 128, 'max': 10 * 1024}),
                            'cache_strategy': (str, StorageDriverClient.VDISK_CACHE_MAP.keys()),
                            'readcache_limit': (int, {'min': 1, 'max': 10 * 1024}, False)}
 
         Toolbox.verify_required_params(required_params, new_config_params)
-        Toolbox.verify_required_params(required_params, old_config_params)
 
         errors = False
         vdisk = VDisk(vdisk_guid)
         volume_id = str(vdisk.volume_id)
-        old_sco_size = old_config_params['sco_size']
+        current_vdisk_configuration = VDiskController.get_config_params(vdisk.guid)
+
         new_sco_size = new_config_params['sco_size']
+        old_vdisk_sco_size = current_vdisk_configuration['sco_size']
 
         # 1st update SCO size, because this impacts TLOG multiplier which on its turn impacts write buffer
-        if new_sco_size != old_sco_size:
+        if new_sco_size != old_vdisk_sco_size:
             write_buffer = float(new_config_params['write_buffer'])
             tlog_multiplier = StorageDriverClient.TLOG_MULTIPLIER_MAP[new_sco_size]
             sco_factor = write_buffer / tlog_multiplier / new_sco_size
             try:
-                logger.info('Updating property sco_size on vDisk {0} from {1} to {2}'.format(vdisk_guid, old_sco_size, new_sco_size))
+                logger.info('Updating property sco_size on vDisk {0} to {1}'.format(vdisk_guid, new_sco_size))
                 vdisk.storagedriver_client.set_sco_multiplier(volume_id, new_sco_size / 4 * 1024)
                 vdisk.storagedriver_client.set_tlog_multiplier(volume_id, tlog_multiplier)
                 vdisk.storagedriver_client.set_sco_cache_max_non_disposable_factor(volume_id, sco_factor)
@@ -583,32 +582,34 @@ class VDiskController(object):
                 errors = True
 
         # 2nd update rest
-        for key, old_value in old_config_params.iteritems():
-            if key.startswith('dtl') or key == 'sco_size':
-                continue
-            new_value = new_config_params[key]
-            if new_value != old_value:
-                try:
-                    logger.info('Updating property {0} on vDisk {1} from {2} to {3}'.format(key, vdisk_guid, old_value, new_value))
-                    if key == 'cache_strategy':
-                        vdisk.storagedriver_client.set_readcache_behaviour(volume_id, StorageDriverClient.VDISK_CACHE_MAP[new_value])
-                    elif key == 'dedupe_mode':
+        for key in required_params:
+            try:
+                if key == 'sco_size':
+                    continue
+
+                new_value = new_config_params[key]
+                old_value = current_vdisk_configuration[key]
+                if new_value != old_value:
+                    logger.info('Updating property {0} on vDisk {1} from to {2}'.format(key, vdisk_guid, new_value))
+                    if key == 'dedupe_mode':
                         vdisk.storagedriver_client.set_readcache_mode(volume_id, StorageDriverClient.VDISK_DEDUPE_MAP[new_value])
                     elif key == 'write_buffer':
                         tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id) or StorageDriverClient.TLOG_MULTIPLIER_MAP[new_sco_size]
                         sco_factor = float(new_value) / tlog_multiplier / new_sco_size
                         vdisk.storagedriver_client.set_sco_cache_max_non_disposable_factor(volume_id, sco_factor)
+                    elif key == 'cache_strategy':
+                        vdisk.storagedriver_client.set_readcache_behaviour(volume_id, StorageDriverClient.VDISK_CACHE_MAP[new_value])
                     elif key == 'readcache_limit':
-                        volume_info = vdisk.storagedriver_client.info_volume(volume_id)
-                        block_size = volume_info.lba_size * volume_info.cluster_multiplier or 4096
+                        vol_info = vdisk.storagedriver_client.info_volume(volume_id)
+                        block_size = vol_info.lba_size * vol_info.cluster_multiplier or 4096
                         limit = new_value * 1024 * 1024 * 1024 / block_size if new_value else None
                         vdisk.storagedriver_client.set_readcache_limit(volume_id, limit)
                     else:
                         raise KeyError('Unsupported property provided: "{0}"'.format(key))
                     logger.info('Updated property {0}'.format(key))
-                except Exception as ex:
-                    logger.error('Error updating "{0}": {1}'.format(key, ex))
-                    errors = True
+            except Exception as ex:
+                logger.error('Error updating "{0}": {1}'.format(key, ex))
+                errors = True
         if errors is True:
             raise Exception('Failed to update the values for vDisk {0}'.format(vdisk.name))
 
