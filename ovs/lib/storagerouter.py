@@ -1469,6 +1469,7 @@ class StorageRouterController(object):
         :param size: Size of the partition
         :param roles: Roles assigned to the partition
         """
+        create_fs = None
         storagerouter = StorageRouter(storagerouter_guid)
         for role in roles:
             if role not in DiskPartition.ROLES or role == DiskPartition.ROLES.BACKEND:
@@ -1494,6 +1495,7 @@ class StorageRouterController(object):
                 raise RuntimeError('Given offset/size do not fit into the given Disk')
             with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
                 remote.DiskTools.create_partition(disk.path, offset, size)
+                create_fs = True
             DiskController.sync_with_reality(storagerouter_guid)
             disk = Disk(disk_guid)
             partition = None
@@ -1521,7 +1523,7 @@ class StorageRouterController(object):
             partition = DiskPartition(partition_guid)
             if partition.disk_guid != disk_guid:
                 raise RuntimeError('The given DiskPartition is not on the given Disk')
-        if partition.filesystem is None:
+        if partition.filesystem is None or create_fs is True:
             logger.debug('Creating filesystem')
             with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
                 remote.DiskTools.make_fs(partition.path)
