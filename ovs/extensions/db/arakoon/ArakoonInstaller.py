@@ -305,21 +305,39 @@ class ArakoonInstaller(object):
             logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
 
     @staticmethod
-    def start(cluster_name, client):
+    def start(cluster_name, client, wait_sec=60):
         """
         Starts an arakoon cluster
         """
         if ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is False:
             ServiceManager.start_service('arakoon-{0}'.format(cluster_name), client=client)
+        start = time.time()
+        while time.time() < start+wait_sec:
+            if ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is True:
+                return
+            time.sleep(5)
+        if ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is True:
+            return
+        else:
+            raise RuntimeError('Service arakoon-{0} not started after {1} seconds'.format(cluster_name, wait_sec))
 
     @staticmethod
-    def stop(cluster_name, client):
+    def stop(cluster_name, client, wait_sec=60):
         """
         Stops an arakoon service
         """
         if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
                 ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.stop_service('arakoon-{0}'.format(cluster_name), client=client)
+        start = time.time()
+        while time.time() < start+wait_sec:
+            if ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is False:
+                return
+            time.sleep(5)
+        if ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is False:
+            return
+        else:
+            raise RuntimeError('Service arakoon-{0} not stopped after {1} seconds'.format(cluster_name, wait_sec))
 
     @staticmethod
     def remove(cluster_name, client):
