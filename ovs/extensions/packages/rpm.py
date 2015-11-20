@@ -1,4 +1,4 @@
-# Copyright 2015 CloudFounders NV
+# Copyright 2015 iNuron NV
 #
 # Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ from subprocess import CalledProcessError
 
 logger = LogHandler.get('lib', name='packager')
 
+
 class RpmPackage(object):
     """
     Contains all logic related to Rpm packages (used in e.g. Centos)
@@ -44,6 +45,7 @@ class RpmPackage(object):
 
     @staticmethod
     def install(package_name, client, force=False):
+        _ = force
         counter = 0
         max_counter = 3
         while counter < max_counter:

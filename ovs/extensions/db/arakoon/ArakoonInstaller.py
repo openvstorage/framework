@@ -309,7 +309,8 @@ class ArakoonInstaller(object):
         """
         Starts an arakoon cluster
         """
-        if ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is False:
+        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
+                ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is False:
             ServiceManager.start_service('arakoon-{0}'.format(cluster_name), client=client)
 
     @staticmethod

@@ -18,6 +18,9 @@ import getpass
 class Interactive(object):
     """
     This class contains various interactive methods
+    Notes:
+        .rstrip(chr(13)) only removes \r if it's the last one
+        .rstrip() removes all characters including \r, \n, \r\n and trailing whitespace
     """
 
     @staticmethod
@@ -75,7 +78,7 @@ class Interactive(object):
         Asks the user a question
         """
         default_string = ': ' if default_value is None else ' [{0}]: '.format(default_value)
-        result = raw_input(str(message) + default_string).rstrip(chr(13))
+        result = raw_input(str(message) + default_string).rstrip()
         if not result and default_value is not None:
             return default_value
         return result
@@ -97,7 +100,7 @@ class Interactive(object):
         else:
             raise ValueError('Invalid default value {0}'.format(default_value))
         while True:
-            result = raw_input(str(message) + ynstring).rstrip(chr(13))
+            result = raw_input(str(message) + ynstring).rstrip()
             if not result and default_value is not None:
                 return default_value
             if result.lower() in ('y', 'yes'):
@@ -112,6 +115,7 @@ class Interactive(object):
             print message
         else:
             print 'Enter the password:'
+        # Password input should not be rstrip'ed
         return getpass.getpass()
 
     @staticmethod

@@ -592,17 +592,14 @@ class VDiskController(object):
 
         errors = False
         vdisk = VDisk(vdisk_guid)
-        vpool = VPool(vdisk.vpool_guid)
         volume_id = str(vdisk.volume_id)
-        current_vpool_configuration = VPoolController.get_configuration(vpool.guid)
         current_vdisk_configuration = VDiskController.get_config_params(vdisk.guid)
 
         new_sco_size = new_config_params['sco_size']
-        old_vpool_sco_size = current_vpool_configuration['sco_size']
         old_vdisk_sco_size = current_vdisk_configuration['sco_size']
 
         # 1st update SCO size, because this impacts TLOG multiplier which on its turn impacts write buffer
-        if new_sco_size != old_vdisk_sco_size or (new_sco_size == old_vdisk_sco_size and old_vpool_sco_size != old_vdisk_sco_size):
+        if new_sco_size != old_vdisk_sco_size:
             write_buffer = float(new_config_params['write_buffer'])
             tlog_multiplier = StorageDriverClient.TLOG_MULTIPLIER_MAP[new_sco_size]
             sco_factor = write_buffer / tlog_multiplier / new_sco_size
@@ -617,22 +614,14 @@ class VDiskController(object):
                 errors = True
 
         # 2nd update rest
-        vol_info = vdisk.storagedriver_client.info_volume(volume_id)
-        block_size = vol_info.lba_size * vol_info.cluster_multiplier or 4096
         for key in required_params:
             try:
                 if key == 'sco_size':
                     continue
-                elif key == 'readcache_limit':
-                    old_readcache_limit = vdisk.storagedriver_client.get_readcache_limit(volume_id)
-                    current_vpool_configuration[key] = None
-                    if old_readcache_limit is not None:
-                        current_vpool_configuration[key] = old_readcache_limit * block_size / 1024 / 1024 / 1024
 
                 new_value = new_config_params[key]
-                old_vpool_value = current_vpool_configuration[key]
-                old_vdisk_value = current_vdisk_configuration[key]
-                if new_value != old_vdisk_value or (new_value == old_vdisk_value and old_vpool_value != old_vdisk_value):
+                old_value = current_vdisk_configuration[key]
+                if new_value != old_value:
                     logger.info('Updating property {0} on vDisk {1} from to {2}'.format(key, vdisk_guid, new_value))
                     if key == 'dtl_mode':
                         if new_value == 'no_sync':
@@ -650,6 +639,8 @@ class VDiskController(object):
                     elif key == 'cache_strategy':
                         vdisk.storagedriver_client.set_readcache_behaviour(volume_id, StorageDriverClient.VDISK_CACHE_MAP[new_value])
                     elif key == 'readcache_limit':
+                        vol_info = vdisk.storagedriver_client.info_volume(volume_id)
+                        block_size = vol_info.lba_size * vol_info.cluster_multiplier or 4096
                         limit = new_value * 1024 * 1024 * 1024 / block_size if new_value else None
                         vdisk.storagedriver_client.set_readcache_limit(volume_id, limit)
                     else:
@@ -690,16 +681,16 @@ class VDiskController(object):
             try:
                 hv = Factory.get(pmachine)
                 info = hv.get_vm_agnostic_object(disk.vmachine.hypervisor_id)
-                for disk in info.get('disks', {}):
-                    if disk.get('filename', '') == disk.devicename:
-                        disk_name = disk.get('name', None)
+                for _disk in info.get('disks', {}):
+                    if _disk.get('filename', '') == disk.devicename:
+                        disk_name = _disk.get('name', None)
                         break
             except Exception as ex:
                 logger.error('Failed to get vdisk info from hypervisor. %s' % ex)
 
         if disk_name is None:
             logger.info('No info retrieved from hypervisor, using devicename')
-            disk_name = disk.devicename.split('/')[-1].split('.')[0]
+            disk_name = os.path.splitext(disk.devicename)[0]
 
         if disk_name is not None:
             disk.name = disk_name
