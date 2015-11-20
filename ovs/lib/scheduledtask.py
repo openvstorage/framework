@@ -330,8 +330,7 @@ class ScheduledTaskController(object):
                         try:
                             cluster_instance.remoteCollapse(node, 2)  # Keep 2 tlogs
                         except Exception as e:
-                            logger.info('Error during collapsing cluster {0} node {1}: {2}\n{3}'.format(
-                                cluster, node, str(e), traceback.format_exc()))
+                            logger.exception('Error during collapsing cluster {0} node {1}'.format(cluster, node))
             else:
                 logger.warning('Could not collapse cluster {0}. No IP addresses found'.format(cluster))
 
