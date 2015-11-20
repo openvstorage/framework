@@ -29,6 +29,7 @@ define([
         self.loadParentConfig = undefined;
 
         // External dependencies
+        self.dtlTargets    = ko.observableArray([]);
         self.storageRouter = ko.observable();
         self.vMachine      = ko.observable();
         self.vpool         = ko.observable();
@@ -44,10 +45,10 @@ define([
         self.dedupeMode          = ko.observable();
         self.dedupeModes         = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
         self.dtlEnabled          = ko.observable(true);
-        self.dtlLocation         = ko.observable();
         self.dtlMode             = ko.observable();
-        self.dtlModes            = ko.observableArray(['no_sync', 'a_sync', 'sync']);
+        self.dtlModes            = ko.observableArray([{name: 'no_sync', disabled: false}, {name: 'a_sync', disabled: false}, {name: 'sync', disabled: false}]);
         self.dtlStatus           = ko.observable();
+        self.dtlTarget           = ko.observable();
         self.guid                = ko.observable(guid);
         self.iops                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.loaded              = ko.observable(false);
@@ -83,15 +84,27 @@ define([
         });
         self.dtlModeChange = ko.computed({
             read: function() {
-                return self.dtlMode();
+                if (self.dtlTargets().length === 0) {
+                    self.dtlMode('no_sync');
+                    return {name: self.dtlMode(), disabled: true};
+                }
+                return {name: self.dtlMode(), disabled: false};
             },
             write: function(mode) {
                 if (mode === 'no_sync') {
                     self.dtlEnabled(false);
                 } else {
                     self.dtlEnabled(true);
+                    if (self.dtlTargets().length === 0) {
+                        self.dtlTarget(undefined);
+                        $.each(self.dtlModes(), function(index, item) {
+                            item.disabled = true;
+                        })
+                    } else if (self.dtlTarget() === undefined) {
+                        self.dtlTarget(self.dtlTargets()[0]);
+                    }
                 }
-                self.dtlMode(mode);
+                self.dtlMode(mode.name);
             }
         });
         self.configuration = ko.computed({
@@ -101,7 +114,7 @@ define([
                         dtl_enabled: self.dtlEnabled(),
                         dedupe_mode: self.dedupeMode() !== undefined ? self.dedupeMode().name : undefined,
                         write_buffer: self.writeBuffer(),
-                        dtl_location: self.dtlLocation(),
+                        dtl_target: self.dtlTarget(),
                         cache_strategy: self.cacheStrategy(),
                         readcache_limit: self.readCacheLimit() || null}
             },
@@ -110,7 +123,7 @@ define([
                 self.scoSize(configData.sco_size);
                 self.dtlMode(configData.dtl_mode);
                 self.dedupeMode({name: configData.dedupe_mode, disabled: false});
-                self.dtlLocation(configData.dtl_location);
+                self.dtlTarget(configData.dtl_target === null ? undefined : configData.dtl_target);
                 self.cacheStrategy(configData.cache_strategy);
                 self.readCacheLimit(configData.readcache_limit);
             }
@@ -230,11 +243,15 @@ define([
                         if (self.oldConfiguration() === undefined || reload === true) {
                             self.oldConfiguration($.extend({}, data));  // Used to make comparison to check for changes
                             $.each(self.oldConfiguration(), function (key, value) {
+                                var oldConfig;
                                 if (key === 'write_buffer') {
-                                    var oldConfig = self.oldConfiguration();
+                                    oldConfig = self.oldConfiguration();
                                     oldConfig.write_buffer = Math.round(self.oldConfiguration().write_buffer);
                                     self.oldConfiguration(oldConfig);
-                                    return false;
+                                } else if (key === 'dtl_target' && value === null) {
+                                    oldConfig = self.oldConfiguration();
+                                    oldConfig.dtl_target = undefined;
+                                    self.oldConfiguration(oldConfig);
                                 }
                             });
                         }
@@ -242,10 +259,6 @@ define([
                     })
                     .fail(deferred.reject);
             }).promise();
-        };
-        self.loadAllConfigurations = function() {
-            self.loadConfiguration(false);
-            self.loadParentConfiguration();
         };
     };
 });

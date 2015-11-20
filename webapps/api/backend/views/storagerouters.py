@@ -29,10 +29,11 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
+from ovs.lib.disk import DiskController
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.storagedriver import StorageDriverController
-from ovs.lib.mdsservice import MDSServiceController
-from ovs.lib.disk import DiskController
+from ovs.lib.vdisk import VDiskController
 from backend.decorators import required_roles, return_list, return_object, return_task, return_plain, load, log
 
 
@@ -98,15 +99,19 @@ class StorageRouterViewSet(viewsets.ViewSet):
             serializer.save()
             if previous_primary != primary or previous_secondary != secondary:
                 cache = VolatileFactory.get_client()
-                key = 'ovs_dedupe_fdchange_{0}'.format(storagerouter.guid)
-                task_id = cache.get(key)
-                if task_id:
-                    # Key exists, task was already scheduled
-                    # If task is already running, the revoke message will
-                    # be ignored
-                    revoke(task_id)
-                async_result = MDSServiceController.mds_checkup.s().apply_async(countdown=60)
-                cache.set(key, async_result.id, 600)  # Store the task id
+                key_mds = 'ovs_dedupe_fdchange_mds_{0}'.format(storagerouter.guid)
+                key_dtl = 'ovs_dedupe_fdchange_dtl_{0}'.format(storagerouter.guid)
+                task_mds_id = cache.get(key_mds)
+                task_dtl_id = cache.get(key_dtl)
+                if task_mds_id:
+                    # Key exists, task was already scheduled. If task is already running, the revoke message will be ignored
+                    revoke(task_mds_id)
+                if task_dtl_id:
+                    revoke(task_dtl_id)
+                async_mds_result = MDSServiceController.mds_checkup.s().apply_async(countdown=60)
+                async_dtl_result = VDiskController.dtl_checkup.s().apply_async(countdown=60)
+                cache.set(key_mds, async_mds_result.id, 600)  # Store the task id
+                cache.set(key_mds, async_dtl_result.id, 600)  # Store the task id
 
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:

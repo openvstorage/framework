@@ -39,7 +39,7 @@ def log(event_type):
             Wrapped function
             """
             # Log the call
-            if event_type == 'VOLUMEDRIVER_TASK':
+            if event_type == 'VOLUMEDRIVER_TASK' and 'storagedriver_id' in kwargs:
                 metadata = {'storagedriver': StorageDriverList.get_by_storagedriver_id(kwargs['storagedriver_id']).guid}
             else:
                 metadata = {}

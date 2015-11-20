@@ -299,13 +299,13 @@
                 "dtl": "Distributed Transaction Log",
                 "dtl_help_message": "Copies unprotected data in the write buffer of a vDisk to another Storage Router",
                 "dtl_help_title": "Distributed Transaction Log",
-                "dtl_location": "Location",
                 "dtl_mode": "Mode",
                 "dtl_modes": {
                     "a_sync": "Asynchronous",
                     "no_sync": "Disabled",
                     "sync": "Synchronous"
                 },
+                "dtl_target": "Target",
                 "dtl_transport": "Transport Mode",
                 "dtl_transport_modes": {
                     "rdma": "RDMA",

@@ -31,7 +31,7 @@ define([
         });
         self.dtlMode = ko.computed({
             write: function(mode) {
-                if (mode === 'no_sync') {
+                if (mode.name === 'no_sync') {
                     self.data.dtlEnabled(false);
                 } else {
                     self.data.dtlEnabled(true);

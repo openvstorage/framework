@@ -143,7 +143,7 @@ limitations under the License.
             <li class="active" data-bind="tooltip: 'ovs:generic.snapshots'">
                 <a href="#snapshots" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.snapshot"></a>
             </li>
-            <li data-bind="tooltip: 'ovs:generic.management', visible: $root.shared.user.roles().contains('manage'), click: loadAllConfigurations">
+            <li data-bind="tooltip: 'ovs:generic.management', visible: $root.shared.user.roles().contains('manage'), click: $root.loadAllConfigurations">
                 <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
             </li>
         </ul>
@@ -209,7 +209,7 @@ limitations under the License.
                                                                                  items: dtlModes,
                                                                                  target: dtlModeChange,
                                                                                  text: function(item) {
-                                                                                     return $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item);
+                                                                                     return $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item.name);
                                                                                  },
                                                                                  small: true
                                                                              }">
@@ -219,6 +219,28 @@ limitations under the License.
                                                             <!-- ko if: configuration() !== undefined  && parentConfiguration() !== undefined && configuration().dtl_mode === parentConfiguration().dtl_mode -->
                                                                 <span data-i18n="ovs:generic.default"></span>
                                                             <!-- /ko -->
+                                                        </td>
+                                                    </tr>
+                                                    <tr data-bind="visible: dtlMode() !== 'no_sync'">
+                                                        <td style="width: 20%; padding: 0;">
+                                                            <div style="margin-top: 5px;">
+                                                                <label class="control-label"
+                                                                       style="padding: inherit; font-weight: inherit; margin-bottom: inherit;"
+                                                                       data-i18n="ovs:storagedrivers.configuration.general.dtl_target">
+                                                                </label>:
+                                                            </div>
+                                                        </td>
+                                                        <td style="width: 16%; padding: 0;">
+                                                            <span data-bind="dropdown: {
+                                                                                 items: dtlTargets,
+                                                                                 target: dtlTarget,
+                                                                                 text: function(item) {
+                                                                                     return item;
+                                                                                 },
+                                                                                 small: true,
+                                                                                 emptyisloading: true
+                                                                             }">
+                                                            </span>
                                                         </td>
                                                     </tr>
                                                 </tbody>

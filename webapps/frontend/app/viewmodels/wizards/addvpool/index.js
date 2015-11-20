@@ -53,7 +53,7 @@ define([
         data.dedupeMode('dedupe');
         data.distributedMtpt(undefined);
         data.dtlEnabled(true);
-        data.dtlMode('a_sync');
+        data.dtlMode({name: 'a_sync', disabled: false});
         data.dtlTransportMode({name: 'tcp'});
         data.hasMgmtCenter(false);
         data.host('');

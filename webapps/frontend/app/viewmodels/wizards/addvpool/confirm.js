@@ -51,7 +51,7 @@ define([
                 var configParams = undefined;
                 if (self.data.extendVpool() === false) {
                     configParams = {
-                        'dtl_mode': self.data.dtlMode(),
+                        'dtl_mode': self.data.dtlMode().name,
                         'sco_size': self.data.scoSize(),
                         'dedupe_mode': self.data.dedupeMode(),
                         'write_buffer': self.data.writeBuffer(),

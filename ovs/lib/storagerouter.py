@@ -57,6 +57,7 @@ from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
+from ovs.lib.vdisk import VDiskController
 from ovs.lib.vpool import VPoolController
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
@@ -835,6 +836,7 @@ class StorageRouterController(object):
         vpool.size = vfs_info.f_blocks * vfs_info.f_bsize
         vpool.save()
 
+        VDiskController.dtl_checkup(vpool_to_check=vpool)
         for vdisk in vpool.vdisks:
             MDSServiceController.ensure_safety(vdisk=vdisk)
 
@@ -1058,6 +1060,8 @@ class StorageRouterController(object):
                     junction.delete()
                 vdisk.delete()
             vpool.delete()
+        else:
+            VDiskController.dtl_checkup(vpool_to_check=vpool)
 
         MDSServiceController.mds_checkup()
 

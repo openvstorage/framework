@@ -92,14 +92,12 @@ class StorageDriverController(object):
     @staticmethod
     @celery.task(name='ovs.storagedriver.volumedriver_error')
     @log('VOLUMEDRIVER_TASK')
-    def volumedriver_error(code, volumename, storagedriver_id):
+    def volumedriver_error(code, volumename):
         """
         Handles error messages/events from the volumedriver
         :param code: Volumedriver error code
         :param volumename: Name of the volume throwing the error
-        :param storagedriver_id: ID of the storagedriver hosting the volume
         """
-        _ = storagedriver_id  # Required for the @log decorator
         if code == VolumeDriverEvents.MDSFailover:
             disk = VDiskList.get_vdisk_by_volume_id(volumename)
             if disk is not None:
