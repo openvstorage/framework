@@ -29,11 +29,13 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vmachinelist import VMachineList
+from ovs.dal.lists.servicelist import ServiceList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.remote import Remote
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
@@ -312,16 +314,25 @@ class ScheduledTaskController(object):
     @ensure_single(['ovs.scheduled.collapse_arakoon'])
     def collapse_arakoon():
         logger.info('Starting arakoon collapse')
-        arakoon_dir = os.path.join(Configuration.get('ovs.core.cfgdir'), 'arakoon')
-        arakoon_clusters = map(lambda directory: os.path.basename(directory.rstrip(os.path.sep)),
-                               os.walk(arakoon_dir).next()[1])
-        for cluster in arakoon_clusters:
-            logger.info('  Collapsing cluster: {0}'.format(cluster))
-            cluster_instance = ArakoonManagementEx().getCluster(cluster)
-            for node in cluster_instance.listNodes():
-                logger.info('    Collapsing node: {0}'.format(node))
-                try:
-                    cluster_instance.remoteCollapse(node, 2)  # Keep 2 tlogs
-                except Exception as e:
-                    logger.info('Error during collapsing cluster {0} node {1}: {2}\n{3}'.format(cluster, node, str(e), traceback.format_exc()))
+        arakoon_clusters = {}
+        for service in ServiceList.get_services():
+            if service.type.name in ('Arakoon', 'NamespaceManager', 'AlbaManager'):
+                arakoon_clusters.setdefault(service.name.replace('arakoon-', ''), []).append(service.storagerouter.ip)
+
+        for cluster, ips in arakoon_clusters.iteritems():
+            if len(ips) > 0:
+                ip = ips[0]
+                logger.info('  Collapsing cluster: {0} using ip {1}'.format(cluster, ip))
+                with Remote(ip, [ArakoonManagementEx])  as remote:
+                    cluster_instance = remote.ArakoonManagementEx().getCluster(cluster)
+                    for node in cluster_instance.listNodes():
+                        logger.info('    Collapsing node: {0}'.format(node))
+                        try:
+                            cluster_instance.remoteCollapse(node, 2)  # Keep 2 tlogs
+                        except Exception as e:
+                            logger.info('Error during collapsing cluster {0} node {1}: {2}\n{3}'.format(
+                                cluster, node, str(e), traceback.format_exc()))
+            else:
+                logger.warning('Could not collapse cluster {0}. No IP addresses found'.format(cluster))
+
         logger.info('Arakoon collapse finished')
