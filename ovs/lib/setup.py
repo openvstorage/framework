@@ -1706,18 +1706,6 @@ EOF
         if action is None:
             print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
         else:
-            tries = 10
-            success = False
-            while tries > 0:
-                logger.debug('  Waiting for service {0} to be {1}...'.format(name, action))
-                status = ServiceManager.get_service_status(name, client=client)
-                if (status is False and state == 'stop') or (status is True and state in ['start', 'restart']):
-                    success = True
-                    break
-                tries -= 1
-                time.sleep(10 - tries)
-            if success is False:
-                raise RuntimeError('Service {0} could not be {1} on node {2}'.format(name, action, client.ip))
             logger.debug('  Service {0} {1}'.format(name, action))
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
 
