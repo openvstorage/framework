@@ -56,7 +56,7 @@ class ScheduledTaskController(object):
 
     @staticmethod
     @celery.task(name='ovs.scheduled.snapshot_all_vms', schedule=crontab(minute='0', hour='2-22'))
-    @ensure_single(['ovs.scheduled.snapshot_all_vms', 'ovs.scheduled.delete_snapshots'])
+    @ensure_single(task_name='ovs.scheduled.snapshot_all_vms', extra_task_names=['ovs.scheduled.delete_snapshots'])
     def snapshot_all_vms():
         """
         Snapshots all VMachines
@@ -78,7 +78,7 @@ class ScheduledTaskController(object):
 
     @staticmethod
     @celery.task(name='ovs.scheduled.delete_snapshots', schedule=crontab(minute='1', hour='2'))
-    @ensure_single(['ovs.scheduled.delete_snapshots'])
+    @ensure_single(task_name='ovs.scheduled.delete_snapshots')
     def delete_snapshots(timestamp=None):
         """
         Delete snapshots & scrubbing policy
@@ -197,7 +197,7 @@ class ScheduledTaskController(object):
 
     @staticmethod
     @celery.task(name='ovs.scheduled.gather_scrub_work', schedule=crontab(minute='0', hour='3'))
-    @ensure_single(['ovs.scheduled.gather_scrub_work'])
+    @ensure_single(task_name='ovs.scheduled.gather_scrub_work')
     def gather_scrub_work():
         """
         Retrieve and execute scrub work
@@ -325,7 +325,7 @@ class ScheduledTaskController(object):
 
     @staticmethod
     @celery.task(name='ovs.scheduled.collapse_arakoon', schedule=crontab(minute='30', hour='0'))
-    @ensure_single(['ovs.scheduled.collapse_arakoon'])
+    @ensure_single(task_name='ovs.scheduled.collapse_arakoon')
     def collapse_arakoon():
         """
         Collapse Arakoon's Tlogs

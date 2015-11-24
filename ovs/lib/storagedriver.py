@@ -150,7 +150,7 @@ class StorageDriverController(object):
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=crontab(minute='30', hour='*'))
-    @ensure_single(['ovs.storagedriver.scheduled_voldrv_arakoon_checkup'])
+    @ensure_single(task_name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup')
     def scheduled_voldrv_arakoon_checkup():
         """
         Makes sure the volumedriver arakoon is on all available master nodes

@@ -80,10 +80,10 @@ def task_postrun_handler(sender=None, task_id=None, task=None, args=None, kwargs
     """
     Hook for celery postrun event
     """
-    cache = PersistentFactory.get_client()
-    key = None if task is None else '{0}_{1}'.format(ENSURE_SINGLE_KEY, task.name)
-    if key is not None and cache.exists(key):
-        cache.delete(key)
+    arakoon_cache = PersistentFactory.get_client()
+    arakoon_key = None if task is None else '{0}_{1}'.format(ENSURE_SINGLE_KEY, task.name)
+    if arakoon_key is not None and arakoon_cache.exists(arakoon_key):
+        arakoon_cache.delete(arakoon_key)
     _ = sender, task, args, kwargs, kwds
     MessageController.fire(MessageController.Type.TASK_COMPLETE, task_id)
 
@@ -99,7 +99,10 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
 
 
 if __name__ == '__main__':
-    cache = PersistentFactory.get_client()
-    for key in cache.prefix(ENSURE_SINGLE_KEY):
-        cache.delete(key)
+    try:
+        cache = PersistentFactory.get_client()
+        for key in cache.prefix(ENSURE_SINGLE_KEY):
+            cache.delete(key)
+    except Exception as ex:
+        loghandler.error('Error while trying to delete ensure single keys: {0}'.format(ex))
     celery.start()

@@ -68,7 +68,7 @@ def log(event_type):
     return wrap
 
 
-def ensure_single(task_names, mode='REVOKE'):
+def ensure_single(task_name, extra_task_names=None, mode='REVOKE'):
     """
     Decorator ensuring a new task cannot be started in case a certain task is
     running, scheduled or reserved.
@@ -83,11 +83,16 @@ def ensure_single(task_names, mode='REVOKE'):
      - DELAY: If a task is in queue, it will be revoked and a new one will be launched with the specified delay
      - CHAIN: If a task is being executed, the new task will be appended for later execution
 
-    :param task_names: List of names to check
-    :type task_names: List
-    :param mode: Mode of the ensure single. Allowed values: REVOKE, DELAY, CHAIN
-    :type mode: String
-    :return: Pointer to function
+    :param task_name:        Name of the task to ensure its singularity
+    :type task_name:         String
+
+    :param extra_task_names: Extra tasks to take into account
+    :type extra_task_names:  List
+
+    :param mode:             Mode of the ensure single. Allowed values: REVOKE, DELAY, CHAIN
+    :type mode:              String
+
+    :return:                 Pointer to function
     """
     def wrap(function):
         """
@@ -101,14 +106,13 @@ def ensure_single(task_names, mode='REVOKE'):
             :param kwargs: Arguments with default values
             """
             cache = PersistentFactory.get_client()
-            if not task_names[0].endswith(function.__name__):
-                raise ValueError('First task name in ensure_single decorator must be identical to function name')
+            task_names = [] if extra_task_names is None else extra_task_names
             if mode == 'REVOKE':
-                for task_name in task_names:
-                    if cache.exists('{0}_{1}'.format(ENSURE_SINGLE_KEY, task_name)):
+                for task in [task_name] + task_names:
+                    if cache.exists('{0}_{1}'.format(ENSURE_SINGLE_KEY, task)):
                         logger.debug('Execution of task {0} discarded'.format(function.__name__))
                         return None
-                cache.set('{0}_{1}'.format(ENSURE_SINGLE_KEY, task_names[0]), 'revoke_task')
+                cache.set('{0}_{1}'.format(ENSURE_SINGLE_KEY, task_name), 'revoke_task')
                 return function(*args, **kwargs)
             elif mode == 'DELAY':
                 pass
