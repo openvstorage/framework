@@ -17,26 +17,32 @@ Contains various decorators
 """
 
 import json
-from celery.task.control import inspect
 from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('lib', name='scheduled tasks')
+ENSURE_SINGLE_KEY = 'ovs_ensure_single'
 
 
 def log(event_type):
     """
     Task logger
+    :param event_type: Event type
+    :return: Pointer to function
     """
 
-    def wrap(f):
+    def wrap(function):
         """
         Wrapper function
+        :param function: Function to log something about
         """
 
         def new_function(*args, **kwargs):
             """
             Wrapped function
+            :param args: Arguments without default values
+            :param kwargs: Arguments with default values
             """
             # Log the call
             if event_type == 'VOLUMEDRIVER_TASK' and 'storagedriver_id' in kwargs:
@@ -45,106 +51,88 @@ def log(event_type):
                 metadata = {}
             _logger = LogHandler.get('log', name=event_type.lower())
             _logger.info('[{0}.{1}] - {2} - {3} - {4}'.format(
-                f.__module__,
-                f.__name__,
+                function.__module__,
+                function.__name__,
                 json.dumps(list(args)),
                 json.dumps(kwargs),
                 json.dumps(metadata)
             ))
 
             # Call the function
-            return f(*args, **kwargs)
+            return function(*args, **kwargs)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
+        new_function.__name__ = function.__name__
+        new_function.__module__ = function.__module__
         return new_function
 
     return wrap
 
 
-def ensure_single(tasknames):
+def ensure_single(task_names, mode='REVOKE'):
     """
     Decorator ensuring a new task cannot be started in case a certain task is
     running, scheduled or reserved.
 
-    The task using this decorator on, must be a bound task (with bind=True argument). Keep also in
+    The task using this decorator on. Keep also in
     mind that validation will be executed by the worker itself, so if the task is scheduled on
     a worker currently processing a "duplicate" task, it will only get validated after the first
     one completes, which will result in the fact that the task will execute normally.
 
-    @param tasknames: list of names to check
-    @type tasknames: list
+    Allowed modes:
+     - REVOKE: If any of the specified task names is being executed, the calling function will not be executed
+     - DELAY: If a task is in queue, it will be revoked and a new one will be launched with the specified delay
+     - CHAIN: If a task is being executed, the new task will be appended for later execution
+
+    :param task_names: List of names to check
+    :type task_names: List
+    :param mode: Mode of the ensure single. Allowed values: REVOKE, DELAY, CHAIN
+    :type mode: String
+    :return: Pointer to function
     """
     def wrap(function):
         """
         Wrapper function
+        :param function: Function to check
         """
-        def wrapped(self=None, *args, **kwargs):
+        def new_function(*args, **kwargs):
             """
             Wrapped function
+            :param args: Arguments without default values
+            :param kwargs: Arguments with default values
             """
-            if not hasattr(self, 'request'):
-                raise RuntimeError('The decorator ensure_single can only be applied to bound tasks (with bind=True argument)')
-            task_id = self.request.id
-
-            reason = ''
-
-            def can_run():
-                global reason
-                """
-                Checks whether a task is running/scheduled/reserved.
-                The check is executed in stages, as querying the inspector is a slow call.
-                """
-                if tasknames:
-                    inspector = inspect()
-                    active = inspector.active()
-                    if active:
-                        for taskname in tasknames:
-                            for worker in active.values():
-                                for task in worker:
-                                    if task['id'] != task_id and taskname == task['name']:
-                                        reason = 'active'
-                                        return False
-                    scheduled = inspector.scheduled()
-                    if scheduled:
-                        for taskname in tasknames:
-                            for worker in scheduled.values():
-                                for task in worker:
-                                    request = task['request']
-                                    if request['id'] != task_id and taskname == request['name']:
-                                        reason = 'scheduled'
-                                        return False
-                    reserved = inspector.reserved()
-                    if reserved:
-                        for taskname in tasknames:
-                            for worker in reserved.values():
-                                for task in worker:
-                                    if task['id'] != task_id and taskname == task['name']:
-                                        reason = 'reserved'
-                                        return False
-                return True
-
-            if can_run():
+            cache = PersistentFactory.get_client()
+            if not task_names[0].endswith(function.__name__):
+                raise ValueError('First task name in ensure_single decorator must be identical to function name')
+            if mode == 'REVOKE':
+                for task_name in task_names:
+                    if cache.exists('{0}_{1}'.format(ENSURE_SINGLE_KEY, task_name)):
+                        logger.debug('Execution of task {0} discarded'.format(function.__name__))
+                        return None
+                cache.set('{0}_{1}'.format(ENSURE_SINGLE_KEY, task_names[0]), 'revoke_task')
                 return function(*args, **kwargs)
+            elif mode == 'DELAY':
+                pass
+            elif mode == 'CHAIN':
+                pass
             else:
-                logger.debug('Execution of task {0}[{1}] discarded'.format(
-                    self.name, self.request.id
-                ))
-                return None
+                raise ValueError('Unsupported mode "{0}" provided'.format(mode))
 
-        wrapped.__name__ = function.__name__
-        wrapped.__module__ = function.__module__
-        return wrapped
+        new_function.__name__ = function.__name__
+        new_function.__module__ = function.__module__
+        return new_function
     return wrap
 
 
 def add_hooks(hook_type, hooks):
     """
     This decorator marks the decorated function to be interested in a certain hook
+    :param hook_type: Type of hook
+    :param hooks: Hooks to add to function
     """
     def wrap(function):
         """
         Wrapper function
+        :param function: Function to add hooks on
         """
         if not hasattr(function, 'hooks'):
             function.hooks = {}

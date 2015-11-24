@@ -25,6 +25,7 @@ from ConfigParser import RawConfigParser
 from kombu import Queue
 from celery import Celery
 from celery.signals import task_postrun, worker_process_init
+from ovs.lib.helpers.decorators import ENSURE_SINGLE_KEY
 from ovs.lib.messaging import MessageController
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -79,6 +80,10 @@ def task_postrun_handler(sender=None, task_id=None, task=None, args=None, kwargs
     """
     Hook for celery postrun event
     """
+    cache = PersistentFactory.get_client()
+    key = None if task is None else '{0}_{1}'.format(ENSURE_SINGLE_KEY, task.name)
+    if key is not None and cache.exists(key):
+        cache.delete(key)
     _ = sender, task, args, kwargs, kwds
     MessageController.fire(MessageController.Type.TASK_COMPLETE, task_id)
 
@@ -94,4 +99,7 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
 
 
 if __name__ == '__main__':
+    cache = PersistentFactory.get_client()
+    for key in cache.prefix(ENSURE_SINGLE_KEY):
+        cache.delete(key)
     celery.start()

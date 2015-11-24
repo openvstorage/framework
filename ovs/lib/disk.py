@@ -48,8 +48,13 @@ class DiskController(object):
         Keep existing task as it is, some tasks depend on it being sync, call async explicitly
         - if task was already called for this storagerouter, revoke it and call a new one
         - ensures only 1 task runs for a storagerouter and only the last task is executed
-        :param storagerouter_guid:
-        :return:
+        :param storagerouter_guid: Guid of the storage router to synchronize its disks
+        :type storagerouter_guid:  String
+
+        :param max_attempts:       Attempts to try to synchronize disks before raising
+        :type max_attempts:        Integer
+
+        :return:                   None
         """
         cache = VolatileFactory.get_client()
         key = 'ovs_dedupe_sync_with_reality_{0}'.format(storagerouter_guid)
@@ -67,15 +72,20 @@ class DiskController(object):
         """
         Try to run sync_with_reality, retry in case of failure
          always run sync, as tasks calling this expect this to be sync
-        :param storagerouter_guid:
-        :return:
+        :param storagerouter_guid: Guid of the storage router to synchronize its disks
+        :type storagerouter_guid:  String
+
+        :param max_attempts:       Attempts to try to synchronize disks before raising
+        :type max_attempts:        Integer
+
+        :return:                   None
         """
         cache = VolatileFactory.get_client()
         mutex = VolatileMutex('ovs_disk_sync_with_reality_{0}'.format(storagerouter_guid))
 
         key = 'ovs_dedupe_sync_with_reality_{0}'.format(storagerouter_guid)
         attempt = 1
-        while attempt < max_attempts:
+        while attempt <= max_attempts:
             task_id = cache.get(key)
             if task_id:
                 revoke(task_id)
@@ -85,7 +95,7 @@ class DiskController(object):
             except Exception as ex:
                 logger.warning('Sync with reality failed. {0}'.format(ex))
                 attempt += 1
-                time.sleep(attempt*30)
+                time.sleep(attempt * 30)
             finally:
                 mutex.release()
 
@@ -121,8 +131,8 @@ class DiskController(object):
             with Remote(storagerouter.ip, [Context, os]) as remote:
                 context = remote.Context()
                 devices = [device for device in context.list_devices(subsystem='block')
-                           if ('ID_TYPE' in device and device['ID_TYPE'] == 'disk')
-                           or ('DEVNAME' in device and 'nvme' in device['DEVNAME'])]
+                           if ('ID_TYPE' in device and device['ID_TYPE'] == 'disk') or
+                              ('DEVNAME' in device and 'nvme' in device['DEVNAME'])]
                 for device in devices:
                     is_partition = device['DEVTYPE'] == 'partition'
                     device_path = device['DEVNAME']

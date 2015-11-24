@@ -149,7 +149,7 @@ class StorageDriverController(object):
                 break
 
     @staticmethod
-    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', bind=True, schedule=crontab(minute='30', hour='*'))
+    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=crontab(minute='30', hour='*'))
     @ensure_single(['ovs.storagedriver.scheduled_voldrv_arakoon_checkup'])
     def scheduled_voldrv_arakoon_checkup():
         """
@@ -168,6 +168,16 @@ class StorageDriverController(object):
     @staticmethod
     def _voldrv_arakoon_checkup(create_cluster):
         def add_service(service_storagerouter, arakoon_result):
+            """
+            Add a service to the storage router
+            :param service_storagerouter: Storage Router to add the service to
+            :type service_storagerouter:  StorageRouter
+
+            :param arakoon_result:        Port information
+            :type arakoon_result:         Dictionary
+
+            :return:                      The newly created and added service
+            """
             new_service = Service()
             new_service.name = service_name
             new_service.type = service_type
