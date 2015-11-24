@@ -101,6 +101,14 @@ class MetaClass(type):
         return super(MetaClass, mcs).__new__(mcs, name, bases, dct)
 
 
+class DataObjectAttributeEncoder(json.JSONEncoder):
+    """
+    Custom JSONEncoder for attributes
+    """
+    def default(self, obj):
+        return "{0}: {1}".format(type(obj), obj)
+
+
 class DataObject(object):
     """
     This base class contains all logic to support our multiple backends and the caching
@@ -899,7 +907,7 @@ class DataObject(object):
         """
         The string representation of a DataObject is the serialized value
         """
-        return json.dumps(self.serialize(), indent=4)
+        return json.dumps(self.serialize(), indent=4, cls=DataObjectAttributeEncoder)
 
     def __hash__(self):
         """
