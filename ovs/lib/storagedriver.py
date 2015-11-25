@@ -209,7 +209,6 @@ class StorageDriverController(object):
             StorageDriverController._configure_arakoon_to_volumedriver()
 
         if 0 < len(current_services) < len(available_storagerouters):
-            distributed = False
             for storagerouter, partition in available_storagerouters.iteritems():
                 if storagerouter.ip in current_ips:
                     continue
@@ -222,11 +221,9 @@ class StorageDriverController(object):
                 )
                 add_service(storagerouter, result)
                 current_ips.append(storagerouter.ip)
-                if distributed is False:
-                    distributed = True
-                    for sr_ip in all_sr_ips:
-                        if sr_ip not in current_ips:
-                            ArakoonInstaller.deploy_to_slave(current_services[0].storagerouter.ip, sr_ip, cluster_name)
+                for sr_ip in all_sr_ips:
+                    if sr_ip not in current_ips:
+                        ArakoonInstaller.deploy_to_slave(current_services[0].storagerouter.ip, sr_ip, cluster_name)
                 ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
             StorageDriverController._configure_arakoon_to_volumedriver()
 
