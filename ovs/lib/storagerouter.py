@@ -685,6 +685,7 @@ class StorageRouterController(object):
             storagedriver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
                                                                       alba_connection_port=alba_proxy.service.ports[0],
                                                                       alba_connection_preset=vpool.metadata['preset'],
+                                                                      alba_connection_timeout=15,
                                                                       backend_type='ALBA')
         elif vpool.backend_type.code in ['local', 'distributed']:
             storagedriver_config.configure_backend_connection_manager(**local_backend_data)
