@@ -40,6 +40,7 @@ from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.decorators import log
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
@@ -155,7 +156,7 @@ class VDiskController(object):
 
         VDiskController.sync_with_mgmtcenter(disk, pmachine, storagedriver)
         MDSServiceController.ensure_safety(disk)
-        VDiskController.dtl_checkup(vdisk_to_check=disk)
+        VDiskController.dtl_checkup(vdisk_guid=disk.guid)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.rename_from_voldrv')
@@ -271,7 +272,7 @@ class VDiskController(object):
 
         try:
             MDSServiceController.ensure_safety(new_vdisk)
-            VDiskController.dtl_checkup(vdisk_to_check=new_vdisk)
+            VDiskController.dtl_checkup(vdisk_guid=new_vdisk.guid)
         except Exception as ex:
             logger.error('Caught exception during "ensure_safety" {0}'.format(ex))
 
@@ -413,7 +414,7 @@ class VDiskController(object):
             new_vdisk.volume_id = volume_id
             new_vdisk.save()
             MDSServiceController.ensure_safety(new_vdisk)
-            VDiskController.dtl_checkup(vdisk_to_check=new_vdisk)
+            VDiskController.dtl_checkup(vdisk_guid=new_vdisk.guid)
 
         except Exception as ex:
             logger.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
@@ -723,16 +724,24 @@ class VDiskController(object):
             disk.name = disk_name
             disk.save()
 
-    @celery.task(name='ovs.vdisk.dtl_checkup', bind=True, schedule=crontab(minute='15', hour='0,4,8,12,16,20'))
-    def dtl_checkup(self, vpool_to_check=None, vdisk_to_check=None, storagerouters_to_exclude=None):
+    @staticmethod
+    @celery.task(name='ovs.vdisk.dtl_checkup', schedule=crontab(minute='15', hour='0,4,8,12,16,20'))
+    @ensure_single(task_name='dtl_checkup', mode='CHAIN')
+    def dtl_checkup(vpool_guid=None, vdisk_guid=None, storagerouters_to_exclude=None):
         """
         Check DTL for all volumes
-        :param vpool_to_check: vPool to check the DTL configuration of all its disks
-        :param vdisk_to_check: Virtual Disk to check its DTL configuration
+        :param vpool_guid:                vPool to check the DTL configuration of all its disks
+        :type vpool_guid:                 String
+
+        :param vdisk_guid:                Virtual Disk to check its DTL configuration
+        :type vdisk_guid:                 String
+
         :param storagerouters_to_exclude: Storage Routers to exclude from possible targets
-        :return: None
+        :type storagerouters_to_exclude:  List
+
+        :return:                          None
         """
-        if vpool_to_check is not None and vdisk_to_check is not None:
+        if vpool_guid is not None and vdisk_guid is not None:
             raise ValueError('vpool and vdisk are mutually exclusive')
         if storagerouters_to_exclude is None:
             storagerouters_to_exclude = []
@@ -742,9 +751,11 @@ class VDiskController(object):
         logger.info('DTL checkup started')
         required_params = {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
                            'dtl_enabled': (bool, None)}
+        vdisk = VDisk(vdisk_guid) if vdisk_guid else None
+        vpool = VPool(vpool_guid) if vpool_guid else None
         root_client_map = {}
         vpool_dtl_config_cache = {}
-        vdisks = VDiskList.get_vdisks() if vdisk_to_check is None and vpool_to_check is None else vpool_to_check.vdisks if vpool_to_check is not None else [vdisk_to_check]
+        vdisks = VDiskList.get_vdisks() if vdisk is None and vpool is None else vpool.vdisks if vpool is not None else [vdisk]
         for vdisk in vdisks:
             logger.info('    Verifying vDisk {0} with guid {1}'.format(vdisk.name, vdisk.guid))
             vdisk.invalidate_dynamics(['storagedriver_client', 'storagerouter_guid'])
@@ -857,5 +868,5 @@ class VDiskController(object):
             if vdisk:
                 logger.info('Degraded DTL detected for volume {0} with guid {1}'.format(vdisk.name, vdisk.guid))
                 storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-                VDiskController.dtl_checkup(vdisk_to_check=vdisk,
+                VDiskController.dtl_checkup(vdisk_guid=vdisk.guid,
                                             storagerouters_to_exclude=[storagedriver.storagerouter.guid])

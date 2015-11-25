@@ -46,6 +46,16 @@ class VMachineController(object):
     @staticmethod
     @celery.task(name='ovs.machine.create_multiple_from_template')
     def create_multiple_from_template(name, machineguid, pmachineguids, start, amount, description=None):
+        """
+        Create multiple machines from a template
+        :param name: Name of the machines to be created
+        :param machineguid: Guid of the template machine
+        :param pmachineguids: Physical machine guids on which to spread the created the machines
+        :param start: Start to count
+        :param amount: Amount to deploy
+        :param description: Description for the machines
+        :return: None
+        """
         pmachine_pointer = 0
         for i in xrange(start, start + amount):
             new_name = name if amount == 1 else '{0}-{1}'.format(name, i)
@@ -64,10 +74,11 @@ class VMachineController(object):
         """
         Create a new vmachine using an existing vmachine template
 
-        @param machineguid: guid of the template vmachine
-        @param name: name of new vmachine
-        @param pmachineguid: guid of hypervisor to create new vmachine on
-        @return: guid of the newly created vmachine | False on any failure
+        :param machineguid: guid of the template vmachine
+        :param name: name of new vmachine
+        :param pmachineguid: guid of hypervisor to create new vmachine on
+        :param description: Description for the machine
+        :return: guid of the newly created vmachine | False on any failure
         """
 
         template_vm = VMachine(machineguid)
@@ -281,6 +292,8 @@ class VMachineController(object):
     def delete_from_voldrv(name, storagedriver_id):
         """
         This method will delete a vmachine based on the name of the vmx given
+        :param name: Name of the vmx
+        :param storagedriver_id: Storage Driver hosting the vmachine
         """
         pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         if pmachine.hvtype not in ['VMWARE', 'KVM']:
@@ -305,6 +318,9 @@ class VMachineController(object):
     def rename_from_voldrv(old_name, new_name, storagedriver_id):
         """
         This machine will handle the rename of a vmx file
+        :param old_name: Old name of vmx
+        :param new_name: New name for the vmx
+        :param storagedriver_id: Storage Driver hosting the vmachine
         """
         pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         if pmachine.hvtype not in ['VMWARE', 'KVM']:
@@ -375,6 +391,8 @@ class VMachineController(object):
     def rollback(machineguid, timestamp):
         """
         Rolls back a VM based on a given disk snapshot timestamp
+        :param machineguid: Guid of the machine to rollback
+        :param timestamp: Timestamp to rollback to
         """
         vmachine = VMachine(machineguid)
         if vmachine.hypervisor_status == 'RUNNING':
@@ -398,10 +416,11 @@ class VMachineController(object):
         """
         Snapshot VMachine disks
 
-        @param machineguid: guid of the machine
-        @param label: label to give the snapshots
-        @param is_consistent: flag indicating the snapshot was consistent or not
-        @param timestamp: override timestamp, if required. Should be a unix timestamp
+        :param machineguid: guid of the machine
+        :param label: label to give the snapshots
+        :param is_consistent: flag indicating the snapshot was consistent or not
+        :param timestamp: override timestamp, if required. Should be a unix timestamp
+        :param is_automatic: Flag to determine automated snapshots
         """
 
         timestamp = timestamp if timestamp is not None else time.time()
@@ -450,6 +469,8 @@ class VMachineController(object):
     def sync_with_hypervisor(vmachineguid, storagedriver_id=None):
         """
         Updates a given vmachine with data retrieved from a given pmachine
+        :param vmachineguid: Guid of the virtual machine
+        :param storagedriver_id: Storage Driver hosting the vmachine
         """
         try:
             vmachine = VMachine(vmachineguid)
@@ -512,6 +533,8 @@ class VMachineController(object):
     def update_from_voldrv(name, storagedriver_id):
         """
         This method will update/create a vmachine based on a given vmx/xml file
+        :param name: Name of the vmx
+        :param storagedriver_id: Storage Driver hosting the vmachine
         """
 
         pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
@@ -576,6 +599,9 @@ class VMachineController(object):
     def update_vmachine_config(vmachine, vm_object, pmachine=None):
         """
         Update a vMachine configuration with a given vMachine configuration
+        :param vmachine: Virtual Machine to update
+        :param vm_object: New virtual machine info
+        :param pmachine: Physical machine of the virtual machine
         """
         try:
             vdisks_synced = 0
@@ -622,7 +648,7 @@ class VMachineController(object):
                             mutex.release()
                         if ensure_safety:
                             MDSServiceController.ensure_safety(vdisk)
-                            VDiskController.dtl_checkup(vdisk_to_check=vdisk)
+                            VDiskController.dtl_checkup(vdisk_guid=vdisk.guid)
 
                         # Update the disk with information from the hypervisor
                         if vdisk.vmachine is None:
@@ -658,6 +684,9 @@ class VMachineController(object):
     def update_vmachine_name(instance_id, old_name, new_name):
         """
         Update a vMachine name: find vmachine by management center instance id, set new name
+        :param instance_id: ID for the virtual machine known by management center
+        :param old_name: Old name of the virtual machine
+        :param new_name: New name for the virtual machine
         """
         vmachine = None
         for mgmt_center in MgmtCenterList.get_mgmtcenters():

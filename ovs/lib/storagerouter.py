@@ -836,7 +836,7 @@ class StorageRouterController(object):
         vpool.size = vfs_info.f_blocks * vfs_info.f_bsize
         vpool.save()
 
-        VDiskController.dtl_checkup(vpool_to_check=vpool)
+        VDiskController.dtl_checkup(vpool_guid=vpool.guid)
         for vdisk in vpool.vdisks:
             MDSServiceController.ensure_safety(vdisk=vdisk)
 
@@ -1061,7 +1061,7 @@ class StorageRouterController(object):
                 vdisk.delete()
             vpool.delete()
         else:
-            VDiskController.dtl_checkup(vpool_to_check=vpool)
+            VDiskController.dtl_checkup(vpool_guid=vpool.guid)
 
         MDSServiceController.mds_checkup()
 
@@ -1452,6 +1452,11 @@ class StorageRouterController(object):
 
     @staticmethod
     def set_rdma_capability(storagerouter_guid):
+        """
+        Check if the Storage Router has been reconfigured to be able to support RDMA
+        :param storagerouter_guid: Guid of the Storage Router to check and set
+        :return: None
+        """
         storagerouter = StorageRouter(storagerouter_guid)
         client = SSHClient(storagerouter, username='root')
         rdma_capable = False
@@ -1516,8 +1521,8 @@ class StorageRouterController(object):
             partition = None
             if part_previous is not None and part_next is not None:
                 for possible_partition in disk.partitions:
-                    if possible_partition.offset > (part_previous.size + part_previous.offset) and\
-                    (possible_partition.offset + possible_partition.size) < part_next.offset:
+                    if possible_partition.offset > (part_previous.size + part_previous.offset) and \
+                       (possible_partition.offset + possible_partition.size) < part_next.offset:
                         partition = possible_partition
             elif part_previous is None and part_next is not None:
                 for possible_partition in disk.partitions:

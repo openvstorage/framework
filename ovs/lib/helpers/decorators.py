@@ -16,8 +16,13 @@
 Contains various decorators
 """
 
+import inspect
 import json
+import random
+import string
+import time
 from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.log.logHandler import LogHandler
 
@@ -105,19 +110,112 @@ def ensure_single(task_name, extra_task_names=None, mode='REVOKE'):
             :param args: Arguments without default values
             :param kwargs: Arguments with default values
             """
-            cache = PersistentFactory.get_client()
-            task_names = [] if extra_task_names is None else extra_task_names
+            def update_value(key, append, value_to_store=None):
+                """
+                Store the specified value in the PersistentFactory
+                :param key:            Key to store the value for
+                :param append:         If True, the specified value will be appended else element at index 0 will be popped
+                :param value_to_store: Value to append to the list
+                :return:               None
+                """
+                with VolatileMutex(name=key, wait=5) as volatile_mutex:
+                    volatile_mutex.acquire()
+                    if persistent_client.exists(key):
+                        val = persistent_client.get(key)
+                        if append is True and value_to_store is not None:
+                            val['values'].append(value_to_store)
+                        elif append is False:
+                            val['values'].pop(0)
+                    else:
+                        logger.info('Ensure single {0} mode: Setting initial value for key {1}'.format(mode, persistent_key))
+                        val = {'mode': mode,
+                               'values': []}
+                    persistent_client.set(key, val)
+                    volatile_mutex.release()
+
+            now = '{0}_{1}'.format(int(time.time()), ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10)))
+            task_names = [task_name] if extra_task_names is None else [task_name] + extra_task_names
+            persistent_key = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task_name)
+            persistent_client = PersistentFactory.get_client()
+
             if mode == 'REVOKE':
-                for task in [task_name] + task_names:
-                    if cache.exists('{0}_{1}'.format(ENSURE_SINGLE_KEY, task)):
-                        logger.debug('Execution of task {0} discarded'.format(function.__name__))
-                        return None
-                cache.set('{0}_{1}'.format(ENSURE_SINGLE_KEY, task_name), 'revoke_task')
-                return function(*args, **kwargs)
+                with VolatileMutex(persistent_key, wait=5) as mutex:
+                    mutex.acquire()
+                    for task in task_names:
+                        key_to_check = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task)
+                        if persistent_client.exists(key_to_check):
+                            logger.info('Ensure single {0} mode: Execution of task "{1}" discarded'.format(mode, task_name))
+                            mutex.release()
+                            return None
+                    logger.info('Ensure single {0} mode: Setting key "{1}"'.format(mode, persistent_key))
+                    persistent_client.set(persistent_key, {'mode': mode})
+                    mutex.release()
+
+                try:
+                    output = function(*args, **kwargs)
+                finally:
+                    with VolatileMutex(persistent_key, wait=5) as mutex:
+                        mutex.acquire()
+                        if persistent_client.exists(persistent_key):
+                            logger.info('Ensure single {0} mode: Deleting key "{1}" from persistent client'.format(mode, persistent_key))
+                            persistent_client.delete(persistent_key)
+                        mutex.release()
+                return output
+
             elif mode == 'DELAY':
                 pass
+
             elif mode == 'CHAIN':
-                pass
+                if extra_task_names is not None:
+                    raise ValueError('Ensure single {0} mode: Extra tasks are not allowed in this mode'.format(mode))
+
+                # 1. Create key to be stored in arakoon and update kwargs with args
+                timeout = kwargs.pop('chain_timeout') if 'chain_timeout' in kwargs else 60
+                function_info = inspect.getargspec(function)
+                kwargs_dict = {}
+                for index, arg in enumerate(args):
+                    kwargs_dict[function_info.args[index]] = arg
+                kwargs_dict.update(kwargs)
+
+                # 2. Set the key in arakoon if non-existent
+                update_value(key=persistent_key,
+                             append=True)
+
+                # 3. Validate whether another job with same params is being executed, skip if so
+                value = persistent_client.get(persistent_key)
+                for item in value['values'][1:]:  # 1st element is processing job, we check all other queued jobs for identical params
+                    if item['kwargs'] == kwargs_dict:
+                        logger.info('Ensure single {0} mode: Execution of task {1} discarded because of identical parameters. {2}'.format(mode, task_name, kwargs_dict))
+                        return None
+                update_value(key=persistent_key,
+                             append=True,
+                             value_to_store={'kwargs': kwargs_dict,
+                                             'timestamp': now})
+
+                # 4. Poll the arakoon to see whether this call is the first in list, if so --> execute, else wait
+                first_element = None
+                counter = 0
+                while first_element != now and counter < timeout:
+                    value = persistent_client.get(persistent_key)
+                    first_element = value['values'][0]['timestamp']
+
+                    if first_element == now:
+                        try:
+                            if counter != 0:
+                                current_time = int(time.time())
+                                starting_time = int(now.split('_')[0])
+                                logger.info('Ensure single {0} mode: Task had to wait {1} seconds before being able to start'.format(now, current_time - starting_time))
+                            output = function(*args, **kwargs)
+                        finally:
+                            update_value(key=persistent_key,
+                                         append=False)
+                        return output
+                    counter += 1
+                    time.sleep(1)
+                    if counter == timeout:
+                        update_value(key=persistent_key,
+                                     append=False)
+                        raise RuntimeError('Ensure single {0} mode: Could not start job within expected time. Removed it from queue'.format(mode))
             else:
                 raise ValueError('Unsupported mode "{0}" provided'.format(mode))
 
