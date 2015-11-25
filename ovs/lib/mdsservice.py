@@ -163,7 +163,7 @@ class MDSServiceController(object):
         return mds_service
 
     @staticmethod
-    def remove_mds_service(mds_service, vpool, reload_config):
+    def remove_mds_service(mds_service, vpool, reload_config, offline=False):
         """
         Removes an MDS service
         :param mds_service:   The MDS service to remove
@@ -174,7 +174,10 @@ class MDSServiceController(object):
             raise RuntimeError('Cannot remove MDSService that is still serving disks')
 
         storagerouter = mds_service.service.storagerouter
-        client = SSHClient(storagerouter)
+        if not offline:
+            client = SSHClient(storagerouter)
+        else:
+            client = None
         mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
 
         # Clean up model
@@ -204,20 +207,22 @@ class MDSServiceController(object):
         storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
         storagedriver_config.save(client, reload_config=reload_config)
 
-        tries = 5
-        while tries > 0:
-            try:
-                root_client = SSHClient(storagerouter, username='root')
-                root_client.dir_delete(directories_to_clean)
-                for dir_name in directories_to_clean:
-                    logger.debug('Recursively removed {0}'.format(dir_name))
-                break
-            except Exception:
-                time.sleep(5)
-                logger.debug('Waiting for the MDS service to go down...')
-                tries -= 1
-                if tries == 0:
-                    raise
+        if not offline:
+            tries = 5
+            while tries > 0:
+                try:
+                    root_client = SSHClient(storagerouter, username='root')
+                    root_client.dir_delete(directories_to_clean)
+                    for dir_name in directories_to_clean:
+                        logger.debug('Recursively removed {0}'.format(dir_name))
+                    break
+                except Exception:
+                    time.sleep(5)
+                    logger.debug('Waiting for the MDS service to go down...')
+                    tries -= 1
+                    if tries == 0:
+                        raise
+
 
     @staticmethod
     def sync_vdisk_to_reality(vdisk):

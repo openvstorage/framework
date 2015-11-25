@@ -48,6 +48,10 @@ elif [ "$1" = "update" ] ; then
         at -f /tmp/update now
         rm /tmp/update
     fi
+elif [ "$1" = "remove" ] ; then
+    if [ "$2" = "node" ] ; then
+        python -c "from ovs.lib.setup import SetupController; SetupController.remove_node('$3')"
+    fi
 elif [ "$1" = "monitor" ] ; then
     if [ "$2" = "services" ] ; then
     service_manager=`cat /proc/1/comm`
