@@ -28,7 +28,7 @@ from paramiko import AuthenticationException
 
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.system import System
@@ -791,6 +791,64 @@ class SetupController(object):
             file_mutex.release()
 
     @staticmethod
+    def remove_node(node_ip):
+        from ovs.lib.storagerouter import StorageRouterController
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
+
+        node_ips = list(node.ip for node in StorageRouterList.get_storagerouters())
+        if node_ip not in node_ips:
+            raise RuntimeError('The node({0}) is not in the cluster.'.format(node_ip))
+        
+        # check node state is offline or not
+        try:
+            client = SSHClient(node_ip, username='root')
+            if client:
+                raise RuntimeError('The node({0}) is not offline.'.format(node_ip))
+        except UnableToConnectException:
+            pass
+        except Exception:
+            raise
+
+        print '\n+++ Remove node {0} starts +++\n'.format(node_ip)
+        # Collecting available master nodes
+        masters = StorageRouterList.get_masters()
+        ip_client_map = dict((master.ip, SSHClient(master.ip, username='root')) for master in masters if master.ip != node_ip)
+        if len(ip_client_map) == 0:
+            raise RuntimeError('There is only one node({0}) left in the cluster.'.format(node_ip))
+        # Grab one master node ip
+        master_ip = ip_client_map.keys()[0]
+
+        # Remove all vpools from the node
+        storagerouter = StorageRouterList.get_by_ip(node_ip)
+        for storagedriver in storagerouter.storagedrivers:
+            logger.info('Removing storagedriver {0} from node {1}'.format(storagedriver.guid, node_ip))
+            StorageRouterController.remove_storagedriver(storagedriver.guid, offline=True)
+
+        # Demote the node if it's Master
+        if storagerouter.node_type == 'MASTER':
+            cluster_name = None
+            SetupController._demote_node(cluster_ip=node_ip,
+                                             master_ip=master_ip,
+                                             cluster_name=cluster_name,
+                                             ip_client_map=ip_client_map,
+                                             unique_id=storagerouter.machine_id, offline=True)
+
+        # Cleaned up physical disks of a storagerouter
+        for disk in storagerouter.disks:
+            for partition in disk.partitions:
+                partition.delete()
+            disk.delete()
+
+        # Delete storagerouter and pmachine
+        pmachine=storagerouter.pmachine
+        storagerouter.delete()
+
+        #for vmachine in pmachine.vmachines:
+        #    vmachine.delete()
+        pmachine.delete()
+        print '\n+++ Remove node {0} completes +++\n'.format(node_ip)
+
+    @staticmethod
     def _prepare_node(cluster_ip, nodes, known_passwords, ip_client_map, hypervisor_info):
         """
         Prepares a node:
@@ -1270,7 +1328,7 @@ class SetupController(object):
 
     @staticmethod
     def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached,
-                     configure_rabbitmq):
+                     configure_rabbitmq, offline=False):
         """
         Demotes a given node
         """
@@ -1283,12 +1341,15 @@ class SetupController(object):
             if SetupController._validate_local_memcache_servers(ip_client_map) is False:
                 raise RuntimeError('Not all memcache nodes can be reached which is required for demoting a node.')
 
-        target_client = ip_client_map[cluster_ip]
-        node_name = target_client.run('hostname')
+        if not offline:
+            target_client = ip_client_map[cluster_ip]
+            node_name = target_client.run('hostname')
 
-        storagerouter = StorageRouterList.get_by_machine_id(unique_id)
-        storagerouter.node_type = 'EXTRA'
-        storagerouter.save()
+            storagerouter = StorageRouterList.get_by_machine_id(unique_id)
+            storagerouter.node_type = 'EXTRA'
+            storagerouter.save()
+        else:
+            target_client = None
 
         # Find other (arakoon) master nodes
         config = ArakoonClusterConfig('ovsdb')
@@ -1335,34 +1396,35 @@ class SetupController(object):
             if service.name == 'arakoon-ovsdb':
                 service.delete()
 
-        if configure_rabbitmq:
-            print 'Removing/unconfiguring RabbitMQ'
-            logger.debug('Removing/unconfiguring RabbitMQ')
-            if ServiceManager.has_service('rabbitmq-server', client=target_client):
-                target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
-                target_client.run('rabbitmqctl reset; sleep 5;')
-                target_client.run('rabbitmqctl stop; sleep 5;')
-                SetupController.change_service_state(target_client, 'rabbitmq-server', 'stop')
-                target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
+        if not offline:
+            if configure_rabbitmq:
+                print 'Removing/unconfiguring RabbitMQ'
+                logger.debug('Removing/unconfiguring RabbitMQ')
+                if ServiceManager.has_service('rabbitmq-server', client=target_client):
+                    target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
+                    target_client.run('rabbitmqctl reset; sleep 5;')
+                    target_client.run('rabbitmqctl stop; sleep 5;')
+                    SetupController.change_service_state(target_client, 'rabbitmq-server', 'stop')
+                    target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
-        print 'Removing services'
-        logger.info('Removing services')
-        services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + ['arakoon-ovsdb'])]
-        if not configure_rabbitmq:
-            services.remove('rabbitmq-server')
-        if not configure_memcached:
-            services.remove('memcached')
-        for service in services:
-            if ServiceManager.has_service(service, client=target_client):
-                logger.debug('Removing service {0}'.format(service))
-                SetupController.change_service_state(target_client, service, 'stop')
-                ServiceManager.remove_service(service, client=target_client)
+            print 'Removing services'
+            logger.info('Removing services')
+            services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + ['arakoon-ovsdb'])]
+            if not configure_rabbitmq:
+                services.remove('rabbitmq-server')
+            if not configure_memcached:
+                services.remove('memcached')
+            for service in services:
+                if ServiceManager.has_service(service, client=target_client):
+                    logger.debug('Removing service {0}'.format(service))
+                    SetupController.change_service_state(target_client, service, 'stop')
+                    ServiceManager.remove_service(service, client=target_client)
 
-        if ServiceManager.has_service('workers', client=target_client):
-            ServiceManager.add_service(name='workers',
-                                       client=target_client,
-                                       params={'MEMCACHE_NODE_IP': cluster_ip,
-                                               'WORKER_QUEUE': '{0}'.format(unique_id)})
+            if ServiceManager.has_service('workers', client=target_client):
+                ServiceManager.add_service(name='workers',
+                                           client=target_client,
+                                           params={'MEMCACHE_NODE_IP': cluster_ip,
+                                                   'WORKER_QUEUE': '{0}'.format(unique_id)})
 
         SetupController._configure_amqp_to_volumedriver(ip_client_map)
 
@@ -1374,9 +1436,10 @@ class SetupController(object):
             print 'Restarting services'
             SetupController._restart_framework_and_memcache_services(ip_client_map, target_client)
 
-        if SetupController._avahi_installed(target_client) is True:
-            SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
-        target_client.config_set('ovs.core.nodetype', 'EXTRA')
+        if not offline:
+            if SetupController._avahi_installed(target_client) is True:
+                SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
+            target_client.config_set('ovs.core.nodetype', 'EXTRA')
 
         logger.info('Demote complete')
 
