@@ -634,7 +634,7 @@ class MDSServiceController(object):
 
     @staticmethod
     @celery.task(name='ovs.mds.mds_checkup', schedule=crontab(minute='30', hour='0,4,8,12,16,20'))
-    @ensure_single(task_name='ovs.mds.mds_checkup')
+    @ensure_single(task_name='ovs.mds.mds_checkup', mode='CHAINED')
     def mds_checkup():
         """
         Validates the current MDS setup/configuration and takes actions where required

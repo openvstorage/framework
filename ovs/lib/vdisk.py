@@ -726,7 +726,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.dtl_checkup', schedule=crontab(minute='15', hour='0,4,8,12,16,20'))
-    @ensure_single(task_name='dtl_checkup', mode='CHAIN')
+    @ensure_single(task_name='ovs.vdisk.dtl_checkup', mode='CHAINED')
     def dtl_checkup(vpool_guid=None, vdisk_guid=None, storagerouters_to_exclude=None):
         """
         Check DTL for all volumes

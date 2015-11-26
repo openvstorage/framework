@@ -25,11 +25,9 @@ from ConfigParser import RawConfigParser
 from kombu import Queue
 from celery import Celery
 from celery.signals import task_postrun, worker_process_init
-from ovs.lib.helpers.decorators import ENSURE_SINGLE_KEY
 from ovs.lib.messaging import MessageController
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.configuration import Configuration
 
@@ -95,10 +93,11 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
 
 
 if __name__ == '__main__':
-    try:
+    import sys
+    if len(sys.argv) == 2 and sys.argv[1] == 'clear_cache':
+        from ovs.extensions.storage.persistentfactory import PersistentFactory
+        from ovs.lib.helpers.decorators import ENSURE_SINGLE_KEY
+
         cache = PersistentFactory.get_client()
         for key in cache.prefix(ENSURE_SINGLE_KEY):
             cache.delete(key)
-    except Exception as ex:
-        loghandler.error('Error while trying to delete ensure single keys: {0}'.format(ex))
-    celery.start()

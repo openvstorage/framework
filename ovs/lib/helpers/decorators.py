@@ -73,7 +73,7 @@ def log(event_type):
     return wrap
 
 
-def ensure_single(task_name, extra_task_names=None, mode='REVOKE'):
+def ensure_single(task_name, extra_task_names=None, mode='DEFAULT'):
     """
     Decorator ensuring a new task cannot be started in case a certain task is
     running, scheduled or reserved.
@@ -84,9 +84,8 @@ def ensure_single(task_name, extra_task_names=None, mode='REVOKE'):
     one completes, which will result in the fact that the task will execute normally.
 
     Allowed modes:
-     - REVOKE: If any of the specified task names is being executed, the calling function will not be executed
-     - DELAY: If a task is in queue, it will be revoked and a new one will be launched with the specified delay
-     - CHAIN: If a task is being executed, the new task will be appended for later execution
+     - DEFAULT: If any of the specified task names is being executed, the calling function will not be executed
+     - CHAINED: If a task is being executed, the new task will be appended for later execution
 
     :param task_name:        Name of the task to ensure its singularity
     :type task_name:         String
@@ -94,7 +93,7 @@ def ensure_single(task_name, extra_task_names=None, mode='REVOKE'):
     :param extra_task_names: Extra tasks to take into account
     :type extra_task_names:  List
 
-    :param mode:             Mode of the ensure single. Allowed values: REVOKE, DELAY, CHAIN
+    :param mode:             Mode of the ensure single. Allowed values: DEFAULT, CHAINED
     :type mode:              String
 
     :return:                 Pointer to function
@@ -110,6 +109,18 @@ def ensure_single(task_name, extra_task_names=None, mode='REVOKE'):
             :param args: Arguments without default values
             :param kwargs: Arguments with default values
             """
+            def log_message(message, level='info'):
+                """
+                Log a message with some additional information
+                :param message: Message to log
+                :param level:   Log level
+                :return:        None
+                """
+                if level not in ('info', 'warning', 'debug', 'error'):
+                    raise ValueError('Unsupported log level "{0}" specified'.format(level))
+                complete_message = 'Ensure single {0} mode - ID {1} - {2}'.format(mode, now, message)
+                getattr(logger, level)(complete_message)
+
             def update_value(key, append, value_to_store=None):
                 """
                 Store the specified value in the PersistentFactory
@@ -118,8 +129,7 @@ def ensure_single(task_name, extra_task_names=None, mode='REVOKE'):
                 :param value_to_store: Value to append to the list
                 :return:               None
                 """
-                with VolatileMutex(name=key, wait=5) as volatile_mutex:
-                    volatile_mutex.acquire()
+                with VolatileMutex(name=key, wait=5):
                     if persistent_client.exists(key):
                         val = persistent_client.get(key)
                         if append is True and value_to_store is not None:
@@ -127,55 +137,50 @@ def ensure_single(task_name, extra_task_names=None, mode='REVOKE'):
                         elif append is False:
                             val['values'].pop(0)
                     else:
-                        logger.info('Ensure single {0} mode: Setting initial value for key {1}'.format(mode, persistent_key))
+                        log_message('Setting initial value for key {0}'.format(persistent_key))
                         val = {'mode': mode,
                                'values': []}
                     persistent_client.set(key, val)
-                    volatile_mutex.release()
 
             now = '{0}_{1}'.format(int(time.time()), ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10)))
             task_names = [task_name] if extra_task_names is None else [task_name] + extra_task_names
             persistent_key = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task_name)
             persistent_client = PersistentFactory.get_client()
 
-            if mode == 'REVOKE':
-                with VolatileMutex(persistent_key, wait=5) as mutex:
-                    mutex.acquire()
+            if mode == 'DEFAULT':
+                with VolatileMutex(persistent_key, wait=5):
                     for task in task_names:
                         key_to_check = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task)
                         if persistent_client.exists(key_to_check):
-                            logger.info('Ensure single {0} mode: Execution of task "{1}" discarded'.format(mode, task_name))
-                            mutex.release()
+                            log_message('Execution of task {0} discarded'.format(task_name))
                             return None
-                    logger.info('Ensure single {0} mode: Setting key "{1}"'.format(mode, persistent_key))
+                    log_message('Setting key {0}'.format(persistent_key))
                     persistent_client.set(persistent_key, {'mode': mode})
-                    mutex.release()
 
                 try:
                     output = function(*args, **kwargs)
+                    log_message('Task {0} finished successfully'.format(task_name))
+                    return output
                 finally:
-                    with VolatileMutex(persistent_key, wait=5) as mutex:
-                        mutex.acquire()
+                    with VolatileMutex(persistent_key, wait=5):
                         if persistent_client.exists(persistent_key):
-                            logger.info('Ensure single {0} mode: Deleting key "{1}" from persistent client'.format(mode, persistent_key))
+                            log_message('Deleting key {0}'.format(persistent_key))
                             persistent_client.delete(persistent_key)
-                        mutex.release()
-                return output
 
-            elif mode == 'DELAY':
-                pass
-
-            elif mode == 'CHAIN':
+            elif mode == 'CHAINED':
                 if extra_task_names is not None:
-                    raise ValueError('Ensure single {0} mode: Extra tasks are not allowed in this mode'.format(mode))
+                    log_message('Extra tasks are not allowed in this mode',
+                                level='error')
+                    raise ValueError('Ensure single {0} mode - ID {1} - Extra tasks are not allowed in this mode'.format(mode, now))
 
                 # 1. Create key to be stored in arakoon and update kwargs with args
-                timeout = kwargs.pop('chain_timeout') if 'chain_timeout' in kwargs else 60
+                timeout = kwargs.pop('chain_timeout') if 'chain_timeout' in kwargs else 30
                 function_info = inspect.getargspec(function)
                 kwargs_dict = {}
                 for index, arg in enumerate(args):
                     kwargs_dict[function_info.args[index]] = arg
                 kwargs_dict.update(kwargs)
+                params_info = 'with params {0}'.format(kwargs_dict) if kwargs_dict else 'with default params'
 
                 # 2. Set the key in arakoon if non-existent
                 update_value(key=persistent_key,
@@ -185,8 +190,9 @@ def ensure_single(task_name, extra_task_names=None, mode='REVOKE'):
                 value = persistent_client.get(persistent_key)
                 for item in value['values'][1:]:  # 1st element is processing job, we check all other queued jobs for identical params
                     if item['kwargs'] == kwargs_dict:
-                        logger.info('Ensure single {0} mode: Execution of task {1} discarded because of identical parameters. {2}'.format(mode, task_name, kwargs_dict))
+                        log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
                         return None
+                log_message('New task {0} {1} scheduled for execution'.format(task_name, params_info))
                 update_value(key=persistent_key,
                              append=True,
                              value_to_store={'kwargs': kwargs_dict,
@@ -204,8 +210,11 @@ def ensure_single(task_name, extra_task_names=None, mode='REVOKE'):
                             if counter != 0:
                                 current_time = int(time.time())
                                 starting_time = int(now.split('_')[0])
-                                logger.info('Ensure single {0} mode: Task had to wait {1} seconds before being able to start'.format(now, current_time - starting_time))
+                                log_message('Task {0} {1} had to wait {2} seconds before being able to start'.format(task_name,
+                                                                                                                     params_info,
+                                                                                                                     current_time - starting_time))
                             output = function(*args, **kwargs)
+                            log_message('Task {0} finished successfully'.format(task_name))
                         finally:
                             update_value(key=persistent_key,
                                          append=False)
@@ -215,7 +224,12 @@ def ensure_single(task_name, extra_task_names=None, mode='REVOKE'):
                     if counter == timeout:
                         update_value(key=persistent_key,
                                      append=False)
-                        raise RuntimeError('Ensure single {0} mode: Could not start job within expected time. Removed it from queue'.format(mode))
+                        log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
+                                    level='error')
+                        raise RuntimeError('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
+                                                                                                                                           now,
+                                                                                                                                           task_name,
+                                                                                                                                           timeout))
             else:
                 raise ValueError('Unsupported mode "{0}" provided'.format(mode))
 
