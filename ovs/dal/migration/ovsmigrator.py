@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -435,5 +435,33 @@ class OVSMigrator(object):
                     storagerouter.save()
 
             working_version = 5
+
+        # Version 6
+        # Distributed scrubbing
+        if working_version < 6:
+            from ovs.dal.hybrids.diskpartition import DiskPartition
+            from ovs.dal.lists.servicetypelist import ServiceTypeList
+            from ovs.dal.lists.storagedriverlist import StorageDriverList
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
+            from ovs.extensions.generic.sshclient import SSHClient
+            from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+            for storage_driver in StorageDriverList.get_storagedrivers():
+                root_client = SSHClient(storage_driver.storagerouter, username='root')
+                for partition in storage_driver.partitions:
+                    if partition.role == DiskPartition.ROLES.SCRUB:
+                        old_path = partition.path
+                        partition.sub_role = None
+                        partition.save()
+                        partition.invalidate_dynamics(['folder', 'path'])
+                        if root_client.dir_exists(partition.path):
+                            continue  # New directory already exists
+                        if '_mds_' in old_path:
+                            if root_client.dir_exists(old_path):
+                                root_client.symlink({partition.path: old_path})
+                        if not root_client.dir_exists(partition.path):
+                            root_client.dir_create(partition.path)
+                        root_client.dir_chmod(partition.path, 0777)
+
+            working_version = 6
 
         return working_version

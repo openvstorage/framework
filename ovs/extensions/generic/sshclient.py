@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,6 +47,7 @@ def connected():
         def new_function(self, *args, **kwargs):
             """
             Wrapped function
+
             """
             try:
                 if self.client is not None and not self.client.is_connected():
@@ -184,6 +185,8 @@ class SSHClient(object):
     def run(self, command, debug=False):
         """
         Executes a shell command
+        :param command: Command to execute
+        :param debug: Extended logging and stderr output returned
         """
         if self.is_local is True:
             try:
@@ -207,8 +210,8 @@ class SSHClient(object):
             _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
-                stderr = ''.join(stderr.readlines())
-                stdout = ''.join(stdout.readlines())
+                stderr = ''.join(stderr.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+                stdout = ''.join(stdout.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
                 raise CalledProcessError(exit_code, command, stderr)
             if debug:
@@ -219,6 +222,7 @@ class SSHClient(object):
     def dir_create(self, directories):
         """
         Ensures a directory exists on the remote end
+        :param directories: Directories to create
         """
         if isinstance(directories, basestring):
             directories = [directories]
@@ -230,29 +234,37 @@ class SSHClient(object):
             else:
                 self.run('mkdir -p "{0}"; echo true'.format(directory))
 
-    def dir_delete(self, directories):
+    def dir_delete(self, directories, follow_symlinks=False):
         """
         Remove a directory (or multiple directories) from the remote filesystem recursively
+        :param directories: Single directory or list of directories to delete
+        :param follow_symlinks: Boolean to indicate if symlinks should be followed and thus be deleted too
         """
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
             directory = self._shell_safe(directory)
-            if self.is_local is True:
-                if os.path.exists(directory):
-                    for dirpath, dirnames, filenames in os.walk(directory, topdown=False):
-                        for filename in filenames:
-                            os.remove(os.path.join(dirpath, filename))
-                        for sub_directory in dirnames:
-                            os.rmdir(os.path.join(dirpath, sub_directory))
-                    os.rmdir(directory)
+            real_path = self.file_read_link(directory)
+            if real_path and follow_symlinks is True:
+                self.file_unlink(directory.rstrip('/'))
+                self.dir_delete(real_path)
             else:
-                if self.dir_exists(directory):
-                    self.run('rm -rf "{0}"'.format(directory))
+                if self.is_local is True:
+                    if os.path.exists(directory):
+                        for dirpath, dirnames, filenames in os.walk(directory, topdown=False, followlinks=follow_symlinks):
+                            for filename in filenames:
+                                os.remove(os.path.join(dirpath, filename))
+                            for sub_directory in dirnames:
+                                os.rmdir(os.path.join(dirpath, sub_directory))
+                        os.rmdir(directory)
+                else:
+                    if self.dir_exists(directory):
+                        self.run('rm -rf {0}'.format(directory))
 
     def dir_exists(self, directory):
         """
         Checks if a directory exists on a remote host
+        :param directory: Directory to check for existence
         """
         if self.is_local is True:
             return os.path.isdir(self._shell_safe(directory))
@@ -333,6 +345,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(self._shell_safe(directory))
     def file_delete(self, filenames):
         """
         Remove a file (or multiple files) from the remote filesystem
+        :param filenames: File names to delete
         """
         if isinstance(filenames, basestring):
             filenames = [filenames]
@@ -356,12 +369,28 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
                         self.run('rm -f "{0}"'.format(filename))
 
     def file_unlink(self, path):
-        if self.file_exists(path):
-            self.run("unlink {0}".format(self._shell_safe(path)))
+        path = self._shell_safe(path)
+        if self.is_local is True:
+            if os.path.islink(path):
+                os.unlink(path)
+        else:
+            self.run("unlink {0}".format(path))
+
+    def file_read_link(self, path):
+        path = self._shell_safe(path.rstrip('/'))
+        if self.is_local is True:
+            if os.path.islink(path):
+                return os.path.realpath(path)
+        else:
+            try:
+                return self.run('readlink -f {0}'.format(path))
+            except:
+                pass
 
     def file_read(self, filename):
         """
         Load a file from the remote end
+        :param filename: File to read
         """
         if self.is_local is True:
             with open(filename, 'r') as the_file:
@@ -373,6 +402,9 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
     def file_write(self, filename, contents, mode='w'):
         """
         Writes into a file to the remote end
+        :param filename: File to write
+        :param contents: Contents to write to the file
+        :param mode: Mode to write to the file, can be a, a+, w, w+
         """
         if self.is_local is True:
             with open(filename, mode) as the_file:
@@ -393,6 +425,8 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
     def file_upload(self, remote_filename, local_filename):
         """
         Uploads a file to a remote end
+        :param remote_filename: Name of the file on the remote location
+        :param local_filename: Name of the file locally
         """
         if self.is_local is True:
             check_output('cp -f "{0}" "{1}"'.format(local_filename, remote_filename), shell=True)
@@ -403,6 +437,7 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
     def file_exists(self, filename):
         """
         Checks if a file exists on a remote host
+        :param filename: File to check for existence
         """
         if self.is_local is True:
             return os.path.isfile(self._shell_safe(filename))
@@ -414,6 +449,8 @@ print json.dumps(os.path.isfile('{0}'))""".format(self._shell_safe(filename))
     def file_attribs(self, filename, mode):
         """
         Sets the mode of a remote file
+        :param filename: File to chmod
+        :param mode: Mode to give to file, eg: 0744
         """
         command = 'chmod {0} "{1}"'.format(mode, filename)
         if self.is_local is True:

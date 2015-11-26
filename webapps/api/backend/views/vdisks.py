@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.lib.vdisk import VDiskController
 from backend.decorators import required_roles, load, return_list, return_object, return_task, log
 
@@ -92,3 +93,18 @@ class VDiskViewSet(viewsets.ViewSet):
         Retrieve the configuration parameters for the given disk from the storagedriver.
         """
         return VDiskController.get_config_params.delay(vdisk_guid=vdisk.guid)
+
+    @action()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VDisk)
+    def clone(self, vdisk, name, storagerouter_guid, snapshot_id=None):
+        """
+        Clones a vDisk
+        """
+        storagerouter = StorageRouter(storagerouter_guid)
+        return VDiskController.clone.delay(diskguid=vdisk.guid,
+                                           snapshotid=snapshot_id,
+                                           devicename=name,
+                                           pmachineguid=storagerouter.pmachine_guid,
+                                           detached=True)

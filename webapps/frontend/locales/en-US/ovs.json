@@ -2,11 +2,11 @@
     "license": [
         "Copyright 2014 iNuron NV",
         "",
-        "Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the \"License\");",
+        "Licensed under the Open vStorage Modified Apache License (the \"License\");",
         "you may not use this file except in compliance with the License.",
         "You may obtain a copy of the License at",
         "",
-        "    http://www.openvstorage.org/OVS_NON_COMMERCIAL",
+        "    http://www.openvstorage.org/license",
         "",
         "Unless required by applicable law or agreed to in writing, software",
         "distributed under the License is distributed on an \"AS IS\" BASIS,",
@@ -14,7 +14,7 @@
         "See the License for the specific language governing permissions and",
         "limitations under the License."
     ],
-    "releasename": "Denver",
+    "releasename": "Eugene",
     "generic": {
         "states": {
             "storagerouter": {
@@ -30,7 +30,8 @@
                 "catch_up": "Rebuilding",
                 "degraded": "Degraded",
                 "unknown": "Unknown",
-                "undefined": "Unknown"
+                "undefined": "Unknown",
+                "null": "Unknown"
             },
             "backend": {
                 "new": "New",
@@ -191,6 +192,7 @@
         "roles": "Roles",
         "save": "Save",
         "saved": "Saved",
+        "scrub": "Scrub",
         "showing": "Showing",
         "signin": "Sign in",
         "size": "Size",
@@ -440,7 +442,8 @@
             "snapshots": "Snapshots",
             "rollback": "Rollback",
             "configuration": "vDisk configuration",
-            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool."
+            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool.",
+            "clone": "Clone"
         },
         "saveconfig": {
             "done": "Save complete",
@@ -480,33 +483,6 @@
                 "title": "vPools"
             }
         }
-    },
-    "about": {
-        "title": "About Open vStorage",
-        "product": "Open vStorage",
-        "installedproducts": "Installed Packages",
-        "importantwebsites": "Important Websites",
-        "projectwebsite": "Project Website:",
-        "projectwebsiteurl": "http://www.openvstorage.org",
-        "sourcecode": "Source Code:",
-        "sourcecodeurl": "https://github.com/openvstorage",
-        "companywebsite": "Company Website:",
-        "companywebsiteurl": "https://www.openvstorage.com",
-        "communitysupport": "Community support:",
-        "communitysupporturl": "https://groups.google.com/forum/#!forum/open-vstorage",
-        "commercialsupport": "Commercial support:",
-        "commercialsupporturl": "https://www.openvstorage.com",
-        "openvstorage": "Open vStorage:",
-        "openvstoragecore": "Open vStorage - Core:",
-        "openvstoragewebapps": "Open vStorage - Webapps:",
-        "openvstoragebackend": "Open vStorage - Backend:",
-        "openvstoragebackendcore": "Open vStorage - Backend - Core:",
-        "openvstoragebackendwebapps": "Open vStorage - Backend - Webapps:",
-        "openvstoragesdm": "Open vStorage - SDM:",
-        "volumedriverbase": "Storage Driver - Base:",
-        "volumedriverserver": "Storage Driver - Server:",
-        "alba": "Alba:",
-        "arakoon": "Arakoon"
     },
     "pmachines": {
         "title": "Hypervisor Mgmt.",
@@ -659,32 +635,37 @@
     },
     "licenses": {
         "title": "Licenses",
-        "add": "Add license",
-        "request": {
-            "title": "Register",
-            "basicinfo": "To obtain a free license, register below.",
-            "company": "Company",
-            "companyhelp": "Company name, if applicable",
-            "name": "Name",
-            "namehelp": "Mandatory field",
-            "email": "Email",
-            "emailhelp": "The license key will be mailed to this address. Mandatory field",
-            "phone": "Phone",
-            "newsletter": "Newsletter",
-            "newsletterhelp": "I want to receive the Open vStorage newsletter.",
-            "agreement": "Agreement",
-            "agreementhelp": "I hereby accept the <a href=\"http://www.cloudfounders.com/open-vstorage-backend\" target=\"_blank\">free license agreement</a>.",
-            "register": "Register",
-            "success": "Successful",
-            "successmsg": "Registration completed. A free license key will be mailed shortly.",
-            "registering": "processing the registration"
-        }
+        "add": "Add license"
+    },
+    "register": {
+        "title": "Register",
+        "registered": "Your installation of Open vStorage is registered.",
+        "basicinfo1": "To use Open vStorage longer than 30 days, register below. There are",
+        "basicinfo2": "days left in the evaluation period.",
+        "basicinfo3": "To use Open vStorage longer than 30 days, register below. You are",
+        "basicinfo4": "days over your evaluation period and registration is now mandatory.",
+        "company": "Company",
+        "companyhelp": "Company name, if applicable",
+        "name": "Name",
+        "namehelp": "Mandatory field",
+        "email": "Email",
+        "emailhelp": "Mandatory field",
+        "phone": "Phone",
+        "newsletter": "Newsletter",
+        "newsletterhelp": "I want to receive the Open vStorage newsletter.",
+        "agreement": "Agreement",
+        "agreementhelp": "I hereby accept the <a href=\"https://www.openvstorage.org/license\" target=\"_blank\">Modified Apache License</a> of Open vStorage.",
+        "register": "Register",
+        "success": "Successful",
+        "successmsg": "Registration completed.",
+        "registering": "processing the registration"
     },
     "support": {
-        "information": "Information",
+        "information": "Support information",
         "description": "Open vStorage has the option to send regular heartbeats with metadata to a centralized server. The heartbeat data can be inspected at the bottom of this page. Additionally, you can enable remote access which enables the Open vStorage support team to access your environment upon your request through a secured tunnel.",
         "identification": "Identification parameters",
         "title": "Support",
+        "registered": "Your copy of Open vStorage is registered.",
         "clusterid": "Cluster ID:",
         "nodeid": "Node ID",
         "nodes": "StorageRouters:",
@@ -700,7 +681,33 @@
         "failed": "Error",
         "failedmsg": "Error while applying your settings",
         "downloadinglogs": "collecting...",
-        "downloadlogs": "download logfiles"
+        "downloadlogs": "download logfiles",
+        "product": "Open vStorage",
+        "installedproducts": "Installed Packages",
+        "importantwebsites": "Important Websites",
+        "projectwebsite": "Project Website:",
+        "projectwebsiteurl": "http://www.openvstorage.org",
+        "sourcecode": "Source Code:",
+        "sourcecodeurl": "https://github.com/openvstorage",
+        "companywebsite": "Company Website:",
+        "companywebsiteurl": "https://www.openvstorage.com",
+        "communitysupport": "Community support:",
+        "communitysupporturl": "https://groups.google.com/forum/#!forum/open-vstorage",
+        "commercialsupport": "Commercial support:",
+        "commercialsupporturl": "https://www.openvstorage.com",
+        "openvstorage": "Open vStorage:",
+        "openvstoragecore": "Open vStorage - Core:",
+        "openvstoragewebapps": "Open vStorage - Webapps:",
+        "openvstoragebackend": "Open vStorage - Backend:",
+        "openvstoragebackendcore": "Open vStorage - Backend - Core:",
+        "openvstoragebackendwebapps": "Open vStorage - Backend - Webapps:",
+        "openvstoragesdm": "Open vStorage - SDM:",
+        "volumedriverbase": "Storage Driver - Base:",
+        "volumedriverserver": "Storage Driver - Server:",
+        "alba": "Alba:",
+        "arakoon": "Arakoon",
+        "lastheartbeat": "Last time received",
+        "noheartbeat": "never"
     },
     "notfound": {
         "title": "Page not found",
@@ -879,25 +886,23 @@
                 "title": "Please provide the required information",
                 "basicinfo": "Enter basic information",
                 "name": "Clone name",
-                "amount": "Number of clones",
                 "selectsnapshots": "Select the Snapshot from which you want to clone:",
-                "nomachine": "No machine loaded",
                 "noname": "No name was entered",
                 "nosnapshots": "Not all disks have Snapshots",
-                "snapshot": "Snapshots"
+                "snapshot": "Snapshots",
+                "storagerouters": "Storage Router:",
+                "snapshots": "Snapshot:",
+                "newsnapshot": "Create a new snapshot"
             },
             "confirm": {
                 "title": "Verify the entered information",
                 "clonename": "Name of the clone:",
-                "cloneamount": "Amount of clones:",
+                "storagerouter": "StorageRouter:",
                 "verifysnapshots": "Please validate the selected Snapshot below. It will be used for the clone:",
-                "cloning": "cloning __what__",
                 "clonestarted": "Clone started",
-                "inprogress": "Machine __what__ cloning in progress...",
+                "inprogress": "vDisk __what__ cloning in progress...",
                 "success": "Cloned __what__ successfully",
-                "somefailed": "Machine __what__ cloned. However, some of the clones could not be created.",
-                "allfailed": "All clones for machine __what__ failed.",
-                "complete": "Clones completed",
+                "failed": "Failed to clone vDisk __what__ failed.",
                 "snapshot": "Snapshot:"
             }
         },
@@ -994,7 +999,9 @@
         "cachereads": "Reads served from the Cache:",
         "datawritten": "Data written to the Backend:",
         "dataread": "Data read from the Backend:",
-        "bandwidthsaved": "Bandwidth Saved:"
+        "bandwidthsaved": "Bandwidth Saved:",
+        "unregistered1": "Unregistered version,",
+        "unregistered2": "days remaining."
     },
     "events": {
         "vmachine_deleted": "vMachine deleted",
@@ -1052,6 +1059,7 @@
         "vdisks": "&#xf0a0;",
         "vmachines": "&#xf0e8;",
         "vpools": "&#xf0c2;",
-        "warning": "&#xf071;"
+        "warning": "&#xf071;",
+        "clone": "&#xf24d;"
     }
 }

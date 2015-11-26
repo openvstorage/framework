@@ -1,10 +1,10 @@
 # Copyright 2015 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,13 +35,15 @@ class DiskTools(object):
         """
         try:
             label = disk.split('/')[-1]
-            check_output('parted {0} -s mkpart {1} {2}B {3}B'.format(disk, label, offset, offset + size), shell=True)
+            start = "{0}GB".format(round(float(offset) / 1000**3, 2))
+            end = "{0}GB".format(round(float(offset+size) / 1000**3, 2))
+            check_output('parted {0} -s mkpart {1} {2} {3}'.format(disk, label, start, end), shell=True)
         except CalledProcessError as ex:
             if 'unrecognised disk label' in ex.output:
                 try:
                     check_output('parted {0} -s mklabel gpt'.format(disk), shell=True)
                     label = disk.split('/')[-1]
-                    check_output('parted {0} -s mkpart {1} {2}B 100%'.format(disk, label, offset), shell=True)
+                    check_output('parted {0} -s mkpart {1} {2} 100%'.format(disk, label, start), shell=True)
                 except Exception as iex:
                     logger.exception('Error during label/partition creation: {0}'.format(iex))
                     raise

@@ -1,10 +1,10 @@
 # Copyright 2015 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -57,8 +57,7 @@ class SupportAgent(object):
         else:
             raise RuntimeError('There was no known service manager detected in /proc/1/comm')
 
-    @staticmethod
-    def get_heartbeat_data(servicemanager):
+    def get_heartbeat_data(self):
         """
         Returns heartbeat data
         """
@@ -73,7 +72,7 @@ class SupportAgent(object):
         except Exception, ex:
             data['errors'].append(str(ex))
         try:
-            if servicemanager == 'upstart':
+            if self.servicemanager == 'upstart':
                 services = check_output("initctl list | grep ovs", shell=True).strip().split('\n')
             else:
                 services = check_output("systemctl -l | grep ovs", shell=True).strip().split('\n')
@@ -156,7 +155,7 @@ class SupportAgent(object):
 
         try:
             response = requests.post(self._url,
-                                     data={'data': json.dumps(SupportAgent.get_heartbeat_data(self.servicemanager))},
+                                     data={'data': json.dumps(self.get_heartbeat_data())},
                                      headers={'Accept': 'application/json; version=1'})
             if response.status_code != 200:
                 raise RuntimeError('Received invalid status code: {0} - {1}'.format(response.status_code, response.text))
@@ -164,6 +163,16 @@ class SupportAgent(object):
         except Exception, ex:
             logger.exception('Unexpected error during support call: {0}'.format(ex))
             raise
+
+        try:
+            # Try to save the timestamp at which we last succefully send the heartbeat data
+            from ovs.extensions.generic.system import System
+            storagerouter = System.get_my_storagerouter()
+            storagerouter.last_heartheat = time.time()
+            storagerouter.save()
+        except Exception:
+            logger.error('Could not save last heartbeat timestamp')
+            # Ignore this error, it's not mandatory for the support agent
 
         if self._enable_support:
             try:

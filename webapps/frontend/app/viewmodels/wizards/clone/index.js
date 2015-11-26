@@ -1,10 +1,10 @@
 // Copyright 2014 iNuron NV
 //
-// Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+// Licensed under the Open vStorage Modified Apache License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+//     http://www.openvstorage.org/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,21 +27,18 @@ define([
         // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.clone.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.data.machineGuid(options.machineguid);
+        self.data.vDisk(options.vdisk);
         self.steps([new Gather(), new Confirm()]);
         self.activateStep();
 
-        // Functions
-        self.compositionComplete = function() {
-            var amount = $("#amount");
-            amount.on('keypress', function(e) {
-                // Guard keypresses, only accepting numeric values
-                return !(e.which !== 8 && e.which !== 0 && (e.which < 48 || e.which > 57));
-            });
-            amount.on('change', function() {
-                // Guard ctrl+v
-                amount.val(Math.max(1, parseInt('0' + amount.val(), 10)));
-            });
-        };
+        if (self.data.storageRouters().length > 0) {
+            self.data.storageRouter(self.data.storageRouters()[0]);
+        } else {
+            self.data.storageRouter(undefined);
+        }
+        self.data.snapshot(undefined);
+        if (self.data.vDisk() !== undefined) {
+            self.data.name(self.data.vDisk().name().toLowerCase().replace(/ /, '-') + '-clone');
+        }
     };
 });

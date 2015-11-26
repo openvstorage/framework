@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,7 @@ import time
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.api.client import OVSClient
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
@@ -56,7 +57,9 @@ class MetadataView(View):
                 'identification': {},
                 'storagerouter_ips': [sr.ip for sr in StorageRouterList.get_storagerouters()],
                 'versions': list(settings.VERSION),
-                'plugins': {}}
+                'plugins': {},
+                'registration': {'registered': False,
+                                 'remaining': None}}
         try:
             # Gather plugin metadata
             plugins = {}
@@ -76,6 +79,20 @@ class MetadataView(View):
 
             # Fill identification
             data['identification'] = {'cluster_id': Configuration.get('ovs.support.cid')}
+
+            # Registration data
+            registered = Configuration.get('ovs.core.registered')
+            data['registration']['registered'] = registered
+            if registered is False:
+                cluster_install_time = None
+                for storagerouter in StorageRouterList.get_storagerouters():
+                    client = SSHClient(storagerouter)
+                    install_time = client.config_read('ovs.core.install_time')
+                    if cluster_install_time is None or (install_time is not None and install_time < cluster_install_time):
+                        cluster_install_time = install_time
+                if cluster_install_time is not None:
+                    timeout_days = 30 * 24 * 60 * 60
+                    data['registration']['remaining'] = (timeout_days - time.time() + cluster_install_time) / 24 / 60 / 60
 
             # Get authentication metadata
             authentication_metadata = {'ip': System.get_my_storagerouter().ip}

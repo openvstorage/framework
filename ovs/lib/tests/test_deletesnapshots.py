@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,6 +41,7 @@ class DeleteSnapshots(TestCase):
     logLevel = None
     BackendType = None
     DiskPartition = None
+    FailureDomain = None
     StorageRouter = None
     VolatileMutex = None
     VDiskController = None
@@ -62,6 +63,7 @@ class DeleteSnapshots(TestCase):
         from ovs.dal.hybrids.backendtype import BackendType
         from ovs.dal.hybrids.disk import Disk
         from ovs.dal.hybrids.diskpartition import DiskPartition
+        from ovs.dal.hybrids.failuredomain import FailureDomain
         from ovs.dal.hybrids.pmachine import PMachine
         from ovs.dal.hybrids.storagerouter import StorageRouter
         from ovs.dal.hybrids.vdisk import VDisk
@@ -79,12 +81,13 @@ class DeleteSnapshots(TestCase):
         global VPool
         global BackendType
         global DiskPartition
+        global FailureDomain
         global StorageRouter
         global VolatileMutex
         global VMachineController
         global VDiskController
         global ScheduledTaskController
-        _ = VDisk(), VolatileMutex('dummy'), VMachine(), PMachine(), VPool(), BackendType(), \
+        _ = VDisk(), VolatileMutex('dummy'), VMachine(), PMachine(), VPool(), BackendType(), FailureDomain(), \
             VMachineController, VDiskController, ScheduledTaskController, StorageRouter(), Disk(), DiskPartition()
 
         # Cleaning storage
@@ -108,6 +111,9 @@ class DeleteSnapshots(TestCase):
         """
         # Setup
         # There are 2 machines; one with two disks, one with one disk and an additional disk
+        failure_domain = FailureDomain()
+        failure_domain.name = 'Test'
+        failure_domain.save()
         backend_type = BackendType()
         backend_type.name = 'BackendType'
         backend_type.code = 'BT'
@@ -127,6 +133,8 @@ class DeleteSnapshots(TestCase):
         storage_router.ip = '127.0.0.1'
         storage_router.pmachine = pmachine
         storage_router.machine_id = System.get_my_machine_id()
+        storage_router.rdma_capable = False
+        storage_router.primary_failure_domain = failure_domain
         storage_router.save()
         disk = Disk()
         disk.name = 'physical_disk_1'
@@ -210,7 +218,7 @@ class DeleteSnapshots(TestCase):
 
             # At the start of the day, delete snapshot policy runs at 00:30
             print '- Deleting snapshots'
-            ScheduledTaskController.deletescrubsnapshots(timestamp=base_timestamp + (minute * 30))
+            ScheduledTaskController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
 
             # Validate snapshots
             print '- Validating snapshots'

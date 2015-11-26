@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -174,17 +174,44 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.clone')
-    def clone(diskguid, snapshotid, devicename, pmachineguid, machinename, machineguid=None):
+    def clone(diskguid, snapshotid, devicename, pmachineguid, machinename=None, machineguid=None, detached=False):
         """
         Clone a disk
         """
         pmachine = PMachine(pmachineguid)
         hypervisor = Factory.get(pmachine)
-        description = '{0} {1}'.format(machinename, devicename)
+        if machinename is None:
+            description = devicename
+        else:
+            description = '{0} {1}'.format(machinename, devicename)
         properties_to_clone = ['description', 'size', 'type', 'retentionpolicyguid',
                                'snapshotpolicyguid', 'autobackup']
         vdisk = VDisk(diskguid)
         location = hypervisor.get_backing_disk_path(machinename, devicename)
+
+        if machineguid is not None and detached is True:
+            raise ValueError('A vMachine GUID was specified while detached is True')
+
+        if snapshotid is None:
+            # Create a new snapshot
+            timestamp = str(int(time.time()))
+            metadata = {'label': '',
+                        'is_consistent': False,
+                        'timestamp': timestamp,
+                        'machineguid': machineguid,
+                        'is_automatic': True}
+            VDiskController.create_snapshot(diskguid, metadata)
+            tries = 25  # About 5 minutes
+            while snapshotid is None and tries > 0:
+                tries -= 1
+                time.sleep(25 - tries)
+                vdisk.invalidate_dynamics(['snapshots'])
+                snapshots = [snapshot for snapshot in vdisk.snapshots
+                             if snapshot['in_backend'] is True and snapshot['timestamp'] == timestamp]
+                if len(snapshots) == 1:
+                    snapshotid = snapshots[0]['guid']
+            if snapshotid is None:
+                raise RuntimeError('Could not find created snapshot in time')
 
         new_vdisk = VDisk()
         new_vdisk.copy(vdisk, include=properties_to_clone)
@@ -193,7 +220,8 @@ class VDiskController(object):
         new_vdisk.description = description
         new_vdisk.devicename = hypervisor.clean_backing_disk_filename(location)
         new_vdisk.parentsnapshot = snapshotid
-        new_vdisk.vmachine = VMachine(machineguid) if machineguid else vdisk.vmachine
+        if detached is False:
+            new_vdisk.vmachine = VMachine(machineguid) if machineguid else vdisk.vmachine
         new_vdisk.vpool = vdisk.vpool
         new_vdisk.save()
 
@@ -614,16 +642,16 @@ class VDiskController(object):
             try:
                 hv = Factory.get(pmachine)
                 info = hv.get_vm_agnostic_object(disk.vmachine.hypervisor_id)
-                for disk in info.get('disks', {}):
-                    if disk.get('filename', '') == disk.devicename:
-                        disk_name = disk.get('name', None)
+                for _disk in info.get('disks', {}):
+                    if _disk.get('filename', '') == disk.devicename:
+                        disk_name = _disk.get('name', None)
                         break
             except Exception as ex:
                 logger.error('Failed to get vdisk info from hypervisor. %s' % ex)
 
         if disk_name is None:
             logger.info('No info retrieved from hypervisor, using devicename')
-            disk_name = disk.devicename.split('/')[-1].split('.')[0]
+            disk_name = os.path.splitext(disk.devicename)[0]
 
         if disk_name is not None:
             disk.name = disk_name

@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -1137,6 +1137,7 @@ class SetupController(object):
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
         target_client.config_set('ovs.core.setupcompleted', True)
         target_client.config_set('ovs.core.nodetype', 'MASTER')
+        target_client.config_set('ovs.core.install_time', time.time())
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
 
         logger.info('First node complete')
@@ -1172,10 +1173,12 @@ class SetupController(object):
         cid = master_client.config_read('ovs.support.cid')
         enabled = master_client.config_read('ovs.support.enabled')
         enablesupport = master_client.config_read('ovs.support.enablesupport')
+        registered = master_client.config_read('ovs.core.registered')
         target_client.config_set('ovs.support.nid', Toolbox.get_hash())
         target_client.config_set('ovs.support.cid', cid)
         target_client.config_set('ovs.support.enabled', enabled)
         target_client.config_set('ovs.support.enablesupport', enablesupport)
+        target_client.config_set('ovs.core.registered', registered)
         if enabled is True:
             service = 'support-agent'
             ServiceManager.add_service(service, client=target_client)
@@ -1204,6 +1207,7 @@ class SetupController(object):
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
         target_client.config_set('ovs.core.setupcompleted', True)
         target_client.config_set('ovs.core.nodetype', 'EXTRA')
+        target_client.config_set('ovs.core.install_time', time.time())
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
         logger.info('Extra node complete')
 
@@ -1765,18 +1769,6 @@ EOF
         if action is None:
             print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
         else:
-            tries = 10
-            success = False
-            while tries > 0:
-                logger.debug('  Waiting for service {0} to be {1}...'.format(name, action))
-                status = ServiceManager.get_service_status(name, client=client)
-                if (status is False and state == 'stop') or (status is True and state in ['start', 'restart']):
-                    success = True
-                    break
-                tries -= 1
-                time.sleep(10 - tries)
-            if success is False:
-                raise RuntimeError('Service {0} could not be {1} on node {2}'.format(name, action, client.ip))
             logger.debug('  Service {0} {1}'.format(name, action))
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
 

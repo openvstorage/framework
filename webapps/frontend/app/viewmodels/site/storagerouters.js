@@ -1,10 +1,10 @@
-﻿// Copyright 2014 iNuron NV
+// Copyright 2014 iNuron NV
 //
-// Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+// Licensed under the Open vStorage Modified Apache License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+//     http://www.openvstorage.org/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,10 +23,11 @@ define([
 
         // Variables
         self.shared                = shared;
-        self.guard                 = { authenticated: true };
+        self.guard                 = { authenticated: true, registered: true };
         self.refresher             = new Refresher();
         self.widgets               = [];
         self.pMachineCache         = {};
+        self.fdCache               = {};
         self.storageRoutersHeaders = [
             { key: 'status',      value: $.t('ovs:generic.status'),                      width: 60        },
             { key: 'name',        value: $.t('ovs:generic.name'),                        width: 100       },
@@ -40,7 +41,8 @@ define([
             { key: 'readSpeed',   value: $.t('ovs:generic.read'),                        width: 100       },
             { key: 'writeSpeed',  value: $.t('ovs:generic.write'),                       width: 100       },
             { key: 'primaryFD',   value: $.t('ovs:generic.failure_domain_short'),        width: 100       },
-            { key: 'secondaryFD', value: $.t('ovs:generic.backup_failure_domain_short'), width: undefined }
+            { key: 'secondaryFD', value: $.t('ovs:generic.backup_failure_domain_short'), width: 100       },
+            { key: 'scrub',       value: $.t('ovs:generic.scrub'),                       width: undefined }
         ];
 
         // Observables
@@ -61,7 +63,7 @@ define([
                     var options = {
                         sort: 'name',
                         page: page,
-                        contents: '_relations,statistics,stored_data,vdisks_guids,status'
+                        contents: '_relations,statistics,stored_data,vdisks_guids,status,partition_config'
                     };
                     self.storageRoutersHandle[page] = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
@@ -71,7 +73,9 @@ define([
                                     return new StorageRouter(guid);
                                 },
                                 dependencyLoader: function(item) {
-                                    var pMachineGuid = item.pMachineGuid(), pm;
+                                    var pMachineGuid = item.pMachineGuid(), pm, pfd, sfd,
+                                        primaryFailureDomainGuid = item.primaryFailureDomainGuid(),
+                                        secondaryFailureDomainGuid = item.secondaryFailureDomainGuid();
                                     if (pMachineGuid && (item.pMachine() === undefined || item.pMachine().guid() !== pMachineGuid)) {
                                         if (!self.pMachineCache.hasOwnProperty(pMachineGuid)) {
                                             pm = new PMachine(pMachineGuid);
@@ -84,6 +88,22 @@ define([
                                             self.pMachineCache[item.pMachine().guid()] = item.pMachine();
                                         }
                                         item.pMachine().load();
+                                    }
+                                    if (primaryFailureDomainGuid && (item.primaryFailureDomain() === undefined || item.primaryFailureDomainGuid() !== primaryFailureDomainGuid)) {
+                                        if (!self.fdCache.hasOwnProperty(primaryFailureDomainGuid)) {
+                                            pfd = new FailureDomain(primaryFailureDomainGuid);
+                                            pfd.load();
+                                            self.fdCache[primaryFailureDomainGuid] = pfd;
+                                        }
+                                        item.primaryFailureDomain(self.fdCache[primaryFailureDomainGuid]);
+                                    }
+                                    if (secondaryFailureDomainGuid && (item.secondaryFailureDomain() === undefined || item.secondaryFailureDomainGuid() !== secondaryFailureDomainGuid)) {
+                                        if (!self.fdCache.hasOwnProperty(secondaryFailureDomainGuid)) {
+                                            sfd = new FailureDomain(secondaryFailureDomainGuid);
+                                            sfd.load();
+                                            self.fdCache[secondaryFailureDomainGuid] = sfd;
+                                        }
+                                        item.secondaryFailureDomain(self.fdCache[secondaryFailureDomainGuid]);
                                     }
                                 }
                             });
@@ -98,33 +118,8 @@ define([
         // Durandal
         self.activate = function() {
             self.refresher.init(function() {
-                if (generic.xhrCompleted(self.vPoolsHandle)) {
-                    self.vPoolsHandle = api.get('vpools', { queryparams: { contents: 'statistics,stored_data' }})
-                        .done(function(data) {
-                            var guids = [], vpdata = {};
-                            $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                                vpdata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.vPools,
-                                function(guid) {
-                                    return new VPool(guid);
-                                }, 'guid'
-                            );
-                            $.each(self.vPools(), function(index, item) {
-                                if (vpdata.hasOwnProperty(item.guid())) {
-                                    item.fillData(vpdata[item.guid()]);
-                                }
-                            });
-                        });
-                }
                 if (generic.xhrCompleted(self.failureDomainHandle)) {
-                    var options = {
-                        sort: 'name',
-                        contents: ''
-                    };
-                    self.failureDomainHandle = api.get('failure_domains', { queryparams: options })
+                    self.failureDomainHandle = api.get('failure_domains', { queryparams: { contents: '', sort: 'name' } })
                         .done(function(data) {
                             var guids = [], fdData = {};
                             $.each(data.data, function(index, item) {
@@ -134,37 +129,15 @@ define([
                             generic.crossFiller(
                                 guids, self.failureDomains,
                                 function(guid) {
-                                    return new FailureDomain(guid);
+                                    if (!self.fdCache.hasOwnProperty(guid)) {
+                                        self.fdCache[guid] = new FailureDomain(guid);
+                                    }
+                                    return self.fdCache[guid];
                                 }, 'guid'
                             );
                             $.each(self.failureDomains(), function(index, item) {
                                 if (fdData.hasOwnProperty(item.guid())) {
                                     item.fillData(fdData[item.guid()]);
-                                }
-                            });
-                        });
-                }
-                if (generic.xhrCompleted(self.storageRouterHandle)) {
-                    var options = {
-                        sort: 'name',
-                        contents: '_relations'
-                    };
-                    self.storageRouterHandle = api.get('storagerouters', { queryparams: options })
-                        .done(function(data) {
-                            var guids = [], srData = {};
-                            $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                                srData[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.storageRouters,
-                                function(guid) {
-                                    return new StorageRouter(guid);
-                                }, 'guid'
-                            );
-                            $.each(self.storageRouters(), function(index, item) {
-                                if (srData.hasOwnProperty(item.guid())) {
-                                    item.fillData(srData[item.guid()]);
                                 }
                             });
                         });

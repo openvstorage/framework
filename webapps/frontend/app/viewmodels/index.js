@@ -1,10 +1,10 @@
 ﻿// Copyright 2014 iNuron NV
 //
-// Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+// Licensed under the Open vStorage Modified Apache License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+//     http://www.openvstorage.org/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,24 +33,29 @@ define([
         var state, metadata;
         if (instance !== undefined && instance.hasOwnProperty('guard')) {
             if (instance.guard.authenticated === true) {
-                if (instance.shared.authentication.validate()) {
-                    window.localStorage.removeItem('state');
-                    return true;
+                if (!instance.shared.authentication.validate()) {
+                    window.localStorage.setItem('referrer', instruction.fragment);
+                    state = window.localStorage.getItem('state');
+                    if (state === null && instance.shared.authentication.metadata.mode === 'remote') {
+                        metadata = instance.shared.authentication.metadata;
+                        state = generic.getTimestamp() + '_' + Math.random().toString().substr(2, 10);
+                        window.localStorage.setItem('state', state);
+                        return metadata.authorize_uri +
+                            '?response_type=code' +
+                            '&client_id=' + encodeURIComponent(metadata.client_id) +
+                            '&redirect_uri=' + encodeURIComponent('https://' + window.location.host + '/api/oauth2/redirect/') +
+                            '&state=' + encodeURIComponent(state) +
+                            '&scope=' + encodeURIComponent(metadata.scope);
+                    }
+                    return instruction.params[0] + '/login';
                 }
-                window.localStorage.setItem('referrer', instruction.fragment);
-                state = window.localStorage.getItem('state');
-                if (state === null && instance.shared.authentication.metadata.mode === 'remote') {
-                    metadata = instance.shared.authentication.metadata;
-                    state = generic.getTimestamp() + '_' + Math.random().toString().substr(2, 10);
-                    window.localStorage.setItem('state', state);
-                    return metadata.authorize_uri +
-                        '?response_type=code' +
-                        '&client_id=' + encodeURIComponent(metadata.client_id) +
-                        '&redirect_uri=' + encodeURIComponent('https://' + window.location.host + '/api/oauth2/redirect/') +
-                        '&state=' + encodeURIComponent(state) +
-                        '&scope=' + encodeURIComponent(metadata.scope);
+            }
+            if (instance.guard.registered === true && shared.registration().registered === false) {
+                if (shared.registration().remaining <= 0) {
+                    return instruction.params[0] + '/register';
+                } else {
+                    window.localStorage.setItem('referrer', instruction.params[0] + '/register');
                 }
-                return instruction.params[0] + '/login';
             }
         }
         window.localStorage.removeItem('state');

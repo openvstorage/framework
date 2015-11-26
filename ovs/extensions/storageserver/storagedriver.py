@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,6 +36,7 @@ from volumedriver.storagerouter.storagerouterclient import VolumeInfo
 
 logger = LogHandler.get('extensions', name='storagedriver')
 storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+# noinspection PyArgumentList
 storagerouterclient.Logger.enableLogging()
 
 client_vpool_cache = {}
@@ -141,6 +142,7 @@ class StorageDriverClient(object):
         """
         Initializes the wrapper given a vpool name for which it finds the corresponding Storage Driver
         Loads and returns the client
+        :param vpool: vPool for which the StorageRouterClient needs to be loaded
         """
 
         key = '{0}_{1}'.format(vpool.guid, '_'.join(guid for guid in vpool.storagedrivers_guids))
@@ -168,11 +170,13 @@ class MetadataServerClient(object):
     def load(service):
         """
         Loads a MDSClient
+        :param service: Service for which the MDSClient needs to be loaded
         """
 
         key = service.guid
         if key not in mdsclient_service_cache:
             try:
+                # noinspection PyArgumentList
                 client = MDSClient(MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0]))
                 mdsclient_service_cache[key] = client
             except RuntimeError as ex:
@@ -191,9 +195,9 @@ class StorageDriverConfiguration(object):
     # DO NOT MAKE MANUAL CHANGES HERE
 
     parameters = {
-        # hg branch: (detached
-        # hg revision: e32a21486a90ac1a28f74383fd7948d94e0afcc4
-        # buildTime: Fri Oct 23 08:03:15 UTC 2015
+        # hg branch: dev
+        # hg revision: 63d8c887a77f44365f8258a78caf889cbf5fd2bc
+        # buildTime: Mon Oct 12 08:55:42 UTC 2015
         'metadataserver': {
             'backend_connection_manager': {
                 'optional': ['backend_connection_pool_capacity', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
@@ -217,6 +221,10 @@ class StorageDriverConfiguration(object):
                 'optional': ['events_amqp_uris', 'events_amqp_exchange', 'events_amqp_routing_key', ],
                 'mandatory': []
             },
+            'distributed_lock_store': {
+                'optional': ['dls_type', 'dls_arakoon_timeout_ms', 'dls_arakoon_cluster_id', 'dls_arakoon_cluster_nodes', ],
+                'mandatory': []
+            },
             'failovercache': {
                 'optional': ['failovercache_transport', ],
                 'mandatory': ['failovercache_path', ]
@@ -226,7 +234,7 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['fd_cache_path', 'fd_namespace', ]
             },
             'filesystem': {
-                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_cache_dentries', 'fs_dtl_config_mode', 'fs_dtl_host', 'fs_dtl_port', ],
+                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_cache_dentries', 'fs_dtl_config_mode', 'fs_dtl_host', 'fs_dtl_port', 'fs_dtl_mode', ],
                 'mandatory': ['fs_virtual_disk_format', ]
             },
             'metadata_server': {
@@ -266,7 +274,10 @@ class StorageDriverConfiguration(object):
         """
 
         def make_configure(sct):
-            """ section closure """
+            """
+            section closure
+            :param sct: Section to create configure function for
+            """
             return lambda **kwargs: self._add(sct, **kwargs)
 
         if config_type not in ['storagedriver', 'metadataserver']:
@@ -293,6 +304,7 @@ class StorageDriverConfiguration(object):
     def load(self, client=None):
         """
         Loads the configuration from a given file, optionally a remote one
+        :param client: If provided, load remote configuration
         """
         contents = '{}'
         if client is None:
@@ -316,6 +328,8 @@ class StorageDriverConfiguration(object):
     def save(self, client=None, reload_config=True):
         """
         Saves the configuration to a given file, optionally a remote one
+        :param client: If provided, save remote configuration
+        :param reload_config: Reload the running Storage Driver configuration
         """
         self._validate()
         contents = json.dumps(self.configuration, indent=2)
@@ -364,6 +378,7 @@ class StorageDriverConfiguration(object):
     def build_filesystem_by_hypervisor(hypervisor_type):
         """
         Builds a filesystem configuration dict, based on a given hypervisor
+        :param hypervisor_type: Hypervisor type for which to build a filesystem
         """
         if hypervisor_type == 'VMWARE':
             return {'fs_virtual_disk_format': 'vmdk',

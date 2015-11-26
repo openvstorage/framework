@@ -1,10 +1,10 @@
 // Copyright 2014 iNuron NV
 //
-// Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+// Licensed under the Open vStorage Modified Apache License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+//     http://www.openvstorage.org/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,10 @@ define(['knockout'], function(ko){
             messaging      : undefined,
             tasks          : undefined,
             authentication : undefined,
+            registration   : ko.observable({
+                registered: false,
+                remaining: null
+            }),
             defaultLanguage: 'en-US',
             language       : 'en-US',
             mode           : ko.observable('full'),

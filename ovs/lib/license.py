@@ -1,10 +1,10 @@
 # Copyright 2015 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -174,20 +174,26 @@ class LicenseController(object):
         client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
 
     @staticmethod
-    @celery.task(name='ovs.license.get_free_license')
-    def get_free_license(registration_parameters):
+    @celery.task(name='ovs.license.register')
+    def register(name, email, company, phone, newsletter):
         """
-        Obtains a free license
+        Registers the environment
         """
         SupportAgent().run()  # Execute a single heartbeat run
-        client = OVSClient('monitoring.openvstorage.com', 443, credentials=None, verify=True)
-        client.post('/support/register/',
-                    data={'cluster_id': Configuration.get('ovs.support.cid'),
-                          'name': registration_parameters['name'],
-                          'email': registration_parameters['email'],
-                          'company': registration_parameters['company'],
-                          'phone': registration_parameters['phone'],
-                          'newsletter': registration_parameters['newsletter']})
+        client = OVSClient('monitoring.openvstorage.com', 443, credentials=None, verify=True, version=1)
+        task_id = client.post('/support/register/',
+                              data={'cluster_id': Configuration.get('ovs.support.cid'),
+                                    'name': name,
+                                    'email': email,
+                                    'company': company,
+                                    'phone': phone,
+                                    'newsletter': newsletter,
+                                    'register_only': True})
+        if task_id:
+            client.wait_for_task(task_id, timeout=120)
+        for storagerouter in StorageRouterList.get_storagerouters():
+            client = SSHClient(storagerouter)
+            client.config_set('ovs.core.registered', True)
 
     @staticmethod
     def _encode(data):

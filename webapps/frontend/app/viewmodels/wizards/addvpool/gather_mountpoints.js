@@ -1,10 +1,10 @@
 // Copyright 2014 iNuron NV
 //
-// Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+// Licensed under the Open vStorage Modified Apache License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+//     http://www.openvstorage.org/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,6 +46,9 @@ define([
                 fields.push('writeCacheSize');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.over_allocation'));
             }
+            if (self.data.scrubAvailable() === false) {
+                reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_role', { what: 'SRUB' }));
+            }
             var valid = reasons.length === 0;
             if (self.activateResult.valid === false) {
                 valid = false;
@@ -85,19 +88,26 @@ define([
                 api.post('storagerouters/' + self.data.target().guid() + '/get_metadata')
                     .then(self.shared.tasks.wait)
                     .then(function(data) {
+                        var write;
                         self.data.mountpoints(data.mountpoints);
                         self.data.partitions(data.partitions);
                         self.data.ipAddresses(data.ipaddresses);
                         self.data.arakoonFound(data.arakoon_found);
                         self.data.sharedSize(data.shared_size);
+                        self.data.scrubAvailable(data.scrub_available);
                         self.data.readCacheAvailableSize(data.readcache_size);
                         self.data.writeCacheAvailableSize(data.writecache_size);
                         self.data.readCacheSize(Math.floor(data.readcache_size / 1024 / 1024 / 1024));
-                        self.data.writeCacheSize(Math.floor((data.writecache_size + data.shared_size) / 1024 / 1024 / 1024));
+                        if (self.data.readCacheAvailableSize() === 0) {
+                            write = Math.floor((data.writecache_size + data.shared_size) / 1024 / 1024 / 1024) - 1;
+                        } else {
+                            write = Math.floor((data.writecache_size + data.shared_size) / 1024 / 1024 / 1024);
+                        }
+                        self.data.writeCacheSize(write);
                     })
                     .done(function() {
                         self.activateResult = { valid: true, reasons: [], fields: [] };
-                        var requiredRoles = ['READ', 'WRITE', 'SCRUB'];
+                        var requiredRoles = ['READ', 'WRITE'];
                         if (self.data.arakoonFound() === false) {
                             requiredRoles.push('DB');
                         }

@@ -1,10 +1,10 @@
 // Copyright 2014 iNuron NV
 //
-// Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+// Licensed under the Open vStorage Modified Apache License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+//     http://www.openvstorage.org/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,15 +16,15 @@ define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter',
-    '../wizards/rollback/index', '../wizards/snapshot/index'
-], function($, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, RollbackWizard) {
+    '../wizards/rollback/index', '../wizards/clone/index'
+], function($, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, RollbackWizard, CloneWizard) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
         self.shared            = shared;
-        self.guard             = { authenticated: true };
+        self.guard             = { authenticated: true, registered: true };
         self.refresher         = new Refresher();
         self.widgets           = [];
         self.snapshotHeaders   = [
@@ -85,6 +85,14 @@ define([
                         guid: vdisk.guid()
                     }));
                 }
+            }
+        };
+        self.clone = function() {
+            if (self.vDisk() !== undefined) {
+                dialog.show(new CloneWizard({
+                    modal: true,
+                    vdisk: self.vDisk()
+                }));
             }
         };
         self.saveConfiguration = function() {

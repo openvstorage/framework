@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -64,6 +64,7 @@ from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, Arak
 
 logger = LogHandler.get('lib', name='storagerouter')
 storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+# noinspection PyArgumentList
 storagerouterclient.Logger.enableLogging()
 
 
@@ -80,6 +81,7 @@ class StorageRouterController(object):
     def get_metadata(storagerouter_guid):
         """
         Gets physical information about the machine this task is running on
+        :param storagerouter_guid: Storage Router guid to retrieve the metadata for
         """
         storagerouter = StorageRouter(storagerouter_guid)
         client = SSHClient(storagerouter)
@@ -156,13 +158,15 @@ class StorageRouterController(object):
                 'shared_size': shared_size,
                 'arakoon_found': arakoon_service_found,
                 'readcache_size': readcache_size,
-                'writecache_size': writecache_size}
+                'writecache_size': writecache_size,
+                'scrub_available': StorageRouterController._check_scrub_partition_present()}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.add_vpool')
     def add_vpool(parameters):
         """
         Add a vPool to the machine this task is running on
+        :param parameters: Parameters for vPool creation
         """
         sd_config_params = (dict, {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
                                    'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
@@ -285,9 +289,12 @@ class StorageRouterController(object):
                 arakoon_service_found = True
                 break
 
-        partition_info = metadata['partitions']
         error_messages = []
-        for required_role in [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.SCRUB]:
+        if StorageRouterController._check_scrub_partition_present() is False:
+            error_messages.append('At least 1 Storage Router must have a {0} partition'.format(DiskPartition.ROLES.SCRUB))
+
+        partition_info = metadata['partitions']
+        for required_role in [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE]:
             if required_role not in partition_info:
                 error_messages.append('Missing required partition role {0}'.format(required_role))
             elif len(partition_info[required_role]) == 0:
@@ -564,6 +571,18 @@ class StorageRouterController(object):
                                  "metadata_path": sdp_metadata.path,
                                  "clean_interval": 1,
                                  "foc_throttle_usecs": 4000}
+
+        # 5. Create SCRUB storagedriver partition (if necessary)
+        sdp_scrub = None
+        scrub_info = partition_info[DiskPartition.ROLES.SCRUB]
+        if len(scrub_info) > 0:
+            scrub_info = scrub_info[0]
+            size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.SCRUB][0] * 1024 ** 3
+            percentage = scrub_info['available'] * StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.SCRUB][1] / 100.0
+            sdp_scrub = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
+                                                                                           'role': DiskPartition.ROLES.SCRUB,
+                                                                                           'partition': DiskPartition(scrub_info['guid'])})
+            dirs2create.append(sdp_scrub.path)
         dirs2create.append(sdp_tlogs.path)
         dirs2create.append(sdp_metadata.path)
 
@@ -666,6 +685,7 @@ class StorageRouterController(object):
             storagedriver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
                                                                       alba_connection_port=alba_proxy.service.ports[0],
                                                                       alba_connection_preset=vpool.metadata['preset'],
+                                                                      alba_connection_timeout=15,
                                                                       backend_type='ALBA')
         elif vpool.backend_type.code in ['local', 'distributed']:
             storagedriver_config.configure_backend_connection_manager(**local_backend_data)
@@ -695,6 +715,9 @@ class StorageRouterController(object):
         storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
         storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=voldrv_arakoon_cluster_id,
                                                        vregistry_arakoon_cluster_nodes=arakoon_nodes)
+        storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
+                                                              dls_arakoon_cluster_id=voldrv_arakoon_cluster_id,
+                                                              dls_arakoon_cluster_nodes=arakoon_nodes)
         storagedriver_config.configure_file_driver(fd_cache_path=sdp_fd.path,
                                                    fd_extent_cache_capacity='1024',
                                                    fd_namespace='fd-{0}-{1}'.format(vpool_name, vpool.guid))
@@ -712,6 +735,8 @@ class StorageRouterController(object):
 
         root_client.dir_create(dirs2create)
         root_client.file_create(files2create)
+        if sdp_scrub is not None:
+            root_client.dir_chmod(sdp_scrub.path, 0777)  # Used by gather_scrub_work which is a celery task executed by 'ovs' user and should be able to write in it
 
         params = {'VPOOL_MOUNTPOINT': storagedriver.mountpoint,
                   'HYPERVISOR_TYPE': storagerouter.pmachine.hvtype,
@@ -815,6 +840,7 @@ class StorageRouterController(object):
     def remove_storagedriver(storagedriver_guid, offline=False):
         """
         Removes a StorageDriver (and, if it was the last Storage Driver for a vPool, the vPool is removed as well)
+        :param storagedriver_guid: Storage Driver guid to remove
         """
         logger.info('Deleting storage driver with guid {0}'.format(storagedriver_guid))
 
@@ -915,7 +941,9 @@ class StorageRouterController(object):
 
                     logger.debug('Destroying filesystem and erasing node configs')
                     storagedriver_client = LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
+                    # noinspection PyArgumentList
                     storagedriver_client.destroy_filesystem()
+                    # noinspection PyArgumentList
                     vrouter_clusterregistry.erase_node_configs()
                 except RuntimeError as ex:
                     logger.error('Could not destroy filesystem or erase node configs: {0}'.format(ex))
@@ -1065,7 +1093,7 @@ class StorageRouterController(object):
                         routing_key='sr.{0}'.format(storageappliance_machineid)
                     )
                     result.wait()
-            except Exception, ex:
+            except Exception as ex:
                 logger.error('{0}'.format(ex))
                 success = False
         # Remove Storage Drivers
@@ -1093,7 +1121,7 @@ class StorageRouterController(object):
                         routing_key='sr.{0}'.format(storagerouter_machineid)
                     )
                     result.wait()
-            except Exception, ex:
+            except Exception as ex:
                 logger.error('{0}'.format(ex))
                 success = False
         return success
@@ -1103,6 +1131,7 @@ class StorageRouterController(object):
     def get_version_info(storagerouter_guid):
         """
         Returns version information regarding a given StorageRouter
+        :param storagerouter_guid: Storage Router guid to get version information for
         """
         return {'storagerouter_guid': storagerouter_guid,
                 'versions': PackageManager.get_versions()}
@@ -1112,6 +1141,7 @@ class StorageRouterController(object):
     def get_support_info(storagerouter_guid):
         """
         Returns support information regarding a given StorageRouter
+        :param storagerouter_guid: Storage Router guid to get support information for
         """
         return {'storagerouter_guid': storagerouter_guid,
                 'nodeid': Configuration.get('ovs.support.nid'),
@@ -1125,13 +1155,14 @@ class StorageRouterController(object):
         """
         Returns support metadata for a given storagerouter. This should be a routed task!
         """
-        return SupportAgent.get_heartbeat_data()
+        return SupportAgent().get_heartbeat_data()
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_logfiles')
     def get_logfiles(local_storagerouter_guid):
         """
         Collects logs, moves them to a web-accessible location and returns log tgz's filename
+        :param local_storagerouter_guid: Storage Router guid to retrieve log files on
         """
         this_client = SSHClient('127.0.0.1', username='root')
         logfile = this_client.run('ovs collect logs').strip()
@@ -1150,6 +1181,8 @@ class StorageRouterController(object):
     def configure_support(enable, enable_support):
         """
         Configures support on all StorageRouters
+        :param enable: If True support agent will be enabled and started, else disabled and stopped
+        :param enable_support: If False openvpn will be stopped
         """
         clients = []
         try:
@@ -1183,6 +1216,10 @@ class StorageRouterController(object):
     def check_s3(host, port, accesskey, secretkey):
         """
         Validates whether connection to a given S3 backend can be made
+        :param host: Host to check
+        :param port: Port on which to check
+        :param accesskey: Access key to be used for connection
+        :param secretkey: Secret key to be used for connection
         """
         try:
             import boto
@@ -1204,6 +1241,7 @@ class StorageRouterController(object):
     def check_mtpt(name):
         """
         Checks whether a given mountpoint for vPool is in use
+        :param name: Name of the mountpoint to check
         """
         mountpoint = '/mnt/{0}'.format(name)
         if not os.path.exists(mountpoint):
@@ -1215,6 +1253,7 @@ class StorageRouterController(object):
     def get_update_status(storagerouter_ip):
         """
         Checks for new updates
+        :param storagerouter_ip: IP of the Storage Router to check for updates
         """
         # Check plugin requirements
         root_client = SSHClient(storagerouter_ip,
@@ -1377,6 +1416,7 @@ class StorageRouterController(object):
     def update_framework(storagerouter_ip):
         """
         Launch the update_framework method in setup.py
+        :param storagerouter_ip: IP of the Storage Router to update the framework packages on
         """
         root_client = SSHClient(storagerouter_ip,
                                 username='root')
@@ -1387,6 +1427,7 @@ class StorageRouterController(object):
     def update_volumedriver(storagerouter_ip):
         """
         Launch the update_volumedriver method in setup.py
+        :param storagerouter_ip: IP of the Storage Router to update the volumedriver packages on
         """
         root_client = SSHClient(storagerouter_ip,
                                 username='root')
@@ -1397,6 +1438,7 @@ class StorageRouterController(object):
     def refresh_hardware(storagerouter_guid):
         """
         Refreshes all hardware related information
+        :param storagerouter_guid: Guid of the Storage Router to refresh the hardware on
         """
         StorageRouterController.set_rdma_capability(storagerouter_guid)
         DiskController.sync_with_reality(storagerouter_guid)
@@ -1428,7 +1470,14 @@ class StorageRouterController(object):
     def configure_disk(storagerouter_guid, disk_guid, partition_guid, offset, size, roles):
         """
         Configures a partition
+        :param storagerouter_guid: Guid of the Storage Router to configure a disk on
+        :param disk_guid: Guid of the disk to configure
+        :param partition_guid: Guid of the partition on the disk
+        :param offset: Offset for the partition
+        :param size: Size of the partition
+        :param roles: Roles assigned to the partition
         """
+        create_fs = None
         storagerouter = StorageRouter(storagerouter_guid)
         for role in roles:
             if role not in DiskPartition.ROLES or role == DiskPartition.ROLES.BACKEND:
@@ -1441,26 +1490,39 @@ class StorageRouterController(object):
             logger.debug('Creating new partition: {0}, {1}, {2}'.format(offset, size, roles))
             found_previous = offset == 0
             found_next = offset + size == disk.size
+            part_previous = None
+            part_next = None
             for partition in disk.partitions:
                 if partition.offset + partition.size == offset:
                     found_previous = True
+                    part_previous = partition
                 if partition.offset == offset + size:
                     found_next = True
+                    part_next = partition
             if not found_previous or not found_next:
                 raise RuntimeError('Given offset/size do not fit into the given Disk')
-            if offset == 0:
-                offset = 1024**2
-                size -= offset
-            size -= 1
             with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
                 remote.DiskTools.create_partition(disk.path, offset, size)
+                create_fs = True
             DiskController.sync_with_reality(storagerouter_guid)
             disk = Disk(disk_guid)
             partition = None
-            for possible_partition in disk.partitions:
-                if possible_partition.offset == offset:
-                    partition = possible_partition
-                    break
+            if part_previous is not None and part_next is not None:
+                for possible_partition in disk.partitions:
+                    if possible_partition.offset > (part_previous.size + part_previous.offset) and\
+                    (possible_partition.offset + possible_partition.size) < part_next.offset:
+                        partition = possible_partition
+            elif part_previous is None and part_next is not None:
+                for possible_partition in disk.partitions:
+                    if (possible_partition.offset + possible_partition.size) < part_next.offset:
+                        partition = possible_partition
+            elif part_previous is not None and part_next is None:
+                for possible_partition in disk.partitions:
+                    if possible_partition.offset > (part_previous.size + part_previous.offset):
+                        partition = possible_partition
+            elif part_previous is None and part_next is None:
+                if len(disk.partitions) == 1:
+                    partition = disk.partitions[0]
             if partition is None:
                 raise RuntimeError('Could not locate partition')
             logger.debug('Partition created')
@@ -1469,7 +1531,7 @@ class StorageRouterController(object):
             partition = DiskPartition(partition_guid)
             if partition.disk_guid != disk_guid:
                 raise RuntimeError('The given DiskPartition is not on the given Disk')
-        if partition.filesystem is None:
+        if partition.filesystem is None or create_fs is True:
             logger.debug('Creating filesystem')
             with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
                 remote.DiskTools.make_fs(partition.path)
@@ -1509,3 +1571,16 @@ class StorageRouterController(object):
         ports = System.get_free_ports(port_range, ports_in_use, number, client)
 
         return ports if number != 1 else ports[0]
+
+    @staticmethod
+    def _check_scrub_partition_present():
+        """
+        Checks whether at least 1 scrub partition is present on any Storage Router
+        :return: boolean
+        """
+        for storage_router in StorageRouterList.get_storagerouters():
+            for disk in storage_router.disks:
+                for partition in disk.partitions:
+                    if DiskPartition.ROLES.SCRUB in partition.roles:
+                        return True
+        return False

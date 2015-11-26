@@ -1,11 +1,11 @@
 <!--
 Copyright 2015 iNuron NV
 
-Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+Licensed under the Open vStorage Modified Apache License (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.openvstorage.org/OVS_NON_COMMERCIAL
+    http://www.openvstorage.org/license
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <section>
-    <h2><span data-i18n="ovs:support.title"></span></h2>
+    <h2><span data-i18n="ovs:support.product"></span> <span data-i18n="ovs:releasename"></span> - <span data-i18n="ovs:support.title"></span></h2>
     <p>&nbsp;</p>
+
     <div class="row">
         <div class="col-md-12">
             <div class="panel panel-default">
@@ -24,6 +25,7 @@ limitations under the License.
                 </div>
                 <div class="panel-body">
                     <p data-i18n="[html]ovs:support.description"></p>
+                    <span data-bind="visible: shared.registration().registered === true" data-i18n="ovs:support.registered"></span><br />
                     <span data-i18n="ovs:support.clusterid"></span> <span data-bind="text: clusterid"></span><br />
                     <span data-i18n="ovs:support.nodes"></span><br />
                     <ul data-bind="foreach: storageRouters">
@@ -54,7 +56,10 @@ limitations under the License.
         <div class="col-md-12">
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <b data-i18n="ovs:support.metadata"></b>
+                    <b data-i18n="ovs:support.metadata"></b> -
+                    <span data-i18n="ovs:support.lastheartbeat"></span>:
+                    <span data-bind="visible: lastHeartbeat() !== undefined, timeago: lastHeartbeat()"></span>
+                    <span data-bind="visible: lastHeartbeat() === undefined" data-i18n="ovs:support.noheartbeat"></span>
                 </div>
                 <div class="panel-body">
                     <ul data-bind="foreach: storageRouters">
@@ -62,6 +67,88 @@ limitations under the License.
                             <span data-bind="text: name"></span><br />
                             <pre data-bind="visible: metadata() !== '', text: JSON.stringify(metadata(), null, 4)"></pre>
                             <span class="fa fa-spin" data-bind="visible: metadata() === ''" data-i18n="[html]ovs:icons.loading"></span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <b data-i18n="ovs:support.installedproducts"></b>
+                </div>
+                <div class="panel-body">
+                    <span data-i18n="ovs:generic.storagerouters">:</span><br />
+                    <ul data-bind="foreach: storageRouters">
+                        <li>
+                            <span data-bind="text: name"></span>
+                            <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading" data-bind="if: versions() === undefined"
+                               style="margin-left: 10px;"></i>
+                            <ul data-bind="if: versions() !== undefined">
+                                <li>
+                                    <span data-i18n="ovs:support.openvstorage"></span>
+                                    <span data-bind="text: versions().openvstorage"></span>
+                                </li>
+                                <li>
+                                    <span data-i18n="ovs:support.openvstoragebackend"></span>
+                                    <span data-bind="text: versions()['openvstorage-backend']"></span>
+                                </li>
+                                <li>
+                                    <span data-i18n="ovs:support.openvstoragesdm"></span>
+                                    <span data-bind="text: versions()['openvstorage-sdm']"></span>
+                                </li>
+                                <li>
+                                    <span data-i18n="ovs:support.volumedriverbase"></span>
+                                    <span data-bind="text: versions()['volumedriver-base']"></span>
+                                </li>
+                                <li>
+                                    <span data-i18n="ovs:support.volumedriverserver"></span>
+                                    <span data-bind="text: versions()['volumedriver-server']"></span>
+                                </li>
+                                <li>
+                                    <span data-i18n="ovs:support.alba"></span>
+                                    <span data-bind="text: versions().alba"></span>
+                                </li>
+                                <li>
+                                    <span data-i18n="ovs:support.arakoon"></span>
+                                    <span data-bind="text: versions().arakoon"></span>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <b data-i18n="ovs:support.importantwebsites"></b>
+                </div>
+                <div class="panel-body">
+                    <ul>
+                        <li>
+                            <span data-i18n="ovs:support.projectwebsite"></span>
+                            <a data-bind="attr: { href: $.t('ovs:support.projectwebsiteurl') }"
+                               data-i18n="ovs:support.projectwebsiteurl"></a>
+                        </li>
+                        <li>
+                            <span data-i18n="ovs:support.commercialsupport"></span>
+                            <a data-bind="attr: { href: $.t('ovs:support.commercialsupporturl') }"
+                               data-i18n="ovs:support.commercialsupporturl"></a>
+                        </li>
+                        <li>
+                            <span data-i18n="ovs:support.communitysupport"></span>
+                            <a data-bind="attr: { href: $.t('ovs:support.communitysupporturl') }"
+                               data-i18n="ovs:support.communitysupporturl"></a>
+                        </li>
+                        <li>
+                            <span data-i18n="ovs:support.sourcecode"></span>
+                            <a data-bind="attr: { href: $.t('ovs:support.sourcecodeurl') }"
+                               data-i18n="ovs:support.sourcecodeurl"></a>
                         </li>
                     </ul>
                 </div>

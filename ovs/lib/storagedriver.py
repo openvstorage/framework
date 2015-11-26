@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -209,7 +209,6 @@ class StorageDriverController(object):
             StorageDriverController._configure_arakoon_to_volumedriver()
 
         if 0 < len(current_services) < len(available_storagerouters):
-            distributed = False
             for storagerouter, partition in available_storagerouters.iteritems():
                 if storagerouter.ip in current_ips:
                     continue
@@ -222,11 +221,9 @@ class StorageDriverController(object):
                 )
                 add_service(storagerouter, result)
                 current_ips.append(storagerouter.ip)
-                if distributed is False:
-                    distributed = True
-                    for sr_ip in all_sr_ips:
-                        if sr_ip not in current_ips:
-                            ArakoonInstaller.deploy_to_slave(current_services[0].storagerouter.ip, sr_ip, cluster_name)
+                for sr_ip in all_sr_ips:
+                    if sr_ip not in current_ips:
+                        ArakoonInstaller.deploy_to_slave(current_services[0].storagerouter.ip, sr_ip, cluster_name)
                 ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
             StorageDriverController._configure_arakoon_to_volumedriver()
 
@@ -255,6 +252,9 @@ class StorageDriverController(object):
                         storagedriver_config.load()
                         storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id='voldrv',
                                                                        vregistry_arakoon_cluster_nodes=arakoon_nodes)
+                        storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
+                                                                              dls_arakoon_cluster_id='voldrv',
+                                                                              dls_arakoon_cluster_nodes=arakoon_nodes)
                         storagedriver_config.save()
 
     @staticmethod

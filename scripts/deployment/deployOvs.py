@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,7 +26,7 @@ import subprocess as sp
 import os
 import re
 import shlex
-
+import shutil
 
 class InstallHelper():
     """
@@ -426,6 +426,18 @@ usb_xhci.present = "TRUE"
         vmconfig.close()
         return vmconfigfile
 
+    def delete_vm(self, vm):
+        """
+        Deletes a VM
+        @param vm: name of the vm to delete
+        """
+        vmpath = '/vmfs/volumes/{0}/{1}'.format(datastore, vm)
+        if os.path.exists(vmpath):
+            if os.path.islink(vmpath):
+                os.remove(vmpath)
+            else:
+                shutil.rmtree(vmpath)
+
     def create_vdisk(self, vm, seq, size, dconfig):
         """
         Creates a virtual disk (vmdk)
@@ -569,27 +581,31 @@ if __name__ == '__main__':
             else:
                 hdds.append(disk)
     if len(ssds) == 0:
-        if len(hdds) > 0:
+        if len(hdds) > 0 and options.skip is False:
             print InstallHelper.boxed_message(['Not enough SSD devices available, but a HDD device might be used instead of an SSD device in a test setup.',
                                                'This will however have a severe decrease in performance.'])
             if not InstallHelper.ask_yesno('Do you want to continue?', default_value=False):
                 print InstallHelper.boxed_message(['Not enough SSD devices available to continue the install. Min: 1'])
+                vm_sys.delete_vm(vm_name)
                 sys.exit(1)
         else:
-            print InstallHelper.boxed_message(['Not enough SSD devices available to continue the install. Min: 1'])
+            print InstallHelper.boxed_message(['No HDD detected and not enough SSD devices available to continue the install. Min: 1'])
+            vm_sys.delete_vm(vm_name)
             sys.exit(1)
 
-    print 'Select an SSD device'
-    ssd = InstallHelper.ask_choice(ssds if len(ssds) > 0 else hdds,
-                                   columns=['Vendor', 'Model', 'DevfsPath'])
-    disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, ssd, disk_config)
-    if ssd in hdds:
-        hdds.remove(ssd)
+    diskid = 1
+    for sdd in ssds:
+        print 'Adding ssd:', ssd['Vendor'], ssd['Model'], ssd['DevfsPath']
+        disk_config = vm_sys.create_vdisk_mapping(vm_name, diskid, ssd, disk_config)
+        if ssd in hdds:
+            hdds.remove(ssd)
+        diskid += 1
 
-    if len(hdds) > 0 and options.skip is False:
-        print 'Select an HDD device'
-        hdd = InstallHelper.ask_choice(hdds, columns=['Vendor', 'Model', 'DevfsPath'])
-        disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, hdd, disk_config)
+    if options.skip is False:
+        for hdd in hdds:
+            print 'Adding hdd:', hdd['Vendor'], hdd['Model'], hdd['DevfsPath']
+            disk_config = vm_sys.create_vdisk_mapping(vm_name, diskid, hdd, disk_config)
+            diskid += 1
 
     # Add CD drive
     if imagefile:
