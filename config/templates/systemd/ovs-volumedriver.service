@@ -1,5 +1,6 @@
 [Unit]
 Description=ovs volumedriver
+Requires=<ADDITIONAL_DEPENDENCIES>
 Wants=ovs-watcher-volumedriver.service
 After=ovs-watcher-volumedriver.service
 
