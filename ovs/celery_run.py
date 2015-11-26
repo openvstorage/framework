@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,8 +27,8 @@ from celery import Celery
 from celery.signals import task_postrun, worker_process_init
 from ovs.lib.messaging import MessageController
 from ovs.log.logHandler import LogHandler
-from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.configuration import Configuration
 
@@ -94,4 +94,10 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
 
 
 if __name__ == '__main__':
-    celery.start()
+    import sys
+    if len(sys.argv) == 2 and sys.argv[1] == 'clear_cache':
+        from ovs.lib.helpers.decorators import ENSURE_SINGLE_KEY
+
+        cache = PersistentFactory.get_client()
+        for key in cache.prefix(ENSURE_SINGLE_KEY):
+            cache.delete(key)

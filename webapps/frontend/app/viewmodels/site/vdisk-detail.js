@@ -1,10 +1,10 @@
 // Copyright 2014 iNuron NV
 //
-// Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+// Licensed under the Open vStorage Modified Apache License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+//     http://www.openvstorage.org/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,8 +36,12 @@ define([
         ];
 
         // Observables
-        self.snapshotsInitialLoad = ko.observable(true);
-        self.vDisk                = ko.observable();
+        self.snapshotsInitialLoad  = ko.observable(true);
+        self.storageRoutersLoading = ko.observable(false);
+        self.vDisk                 = ko.observable();
+
+        // Handles
+        self.loadStorageRoutersHandle = undefined;
 
         // Functions
         self.load = function() {
@@ -99,8 +103,7 @@ define([
             if (self.vDisk() !== undefined) {
                 var vd = self.vDisk();
                 api.post('vdisks/' + vd.guid() + '/set_config_params', {
-                    data: { new_config_params: vd.configuration(),
-                            old_config_params: vd.oldConfiguration() }
+                    data: { new_config_params: vd.configuration() }
                 })
                     .then(self.shared.tasks.wait)
                     .done(function () {
@@ -122,6 +125,42 @@ define([
                     });
                 vd.oldConfiguration($.extend({}, vd.configuration()));
             }
+        };
+        self.loadStorageRouters = function() {
+            return $.Deferred(function(deferred) {
+                self.storageRoutersLoading(true);
+                if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
+                    self.loadStorageRoutersHandle = api.get('vpools/' + self.vDisk().vpoolGuid() + '/storagerouters', { queryparams: { 'contents': '' } } )
+                        .done(function(data) {
+                            var dtlTargets = [];
+                            $.each(data.data, function(index, item) {
+                                if (item.ip !== self.vDisk().storageRouter().ipAddress()) {
+                                    dtlTargets.push(item.ip);
+                                }
+                            });
+                            if (dtlTargets.length === 0) {
+                                $.each(self.vDisk().dtlModes(), function(index, item) {
+                                    if (item.name === 'a_sync' || item.name === 'sync') {
+                                        item.disabled = true;
+                                    }
+                                });
+                            }
+                            self.vDisk().dtlTargets(dtlTargets);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject)
+                        .always(function() {
+                            self.storageRoutersLoading(false);
+                        });
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
+        self.loadAllConfigurations = function() {
+            self.vDisk().loadConfiguration(false);
+            self.vDisk().loadParentConfiguration();
+            self.loadStorageRouters();
         };
 
         // Durandal

@@ -1,10 +1,10 @@
 # Copyright 2015 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,6 @@ DiskController module
 import re
 import os
 import time
-from celery.task.control import revoke
 from subprocess import CalledProcessError
 from pyudev import Context
 from ovs.celery_run import celery
@@ -29,8 +28,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.remote import Remote
-from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.lib.helpers.decorators import ensure_single
 
 logger = LogHandler.get('lib', name='disk')
 
@@ -41,58 +39,9 @@ class DiskController(object):
     """
 
     @staticmethod
-    @celery.task(name='ovs.disk.async_sync_with_reality')
-    def async_sync_with_reality(storagerouter_guid=None, max_attempts=3):
-        """
-        Calls sync_with_reality, implements dedupe logic
-        Keep existing task as it is, some tasks depend on it being sync, call async explicitly
-        - if task was already called for this storagerouter, revoke it and call a new one
-        - ensures only 1 task runs for a storagerouter and only the last task is executed
-        :param storagerouter_guid:
-        :return:
-        """
-        cache = VolatileFactory.get_client()
-        key = 'ovs_dedupe_sync_with_reality_{0}'.format(storagerouter_guid)
-        task_id = cache.get(key)
-        if task_id:
-            # Key exists, task was already scheduled
-            # If task is already running, the revoke message will be ignored
-            revoke(task_id)
-        async_result = DiskController.sync_with_reality.s().apply_async(args=[storagerouter_guid, max_attempts], countdown=15)
-        cache.set(key, async_result.id, 600)  # Store the task id
-
-    @staticmethod
     @celery.task(name='ovs.disk.sync_with_reality')
-    def sync_with_reality(storagerouter_guid=None, max_attempts=3):
-        """
-        Try to run sync_with_reality, retry in case of failure
-         always run sync, as tasks calling this expect this to be sync
-        :param storagerouter_guid:
-        :return:
-        """
-        cache = VolatileFactory.get_client()
-        mutex = VolatileMutex('ovs_disk_sync_with_reality_{0}'.format(storagerouter_guid))
-
-        key = 'ovs_dedupe_sync_with_reality_{0}'.format(storagerouter_guid)
-        attempt = 1
-        while attempt < max_attempts:
-            task_id = cache.get(key)
-            if task_id:
-                revoke(task_id)
-            try:
-                mutex.acquire(wait=120)
-                return DiskController._sync_with_reality(storagerouter_guid)
-            except Exception as ex:
-                logger.warning('Sync with reality failed. {0}'.format(ex))
-                attempt += 1
-                time.sleep(attempt*30)
-            finally:
-                mutex.release()
-
-        raise RuntimeError('Sync with reality failed after 3 attempts')
-
-    @staticmethod
-    def _sync_with_reality(storagerouter_guid=None):
+    @ensure_single(task_name='ovs.disk.sync_with_reality', mode='CHAINED')
+    def sync_with_reality(storagerouter_guid=None):
         """
         Syncs the Disks from all StorageRouters with the reality.
         :param storagerouter_guid: Guid of the Storage Router to synchronize
@@ -121,8 +70,8 @@ class DiskController(object):
             with Remote(storagerouter.ip, [Context, os]) as remote:
                 context = remote.Context()
                 devices = [device for device in context.list_devices(subsystem='block')
-                           if ('ID_TYPE' in device and device['ID_TYPE'] == 'disk')
-                           or ('DEVNAME' in device and 'nvme' in device['DEVNAME'])]
+                           if ('ID_TYPE' in device and device['ID_TYPE'] == 'disk') or
+                              ('DEVNAME' in device and 'nvme' in device['DEVNAME'])]
                 for device in devices:
                     is_partition = device['DEVTYPE'] == 'partition'
                     device_path = device['DEVNAME']
@@ -135,7 +84,10 @@ class DiskController(object):
                             extended_parition_info = True
                             partition_id = device['ID_PART_ENTRY_NUMBER']
                             partition_name = device_name
-                            device_name = device_name[:0 - int(len(partition_id))]
+                            if device_name.startswith('nvme'):
+                                device_name = device_name[:0 - int(len(partition_id)) - 1]
+                            else:
+                                device_name = device_name[:0 - int(len(partition_id))]
                         else:
                             logger.debug('Partition {0} has no partition metadata'.format(device_path))
                             extended_parition_info = False
@@ -152,9 +104,10 @@ class DiskController(object):
                     for path_type in ['by-id', 'by-uuid']:
                         if path is not None:
                             break
-                        for item in device['DEVLINKS'].split(' '):
-                            if path_type in item:
-                                path = item
+                        if 'DEVLINKS' in device:
+                            for item in device['DEVLINKS'].split(' '):
+                                if path_type in item:
+                                    path = item
                     if path is None:
                         path = device_path
                     sectors = int(client.run('cat /sys/block/{0}/size'.format(device_name)))

@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,22 +18,22 @@ ScheduledTaskController module
 
 import copy
 import time
-import os
-import traceback
 from celery.result import ResultSet
 from celery.schedules import crontab
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 from ovs.celery_run import celery
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vmachinelist import VMachineList
+from ovs.dal.lists.servicelist import ServiceList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.remote import Remote
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
@@ -55,8 +55,8 @@ class ScheduledTaskController(object):
     """
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.snapshotall', bind=True, schedule=crontab(minute='0', hour='2-22'))
-    @ensure_single(['ovs.scheduled.snapshotall', 'ovs.scheduled.delete_snapshots'])
+    @celery.task(name='ovs.scheduled.snapshot_all_vms', schedule=crontab(minute='0', hour='2-22'))
+    @ensure_single(task_name='ovs.scheduled.snapshot_all_vms', extra_task_names=['ovs.scheduled.delete_snapshots'])
     def snapshot_all_vms():
         """
         Snapshots all VMachines
@@ -77,8 +77,8 @@ class ScheduledTaskController(object):
         logger.info('[SSA] Snapshot has been taken for {0} vMachines, {1} failed.'.format(len(success), len(fail)))
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.delete_snapshots', bind=True, schedule=crontab(minute='0', hour='2'))
-    @ensure_single(['ovs.scheduled.delete_snapshots'])
+    @celery.task(name='ovs.scheduled.delete_snapshots', schedule=crontab(minute='1', hour='2'))
+    @ensure_single(task_name='ovs.scheduled.delete_snapshots')
     def delete_snapshots(timestamp=None):
         """
         Delete snapshots & scrubbing policy
@@ -98,6 +98,11 @@ class ScheduledTaskController(object):
         week = day * 7
 
         def make_timestamp(offset):
+            """
+            Create an integer based timestamp
+            :param offset: Offset in days
+            :return: Timestamp
+            """
             return int(mktime((base - offset).timetuple()))
 
         # Calculate bucket structure
@@ -191,9 +196,13 @@ class ScheduledTaskController(object):
         logger.info('Delete snapshots finished')
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.gather_scrub_work', bind=True, schedule=crontab(minute='0', hour='3'))
-    @ensure_single(['ovs.scheduled.gather_scrub_work'])
+    @celery.task(name='ovs.scheduled.gather_scrub_work', schedule=crontab(minute='0', hour='3'))
+    @ensure_single(task_name='ovs.scheduled.gather_scrub_work')
     def gather_scrub_work():
+        """
+        Retrieve and execute scrub work
+        :return: None
+        """
         logger.info('Divide scrubbing work among allowed Storage Routers')
 
         scrub_locations = {}
@@ -259,6 +268,13 @@ class ScheduledTaskController(object):
     @celery.task(name='ovs.scheduled.execute_scrub_work')
     def _execute_scrub_work(scrub_location, vdisk_guids):
         def verify_mds_config(current_vdisk):
+            """
+            Retrieve the metadata backend configuration for vDisk
+            :param current_vdisk: vDisk to retrieve configuration for
+            :type current_vdisk:  vDisk
+
+            :return:              MDS configuration for vDisk
+            """
             current_vdisk.invalidate_dynamics(['info'])
             vdisk_configs = current_vdisk.info['metadata_backend_config']
             if len(vdisk_configs) == 0:
@@ -308,20 +324,32 @@ class ScheduledTaskController(object):
             raise Exception("\n\n".join(failures))
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.collapse_arakoon', bind=True, schedule=crontab(minute='30', hour='0'))
-    @ensure_single(['ovs.scheduled.collapse_arakoon'])
+    @celery.task(name='ovs.scheduled.collapse_arakoon', schedule=crontab(minute='30', hour='0'))
+    @ensure_single(task_name='ovs.scheduled.collapse_arakoon')
     def collapse_arakoon():
+        """
+        Collapse Arakoon's Tlogs
+        :return: None
+        """
         logger.info('Starting arakoon collapse')
-        arakoon_dir = os.path.join(Configuration.get('ovs.core.cfgdir'), 'arakoon')
-        arakoon_clusters = map(lambda directory: os.path.basename(directory.rstrip(os.path.sep)),
-                               os.walk(arakoon_dir).next()[1])
-        for cluster in arakoon_clusters:
-            logger.info('  Collapsing cluster: {0}'.format(cluster))
-            cluster_instance = ArakoonManagementEx().getCluster(cluster)
-            for node in cluster_instance.listNodes():
-                logger.info('    Collapsing node: {0}'.format(node))
-                try:
-                    cluster_instance.remoteCollapse(node, 2)  # Keep 2 tlogs
-                except Exception as e:
-                    logger.info('Error during collapsing cluster {0} node {1}: {2}\n{3}'.format(cluster, node, str(e), traceback.format_exc()))
+        arakoon_clusters = {}
+        for service in ServiceList.get_services():
+            if service.type.name in ('Arakoon', 'NamespaceManager', 'AlbaManager'):
+                arakoon_clusters.setdefault(service.name.replace('arakoon-', ''), []).append(service.storagerouter.ip)
+
+        for cluster, ips in arakoon_clusters.iteritems():
+            if len(ips) > 0:
+                ip = ips[0]
+                logger.info('  Collapsing cluster: {0} using ip {1}'.format(cluster, ip))
+                with Remote(ip, [ArakoonManagementEx]) as remote:
+                    cluster_instance = remote.ArakoonManagementEx().getCluster(cluster)
+                    for node in cluster_instance.listNodes():
+                        logger.info('    Collapsing node: {0}'.format(node))
+                        try:
+                            cluster_instance.remoteCollapse(node, 2)  # Keep 2 tlogs
+                        except Exception:
+                            logger.exception('Error during collapsing cluster {0} node {1}'.format(cluster, node))
+            else:
+                logger.warning('Could not collapse cluster {0}. No IP addresses found'.format(cluster))
+
         logger.info('Arakoon collapse finished')

@@ -1,11 +1,11 @@
 <!--
 Copyright 2014 iNuron NV
 
-Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+Licensed under the Open vStorage Modified Apache License (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.openvstorage.org/OVS_NON_COMMERCIAL
+    http://www.openvstorage.org/license
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -126,7 +126,7 @@ limitations under the License.
                             </td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="text: (item().dtl_enabled === true ? item().dtl_mode : $.t('ovs:vpools.dtl_disabled'))"></span>
+                                    <span data-part="lazy-entry" data-bind="text: $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item().dtl_mode)"></span>
                                 </span>
                             </td>
                         </tr>
@@ -136,29 +136,23 @@ limitations under the License.
                             <td colspan="2">&nbsp;</td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-i18n="ovs:vpools.dtl_transport"></span>
+                                    <span data-part="lazy-entry"
+                                          data-i18n="ovs:vpools.dtl_transport"
+                                          data-bind="visible: item().dtl_enabled === true"></span>
                                 </span>
                             </td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="translate: 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + item().dtl_transport"></span>
+                                    <span data-part="lazy-entry"
+                                          data-bind="visible: item().dtl_enabled === true,
+                                                     translate: 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + item().dtl_transport"></span>
                                 </span>
                             </td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.nrofvdisks"></td>
                             <td><span data-bind="text: vDisks().length"></span></td>
-                            <td colspan="2">&nbsp;</td>
-                            <td>
-                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-i18n="ovs:vpools.dtl_location" data-bind="visible: item().dtl_enabled === true"></span>
-                                </span>
-                            </td>
-                            <td>
-                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="text: item().dtl_location, visible: item().dtl_enabled === true"></span>
-                                </span>
-                            </td>
+                            <td colspan="4">&nbsp;</td>
                         </tr>
                     </tbody>
                 </table>
@@ -204,12 +198,12 @@ limitations under the License.
                             <td>
                                 <div data-bind="status: {
                                                     colors: {
-                                                        green: ['ok_standalone', 'ok_sync'].contains(dtlMode()),
-                                                        orange: dtlMode() == 'catch_up',
-                                                        red: dtlMode() == 'degraded'
+                                                        green: ['ok_standalone', 'ok_sync'].contains(dtlStatus()),
+                                                        orange: dtlStatus() == 'catch_up',
+                                                        red: dtlStatus() == 'degraded'
                                                     },
                                                     defaultColor: 'lightgrey'
-                                                }, tooltip: 'ovs:generic.states.dtl.' + dtlMode()"
+                                                }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
                                      style="width: 14px; height: 14px;"></div>
                             </td>
                         </tr>
@@ -244,12 +238,12 @@ limitations under the License.
                             <td>
                                 <div data-bind="status: {
                                                     colors: {
-                                                        green: ['ok_standalone', 'ok_sync'].contains(dtlMode()),
-                                                        orange: dtlMode() == 'catch_up',
-                                                        red: dtlMode() == 'degraded'
+                                                        green: ['ok_standalone', 'ok_sync'].contains(dtlStatus()),
+                                                        orange: dtlStatus() == 'catch_up',
+                                                        red: dtlStatus() == 'degraded'
                                                     },
                                                     defaultColor: 'lightgrey'
-                                                }, tooltip: 'ovs:generic.states.dtl.' + dtlMode()"
+                                                }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
                                      style="width: 14px; height: 14px;"></div>
                             </td>
                         </tr>

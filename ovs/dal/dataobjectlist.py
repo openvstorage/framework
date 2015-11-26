@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -235,10 +235,41 @@ class DataObjectList(object):
             result = [qr_item for qr_item in self._query_result if qr_item in guids]
             data_object_list = DataObjectList(result, self.type)
             # Overwrite some internal fields, making sure we keep already fetched objects
-            # and we preseve existing sorting
+            # and we preserve existing sorting
             data_object_list._objects = dict(item for item in self._objects.iteritems() if item[0] in guids)
             data_object_list._guids = guids
             return data_object_list
         else:
             guid = self._guids[item]
             return self._get_object(guid)
+
+    def remove(self, item):
+        """
+        Remove an item from the data-object list
+        Item can be a guid of an object or the object itself
+        :param item: Guid or object
+        :return: Updated list
+        """
+        guid = None
+        if isinstance(item, basestring):
+            if item in self._guids:
+                guid = item
+        else:
+            if Descriptor(self.type) != Descriptor(item.__class__):
+                raise TypeError('Item should be of type {0}'.format(self.type))
+            guid = item.guid
+        if guid is None:
+            raise ValueError('Item not in list')
+        self._guids.remove(guid)
+        self._objects = dict(item for item in self._objects.iteritems() if item[0] in self._guids)
+
+    def pop(self, index):
+        """
+        Pop an item from the data-object list at the specified index
+        :param index: Index of item to pop
+        :return: Updated list
+        """
+        if not isinstance(index, int):
+            raise ValueError('Index must be an integer')
+        self._guids.pop(index)
+        self._objects = dict(item for item in self._objects.iteritems() if item[0] in self._guids)

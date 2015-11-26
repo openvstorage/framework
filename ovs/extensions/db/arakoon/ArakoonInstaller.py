@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -309,7 +309,8 @@ class ArakoonInstaller(object):
         """
         Starts an arakoon cluster
         """
-        if ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is False:
+        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
+                ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is False:
             ServiceManager.start_service('arakoon-{0}'.format(cluster_name), client=client)
 
     @staticmethod
@@ -352,27 +353,27 @@ class ArakoonInstaller(object):
         config.delete_config(client)
 
     @staticmethod
-    def wait_for_cluster(cluster_name):
+    def wait_for_cluster(cluster_name, sshclient):
         """
         Waits for an Arakoon cluster to be available (by sending a nop)
         """
         logger.debug('Waiting for cluster {0}'.format(cluster_name))
         from ovs.extensions.db.arakoon.arakoon.ArakoonExceptions import ArakoonSockReadNoBytes
-
-        last_exception = None
-        tries = 3
-        while tries > 0:
-            try:
-                cluster_object = ArakoonManagementEx().getCluster(str(cluster_name))
-                client = cluster_object.getClient()
-                client.nop()
-                logger.debug('Waiting for cluster {0}: available'.format(cluster_name))
-                return True
-            except ArakoonSockReadNoBytes as exception:
-                last_exception = exception
-                tries -= 1
-                time.sleep(1)
-        raise last_exception
+        with Remote(sshclient.ip, [ArakoonManagementEx], 'ovs') as remote:
+            last_exception = None
+            tries = 3
+            while tries > 0:
+                try:
+                    cluster_object = remote.ArakoonManagementEx().getCluster(str(cluster_name))
+                    client = cluster_object.getClient()
+                    client.nop()
+                    logger.debug('Waiting for cluster {0}: available'.format(cluster_name))
+                    return True
+                except ArakoonSockReadNoBytes as exception:
+                    last_exception = exception
+                    tries -= 1
+                    time.sleep(1)
+            raise last_exception
 
     @staticmethod
     def restart_cluster(cluster_name, master_ip):
@@ -391,14 +392,14 @@ class ArakoonInstaller(object):
             for function in [ArakoonInstaller.stop, ArakoonInstaller.start]:
                 for client in all_clients:
                     function(cluster_name, client)
-            ArakoonInstaller.wait_for_cluster(cluster_name)
+            ArakoonInstaller.wait_for_cluster(cluster_name, all_clients[0])
         else:
             logger.debug('  Sufficient nodes in cluster {0}. Sequential restart'.format(cluster_name))
             for client in all_clients:
                 ArakoonInstaller.stop(cluster_name, client)
                 ArakoonInstaller.start(cluster_name, client)
                 logger.debug('  Restarted node {0} on cluster {1}'.format(client.ip, cluster_name))
-                ArakoonInstaller.wait_for_cluster(cluster_name)
+                ArakoonInstaller.wait_for_cluster(cluster_name, client)
         logger.debug('Restart sequence for {0} via {1} completed'.format(cluster_name, master_ip))
 
     @staticmethod
@@ -425,10 +426,10 @@ class ArakoonInstaller(object):
             ArakoonInstaller.start(cluster_name, client=client)
             logger.debug('  Restarted node {0} for cluster {1}'.format(client.ip, cluster_name))
             if len(current_ips) > threshold:  # A two node cluster needs all nodes running
-                ArakoonInstaller.wait_for_cluster(cluster_name)
+                ArakoonInstaller.wait_for_cluster(cluster_name, client)
         new_client = SSHClient(new_ip, username='root')
         ArakoonInstaller.start(cluster_name, client=new_client)
-        ArakoonInstaller.wait_for_cluster(cluster_name)
+        ArakoonInstaller.wait_for_cluster(cluster_name, new_client)
         logger.debug('Started node {0} for cluster {1}'.format(new_ip, cluster_name))
 
     @staticmethod
@@ -444,5 +445,5 @@ class ArakoonInstaller(object):
             ArakoonInstaller.start(cluster_name, client=client)
             logger.debug('  Restarted node {0} for cluster {1}'.format(client.ip, cluster_name))
             if len(remaining_ips) > 2:  # A two node cluster needs all nodes running
-                ArakoonInstaller.wait_for_cluster(cluster_name)
+                ArakoonInstaller.wait_for_cluster(cluster_name, client)
         logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))

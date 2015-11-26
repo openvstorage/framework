@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -57,10 +57,14 @@ from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
+from ovs.lib.vdisk import VDiskController
 from ovs.lib.vpool import VPoolController
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
+from volumedriver.storagerouter.storagerouterclient import ArakoonNodeConfig
+from volumedriver.storagerouter.storagerouterclient import ClusterNodeConfig
+from volumedriver.storagerouter.storagerouterclient import ClusterRegistry
+from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient
 
 logger = LogHandler.get('lib', name='storagerouter')
 storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
@@ -73,8 +77,8 @@ class StorageRouterController(object):
     Contains all BLL related to StorageRouter
     """
     SUPPORT_AGENT = 'support-agent'
-    PARTITION_DEFAULT_UAGES = {DiskPartition.ROLES.DB: (20, 10),  # 1st number is exact size in GiB, 2nd number is percentage (highest of the 2 will be taken)
-                               DiskPartition.ROLES.SCRUB: (0, 0)}
+    PARTITION_DEFAULT_USAGES = {DiskPartition.ROLES.DB: (20, 10),  # 1st number is exact size in GiB, 2nd number is percentage (highest of the 2 will be taken)
+                                DiskPartition.ROLES.SCRUB: (0, 0)}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_metadata')
@@ -113,7 +117,7 @@ class StorageRouterController(object):
                     size = disk_partition.size if disk_partition.size is not None else 0
                     available = size - claimed_space  # Subtract size for roles which have already been claimed by other vpools (but not necessarily already been fully used)
                     # Subtract size for competing roles on the same partition
-                    for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_UAGES.iteritems():
+                    for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_USAGES.iteritems():
                         if sub_role in disk_partition.roles and sub_role != role:
                             amount = required_size[0] * 1024 ** 3
                             percentage = required_size[1] * disk_partition.size / 100
@@ -171,8 +175,6 @@ class StorageRouterController(object):
         sd_config_params = (dict, {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
                                    'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
                                    'dedupe_mode': (str, StorageDriverClient.VPOOL_DEDUPE_MAP.keys()),
-                                   'dtl_enabled': (bool, None),
-                                   'dtl_location': (str, None),
                                    'write_buffer': (int, {'min': 128, 'max': 10240}),
                                    'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
                                    'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys())})
@@ -190,7 +192,7 @@ class StorageRouterController(object):
                                          'connection_username': (str, None),
                                          'connection_password': (str, None)}
         required_params_for_new_distributed_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
-                                                     'config_params': sd_config_params}  # 'distributed_mountpoint': (str, None)}  @TODO: Enable again once local has been removed
+                                                     'config_params': sd_config_params}
 
         ###############
         # VALIDATIONS #
@@ -557,8 +559,8 @@ class StorageRouterController(object):
 
         # 4. Assign DB
         db_info = partition_info[DiskPartition.ROLES.DB][0]
-        size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3
-        percentage = db_info['available'] * StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.DB][1] / 100.0
+        size = StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3
+        percentage = db_info['available'] * StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][1] / 100.0
         sdp_tlogs = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
                                                                                        'role': DiskPartition.ROLES.DB,
                                                                                        'sub_role': StorageDriverPartition.SUBROLE.TLOG,
@@ -577,8 +579,8 @@ class StorageRouterController(object):
         scrub_info = partition_info[DiskPartition.ROLES.SCRUB]
         if len(scrub_info) > 0:
             scrub_info = scrub_info[0]
-            size = StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.SCRUB][0] * 1024 ** 3
-            percentage = scrub_info['available'] * StorageRouterController.PARTITION_DEFAULT_UAGES[DiskPartition.ROLES.SCRUB][1] / 100.0
+            size = StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.SCRUB][0] * 1024 ** 3
+            percentage = scrub_info['available'] * StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.SCRUB][1] / 100.0
             sdp_scrub = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
                                                                                            'role': DiskPartition.ROLES.SCRUB,
                                                                                            'partition': DiskPartition(scrub_info['guid'])})
@@ -651,20 +653,30 @@ class StorageRouterController(object):
                 contents = contents.replace('<{0}>'.format(key), value)
             client.file_write(ganesha_config, contents)
 
-        if 'config_params' in parameters:
-            sco_size = parameters['config_params']['sco_size']
+        if 'config_params' in parameters:  # New vPool
+            config_params = parameters['config_params']
+            sco_size = config_params['sco_size']
+            dtl_mode = config_params['dtl_mode']
+            dedupe_mode = config_params['dedupe_mode']
+            dtl_transport = config_params['dtl_transport']
+            cache_strategy = config_params['cache_strategy']
             tlog_multiplier = StorageDriverClient.TLOG_MULTIPLIER_MAP[sco_size]
-            sco_factor = float(parameters['config_params']['write_buffer']) / tlog_multiplier / sco_size  # sco_factor = write buffer / tlog multiplier (default 20) / sco size (in MiB)
-            dedupe_mode = parameters['config_params']['dedupe_mode']
-            cache_strategy = parameters['config_params']['cache_strategy']
-            dtl_transport = StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[parameters['config_params']['dtl_transport']]
-        else:
+            sco_factor = float(config_params['write_buffer']) / tlog_multiplier / sco_size  # sco_factor = write buffer / tlog multiplier (default 20) / sco size (in MiB)
+        else:  # Extend vPool
             sco_size = current_storage_driver_config['sco_size']
+            dtl_mode = current_storage_driver_config['dtl_mode']
+            dedupe_mode = current_storage_driver_config['dedupe_mode']
+            dtl_transport = current_storage_driver_config['dtl_transport']
+            cache_strategy = current_storage_driver_config['cache_strategy']
             tlog_multiplier = current_storage_driver_config['tlog_multiplier']
             sco_factor = float(current_storage_driver_config['write_buffer']) / tlog_multiplier / sco_size
-            dedupe_mode = current_storage_driver_config['dedupe_mode']
-            cache_strategy = current_storage_driver_config['cache_strategy']
-            dtl_transport = StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[current_storage_driver_config['dtl_transport']]
+
+        if dtl_mode == 'no_sync':
+            filesystem_config['fs_dtl_host'] = None
+            filesystem_config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_MANUAL_MODE
+        else:
+            filesystem_config['fs_dtl_mode'] = StorageDriverClient.VPOOL_DTL_MODE_MAP[dtl_mode]
+            filesystem_config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE
 
         volume_manager_config["read_cache_default_mode"] = StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode]
         volume_manager_config["read_cache_default_behaviour"] = StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy]
@@ -685,6 +697,7 @@ class StorageRouterController(object):
             storagedriver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
                                                                       alba_connection_port=alba_proxy.service.ports[0],
                                                                       alba_connection_preset=vpool.metadata['preset'],
+                                                                      alba_connection_timeout=15,
                                                                       backend_type='ALBA')
         elif vpool.backend_type.code in ['local', 'distributed']:
             storagedriver_config.configure_backend_connection_manager(**local_backend_data)
@@ -696,7 +709,7 @@ class StorageRouterController(object):
                                                 trigger_gap='1GB',
                                                 backoff_gap='2GB')
         storagedriver_config.configure_failovercache(failovercache_path=sdp_dtl.path,
-                                                     failovercache_transport=dtl_transport)
+                                                     failovercache_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport])
         storagedriver_config.configure_filesystem(**filesystem_config)
         storagedriver_config.configure_volume_manager(**volume_manager_config)
         storagedriver_config.configure_volume_router(vrouter_id=vrouter_id,
@@ -824,6 +837,7 @@ class StorageRouterController(object):
         vpool.size = vfs_info.f_blocks * vfs_info.f_bsize
         vpool.save()
 
+        VDiskController.dtl_checkup(vpool_guid=vpool.guid)
         for vdisk in vpool.vdisks:
             MDSServiceController.ensure_safety(vdisk=vdisk)
 
@@ -1047,6 +1061,8 @@ class StorageRouterController(object):
                     junction.delete()
                 vdisk.delete()
             vpool.delete()
+        else:
+            VDiskController.dtl_checkup(vpool_guid=vpool.guid)
 
         MDSServiceController.mds_checkup()
 
@@ -1437,6 +1453,11 @@ class StorageRouterController(object):
 
     @staticmethod
     def set_rdma_capability(storagerouter_guid):
+        """
+        Check if the Storage Router has been reconfigured to be able to support RDMA
+        :param storagerouter_guid: Guid of the Storage Router to check and set
+        :return: None
+        """
         storagerouter = StorageRouter(storagerouter_guid)
         client = SSHClient(storagerouter, username='root')
         rdma_capable = False
@@ -1469,6 +1490,7 @@ class StorageRouterController(object):
         :param size: Size of the partition
         :param roles: Roles assigned to the partition
         """
+        create_fs = None
         storagerouter = StorageRouter(storagerouter_guid)
         for role in roles:
             if role not in DiskPartition.ROLES or role == DiskPartition.ROLES.BACKEND:
@@ -1494,13 +1516,14 @@ class StorageRouterController(object):
                 raise RuntimeError('Given offset/size do not fit into the given Disk')
             with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
                 remote.DiskTools.create_partition(disk.path, offset, size)
+                create_fs = True
             DiskController.sync_with_reality(storagerouter_guid)
             disk = Disk(disk_guid)
             partition = None
             if part_previous is not None and part_next is not None:
                 for possible_partition in disk.partitions:
-                    if possible_partition.offset > (part_previous.size + part_previous.offset) and\
-                    (possible_partition.offset + possible_partition.size) < part_next.offset:
+                    if possible_partition.offset > (part_previous.size + part_previous.offset) and \
+                       (possible_partition.offset + possible_partition.size) < part_next.offset:
                         partition = possible_partition
             elif part_previous is None and part_next is not None:
                 for possible_partition in disk.partitions:
@@ -1521,7 +1544,7 @@ class StorageRouterController(object):
             partition = DiskPartition(partition_guid)
             if partition.disk_guid != disk_guid:
                 raise RuntimeError('The given DiskPartition is not on the given Disk')
-        if partition.filesystem is None:
+        if partition.filesystem is None or create_fs is True:
             logger.debug('Creating filesystem')
             with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
                 remote.DiskTools.make_fs(partition.path)

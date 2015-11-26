@@ -1,11 +1,11 @@
 <!--
 Copyright 2014 iNuron NV
 
-Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+Licensed under the Open vStorage Modified Apache License (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.openvstorage.org/OVS_NON_COMMERCIAL
+    http://www.openvstorage.org/license
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -56,14 +56,10 @@ limitations under the License.
             <li><b data-i18n="ovs:vpools.write_buffer"></b>: <span data-bind="text: data.writeBuffer() !== undefined ? data.writeBuffer() : ''"></span> <span data-i18n="ovs:generic.units.mib"></span></li>
             <li>
                 <b data-bind="translate: 'ovs:vpools.' + (data.dtlEnabled() === true ? 'dtl_mode' : 'dtl')"></b>:
-                <span data-bind="translate: (data.dtlEnabled() === true ? 'ovs:storagedrivers.configuration.general.dtl_modes.' + data.dtlMode() : 'ovs:vpools.dtl_disabled')"></span>
+                <span data-bind="translate: (data.dtlEnabled() === true ? 'ovs:storagedrivers.configuration.general.dtl_modes.' + data.dtlMode().name : 'ovs:vpools.dtl_disabled')"></span>
             </li>
             <li data-bind="visible: data.dtlEnabled() === true">
-                <b data-i18n="ovs:wizards.addvpool.confirm.dtl_location" data-bind="visible: data.dtlEnabled() === true"></b>
-                <span data-bind="text: data.dtlLocation() !== undefined ? data.dtlLocation() : ''"></span>
-            </li>
-            <li data-bind="visible: data.dtlEnabled() === true">
-                <b data-i18n="ovs:wizards.addvpool.confirm.dtl_transport" data-bind="visible: data.dtlEnabled() === true"></b>
+                <b data-i18n="ovs:wizards.addvpool.confirm.dtl_transport"></b>
                 <span data-bind="translate: data.dtlTransportMode() !== undefined ? 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + data.dtlTransportMode().name : ''"></span>
             </li>
         </ul>

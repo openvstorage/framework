@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -72,5 +72,9 @@ class Mapping(object):
                                                                              'dedupe_key': '[TASK_NAME]_[storagedriver_id]'}}],
                VolumeDriverEvents.volumedriver_error: [{'task': StorageDriverController.volumedriver_error,
                                                         'arguments': {'code': 'code',
-                                                                      'volume_name': 'volumename',
-                                                                      '[NODE_ID]': 'storagedriver_id'}}]}
+                                                                      'volume_name': 'volumename'}}],
+               VolumeDriverEvents.dtl_state_transition: [{'task': VDiskController.dtl_state_transition,
+                                                          'arguments': {'volume_name': 'volume_name',
+                                                                        'old_state': 'old_state',
+                                                                        'new_state': 'new_state',
+                                                                        '[NODE_ID]': 'storagedriver_id'}}]}

@@ -1,11 +1,11 @@
 #!/usr/bin/env python2
 #  Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -1336,6 +1336,58 @@ class Basic(TestCase):
             self.assertIn(key, enum, '{0} should be in the enumerator'.format(key))
             self.assertEqual(getattr(enum, key), value, "Value for key '{0}' should be '{1}' instead of '{2}'".format(key, value, getattr(enum, key)))
 
+    def test_pop_and_remove_from_dataobjectlist(self):
+        """
+        Removes multiple items from a data-object list
+        """
+        disk1 = TestDisk()
+        disk2 = TestDisk()
+        disk1.name = 'disk1'
+        disk2.name = 'disk2'
+        disk1.save()
+        disk2.save()
+
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.GUIDS,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': []}}).data
+        datalist1 = DataObjectList(data, TestDisk)
+        self.assertEqual(len(datalist1), 2, 'Expected 2 items in list')
+        # Remove from list by specifying object itself
+        datalist1.remove(disk1)
+        self.assertEqual(len(datalist1), 1, 'Expected 1 item in list')
+        with self.assertRaises(ValueError):
+            datalist1.remove(disk1)
+        # Remove from list by specifying guid of object
+        datalist1.remove(disk2.guid)
+        self.assertEqual(len(datalist1), 0, 'Expected 0 items in list')
+        # Raise error by specifying incorrect object type
+        machine1 = TestMachine()
+        machine1.name = 'machine1'
+        machine1.save()
+        with self.assertRaises(TypeError):
+            datalist1.remove(machine1)
+
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.GUIDS,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': []}}).data
+        datalist2 = DataObjectList(data, TestDisk)
+        self.assertEqual(len(datalist2), 2, 'Expected 2 items in list')
+        # Raise error by attempting to pop item which does not exist
+        with self.assertRaises(IndexError):
+            datalist2.pop(3)
+            datalist2.pop(-3)
+        # Raise error by attempting to specify non-integer index
+        with self.assertRaises(ValueError):
+            datalist2.pop('test')
+        # Pop all items by using 0 and a negative index
+        datalist2.pop(0)
+        datalist2.pop(-1)
+        self.assertEqual(len(datalist2), 0, 'Expected 0 items in list')
+        # Raise error by attempting to pop from empty list
+        with self.assertRaises(IndexError):
+            datalist2.pop(0)
 
 if __name__ == '__main__':
     import unittest

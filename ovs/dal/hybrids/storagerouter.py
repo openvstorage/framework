@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,7 +42,6 @@ class StorageRouter(DataObject):
                    Relation('secondary_failure_domain', FailureDomain, 'secondary_storagerouters', mandatory=False)]
     __dynamics = [Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('stored_data', int, 60),
-                  Dynamic('dtl_mode', str, 60),
                   Dynamic('vmachines_guids', list, 15),
                   Dynamic('vpools_guids', list, 15),
                   Dynamic('vdisks_guids', list, 15),
@@ -77,22 +76,6 @@ class StorageRouter(DataObject):
                 if vdisk.storagedriver_id == storagedriver.storagedriver_id:
                     data += vdisk.info['stored']
         return data
-
-    def _dtl_mode(self):
-        """
-        Gets the aggregated DTL mode
-        """
-        status = 'UNKNOWN'
-        status_code = 0
-        for storagedriver in self.storagedrivers:
-            for vdisk in storagedriver.vpool.vdisks:
-                if vdisk.storagedriver_id == storagedriver.storagedriver_id:
-                    mode = vdisk.info['failover_mode']
-                    current_status_code = StorageDriverClient.DTL_STATUS[mode.lower()]
-                    if current_status_code > status_code:
-                        status = mode
-                        status_code = current_status_code
-        return status
 
     def _vmachines_guids(self):
         """

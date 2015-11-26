@@ -1,10 +1,10 @@
 // Copyright 2014 iNuron NV
 //
-// Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+// Licensed under the Open vStorage Modified Apache License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+//     http://www.openvstorage.org/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,6 +29,19 @@ define([
         self.canContinue = ko.computed(function () {
             return { value: true, reasons: [], fields: [] };
         });
+        self.dtlMode = ko.computed({
+            write: function(mode) {
+                if (mode.name === 'no_sync') {
+                    self.data.dtlEnabled(false);
+                } else {
+                    self.data.dtlEnabled(true);
+                }
+                self.data.dtlMode(mode);
+            },
+            read: function() {
+                return self.data.dtlMode();
+            }
+        });
 
         // Functions
         self.next = function() {
@@ -37,9 +50,7 @@ define([
 
         // Durandal
         self.activate = function() {
-            self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: {
-                    contents: 'storagedrivers',
-            }})
+            self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: { contents: 'storagedrivers' }})
                 .done(function(data) {
                     var guids = [], srdata = {};
                     $.each(data.data, function(index, item) {

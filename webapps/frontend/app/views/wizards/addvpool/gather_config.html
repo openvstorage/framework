@@ -1,11 +1,11 @@
 <!--
 Copyright 2014 iNuron NV
 
-Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+Licensed under the Open vStorage Modified Apache License (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.openvstorage.org/OVS_NON_COMMERCIAL
+    http://www.openvstorage.org/license
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,11 +35,19 @@ limitations under the License.
                             <tr>
                                 <td style="width: 40%; padding: 0; border: 0">
                                     <div style="margin-top: 5px;">
-                                        <span data-i18n="ovs:storagedrivers.configuration.general.dtl_enable"></span>:
+                                        <span data-i18n="ovs:storagedrivers.configuration.general.dtl_mode"></span>:
                                     </div>
                                 </td>
                                 <td style="padding: 0; border: 0">
-                                    <input type="checkbox" id="enableDTL" data-bind="checked: data.dtlEnabled" style="margin-top: 8px;">
+                                    <span data-bind="dropdown: {
+                                                         items: data.dtlModes,
+                                                         target: dtlMode,
+                                                         text: function(item) {
+                                                             return $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item.name);
+                                                         },
+                                                         small: true
+                                                     }">
+                                    </span>
                                 </td>
                             </tr>
                             <tr data-bind="visible: data.dtlEnabled()">
@@ -60,42 +68,6 @@ limitations under the License.
                                     </span>
                                 </td>
                             </tr>
-                            <!--<tr>-->
-                                <!--<td style="width: 40%; padding: 0; border: 0;">-->
-                                    <!--<div style="margin-top: 5px;">-->
-                                        <!--<span data-i18n="ovs:storagedrivers.configuration.general.dtl_mode"></span>:-->
-                                    <!--</div>-->
-                                <!--</td>-->
-                                <!--<td style="padding: 0; border: 0;">-->
-                                    <!--<span data-bind="dropdown: {-->
-                                                         <!--items: data.dtlModes,-->
-                                                         <!--target: data.dtlMode,-->
-                                                         <!--text: function(item) {-->
-                                                             <!--return $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item);-->
-                                                         <!--},-->
-                                                         <!--small: true-->
-                                                     <!--}">-->
-                                    <!--</span>-->
-                                <!--</td>-->
-                            <!--</tr>-->
-                            <!--<tr>-->
-                                <!--<td style="width: 40%; padding: 0; border: 0;">-->
-                                    <!--<div style="margin-top: 5px;">-->
-                                        <!--<span data-i18n="ovs:storagedrivers.configuration.general.dtl_location"></span>:-->
-                                    <!--</div>-->
-                                <!--</td>-->
-                                <!--<td style="padding: 0; border: 0;">-->
-                                    <!--<span data-bind="dropdown: {-->
-                                                         <!--items: ,-->
-                                                         <!--target: ,-->
-                                                         <!--text: function(item) {-->
-                                                             <!--return item.name;-->
-                                                         <!--},-->
-                                                         <!--small: true-->
-                                                     <!--}">-->
-                                    <!--</span>-->
-                                <!--</td>-->
-                            <!--</tr>-->
                         </tbody>
                     </table>
                 </div>
