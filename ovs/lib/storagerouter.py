@@ -1,10 +1,10 @@
 # Copyright 2014 iNuron NV
 #
-# Licensed under the Open vStorage Non-Commercial License, Version 1.0 (the "License");
+# Licensed under the Open vStorage Modified Apache License (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/OVS_NON_COMMERCIAL
+#     http://www.openvstorage.org/license
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -697,6 +697,7 @@ class StorageRouterController(object):
             storagedriver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
                                                                       alba_connection_port=alba_proxy.service.ports[0],
                                                                       alba_connection_preset=vpool.metadata['preset'],
+                                                                      alba_connection_timeout=15,
                                                                       backend_type='ALBA')
         elif vpool.backend_type.code in ['local', 'distributed']:
             storagedriver_config.configure_backend_connection_manager(**local_backend_data)
