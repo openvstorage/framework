@@ -654,7 +654,7 @@
         "newsletter": "Newsletter",
         "newsletterhelp": "I want to receive the Open vStorage newsletter.",
         "agreement": "Agreement",
-        "agreementhelp": "I hereby accept the <a href=\"https://www.openvstorage.org/OVS_NON_COMMERCIAL\" target=\"_blank\">Modified Apache License</a> of Open vStorage.",
+        "agreementhelp": "I hereby accept the <a href=\"https://www.openvstorage.org/license\" target=\"_blank\">Modified Apache License</a> of Open vStorage.",
         "register": "Register",
         "success": "Successful",
         "successmsg": "Registration completed.",
