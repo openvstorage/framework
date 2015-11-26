@@ -1,7 +1,6 @@
 [Unit]
 Description=ovs dtl
-Requires=<ADDITIONAL_DEPENDENCIES>
-Wants=ovs-watcher-volumedriver.service
+Requires=ovs-watcher-volumedriver.service
 After=ovs-watcher-volumedriver.service
 
 [Service]
