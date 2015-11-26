@@ -92,14 +92,12 @@ class StorageDriverController(object):
     @staticmethod
     @celery.task(name='ovs.storagedriver.volumedriver_error')
     @log('VOLUMEDRIVER_TASK')
-    def volumedriver_error(code, volumename, storagedriver_id):
+    def volumedriver_error(code, volumename):
         """
         Handles error messages/events from the volumedriver
         :param code: Volumedriver error code
         :param volumename: Name of the volume throwing the error
-        :param storagedriver_id: ID of the storagedriver hosting the volume
         """
-        _ = storagedriver_id  # Required for the @log decorator
         if code == VolumeDriverEvents.MDSFailover:
             disk = VDiskList.get_vdisk_by_volume_id(volumename)
             if disk is not None:
@@ -151,8 +149,8 @@ class StorageDriverController(object):
                 break
 
     @staticmethod
-    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', bind=True, schedule=crontab(minute='30', hour='*'))
-    @ensure_single(['ovs.storagedriver.scheduled_voldrv_arakoon_checkup'])
+    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=crontab(minute='30', hour='*'))
+    @ensure_single(task_name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup')
     def scheduled_voldrv_arakoon_checkup():
         """
         Makes sure the volumedriver arakoon is on all available master nodes
@@ -170,6 +168,16 @@ class StorageDriverController(object):
     @staticmethod
     def _voldrv_arakoon_checkup(create_cluster):
         def add_service(service_storagerouter, arakoon_result):
+            """
+            Add a service to the storage router
+            :param service_storagerouter: Storage Router to add the service to
+            :type service_storagerouter:  StorageRouter
+
+            :param arakoon_result:        Port information
+            :type arakoon_result:         Dictionary
+
+            :return:                      The newly created and added service
+            """
             new_service = Service()
             new_service.name = service_name
             new_service.type = service_type

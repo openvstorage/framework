@@ -16,135 +16,239 @@
 Contains various decorators
 """
 
+import inspect
 import json
-from celery.task.control import inspect
+import random
+import string
+import time
 from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('lib', name='scheduled tasks')
+ENSURE_SINGLE_KEY = 'ovs_ensure_single'
 
 
 def log(event_type):
     """
     Task logger
+    :param event_type: Event type
+    :return: Pointer to function
     """
 
-    def wrap(f):
+    def wrap(function):
         """
         Wrapper function
+        :param function: Function to log something about
         """
 
         def new_function(*args, **kwargs):
             """
             Wrapped function
+            :param args: Arguments without default values
+            :param kwargs: Arguments with default values
             """
             # Log the call
-            if event_type == 'VOLUMEDRIVER_TASK':
+            if event_type == 'VOLUMEDRIVER_TASK' and 'storagedriver_id' in kwargs:
                 metadata = {'storagedriver': StorageDriverList.get_by_storagedriver_id(kwargs['storagedriver_id']).guid}
             else:
                 metadata = {}
             _logger = LogHandler.get('log', name=event_type.lower())
             _logger.info('[{0}.{1}] - {2} - {3} - {4}'.format(
-                f.__module__,
-                f.__name__,
+                function.__module__,
+                function.__name__,
                 json.dumps(list(args)),
                 json.dumps(kwargs),
                 json.dumps(metadata)
             ))
 
             # Call the function
-            return f(*args, **kwargs)
+            return function(*args, **kwargs)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
+        new_function.__name__ = function.__name__
+        new_function.__module__ = function.__module__
         return new_function
 
     return wrap
 
 
-def ensure_single(tasknames):
+def ensure_single(task_name, extra_task_names=None, mode='DEFAULT'):
     """
     Decorator ensuring a new task cannot be started in case a certain task is
     running, scheduled or reserved.
 
-    The task using this decorator on, must be a bound task (with bind=True argument). Keep also in
+    The task using this decorator on. Keep also in
     mind that validation will be executed by the worker itself, so if the task is scheduled on
     a worker currently processing a "duplicate" task, it will only get validated after the first
     one completes, which will result in the fact that the task will execute normally.
 
-    @param tasknames: list of names to check
-    @type tasknames: list
+    Allowed modes:
+     - DEFAULT: If any of the specified task names is being executed, the calling function will not be executed
+     - CHAINED: If a task is being executed, the new task will be appended for later execution
+
+    :param task_name:        Name of the task to ensure its singularity
+    :type task_name:         String
+
+    :param extra_task_names: Extra tasks to take into account
+    :type extra_task_names:  List
+
+    :param mode:             Mode of the ensure single. Allowed values: DEFAULT, CHAINED
+    :type mode:              String
+
+    :return:                 Pointer to function
     """
     def wrap(function):
         """
         Wrapper function
+        :param function: Function to check
         """
-        def wrapped(self=None, *args, **kwargs):
+        def new_function(*args, **kwargs):
             """
             Wrapped function
+            :param args: Arguments without default values
+            :param kwargs: Arguments with default values
             """
-            if not hasattr(self, 'request'):
-                raise RuntimeError('The decorator ensure_single can only be applied to bound tasks (with bind=True argument)')
-            task_id = self.request.id
-
-            reason = ''
-
-            def can_run():
-                global reason
+            def log_message(message, level='info'):
                 """
-                Checks whether a task is running/scheduled/reserved.
-                The check is executed in stages, as querying the inspector is a slow call.
+                Log a message with some additional information
+                :param message: Message to log
+                :param level:   Log level
+                :return:        None
                 """
-                if tasknames:
-                    inspector = inspect()
-                    active = inspector.active()
-                    if active:
-                        for taskname in tasknames:
-                            for worker in active.values():
-                                for task in worker:
-                                    if task['id'] != task_id and taskname == task['name']:
-                                        reason = 'active'
-                                        return False
-                    scheduled = inspector.scheduled()
-                    if scheduled:
-                        for taskname in tasknames:
-                            for worker in scheduled.values():
-                                for task in worker:
-                                    request = task['request']
-                                    if request['id'] != task_id and taskname == request['name']:
-                                        reason = 'scheduled'
-                                        return False
-                    reserved = inspector.reserved()
-                    if reserved:
-                        for taskname in tasknames:
-                            for worker in reserved.values():
-                                for task in worker:
-                                    if task['id'] != task_id and taskname == task['name']:
-                                        reason = 'reserved'
-                                        return False
-                return True
+                if level not in ('info', 'warning', 'debug', 'error'):
+                    raise ValueError('Unsupported log level "{0}" specified'.format(level))
+                complete_message = 'Ensure single {0} mode - ID {1} - {2}'.format(mode, now, message)
+                getattr(logger, level)(complete_message)
 
-            if can_run():
-                return function(*args, **kwargs)
+            def update_value(key, append, value_to_store=None):
+                """
+                Store the specified value in the PersistentFactory
+                :param key:            Key to store the value for
+                :param append:         If True, the specified value will be appended else element at index 0 will be popped
+                :param value_to_store: Value to append to the list
+                :return:               None
+                """
+                with VolatileMutex(name=key, wait=5):
+                    if persistent_client.exists(key):
+                        val = persistent_client.get(key)
+                        if append is True and value_to_store is not None:
+                            val['values'].append(value_to_store)
+                        elif append is False:
+                            val['values'].pop(0)
+                    else:
+                        log_message('Setting initial value for key {0}'.format(persistent_key))
+                        val = {'mode': mode,
+                               'values': []}
+                    persistent_client.set(key, val)
+
+            now = '{0}_{1}'.format(int(time.time()), ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10)))
+            task_names = [task_name] if extra_task_names is None else [task_name] + extra_task_names
+            persistent_key = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task_name)
+            persistent_client = PersistentFactory.get_client()
+
+            if mode == 'DEFAULT':
+                with VolatileMutex(persistent_key, wait=5):
+                    for task in task_names:
+                        key_to_check = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task)
+                        if persistent_client.exists(key_to_check):
+                            log_message('Execution of task {0} discarded'.format(task_name))
+                            return None
+                    log_message('Setting key {0}'.format(persistent_key))
+                    persistent_client.set(persistent_key, {'mode': mode})
+
+                try:
+                    output = function(*args, **kwargs)
+                    log_message('Task {0} finished successfully'.format(task_name))
+                    return output
+                finally:
+                    with VolatileMutex(persistent_key, wait=5):
+                        if persistent_client.exists(persistent_key):
+                            log_message('Deleting key {0}'.format(persistent_key))
+                            persistent_client.delete(persistent_key)
+
+            elif mode == 'CHAINED':
+                if extra_task_names is not None:
+                    log_message('Extra tasks are not allowed in this mode',
+                                level='error')
+                    raise ValueError('Ensure single {0} mode - ID {1} - Extra tasks are not allowed in this mode'.format(mode, now))
+
+                # 1. Create key to be stored in arakoon and update kwargs with args
+                timeout = kwargs.pop('chain_timeout') if 'chain_timeout' in kwargs else 30
+                function_info = inspect.getargspec(function)
+                kwargs_dict = {}
+                for index, arg in enumerate(args):
+                    kwargs_dict[function_info.args[index]] = arg
+                kwargs_dict.update(kwargs)
+                params_info = 'with params {0}'.format(kwargs_dict) if kwargs_dict else 'with default params'
+
+                # 2. Set the key in arakoon if non-existent
+                update_value(key=persistent_key,
+                             append=True)
+
+                # 3. Validate whether another job with same params is being executed, skip if so
+                value = persistent_client.get(persistent_key)
+                for item in value['values'][1:]:  # 1st element is processing job, we check all other queued jobs for identical params
+                    if item['kwargs'] == kwargs_dict:
+                        log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
+                        return None
+                log_message('New task {0} {1} scheduled for execution'.format(task_name, params_info))
+                update_value(key=persistent_key,
+                             append=True,
+                             value_to_store={'kwargs': kwargs_dict,
+                                             'timestamp': now})
+
+                # 4. Poll the arakoon to see whether this call is the first in list, if so --> execute, else wait
+                first_element = None
+                counter = 0
+                while first_element != now and counter < timeout:
+                    value = persistent_client.get(persistent_key)
+                    first_element = value['values'][0]['timestamp']
+
+                    if first_element == now:
+                        try:
+                            if counter != 0:
+                                current_time = int(time.time())
+                                starting_time = int(now.split('_')[0])
+                                log_message('Task {0} {1} had to wait {2} seconds before being able to start'.format(task_name,
+                                                                                                                     params_info,
+                                                                                                                     current_time - starting_time))
+                            output = function(*args, **kwargs)
+                            log_message('Task {0} finished successfully'.format(task_name))
+                        finally:
+                            update_value(key=persistent_key,
+                                         append=False)
+                        return output
+                    counter += 1
+                    time.sleep(1)
+                    if counter == timeout:
+                        update_value(key=persistent_key,
+                                     append=False)
+                        log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
+                                    level='error')
+                        raise RuntimeError('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
+                                                                                                                                           now,
+                                                                                                                                           task_name,
+                                                                                                                                           timeout))
             else:
-                logger.debug('Execution of task {0}[{1}] discarded'.format(
-                    self.name, self.request.id
-                ))
-                return None
+                raise ValueError('Unsupported mode "{0}" provided'.format(mode))
 
-        wrapped.__name__ = function.__name__
-        wrapped.__module__ = function.__module__
-        return wrapped
+        new_function.__name__ = function.__name__
+        new_function.__module__ = function.__module__
+        return new_function
     return wrap
 
 
 def add_hooks(hook_type, hooks):
     """
     This decorator marks the decorated function to be interested in a certain hook
+    :param hook_type: Type of hook
+    :param hooks: Hooks to add to function
     """
     def wrap(function):
         """
         Wrapper function
+        :param function: Function to add hooks on
         """
         if not hasattr(function, 'hooks'):
             function.hooks = {}

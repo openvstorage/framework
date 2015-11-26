@@ -27,22 +27,23 @@ import subprocess
 from paramiko import AuthenticationException
 
 from ConfigParser import RawConfigParser
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.filemutex import FileMutex
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
-from ovs.log.logHandler import LogHandler
-from ovs.lib.helpers.toolbox import Toolbox
 from ovs.extensions.migration.migrator import Migrator
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.packages.package import PackageManager
+from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.filemutex import FileMutex
+from ovs.lib.helpers.toolbox import Toolbox
+from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('lib', name='setup')
 logger.logger.propagate = False
@@ -78,6 +79,8 @@ class SetupController(object):
         2. Prepare cluster
         3. Depending on (2), setup first/extra node
         4. Depending on (2), promote new extra node
+        :param ip: IP of the node to set up
+        :param force_type: Force master or extra node
         """
 
         print Interactive.boxed_message(['Open vStorage Setup'])
@@ -386,6 +389,7 @@ class SetupController(object):
     def promote_or_demote_node(node_action):
         """
         Promotes or demotes the local node
+        :param node_action: Demote or promote
         """
 
         if node_action not in ('promote', 'demote'):
@@ -501,6 +505,10 @@ class SetupController(object):
 
     @staticmethod
     def update_framework():
+        """
+        Update the framework
+        :return: None
+        """
         file_mutex = FileMutex('system_update', wait=2)
         upgrade_file = '/etc/ready_for_upgrade'
         upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
@@ -670,6 +678,10 @@ class SetupController(object):
 
     @staticmethod
     def update_volumedriver():
+        """
+        Update the volumedriver
+        :return: None
+        """
         file_mutex = FileMutex('system_update', wait=2)
         upgrade_file = '/etc/ready_for_upgrade'
         upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
@@ -1681,6 +1693,9 @@ EOF
     def change_service_state(client, name, state):
         """
         Starts/stops/restarts a service
+        :param client: SSHClient on which to connect and change service state
+        :param name: Name of the service
+        :param state: State to put the service in
         """
         action = None
         # Enable service before changing the state

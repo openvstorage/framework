@@ -52,9 +52,8 @@ define([
         data.cacheStrategy('on_read');
         data.dedupeMode('dedupe');
         data.distributedMtpt(undefined);
-        data.dtlEnabled(false);
-        data.dtlLocation('');
-        data.dtlMode('no_sync');
+        data.dtlEnabled(true);
+        data.dtlMode({name: 'a_sync', disabled: false});
         data.dtlTransportMode({name: 'tcp'});
         data.hasMgmtCenter(false);
         data.host('');

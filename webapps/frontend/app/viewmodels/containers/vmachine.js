@@ -59,7 +59,7 @@ define([
         self.backendWritten        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendRead           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.bandwidthSaved        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.dtlMode               = ko.observable();
+        self.dtlStatus             = ko.observable();
         self.snapshots             = ko.observableArray([]);
         self.vDisks                = ko.observableArray([]);
         self.templateChildrenGuids = ko.observableArray([]);
@@ -117,7 +117,7 @@ define([
                 self.snapshots(snapshots);
             }
             generic.trySet(self.status, data, 'status', generic.lower);
-            generic.trySet(self.dtlMode, data, 'dtl_mode', generic.lower);
+            generic.trySet(self.dtlStatus, data, 'dtl_mode', generic.lower);
             generic.trySet(self.pMachineGuid, data, 'pmachine_guid');
             if (data.hasOwnProperty('storagerouters_guids')) {
                 self.storageRouterGuids = data.storagerouters_guids;
