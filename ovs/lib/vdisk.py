@@ -816,13 +816,10 @@ class VDiskController(object):
                 continue
 
             reconfigure_required = False
-            if current_dtl_config is None and len(available_storagerouters) > 0:
+            if current_dtl_config is None:
                 logger.info('        No DTL configuration found, but there are Storage Routers available')
                 reconfigure_required = True
-            elif current_dtl_config is not None and len(available_storagerouters) == 0:
-                logger.info('        Resetting DTL configuration since no more available Storage Routers found')
-                reconfigure_required = True
-            elif current_dtl_config is not None:
+            else:
                 dtl_host = current_dtl_config.host
                 dtl_port = current_dtl_config.port
                 storage_drivers = [sd for sd in vpool.storagedrivers if sd.storagerouter.ip == dtl_host]
