@@ -24,6 +24,7 @@ import time
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('lib', name='scheduled tasks')
@@ -73,7 +74,7 @@ def log(event_type):
     return wrap
 
 
-def ensure_single(task_name, extra_task_names=None, mode='DEFAULT'):
+def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeout=300):
     """
     Decorator ensuring a new task cannot be started in case a certain task is
     running, scheduled or reserved.
@@ -95,6 +96,9 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT'):
 
     :param mode:             Mode of the ensure single. Allowed values: DEFAULT, CHAINED
     :type mode:              String
+
+    :param global_timeout:   Timeout before raising error (Only applicable in CHAINED mode)
+    :type global_timeout:    Integer
 
     :return:                 Pointer to function
     """
@@ -174,7 +178,7 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT'):
                     raise ValueError('Ensure single {0} mode - ID {1} - Extra tasks are not allowed in this mode'.format(mode, now))
 
                 # 1. Create key to be stored in arakoon and update kwargs with args
-                timeout = kwargs.pop('chain_timeout') if 'chain_timeout' in kwargs else 30
+                timeout = kwargs.pop('chain_timeout') if 'chain_timeout' in kwargs else global_timeout
                 function_info = inspect.getargspec(function)
                 kwargs_dict = {}
                 for index, arg in enumerate(args):
@@ -226,10 +230,10 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT'):
                                      append=False)
                         log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
                                     level='error')
-                        raise RuntimeError('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
-                                                                                                                                           now,
-                                                                                                                                           task_name,
-                                                                                                                                           timeout))
+                        raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
+                                                                                                                                                         now,
+                                                                                                                                                         task_name,
+                                                                                                                                                         timeout))
             else:
                 raise ValueError('Unsupported mode "{0}" provided'.format(mode))
 

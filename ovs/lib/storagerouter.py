@@ -837,7 +837,7 @@ class StorageRouterController(object):
         vpool.size = vfs_info.f_blocks * vfs_info.f_bsize
         vpool.save()
 
-        VDiskController.dtl_checkup(vpool_guid=vpool.guid)
+        VDiskController.dtl_checkup(vpool_guid=vpool.guid, chain_timeout=600)
         for vdisk in vpool.vdisks:
             MDSServiceController.ensure_safety(vdisk=vdisk)
 
