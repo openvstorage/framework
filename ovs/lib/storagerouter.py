@@ -1387,8 +1387,12 @@ class StorageRouterController(object):
                     alba_downtime.append(('ovs', 'proxy', service.alba_proxy.storagedriver.vpool.name))
 
         prerequisites = [('ovs', 'vmachine', None)] if running_vms is True else []
+        volumedriver_services = ['ovs-volumedriver_{0}'.format(sd.vpool.name)
+                                 for sd in this_sr.storagedrivers]
+        volumedriver_services.extend(['ovs-dtl_{0}'.format(sd.vpool.name) 
+                                      for sd in this_sr.storagedrivers])
         voldrv_info = PackageManager.verify_update_required(packages=['volumedriver-base', 'volumedriver-server'],
-                                                            services=['watcher-volumedriver'],
+                                                            services=volumedriver_services,
                                                             client=client)
         alba_info = PackageManager.verify_update_required(packages=['alba'],
                                                           services=[service.service.name for service in alba_proxies],
