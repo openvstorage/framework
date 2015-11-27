@@ -385,7 +385,10 @@ class VDiskController(object):
         if storagedriver_guid is not None:
             storagedriver_id = StorageDriver(storagedriver_guid).storagedriver_id
         else:
-            storagedriver_id = vdisk.storagedriver_id
+            for storagedriver in vdisk.vpool.storagedrivers:
+                if storagedriver.storagerouter_guid in pmachine.storagerouters_guids:
+                    storagedriver_id = storagedriver.storagedriver_id
+
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         if storagedriver is None:
             raise RuntimeError('Could not find StorageDriver with id {0}'.format(storagedriver_id))
@@ -400,13 +403,14 @@ class VDiskController(object):
         new_vdisk.vmachine = VMachine(machineguid) if machineguid else vdisk.vmachine
         new_vdisk.save()
 
-        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
+        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, new_vdisk.vpool)
         if mds_service is None:
             raise RuntimeError('Could not find a MDS service')
 
         logger.info('Create disk from template {0} to new disk {1} to location {2}'.format(
             vdisk.name, new_vdisk.name, disk_path
         ))
+
         try:
             volume_id = vdisk.storagedriver_client.create_clone_from_template(
                 target_path=disk_path,
