@@ -42,6 +42,7 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.decorators import log
+from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.logHandler import LogHandler
@@ -156,7 +157,10 @@ class VDiskController(object):
 
         VDiskController.sync_with_mgmtcenter(disk, pmachine, storagedriver)
         MDSServiceController.ensure_safety(disk)
-        VDiskController.dtl_checkup(vdisk_guid=disk.guid)
+        try:
+            VDiskController.dtl_checkup(vdisk_guid=disk.guid)
+        except EnsureSingleTimeoutReached:
+            pass
 
     @staticmethod
     @celery.task(name='ovs.vdisk.rename_from_voldrv')
@@ -414,7 +418,10 @@ class VDiskController(object):
             new_vdisk.volume_id = volume_id
             new_vdisk.save()
             MDSServiceController.ensure_safety(new_vdisk)
-            VDiskController.dtl_checkup(vdisk_guid=new_vdisk.guid)
+            try:
+                VDiskController.dtl_checkup(vdisk_guid=new_vdisk.guid)
+            except EnsureSingleTimeoutReached:
+                logger.warning('DTL will be in DEGRADED mode because DTL checkup could not be started within due time')
 
         except Exception as ex:
             logger.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
@@ -866,4 +873,5 @@ class VDiskController(object):
                 logger.info('Degraded DTL detected for volume {0} with guid {1}'.format(vdisk.name, vdisk.guid))
                 storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
                 VDiskController.dtl_checkup(vdisk_guid=vdisk.guid,
-                                            storagerouters_to_exclude=[storagedriver.storagerouter.guid])
+                                            storagerouters_to_exclude=[storagedriver.storagerouter.guid],
+                                            chain_timeout=600)
