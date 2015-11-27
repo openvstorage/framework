@@ -1242,6 +1242,9 @@ class SetupController(object):
         service.storagerouter = storagerouter
         service.save()
 
+        master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
+        slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
+
         if configure_rabbitmq:
             SetupController._configure_rabbitmq(target_client)
 
@@ -1271,11 +1274,11 @@ class SetupController(object):
                 SetupController.change_service_state(target_client, service, 'start')
 
         print 'Restarting services'
-        SetupController._restart_framework_and_memcache_services(ip_client_map)
+        SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if SetupController._run_hooks('promote', cluster_ip, master_ip):
             print 'Restarting services'
-            SetupController._restart_framework_and_memcache_services(ip_client_map)
+            SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -1351,6 +1354,9 @@ class SetupController(object):
             if service.name == 'arakoon-ovsdb':
                 service.delete()
 
+        master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
+        slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
+
         if configure_rabbitmq:
             print 'Removing/unconfiguring RabbitMQ'
             logger.debug('Removing/unconfiguring RabbitMQ')
@@ -1384,11 +1390,11 @@ class SetupController(object):
 
         print 'Restarting services'
         logger.debug('Restarting services')
-        SetupController._restart_framework_and_memcache_services(ip_client_map, target_client)
+        SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if SetupController._run_hooks('demote', cluster_ip, master_ip):
             print 'Restarting services'
-            SetupController._restart_framework_and_memcache_services(ip_client_map, target_client)
+            SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
@@ -1397,14 +1403,17 @@ class SetupController(object):
         logger.info('Demote complete')
 
     @staticmethod
-    def _restart_framework_and_memcache_services(ip_client_map, memcached_exclude_client=None):
-        for service_info in [('watcher-framework', 'stop'),
-                             ('memcached', 'restart'),
-                             ('watcher-framework', 'start')]:
-            for node_client in ip_client_map.itervalues():
-                if memcached_exclude_client is not None and memcached_exclude_client.ip == node_client.ip and service_info[0] == 'memcached':
-                    continue  # Skip memcached for demoted nodes, because they don't run that service
-                SetupController.change_service_state(node_client, service_info[0], service_info[1])
+    def _restart_framework_and_memcache_services(masters, slaves, clients):
+        memcached = 'memcached'
+        watcher = 'watcher-framework'
+        for ip in masters + slaves:
+            if ServiceManager.has_service(watcher, clients[ip]):
+                SetupController.change_service_state(clients[ip], watcher, 'stop')
+        for ip in masters:
+            SetupController.change_service_state(clients[ip], memcached, 'restart')
+        for ip in masters + slaves:
+            if ServiceManager.has_service(watcher, clients[ip]):
+                SetupController.change_service_state(clients[ip], watcher, 'start')
         VolatileFactory.store = None
 
     @staticmethod
