@@ -21,7 +21,7 @@ On our community website you can find [more information](https://www.openvstorag
 ## Contribution & Packaging
 
 We welcome contributions.
-Packaging your own changes for testing can be done using the [packager module](packaging/generic/packager.py)
+Packaging your own changes for testing can be done using the [packager module](https://github.com/openvstorage/framework-tools/blob/master/packaging/packager.py)
 
 ## File a bug
 Open vStorage is quality checked to the highest level. Unfortunately we might have overlooked some tiny topics here or there. The Open vStorage Project maintains a [public issue tracker](https://github.com/openvstorage/openvstorage/issues) where you can report bugs and request features. This issue tracker is not a customer support forum but an error, flaw, failure, or fault in the Open vStorage software.
