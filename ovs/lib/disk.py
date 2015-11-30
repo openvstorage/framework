@@ -71,7 +71,7 @@ class DiskController(object):
                 context = remote.Context()
                 devices = [device for device in context.list_devices(subsystem='block')
                            if ('ID_TYPE' in device and device['ID_TYPE'] == 'disk') or
-                              ('DEVNAME' in device and 'nvme' in device['DEVNAME'])]
+                              ('DEVNAME' in device and ('loop' in device['DEVNAME'] or 'nvme' in device['DEVNAME']))]
                 for device in devices:
                     is_partition = device['DEVTYPE'] == 'partition'
                     device_path = device['DEVNAME']
@@ -84,7 +84,7 @@ class DiskController(object):
                             extended_parition_info = True
                             partition_id = device['ID_PART_ENTRY_NUMBER']
                             partition_name = device_name
-                            if device_name.startswith('nvme'):
+                            if device_name.startswith('nvme') or device_name.startswith('loop'):
                                 device_name = device_name[:0 - int(len(partition_id)) - 1]
                             else:
                                 device_name = device_name[:0 - int(len(partition_id))]
