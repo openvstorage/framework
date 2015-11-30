@@ -16,7 +16,6 @@ function show_help {
     echo "* ovs setup demote          Demote this node (master -> extra)"
     echo "* ovs monitor services      Watch Open vStorage services"
     echo "* ovs monitor heartbeat     Send an internal heartbeat"
-    echo "* ovs monitor mds           Watch MDS configuration/loads"
     echo "* ovs stop services         Try to stop all Open vStorage services"
     echo "* ovs start services        Try to start all Open vStorage servces"
     echo "* ovs collect logs          Collect all Open vStorage logs to a tarball"
@@ -59,8 +58,6 @@ elif [ "$1" = "monitor" ] ; then
     fi
     elif [ "$2" = "heartbeat" ] ; then
         python /opt/OpenvStorage/ovs/extensions/generic/heartbeat.py
-    elif [ "$2" = "mds" ] ; then
-        python /opt/OpenvStorage/ovs/lib/mdsservice.py
     else
         show_help
     fi
