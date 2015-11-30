@@ -35,6 +35,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.services.service import ServiceManager
@@ -796,7 +797,11 @@ class VDiskController(object):
                     if vpool.guid not in storagerouter.vpools_guids:
                         continue
                     if storagerouter not in root_client_map:
-                        root_client = SSHClient(storagerouter, username='root')
+                        try:
+                            root_client = SSHClient(storagerouter, username='root')
+                        except UnableToConnectException:
+                            logger.warning('    Storage Router with IP {0} of vDisk {1} is not reachable'.format(storagerouter.ip, vdisk.name))
+                            continue
                         root_client_map[storagerouter] = root_client
                     else:
                         root_client = root_client_map[storagerouter]
@@ -808,7 +813,11 @@ class VDiskController(object):
                     if vpool.guid not in storagerouter.vpools_guids or storagerouter == storage_router:
                         continue
                     if storagerouter not in root_client_map:
-                        root_client = SSHClient(storagerouter, username='root')
+                        try:
+                            root_client = SSHClient(storagerouter, username='root')
+                        except UnableToConnectException:
+                            logger.warning('    Storage Router with IP {0} of vDisk {1} is not reachable'.format(storagerouter.ip, vdisk.name))
+                            continue
                         root_client_map[storagerouter] = root_client
                     else:
                         root_client = root_client_map[storagerouter]
