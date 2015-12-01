@@ -98,6 +98,11 @@ class DiskController(object):
                             partition_name = device_name
                             partition_id = match.groups()[1]
                             device_name = match.groups()[0]
+                    sectors = int(client.run('cat /sys/block/{0}/size'.format(device_name)))
+                    sector_size = int(client.run('cat /sys/block/{0}/queue/hw_sector_size'.format(device_name)))
+                    rotational = int(client.run('cat /sys/block/{0}/queue/rotational'.format(device_name)))
+                    if sectors == 0:
+                        continue
                     if device_name not in configuration:
                         configuration[device_name] = {'partitions': {}}
                     path = None
@@ -110,9 +115,6 @@ class DiskController(object):
                                     path = item
                     if path is None:
                         path = device_path
-                    sectors = int(client.run('cat /sys/block/{0}/size'.format(device_name)))
-                    sector_size = int(client.run('cat /sys/block/{0}/queue/hw_sector_size'.format(device_name)))
-                    rotational = int(client.run('cat /sys/block/{0}/queue/rotational'.format(device_name)))
                     if is_partition is True:
                         if 'ID_PART_ENTRY_TYPE' in device and device['ID_PART_ENTRY_TYPE'] == '0x5':
                             continue  # This is an extended partition, let's skip that one
