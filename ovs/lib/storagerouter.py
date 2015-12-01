@@ -245,7 +245,17 @@ class StorageRouterController(object):
         all_storagerouters = [storagerouter]
         current_storage_driver_config = {}
         if vpool is not None:
+            required_params_sd_config = {'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
+                                         'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
+                                         'dedupe_mode': (str, StorageDriverClient.VPOOL_DEDUPE_MAP.keys()),
+                                         'write_buffer': (float, None),
+                                         'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys()),
+                                         'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
+                                         'tlog_multiplier': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.values())}
             current_storage_driver_config = VPoolController.get_configuration(vpool.guid)
+            Toolbox.verify_required_params(required_params=required_params_sd_config,
+                                           actual_params=current_storage_driver_config)
+
             if vpool.backend_type.code == 'local':
                 # Might be an issue, investigating whether it's on the same Storage Router or not
                 if len(vpool.storagedrivers) == 1 and vpool.storagedrivers[0].storagerouter.machine_id != unique_id:
@@ -342,7 +352,9 @@ class StorageRouterController(object):
         ######################
         # START ADDING VPOOL #
         ######################
+        new_vpool = False
         if vpool is None:  # Keep in mind that if the Storage Driver exists, the vPool does as well
+            new_vpool = True
             vpool = VPool()
             vpool.backend_type = backend_type
             connection_host = parameters.get('connection_host', '')
@@ -441,7 +453,6 @@ class StorageRouterController(object):
             arakoon_node_configs.append(ArakoonNodeConfig(arakoon_node,
                                                           voldrv_arakoon_client_config[arakoon_node][0][0],
                                                           voldrv_arakoon_client_config[arakoon_node][1]))
-        vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), voldrv_arakoon_cluster_id, arakoon_node_configs)
         node_configs = []
         for existing_storagedriver in StorageDriverList.get_storagedrivers():
             if existing_storagedriver.vpool_guid == vpool.guid:
@@ -452,7 +463,14 @@ class StorageRouterController(object):
                                                       existing_storagedriver.ports[2]))
         if new_storagedriver:
             node_configs.append(ClusterNodeConfig(vrouter_id, str(grid_ip), ports[0], ports[1], ports[2]))
-        vrouter_clusterregistry.set_node_configs(node_configs)
+
+        try:
+            vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), voldrv_arakoon_cluster_id, arakoon_node_configs)
+            vrouter_clusterregistry.set_node_configs(node_configs)
+        except:
+            if new_vpool is True:
+                vpool.delete()
+            raise
 
         filesystem_config = StorageDriverConfiguration.build_filesystem_by_hypervisor(storagerouter.pmachine.hvtype)
         filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
@@ -1389,7 +1407,7 @@ class StorageRouterController(object):
         prerequisites = [('ovs', 'vmachine', None)] if running_vms is True else []
         volumedriver_services = ['ovs-volumedriver_{0}'.format(sd.vpool.name)
                                  for sd in this_sr.storagedrivers]
-        volumedriver_services.extend(['ovs-dtl_{0}'.format(sd.vpool.name) 
+        volumedriver_services.extend(['ovs-dtl_{0}'.format(sd.vpool.name)
                                       for sd in this_sr.storagedrivers])
         voldrv_info = PackageManager.verify_update_required(packages=['volumedriver-base', 'volumedriver-server'],
                                                             services=volumedriver_services,
