@@ -158,10 +158,7 @@ class VDiskController(object):
 
         VDiskController.sync_with_mgmtcenter(disk, pmachine, storagedriver)
         MDSServiceController.ensure_safety(disk)
-        try:
-            VDiskController.dtl_checkup.s(vdisk_guid=disk.guid).apply_async()
-        except EnsureSingleTimeoutReached:
-            pass
+        VDiskController.dtl_checkup.delay(vdisk_guid=disk.guid)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.rename_from_voldrv')
@@ -279,7 +276,7 @@ class VDiskController(object):
             MDSServiceController.ensure_safety(new_vdisk)
         except Exception as ex:
             logger.error('Caught exception during "ensure_safety" {0}'.format(ex))
-        VDiskController.dtl_checkup.s(vdisk_guid=new_vdisk.guid).apply_async()
+        VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
 
         return {'diskguid': new_vdisk.guid,
                 'name': new_vdisk.name,
@@ -423,7 +420,7 @@ class VDiskController(object):
             new_vdisk.volume_id = volume_id
             new_vdisk.save()
             MDSServiceController.ensure_safety(new_vdisk)
-            VDiskController.dtl_checkup.s(vdisk_guid=new_vdisk.guid).apply_async()
+            VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
         except Exception as ex:
             logger.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
             new_vdisk.delete()
