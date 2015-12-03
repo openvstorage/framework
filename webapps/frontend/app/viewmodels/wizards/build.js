@@ -24,7 +24,6 @@ define([
         parent.running     = ko.observable(false);
         parent.steps       = ko.observableArray([]);
         parent.loadingNext = ko.observable(false);
-        parent.composed    = ko.observable(false);
 
         // Deferreds
         parent.closing   = $.Deferred();
@@ -74,15 +73,6 @@ define([
             }
             return { value: true, reasons: [], fields: [] };
         });
-        parent.loading = ko.computed(function() {
-            if (parent.step() === 0) {
-                if (parent.activeStep.canActivate() && parent.activeStep.isActivating()) {
-                    return true;
-                }
-                return !parent.composed();
-            }
-            return false;
-        });
 
         // Functions
         parent.next = function() {
@@ -98,8 +88,7 @@ define([
                     if (step.hasOwnProperty('next') && step.next && step.next.call) {
                         chainPromise = chainPromise.then(step.next);
                     }
-                    chainPromise
-                        .done(deferred.resolve)
+                    chainPromise.done(deferred.resolve)
                         .fail(deferred.reject);
                 }).promise()
                     .done(function() {
@@ -112,13 +101,6 @@ define([
             }
         };
         parent.activateStep = function() {
-            if (!parent.composed()) {
-                $.each(parent.steps(), function(index, step) {
-                    step.compositionComplete = function() {
-                        parent.composed(true);
-                    }
-                });
-            }
             parent.activeStep(parent.steps()[parent.step()]);
         };
         parent.previous = function() {
