@@ -423,8 +423,11 @@ class VDiskController(object):
             VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
         except Exception as ex:
             logger.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
-            new_vdisk.delete()
-            raise
+            try:
+                new_vdisk.delete()
+            except Exception as ex2:
+                logger.exception('Exception during exception handling of "create_clone_from_template" : {0}'.format(str(ex2)))
+            raise ex
 
         return {'diskguid': new_vdisk.guid, 'name': new_vdisk.name,
                 'backingdevice': disk_path}
