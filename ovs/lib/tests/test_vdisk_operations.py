@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Delete snapshots test module
+Vdisk operations test module
 """
 import sys
 import unittest
@@ -27,7 +27,7 @@ from ovs.extensions.generic.system import System
 
 class VDiskOperations(TestCase):
     """
-    This test class will validate the various scenarios of the delete snapshots logic
+    This test class will test the various operations of the vdisk controller 
     """
     VDisk = None
     PMachine = None
