@@ -13,7 +13,7 @@
             }
         },
         "storage": {
-            "persistent": "arakoon",
+            "persistent": "pyrakoon",
             "volatile": "memcache"
         },
         "audittrails": {
