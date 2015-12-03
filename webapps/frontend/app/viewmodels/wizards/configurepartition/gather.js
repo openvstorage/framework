@@ -62,19 +62,23 @@ define([
 
         // Durandal
         self.activate = function() {
-            api.post('storagerouters/' + self.data.storageRouter().guid() + '/get_metadata')
-                .then(self.shared.tasks.wait)
-                .done(function(metadata) {
-                    self.data.currentUsage(metadata.partitions);
-                    self.data.roles([]);
-                    $.each(metadata.partitions, function(role, partitions) {
-                        $.each(partitions, function(index, partition) {
-                            if (partition.guid === self.data.partition().guid()) {
-                                self.data.roles.push({name: role.toLowerCase()});
-                            }
-                        })
-                    });
-                });
+            return $.Deferred(function(deferred) {
+                api.post('storagerouters/' + self.data.storageRouter().guid() + '/get_metadata')
+                    .then(self.shared.tasks.wait)
+                    .then(function(metadata) {
+                        self.data.currentUsage(metadata.partitions);
+                        self.data.roles([]);
+                        $.each(metadata.partitions, function(role, partitions) {
+                            $.each(partitions, function(index, partition) {
+                                if (partition.guid === self.data.partition().guid()) {
+                                    self.data.roles.push({name: role.toLowerCase()});
+                                }
+                            })
+                        });
+                    })
+                    .done(deferred.resolve)
+                    .fail(deferred.reject);
+            }).promise();
         };
     };
 });
