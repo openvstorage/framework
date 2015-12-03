@@ -60,7 +60,7 @@ class PyrakoonStore(object):
         Initializes the client
         """
         parser = RawConfigParser()
-        parser.read(ArakoonStore.ARAKOON_CONFIG_FILE.format(cluster))
+        parser.read(PyrakoonStore.ARAKOON_CONFIG_FILE.format(cluster))
         nodes = {}
         for node in parser.get('global', 'cluster').split(','):
             node = node.strip()
@@ -77,7 +77,7 @@ class PyrakoonStore(object):
         Retrieves a certain value for a given key
         """
         try:
-            return json.loads(ArakoonStore._try(self._identifier, self._client.get, key))
+            return json.loads(PyrakoonStore._try(self._identifier, self._client.get, key))
         except ValueError:
             raise KeyNotFoundException('Could not parse JSON stored for {0}'.format(key))
         except ArakoonNotFound as field:
@@ -88,23 +88,23 @@ class PyrakoonStore(object):
         """
         Sets the value for a key to a given value
         """
-        return ArakoonStore._try(self._identifier, self._client.set, key, json.dumps(value))
+        return PyrakoonStore._try(self._identifier, self._client.set, key, json.dumps(value))
 
     @locked()
     def prefix(self, prefix):
         """
         Lists all keys starting with the given prefix
         """
-        next_prefix = ArakoonStore._next_key(prefix)
+        next_prefix = PyrakoonStore._next_key(prefix)
         batch = None
         while batch is None or len(batch) > 0:
-            batch = ArakoonStore._try(self._identifier,
-                                      self._client.range,
-                                      beginKey=prefix if batch is None else batch[-1],
-                                      beginKeyIncluded=batch is None,
-                                      endKey=next_prefix,
-                                      endKeyIncluded=False,
-                                      maxElements=self._batch_size)
+            batch = PyrakoonStore._try(self._identifier,
+                                       self._client.range,
+                                       beginKey=prefix if batch is None else batch[-1],
+                                       beginKeyIncluded=batch is None,
+                                       endKey=next_prefix,
+                                       endKeyIncluded=False,
+                                       maxElements=self._batch_size)
             for item in batch:
                 yield item
 
@@ -114,7 +114,7 @@ class PyrakoonStore(object):
         Deletes a given key from the store
         """
         try:
-            return ArakoonStore._try(self._identifier, self._client.delete, key)
+            return PyrakoonStore._try(self._identifier, self._client.delete, key)
         except ArakoonNotFound as field:
             raise KeyNotFoundException(field)
 
@@ -123,14 +123,14 @@ class PyrakoonStore(object):
         """
         Executes a nop command
         """
-        return ArakoonStore._try(self._identifier, self._client.nop)
+        return PyrakoonStore._try(self._identifier, self._client.nop)
 
     @locked()
     def exists(self, key):
         """
         Check if key exists
         """
-        return ArakoonStore._try(self._identifier, self._client.exists, key)
+        return PyrakoonStore._try(self._identifier, self._client.exists, key)
 
     @staticmethod
     def _try(identifier, method, *args, **kwargs):
