@@ -23,7 +23,7 @@
 
 from ovs.extensions.db.pyrakoon.pyrakoon import errors, protocol
 import ovs.extensions.db.pyrakoon.pyrakoon.utils
-from pyrakoon.client.utils import call
+from ovs.extensions.db.pyrakoon.pyrakoon.client.utils import call
 
 class ClientMixin: #pylint: disable=W0232,R0904,old-style-class
     '''Mixin providing client actions for standard cluster functionality

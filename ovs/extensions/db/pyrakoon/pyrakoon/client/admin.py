@@ -21,8 +21,8 @@
 
 '''Administrative client interface'''
 
-from pyrakoon.client import utils
-from pyrakoon.protocol import admin
+from ovs.extensions.db.pyrakoon.pyrakoon.client import utils
+from ovs.extensions.db.pyrakoon.pyrakoon.protocol import admin
 
 class ClientMixin: #pylint: disable=W0232,C1001
     '''Mixin providing client actions for node administration
