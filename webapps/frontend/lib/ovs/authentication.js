@@ -73,12 +73,17 @@ define([
             }).promise();
         };
         self.logout = function() {
+            var remote = self.metadata.mode === 'remote';
             self.accessToken(undefined);
             self.metadata = {};
             window.localStorage.removeItem('accesstoken');
             self.dispatch(false)
                 .always(function() {
-                    router.navigate('');
+                    if (remote === true) {
+                        window.location.href = 'https://' + window.location.host + '/';
+                    } else {
+                        router.navigate('');
+                    }
                 });
         };
         self.dispatch = function(login) {
