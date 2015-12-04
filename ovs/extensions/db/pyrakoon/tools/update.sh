@@ -11,6 +11,7 @@ else
   rm -rf $1/ovs/extensions/db/pyrakoon/pyrakoon
   mv pyrakoon/pyrakoon $1/ovs/extensions/db/pyrakoon/
   find $1/ovs/extensions/db/pyrakoon/pyrakoon -type f -print0 | xargs -0 sed -i 's/from pyrakoon /from ovs.extensions.db.pyrakoon.pyrakoon /g'
+  find $1/ovs/extensions/db/pyrakoon/pyrakoon -type f -print0 | xargs -0 sed -i 's/from pyrakoon./from ovs.extensions.db.pyrakoon.pyrakoon./g'
   find $1/ovs/extensions/db/pyrakoon/pyrakoon -type f -print0 | xargs -0 sed -i 's/import pyrakoon/import ovs.extensions.db.pyrakoon.pyrakoon/g'
   cd ..
   rm -rf $dir
