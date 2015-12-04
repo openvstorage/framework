@@ -265,8 +265,10 @@ class VDiskController(object):
             )
         except Exception as ex:
             logger.error('Caught exception during clone, trying to delete the volume. {0}'.format(ex))
-            new_vdisk.delete()
-            VDiskController.delete_volume(location)
+            try:
+                VDiskController.clean_bad_disk(new_vdisk.guid)
+            except Exception as ex2:
+                logger.exception('Exception during exception handling of "create_clone_from_template" : {0}'.format(str(ex2)))
             raise
 
         new_vdisk.volume_id = volume_id
@@ -423,8 +425,11 @@ class VDiskController(object):
             VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
         except Exception as ex:
             logger.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
-            new_vdisk.delete()
-            raise
+            try:
+                VDiskController.clean_bad_disk(new_vdisk.guid)
+            except Exception as ex2:
+                logger.exception('Exception during exception handling of "create_clone_from_template" : {0}'.format(str(ex2)))
+            raise ex
 
         return {'diskguid': new_vdisk.guid, 'name': new_vdisk.name,
                 'backingdevice': disk_path}
@@ -881,3 +886,27 @@ class VDiskController(object):
                 VDiskController.dtl_checkup(vdisk_guid=vdisk.guid,
                                             storagerouters_to_exclude=[storagedriver.storagerouter.guid],
                                             chain_timeout=600)
+    @staticmethod
+    @celery.task(name='ovs.vdisk.clean_bad_disk')
+    def clean_bad_disk(vdiskguid):
+        """
+        Cleanup bad vdisk:
+        - in case create_from_template failed
+        - remove mds_services so the vdisk can be properly cleaned up
+        :param vdiskguid: guid of vdisk
+        :return: None
+        """
+        vdisk = VDisk(vdiskguid)
+        logger.info('Cleanup vdisk {0}'.format(vdisk.name))
+        for mdss in vdisk.mds_services:
+            mdss.delete()
+        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+        if storagedriver is not None and vdisk.devicename is not None:
+            logger.debug('Removing volume from filesystem')
+            volumepath = vdisk.devicename
+            mountpoint = storagedriver.mountpoint
+            devicepath = '{0}/{1}'.format(mountpoint, volumepath)
+            VDiskController.delete_volume(devicepath)
+
+        logger.debug('Deleting vdisk {0} from model'.format(vdisk.name))
+        vdisk.delete()
