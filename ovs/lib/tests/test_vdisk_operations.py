@@ -27,7 +27,7 @@ from ovs.extensions.generic.system import System
 
 class VDiskOperations(TestCase):
     """
-    This test class will test the various operations of the vdisk controller 
+    This test class will test the various operations of the vdisk controller
     """
     VDisk = None
     PMachine = None
