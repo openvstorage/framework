@@ -769,7 +769,6 @@
                 "invalidname": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
                 "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
                 "localhost": "Use local Open vStorage backends",
-                "missing_arakoon": "Arakoon should either be installed or a DB partition role should be defined",
                 "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
                 "missing_role": "Missing required partition role: __what__",
                 "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use.",

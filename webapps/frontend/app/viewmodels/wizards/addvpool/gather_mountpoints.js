@@ -107,20 +107,12 @@ define([
                     })
                     .done(function() {
                         self.activateResult = { valid: true, reasons: [], fields: [] };
-                        var requiredRoles = ['READ', 'WRITE'];
-                        if (self.data.arakoonFound() === false) {
-                            requiredRoles.push('DB');
-                        }
+                        var requiredRoles = ['READ', 'WRITE', 'DB'];
                         $.each(self.data.partitions(), function(role, partitions) {
                            if (requiredRoles.contains(role) && partitions.length > 0) {
                                generic.removeElement(requiredRoles, role);
                            }
                         });
-                        if (requiredRoles.contains('DB')) {
-                            self.activateResult.valid = false;
-                            self.activateResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_arakoon'));
-                            generic.removeElement(requiredRoles, 'DB');
-                        }
                         $.each(requiredRoles, function(index, role) {
                             self.activateResult.valid = false;
                             self.activateResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_role', { what: role }));
