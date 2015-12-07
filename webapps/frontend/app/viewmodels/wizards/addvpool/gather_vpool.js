@@ -147,7 +147,6 @@ define([
                                 self.data.mountpoints(data.mountpoints);
                                 self.data.partitions(data.partitions);
                                 self.data.ipAddresses(data.ipaddresses);
-                                self.data.arakoonFound(data.arakoon_found);
                                 self.data.sharedSize(data.shared_size);
                                 self.data.scrubAvailable(data.scrub_available);
                                 self.data.readCacheAvailableSize(data.readcache_size);
