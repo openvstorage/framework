@@ -142,15 +142,12 @@ class StorageRouterController(object):
                                              'mountpoint': disk_partition.folder,  # Equals to mountpoint unless mountpoint is root ('/'), then we pre-pend mountpoint with '/mnt/storage'
                                              'storagerouter_guid': disk_partition.disk.storagerouter_guid})
 
-        arakoon_service_found = False
         for service in ServiceTypeList.get_by_name('Arakoon').services:
             if service.name == 'arakoon-ovsdb':
                 continue
             for partition in partitions[DiskPartition.ROLES.DB]:
                 if service.storagerouter_guid == partition['storagerouter_guid']:
                     partition['in_use'] = True
-            if service.name == 'arakoon-voldrv':
-                arakoon_service_found = True
         for service in ServiceTypeList.get_by_name('MetadataServer').services:
             for partition in partitions[DiskPartition.ROLES.DB]:
                 if service.storagerouter_guid == partition['storagerouter_guid']:
@@ -160,7 +157,6 @@ class StorageRouterController(object):
                 'mountpoints': mountpoints,
                 'ipaddresses': ipaddresses,
                 'shared_size': shared_size,
-                'arakoon_found': arakoon_service_found,
                 'readcache_size': readcache_size,
                 'writecache_size': writecache_size,
                 'scrub_available': StorageRouterController._check_scrub_partition_present()}
