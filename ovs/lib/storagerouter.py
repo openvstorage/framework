@@ -1508,7 +1508,6 @@ class StorageRouterController(object):
         :param size: Size of the partition
         :param roles: Roles assigned to the partition
         """
-        create_fs = None
         storagerouter = StorageRouter(storagerouter_guid)
         for role in roles:
             if role not in DiskPartition.ROLES or role == DiskPartition.ROLES.BACKEND:
@@ -1518,51 +1517,30 @@ class StorageRouterController(object):
         if disk.storagerouter_guid != storagerouter_guid:
             raise RuntimeError('The given Disk is not on the given StorageRouter')
         if partition_guid is None:
-            logger.debug('Creating new partition: {0}, {1}, {2}'.format(offset, size, roles))
-            found_previous = offset == 0
-            found_next = offset + size == disk.size
-            part_previous = None
-            part_next = None
-            for partition in disk.partitions:
-                if partition.offset + partition.size == offset:
-                    found_previous = True
-                    part_previous = partition
-                if partition.offset == offset + size:
-                    found_next = True
-                    part_next = partition
-            if not found_previous or not found_next:
-                raise RuntimeError('Given offset/size do not fit into the given Disk')
+            logger.debug('Creating new partition - Offset: {0} bytes - Size: {1} bytes - Roles: {2}'.format(offset, size, roles))
             with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
-                remote.DiskTools.create_partition(disk.path, offset, size)
-                create_fs = True
+                remote.DiskTools.create_partition(disk_path=disk.path,
+                                                  disk_size=disk.size,
+                                                  partition_start=offset,
+                                                  partition_size=size)
             DiskController.sync_with_reality(storagerouter_guid)
             disk = Disk(disk_guid)
+            end_point = offset + size
             partition = None
-            if part_previous is not None and part_next is not None:
-                for possible_partition in disk.partitions:
-                    if possible_partition.offset > (part_previous.size + part_previous.offset) and \
-                       (possible_partition.offset + possible_partition.size) < part_next.offset:
-                        partition = possible_partition
-            elif part_previous is None and part_next is not None:
-                for possible_partition in disk.partitions:
-                    if (possible_partition.offset + possible_partition.size) < part_next.offset:
-                        partition = possible_partition
-            elif part_previous is not None and part_next is None:
-                for possible_partition in disk.partitions:
-                    if possible_partition.offset > (part_previous.size + part_previous.offset):
-                        partition = possible_partition
-            elif part_previous is None and part_next is None:
-                if len(disk.partitions) == 1:
-                    partition = disk.partitions[0]
+            for part in disk.partitions:
+                if offset < part.offset + part.size and end_point > part.offset:
+                    partition = part
+                    break
+
             if partition is None:
-                raise RuntimeError('Could not locate partition')
+                raise RuntimeError('No new partition detected on disk {0} after having created 1'.format(disk.name))
             logger.debug('Partition created')
         else:
             logger.debug('Using existing partition')
             partition = DiskPartition(partition_guid)
             if partition.disk_guid != disk_guid:
                 raise RuntimeError('The given DiskPartition is not on the given Disk')
-        if partition.filesystem is None or create_fs is True:
+        if partition.filesystem is None or partition_guid is None:
             logger.debug('Creating filesystem')
             with Remote(storagerouter.ip, [DiskTools], username='root') as remote:
                 remote.DiskTools.make_fs(partition.path)
