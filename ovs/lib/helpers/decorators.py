@@ -131,20 +131,21 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 :param key:            Key to store the value for
                 :param append:         If True, the specified value will be appended else element at index 0 will be popped
                 :param value_to_store: Value to append to the list
-                :return:               None
+                :return:               Updated value
                 """
                 with VolatileMutex(name=key, wait=5):
                     if persistent_client.exists(key):
                         val = persistent_client.get(key)
                         if append is True and value_to_store is not None:
                             val['values'].append(value_to_store)
-                        elif append is False:
+                        elif append is False and len(val['values']) > 0:
                             val['values'].pop(0)
                     else:
                         log_message('Setting initial value for key {0}'.format(persistent_key))
                         val = {'mode': mode,
                                'values': []}
                     persistent_client.set(key, val)
+                return val
 
             now = '{0}_{1}'.format(int(time.time()), ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10)))
             task_names = [task_name] if extra_task_names is None else [task_name] + extra_task_names
@@ -187,11 +188,10 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 params_info = 'with params {0}'.format(kwargs_dict) if kwargs_dict else 'with default params'
 
                 # 2. Set the key in arakoon if non-existent
-                update_value(key=persistent_key,
-                             append=True)
+                value = update_value(key=persistent_key,
+                                     append=True)
 
                 # 3. Validate whether another job with same params is being executed, skip if so
-                value = persistent_client.get(persistent_key)
                 for item in value['values'][1:]:  # 1st element is processing job, we check all other queued jobs for identical params
                     if item['kwargs'] == kwargs_dict:
                         log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
@@ -206,8 +206,9 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 first_element = None
                 counter = 0
                 while first_element != now and counter < timeout:
-                    value = persistent_client.get(persistent_key)
-                    first_element = value['values'][0]['timestamp']
+                    if persistent_client.exists(persistent_key):
+                        value = persistent_client.get(persistent_key)
+                        first_element = value['values'][0]['timestamp']
 
                     if first_element == now:
                         try:
