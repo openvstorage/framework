@@ -386,7 +386,7 @@ class ArakoonInstaller(object):
         config = ArakoonClusterConfig(cluster_name)
         config.load_config(client)
 
-        all_clients = [SSHClient(node.ip) for node in config.nodes if node.ip != master_ip] + [client]
+        all_clients = [SSHClient(node.ip, username='root') for node in config.nodes]
         if len(config.nodes) <= 2:
             logger.debug('  Insufficient nodes in cluster {0}. Full restart'.format(cluster_name))
             for function in [ArakoonInstaller.stop, ArakoonInstaller.start]:

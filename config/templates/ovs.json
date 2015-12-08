@@ -13,7 +13,7 @@
             }
         },
         "storage": {
-            "persistent": "arakoon",
+            "persistent": "pyrakoon",
             "volatile": "memcache"
         },
         "audittrails": {
@@ -45,7 +45,7 @@
     "storagedriver": {
         "rsp": "/var/rsp",
         "mds": {
-            "safety": 3,
+            "safety": 2,
             "maxload": 75,
             "tlogs": 100
         },

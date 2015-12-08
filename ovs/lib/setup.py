@@ -27,22 +27,24 @@ import subprocess
 from paramiko import AuthenticationException
 
 from ConfigParser import RawConfigParser
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.filemutex import FileMutex
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.log.logHandler import LogHandler
-from ovs.lib.helpers.toolbox import Toolbox
 from ovs.extensions.migration.migrator import Migrator
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.packages.package import PackageManager
+from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.filemutex import FileMutex
+from ovs.lib.helpers.toolbox import Toolbox
+from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('lib', name='setup')
 logger.logger.propagate = False
@@ -78,6 +80,8 @@ class SetupController(object):
         2. Prepare cluster
         3. Depending on (2), setup first/extra node
         4. Depending on (2), promote new extra node
+        :param ip: IP of the node to set up
+        :param force_type: Force master or extra node
         """
 
         print Interactive.boxed_message(['Open vStorage Setup'])
@@ -386,6 +390,7 @@ class SetupController(object):
     def promote_or_demote_node(node_action):
         """
         Promotes or demotes the local node
+        :param node_action: Demote or promote
         """
 
         if node_action not in ('promote', 'demote'):
@@ -501,6 +506,10 @@ class SetupController(object):
 
     @staticmethod
     def update_framework():
+        """
+        Update the framework
+        :return: None
+        """
         file_mutex = FileMutex('system_update', wait=2)
         upgrade_file = '/etc/ready_for_upgrade'
         upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
@@ -670,6 +679,10 @@ class SetupController(object):
 
     @staticmethod
     def update_volumedriver():
+        """
+        Update the volumedriver
+        :return: None
+        """
         file_mutex = FileMutex('system_update', wait=2)
         upgrade_file = '/etc/ready_for_upgrade'
         upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
@@ -1288,6 +1301,9 @@ class SetupController(object):
         service.storagerouter = storagerouter
         service.save()
 
+        master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
+        slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
+
         if configure_rabbitmq:
             SetupController._configure_rabbitmq(target_client)
 
@@ -1317,11 +1333,11 @@ class SetupController(object):
                 SetupController.change_service_state(target_client, service, 'start')
 
         print 'Restarting services'
-        SetupController._restart_framework_and_memcache_services(ip_client_map)
+        SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if SetupController._run_hooks('promote', cluster_ip, master_ip):
             print 'Restarting services'
-            SetupController._restart_framework_and_memcache_services(ip_client_map)
+            SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -1400,6 +1416,9 @@ class SetupController(object):
             if service.name == 'arakoon-ovsdb':
                 service.delete()
 
+        master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
+        slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
+
         if not offline:
             if configure_rabbitmq:
                 print 'Removing/unconfiguring RabbitMQ'
@@ -1411,34 +1430,34 @@ class SetupController(object):
                     SetupController.change_service_state(target_client, 'rabbitmq-server', 'stop')
                     target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
-            print 'Removing services'
-            logger.info('Removing services')
-            services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + ['arakoon-ovsdb'])]
-            if not configure_rabbitmq:
-                services.remove('rabbitmq-server')
-            if not configure_memcached:
-                services.remove('memcached')
-            for service in services:
-                if ServiceManager.has_service(service, client=target_client):
-                    logger.debug('Removing service {0}'.format(service))
-                    SetupController.change_service_state(target_client, service, 'stop')
-                    ServiceManager.remove_service(service, client=target_client)
+                print 'Removing services'
+                logger.info('Removing services')
+                services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + ['arakoon-ovsdb'])]
+                if not configure_rabbitmq:
+                    services.remove('rabbitmq-server')
+                if not configure_memcached:
+                    services.remove('memcached')
+                for service in services:
+                    if ServiceManager.has_service(service, client=target_client):
+                        logger.debug('Removing service {0}'.format(service))
+                        SetupController.change_service_state(target_client, service, 'stop')
+                        ServiceManager.remove_service(service, client=target_client)
 
-            if ServiceManager.has_service('workers', client=target_client):
-                ServiceManager.add_service(name='workers',
-                                           client=target_client,
-                                           params={'MEMCACHE_NODE_IP': cluster_ip,
-                                                   'WORKER_QUEUE': '{0}'.format(unique_id)})
+                if ServiceManager.has_service('workers', client=target_client):
+                    ServiceManager.add_service(name='workers',
+                                               client=target_client,
+                                               params={'MEMCACHE_NODE_IP': cluster_ip,
+                                                       'WORKER_QUEUE': '{0}'.format(unique_id)})
 
         SetupController._configure_amqp_to_volumedriver(ip_client_map)
 
         print 'Restarting services'
         logger.debug('Restarting services')
-        SetupController._restart_framework_and_memcache_services(ip_client_map, target_client)
+        SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if SetupController._run_hooks('demote', cluster_ip, master_ip):
             print 'Restarting services'
-            SetupController._restart_framework_and_memcache_services(ip_client_map, target_client)
+            SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if not offline:
             if SetupController._avahi_installed(target_client) is True:
@@ -1448,14 +1467,17 @@ class SetupController(object):
         logger.info('Demote complete')
 
     @staticmethod
-    def _restart_framework_and_memcache_services(ip_client_map, memcached_exclude_client=None):
-        for service_info in [('watcher-framework', 'stop'),
-                             ('memcached', 'restart'),
-                             ('watcher-framework', 'start')]:
-            for node_client in ip_client_map.itervalues():
-                if memcached_exclude_client is not None and memcached_exclude_client.ip == node_client.ip and service_info[0] == 'memcached':
-                    continue  # Skip memcached for demoted nodes, because they don't run that service
-                SetupController.change_service_state(node_client, service_info[0], service_info[1])
+    def _restart_framework_and_memcache_services(masters, slaves, clients):
+        memcached = 'memcached'
+        watcher = 'watcher-framework'
+        for ip in masters + slaves:
+            if ServiceManager.has_service(watcher, clients[ip]):
+                SetupController.change_service_state(clients[ip], watcher, 'stop')
+        for ip in masters:
+            SetupController.change_service_state(clients[ip], memcached, 'restart')
+        for ip in masters + slaves:
+            if ServiceManager.has_service(watcher, clients[ip]):
+                SetupController.change_service_state(clients[ip], watcher, 'start')
         VolatileFactory.store = None
 
     @staticmethod
@@ -1744,6 +1766,9 @@ EOF
     def change_service_state(client, name, state):
         """
         Starts/stops/restarts a service
+        :param client: SSHClient on which to connect and change service state
+        :param name: Name of the service
+        :param state: State to put the service in
         """
         action = None
         # Enable service before changing the state

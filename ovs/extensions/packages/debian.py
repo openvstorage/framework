@@ -39,6 +39,20 @@ class DebianPackage(object):
         return check_output("dpkg -s {0} | grep Version | cut -d ' ' -f 2".format(package_name), shell=True).strip()
 
     @staticmethod
+    def _get_installed_candidate_version(package_name, client):
+        installed = None
+        candidate = None
+        for line in client.run('apt-cache policy {0} {1}'.format(package_name, DebianPackage.APT_CONFIG_STRING)).splitlines():
+            line = line.strip()
+            if line.startswith('Installed:'):
+                installed = line.lstrip('Installed:').strip()
+            elif line.startswith('Candidate:'):
+                candidate = line.lstrip('Candidate:').strip()
+            if installed is not None and candidate is not None:
+                break
+        return installed if installed != '(none)' else None, candidate if candidate != '(none)' else None
+
+    @staticmethod
     def get_versions():
         versions = {}
         for package_name in DebianPackage.OVS_PACKAGE_NAMES:
@@ -52,20 +66,31 @@ class DebianPackage(object):
         force_text = '--force-yes' if force is True else ''
         counter = 0
         max_counter = 5
-        while True and counter < max_counter:
+        last_exception = None
+        success = False
+        while counter < max_counter:
             counter += 1
+            try_again = ', trying again' if counter < max_counter else ''
             try:
                 client.run('apt-get install -y {0} {1}'.format(force_text, package_name))
-                break
+                installed, candidate = DebianPackage._get_installed_candidate_version(package_name, client=client)
+                if installed == candidate:
+                    success = True
+                    break
+                else:
+                    last_exception = RuntimeError('"apt-get install" succeeded, but upgrade not visible in "apt-cache policy"')
+                    logger.error('Failure: Upgrade not visible{0}'.format(try_again))
             except CalledProcessError as cpe:
+                logger.error('Install failed{0}: {1}'.format(try_again, cpe.output))
                 if cpe.output and 'You may want to run apt-get update' in cpe.output[0] and counter != max_counter:
                     DebianPackage.update(client)
-                if counter == max_counter:    # Install can sometimes fail because apt lock cannot be retrieved
-                    logger.error('Install failed. Error: {0}'.format(cpe.output))
-                    raise cpe
+                last_exception = cpe
             except Exception as ex:
-                raise ex
+                logger.error('Install failed{0}: {1}'.format(try_again, ex))
+                last_exception = ex
             time.sleep(1)
+        if success is False:
+            raise last_exception
 
     @staticmethod
     def update(client):
@@ -91,19 +116,9 @@ class DebianPackage(object):
                        'packages': [],
                        'services': []}
         for package_name in packages:
-            installed = None
-            candidate = None
-            for line in client.run('apt-cache policy {0} {1}'.format(package_name, DebianPackage.APT_CONFIG_STRING)).splitlines():
-                line = line.strip()
-                if line.startswith('Installed:'):
-                    installed = line.lstrip('Installed:').strip()
-                elif line.startswith('Candidate:'):
-                    candidate = line.lstrip('Candidate:').strip()
+            installed, candidate = DebianPackage._get_installed_candidate_version(package_name, client=client)
 
-                if installed is not None and candidate is not None:
-                    break
-
-            if installed != '(none)' and candidate != installed:
+            if installed is not None and candidate != installed:
                 update_info['packages'].append(package_name)
                 update_info['services'] = services
                 update_info['version'] = candidate

@@ -36,8 +36,12 @@ define([
         ];
 
         // Observables
-        self.snapshotsInitialLoad = ko.observable(true);
-        self.vDisk                = ko.observable();
+        self.snapshotsInitialLoad  = ko.observable(true);
+        self.storageRoutersLoading = ko.observable(false);
+        self.vDisk                 = ko.observable();
+
+        // Handles
+        self.loadStorageRoutersHandle = undefined;
 
         // Functions
         self.load = function() {
@@ -121,6 +125,42 @@ define([
                     });
                 vd.oldConfiguration($.extend({}, vd.configuration()));
             }
+        };
+        self.loadStorageRouters = function() {
+            return $.Deferred(function(deferred) {
+                self.storageRoutersLoading(true);
+                if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
+                    self.loadStorageRoutersHandle = api.get('vpools/' + self.vDisk().vpoolGuid() + '/storagerouters', { queryparams: { 'contents': '' } } )
+                        .done(function(data) {
+                            var dtlTargets = [];
+                            $.each(data.data, function(index, item) {
+                                if (item.ip !== self.vDisk().storageRouter().ipAddress()) {
+                                    dtlTargets.push(item.ip);
+                                }
+                            });
+                            if (dtlTargets.length === 0) {
+                                $.each(self.vDisk().dtlModes(), function(index, item) {
+                                    if (item.name === 'a_sync' || item.name === 'sync') {
+                                        item.disabled = true;
+                                    }
+                                });
+                            }
+                            self.vDisk().dtlTargets(dtlTargets);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject)
+                        .always(function() {
+                            self.storageRoutersLoading(false);
+                        });
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
+        self.loadAllConfigurations = function() {
+            self.vDisk().loadConfiguration(false);
+            self.vDisk().loadParentConfiguration();
+            self.loadStorageRouters();
         };
 
         // Durandal

@@ -72,5 +72,9 @@ class Mapping(object):
                                                                              'dedupe_key': '[TASK_NAME]_[storagedriver_id]'}}],
                VolumeDriverEvents.volumedriver_error: [{'task': StorageDriverController.volumedriver_error,
                                                         'arguments': {'code': 'code',
-                                                                      'volume_name': 'volumename',
-                                                                      '[NODE_ID]': 'storagedriver_id'}}]}
+                                                                      'volume_name': 'volumename'}}],
+               VolumeDriverEvents.dtl_state_transition: [{'task': VDiskController.dtl_state_transition,
+                                                          'arguments': {'volume_name': 'volume_name',
+                                                                        'old_state': 'old_state',
+                                                                        'new_state': 'new_state',
+                                                                        '[NODE_ID]': 'storagedriver_id'}}]}

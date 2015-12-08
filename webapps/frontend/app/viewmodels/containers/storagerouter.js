@@ -15,8 +15,8 @@
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/api', 'ovs/shared',
-    'viewmodels/containers/vdisk', 'viewmodels/containers/disk', 'viewmodels/containers/pmachine', 'viewmodels/containers/failuredomain'
-], function($, ko, generic, api, shared, VDisk, Disk, PMachine, FailureDomain) {
+    'viewmodels/containers/vdisk', 'viewmodels/containers/disk', 'viewmodels/containers/pmachine'
+], function($, ko, generic, api, shared, VDisk, Disk, PMachine) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -49,7 +49,6 @@ define([
         self.disks                      = ko.observableArray([]);
         self.disksLoaded                = ko.observable(false);
         self.downloadLogState           = ko.observable($.t('ovs:support.downloadlogs'));
-        self.dtlMode                    = ko.observable();
         self.edit                       = ko.observable(false);
         self.guid                       = ko.observable(guid);
         self.iops                       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
@@ -198,7 +197,6 @@ define([
             generic.trySet(self.ipAddress, data, 'ip');
             generic.trySet(self.machineId, data, 'machineid');
             generic.trySet(self.status, data, 'status', generic.lower);
-            generic.trySet(self.dtlMode, data, 'dtl_mode', generic.lower);
             generic.trySet(self.nodeType, data, 'node_type');
             generic.trySet(self.rdmaCapable, data, 'rdma_capable');
             if (data.hasOwnProperty('last_heartheat')) {

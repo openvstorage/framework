@@ -37,6 +37,9 @@ class PersistentFactory(object):
                 client_type = Configuration.get('ovs.core.storage.persistent')
 
             PersistentFactory.store = None
+            if client_type == 'pyrakoon':
+                from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
+                PersistentFactory.store = PyrakoonStore('ovsdb')
             if client_type == 'arakoon':
                 from ovs.extensions.storage.persistent.arakoonstore import ArakoonStore
                 PersistentFactory.store = ArakoonStore('ovsdb')

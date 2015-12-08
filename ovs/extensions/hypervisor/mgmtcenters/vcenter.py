@@ -40,6 +40,7 @@ class VCenter(object):
         """
         Return host status from vCenter Server
         Must be connected to vCenter
+        :param host_ip: IP of host
         """
         return self.STATE_MAPPING.get(self.sdk.get_host_status_by_ip(host_ip), 'UNKNOWN')
 
@@ -47,6 +48,7 @@ class VCenter(object):
         """
         Return host status from vCenter Server
         Must be connected to vCenter
+        :param pk: Primary key of host
         """
         return self.STATE_MAPPING.get(self.sdk.get_host_status_by_pk(pk), 'UNKNOWN')
 
@@ -54,6 +56,7 @@ class VCenter(object):
         """
         Return host status from vCenter Server
         Must be connected to vCenter
+        :param host_ip: IP of host
         """
         return self.sdk.get_host_primary_key(host_ip)
 
@@ -74,9 +77,29 @@ class VCenter(object):
         return self.sdk.get_hosts()
 
     def configure_vpool_for_host(self, vpool_guid, ip):
+        """
+        Make necessary configurations on host
+        :param vpool_guid: Guid of the vPool to configure
+        :param ip:         IP of the host
+        :return:           None
+        """
+        _ = self
+        _ = vpool_guid
+        _ = ip
         pass
 
     def unconfigure_vpool_for_host(self, vpool_guid, remove_volume_type, ip):
+        """
+        Unconfigure the host for the vPool
+        :param vpool_guid:         Guid of the vPool to unconfigure
+        :param remove_volume_type: Remove volume type
+        :param ip:                 IP of the host
+        :return:                   None
+        """
+        _ = self
+        _ = vpool_guid
+        _ = remove_volume_type
+        _ = ip
         pass
 
     def get_guests(self):
@@ -112,20 +135,22 @@ class VCenter(object):
     def get_vdisk_device_info(self, volumeid):
         """
         This method does not make sense for vCenter as you cannot retrieve a Virtual Disk by uuid
+        :param volumeid: ID of the volume
         """
         raise NotImplementedError('Method <get_vdisk_device_info> not implemented for vCenter Management Center')
 
     def get_vmachine_device_info(self, instanceid):
         """
         Return device info
+        :param instanceid: ID of the virtual machine instance
         """
         return self.sdk.get_vm_device_info(instanceid)
 
     def get_vm_agnostic_object(self, devicename, ip, mountpoint):
         """
-        devicename: clHp75aS65QhsAHy/instance-00000001.xml
-        ip: 127.0.0.1
-        mountpoint: /mnt/saio
+        :param devicename: clHp75aS65QhsAHy/instance-00000001.xml
+        :param ip:         127.0.0.1
+        :param mountpoint: /mnt/saio
 
         Return vm agnostic object
         {'backing': {'datastore': '/mnt/saio',
@@ -149,18 +174,43 @@ class VCenter(object):
         return None
 
     def is_host_configured_for_vpool(self, vpool_guid, ip):
+        """
+        Verify whether the host is configured for this vPool
+        :param vpool_guid: Guid of the vPool
+        :param ip:         IP of the host
+        :return:           True
+        """
         _ = self
         _ = ip
         _ = vpool_guid
-        return False
+        return True
 
     def is_host_configured(self, ip):
+        """
+        Verify whether the host is configured
+        :param ip: IP of the host
+        :return:   True
+        """
         _ = self
         _ = ip
-        return False
+        return True
 
     def configure_host(self, ip):
+        """
+        Configure the host
+        :param ip: IP of the host
+        :return:   None
+        """
+        _ = self
+        _ = ip
         pass
 
     def unconfigure_host(self, ip):
+        """
+        Unconfigure the host
+        :param ip: IP of the host
+        :return:   None
+        """
+        _ = self
+        _ = ip
         pass

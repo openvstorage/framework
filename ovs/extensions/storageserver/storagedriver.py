@@ -24,6 +24,7 @@ from ovs.extensions.generic.remote import Remote
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import ClusterContact
+from volumedriver.storagerouter.storagerouterclient import DTLMode
 from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient as LSRClient
 from volumedriver.storagerouter.storagerouterclient import MDSClient
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
@@ -48,20 +49,21 @@ class StorageDriverClient(object):
     """
     Client to access storagedriver client
     """
-    VOLDRV_DTL_SYNC = ''
-    VOLDRV_DTL_ASYNC = ''
-    VOLDRV_DTL_NOSYNC = ''
+    VOLDRV_DTL_SYNC = 'Synchronous'
+    VOLDRV_DTL_ASYNC = 'Asynchronous'
     VOLDRV_NO_CACHE = 'NoCache'
     VOLDRV_CACHE_ON_READ = 'CacheOnRead'
     VOLDRV_CONTENT_BASED = 'ContentBased'
     VOLDRV_CACHE_ON_WRITE = 'CacheOnWrite'
     VOLDRV_LOCATION_BASED = 'LocationBased'
+    VOLDRV_DTL_MANUAL_MODE = 'Manual'
+    VOLDRV_DTL_AUTOMATIC_MODE = 'Automatic'
     VOLDRV_DTL_TRANSPORT_TCP = 'TCP'
     VOLDRV_DTL_TRANSPORT_RSOCKET = 'RSocket'
 
     FRAMEWORK_DTL_SYNC = 'sync'
-    FRAMEWORK_DTL_ASYNC = 'async'
-    FRAMEWORK_DTL_NOSYNC = 'no_sync'
+    FRAMEWORK_DTL_ASYNC = 'a_sync'
+    FRAMEWORK_DTL_NO_SYNC = 'no_sync'
     FRAMEWORK_NO_CACHE = 'none'
     FRAMEWORK_CACHE_ON_READ = 'on_read'
     FRAMEWORK_CONTENT_BASED = 'dedupe'
@@ -80,12 +82,12 @@ class StorageDriverClient(object):
                         FRAMEWORK_LOCATION_BASED: ReadCacheMode.LOCATION_BASED}
     VPOOL_DEDUPE_MAP = {FRAMEWORK_CONTENT_BASED: VOLDRV_CONTENT_BASED,
                         FRAMEWORK_LOCATION_BASED: VOLDRV_LOCATION_BASED}
-    VDISK_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: '',
-                          FRAMEWORK_DTL_ASYNC: '',
-                          FRAMEWORK_DTL_NOSYNC: ''}
+    VDISK_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: DTLMode.SYNCHRONOUS,
+                          FRAMEWORK_DTL_ASYNC: DTLMode.ASYNCHRONOUS,
+                          FRAMEWORK_DTL_NO_SYNC: None}
     VPOOL_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: VOLDRV_DTL_SYNC,
                           FRAMEWORK_DTL_ASYNC: VOLDRV_DTL_ASYNC,
-                          FRAMEWORK_DTL_NOSYNC: VOLDRV_DTL_NOSYNC}
+                          FRAMEWORK_DTL_NO_SYNC: None}
     VPOOL_DTL_TRANSPORT_MAP = {FRAMEWORK_DTL_TRANSPORT_TCP: VOLDRV_DTL_TRANSPORT_TCP,
                                FRAMEWORK_DTL_TRANSPORT_RSOCKET: VOLDRV_DTL_TRANSPORT_RSOCKET}
     REVERSE_CACHE_MAP = {VOLDRV_NO_CACHE: FRAMEWORK_NO_CACHE,
@@ -100,10 +102,8 @@ class StorageDriverClient(object):
                           ReadCacheMode.LOCATION_BASED: FRAMEWORK_LOCATION_BASED}
     REVERSE_DTL_MODE_MAP = {VOLDRV_DTL_SYNC: FRAMEWORK_DTL_SYNC,
                             VOLDRV_DTL_ASYNC: FRAMEWORK_DTL_ASYNC,
-                            VOLDRV_DTL_NOSYNC: FRAMEWORK_DTL_NOSYNC,
-                            '': FRAMEWORK_DTL_SYNC,
-                            '': FRAMEWORK_DTL_ASYNC,
-                            '': FRAMEWORK_DTL_NOSYNC}
+                            DTLMode.SYNCHRONOUS: FRAMEWORK_DTL_SYNC,
+                            DTLMode.ASYNCHRONOUS: FRAMEWORK_DTL_ASYNC}
     REVERSE_DTL_TRANSPORT_MAP = {VOLDRV_DTL_TRANSPORT_TCP: FRAMEWORK_DTL_TRANSPORT_TCP,
                                  VOLDRV_DTL_TRANSPORT_RSOCKET: FRAMEWORK_DTL_TRANSPORT_RSOCKET}
     TLOG_MULTIPLIER_MAP = {4: 16,

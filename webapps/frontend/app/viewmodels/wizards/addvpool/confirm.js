@@ -51,11 +51,9 @@ define([
                 var configParams = undefined;
                 if (self.data.extendVpool() === false) {
                     configParams = {
-                        'dtl_mode': self.data.dtlMode(),
+                        'dtl_mode': self.data.dtlMode().name,
                         'sco_size': self.data.scoSize(),
                         'dedupe_mode': self.data.dedupeMode(),
-                        'dtl_enabled': self.data.dtlEnabled(),
-                        'dtl_location': self.data.dtlLocation(),
                         'write_buffer': self.data.writeBuffer(),
                         'dtl_transport': self.data.dtlTransportMode().name,
                         'cache_strategy': self.data.cacheStrategy()
