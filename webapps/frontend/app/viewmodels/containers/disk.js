@@ -96,9 +96,9 @@ define([
                                 runningIndex = 0;
                             }
                             if (runningIndex !== index && data[runningIndex].relativeSize >= (minSize * 2)) {
+                                data[runningIndex].relativeSize -= minSize - partition.relativeSize;
                                 partition.relativeSize = minSize;
                                 partition.small = true;
-                                data[runningIndex].relativeSize -= minSize;
                             }
                             runningIndex += 1;
                         }

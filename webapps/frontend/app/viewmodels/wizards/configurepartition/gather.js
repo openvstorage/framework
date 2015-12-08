@@ -14,18 +14,17 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'plugins/router',
     'ovs/api', 'ovs/shared', 'ovs/generic',
     './data',
     '../../containers/backend', '../../containers/backendtype'
-], function($, ko, router, api, shared, generic, data) {
+], function($, ko, api, shared, generic, data) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.data                   = data;
-        self.shared                 = shared;
+        self.data   = data;
+        self.shared = shared;
 
         // Computed
         self.canContinue = ko.computed(function() {
@@ -48,7 +47,7 @@ define([
                 });
                 post_data.roles = roles;
                 api.post('storagerouters/' + self.data.storageRouter().guid() + '/configure_disk', { data: post_data })
-                        .then(shared.tasks.wait)
+                        .then(self.shared.tasks.wait)
                         .done(function() {
                             generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:wizards.configurepartition.confirm.success'));
                         })
