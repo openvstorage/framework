@@ -47,7 +47,7 @@ class DistributedScheduler(Scheduler):
         """
         self._persistent = PersistentFactory.get_client()
         self._namespace = 'ovs_celery_beat'
-        self._mutex = VolatileMutex('celery_beat')
+        self._mutex = VolatileMutex('celery_beat', 10)
         self._has_lock = False
         super(DistributedScheduler, self).__init__(*args, **kwargs)
         logger.debug('DS init')
@@ -116,55 +116,56 @@ class DistributedScheduler(Scheduler):
         """
         Runs one iteration of the scheduler. This is guarded with a distributed lock
         """
-        self._has_lock = False
+        logger.debug('DS executing tick')
         try:
-            logger.debug('DS executing tick')
-            self._mutex.acquire(wait=10)
-            node_now = current_app._get_current_object().now()
-            node_timestamp = time.mktime(node_now.timetuple())
-            node_name = System.get_my_machine_id()
-            try:
-                lock = self._persistent.get('{0}_lock'.format(self._namespace))
-            except KeyNotFoundException:
-                lock = None
-            if lock is None:
-                # There is no lock yet, so the lock is acquired
-                self._has_lock = True
-                logger.debug('DS there was no lock in tick')
-            else:
-                if lock['name'] == node_name:
-                    # The current node holds the lock
-                    logger.debug('DS keeps own lock')
+            self._has_lock = False
+            with self._mutex:
+                node_now = current_app._get_current_object().now()
+                node_timestamp = time.mktime(node_now.timetuple())
+                node_name = System.get_my_machine_id()
+                try:
+                    lock = self._persistent.get('{0}_lock'.format(self._namespace))
+                except KeyNotFoundException:
+                    lock = None
+                if lock is None:
+                    # There is no lock yet, so the lock is acquired
                     self._has_lock = True
-                elif node_timestamp - lock['timestamp'] > DistributedScheduler.TIMEOUT:
-                    # The current lock is timed out, so the lock is stolen
-                    logger.debug('DS last lock refresh is {0}s old'.format(
-                        node_timestamp - lock['timestamp']))
-                    logger.debug(
-                        'DS stealing lock from {0}'.format(lock['name']))
-                    self._load_schedule()
-                    self._has_lock = True
+                    logger.debug('DS there was no lock in tick')
                 else:
-                    logger.debug('DS lock is not ours')
-            if self._has_lock is True:
-                lock = {'name': node_name,
-                        'timestamp': node_timestamp}
-                logger.debug('DS refreshing lock')
-                self._persistent.set('{0}_lock'.format(self._namespace), lock)
-        finally:
-            self._mutex.release()
+                    if lock['name'] == node_name:
+                        # The current node holds the lock
+                        logger.debug('DS keeps own lock')
+                        self._has_lock = True
+                    elif node_timestamp - lock['timestamp'] > DistributedScheduler.TIMEOUT:
+                        # The current lock is timed out, so the lock is stolen
+                        logger.debug('DS last lock refresh is {0}s old'.format(
+                            node_timestamp - lock['timestamp']))
+                        logger.debug(
+                            'DS stealing lock from {0}'.format(lock['name']))
+                        self._load_schedule()
+                        self._has_lock = True
+                    else:
+                        logger.debug('DS lock is not ours')
+                if self._has_lock is True:
+                    lock = {'name': node_name,
+                            'timestamp': node_timestamp}
+                    logger.debug('DS refreshing lock')
+                    self._persistent.set('{0}_lock'.format(self._namespace), lock)
 
-        if self._has_lock is True:
-            logger.debug('DS executing tick workload')
-            remaining_times = []
-            try:
-                for entry in self.schedule.itervalues():
-                    next_time_to_run = self.maybe_due(entry, self.publisher)
-                    if next_time_to_run:
-                        remaining_times.append(next_time_to_run)
-            except RuntimeError:
-                pass
-            logger.debug('DS executing tick workload - done')
-            return min(remaining_times + [self.max_interval])
-        else:
+            if self._has_lock is True:
+                logger.debug('DS executing tick workload')
+                remaining_times = []
+                try:
+                    for entry in self.schedule.itervalues():
+                        next_time_to_run = self.maybe_due(entry, self.publisher)
+                        if next_time_to_run:
+                            remaining_times.append(next_time_to_run)
+                except RuntimeError:
+                    pass
+                logger.debug('DS executing tick workload - done')
+                return min(remaining_times + [self.max_interval])
+            else:
+                return self.max_interval
+        except Exception as ex:
+            logger.debug('DS got error during tick: {0}'.format(ex))
             return self.max_interval
