@@ -17,6 +17,7 @@ Arakoon store module, using pyrakoon
 """
 
 import os
+import time
 import json
 import random
 from threading import Lock, current_thread
@@ -141,7 +142,12 @@ class PyrakoonStore(object):
             last_exception = None
             tries = 5
             while tries > 0:
-                return method(*args, **kwargs)
+                start = time.time()
+                return_value = method(*args, **kwargs)
+                duration = time.time() - start
+                if duration > 0.5:
+                    logger.warning('Arakoon call {0} took {1}s'.format(method.__name__, round(duration, 2)))
+                return return_value
             raise last_exception
         except ArakoonNotFound:
             # No extra logging for ArakoonNotFound
