@@ -138,10 +138,8 @@ class DistributedScheduler(Scheduler):
                         self._has_lock = True
                     elif node_timestamp - lock['timestamp'] > DistributedScheduler.TIMEOUT:
                         # The current lock is timed out, so the lock is stolen
-                        logger.debug('DS last lock refresh is {0}s old'.format(
-                            node_timestamp - lock['timestamp']))
-                        logger.debug(
-                            'DS stealing lock from {0}'.format(lock['name']))
+                        logger.debug('DS last lock refresh is {0}s old'.format(node_timestamp - lock['timestamp']))
+                        logger.debug('DS stealing lock from {0}'.format(lock['name']))
                         self._load_schedule()
                         self._has_lock = True
                     else:
