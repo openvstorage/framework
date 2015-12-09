@@ -89,7 +89,7 @@ class VDiskController(object):
         """
         Delete a disk
         Triggered by volumedriver messages on the queue
-        :param volumename: volume id of the disk
+        :param volumename: volume ID of the disk
         :param storagedriver_id: ID of the storagedriver serving the volume to delete
         """
         disk = VDiskList.get_vdisk_by_volume_id(volumename)
@@ -131,7 +131,7 @@ class VDiskController(object):
         Resize a disk
         Triggered by volumedriver messages on the queue
 
-        :param volumename: volume id of the disk
+        :param volumename: volume ID of the disk
         :param volumesize: size of the volume
         :param volumepath: path on hypervisor to the volume
         :param storagedriver_id: ID of the storagedriver serving the volume to resize
@@ -168,7 +168,7 @@ class VDiskController(object):
         Rename a disk
         Triggered by volumedriver messages
 
-        :param volumename: volume id of the disk
+        :param volumename: volume ID of the disk
         :param volume_old_path: old path on hypervisor to the volume
         :param volume_new_path: new path on hypervisor to the volume
         :param storagedriver_id: ID of the storagedriver serving the volume to rename
@@ -184,6 +184,31 @@ class VDiskController(object):
                                                                volume_new_path))
             disk.devicename = volume_new_path
             disk.save()
+
+    @staticmethod
+    @celery.task(name='ovs.vdisk.migrate_from_voldrv')
+    @log('VOLUMEDRIVER_TASK')
+    def migrate_from_voldrv(volume_id, new_owner_id):
+        """
+        Triggered when volume has changed owner (Clean migration or stolen due to other reason)
+        Triggered by volumedriver messages
+
+        :param volume_id:    Volume ID of the disk
+        :type volume_id:     unicode
+
+        :param new_owner_id: ID of the storage driver the volume migrated to
+        :type new_owner_id:  unicode
+
+        :returns:            None
+        """
+        sd = StorageDriverList.get_by_storagedriver_id(storagedriver_id=new_owner_id)
+        vdisk = VDiskList.get_vdisk_by_volume_id(volume_id=volume_id)
+        logger.info('Migration - Guid {0} - ID {1} - Detected migration for virtual disk {2}'.format(vdisk.guid, vdisk.volume_id, vdisk.name))
+        if vdisk is not None:
+            if sd is not None:
+                logger.info('Migration - Guid {0} - ID {1} - Storage Router {2} is the new owner of virtual disk {3}'.format(vdisk.guid, vdisk.volume_id, sd.storagerouter.name, vdisk.name))
+            MDSServiceController.mds_checkup()
+            VDiskController.dtl_checkup(vdisk_guid=vdisk.guid)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.clone')
@@ -248,7 +273,7 @@ class VDiskController(object):
         try:
             storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
             if storagedriver is None:
-                raise RuntimeError('Could not find StorageDriver with id {0}'.format(vdisk.storagedriver_id))
+                raise RuntimeError('Could not find StorageDriver with ID {0}'.format(vdisk.storagedriver_id))
 
             mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
             if mds_service is None:
@@ -314,7 +339,7 @@ class VDiskController(object):
         Delete a disk snapshot
 
         @param diskguid: guid of the disk
-        @param snapshotid: id of the snapshot
+        @param snapshotid: ID of the snapshot
 
         @todo: Check if new volumedriver storagedriver upon deletion
         of a snapshot has built-in protection to block it from being deleted
@@ -391,7 +416,7 @@ class VDiskController(object):
 
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         if storagedriver is None:
-            raise RuntimeError('Could not find StorageDriver with id {0}'.format(storagedriver_id))
+            raise RuntimeError('Could not find StorageDriver with ID {0}'.format(storagedriver_id))
 
         new_vdisk = VDisk()
         new_vdisk.copy(vdisk, include=properties_to_clone)
@@ -886,6 +911,7 @@ class VDiskController(object):
                 VDiskController.dtl_checkup(vdisk_guid=vdisk.guid,
                                             storagerouters_to_exclude=[storagedriver.storagerouter.guid],
                                             chain_timeout=600)
+
     @staticmethod
     @celery.task(name='ovs.vdisk.clean_bad_disk')
     def clean_bad_disk(vdiskguid):
