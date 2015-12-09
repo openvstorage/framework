@@ -32,7 +32,8 @@ define([
             { key: 'timestamp',     value: $.t('ovs:generic.datetime'),    width: 200       },
             { key: 'stored',        value: $.t('ovs:generic.storeddata'),  width: 110       },
             { key: 'is_automatic',  value: $.t('ovs:generic.type'),        width: 110       },
-            { key: 'is_consistent', value: $.t('ovs:generic.consistent'),  width: 100       }
+            { key: 'is_consistent', value: $.t('ovs:generic.consistent'),  width: 100       },
+            { key: 'is_sticky',     value: $.t('ovs:generic.sticky'),      width: 100       }
         ];
 
         // Observables
@@ -161,6 +162,13 @@ define([
             self.vDisk().loadConfiguration(false);
             self.vDisk().loadParentConfiguration();
             self.loadStorageRouters();
+        };
+        self.removeSnapshot = function(snapshotid) {
+            console.log("Removing snapshot " + snapshotid + " of disk " + self.vDisk().guid());
+            api.post('vdisks/' + self.vDisk().guid() + '/removesnapshot', {
+                     data: { snapshot_id: snapshotid }
+            });
+
         };
 
         // Durandal

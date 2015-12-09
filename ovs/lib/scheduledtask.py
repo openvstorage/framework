@@ -70,7 +70,8 @@ class ScheduledTaskController(object):
                 VMachineController.snapshot(machineguid=machine.guid,
                                             label='',
                                             is_consistent=False,
-                                            is_automatic=True)
+                                            is_automatic=True,
+                                            is_sticky=False)
                 success.append(machine.guid)
             except:
                 fail.append(machine.guid)
@@ -133,6 +134,8 @@ class ScheduledTaskController(object):
             if any(vd.info['object_type'] in ['BASE'] for vd in vmachine.vdisks):
                 bucket_chain = copy.deepcopy(buckets)
                 for snapshot in vmachine.snapshots:
+                    if snapshot.get('is_sticky') is True:
+                        continue
                     timestamp = int(snapshot['timestamp'])
                     for bucket in bucket_chain:
                         if bucket['start'] >= timestamp > bucket['end']:
@@ -147,6 +150,8 @@ class ScheduledTaskController(object):
             if vdisk.info['object_type'] in ['BASE']:
                 bucket_chain = copy.deepcopy(buckets)
                 for snapshot in vdisk.snapshots:
+                    if snapshot.get('is_sticky') is True:
+                        continue
                     timestamp = int(snapshot['timestamp'])
                     for bucket in bucket_chain:
                         if bucket['start'] >= timestamp > bucket['end']:
@@ -191,6 +196,8 @@ class ScheduledTaskController(object):
         for bucket_chain in bucket_chains:
             for bucket in bucket_chain:
                 for snapshot in bucket['snapshots']:
+                    if snapshot.get('is_sticky') is True:
+                        continue
                     VDiskController.delete_snapshot(diskguid=snapshot['diskguid'],
                                                     snapshotid=snapshot['snapshotid'])
         logger.info('Delete snapshots finished')
@@ -315,7 +322,7 @@ class ScheduledTaskController(object):
                         locked_client.apply_scrubbing_result(scrubbing_result)
                     if work_units:
                         logger.info('Scrubbing successfully applied')
-            except Exception, ex:
+            except Exception as ex:
                 failures.append('Failed scrubbing work unit for volume {0} with guid {1}: {2}'.format(vdisk.name, vdisk.guid, ex))
 
         failed = len(failures)

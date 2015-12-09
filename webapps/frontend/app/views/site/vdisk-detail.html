@@ -159,6 +159,16 @@ limitations under the License.
                             <td><span data-bind="text: (is_automatic ? 'Automatic' : 'Manual')"></span></td>
                             <td><span class="fa pointer" data-bind="translate: (is_consistent ? 'ovs:icons.consistent' : 'ovs:icons.inconsistent'),
                                                                     tooltip: (is_consistent ? 'ovs:generic.consistentss' : 'ovs:generic.inconsistentss')"></span></td>
+                            <td><span data-bind="text: (is_sticky ? 'Sticky' : '-')"></span></td>
+                            <td>
+                                <button type="button"
+                                        class="btn btn-mini btn-default"
+                                        data-bind="click: function(){
+                                                        $root.removeSnapshot(guid);
+                                        }, visible: true, tooltip: 'ovs:generic.removesnapshot' ">
+                                    <span class="fa" data-i18n="[html]ovs:icons.delete"></span>
+                                </button>
+                            </td>
                         </tr>
                     </table>
                 </div>

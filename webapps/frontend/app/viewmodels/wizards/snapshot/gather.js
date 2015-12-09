@@ -45,7 +45,8 @@ define([
             return $.Deferred(function(deferred) {
                 var data = {
                     name: self.data.name(),
-                    consistent: self.data.isConsistent()
+                    consistent: self.data.isConsistent(),
+                    sticky: self.data.isSticky()
                 };
                 api.post('vmachines/' + self.data.vm().guid() + '/snapshot', { data: data })
                     .then(function(taskID) {

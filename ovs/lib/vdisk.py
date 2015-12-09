@@ -321,6 +321,11 @@ class VDiskController(object):
         if a clone was created from it.
         """
         disk = VDisk(diskguid)
+        if not snapshotid in [snap['guid'] for snap in disk.snapshots]:
+            raise RuntimeError('Snapshot {0} does not belong to disk {1}'.format(snapshotid, disk.name))
+        clones_of_snapshot = VDiskList.get_by_parentsnapshot(snapshotid)
+        if len(clones_of_snapshot) > 0:
+            raise RuntimeError('Snapshot {0} has {1} volumes cloned from it, cannot remove'.format(snapshotid, len(clones_of_snapshot)))
         logger.info('Deleting snapshot {0} from disk {1}'.format(snapshotid, disk.name))
         disk.storagedriver_client.delete_snapshot(str(disk.volume_id), str(snapshotid))
         disk.invalidate_dynamics(['snapshots'])

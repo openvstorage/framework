@@ -120,3 +120,16 @@ class VDiskViewSet(viewsets.ViewSet):
                                            devicename=name,
                                            pmachineguid=storagerouter.pmachine_guid,
                                            detached=True)
+
+    @action()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VDisk)
+    def removesnapshot(self, vdisk, snapshot_id):
+        """
+        Remove a snapshot from a VDisk
+        :param vdisk: Guid of the virtual disk whose snapshot is to be removed
+        :param snapshot_id: ID of the snapshot to remove
+        """
+        return VDiskController.delete_snapshot.delay(diskguid=vdisk.guid,
+                                                     snapshotid=snapshot_id)

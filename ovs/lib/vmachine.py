@@ -412,7 +412,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.snapshot')
-    def snapshot(machineguid, label=None, is_consistent=False, timestamp=None, is_automatic=False):
+    def snapshot(machineguid, label=None, is_consistent=False, timestamp=None, is_automatic=False, is_sticky=False):
         """
         Snapshot VMachine disks
 
@@ -421,16 +421,20 @@ class VMachineController(object):
         :param is_consistent: flag indicating the snapshot was consistent or not
         :param timestamp: override timestamp, if required. Should be a unix timestamp
         :param is_automatic: Flag to determine automated snapshots
+        :param is_sticky: Flag indicating the snapshot is not to be deleted automatically
         """
 
         timestamp = timestamp if timestamp is not None else time.time()
         timestamp = str(int(float(timestamp)))
 
+        if is_automatic is True and is_sticky is True:
+            raise ValueError('Snapshot {0} cannot be both automatic and sticky'.format(label))
         metadata = {'label': label,
                     'is_consistent': is_consistent,
                     'timestamp': timestamp,
                     'machineguid': machineguid,
-                    'is_automatic': is_automatic}
+                    'is_automatic': is_automatic,
+                    'is_sticky': is_sticky}
         machine = VMachine(machineguid)
 
         # @todo: we now skip creating a snapshot when a vmachine's disks

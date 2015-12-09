@@ -59,6 +59,7 @@ class VMachine(DataObject):
                     snapshots_structure[timestamp] = {'label': snapshot['label'],
                                                       'is_consistent': snapshot['is_consistent'],
                                                       'is_automatic': snapshot.get('is_automatic', True),
+                                                      'is_sticky': snapshot.get('is_sticky', False),
                                                       'stored': 0,
                                                       'in_backend': snapshot['in_backend'],
                                                       'snapshots': {}}
@@ -73,6 +74,7 @@ class VMachine(DataObject):
                               'label': item['label'],
                               'is_consistent': item['is_consistent'],
                               'is_automatic': item.get('is_automatic', True),
+                              'is_sticky': item.get('is_sticky', False),
                               'stored': item['stored'],
                               'in_backend': item['in_backend'],
                               'snapshots': item['snapshots']})

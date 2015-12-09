@@ -233,7 +233,9 @@
         "yes": "Yes",
         "address": "Address",
         "city": "City",
-        "country": "Country"
+        "country": "Country",
+        "sticky": "Sticky",
+        "removesnapshot": "Remove Snapshot"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -909,6 +911,7 @@
                 "title": "Please provide the required information",
                 "name": "Snapshot name",
                 "consistent": "Label as Consistent Snapshot",
+                "sticky": "Label as Sticky Snapshot",
                 "basicinfo": "Enter basic information",
                 "nomachine": "No machine loaded",
                 "noname": "No name was entered"
