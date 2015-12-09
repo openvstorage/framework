@@ -48,6 +48,7 @@ class MessagingViewSet(viewsets.ViewSet):
     def retrieve(self, pk):
         """
         Retrieves the subscriptions for a given subscriber
+        :param pk: Primary key of subscriber
         """
         try:
             pk = int(pk)
@@ -73,12 +74,14 @@ class MessagingViewSet(viewsets.ViewSet):
         return messages, last_message_id
 
     @link()
-    @log()
+    @log(log_slow=False)
     @required_roles(['read'])
     @load()
     def wait(self, pk, message_id):
         """
         Wait for messages to appear for a given subscriber
+        :param pk: Primary key of subscriber
+        :param message_id: The last message_id that was already received
         """
         try:
             pk = int(pk)
@@ -88,9 +91,9 @@ class MessagingViewSet(viewsets.ViewSet):
         thread = gevent.spawn(MessagingViewSet._wait, pk, message_id)
         gevent.joinall([thread])
         messages, last_message_id = thread.value
-        return Response({'messages'       : messages,
+        return Response({'messages': messages,
                          'last_message_id': last_message_id,
-                         'subscriptions'  : MessageController.subscriptions(pk)}, status=status.HTTP_200_OK)
+                         'subscriptions': MessageController.subscriptions(pk)}, status=status.HTTP_200_OK)
 
     @link()
     @log()
@@ -99,6 +102,7 @@ class MessagingViewSet(viewsets.ViewSet):
     def last(self, pk):
         """
         Get the last messageid
+        :param pk: Primary key of subscriber
         """
         try:
             _ = int(pk)
@@ -113,6 +117,8 @@ class MessagingViewSet(viewsets.ViewSet):
     def subscribe(self, request, pk):
         """
         Subscribes a subscriber to a set of types
+        :param request: Raw request object of the call
+        :param pk: Primary key of subscriber
         """
         try:
             pk = int(pk)
