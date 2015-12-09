@@ -149,7 +149,7 @@ class StorageDriverController(object):
                 break
 
     @staticmethod
-    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=crontab(minute='30', hour='*'))
+    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=crontab(minute='15', hour='*'))
     @ensure_single(task_name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup')
     def scheduled_voldrv_arakoon_checkup():
         """
