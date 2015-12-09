@@ -91,7 +91,8 @@ define([
             generic.xhrAbort(self.requestHandle);
             self.requestHandle = api.get('messages/' + self.subscriberID + '/wait', {
                 queryparams: { 'message_id': self.lastMessageID },
-                timeout: 1000 * 60 * 1.25
+                timeout: 1000 * 60 * 1.25,
+                log: false
             })
                 .done(function(data) {
                     var i, subscriptions = generic.keys(self.subscriptions), resubscribe = false;

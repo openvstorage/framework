@@ -356,9 +356,7 @@ def limit(amount, per, timeout):
                 request.META['HTTP_X_REAL_IP']
             )
             client = VolatileFactory.get_client()
-            mutex = VolatileMutex(key)
-            try:
-                mutex.acquire()
+            with VolatileMutex(key):
                 rate_info = client.get(key, {'calls': [],
                                              'timeout': None})
                 active_timeout = rate_info['timeout']
@@ -376,8 +374,6 @@ def limit(amount, per, timeout):
                     logger.warning('Call {0} is being throttled with a wait of {1}'.format(key, timeout))
                     raise Throttled(wait=timeout)
                 client.set(key, rate_info)
-            finally:
-                mutex.release()
             return f(*args, **kwargs)
 
         new_function.__name__ = f.__name__
@@ -386,9 +382,10 @@ def limit(amount, per, timeout):
     return wrap
 
 
-def log():
+def log(log_slow=True):
     """
     Task logger
+    :param log_slow: Indicates whether a slow call should be logged
     """
 
     def wrap(f):
@@ -419,7 +416,12 @@ def log():
             ))
 
             # Call the function
-            return f(*args, **kwargs)
+            start = time.time()
+            return_value = f(*args, **kwargs)
+            duration = time.time() - start
+            if duration > 5 and log_slow is True:
+                logger.warning('API call {0}.{1} took {2}s'.format(f.__module__, f.__name__, round(duration, 2)))
+            return return_value
 
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
