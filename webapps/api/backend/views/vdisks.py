@@ -134,7 +134,7 @@ class VDiskViewSet(viewsets.ViewSet):
         return VDiskController.delete_snapshot.delay(diskguid=vdisk.guid,
                                                       snapshotid=snapshot_id)
 
-    @action
+    @action()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
@@ -145,7 +145,7 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         return VDiskController.set_as_template.delay(diskguid=vdisk.guid)
 
-    @action
+    @action()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
