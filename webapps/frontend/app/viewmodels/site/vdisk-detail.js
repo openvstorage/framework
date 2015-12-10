@@ -164,7 +164,6 @@ define([
             self.loadStorageRouters();
         };
         self.removeSnapshot = function(snapshotid) {
-            console.log("Removing snapshot " + snapshotid + " of disk " + self.vDisk().guid());
             api.post('vdisks/' + self.vDisk().guid() + '/removesnapshot', {
                      data: { snapshot_id: snapshotid }
             });
