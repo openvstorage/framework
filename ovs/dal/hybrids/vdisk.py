@@ -82,6 +82,7 @@ class VDisk(DataObject):
                                       'label': metadata['label'],
                                       'is_consistent': metadata['is_consistent'],
                                       'is_automatic': metadata.get('is_automatic', True),
+                                      'is_sticky': metadata.get('is_sticky', False),
                                       'in_backend': snapshot.in_backend,
                                       'stored': int(snapshot.stored)})
         return snapshots
