@@ -214,7 +214,7 @@ class ScheduledTaskController(object):
         for storage_driver in StorageDriverList.get_storagedrivers():
             for partition in storage_driver.partitions:
                 if DiskPartition.ROLES.SCRUB == partition.role:
-                    logger.info('Gather Scrub - Storage Router {0:<15} has SCRUB partition at {1}'.format(storage_driver.storagerouter.ip, partition.path))
+                    logger.info('Gather Scrub - Storage Router {0:<15} has SCRUB partition at {1}'.format(storage_driver.storagerouter.ip, partition.folder))
                     if storage_driver.storagerouter not in scrub_locations:
                         try:
                             _ = SSHClient(storage_driver.storagerouter.ip)
@@ -236,7 +236,6 @@ class ScheduledTaskController(object):
 
         logger.info('Gather Scrub - Checking {0} volumes for scrub work'.format(len(vdisk_guids)))
         local_machineid = System.get_my_machine_id()
-        local_storage_router = None
         local_scrub_location = None
         local_vdisks_to_scrub = []
         result_set = ResultSet([])
@@ -251,7 +250,6 @@ class ScheduledTaskController(object):
             logger.info('Gather Scrub - Storage Router {0:<15} ({1}) - Scrubbing {2} virtual disks'.format(storage_router.ip, 'local' if local is True else 'remote', len(vdisk_guids_to_scrub)))
 
             if local is True:
-                local_storage_router = storage_router
                 local_scrub_location = scrub_info[1]
                 local_vdisks_to_scrub = vdisk_guids_to_scrub
             else:
@@ -260,23 +258,16 @@ class ScheduledTaskController(object):
                     routing_key='sr.{0}'.format(storage_router.machine_id)
                 ))
                 storage_router_list.append(storage_router)
+                logger.info('Gather Scrub - Storage Router {0:<15} - Started scrub task'.format(storage_router.ip))
 
         # Remote tasks have been launched, now start the local task and then wait for remote tasks to finish
-        processed_guids = []
         if local_scrub_location is not None and len(local_vdisks_to_scrub) > 0:
-            try:
-                processed_guids = ScheduledTaskController._execute_scrub_work(scrub_location=local_scrub_location,
-                                                                              vdisk_guids=local_vdisks_to_scrub)
-            except Exception as ex:
-                logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(local_storage_router.ip, ex))
+            ScheduledTaskController._execute_scrub_work(scrub_location=local_scrub_location,
+                                                        vdisk_guids=local_vdisks_to_scrub)
         all_results = result_set.join(propagate=False)  # Propagate False makes sure all jobs are waited for even when 1 or more jobs fail
         for index, result in enumerate(all_results):
-            if isinstance(result, list):
-                processed_guids.extend(result)
-            else:
-                logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(storage_router_list[index].ip, result))
-        if len(processed_guids) != len(vdisk_guids) or set(processed_guids).difference(vdisk_guids):
-            raise RuntimeError('Scrubbing failed for 1 or more storagerouters')
+            if result is not None:
+                logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error {1}'.format(storage_router_list[index].ip, result))
         logger.info('Gather Scrub - Finished')
 
     @staticmethod
@@ -332,16 +323,13 @@ class ScheduledTaskController(object):
                         locked_client.apply_scrubbing_result(scrubbing_result)
                     if work_units:
                         logger.info('Execute Scrub - Virtual disk {0} - {1} - Scrub successfully applied'.format(vdisk.guid, vdisk.name))
-                    else:
-                        logger.info('Execute Scrub - Virtual disk {0} - {1} - No scrubbing required'.format(vdisk.guid, vdisk.name))
             except Exception as ex:
                 failures.append('Failed scrubbing work unit for volume {0} with guid {1}: {2}'.format(vdisk.name, vdisk.guid, ex))
 
         failed = len(failures)
         logger.info('Execute Scrub - Finished - Success: {0} - Failed: {1} - Skipped: {2}'.format((total - failed - skipped), failed, skipped))
         if failed > 0:
-            raise Exception('\n - '.join(failures))
-        return vdisk_guids
+            raise Exception("\n\n".join(failures))
 
     @staticmethod
     @celery.task(name='ovs.scheduled.collapse_arakoon', schedule=crontab(minute='30', hour='0'))
