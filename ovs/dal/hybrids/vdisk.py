@@ -40,7 +40,8 @@ class VDisk(DataObject):
                     Property('order', int, mandatory=False, doc='Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
                     Property('volume_id', str, mandatory=False, doc='ID of the vDisk in the Open vStorage Volume Driver.'),
                     Property('parentsnapshot', str, mandatory=False, doc='Points to a parent storage driver parent ID. None if there is no parent Snapshot'),
-                    Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder')]
+                    Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder'),
+                    Property('is_vtemplate', bool, default=False, doc='Indicates whether this vDisk is a vTemplate.'),]
     __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
                    Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False),
