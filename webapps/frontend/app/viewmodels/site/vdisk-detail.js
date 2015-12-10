@@ -33,7 +33,8 @@ define([
             { key: 'stored',        value: $.t('ovs:generic.storeddata'),  width: 110       },
             { key: 'is_automatic',  value: $.t('ovs:generic.type'),        width: 110       },
             { key: 'is_consistent', value: $.t('ovs:generic.consistent'),  width: 100       },
-            { key: 'is_sticky',     value: $.t('ovs:generic.sticky'),      width: 100       }
+            { key: 'is_sticky',     value: $.t('ovs:generic.sticky'),      width: 100       },
+            { key: '',              value: $.t('ovs:generic.actions'),     width: 100       }
         ];
 
         // Observables
@@ -165,9 +166,26 @@ define([
         };
         self.removeSnapshot = function(snapshotid) {
             api.post('vdisks/' + self.vDisk().guid() + '/removesnapshot', {
-                     data: { snapshot_id: snapshotid }
-            });
-
+                data: { snapshot_id: snapshotid }
+            })
+                .then(self.shared.tasks.wait)
+                .done(function () {
+                    generic.alertSuccess(
+                        $.t('ovs:vdisks.removesnapshot.done'),
+                        $.t('ovs:vdisks.removesnapshot.donemsg', { what: snapshotid })
+                    );
+                })
+                .fail(function (error) {
+                    generic.alertError(
+                        $.t('ovs:generic.error'),
+                        $.t('ovs:generic.messages.errorwhile', {
+                            what: $.t('ovs:vdisks.removesnapshot.errormsg', { what: snapshotid })
+                        })
+                    );
+                })
+                .always(function () {
+                    self.load();
+                });
         };
 
         // Durandal

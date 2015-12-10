@@ -449,6 +449,11 @@
             "done": "Save complete",
             "donemsg": "The configuration details for __what__ are saved.",
             "errormsg": "saving __what__"
+        },
+        "removesnapshot": {
+            "done": "Snapshot removed",
+            "donemsg": "Snapshot __what__ was removed successfully.",
+            "errormsg": "Failed to remove snapshot __what__."
         }
     },
     "vtemplates": {

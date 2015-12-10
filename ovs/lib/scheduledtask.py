@@ -196,8 +196,6 @@ class ScheduledTaskController(object):
         for bucket_chain in bucket_chains:
             for bucket in bucket_chain:
                 for snapshot in bucket['snapshots']:
-                    if snapshot.get('is_sticky') is True:
-                        continue
                     VDiskController.delete_snapshot(diskguid=snapshot['diskguid'],
                                                     snapshotid=snapshot['snapshotid'])
         logger.info('Delete snapshots finished')

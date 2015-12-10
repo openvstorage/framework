@@ -46,7 +46,8 @@ define([
             { key: 'timestamp',     value: $.t('ovs:generic.datetime'),    width: 200       },
             { key: 'stored',        value: $.t('ovs:generic.storeddata'),  width: 110       },
             { key: 'is_automatic',  value: $.t('ovs:generic.type'),        width: 110       },
-            { key: 'is_consistent', value: $.t('ovs:generic.consistent'),  width: 100       }
+            { key: 'is_consistent', value: $.t('ovs:generic.consistent'),  width: 100       },
+            { key: 'is_sticky',     value: $.t('ovs:generic.sticky'),      width: 100       }
         ];
 
         // Handles
