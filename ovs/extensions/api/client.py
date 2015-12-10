@@ -107,6 +107,8 @@ class OVSClient(object):
         """
         Executes a GET call
         """
+        if not api.endswith('/'):
+            api += '/'
         headers, url = self._prepare(params=params)
         return self._process(requests.get(url=url.format(api),
                                           headers=headers,
@@ -116,6 +118,8 @@ class OVSClient(object):
         """
         Executes a POST call
         """
+        if not api.endswith('/'):
+            api += '/'
         headers, url = self._prepare(params=params)
         return self._process(requests.post(url=url.format(api),
                                            data=data,
@@ -126,6 +130,8 @@ class OVSClient(object):
         """
         Executes a PUT call
         """
+        if not api.endswith('/'):
+            api += '/'
         headers, url = self._prepare(params=params)
         return self._process(requests.put(url=url.format(api),
                                           data=data,
@@ -136,6 +142,8 @@ class OVSClient(object):
         """
         Executes a PATCH call
         """
+        if not api.endswith('/'):
+            api += '/'
         headers, url = self._prepare(params=params)
         return self._process(requests.patch(url=url.format(api),
                                             data=data,
