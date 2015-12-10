@@ -451,6 +451,7 @@
             "errormsg": "saving __what__"
         },
         "removesnapshot": {
+            "delete": "Are you sure you want to remove snapshot __what__?",
             "done": "Snapshot removed",
             "donemsg": "Snapshot __what__ was removed successfully.",
             "errormsg": "Failed to remove snapshot __what__."
