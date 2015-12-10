@@ -43,7 +43,6 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.decorators import log
-from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.logHandler import LogHandler
@@ -51,6 +50,7 @@ from subprocess import check_output
 from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter import VolumeDriverEvents_pb2
 from volumedriver.storagerouter.storagerouterclient import DTLConfig
+from volumedriver.storagerouter.storagerouterclient import DTLConfigMode
 from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
 
@@ -782,9 +782,13 @@ class VDiskController(object):
             vpool_config = vpool_dtl_config_cache[vpool.guid]
             dtl_vpool_enabled = vpool_config['dtl_enabled']
             current_dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id)
+            current_dtl_config_mode = vdisk.storagedriver_client.get_dtl_config_mode(volume_id)
             if dtl_vpool_enabled is False and (current_dtl_config is None or current_dtl_config.host == 'null'):
                 logger.info('    DTL is globally disabled for vPool {0} with guid {1}'.format(vpool.name, vpool.guid))
                 vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
+                continue
+            elif current_dtl_config_mode == DTLConfigMode.MANUAL and (current_dtl_config is None or current_dtl_config.host == 'null'):
+                logger.info('    DTL is disabled for virtual disk {0} with guid {1}'.format(vdisk.name, vdisk.guid))
                 continue
 
             storage_router = StorageRouter(vdisk.storagerouter_guid)
@@ -833,9 +837,13 @@ class VDiskController(object):
                 vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
                 continue
 
+            # Check whether reconfiguration is required
             reconfigure_required = False
             if current_dtl_config is None:
                 logger.info('        No DTL configuration found, but there are Storage Routers available')
+                reconfigure_required = True
+            elif current_dtl_config_mode == DTLConfigMode.AUTOMATIC:
+                logger.info('        DTL configuration set to AUTOMATIC, switching to manual')
                 reconfigure_required = True
             else:
                 dtl_host = current_dtl_config.host
@@ -851,6 +859,7 @@ class VDiskController(object):
                     logger.info('        Configured port does not match expected port ({0} vs {1})'.format(dtl_port, storage_drivers[0].ports[2]))
                     reconfigure_required = True
 
+            # Perform the reconfiguration
             if reconfigure_required is True:
                 logger.info('        Reconfigure required')
                 index = random.randint(0, len(available_storagerouters) - 1)
@@ -886,6 +895,7 @@ class VDiskController(object):
                 VDiskController.dtl_checkup(vdisk_guid=vdisk.guid,
                                             storagerouters_to_exclude=[storagedriver.storagerouter.guid],
                                             chain_timeout=600)
+
     @staticmethod
     @celery.task(name='ovs.vdisk.clean_bad_disk')
     def clean_bad_disk(vdiskguid):
