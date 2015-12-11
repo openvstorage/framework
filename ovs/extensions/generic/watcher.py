@@ -19,6 +19,7 @@ import uuid
 import os
 import logging
 from ovs.log.logHandler import LogHandler
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 
 logger = LogHandler.get('extensions', name='watcher')
 
@@ -73,8 +74,6 @@ def services_running(target):
                 try:
                     try:
                         logging.disable(logging.WARNING)
-                        from ovs.extensions.storage.persistentfactory import PersistentFactory
-                        PersistentFactory.store = None
                         persistent = PersistentFactory.get_client()
                         persistent.set(key, value)
                         if persistent.get(key) == value:
@@ -147,7 +146,7 @@ def services_running(target):
                 _log(target, '  No working rabbitMQ node could be found', 2)
                 return False
             _log(target, '  RabbitMQ test OK', 0)
-            _log(target, 'All tests OK', 1)
+            _log(target, 'All tests OK', 0)
             return True
     except Exception as ex:
         _log(target, 'Unexpected exception: {0}'.format(ex), 2)
