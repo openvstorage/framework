@@ -149,11 +149,15 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def create_snapshot(self, vdisk, name, timestamp=None, consistent=False, automatic=False, sticky=False, snapshot_id=None):
+    def create_snapshot(self, vdisk, name, timestamp, consistent=False, automatic=False, sticky=False, snapshot_id=None):
         """
         Creates a snapshot from the vDisk
         :param vdisk: Guid of the virtual disk to create snapshot from
-        :param metadata: Metadata of the snapshot (dict)
+        :param name: Name of the snapshot (label)
+        :param timestamp: Timestamp of the snapshot - integer
+        :param consistent: Flag - is_consistent
+        :param automatic: Flag - is_automatic
+        :param sticky: Flag - is_sticky
         :param snapshot_id: (optional) id of the snapshot, default will be new uuid
         """
         metadata = {'label': name,

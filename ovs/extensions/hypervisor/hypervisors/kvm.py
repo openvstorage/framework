@@ -89,13 +89,13 @@ class KVM(object):
         _ = ip
         return self.sdk.is_datastore_available(mountpoint)
 
-    def clone_vm(self, vmid, name, disks, wait=False):
+    def clone_vm(self, vmid, name, disks, mountpoint, wait=False):
         """
         create a clone at vmachine level
         #disks are cloned by VDiskController
         """
         _ = wait  # For compatibility purposes only
-        return self.sdk.clone_vm(vmid, name, disks)
+        return self.sdk.clone_vm(vmid, name, disks, mountpoint)
 
     def set_as_template(self, vmid, disks, wait=False):
         """

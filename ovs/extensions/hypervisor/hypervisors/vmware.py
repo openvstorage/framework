@@ -51,7 +51,7 @@ class VMware(object):
                 return task_info.info.result.value
         return None
 
-    def clone_vm(self, vmid, name, disks, wait=False):
+    def clone_vm(self, vmid, name, disks, mountpoint, wait=False):
         """
         Clone a vmachine
 
@@ -60,6 +60,7 @@ class VMware(object):
         @param disks: list of disk information
         @param wait: wait for action to complete
         """
+        _ = mountpoint
         task = self.sdk.clone_vm(vmid, name, disks, wait)
         if wait is True:
             if self.sdk.validate_result(task):
