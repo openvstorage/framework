@@ -864,7 +864,7 @@ class StorageRouterController(object):
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.remove_storagedriver')
-    def remove_storagedriver(storagedriver_guid, offline=False):
+    def remove_storagedriver(storagedriver_guid, allow_offline=False):
         """
         Removes a StorageDriver (and, if it was the last Storage Driver for a vPool, the vPool is removed as well)
         :param storagedriver_guid: Storage Driver guid to remove
@@ -885,7 +885,7 @@ class StorageRouterController(object):
         # Validate node connectivity
         try:
             for current_storagerouter in [sd.storagerouter for sd in vpool.storagedrivers]:
-                if offline and current_storagerouter.ip == ip:
+                if allow_offline is True and current_storagerouter.ip == ip:
                     continue
                 client = SSHClient(current_storagerouter, username='root')
                 configuration_dir = client.config_read('ovs.core.cfgdir')
@@ -926,6 +926,7 @@ class StorageRouterController(object):
                                                    excluded_storagerouters=[storagerouter])
 
         voldrv_arakoon_cluster_id = 'voldrv'
+        # @TODO: Allow this code to run anywere
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
         arakoon_node_configs = []
@@ -1033,9 +1034,10 @@ class StorageRouterController(object):
             # All MDSServiceVDisk object should have been deleted above
             MDSServiceController.remove_mds_service(mds_service=mds_service,
                                                     vpool=vpool,
-                                                    reload_config=False)
+                                                    reconfigure=False,
+                                                    allow_offline=offline)
 
-        if not offline:    
+        if not offline:
             # Cleanup directories/files
             dirs_to_remove = [storagedriver.mountpoint,
                               '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool.name)]

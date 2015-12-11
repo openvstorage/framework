@@ -152,21 +152,17 @@ class MDSServiceController(object):
         return mds_service
 
     @staticmethod
-    def remove_mds_service(mds_service, vpool, reload_config, offline=False):
+    def remove_mds_service(mds_service, vpool, reconfigure, allow_offline=False):
         """
         Removes an MDS service
-        :param mds_service:   The MDS service to remove
-        :param vpool:         The vPool for which the MDS service will be removed
-        :param reload_config: If True, the volumedriver's updated configuration will be reloaded
+        :param mds_service: The MDS service to remove
+        :param vpool: The vPool for which the MDS service will be removed
+        :param reconfigure: Indicates whether reconfiguration is required
+        :param allow_offline: Indicates whether it's OK that the node for which mds services are cleaned is offline
         """
         if len(mds_service.vdisks_guids) > 0:
             raise RuntimeError('Cannot remove MDSService that is still serving disks')
 
-        storagerouter = mds_service.service.storagerouter
-        if not offline:
-            client = SSHClient(storagerouter)
-        else:
-            client = None
         mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
 
         # Clean up model
@@ -178,26 +174,29 @@ class MDSServiceController(object):
         mds_service.delete()
         mds_service.service.delete()
 
-        # Generate new mds_nodes section
-        mds_nodes = []
-        for service in mdsservice_type.services:
-            if service.storagerouter_guid == storagerouter.guid:
-                mds_service = service.mds_service
-                if mds_service.vpool_guid == vpool.guid:
-                    sdp = [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.DB]
-                    mds_nodes.append({'host': service.storagerouter.ip,
-                                      'port': service.ports[0],
-                                      'db_directory': sdp[0],
-                                      'scratch_directory': sdp[0]})
+        storagerouter = mds_service.service.storagerouter
+        try:
+            client = SSHClient(storagerouter)
+            if reconfigure is True:
+                # Generate new mds_nodes section
+                mds_nodes = []
+                for service in mdsservice_type.services:
+                    if service.storagerouter_guid == storagerouter.guid:
+                        mds_service = service.mds_service
+                        if mds_service.vpool_guid == vpool.guid:
+                            sdp = [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.DB]
+                            mds_nodes.append({'host': service.storagerouter.ip,
+                                              'port': service.ports[0],
+                                              'db_directory': sdp[0],
+                                              'scratch_directory': sdp[0]})
 
-        # Generate the correct section in the Storage Driver's configuration
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
-        storagedriver_config.load(client)
-        storagedriver_config.clean()  # Clean out obsolete values
-        storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
-        storagedriver_config.save(client, reload_config=reload_config)
+                # Generate the correct section in the Storage Driver's configuration
+                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
+                storagedriver_config.load(client)
+                storagedriver_config.clean()  # Clean out obsolete values
+                storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
+                storagedriver_config.save(client, reload_config=reconfigure)
 
-        if not offline:
             tries = 5
             while tries > 0:
                 try:
@@ -208,11 +207,16 @@ class MDSServiceController(object):
                         logger.debug('Recursively removed {0}'.format(dir_name))
                     break
                 except Exception:
-                    time.sleep(5)
                     logger.debug('Waiting for the MDS service to go down...')
+                    time.sleep(5)
                     tries -= 1
                     if tries == 0:
                         raise
+        except UnableToConnectException:
+            if allow_offline is True:
+                logger.info('Allowed offline node during mds service removal')
+            else:
+                raise
 
     @staticmethod
     def sync_vdisk_to_reality(vdisk):
@@ -673,7 +677,7 @@ class MDSServiceController(object):
                 has_room = False
                 for mds_service in mds_services[:]:
                     if mds_service.capacity == 0 and len(mds_service.vdisks_guids) == 0:
-                        MDSServiceController.remove_mds_service(mds_service, vpool, reload_config=True)
+                        MDSServiceController.remove_mds_service(mds_service, vpool, reconfigure=True)
                         mds_services.remove(mds_service)
                 for mds_service in mds_services:
                     _, load = MDSServiceController.get_mds_load(mds_service)
