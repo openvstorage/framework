@@ -29,7 +29,6 @@ from paramiko import AuthenticationException
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.filemutex import FileMutex
 from ovs.extensions.generic.interactive import Interactive
@@ -1490,7 +1489,7 @@ EOF
         print 'Update existing vPools'
         logger.info('Update existing vPools')
         for node_ip in node_ips:
-            with Remote(node_ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration, ArakoonManagementEx],
+            with Remote(node_ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration],
                         'ovs') as remote:
                 login = remote.Configuration.get('ovs.core.broker.login')
                 password = remote.Configuration.get('ovs.core.broker.password')

@@ -41,7 +41,6 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.api.client import OVSClient
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.remote import Remote
@@ -52,6 +51,7 @@ from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
@@ -439,16 +439,14 @@ class StorageRouterController(object):
 
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
         voldrv_arakoon_cluster_id = 'voldrv'
-        voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
-        voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
+
+        config = ArakoonClusterConfig(voldrv_arakoon_cluster_id)
+        config.load_config(client)
         arakoon_nodes = []
-        for node_id, node_config in voldrv_arakoon_client_config.iteritems():
-            arakoon_nodes.append({'node_id': node_id, 'host': node_config[0][0], 'port': node_config[1]})
         arakoon_node_configs = []
-        for arakoon_node in voldrv_arakoon_client_config.keys():
-            arakoon_node_configs.append(ArakoonNodeConfig(arakoon_node,
-                                                          voldrv_arakoon_client_config[arakoon_node][0][0],
-                                                          voldrv_arakoon_client_config[arakoon_node][1]))
+        for node in config.nodes:
+            arakoon_nodes.append({'node_id': node.name, 'host': node.ip, 'port': node.client_port})
+            arakoon_node_configs.append(ArakoonNodeConfig(node.name, node.ip, node.client_port))
         node_configs = []
         for existing_storagedriver in StorageDriverList.get_storagedrivers():
             if existing_storagedriver.vpool_guid == vpool.guid:
@@ -927,13 +925,11 @@ class StorageRouterController(object):
         configuration_dir = client.config_read('ovs.core.cfgdir')
 
         voldrv_arakoon_cluster_id = 'voldrv'
-        voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
-        voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
+        config = ArakoonClusterConfig(voldrv_arakoon_cluster_id)
+        config.load_config(client)
         arakoon_node_configs = []
-        for arakoon_node in voldrv_arakoon_client_config.keys():
-            arakoon_node_configs.append(ArakoonNodeConfig(arakoon_node,
-                                                          voldrv_arakoon_client_config[arakoon_node][0][0],
-                                                          voldrv_arakoon_client_config[arakoon_node][1]))
+        for node in config.nodes:
+            arakoon_node_configs.append(ArakoonNodeConfig(node.name, node.ip, node.client_port))
         vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), voldrv_arakoon_cluster_id, arakoon_node_configs)
 
         if ServiceManager.has_service(voldrv_service, client=client):
