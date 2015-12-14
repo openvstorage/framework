@@ -1,0 +1,242 @@
+--- ovs/extensions/db/pyrakoon/pyrakoon/nursery.py
++++ ovs/extensions/db/pyrakoon/pyrakoon/nursery.py
+@@ -19,7 +19,6 @@
+ #pylint: disable=R0903
+ # R0903: Too few public methods
+
+-import logging
+ import operator
+
+ try:
+@@ -27,10 +26,10 @@
+ except ImportError:
+     import StringIO
+
+-from pyrakoon import protocol, utils
++from ovs.extensions.db.pyrakoon.pyrakoon import protocol, utils
++from ovs.log.logHandler import LogHandler
+
+-
+-LOGGER = logging.getLogger(__name__)
++LOGGER = LogHandler.get('arakoon', 'pyrakoon', propagate=False)
+
+ class NurseryConfigType(protocol.Type):
+     '''NurseryConfig type'''
+--- ovs/extensions/db/pyrakoon/pyrakoon/protocol/__init__.py
++++ ovs/extensions/db/pyrakoon/pyrakoon/protocol/__init__.py
+@@ -26,7 +26,7 @@
+ except ImportError:
+     import StringIO
+
+-from pyrakoon import utils
++from ovs.extensions.db.pyrakoon.pyrakoon import utils
+
+ # Result codes
+ RESULT_SUCCESS = 0x0000
+@@ -300,7 +300,7 @@
+     '''Step type'''
+
+     def check(self, value):
+-        from pyrakoon import sequence
++        from ovs.extensions.db.pyrakoon.pyrakoon import sequence
+
+         if not isinstance(value, sequence.Step):
+             raise TypeError
+@@ -708,7 +708,7 @@
+         :see: :func:`pyrakoon.utils.process_blocking`
+         '''
+
+-        from pyrakoon import errors
++        from ovs.extensions.db.pyrakoon.pyrakoon import errors
+
+         code_receiver = UINT32.receive()
+         request = code_receiver.next() #pylint: disable=E1101
+@@ -1034,7 +1034,7 @@
+     ''')
+
+     def __init__(self, steps, sync):
+-        from pyrakoon import sequence
++        from ovs.extensions.db.pyrakoon.pyrakoon import sequence
+
+         super(Sequence, self).__init__()
+
+--- ovs/extensions/db/pyrakoon/pyrakoon/test.py
++++ ovs/extensions/db/pyrakoon/pyrakoon/test.py
+@@ -20,7 +20,6 @@
+ import time
+ import shutil
+ import struct
+-import logging
+ import tempfile
+ import subprocess
+
+@@ -29,10 +28,10 @@
+ except ImportError:
+     import StringIO
+
+-from pyrakoon import client, compat, errors, protocol, utils
++from ovs.extensions.db.pyrakoon.pyrakoon import client, compat, errors, protocol, utils
++from ovs.log.logHandler import LogHandler
+
+-
+-LOGGER = logging.getLogger(__name__)
++LOGGER = LogHandler.get('arakoon', 'pyrakoon', propagate=False)
+
+ #pylint: disable=R0904
+ class FakeClient(object, client.AbstractClient, client.ClientMixin):
+===================================================================
+--- ovs/extensions/db/pyrakoon/pyrakoon/client/admin.py
++++ ovs/extensions/db/pyrakoon/pyrakoon/client/admin.py
+@@ -16,8 +16,8 @@
+
+ '''Administrative client interface'''
+
+-from pyrakoon.client import utils
+-from pyrakoon.protocol import admin
++from ovs.extensions.db.pyrakoon.pyrakoon.client import utils
++from ovs.extensions.db.pyrakoon.pyrakoon.protocol import admin
+
+ class ClientMixin: #pylint: disable=W0232,C1001
+     '''Mixin providing client actions for node administration
+--- ovs/extensions/db/pyrakoon/pyrakoon/utils.py
++++ ovs/extensions/db/pyrakoon/pyrakoon/utils.py
+@@ -18,11 +18,11 @@
+
+ import __builtin__
+ import uuid
+-import logging
+ import functools
+ import itertools
++from ovs.log.logHandler import LogHandler
+
+-LOGGER = logging.getLogger(__name__)
++LOGGER = LogHandler.get('arakoon', 'pyrakoon', propagate=False)
+ '''Logger for code in this module''' #pylint: disable=W0105
+
+
+@@ -334,7 +334,7 @@
+     :see: :meth:`pyrakoon.protocol.Message.receive`
+     '''
+
+-    from pyrakoon import protocol
++    from ovs.extensions.db.pyrakoon.pyrakoon import protocol
+
+     request = receiver.next()
+
+--- ovs/extensions/db/pyrakoon/pyrakoon/sequence.py
++++ ovs/extensions/db/pyrakoon/pyrakoon/sequence.py
+@@ -18,7 +18,7 @@
+
+ import operator
+
+-from pyrakoon import protocol, utils
++from ovs.extensions.db.pyrakoon.pyrakoon import protocol, utils
+
+ #pylint: disable=R0903
+
+--- ovs/extensions/db/pyrakoon/pyrakoon/client/utils.py
++++ ovs/extensions/db/pyrakoon/pyrakoon/client/utils.py
+@@ -18,7 +18,7 @@
+
+ import functools
+
+-from pyrakoon import protocol, utils
++from ovs.extensions.db.pyrakoon.pyrakoon import protocol, utils
+
+ def validate_types(specs, args):
+     '''Validate method call argument types
+@@ -87,7 +87,7 @@
+             self = kwargs['self']
+
+             if not self.connected:
+-                from pyrakoon import client
++                from ovs.extensions.db.pyrakoon.pyrakoon import client
+                 raise client.NotConnectedError('Not connected')
+
+             args = tuple(kwargs[arg[0]] for arg in message_type.ARGS)
+--- ovs/extensions/db/pyrakoon/pyrakoon/client/__init__.py
++++ ovs/extensions/db/pyrakoon/pyrakoon/client/__init__.py
+@@ -16,9 +16,9 @@
+
+ '''Arakoon client interface'''
+
+-from pyrakoon import errors, protocol
+-import pyrakoon.utils
+-from pyrakoon.client.utils import call
++from ovs.extensions.db.pyrakoon.pyrakoon import errors, protocol
++import ovs.extensions.db.pyrakoon.pyrakoon.utils
++from ovs.extensions.db.pyrakoon.pyrakoon.client.utils import call
+
+ class ClientMixin: #pylint: disable=W0232,R0904,old-style-class
+     '''Mixin providing client actions for standard cluster functionality
+@@ -225,7 +225,7 @@
+             for part in message.serialize():
+                 self._socket.sendall(part)
+
+-            return pyrakoon.utils.read_blocking(
++            return ovs.extensions.db.pyrakoon.pyrakoon.utils.read_blocking(
+                 message.receive(), self._socket.recv)
+         except Exception as exc:
+             if not isinstance(exc, errors.ArakoonError):
+--- ovs/extensions/db/pyrakoon/pyrakoon/protocol/admin.py
++++ ovs/extensions/db/pyrakoon/pyrakoon/protocol/admin.py
+@@ -18,7 +18,7 @@
+
+ import operator
+
+-from pyrakoon import errors, protocol, utils
++from ovs.extensions.db.pyrakoon.pyrakoon import errors, protocol, utils
+
+ class OptimizeDB(protocol.Message):
+     '''"optimize_db" message'''
+--- ovs/extensions/db/pyrakoon/pyrakoon/compat.py
++++ ovs/extensions/db/pyrakoon/pyrakoon/compat.py
+@@ -20,11 +20,11 @@
+ import random
+ import select
+ import socket
+-import logging
+ import functools
+ import threading
+
+-from pyrakoon import client, errors, protocol, sequence, utils
++from ovs.extensions.db.pyrakoon.pyrakoon import client, errors, protocol, sequence, utils
++from ovs.log.logHandler import LogHandler
+
+ __docformat__ = 'epytext'
+
+@@ -48,22 +48,7 @@
+ # E1121: Too many positional arguments for function call
+ # R0904: Too many public methods
+
+-LOGGER = logging.getLogger(__name__)
+-
+-def _add_handler():
+-    if hasattr(logging, 'NullHandler'):
+-        handler = logging.NullHandler() #pylint: disable=E1101
+-    else:
+-        class NullHandler(logging.Handler):
+-            def emit(self, record):
+-                pass
+-
+-        handler = NullHandler()
+-
+-    LOGGER.addHandler(handler)
+-
+-_add_handler()
+-del _add_handler
++LOGGER = LogHandler.get('arakoon', 'pyrakoon', propagate=False)
+
+
+ def _validate_signature_helper(fun, *args):
+--- ovs/extensions/db/pyrakoon/pyrakoon/tx.py
++++ ovs/extensions/db/pyrakoon/pyrakoon/tx.py
+@@ -26,7 +26,7 @@
+ from twisted.protocols import basic, stateful
+ from twisted.python import log
+
+-from pyrakoon import client, errors, protocol, utils
++from ovs.extensions.db.pyrakoon.pyrakoon import client, errors, protocol, utils
+
+ #pylint: disable=R0904,C0103,R0901
+

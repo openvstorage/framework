@@ -26,7 +26,7 @@ try:
 except ImportError:
     import StringIO
 
-from pyrakoon import utils
+from ovs.extensions.db.pyrakoon.pyrakoon import utils
 
 # Result codes
 RESULT_SUCCESS = 0x0000
@@ -300,7 +300,7 @@ class Step(Type):
     '''Step type'''
 
     def check(self, value):
-        from pyrakoon import sequence
+        from ovs.extensions.db.pyrakoon.pyrakoon import sequence
 
         if not isinstance(value, sequence.Step):
             raise TypeError
@@ -708,7 +708,7 @@ class Message(object):
         :see: :func:`pyrakoon.utils.process_blocking`
         '''
 
-        from pyrakoon import errors
+        from ovs.extensions.db.pyrakoon.pyrakoon import errors
 
         code_receiver = UINT32.receive()
         request = code_receiver.next() #pylint: disable=E1101
@@ -1034,7 +1034,7 @@ class Sequence(Message):
     ''')
 
     def __init__(self, steps, sync):
-        from pyrakoon import sequence
+        from ovs.extensions.db.pyrakoon.pyrakoon import sequence
 
         super(Sequence, self).__init__()
 

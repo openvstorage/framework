@@ -19,7 +19,6 @@
 #pylint: disable=R0903
 # R0903: Too few public methods
 
-import logging
 import operator
 
 try:
@@ -27,10 +26,10 @@ try:
 except ImportError:
     import StringIO
 
-from pyrakoon import protocol, utils
+from ovs.extensions.db.pyrakoon.pyrakoon import protocol, utils
+from ovs.log.logHandler import LogHandler
 
-
-LOGGER = logging.getLogger(__name__)
+LOGGER = LogHandler.get('arakoon', 'pyrakoon', propagate=False)
 
 class NurseryConfigType(protocol.Type):
     '''NurseryConfig type'''

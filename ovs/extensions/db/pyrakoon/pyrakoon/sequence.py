@@ -18,7 +18,7 @@
 
 import operator
 
-from pyrakoon import protocol, utils
+from ovs.extensions.db.pyrakoon.pyrakoon import protocol, utils
 
 #pylint: disable=R0903
 

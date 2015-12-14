@@ -7,12 +7,12 @@ if [ "$#" -ne 1 ] ; then
 else
   dir=`mktemp -d`
   cd $dir
-  git clone https://github.com/Incubaid/pyrakoon.git
+  git clone https://github.com/openvstorage/pyrakoon.git
   rm -rf $1/ovs/extensions/db/pyrakoon/pyrakoon
   mv pyrakoon/pyrakoon $1/ovs/extensions/db/pyrakoon/
-  find $1/ovs/extensions/db/pyrakoon/pyrakoon -type f -print0 | xargs -0 sed -i 's/from pyrakoon /from ovs.extensions.db.pyrakoon.pyrakoon /g'
-  find $1/ovs/extensions/db/pyrakoon/pyrakoon -type f -print0 | xargs -0 sed -i 's/from pyrakoon./from ovs.extensions.db.pyrakoon.pyrakoon./g'
-  find $1/ovs/extensions/db/pyrakoon/pyrakoon -type f -print0 | xargs -0 sed -i 's/import pyrakoon/import ovs.extensions.db.pyrakoon.pyrakoon/g'
+  cd $1
+  patch -p0 < ovs/extensions/db/pyrakoon/tools/patches.diff
+  cd $dir
   cd ..
   rm -rf $dir
 fi
