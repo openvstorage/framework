@@ -1,5 +1,5 @@
---- ovs/extensions/db/pyrakoon/pyrakoon/nursery.py
-+++ ovs/extensions/db/pyrakoon/pyrakoon/nursery.py
+--- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/nursery.py
++++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/nursery.py
 @@ -19,7 +19,6 @@
  #pylint: disable=R0903
  # R0903: Too few public methods
@@ -22,8 +22,8 @@
 
  class NurseryConfigType(protocol.Type):
      '''NurseryConfig type'''
---- ovs/extensions/db/pyrakoon/pyrakoon/protocol/__init__.py
-+++ ovs/extensions/db/pyrakoon/pyrakoon/protocol/__init__.py
+--- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/protocol/__init__.py
++++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/protocol/__init__.py
 @@ -26,7 +26,7 @@
  except ImportError:
      import StringIO
@@ -60,8 +60,8 @@
 
          super(Sequence, self).__init__()
 
---- ovs/extensions/db/pyrakoon/pyrakoon/test.py
-+++ ovs/extensions/db/pyrakoon/pyrakoon/test.py
+--- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/test.py
++++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/test.py
 @@ -20,7 +20,6 @@
  import time
  import shutil
@@ -85,8 +85,8 @@
  #pylint: disable=R0904
  class FakeClient(object, client.AbstractClient, client.ClientMixin):
 ===================================================================
---- ovs/extensions/db/pyrakoon/pyrakoon/client/admin.py
-+++ ovs/extensions/db/pyrakoon/pyrakoon/client/admin.py
+--- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/client/admin.py
++++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/client/admin.py
 @@ -16,8 +16,8 @@
 
  '''Administrative client interface'''
@@ -98,8 +98,8 @@
 
  class ClientMixin: #pylint: disable=W0232,C1001
      '''Mixin providing client actions for node administration
---- ovs/extensions/db/pyrakoon/pyrakoon/utils.py
-+++ ovs/extensions/db/pyrakoon/pyrakoon/utils.py
+--- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/utils.py
++++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/utils.py
 @@ -18,11 +18,11 @@
 
  import __builtin__
@@ -123,8 +123,8 @@
 
      request = receiver.next()
 
---- ovs/extensions/db/pyrakoon/pyrakoon/sequence.py
-+++ ovs/extensions/db/pyrakoon/pyrakoon/sequence.py
+--- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/sequence.py
++++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/sequence.py
 @@ -18,7 +18,7 @@
 
  import operator
@@ -134,8 +134,8 @@
 
  #pylint: disable=R0903
 
---- ovs/extensions/db/pyrakoon/pyrakoon/client/utils.py
-+++ ovs/extensions/db/pyrakoon/pyrakoon/client/utils.py
+--- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/client/utils.py
++++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/client/utils.py
 @@ -18,7 +18,7 @@
 
  import functools
@@ -154,8 +154,8 @@
                  raise client.NotConnectedError('Not connected')
 
              args = tuple(kwargs[arg[0]] for arg in message_type.ARGS)
---- ovs/extensions/db/pyrakoon/pyrakoon/client/__init__.py
-+++ ovs/extensions/db/pyrakoon/pyrakoon/client/__init__.py
+--- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/client/__init__.py
++++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/client/__init__.py
 @@ -16,9 +16,9 @@
 
  '''Arakoon client interface'''
@@ -178,8 +178,8 @@
                  message.receive(), self._socket.recv)
          except Exception as exc:
              if not isinstance(exc, errors.ArakoonError):
---- ovs/extensions/db/pyrakoon/pyrakoon/protocol/admin.py
-+++ ovs/extensions/db/pyrakoon/pyrakoon/protocol/admin.py
+--- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/protocol/admin.py
++++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/protocol/admin.py
 @@ -18,7 +18,7 @@
 
  import operator
@@ -189,8 +189,8 @@
 
  class OptimizeDB(protocol.Message):
      '''"optimize_db" message'''
---- ovs/extensions/db/pyrakoon/pyrakoon/compat.py
-+++ ovs/extensions/db/pyrakoon/pyrakoon/compat.py
+--- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/compat.py
++++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/compat.py
 @@ -20,11 +20,11 @@
  import random
  import select
@@ -229,8 +229,8 @@
 
 
  def _validate_signature_helper(fun, *args):
---- ovs/extensions/db/pyrakoon/pyrakoon/tx.py
-+++ ovs/extensions/db/pyrakoon/pyrakoon/tx.py
+--- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/tx.py
++++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/tx.py
 @@ -26,7 +26,7 @@
  from twisted.protocols import basic, stateful
  from twisted.python import log

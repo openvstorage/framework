@@ -8,10 +8,10 @@ else
   dir=`mktemp -d`
   cd $dir
   git clone https://github.com/openvstorage/pyrakoon.git
-  rm -rf $1/ovs/extensions/db/pyrakoon/pyrakoon
-  mv pyrakoon/pyrakoon $1/ovs/extensions/db/pyrakoon/
+  rm -rf $1/ovs/extensions/db/arakoon/pyrakoon/pyrakoon
+  mv pyrakoon/pyrakoon $1/ovs/extensions/db/arakoon/pyrakoon/
   cd $1
-  patch -p0 < ovs/extensions/db/pyrakoon/tools/patches.diff
+  patch -p0 < ovs/extensions/db/arakoon/pyrakoon/tools/patches.diff
   cd $dir
   cd ..
   rm -rf $dir
