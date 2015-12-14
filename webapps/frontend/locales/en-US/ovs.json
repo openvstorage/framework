@@ -107,6 +107,7 @@
         "about": "About",
         "accept": "Accept",
         "actions": "Actions",
+        "address": "Address",
         "administration": "Administration",
         "api": "API",
         "areyousure": "Are you sure?",
@@ -119,10 +120,12 @@
         "cancel": "Cancel",
         "changepassword": "Change password",
         "children": "Children",
+        "city": "City",
         "clone": "Create clones",
         "component": "Component",
         "consistent": "Consistent",
         "consistentss": "Consistent snapshots",
+        "country": "Country",
         "current": "Current",
         "custompath": "Custom path",
         "customvalue": "Custom:",
@@ -230,12 +233,9 @@
         "write": "Write",
         "writespeed": "Write Speed",
         "xmlrpcport": "XML-RPC",
-        "yes": "Yes",
-        "address": "Address",
-        "city": "City",
-        "country": "Country",
         "sticky": "Sticky",
-        "removesnapshot": "Remove Snapshot"
+        "removesnapshot": "Remove Snapshot",
+        "yes": "Yes"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -888,27 +888,25 @@
         "clone": {
             "title": "Clone",
             "gather": {
-                "title": "Please provide the required information",
-                "basicinfo": "Enter basic information",
-                "name": "Clone name",
+                "basicinfo": "Enter basic information:",
+                "duplicate_name": "A virtual disk with this name already exists",
+                "invalid_name": "Invalid name",
+                "name": "Name:",
+                "newsnapshot": "Create a new snapshot",
+                "nostoragerouter": "No Storage Router information found",
                 "selectsnapshots": "Select the Snapshot from which you want to clone:",
-                "noname": "No name was entered",
-                "nosnapshots": "Not all disks have Snapshots",
-                "snapshot": "Snapshots",
-                "storagerouters": "Storage Router:",
                 "snapshots": "Snapshot:",
-                "newsnapshot": "Create a new snapshot"
+                "storagerouters": "Storage Router:"
             },
             "confirm": {
-                "title": "Verify the entered information",
-                "clonename": "Name of the clone:",
-                "storagerouter": "StorageRouter:",
-                "verifysnapshots": "Please validate the selected Snapshot below. It will be used for the clone:",
                 "clonestarted": "Clone started",
-                "inprogress": "vDisk __what__ cloning in progress...",
-                "success": "Cloned __what__ successfully",
                 "failed": "Failed to clone vDisk __what__ failed.",
-                "snapshot": "Snapshot:"
+                "inprogress": "vDisk __what__ cloning in progress...",
+                "name": "Name:",
+                "snapshot": "Snapshot:",
+                "storagerouter": "StorageRouter:",
+                "success": "Cloned __what__ successfully",
+                "title": "Verify the entered information"
             }
         },
         "snapshot": {

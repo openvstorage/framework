@@ -14,10 +14,12 @@
 /*global define */
 define(['jquery', 'knockout'], function($, ko){
     "use strict";
-    var singleton = function() {
+    var nameRegex = /^[0-9a-zA-Z][\-_a-zA-Z0-9]{1,48}[a-zA-Z0-9]$/,
+        singleton = function() {
         var data = {
-            name:           ko.observable(),
+            name:           ko.observable('').extend({ regex: nameRegex }),
             vDisk:          ko.observable(),
+            vDisks:         ko.observableArray([]),
             snapshot:       ko.observable(),
             storageRouter:  ko.observable(),
             storageRouters: ko.observableArray([])
