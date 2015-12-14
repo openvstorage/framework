@@ -18,7 +18,7 @@
 
 import functools
 
-from ovs.extensions.db.pyrakoon.pyrakoon import protocol, utils
+from pyrakoon import protocol, utils
 
 def validate_types(specs, args):
     '''Validate method call argument types
@@ -87,7 +87,7 @@ def call(message_type):
             self = kwargs['self']
 
             if not self.connected:
-                from ovs.extensions.db.pyrakoon.pyrakoon import client
+                from pyrakoon import client
                 raise client.NotConnectedError('Not connected')
 
             args = tuple(kwargs[arg[0]] for arg in message_type.ARGS)

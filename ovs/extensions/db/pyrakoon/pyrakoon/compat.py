@@ -24,7 +24,7 @@ import logging
 import functools
 import threading
 
-from ovs.extensions.db.pyrakoon.pyrakoon import client, errors, protocol, sequence, utils
+from pyrakoon import client, errors, protocol, sequence, utils
 
 __docformat__ = 'epytext'
 

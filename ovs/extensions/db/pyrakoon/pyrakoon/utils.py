@@ -334,7 +334,7 @@ def read_blocking(receiver, read_fun):
     :see: :meth:`pyrakoon.protocol.Message.receive`
     '''
 
-    from ovs.extensions.db.pyrakoon.pyrakoon import protocol
+    from pyrakoon import protocol
 
     request = receiver.next()
 

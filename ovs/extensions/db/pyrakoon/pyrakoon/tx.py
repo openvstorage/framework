@@ -26,7 +26,7 @@ from twisted.internet import defer, protocol as twisted_protocol
 from twisted.protocols import basic, stateful
 from twisted.python import log
 
-from ovs.extensions.db.pyrakoon.pyrakoon import client, errors, protocol, utils
+from pyrakoon import client, errors, protocol, utils
 
 #pylint: disable=R0904,C0103,R0901
 

@@ -29,7 +29,7 @@ try:
 except ImportError:
     import StringIO
 
-from ovs.extensions.db.pyrakoon.pyrakoon import client, compat, errors, protocol, utils
+from pyrakoon import client, compat, errors, protocol, utils
 
 
 LOGGER = logging.getLogger(__name__)
