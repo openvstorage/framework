@@ -16,7 +16,6 @@
 Module for the VMware hypervisor client
 """
 
-import os
 from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
 
 
@@ -30,9 +29,9 @@ class VMware(object):
         Initializes the object with credentials and connection information
         """
         self.sdk = Sdk(ip, username, password)
-        self.state_mapping = {'poweredOn' : 'RUNNING',
+        self.state_mapping = {'poweredOn': 'RUNNING',
                               'poweredOff': 'HALTED',
-                              'suspended' : 'PAUSED'}
+                              'suspended': 'PAUSED'}
 
     def get_state(self, vmid):
         """
