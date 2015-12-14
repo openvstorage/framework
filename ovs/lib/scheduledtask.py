@@ -18,7 +18,6 @@ ScheduledTaskController module
 
 import copy
 import time
-from ConfigParser import RawConfigParser
 from celery.result import ResultSet
 from celery.schedules import crontab
 from datetime import datetime
@@ -30,12 +29,11 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.servicelist import ServiceList
-from ovs.extensions.db.pyrakoon.tools.admin import ArakoonClientConfig, ArakoonAdminClient
+from ovs.extensions.db.arakoon.pyrakoon.tools.admin import ArakoonClientConfig, ArakoonAdminClient
 from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.remote import Remote
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController

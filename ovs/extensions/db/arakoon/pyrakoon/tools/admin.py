@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import time
-from ovs.extensions.db.pyrakoon.pyrakoon import errors, utils
-from ovs.extensions.db.pyrakoon.pyrakoon.client import admin
-from ovs.extensions.db.pyrakoon.pyrakoon.compat import ArakoonClientConfig, ArakoonNoMaster
-from ovs.extensions.db.pyrakoon.pyrakoon.compat import _ArakoonClient, _convert_exceptions, _validate_signature
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import errors, utils
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.client import admin
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClientConfig, ArakoonNoMaster
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import _ArakoonClient, _convert_exceptions, _validate_signature
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('extensions', 'pyrakoon')

@@ -16,9 +16,9 @@
 
 '''Arakoon client interface'''
 
-from ovs.extensions.db.pyrakoon.pyrakoon import errors, protocol
-import ovs.extensions.db.pyrakoon.pyrakoon.utils
-from ovs.extensions.db.pyrakoon.pyrakoon.client.utils import call
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import errors, protocol
+import ovs.extensions.db.arakoon.pyrakoon.pyrakoon.utils
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.client.utils import call
 
 class ClientMixin: #pylint: disable=W0232,R0904,old-style-class
     '''Mixin providing client actions for standard cluster functionality
@@ -225,7 +225,7 @@ class SocketClient(object, AbstractClient):
             for part in message.serialize():
                 self._socket.sendall(part)
 
-            return ovs.extensions.db.pyrakoon.pyrakoon.utils.read_blocking(
+            return ovs.extensions.db.arakoon.pyrakoon.pyrakoon.utils.read_blocking(
                 message.receive(), self._socket.recv)
         except Exception as exc:
             if not isinstance(exc, errors.ArakoonError):

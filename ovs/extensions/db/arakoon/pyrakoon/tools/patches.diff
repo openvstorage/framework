@@ -13,7 +13,7 @@
      import StringIO
 
 -from pyrakoon import protocol, utils
-+from ovs.extensions.db.pyrakoon.pyrakoon import protocol, utils
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import protocol, utils
 +from ovs.log.logHandler import LogHandler
 
 -
@@ -29,7 +29,7 @@
      import StringIO
 
 -from pyrakoon import utils
-+from ovs.extensions.db.pyrakoon.pyrakoon import utils
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import utils
 
  # Result codes
  RESULT_SUCCESS = 0x0000
@@ -38,7 +38,7 @@
 
      def check(self, value):
 -        from pyrakoon import sequence
-+        from ovs.extensions.db.pyrakoon.pyrakoon import sequence
++        from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import sequence
 
          if not isinstance(value, sequence.Step):
              raise TypeError
@@ -47,7 +47,7 @@
          '''
 
 -        from pyrakoon import errors
-+        from ovs.extensions.db.pyrakoon.pyrakoon import errors
++        from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import errors
 
          code_receiver = UINT32.receive()
          request = code_receiver.next() #pylint: disable=E1101
@@ -56,7 +56,7 @@
 
      def __init__(self, steps, sync):
 -        from pyrakoon import sequence
-+        from ovs.extensions.db.pyrakoon.pyrakoon import sequence
++        from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import sequence
 
          super(Sequence, self).__init__()
 
@@ -75,7 +75,7 @@
      import StringIO
 
 -from pyrakoon import client, compat, errors, protocol, utils
-+from ovs.extensions.db.pyrakoon.pyrakoon import client, compat, errors, protocol, utils
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, compat, errors, protocol, utils
 +from ovs.log.logHandler import LogHandler
 
 -
@@ -93,8 +93,8 @@
 
 -from pyrakoon.client import utils
 -from pyrakoon.protocol import admin
-+from ovs.extensions.db.pyrakoon.pyrakoon.client import utils
-+from ovs.extensions.db.pyrakoon.pyrakoon.protocol import admin
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.client import utils
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.protocol import admin
 
  class ClientMixin: #pylint: disable=W0232,C1001
      '''Mixin providing client actions for node administration
@@ -119,7 +119,7 @@
      '''
 
 -    from pyrakoon import protocol
-+    from ovs.extensions.db.pyrakoon.pyrakoon import protocol
++    from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import protocol
 
      request = receiver.next()
 
@@ -130,7 +130,7 @@
  import operator
 
 -from pyrakoon import protocol, utils
-+from ovs.extensions.db.pyrakoon.pyrakoon import protocol, utils
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import protocol, utils
 
  #pylint: disable=R0903
 
@@ -141,7 +141,7 @@
  import functools
 
 -from pyrakoon import protocol, utils
-+from ovs.extensions.db.pyrakoon.pyrakoon import protocol, utils
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import protocol, utils
 
  def validate_types(specs, args):
      '''Validate method call argument types
@@ -150,7 +150,7 @@
 
              if not self.connected:
 -                from pyrakoon import client
-+                from ovs.extensions.db.pyrakoon.pyrakoon import client
++                from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client
                  raise client.NotConnectedError('Not connected')
 
              args = tuple(kwargs[arg[0]] for arg in message_type.ARGS)
@@ -163,9 +163,9 @@
 -from pyrakoon import errors, protocol
 -import pyrakoon.utils
 -from pyrakoon.client.utils import call
-+from ovs.extensions.db.pyrakoon.pyrakoon import errors, protocol
-+import ovs.extensions.db.pyrakoon.pyrakoon.utils
-+from ovs.extensions.db.pyrakoon.pyrakoon.client.utils import call
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import errors, protocol
++import ovs.extensions.db.arakoon.pyrakoon.pyrakoon.utils
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.client.utils import call
 
  class ClientMixin: #pylint: disable=W0232,R0904,old-style-class
      '''Mixin providing client actions for standard cluster functionality
@@ -174,7 +174,7 @@
                  self._socket.sendall(part)
 
 -            return pyrakoon.utils.read_blocking(
-+            return ovs.extensions.db.pyrakoon.pyrakoon.utils.read_blocking(
++            return ovs.extensions.db.arakoon.pyrakoon.pyrakoon.utils.read_blocking(
                  message.receive(), self._socket.recv)
          except Exception as exc:
              if not isinstance(exc, errors.ArakoonError):
@@ -185,7 +185,7 @@
  import operator
 
 -from pyrakoon import errors, protocol, utils
-+from ovs.extensions.db.pyrakoon.pyrakoon import errors, protocol, utils
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import errors, protocol, utils
 
  class OptimizeDB(protocol.Message):
      '''"optimize_db" message'''
@@ -200,7 +200,7 @@
  import threading
 
 -from pyrakoon import client, errors, protocol, sequence, utils
-+from ovs.extensions.db.pyrakoon.pyrakoon import client, errors, protocol, sequence, utils
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, errors, protocol, sequence, utils
 +from ovs.log.logHandler import LogHandler
 
  __docformat__ = 'epytext'
@@ -236,7 +236,7 @@
  from twisted.python import log
 
 -from pyrakoon import client, errors, protocol, utils
-+from ovs.extensions.db.pyrakoon.pyrakoon import client, errors, protocol, utils
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, errors, protocol, utils
 
  #pylint: disable=R0904,C0103,R0901
 

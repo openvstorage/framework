@@ -22,8 +22,8 @@ import json
 import random
 from threading import Lock, current_thread
 from ConfigParser import RawConfigParser
-from ovs.extensions.db.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
-from ovs.extensions.db.pyrakoon.pyrakoon.compat import ArakoonNotFound, ArakoonSockNotReadable, ArakoonSockReadNoBytes
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNotFound, ArakoonSockNotReadable, ArakoonSockReadNoBytes
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.log.logHandler import LogHandler
 

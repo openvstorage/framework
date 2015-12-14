@@ -22,7 +22,7 @@ VAR = 'ARAKOON_PYTHON_CLIENT'
 if os.environ.has_key(VAR) and os.environ[VAR] == 'pyrakoon':
     logging.info("opting for pyrakoon")
     print "pyrakoon"
-    from ovs.extensions.db.pyrakoon.pyrakoon import compat
+    from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import compat
     arakoon_client = compat
 else:
     logging.info("opting for normal client")

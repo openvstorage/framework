@@ -28,7 +28,7 @@ try:
 except ImportError:
     import StringIO
 
-from ovs.extensions.db.pyrakoon.pyrakoon import client, compat, errors, protocol, utils
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, compat, errors, protocol, utils
 from ovs.log.logHandler import LogHandler
 
 LOGGER = LogHandler.get('arakoon', 'pyrakoon', propagate=False)

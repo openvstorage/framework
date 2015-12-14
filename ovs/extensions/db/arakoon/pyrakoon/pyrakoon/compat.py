@@ -23,7 +23,7 @@ import socket
 import functools
 import threading
 
-from ovs.extensions.db.pyrakoon.pyrakoon import client, errors, protocol, sequence, utils
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, errors, protocol, sequence, utils
 from ovs.log.logHandler import LogHandler
 
 __docformat__ = 'epytext'

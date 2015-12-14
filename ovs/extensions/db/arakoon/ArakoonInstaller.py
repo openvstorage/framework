@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import time
 import tempfile
 from ConfigParser import RawConfigParser
 from ovs.extensions.generic.remote import Remote
@@ -192,7 +193,6 @@ class ArakoonInstaller(object):
                 new_client.run('mv {0}/* {1}'.format(directory, archive_dir))
             else:
                 new_client.run('mv {0} {1}'.format(directory, archive_dir))
-
 
     @staticmethod
     def create_cluster(cluster_name, ip, exclude_ports, base_dir, plugins=None):
