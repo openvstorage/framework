@@ -316,6 +316,18 @@ print json.dumps(os.path.isdir('{0}'))""".format(self._shell_safe(directory))
                 recursive_str = '-R' if recursive is True else ''
                 self.run('chown {0} {1}:{2} {3}'.format(recursive_str, user, group, directory))
 
+    def dir_list(self, directory):
+        """
+        List contents of a directory on a remote host
+        :param directory: Directory to list
+        """
+        if self.is_local is True:
+            return os.listdir(self._shell_safe(directory))
+        else:
+            command = """import os, json
+print json.dumps(os.listdir('{0}'))""".format(self._shell_safe(directory))
+            return json.loads(self.run('python -c """{0}"""'.format(command)))
+
     def symlink(self, links):
         if self.is_local is True:
             for link_name, source in links.iteritems():

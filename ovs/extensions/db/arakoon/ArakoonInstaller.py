@@ -160,6 +160,7 @@ class ArakoonInstaller(object):
     class to dynamically install/(re)configure arakoon cluster
     """
     ARAKOON_LOG_DIR = '/var/log/arakoon/{0}'
+    ARAKOON_BASE_DIR = '{0}/arakoon'
     ARAKOON_HOME_DIR = '{0}/arakoon/{1}/db'
     ARAKOON_TLOG_DIR = '{0}/arakoon/{1}/tlogs'
     ARAKOON_CONFIG_DIR = '/opt/OpenvStorage/config/arakoon'
@@ -177,21 +178,21 @@ class ArakoonInstaller(object):
         logger.debug('archive - check if {0} exists'.format(directory))
         if new_client.dir_exists(directory):
             logger.debug('archive - from {0}'.format(directory))
-            archive_dir = top_dir + 'archive/' + cluster_name
+            archive_dir = '/'.join([top_dir, 'archive', cluster_name])
             if new_client.dir_exists(archive_dir + '/' + os.path.basename(directory)):
                 logger.debug('archive - from existing archive {0}'.format(archive_dir))
-                timestamp = time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime())
+                timestamp = time.strftime('%Y%m%d%H%M%S', time.gmtime())
                 new_archive_dir = archive_dir + '-' + timestamp
                 new_client.dir_create(new_archive_dir)
-                new_client.run('/bin/mv {0} {1}'.format(archive_dir, new_archive_dir))
+                new_client.run('mv {0} {1}'.format(archive_dir, new_archive_dir))
                 logger.debug('archive - to new {0}'.format(new_archive_dir))
             logger.debug('create archive dir: {0}'.format(archive_dir))
             new_client.dir_create(archive_dir)
             logger.debug('archive from {0} to {1}'.format(directory, archive_dir))
-            if cluster_name == os.path.basename(directory):
-                new_client.run('/bin/mv {0}/* {1}'.format(directory, archive_dir))
+            if cluster_name == os.path.basename(directory) and new_client.dir_list(directory):
+                new_client.run('mv {0}/* {1}'.format(directory, archive_dir))
             else:
-                new_client.run('/bin/mv {0} {1}'.format(directory, archive_dir))
+                new_client.run('mv {0} {1}'.format(directory, archive_dir))
 
 
     @staticmethod
@@ -210,9 +211,12 @@ class ArakoonInstaller(object):
         log_dir = ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name)
         tlog_dir = ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)
 
-        ArakoonInstaller.archive_existing_arakoon_data(ip, home_dir, base_dir + '/arakoon/', cluster_name)
-        ArakoonInstaller.archive_existing_arakoon_data(ip, log_dir, '/var/log/arakoon/', cluster_name)
-        ArakoonInstaller.archive_existing_arakoon_data(ip, tlog_dir, base_dir + '/arakoon/', cluster_name)
+        ArakoonInstaller.archive_existing_arakoon_data(ip, home_dir, ArakoonInstaller.ARAKOON_BASE_DIR.format(base_dir),
+                                                       cluster_name)
+        ArakoonInstaller.archive_existing_arakoon_data(ip, log_dir, ArakoonInstaller.ARAKOON_LOG_DIR.format(''),
+                                                       cluster_name)
+        ArakoonInstaller.archive_existing_arakoon_data(ip, tlog_dir, ArakoonInstaller.ARAKOON_BASE_DIR.format(base_dir),
+                                                       cluster_name)
 
         config = ArakoonClusterConfig(cluster_name, plugins)
         if not [node.name for node in config.nodes if node.name == node_name]:
@@ -262,9 +266,12 @@ class ArakoonInstaller(object):
         log_dir = ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name)
         tlog_dir = ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)
 
-        ArakoonInstaller.archive_existing_arakoon_data(new_ip, home_dir, base_dir + '/arakoon/', cluster_name)
-        ArakoonInstaller.archive_existing_arakoon_data(new_ip, log_dir, '/var/log/arakoon/', cluster_name)
-        ArakoonInstaller.archive_existing_arakoon_data(new_ip, tlog_dir, base_dir + '/arakoon/', cluster_name)
+        ArakoonInstaller.archive_existing_arakoon_data(new_ip, home_dir,
+                                                       ArakoonInstaller.ARAKOON_BASE_DIR.format(base_dir), cluster_name)
+        ArakoonInstaller.archive_existing_arakoon_data(new_ip, log_dir,
+                                                       ArakoonInstaller.ARAKOON_LOG_DIR.format(''), cluster_name)
+        ArakoonInstaller.archive_existing_arakoon_data(new_ip, tlog_dir,
+                                                       ArakoonInstaller.ARAKOON_BASE_DIR.format(base_dir), cluster_name)
 
         if not [node.name for node in config.nodes if node.name == node_name]:
             config.nodes.append(ArakoonNodeConfig(name=node_name,
@@ -312,12 +319,7 @@ class ArakoonInstaller(object):
 
         # Cleans all directories on a given node
         for directory in [node.log_dir, node.tlog_dir, node.home]:
-            if root_client.dir_exists(directory):
-                root_client.dir_delete([directory])
-        top_dir, tail = os.path.split(node.home)
-        logger.debug('topdir: {0} --- tail: {1}'.format(top_dir, tail))
-        if 'arakoon' in top_dir and config.cluster_id in top_dir and tail == 'db':
-            root_client.dir_delete([top_dir])
+            root_client.dir_delete([directory])
 
         # Removes a configuration file from a node
         config.delete_config(ovs_client)
