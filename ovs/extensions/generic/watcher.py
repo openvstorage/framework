@@ -99,9 +99,8 @@ def services_running(target):
             tries = 0
             while tries < max_tries:
                 try:
-                    from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-                    cluster = ArakoonManagementEx().getCluster('voldrv')
-                    client = cluster.getClient()
+                    from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
+                    client = PyrakoonStore('voldrv')
                     client.set(key, value)
                     if client.get(key) == value:
                         client.delete(key)

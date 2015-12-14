@@ -18,7 +18,7 @@ import os
 import time
 import subprocess
 import shutil
-from ovs.extensions.db.arakoon.EnsureArakoonWorks import EnsureArakoonWorks
+from ovs.extensions.db.arakoon.arakoon.EnsureArakoonWorks import EnsureArakoonWorks
 from ovs.extensions.generic.system import System
 from ArakoonManagement import ArakoonManagementEx
 from ovs.log.logHandler import LogHandler

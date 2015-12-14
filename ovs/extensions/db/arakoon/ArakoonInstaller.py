@@ -16,7 +16,6 @@ import os
 import time
 import tempfile
 from ConfigParser import RawConfigParser
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
@@ -38,8 +37,8 @@ class ArakoonNodeConfig(object):
         """
         self.name = name
         self.ip = ip
-        self.client_port = client_port
-        self.messaging_port = messaging_port
+        self.client_port = int(client_port)
+        self.messaging_port = int(messaging_port)
         self.tlog_compression = 'snappy'
         self.log_level = 'info'
         self.log_dir = log_dir
@@ -83,7 +82,7 @@ class ArakoonClusterConfig(object):
         """
         self.cluster_id = cluster_id
         self._dir = ArakoonClusterConfig.ARAKOON_CONFIG_DIR.format(self.cluster_id)
-        self._filename = ArakoonClusterConfig.ARAKOON_CONFIG_FILE.format(self.cluster_id)
+        self.filename = ArakoonClusterConfig.ARAKOON_CONFIG_FILE.format(self.cluster_id)
         self.nodes = []
         self._plugins = []
         if isinstance(plugins, list):
@@ -95,7 +94,7 @@ class ArakoonClusterConfig(object):
         """
         Reads a configuration from reality
         """
-        contents = client.file_read(self._filename)
+        contents = client.file_read(self.filename)
         parser = RawConfigParser()
         parser.readfp(StringIO(contents))
 
@@ -145,7 +144,7 @@ class ArakoonClusterConfig(object):
         with open(temp_filename, 'wb') as config_file:
             contents.write(config_file)
         client.dir_create(self._dir)
-        client.file_upload(self._filename, temp_filename)
+        client.file_upload(self.filename, temp_filename)
         os.remove(temp_filename)
 
     def delete_config(self, client):
@@ -165,6 +164,7 @@ class ArakoonInstaller(object):
     ARAKOON_TLOG_DIR = '{0}/arakoon/{1}/tlogs'
     ARAKOON_CONFIG_DIR = '/opt/OpenvStorage/config/arakoon'
     ARAKOON_CONFIG_FILE = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
+    ARAKOON_CATCHUP_COMMAND = 'arakoon --node {0} -config {1} -catchup-only'
 
     def __init__(self):
         """
@@ -193,7 +193,6 @@ class ArakoonInstaller(object):
                 new_client.run('mv {0}/* {1}'.format(directory, archive_dir))
             else:
                 new_client.run('mv {0} {1}'.format(directory, archive_dir))
-
 
     @staticmethod
     def create_cluster(cluster_name, ip, exclude_ports, base_dir, plugins=None):
@@ -349,7 +348,9 @@ class ArakoonInstaller(object):
             base_name = 'ovs-arakoon'
             target_name = 'ovs-arakoon-{0}'.format(config.cluster_id)
             ServiceManager.prepare_template(base_name, target_name, ovs_client)
-            ServiceManager.add_service(target_name, root_client, params={'CLUSTER': config.cluster_id})
+            ServiceManager.add_service(target_name, root_client, params={'CLUSTER': config.cluster_id,
+                                                                         'NODE_ID': node.name,
+                                                                         'CONFIG_FILE': config.filename})
             logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
 
     @staticmethod
@@ -406,22 +407,12 @@ class ArakoonInstaller(object):
         Waits for an Arakoon cluster to be available (by sending a nop)
         """
         logger.debug('Waiting for cluster {0}'.format(cluster_name))
-        from ovs.extensions.db.arakoon.arakoon.ArakoonExceptions import ArakoonSockReadNoBytes
-        with Remote(sshclient.ip, [ArakoonManagementEx], 'ovs') as remote:
-            last_exception = None
-            tries = 3
-            while tries > 0:
-                try:
-                    cluster_object = remote.ArakoonManagementEx().getCluster(str(cluster_name))
-                    client = cluster_object.getClient()
-                    client.nop()
-                    logger.debug('Waiting for cluster {0}: available'.format(cluster_name))
-                    return True
-                except ArakoonSockReadNoBytes as exception:
-                    last_exception = exception
-                    tries -= 1
-                    time.sleep(1)
-            raise last_exception
+        from ovs.extensions.storage.persistentfactory import PersistentFactory
+        with Remote(sshclient.ip, [PersistentFactory], 'ovs') as remote:
+            client = remote.PersistentFactory.get_client()
+            client.nop()
+            logger.debug('Waiting for cluster {0}: available'.format(cluster_name))
+            return True
 
     @staticmethod
     def restart_cluster(cluster_name, master_ip):
@@ -459,25 +450,29 @@ class ArakoonInstaller(object):
         logger.debug('Current ips: {0}'.format(', '.join(current_ips)))
         logger.debug('New ip: {0}'.format(new_ip))
 
-        logger.debug('Catching up new node {0} for cluster {1}'.format(new_ip, cluster_name))
-        with Remote(new_ip, [ArakoonManagementEx], 'ovs') as remote:
-            cluster = remote.ArakoonManagementEx().getCluster(cluster_name)
-            cluster.catchup_node()
-        logger.debug('Catching up new node {0} for cluster {1} completed'.format(new_ip, cluster_name))
+        client = SSHClient(new_ip, username='ovs')
+        config = ArakoonClusterConfig(cluster_name)
+        config.load_config(client)
+
+        if len(config.nodes) > 1:
+            logger.debug('Catching up new node {0} for cluster {1}'.format(new_ip, cluster_name))
+            node_name = [node.name for node in config.nodes if node.ip == new_ip][0]
+            client.run(ArakoonInstaller.ARAKOON_CATCHUP_COMMAND.format(node_name, config.filename))
+            logger.debug('Catching up new node {0} for cluster {1} completed'.format(new_ip, cluster_name))
 
         threshold = 2 if new_ip in current_ips else 1
         for ip in current_ips:
             if ip == new_ip:
                 continue
-            client = SSHClient(ip, username='root')
-            ArakoonInstaller.stop(cluster_name, client=client)
-            ArakoonInstaller.start(cluster_name, client=client)
-            logger.debug('  Restarted node {0} for cluster {1}'.format(client.ip, cluster_name))
+            current_client = SSHClient(ip, username='root')
+            ArakoonInstaller.stop(cluster_name, client=current_client)
+            ArakoonInstaller.start(cluster_name, client=current_client)
+            logger.debug('  Restarted node {0} for cluster {1}'.format(current_client.ip, cluster_name))
             if len(current_ips) > threshold:  # A two node cluster needs all nodes running
-                ArakoonInstaller.wait_for_cluster(cluster_name, client)
-        new_client = SSHClient(new_ip, username='root')
-        ArakoonInstaller.start(cluster_name, client=new_client)
-        ArakoonInstaller.wait_for_cluster(cluster_name, new_client)
+                ArakoonInstaller.wait_for_cluster(cluster_name, current_client)
+        client = SSHClient(new_ip, username='root')
+        ArakoonInstaller.start(cluster_name, client=client)
+        ArakoonInstaller.wait_for_cluster(cluster_name, client)
         logger.debug('Started node {0} for cluster {1}'.format(new_ip, cluster_name))
 
     @staticmethod

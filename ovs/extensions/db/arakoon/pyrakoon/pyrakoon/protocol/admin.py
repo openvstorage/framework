@@ -18,7 +18,7 @@
 
 import operator
 
-from ovs.extensions.db.pyrakoon.pyrakoon import errors, protocol, utils
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import errors, protocol, utils
 
 class OptimizeDB(protocol.Message):
     '''"optimize_db" message'''

@@ -21,8 +21,8 @@ import json
 import time
 import random
 from threading import Lock, current_thread
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-from ovs.extensions.db.arakoon.arakoon.ArakoonExceptions import ArakoonNotFound, ArakoonSockReadNoBytes
+from ovs.extensions.db.arakoon.arakoon.ArakoonManagement import ArakoonManagementEx
+from ovs.extensions.db.arakoon.arakoon.arakoon.ArakoonExceptions import ArakoonNotFound, ArakoonSockReadNoBytes
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.log.logHandler import LogHandler
 

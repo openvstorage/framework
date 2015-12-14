@@ -69,7 +69,7 @@ class LogHandler(object):
                'log': 'audit_trails',
                'storagerouterclient': 'storagerouterclient'}
 
-    def __init__(self, source, name=None):
+    def __init__(self, source, name=None, propagate=True):
         """
         Initializes the logger
         """
@@ -87,7 +87,7 @@ class LogHandler(object):
         handler.setFormatter(formatter)
 
         self.logger = logging.getLogger(name)
-        self.logger.propagate = True
+        self.logger.propagate = propagate
         self.logger.setLevel(getattr(logging, Configuration.get('ovs.logging.level')))
         self.logger.addHandler(handler)
 
@@ -103,10 +103,10 @@ class LogHandler(object):
         return log_filename
 
     @staticmethod
-    def get(source, name=None):
+    def get(source, name=None, propagate=True):
         key = '{0}_{1}'.format(source, name)
         if key not in LogHandler.cache:
-            logger = LogHandler(source, name)
+            logger = LogHandler(source, name, propagate)
             LogHandler.cache[key] = logger
         return LogHandler.cache[key]
 
