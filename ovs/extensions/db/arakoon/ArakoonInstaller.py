@@ -160,6 +160,7 @@ class ArakoonInstaller(object):
     class to dynamically install/(re)configure arakoon cluster
     """
     ARAKOON_LOG_DIR = '/var/log/arakoon/{0}'
+    ARAKOON_BASE_DIR = '{0}/arakoon'
     ARAKOON_HOME_DIR = '{0}/arakoon/{1}/db'
     ARAKOON_TLOG_DIR = '{0}/arakoon/{1}/tlogs'
     ARAKOON_CONFIG_DIR = '/opt/OpenvStorage/config/arakoon'
@@ -170,6 +171,29 @@ class ArakoonInstaller(object):
         ArakoonInstaller should not be instantiated
         """
         raise RuntimeError('ArakoonInstaller is a complete static helper class')
+
+    @staticmethod
+    def archive_existing_arakoon_data(ip, directory, top_dir, cluster_name):
+        new_client = SSHClient(ip, username='ovs')
+        logger.debug('archive - check if {0} exists'.format(directory))
+        if new_client.dir_exists(directory):
+            logger.debug('archive - from {0}'.format(directory))
+            archive_dir = '/'.join([top_dir, 'archive', cluster_name])
+            if new_client.dir_exists(archive_dir + '/' + os.path.basename(directory)):
+                logger.debug('archive - from existing archive {0}'.format(archive_dir))
+                timestamp = time.strftime('%Y%m%d%H%M%S', time.gmtime())
+                new_archive_dir = archive_dir + '-' + timestamp
+                new_client.dir_create(new_archive_dir)
+                new_client.run('mv {0} {1}'.format(archive_dir, new_archive_dir))
+                logger.debug('archive - to new {0}'.format(new_archive_dir))
+            logger.debug('create archive dir: {0}'.format(archive_dir))
+            new_client.dir_create(archive_dir)
+            logger.debug('archive from {0} to {1}'.format(directory, archive_dir))
+            if cluster_name == os.path.basename(directory) and new_client.dir_list(directory):
+                new_client.run('mv {0}/* {1}'.format(directory, archive_dir))
+            else:
+                new_client.run('mv {0} {1}'.format(directory, archive_dir))
+
 
     @staticmethod
     def create_cluster(cluster_name, ip, exclude_ports, base_dir, plugins=None):
@@ -183,15 +207,26 @@ class ArakoonInstaller(object):
         ports = System.get_free_ports(port_range, exclude_ports, 2, client)
         node_name = System.get_my_machine_id(client)
 
+        home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
+        log_dir = ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name)
+        tlog_dir = ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)
+
+        ArakoonInstaller.archive_existing_arakoon_data(ip, home_dir, ArakoonInstaller.ARAKOON_BASE_DIR.format(base_dir),
+                                                       cluster_name)
+        ArakoonInstaller.archive_existing_arakoon_data(ip, log_dir, ArakoonInstaller.ARAKOON_LOG_DIR.format(''),
+                                                       cluster_name)
+        ArakoonInstaller.archive_existing_arakoon_data(ip, tlog_dir, ArakoonInstaller.ARAKOON_BASE_DIR.format(base_dir),
+                                                       cluster_name)
+
         config = ArakoonClusterConfig(cluster_name, plugins)
         if not [node.name for node in config.nodes if node.name == node_name]:
             config.nodes.append(ArakoonNodeConfig(name=node_name,
                                                   ip=ip,
                                                   client_port=ports[0],
                                                   messaging_port=ports[1],
-                                                  log_dir=ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name),
-                                                  home=ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name),
-                                                  tlog_dir=ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)))
+                                                  log_dir=log_dir,
+                                                  home=home_dir,
+                                                  tlog_dir=tlog_dir))
         ArakoonInstaller._deploy(config)
         logger.debug('Creating cluster {0} on {1} completed'.format(cluster_name, ip))
         return {'client_port': ports[0],
@@ -227,14 +262,25 @@ class ArakoonInstaller(object):
         ports = System.get_free_ports(port_range, exclude_ports, 2, client)
         node_name = System.get_my_machine_id(client)
 
+        home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
+        log_dir = ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name)
+        tlog_dir = ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)
+
+        ArakoonInstaller.archive_existing_arakoon_data(new_ip, home_dir,
+                                                       ArakoonInstaller.ARAKOON_BASE_DIR.format(base_dir), cluster_name)
+        ArakoonInstaller.archive_existing_arakoon_data(new_ip, log_dir,
+                                                       ArakoonInstaller.ARAKOON_LOG_DIR.format(''), cluster_name)
+        ArakoonInstaller.archive_existing_arakoon_data(new_ip, tlog_dir,
+                                                       ArakoonInstaller.ARAKOON_BASE_DIR.format(base_dir), cluster_name)
+
         if not [node.name for node in config.nodes if node.name == node_name]:
             config.nodes.append(ArakoonNodeConfig(name=node_name,
                                                   ip=new_ip,
                                                   client_port=ports[0],
                                                   messaging_port=ports[1],
-                                                  log_dir=ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name),
-                                                  home=ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name),
-                                                  tlog_dir=ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)))
+                                                  log_dir=log_dir,
+                                                  home=home_dir,
+                                                  tlog_dir=tlog_dir))
         ArakoonInstaller._deploy(config)
         logger.debug('Extending cluster {0} from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
         return {'client_port': ports[0],
@@ -264,6 +310,7 @@ class ArakoonInstaller(object):
         Cleans up a single node (remove services, directories and configuration files)
         """
         logger.debug('Destroy node {0} in cluster {1}'.format(node.ip, config.cluster_id))
+
         # Removes services for a cluster on a given node
         ovs_client = SSHClient(node.ip)
         root_client = SSHClient(node.ip, username='root')
@@ -271,7 +318,8 @@ class ArakoonInstaller(object):
         ArakoonInstaller.remove(config.cluster_id, client=root_client)
 
         # Cleans all directories on a given node
-        root_client.dir_delete([node.log_dir, node.tlog_dir, node.home])
+        for directory in [node.log_dir, node.tlog_dir, node.home]:
+            root_client.dir_delete([directory])
 
         # Removes a configuration file from a node
         config.delete_config(ovs_client)
