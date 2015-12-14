@@ -100,19 +100,19 @@ class Upstart(object):
             if 'rabbitmq' in name:
                 status = re.search('\{pid,\d+?\}', output) is not None
                 if return_output is True:
-                    return (status, output)
+                    return status, output
                 return status
             # Normal cases - or if the above code didn't yield an outcome
-            if 'start' in output or 'is running' in output:
+            if 'start/running' in output or 'is running' in output:
                 if return_output is True:
-                    return (True, output)
+                    return True, output
                 return True
             if 'stop' in output or 'not running' in output:
                 if return_output is True:
-                    return (False, output)
+                    return False, output
                 return False
             if return_output is True:
-                return (False, output)
+                return False, output
             return False
         except CalledProcessError, ex:
             logger.error('Get {0}.service status failed: {1}'.format(name, ex))

@@ -402,7 +402,7 @@ class ArakoonInstaller(object):
         logger.debug('Current ips: {0}'.format(', '.join(current_ips)))
         logger.debug('New ip: {0}'.format(new_ip))
 
-        client = SSHClient(new_ip, username='root')
+        client = SSHClient(new_ip, username='ovs')
         config = ArakoonClusterConfig(cluster_name)
         config.load_config(client)
 
@@ -422,6 +422,7 @@ class ArakoonInstaller(object):
             logger.debug('  Restarted node {0} for cluster {1}'.format(current_client.ip, cluster_name))
             if len(current_ips) > threshold:  # A two node cluster needs all nodes running
                 ArakoonInstaller.wait_for_cluster(cluster_name, current_client)
+        client = SSHClient(new_ip, username='root')
         ArakoonInstaller.start(cluster_name, client=client)
         ArakoonInstaller.wait_for_cluster(cluster_name, client)
         logger.debug('Started node {0} for cluster {1}'.format(new_ip, cluster_name))

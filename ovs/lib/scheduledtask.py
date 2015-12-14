@@ -18,6 +18,7 @@ ScheduledTaskController module
 
 import copy
 import time
+from ConfigParser import RawConfigParser
 from celery.result import ResultSet
 from celery.schedules import crontab
 from datetime import datetime
@@ -29,7 +30,8 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.servicelist import ServiceList
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+from ovs.extensions.db.pyrakoon.tools.admin import ArakoonClientConfig, ArakoonAdminClient
+from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -355,21 +357,23 @@ class ScheduledTaskController(object):
         arakoon_clusters = {}
         for service in ServiceList.get_services():
             if service.type.name in ('Arakoon', 'NamespaceManager', 'AlbaManager'):
-                arakoon_clusters.setdefault(service.name.replace('arakoon-', ''), []).append(service.storagerouter.ip)
+                arakoon_clusters[service.name.replace('arakoon-', '')] = service.storagerouter
 
-        for cluster, ips in arakoon_clusters.iteritems():
-            if len(ips) > 0:
-                ip = ips[0]
-                logger.info('  Collapsing cluster: {0} using ip {1}'.format(cluster, ip))
-                with Remote(ip, [ArakoonManagementEx]) as remote:
-                    cluster_instance = remote.ArakoonManagementEx().getCluster(cluster)
-                    for node in cluster_instance.listNodes():
-                        logger.info('    Collapsing node: {0}'.format(node))
-                        try:
-                            cluster_instance.remoteCollapse(node, 2)  # Keep 2 tlogs
-                        except Exception:
-                            logger.exception('Error during collapsing cluster {0} node {1}'.format(cluster, node))
-            else:
-                logger.warning('Could not collapse cluster {0}. No IP addresses found'.format(cluster))
+        for cluster, storagerouter in arakoon_clusters.iteritems():
+            logger.info('  Collapsing cluster {0}'.format(cluster))
+            client = SSHClient(storagerouter)
+            parser = client.rawconfig_read(PyrakoonStore.ARAKOON_CONFIG_FILE.format(cluster))
+            nodes = {}
+            for node in parser.get('global', 'cluster').split(','):
+                node = node.strip()
+                nodes[node] = ([parser.get(node, 'ip')], parser.get(node, 'client_port'))
+            config = ArakoonClientConfig(str(cluster), nodes)
+            for node in nodes.keys():
+                logger.info('    Collapsing node: {0}'.format(node))
+                client = ArakoonAdminClient(node, config)
+                try:
+                    client.collapse_tlogs(2)
+                except:
+                    logger.exception('Error during collapsing cluster {0} node {1}'.format(cluster, node))
 
         logger.info('Arakoon collapse finished')
