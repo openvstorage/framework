@@ -16,6 +16,7 @@
 Module for VDiskController
 """
 import os
+import re
 import pickle
 import random
 import time
@@ -224,6 +225,13 @@ class VDiskController(object):
         :param detached: Boolean indicating the disk is attached to a machine or not
         """
         # 1. Validations
+        name_regex = "^[0-9a-zA-Z][-_a-zA-Z0-9]{1,48}[a-zA-Z0-9]$"
+        if not re.match(name_regex, devicename):
+            raise RuntimeError("Invalid name for virtual disk clone")
+
+        if VDiskList.get_vdisk_by_name(vdiskname=devicename) is not None:
+            raise RuntimeError("A virtual disk with this name already exists")
+
         vdisk = VDisk(diskguid)
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
         if storagedriver is None:
