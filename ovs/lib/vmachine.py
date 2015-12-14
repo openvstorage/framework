@@ -156,7 +156,6 @@ class VMachineController(object):
         storagedrivers = [storagedriver for storagedriver in vpool.storagedrivers if storagedriver.storagerouter.pmachine_guid == new_vm.pmachine_guid]
         if len(storagedrivers) == 0:
             raise RuntimeError('Cannot find Storage Driver serving {0} on {1}'.format(vpool.name, new_vm.pmachine.name))
-        storagedriverguid = storagedrivers[0].guid
 
         disks = []
         disks_by_order = sorted(template_vm.vdisks, key=lambda x: x.order)
@@ -168,8 +167,7 @@ class VMachineController(object):
                     devicename=prefix,
                     pmachineguid=target_pm.guid,
                     machinename=new_vm.name,
-                    machineguid=new_vm.guid,
-                    storagedriver_guid=storagedriverguid
+                    machineguid=new_vm.guid
                 )
                 disks.append(result)
                 logger.debug('Disk appended: {0}'.format(result))

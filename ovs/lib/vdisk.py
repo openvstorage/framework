@@ -319,6 +319,8 @@ class VDiskController(object):
         :param metadata: dict of metadata
         :param snapshotid: ID of the snapshot
         """
+        if not isinstance(metadata, dict):
+            raise ValueError('Expected metadata as dict, got {0} instead'.format(type(metadata)))
         disk = VDisk(diskguid)
         logger.info('Create snapshot for disk {0}'.format(disk.name))
         if snapshotid is None:
@@ -390,7 +392,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_from_template')
-    def create_from_template(diskguid, machinename, devicename, pmachineguid, machineguid=None, storagedriver_guid=None):
+    def create_from_template(diskguid, machinename, devicename, pmachineguid, machineguid=None):
         """
         Create a disk from a template
 
@@ -399,7 +401,6 @@ class VDiskController(object):
         :param devicename: Device file name for the disk (eg: my_disk-flat.vmdk)
         :param pmachineguid: Guid of the physical machine hosting the template
         :param machineguid: Guid of the machine to assign disk to
-        :param storagedriver_guid: Guid of the storagedriver serving the template
         :return diskguid: Guid of new disk
         """
 
@@ -417,12 +418,9 @@ class VDiskController(object):
             # Disk might not be attached to a vmachine, but still be a template
             raise RuntimeError('The given vdisk does not belong to a template')
 
-        if storagedriver_guid is not None:
-            storagedriver_id = StorageDriver(storagedriver_guid).storagedriver_id
-        else:
-            for storagedriver in vdisk.vpool.storagedrivers:
-                if storagedriver.storagerouter_guid in pmachine.storagerouters_guids:
-                    storagedriver_id = storagedriver.storagedriver_id
+        for storagedriver in vdisk.vpool.storagedrivers:
+            if storagedriver.storagerouter_guid in pmachine.storagerouters_guids:
+                storagedriver_id = storagedriver.storagedriver_id
 
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         if storagedriver is None:
