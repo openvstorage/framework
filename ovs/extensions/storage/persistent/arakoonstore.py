@@ -21,8 +21,8 @@ import json
 import time
 import random
 from threading import Lock, current_thread
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-from ovs.extensions.db.arakoon.arakoon.ArakoonExceptions import ArakoonNotFound, ArakoonSockReadNoBytes
+from ovs.extensions.db.arakoon.arakoon.ArakoonManagement import ArakoonManagementEx
+from ovs.extensions.db.arakoon.arakoon.arakoon.ArakoonExceptions import ArakoonNotFound, ArakoonSockReadNoBytes
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.log.logHandler import LogHandler
 
@@ -135,7 +135,12 @@ class ArakoonStore(object):
             tries = 5
             while tries > 0:
                 try:
-                    return method(*args, **kwargs)
+                    start = time.time()
+                    return_value = method(*args, **kwargs)
+                    duration = time.time() - start
+                    if duration > 0.5:
+                        logger.warning('Arakoon call {0} took {1}s'.format(method.__name__, round(duration, 2)))
+                    return return_value
                 except ArakoonSockReadNoBytes as exception:
                     logger.debug('Error during {0}, retry'.format(method.__name__))
                     last_exception = exception

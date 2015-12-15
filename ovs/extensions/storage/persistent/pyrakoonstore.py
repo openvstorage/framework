@@ -17,11 +17,13 @@ Arakoon store module, using pyrakoon
 """
 
 import os
+import time
 import json
 import random
 from threading import Lock, current_thread
 from ConfigParser import RawConfigParser
-from ovs.extensions.db.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig, ArakoonNotFound
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNotFound, ArakoonSockNotReadable, ArakoonSockReadNoBytes
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.log.logHandler import LogHandler
 
@@ -138,11 +140,17 @@ class PyrakoonStore(object):
         Tries to call a given method, retry-ing if Arakoon is temporary unavailable
         """
         try:
-            last_exception = None
-            tries = 5
-            while tries > 0:
-                return method(*args, **kwargs)
-            raise last_exception
+            start = time.time()
+            try:
+                return_value = method(*args, **kwargs)
+            except (ArakoonSockNotReadable, ArakoonSockReadNoBytes):
+                logger.debug('Error during arakoon call {0}, retry'.format(method.__name__))
+                time.sleep(1)
+                return_value = method(*args, **kwargs)
+            duration = time.time() - start
+            if duration > 0.5:
+                logger.warning('Arakoon call {0} took {1}s'.format(method.__name__, round(duration, 2)))
+            return return_value
         except ArakoonNotFound:
             # No extra logging for ArakoonNotFound
             raise

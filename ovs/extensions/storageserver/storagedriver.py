@@ -195,9 +195,9 @@ class StorageDriverConfiguration(object):
     # DO NOT MAKE MANUAL CHANGES HERE
 
     parameters = {
-        # hg branch: dev
-        # hg revision: 63d8c887a77f44365f8258a78caf889cbf5fd2bc
-        # buildTime: Mon Oct 12 08:55:42 UTC 2015
+        # hg branch: (detached
+        # hg revision: 2954a44977a211a1801ccfeb183f4a83d3603d55
+        # buildTime: Wed Dec  9 09:25:38 UTC 2015
         'metadataserver': {
             'backend_connection_manager': {
                 'optional': ['backend_connection_pool_capacity', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
@@ -212,6 +212,10 @@ class StorageDriverConfiguration(object):
             'backend_connection_manager': {
                 'optional': ['backend_connection_pool_capacity', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
                 'mandatory': ['local_connection_path', ]
+            },
+            'backend_garbage_collector': {
+                'optional': ['bgc_threads', ],
+                'mandatory': []
             },
             'content_addressed_cache': {
                 'optional': ['serialize_read_cache', 'clustercache_mount_points', ],
@@ -234,7 +238,7 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['fd_cache_path', 'fd_namespace', ]
             },
             'filesystem': {
-                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_cache_dentries', 'fs_dtl_config_mode', 'fs_dtl_host', 'fs_dtl_port', 'fs_dtl_mode', ],
+                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_cache_dentries', 'fs_dtl_config_mode', 'fs_dtl_host', 'fs_dtl_port', 'fs_dtl_mode', 'fs_enable_shm_interface', ],
                 'mandatory': ['fs_virtual_disk_format', ]
             },
             'metadata_server': {
@@ -244,6 +248,14 @@ class StorageDriverConfiguration(object):
             'scocache': {
                 'optional': [],
                 'mandatory': ['trigger_gap', 'backoff_gap', 'scocache_mount_points', ]
+            },
+            'scrub_manager': {
+                'optional': ['scrub_manager_interval', 'scrub_manager_sync_wait_secs', ],
+                'mandatory': []
+            },
+            'shm_server': {
+                'optional': [],
+                'mandatory': []
             },
             'threadpool_component': {
                 'optional': ['num_threads', ],

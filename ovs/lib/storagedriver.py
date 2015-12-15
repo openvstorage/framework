@@ -32,8 +32,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.services.service import ServiceManager
@@ -149,7 +148,7 @@ class StorageDriverController(object):
                 break
 
     @staticmethod
-    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=crontab(minute='30', hour='*'))
+    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=crontab(minute='15', hour='*'))
     @ensure_single(task_name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup')
     def scheduled_voldrv_arakoon_checkup():
         """
@@ -240,13 +239,15 @@ class StorageDriverController(object):
         print 'Update existing vPools'
         logger.info('Update existing vPools')
         for storagerouter in StorageRouterList.get_storagerouters():
-            with Remote(storagerouter.ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration, ArakoonManagementEx], 'ovs') as remote:
-                arakoon_cluster_config = remote.ArakoonManagementEx().getCluster('voldrv').getClientConfig()
-                arakoon_nodes = []
-                for node_id, node_config in arakoon_cluster_config.iteritems():
-                    arakoon_nodes.append({'host': node_config[0][0],
-                                          'port': node_config[1],
-                                          'node_id': node_id})
+            client = SSHClient(storagerouter.ip)
+            config = ArakoonClusterConfig('voldrv')
+            config.load_config(client)
+            arakoon_nodes = []
+            for node in config.nodes:
+                arakoon_nodes.append({'host': node.ip,
+                                      'port': node.client_port,
+                                      'node_id': node.name})
+            with Remote(storagerouter.ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration], 'ovs') as remote:
                 configuration_dir = '{0}/storagedriver/storagedriver'.format(
                     remote.Configuration.get('ovs.core.cfgdir'))
                 if not remote.os.path.exists(configuration_dir):

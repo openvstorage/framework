@@ -15,14 +15,18 @@
 define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/generic',
-    '../../containers/storagerouter', './data'
-], function($, ko, api, generic, StorageRouter, data) {
+    '../../containers/storagerouter', '../../containers/vdisk', './data'
+], function($, ko, api, generic, StorageRouter, VDisk, data) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
         self.data = data;
+
+        // Observables
+        self.loaded  = ko.observable(false);
+        self.loading = ko.observable(false);
 
         // Computed
         self.canContinue = ko.computed(function() {
@@ -32,17 +36,26 @@ define([
                 fields.push('vm');
                 reasons.push($.t('ovs:wizards.clone.gather.nostoragerouter'));
             }
-            if (!self.data.name()) {
+            if (!self.data.name.valid()) {
                 valid = false;
                 fields.push('name');
-                reasons.push($.t('ovs:wizards.clone.gather.noname'));
+                reasons.push($.t('ovs:wizards.clone.gather.invalid_name'));
             }
+            $.each(self.data.vDisks(), function(index, vdisk) {
+                if (self.data.name() === vdisk.name()) {
+                    valid = false;
+                    fields.push('name');
+                    reasons.push($.t('ovs:wizards.clone.gather.duplicate_name'));
+                }
+            });
             return { value: valid, reasons: reasons, fields: fields };
         });
 
         // Durandal
         self.activate = function() {
-            return $.Deferred(function(deferred) {
+            self.loading(true);
+            var calls = [];
+            calls.push($.Deferred(function(deferred) {
                 var options = {
                     sort: 'name',
                     contents: 'vpools_guids'
@@ -68,6 +81,43 @@ define([
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
+            }).promise());
+            calls.push($.Deferred(function(deferred) {
+                var options = {
+                    contents: ''
+                };
+                api.get('vdisks', { queryparams: options })
+                    .done(function (data) {
+                        var guids = [], vdiskData = {};
+                        $.each(data.data, function (index, item) {
+                            guids.push(item.guid);
+                            vdiskData[item.guid] = item;
+                        });
+                        generic.crossFiller(
+                            guids, self.data.vDisks,
+                            function (guid) {
+                                return new VDisk(guid);
+                            }, 'guid'
+                        );
+                        $.each(self.data.vDisks(), function (index, vdisk) {
+                            if (guids.contains(vdisk.guid())) {
+                                vdisk.fillData(vdiskData[vdisk.guid()]);
+                            }
+                        });
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
+            }).promise());
+            return $.Deferred(function(deferred) {
+                $.when.apply($, calls)
+                    .done(function () {
+                        self.loaded(true);
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject)
+                    .always(function () {
+                        self.loading(false);
+                    });
             }).promise();
         };
     };

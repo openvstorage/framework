@@ -110,7 +110,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
-    def snapshot(self, vmachine, name, consistent):
+    def snapshot(self, vmachine, name, consistent, sticky):
         """
         Snapshots a given machine
         """
@@ -118,10 +118,12 @@ class VMachineViewSet(viewsets.ViewSet):
             raise NotAcceptable('vMachine should not be a vTemplate')
         label = str(name)
         is_consistent = True if consistent else False  # Assure boolean type
+        is_sticky = True if sticky else False
         return VMachineController.snapshot.delay(machineguid=vmachine.guid,
                                                  label=label,
                                                  is_consistent=is_consistent,
-                                                 is_automatic=False)
+                                                 is_automatic=False,
+                                                 is_sticky=is_sticky)
 
     @link()
     @log()

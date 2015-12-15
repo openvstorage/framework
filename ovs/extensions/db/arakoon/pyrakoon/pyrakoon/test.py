@@ -20,7 +20,6 @@ import os.path
 import time
 import shutil
 import struct
-import logging
 import tempfile
 import subprocess
 
@@ -29,10 +28,10 @@ try:
 except ImportError:
     import StringIO
 
-from ovs.extensions.db.pyrakoon.pyrakoon import client, compat, errors, protocol, utils
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, compat, errors, protocol, utils
+from ovs.log.logHandler import LogHandler
 
-
-LOGGER = logging.getLogger(__name__)
+LOGGER = LogHandler.get('arakoon', 'pyrakoon', propagate=False)
 
 #pylint: disable=R0904
 class FakeClient(object, client.AbstractClient, client.ClientMixin):
