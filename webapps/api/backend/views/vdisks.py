@@ -169,3 +169,4 @@ class VDiskViewSet(viewsets.ViewSet):
         return VDiskController.create_snapshot.delay(diskguid=vdisk.guid,
                                                      metadata=metadata,
                                                      snapshotid=snapshot_id)
+    
