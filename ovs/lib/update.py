@@ -33,7 +33,7 @@ logger.logger.propagate = False
 
 class UpdateController(object):
     """
-    This class contains all logic for updating up an environment
+    This class contains all logic for updating an environment
     """
     model_services = ['memcached', 'arakoon-ovsdb']
 
