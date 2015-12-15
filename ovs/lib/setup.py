@@ -23,20 +23,16 @@ import json
 import time
 import base64
 import urllib2
-import subprocess
 from paramiko import AuthenticationException
 
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.filemutex import FileMutex
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
-from ovs.extensions.migration.migrator import Migrator
-from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -503,305 +499,6 @@ class SetupController(object):
             sys.exit(1)
 
     @staticmethod
-    def update_framework():
-        """
-        Update the framework
-        :return: None
-        """
-        file_mutex = FileMutex('system_update', wait=2)
-        upgrade_file = '/etc/ready_for_upgrade'
-        upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
-        ssh_clients = []
-        try:
-            file_mutex.acquire()
-            SetupController._log_message('+++ Starting framework update +++')
-
-            from ovs.dal.lists.storagerouterlist import StorageRouterList
-
-            SetupController._log_message('Generating SSH client connections for each storage router')
-            upgrade_file = '/etc/ready_for_upgrade'
-            upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
-            storage_routers = StorageRouterList.get_storagerouters()
-            ssh_clients = [SSHClient(storage_router.ip, 'root') for storage_router in storage_routers]
-            this_client = [client for client in ssh_clients if client.is_local is True][0]
-
-            # Commence update !!!!!!!
-            # 0. Create locks
-            SetupController._log_message('Creating lock files', client_ip=this_client.ip)
-            for client in ssh_clients:
-                client.run('touch {0}'.format(upgrade_file))  # Prevents manual install or upgrade individual packages
-                client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Prevents clicking x times on 'Update' btn
-
-            # 1. Check requirements
-            packages_to_update = set()
-            all_services_to_restart = []
-            for client in ssh_clients:
-                for function in Toolbox.fetch_hooks('update', 'metadata'):
-                    SetupController._log_message('Executing function {0}'.format(function.__name__),
-                                                 client_ip=client.ip)
-                    output = function(client)
-                    for key, value in output.iteritems():
-                        if key != 'framework':
-                            continue
-                        for package_info in value:
-                            packages_to_update.update(package_info['packages'])
-                            all_services_to_restart += package_info['services']
-
-            services_to_restart = []
-            for service in all_services_to_restart:
-                if service not in services_to_restart:
-                    services_to_restart.append(service)  # Filter out duplicates maintaining the order of services (eg: watcher-framework before memcached)
-
-            SetupController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
-            SetupController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
-
-            # 2. Stop services
-            if SetupController._change_services_state(services=services_to_restart,
-                                                      ssh_clients=ssh_clients,
-                                                      action='stop') is False:
-                SetupController._log_message('Stopping all services on every node failed, cannot continue',
-                                             client_ip=this_client.ip, severity='warning')
-                SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-
-                # Start services again if a service could not be stopped
-                SetupController._log_message('Attempting to start the services again', client_ip=this_client.ip)
-                SetupController._change_services_state(services=services_to_restart,
-                                                       ssh_clients=ssh_clients,
-                                                       action='start')
-
-                SetupController._log_message('Failed to stop all required services, aborting update',
-                                             client_ip=this_client.ip, severity='error')
-                return
-
-            # 3. Update packages
-            failed_clients = []
-            for client in ssh_clients:
-                PackageManager.update(client=client)
-                try:
-                    SetupController._log_message('Installing latest packages', client.ip)
-                    for package in packages_to_update:
-                        SetupController._log_message('Installing {0}'.format(package), client.ip)
-                        PackageManager.install(package_name=package,
-                                               client=client,
-                                               force=True)
-                        SetupController._log_message('Installed {0}'.format(package), client.ip)
-                    client.file_delete(upgrade_file)
-                except subprocess.CalledProcessError as cpe:
-                    SetupController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip,
-                                                 'error')
-                    failed_clients.append(client)
-                    break
-
-            if failed_clients:
-                SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-                SetupController._log_message('Error occurred. Attempting to start all services again',
-                                             client_ip=this_client.ip, severity='error')
-                SetupController._change_services_state(services=services_to_restart,
-                                                       ssh_clients=ssh_clients,
-                                                       action='start')
-                SetupController._log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients])), this_client.ip, 'error')
-                return
-
-            # 4. Start services
-            SetupController._log_message('Starting services', client_ip=this_client.ip)
-            model_services = []
-            if 'arakoon-ovsdb' in services_to_restart:
-                model_services.append('arakoon-ovsdb')
-                services_to_restart.remove('arakoon-ovsdb')
-            if 'memcached' in services_to_restart:
-                model_services.append('memcached')
-                services_to_restart.remove('memcached')
-            SetupController._change_services_state(services=model_services,
-                                                   ssh_clients=ssh_clients,
-                                                   action='start')
-
-            # 5. Migrate
-            SetupController._log_message('Started model migration', client_ip=this_client.ip)
-            try:
-                from ovs.dal.helpers import Migration
-                Migration.migrate()
-                SetupController._log_message('Finished model migration', client_ip=this_client.ip)
-            except Exception as ex:
-                SetupController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
-                SetupController._log_message('An unexpected error occurred: {0}'.format(ex), client_ip=this_client.ip,
-                                             severity='error')
-                return
-
-            for client in ssh_clients:
-                try:
-                    SetupController._log_message('Started code migration', client.ip)
-                    with Remote(client.ip, [Migrator]) as remote:
-                        remote.Migrator.migrate()
-                    SetupController._log_message('Finished code migration', client.ip)
-                except Exception as ex:
-                    SetupController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
-                    SetupController._log_message('Code migration failed with error: {0}'.format(ex), client.ip, 'error')
-                    return
-
-            # 6. Post upgrade actions
-            SetupController._log_message('Executing post upgrade actions', client_ip=this_client.ip)
-            for client in ssh_clients:
-                with Remote(client.ip, [Toolbox, SSHClient]) as remote:
-                    for function in remote.Toolbox.fetch_hooks('update', 'postupgrade'):
-                        SetupController._log_message('Executing action {0}'.format(function.__name__),
-                                                     client_ip=client.ip)
-                        try:
-                            function(remote.SSHClient(client.ip, username='root'))
-                            SetupController._log_message('Executing action {0} completed'.format(function.__name__),
-                                                         client_ip=client.ip)
-                        except Exception as ex:
-                            SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex),
-                                                         client.ip, 'error')
-
-            # 7. Start watcher and restart support-agent
-            SetupController._change_services_state(services=services_to_restart,
-                                                   ssh_clients=ssh_clients,
-                                                   action='start')
-            SetupController._change_services_state(services=['support-agent'],
-                                                   ssh_clients=ssh_clients,
-                                                   action='restart')
-
-            SetupController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
-            SetupController._log_message('+++ Finished updating +++')
-        except RuntimeError as rte:
-            if 'Could not acquire lock' in rte.message:
-                SetupController._log_message('Another framework update is currently in progress!')
-            else:
-                SetupController._log_message('Error during framework update: {0}'.format(rte), severity='error')
-                SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-        except Exception as ex:
-            SetupController._log_message('Error during framework update: {0}'.format(ex), severity='error')
-            SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-        finally:
-            file_mutex.release()
-
-    @staticmethod
-    def update_volumedriver():
-        """
-        Update the volumedriver
-        :return: None
-        """
-        file_mutex = FileMutex('system_update', wait=2)
-        upgrade_file = '/etc/ready_for_upgrade'
-        upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
-        ssh_clients = []
-        try:
-            file_mutex.acquire()
-            SetupController._log_message('+++ Starting volumedriver update +++')
-
-            from ovs.dal.lists.storagerouterlist import StorageRouterList
-
-            SetupController._log_message('Generating SSH client connections for each storage router')
-            storage_routers = StorageRouterList.get_storagerouters()
-            ssh_clients = [SSHClient(storage_router.ip, 'root') for storage_router in storage_routers]
-            this_client = [client for client in ssh_clients if client.is_local is True][0]
-
-            # Commence update !!!!!!!
-            # 0. Create locks
-            SetupController._log_message('Creating lock files', client_ip=this_client.ip)
-            for client in ssh_clients:
-                client.run('touch {0}'.format(upgrade_file))  # Prevents manual install or upgrade individual packages
-                client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Prevents clicking x times on 'Update' btn
-
-            # 1. Check requirements
-            packages_to_update = set()
-            all_services_to_restart = []
-            for client in ssh_clients:
-                for function in Toolbox.fetch_hooks('update', 'metadata'):
-                    SetupController._log_message('Executing function {0}'.format(function.__name__),
-                                                 client_ip=client.ip)
-                    output = function(client)
-                    for key, value in output.iteritems():
-                        if key != 'volumedriver':
-                            continue
-                        for package_info in value:
-                            packages_to_update.update(package_info['packages'])
-                            all_services_to_restart += package_info['services']
-
-            services_to_restart = []
-            for service in all_services_to_restart:
-                if service not in services_to_restart:
-                    services_to_restart.append(service)  # Filter out duplicates keeping the order of services (eg: watcher-framework before memcached)
-
-            SetupController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
-            SetupController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
-
-            # 1. Stop services
-            if SetupController._change_services_state(services=services_to_restart,
-                                                      ssh_clients=ssh_clients,
-                                                      action='stop') is False:
-                SetupController._log_message('Stopping all services on every node failed, cannot continue',
-                                             client_ip=this_client.ip, severity='warning')
-                SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-
-                SetupController._log_message('Attempting to start the services again', client_ip=this_client.ip)
-                SetupController._change_services_state(services=services_to_restart,
-                                                       ssh_clients=ssh_clients,
-                                                       action='start')
-                SetupController._log_message('Failed to stop all required services, update aborted',
-                                             client_ip=this_client.ip, severity='error')
-                return
-
-            # 2. Update packages
-            failed_clients = []
-            for client in ssh_clients:
-                PackageManager.update(client=client)
-                try:
-                    for package_name in packages_to_update:
-                        SetupController._log_message('Installing {0}'.format(package_name), client.ip)
-                        PackageManager.install(package_name=package_name,
-                                               client=client,
-                                               force=True)
-                        SetupController._log_message('Installed {0}'.format(package_name), client.ip)
-                    client.file_delete(upgrade_file)
-                except subprocess.CalledProcessError as cpe:
-                    SetupController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip,
-                                                 'error')
-                    failed_clients.append(client)
-                    break
-
-            if failed_clients:
-                SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-                SetupController._log_message('Error occurred. Attempting to start all services again',
-                                             client_ip=this_client.ip, severity='error')
-                SetupController._change_services_state(services=services_to_restart,
-                                                       ssh_clients=ssh_clients,
-                                                       action='start')
-                SetupController._log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients])), this_client.ip, 'error')
-                return
-
-            # 3. Post upgrade actions
-            SetupController._log_message('Executing post upgrade actions', client_ip=this_client.ip)
-            for client in ssh_clients:
-                for function in Toolbox.fetch_hooks('update', 'postupgrade'):
-                    SetupController._log_message('Executing action: {0}'.format(function.__name__), client_ip=client.ip)
-                    try:
-                        function(client)
-                    except Exception as ex:
-                        SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex),
-                                                     client.ip, 'error')
-
-            # 4. Start services
-            SetupController._log_message('Starting services', client_ip=this_client.ip)
-            SetupController._change_services_state(services=services_to_restart,
-                                                   ssh_clients=ssh_clients,
-                                                   action='start')
-
-            SetupController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
-            SetupController._log_message('+++ Finished updating +++')
-        except RuntimeError as rte:
-            if 'Could not acquire lock' in rte.message:
-                SetupController._log_message('Another volumedriver update is currently in progress!')
-            else:
-                SetupController._log_message('Error during volumedriver update: {0}'.format(rte), severity='error')
-                SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-        except Exception as ex:
-            SetupController._log_message('Error during volumedriver update: {0}'.format(ex), severity='error')
-            SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-        finally:
-            file_mutex.release()
-
-    @staticmethod
     def _prepare_node(cluster_ip, nodes, known_passwords, ip_client_map, hypervisor_info):
         """
         Prepares a node:
@@ -953,38 +650,6 @@ class SetupController(object):
             logger.error(message, print_msg=True)
 
     @staticmethod
-    def _remove_lock_files(files, ssh_clients):
-        for ssh_client in ssh_clients:
-            for file_name in files:
-                if ssh_client.file_exists(file_name):
-                    ssh_client.file_delete(file_name)
-
-    @staticmethod
-    def _change_services_state(services, ssh_clients, action):
-        """
-        Stop/start services on SSH clients
-        If action is start, we ignore errors and try to start other services on other nodes
-        """
-        if action == 'start':
-            services.reverse()  # Start services again in reverse order of stopping
-        for service_name in services:
-            for ssh_client in ssh_clients:
-                description = 'stopping' if action == 'stop' else 'starting' if action == 'start' else 'restarting'
-                try:
-                    if ServiceManager.has_service(service_name, client=ssh_client):
-                        SetupController._log_message('{0} service {1}'.format(description.capitalize(), service_name),
-                                                     ssh_client.ip)
-                        SetupController.change_service_state(client=ssh_client,
-                                                             name=service_name,
-                                                             state=action)
-                        SetupController._log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started' if action == 'start' else 'Restarted', service_name), ssh_client.ip)
-                except Exception as exc:
-                    SetupController._log_message('Something went wrong {0} service {1}: {2}'.format(description, service_name, exc), ssh_client.ip, severity='warning')
-                    if action == 'stop':
-                        return False
-        return True
-
-    @staticmethod
     def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats,
                           configure_memcached, configure_rabbitmq):
         """
@@ -1026,7 +691,7 @@ class SetupController(object):
         for service in SetupController.model_services:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                SetupController.change_service_state(target_client, service, 'restart')
+                Toolbox.change_service_state(target_client, service, 'restart', logger)
 
         print 'Start model migration'
         logger.debug('Start model migration')
@@ -1057,16 +722,16 @@ class SetupController(object):
         for service in SetupController.master_services:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                SetupController.change_service_state(target_client, service, 'start')
+                Toolbox.change_service_state(target_client, service, 'start', logger)
         # Enable HA for the rabbitMQ queues
         SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
         ServiceManager.enable_service('watcher-framework', client=target_client)
-        SetupController.change_service_state(target_client, 'watcher-framework', 'start')
+        Toolbox.change_service_state(target_client, 'watcher-framework', 'start', logger)
 
         logger.debug('Restarting workers')
         ServiceManager.enable_service('workers', client=target_client)
-        SetupController.change_service_state(target_client, 'workers', 'restart')
+        Toolbox.change_service_state(target_client, 'workers', 'restart', logger)
 
         SetupController._run_hooks('firstnode', cluster_ip)
 
@@ -1084,7 +749,7 @@ class SetupController(object):
             service = 'support-agent'
             ServiceManager.add_service(service, client=target_client)
             ServiceManager.enable_service(service, client=target_client)
-            SetupController.change_service_state(target_client, service, 'start')
+            Toolbox.change_service_state(target_client, service, 'start', logger)
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -1136,7 +801,7 @@ class SetupController(object):
             service = 'support-agent'
             ServiceManager.add_service(service, client=target_client)
             ServiceManager.enable_service(service, client=target_client)
-            SetupController.change_service_state(target_client, service, 'start')
+            Toolbox.change_service_state(target_client, service, 'start', logger)
 
         node_name = target_client.run('hostname')
         SetupController._finalize_setup(target_client, node_name, 'EXTRA', hypervisor_info, unique_id)
@@ -1147,12 +812,12 @@ class SetupController(object):
 
         print 'Starting services'
         ServiceManager.enable_service('watcher-framework', client=target_client)
-        SetupController.change_service_state(target_client, 'watcher-framework', 'start')
+        Toolbox.change_service_state(target_client, 'watcher-framework', 'start', logger)
 
         logger.debug('Restarting workers')
         for node_client in ip_client_map.itervalues():
             ServiceManager.enable_service('workers', client=node_client)
-            SetupController.change_service_state(node_client, 'workers', 'restart')
+            Toolbox.change_service_state(node_client, 'workers', 'restart', logger)
 
         SetupController._run_hooks('extranode', cluster_ip, master_ip)
 
@@ -1260,7 +925,7 @@ class SetupController(object):
             target_client.run('rabbitmqctl stop; sleep 5;')
 
             # Enable HA for the rabbitMQ queues
-            SetupController.change_service_state(target_client, 'rabbitmq-server', 'start')
+            Toolbox.change_service_state(target_client, 'rabbitmq-server', 'start', logger)
             SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
         SetupController._configure_amqp_to_volumedriver(ip_client_map)
@@ -1270,7 +935,7 @@ class SetupController(object):
         for service in SetupController.master_services:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                SetupController.change_service_state(target_client, service, 'start')
+                Toolbox.change_service_state(target_client, service, 'start', logger)
 
         print 'Restarting services'
         SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
@@ -1363,7 +1028,7 @@ class SetupController(object):
                 target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
                 target_client.run('rabbitmqctl reset; sleep 5;')
                 target_client.run('rabbitmqctl stop; sleep 5;')
-                SetupController.change_service_state(target_client, 'rabbitmq-server', 'stop')
+                Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', logger)
                 target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
         print 'Removing services'
@@ -1376,7 +1041,7 @@ class SetupController(object):
         for service in services:
             if ServiceManager.has_service(service, client=target_client):
                 logger.debug('Removing service {0}'.format(service))
-                SetupController.change_service_state(target_client, service, 'stop')
+                Toolbox.change_service_state(target_client, service, 'stop', logger)
                 ServiceManager.remove_service(service, client=target_client)
 
         if ServiceManager.has_service('workers', client=target_client):
@@ -1407,12 +1072,12 @@ class SetupController(object):
         watcher = 'watcher-framework'
         for ip in masters + slaves:
             if ServiceManager.has_service(watcher, clients[ip]):
-                SetupController.change_service_state(clients[ip], watcher, 'stop')
+                Toolbox.change_service_state(clients[ip], watcher, 'stop', logger)
         for ip in masters:
-            SetupController.change_service_state(clients[ip], memcached, 'restart')
+            Toolbox.change_service_state(clients[ip], memcached, 'restart', logger)
         for ip in masters + slaves:
             if ServiceManager.has_service(watcher, clients[ip]):
-                SetupController.change_service_state(clients[ip], watcher, 'start')
+                Toolbox.change_service_state(clients[ip], watcher, 'start', logger)
         VolatileFactory.store = None
 
     @staticmethod
@@ -1441,7 +1106,7 @@ EOF
 """.format(rabbitmq_port, rabbitmq_login, rabbitmq_password))
         rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
         if rabbitmq_running is True:
-            SetupController.change_service_state(client, 'rabbitmq-server', 'stop')
+            Toolbox.change_service_state(client, 'rabbitmq-server', 'stop', logger)
 
         client.run('rabbitmq-server -detached 2> /dev/null; sleep 5;')
 
@@ -1480,7 +1145,7 @@ EOF
             raise RuntimeError('Service rabbitmq-server has not been added on node {0}'.format(client.ip))
         rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
         if rabbitmq_running is False or same_process is False:
-            SetupController.change_service_state(client, 'rabbitmq-server', 'restart')
+            Toolbox.change_service_state(client, 'rabbitmq-server', 'restart', logger)
 
         client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
 
@@ -1545,7 +1210,7 @@ EOF
         logger.info('Configuring logstash')
         if ServiceManager.has_service('logstash', client) is False:
             ServiceManager.add_service('logstash', client)
-        SetupController.change_service_state(client, 'logstash', 'restart')
+        Toolbox.change_service_state(client, 'logstash', 'restart', logger)
 
     @staticmethod
     def _configure_avahi(client, cluster_name, node_name, node_type):
@@ -1567,7 +1232,7 @@ EOF
 EOF
 """.format(cluster_name, node_name, node_type, SetupController.avahi_filename, client.ip.replace('.', '_')))
         client.run('avahi-daemon --reload')
-        SetupController.change_service_state(client, 'avahi-daemon', 'restart')
+        Toolbox.change_service_state(client, 'avahi-daemon', 'restart', logger)
 
     @staticmethod
     def _add_services(client, unique_id, node_type):
@@ -1593,7 +1258,7 @@ EOF
         cluster_ip = client.ip
         client.dir_create('/opt/OpenvStorage/webapps/frontend/logging')
         if SetupController._logstash_installed(client):
-            SetupController.change_service_state(client, 'logstash', 'restart')
+            Toolbox.change_service_state(client, 'logstash', 'restart', logger)
         SetupController._replace_param_in_config(client=client,
                                                  config_file='/opt/OpenvStorage/webapps/frontend/logging/config.js',
                                                  old_value='http://"+window.location.hostname+":9200',
@@ -1659,8 +1324,8 @@ EOF
     @staticmethod
     def _discover_nodes(client):
         nodes = {}
-        SetupController.change_service_state(client, 'dbus', 'start')
-        SetupController.change_service_state(client, 'avahi-daemon', 'start')
+        Toolbox.change_service_state(client, 'dbus', 'start', logger)
+        Toolbox.change_service_state(client, 'avahi-daemon', 'start', logger)
         discover_result = client.run('timeout -k 60 45 avahi-browse -artp 2> /dev/null | grep ovs_cluster || true')
         for entry in discover_result.splitlines():
             entry_parts = entry.split(';')
@@ -1696,41 +1361,6 @@ EOF
             elif old_value in contents:
                 contents = contents.replace(old_value, new_value)
             client.file_write(config_file, contents)
-
-    @staticmethod
-    def change_service_state(client, name, state):
-        """
-        Starts/stops/restarts a service
-        :param client: SSHClient on which to connect and change service state
-        :param name: Name of the service
-        :param state: State to put the service in
-        """
-        action = None
-        # Enable service before changing the state
-        status = ServiceManager.is_enabled(name, client=client)
-        if status is False:
-            logger.debug('  Enabling service {0}'.format(name))
-            ServiceManager.enable_service(name, client=client)
-
-        status = ServiceManager.get_service_status(name, client=client)
-        if status is False and state in ['start', 'restart']:
-            logger.debug('  Starting service {0}'.format(name))
-            ServiceManager.start_service(name, client=client)
-            action = 'started'
-        elif status is True and state == 'stop':
-            logger.debug('  Stopping service {0}'.format(name))
-            ServiceManager.stop_service(name, client=client)
-            action = 'stopped'
-        elif status is True and state == 'restart':
-            logger.debug('  Restarting service {0}'.format(name))
-            ServiceManager.restart_service(name, client=client)
-            action = 'restarted'
-
-        if action is None:
-            print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
-        else:
-            logger.debug('  Service {0} {1}'.format(name, action))
-            print '  [{0}] {1} {2}'.format(client.ip, name, action)
 
     @staticmethod
     def _is_rabbitmq_running(client):
