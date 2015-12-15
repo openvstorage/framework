@@ -21,6 +21,7 @@ from ovs.celery_run import celery
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vdisk import VDisk
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.vdisklist import VDiskList
@@ -155,7 +156,6 @@ class VMachineController(object):
         storagedrivers = [storagedriver for storagedriver in vpool.storagedrivers if storagedriver.storagerouter.pmachine_guid == new_vm.pmachine_guid]
         if len(storagedrivers) == 0:
             raise RuntimeError('Cannot find Storage Driver serving {0} on {1}'.format(vpool.name, new_vm.pmachine.name))
-        storagedriverguid = storagedrivers[0].guid
 
         disks = []
         disks_by_order = sorted(template_vm.vdisks, key=lambda x: x.order)
@@ -167,8 +167,7 @@ class VMachineController(object):
                     devicename=prefix,
                     pmachineguid=target_pm.guid,
                     machinename=new_vm.name,
-                    machineguid=new_vm.guid,
-                    storagedriver_guid=storagedriverguid
+                    machineguid=new_vm.guid
                 )
                 disks.append(result)
                 logger.debug('Disk appended: {0}'.format(result))
@@ -202,6 +201,25 @@ class VMachineController(object):
         @param name: name for the new machine
         """
         machine = VMachine(machineguid)
+        timestamp = str(timestamp)
+        if timestamp not in (snap['timestamp'] for snap in machine.snapshots):
+            raise RuntimeError('Invalid timestamp provided, not a valid snapshot of this vmachine.')
+
+        vpool = None
+        storagerouter = None
+        if machine.pmachine is not None and machine.pmachine.hvtype == 'VMWARE':
+            for vdisk in machine.vdisks:
+                if vdisk.vpool is not None:
+                    vpool = vdisk.vpool
+                    break
+        for vdisk in machine.vdisks:
+            if vdisk.storagerouter_guid:
+                storagerouter = StorageRouter(vdisk.storagerouter_guid)
+                break
+        hv = Factory.get(machine.pmachine)
+        vm_path = hv.get_vmachine_path(name, storagerouter.machine_id if storagerouter is not None else '')
+        # mutex in sync_with_hypervisor uses "None" for KVM hvtype
+        mutex = VolatileMutex('{0}_{1}'.format(hv.clean_vmachine_filename(vm_path), vpool.guid if vpool is not None else 'none'))
 
         disks = {}
         for snapshot in machine.snapshots:
@@ -209,38 +227,56 @@ class VMachineController(object):
                 for diskguid, snapshotguid in snapshot['snapshots'].iteritems():
                     disks[diskguid] = snapshotguid
 
-        new_machine = VMachine()
-        new_machine.copy(machine)
-        new_machine.name = name
-        new_machine.pmachine = machine.pmachine
-        new_machine.save()
+        try:
+            mutex.acquire(wait=120)
+            new_machine = VMachine()
+            new_machine.copy(machine)
+            new_machine.name = name
+            new_machine.devicename = hv.clean_vmachine_filename(vm_path)
+            new_machine.pmachine = machine.pmachine
+            new_machine.save()
+        finally:
+            mutex.release
 
         new_disk_guids = []
+        vm_disks = []
+        mountpoint = None
         disks_by_order = sorted(machine.vdisks, key=lambda x: x.order)
-        for currentDisk in disks_by_order:
-            if machine.is_vtemplate and currentDisk.templatesnapshot:
-                snapshotid = currentDisk.templatesnapshot
-            else:
-                snapshotid = disks[currentDisk.guid]
-            prefix = '%s-clone' % currentDisk.name
-
-            result = VDiskController.clone(diskguid=currentDisk.guid,
-                                           snapshotid=snapshotid,
-                                           devicename=prefix,
-                                           pmachineguid=new_machine.pmachine_guid,
-                                           machinename=new_machine.name,
-                                           machineguid=new_machine.guid)
-            new_disk_guids.append(result['diskguid'])
-
-        hv = Factory.get(machine.pmachine)
         try:
-            result = hv.clone_vm(machine.hypervisor_id, name, disks, None, True)
-        except:
+            for currentDisk in disks_by_order:
+                if machine.is_vtemplate and currentDisk.templatesnapshot:
+                    snapshotid = currentDisk.templatesnapshot
+                else:
+                    snapshotid = disks[currentDisk.guid]
+                prefix = '%s-clone' % currentDisk.name
+
+                result = VDiskController.clone(diskguid=currentDisk.guid,
+                                               snapshotid=snapshotid,
+                                               devicename=prefix,
+                                               pmachineguid=new_machine.pmachine_guid,
+                                               machinename=new_machine.name,
+                                               machineguid=new_machine.guid)
+                new_disk_guids.append(result['diskguid'])
+                mountpoint = StorageDriverList.get_by_storagedriver_id(currentDisk.storagedriver_id).mountpoint
+                vm_disks.append(result)
+        except Exception as ex:
+            logger.error('Failed to clone disks. {0}'.format(ex))
             VMachineController.delete(machineguid=new_machine.guid)
             raise
 
-        new_machine.hypervisor_id = result
-        new_machine.save()
+        try:
+            result = hv.clone_vm(machine.hypervisor_id, name, vm_disks, mountpoint)
+        except Exception as ex:
+            logger.error('Failed to clone vm. {0}'.format(ex))
+            VMachineController.delete(machineguid=new_machine.guid)
+            raise
+
+        try:
+            mutex.acquire(wait=120)
+            new_machine.hypervisor_id = result
+            new_machine.save()
+        finally:
+            mutex.release()
         return new_machine.guid
 
     @staticmethod
@@ -579,6 +615,10 @@ class VMachineController(object):
                 mutex.acquire(wait=5)
                 vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
                 if not vmachine:
+                    vmachines = VMachineList.get_vmachine_by_name(name)
+                    if vmachines is not None:
+                        vmachine = vmachines[0]
+                if not vmachine:
                     vmachine = VMachine()
                     vmachine.vpool = vpool
                     vmachine.pmachine = pmachine
@@ -590,10 +630,13 @@ class VMachineController(object):
 
             if pmachine.hvtype == 'KVM':
                 try:
+                    mutex.acquire(wait=120)
                     VMachineController.sync_with_hypervisor(vmachine.guid, storagedriver_id=storagedriver_id)
                     vmachine.status = 'SYNC'
                 except:
                     vmachine.status = 'SYNC_NOK'
+                finally:
+                    mutex.release()
                 vmachine.save()
         else:
             logger.info('Ignored invalid file {0}'.format(name))

@@ -329,6 +329,8 @@ class VDiskController(object):
         :param metadata: dict of metadata
         :param snapshotid: ID of the snapshot
         """
+        if not isinstance(metadata, dict):
+            raise ValueError('Expected metadata as dict, got {0} instead'.format(type(metadata)))
         disk = VDisk(diskguid)
         logger.info('Create snapshot for disk {0}'.format(disk.name))
         if snapshotid is None:
@@ -374,7 +376,12 @@ class VDiskController(object):
         @param diskguid: guid of the disk
         """
         disk = VDisk(diskguid)
+        if disk.is_vtemplate is True:
+            raise RuntimeError('Disk {0} is already set as template'.format(disk.name))
+        logger.info('Setting disk {0} as template'.format(disk.name))
         disk.storagedriver_client.set_volume_as_template(str(disk.volume_id))
+        disk.is_vtemplate = True
+        disk.save()
 
     @staticmethod
     @celery.task(name='ovs.vdisk.rollback')
@@ -395,7 +402,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_from_template')
-    def create_from_template(diskguid, machinename, devicename, pmachineguid, machineguid=None, storagedriver_guid=None):
+    def create_from_template(diskguid, machinename, devicename, pmachineguid, machineguid=None):
         """
         Create a disk from a template
 
@@ -404,7 +411,6 @@ class VDiskController(object):
         :param devicename: Device file name for the disk (eg: my_disk-flat.vmdk)
         :param pmachineguid: Guid of the physical machine hosting the template
         :param machineguid: Guid of the machine to assign disk to
-        :param storagedriver_guid: Guid of the storagedriver serving the template
         :return diskguid: Guid of new disk
         """
 
@@ -422,12 +428,9 @@ class VDiskController(object):
             # Disk might not be attached to a vmachine, but still be a template
             raise RuntimeError('The given vdisk does not belong to a template')
 
-        if storagedriver_guid is not None:
-            storagedriver_id = StorageDriver(storagedriver_guid).storagedriver_id
-        else:
-            for storagedriver in vdisk.vpool.storagedrivers:
-                if storagedriver.storagerouter_guid in pmachine.storagerouters_guids:
-                    storagedriver_id = storagedriver.storagedriver_id
+        for storagedriver in vdisk.vpool.storagedrivers:
+            if storagedriver.storagerouter_guid in pmachine.storagerouters_guids:
+                storagedriver_id = storagedriver.storagedriver_id
 
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         if storagedriver is None:
@@ -475,6 +478,38 @@ class VDiskController(object):
                 'backingdevice': disk_path}
 
     @staticmethod
+    @celery.task(name='ovs.vdisk.create_new')
+    def create_new(diskname, size, storagedriver_guid):
+        """
+        Create a new vdisk/volume using filesystem calls
+        :param diskname: name of the disk
+        :param size: size of the disk (GB)
+        :param storagedriver_guid: guid of the Storagedriver
+        :return: guid of the new disk
+        """
+        logger.info('Creating new empty disk {0} of {1} GB'.format(diskname, size))
+        storagedriver = StorageDriver(storagedriver_guid)
+        vp_mountpoint = storagedriver.mountpoint
+        hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
+        disk_path = hypervisor.clean_backing_disk_filename(hypervisor.get_disk_path(None, diskname))
+        location = os.path.join(vp_mountpoint, disk_path)
+        VDiskController.create_volume(location, size)
+
+        backoff = 1
+        timeout = 30 #  seconds
+        start = time.time()
+        while time.time() < start + timeout:
+            vdisk = VDiskList.get_by_devicename_and_vpool(disk_path, storagedriver.vpool)
+            if vdisk is None:
+                logger.debug('Waiting for disk to be picked up by voldrv')
+                time.sleep(backoff)
+                backoff += 1
+            else:
+                return vdisk.guid
+        raise RuntimeError('Disk {0} was not created in {1} seconds.'.format(diskname, timeout))
+
+
+    @staticmethod
     @celery.task(name='ovs.vdisk.create_volume')
     def create_volume(location, size):
         """
@@ -487,6 +522,7 @@ class VDiskController(object):
         @param size: size of volume, GB
         @return None
         """
+        logger.info('Creating volume {0} of {1} GB'.format(location, size))
         if os.path.exists(location):
             raise RuntimeError('File already exists at %s' % location)
 
