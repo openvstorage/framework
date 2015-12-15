@@ -243,3 +243,19 @@ class VMachineViewSet(viewsets.ViewSet):
             else:
                 pmachine_guids = list(this_pmachine_guids & set(pmachine_guids))
         return pmachine_guids if hints['full'] is False else [pmachines[guid] for guid in pmachine_guids]
+
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VMachine)
+    def clone_from_snapshot(self, vmachine, snapshot_timestamp, new_machine_name):
+        """
+        Clone a VM based on a snapshot timestamp
+        :param vmachine: GUID of source vmachine
+        :param snapshot_timestamp: timestamp of snapshot
+        :param new_machine_name: Name of the new machine
+        """
+        return VMachineController.clone.delay(machineguid=vmachine.guid,
+                                              timestamp=snapshot_timestamp,
+                                              name=new_machine_name)

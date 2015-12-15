@@ -132,4 +132,41 @@ class VDiskViewSet(viewsets.ViewSet):
         :param snapshot_id: ID of the snapshot to remove
         """
         return VDiskController.delete_snapshot.delay(diskguid=vdisk.guid,
+                                                      snapshotid=snapshot_id)
+
+    @action()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VDisk)
+    def set_as_template(self, vdisk):
+        """
+        Sets a vDisk as template
+        :param vdisk: Guid of the virtual disk to set as template
+        """
+        return VDiskController.set_as_template.delay(diskguid=vdisk.guid)
+
+    @action()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VDisk)
+    def create_snapshot(self, vdisk, name, timestamp, consistent=False, automatic=False, sticky=False, snapshot_id=None):
+        """
+        Creates a snapshot from the vDisk
+        :param vdisk: Guid of the virtual disk to create snapshot from
+        :param name: Name of the snapshot (label)
+        :param timestamp: Timestamp of the snapshot - integer
+        :param consistent: Flag - is_consistent
+        :param automatic: Flag - is_automatic
+        :param sticky: Flag - is_sticky
+        :param snapshot_id: (optional) id of the snapshot, default will be new uuid
+        """
+        metadata = {'label': name,
+                    'timestamp': timestamp,
+                    'is_consistent': True if consistent else False,
+                    'is_sticky': True if sticky else False,
+                    'is_automatic': True if automatic else False
+        }
+        return VDiskController.create_snapshot.delay(diskguid=vdisk.guid,
+                                                     metadata=metadata,
                                                      snapshotid=snapshot_id)
+    

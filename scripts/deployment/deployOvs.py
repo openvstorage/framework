@@ -594,7 +594,7 @@ if __name__ == '__main__':
             sys.exit(1)
 
     diskid = 1
-    for sdd in ssds:
+    for ssd in ssds:
         print 'Adding ssd:', ssd['Vendor'], ssd['Model'], ssd['DevfsPath']
         disk_config = vm_sys.create_vdisk_mapping(vm_name, diskid, ssd, disk_config)
         if ssd in hdds:

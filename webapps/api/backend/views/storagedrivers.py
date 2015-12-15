@@ -22,7 +22,8 @@ from rest_framework.decorators import action
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.hybrids.storagedriver import StorageDriver
-from backend.decorators import required_roles, load, return_list, return_object, return_plain, log
+from ovs.lib.vdisk import VDiskController
+from backend.decorators import required_roles, load, return_list, return_object, return_plain, return_task, log
 
 
 class StorageDriverViewSet(viewsets.ViewSet):
@@ -76,3 +77,18 @@ class StorageDriverViewSet(viewsets.ViewSet):
         if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id):
             result = False
         return result
+
+    @action()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(StorageDriver)
+    def create_new_disk(self, storagedriver, diskname, size):
+        """
+        Create a new empty vdisk - including the volume in the backend
+        :param diskname: Name of the new vdisk
+        :param size: Size in GB
+        :param storagedriver_guid: Guid of the storagedriver holding the vdisk
+        """
+        return VDiskController.create_new.delay(diskname=diskname,
+                                                size=size,
+                                                storagedriver_guid=storagedriver.guid)

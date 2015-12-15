@@ -39,11 +39,11 @@ elif [ "$1" = "setup" ] ; then
     fi
 elif [ "$1" = "update" ] ; then
     if [ "$2" = "framework" ] ; then
-        echo 'python -c "from ovs.lib.setup import SetupController; SetupController.update_framework()"' > /tmp/update
+        echo 'python -c "from ovs.lib.setup import UpdateController; UpdateController.update_framework()"' > /tmp/update
         at -f /tmp/update now
         rm /tmp/update
     elif [ "$2" = "volumedriver" ] ; then
-        echo 'python -c "from ovs.lib.setup import SetupController; SetupController.update_volumedriver()"' > /tmp/update
+        echo 'python -c "from ovs.lib.setup import UpdateController; UpdateController.update_volumedriver()"' > /tmp/update
         at -f /tmp/update now
         rm /tmp/update
     fi

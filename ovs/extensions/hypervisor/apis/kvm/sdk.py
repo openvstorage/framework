@@ -251,7 +251,8 @@ class Sdk(object):
         try:
             config['name'] = self._get_nova_name(vm_object)
         except Exception as ex:
-            logger.error('Cannot retrieve nova:name {0}'.format(ex))
+            logger.debug('Cannot retrieve nova:name {0}'.format(ex))
+            # not an error, as we have a fallback, but still keep logging for debug purposes
             config['name'] = vm_object.name()
         config['id'] = str(vm_object.UUIDString())
         config['backing'] = {'filename': '{0}/{1}'.format(vm_location, vm_filename),
@@ -377,12 +378,14 @@ class Sdk(object):
         return self.ssh_client.run("[ -d {0} ] && echo 'yes' || echo 'no'".format(mountpoint)) == 'yes'
 
     @authenticated
-    def clone_vm(self, vmid, name, disks):
+    def clone_vm(self, vmid, name, disks, mountpoint):
         """
         create a clone vm
-        similar to create_vm_from template (?)
+        similar to create_vm_from template
         """
-        raise NotImplementedError()
+        source_vm = self.get_vm_object(vmid)
+        return self.create_vm_from_template(name, source_vm, disks, mountpoint)
+
 
     @authenticated
     def create_vm_from_template(self, name, source_vm, disks, mountpoint):
