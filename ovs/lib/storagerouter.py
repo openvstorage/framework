@@ -76,6 +76,7 @@ class StorageRouterController(object):
     """
     Contains all BLL related to StorageRouter
     """
+    ARAKOON_CLUSTER_ID_VOLDRV = 'voldrv'
     SUPPORT_AGENT = 'support-agent'
     PARTITION_DEFAULT_USAGES = {DiskPartition.ROLES.DB: (20, 10),  # 1st number is exact size in GiB, 2nd number is percentage (highest of the 2 will be taken)
                                 DiskPartition.ROLES.SCRUB: (0, 0)}
@@ -438,9 +439,8 @@ class StorageRouterController(object):
         model_ports_in_use += ports
 
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
-        voldrv_arakoon_cluster_id = 'voldrv'
 
-        config = ArakoonClusterConfig(voldrv_arakoon_cluster_id)
+        config = ArakoonClusterConfig(StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV)
         config.load_config(client)
         arakoon_nodes = []
         arakoon_node_configs = []
@@ -459,7 +459,7 @@ class StorageRouterController(object):
             node_configs.append(ClusterNodeConfig(vrouter_id, str(grid_ip), ports[0], ports[1], ports[2]))
 
         try:
-            vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), voldrv_arakoon_cluster_id, arakoon_node_configs)
+            vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV, arakoon_node_configs)
             vrouter_clusterregistry.set_node_configs(node_configs)
         except:
             if new_vpool is True:
@@ -737,10 +737,10 @@ class StorageRouterController(object):
                                                      vrouter_backend_sync_timeout_ms=5000,
                                                      vrouter_migrate_timeout_ms=5000)
         storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
-        storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=voldrv_arakoon_cluster_id,
+        storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV,
                                                        vregistry_arakoon_cluster_nodes=arakoon_nodes)
         storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
-                                                              dls_arakoon_cluster_id=voldrv_arakoon_cluster_id,
+                                                              dls_arakoon_cluster_id=StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV,
                                                               dls_arakoon_cluster_nodes=arakoon_nodes)
         storagedriver_config.configure_file_driver(fd_cache_path=sdp_fd.path,
                                                    fd_extent_cache_capacity='1024',
@@ -829,7 +829,7 @@ class StorageRouterController(object):
             raise RuntimeError('StorageDriver service failed to start (got no event)')
         logger.debug('StorageDriver running')
 
-        mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool=vpool)
+        mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool=vpool, check_online=True)
         for sr in all_storagerouters:
             node_client = ip_client_map[sr.ip]['ovs']
             storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
@@ -862,93 +862,159 @@ class StorageRouterController(object):
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.remove_storagedriver')
-    def remove_storagedriver(storagedriver_guid, allow_offline=False):
+    def remove_storagedriver(storagedriver_guid, offline_storage_router_guids=None):
         """
-        Removes a StorageDriver (and, if it was the last Storage Driver for a vPool, the vPool is removed as well)
-        :param storagedriver_guid: Storage Driver guid to remove
+        Removes a Storage Driver (if its the last Storage Driver for a vPool, the vPool is removed as well)
+        :param storagedriver_guid: Guid of the Storage Driver to remove
+        :param offline_storage_router_guids: Guids of Storage Routers which are offline and will be removed from cluster.
+                                             WHETHER VPOOL WILL BE DELETED DEPENDS ON THIS
         """
         logger.info('Deleting storage driver with guid {0}'.format(storagedriver_guid))
 
-        # Get objects & Make some checks
-        storagedriver = StorageDriver(storagedriver_guid)
-        storagerouter = storagedriver.storagerouter
-        ip = storagerouter.ip
-        pmachine = storagerouter.pmachine
-        vmachines = VMachineList.get_customer_vmachines()
-        pmachine_guids = [vm.pmachine_guid for vm in vmachines]
-        vpool_guids = [vm.vpool_guid for vm in vmachines if vm.vpool_guid is not None]
-        storagedrivers_left = False
-        vpool = storagedriver.vpool
+        if offline_storage_router_guids is None:
+            offline_storage_router_guids = []
 
-        # Validate node connectivity
-        try:
-            for current_storagerouter in [sd.storagerouter for sd in vpool.storagedrivers]:
-                if allow_offline is True and current_storagerouter.ip == ip:
-                    continue
-                client = SSHClient(current_storagerouter, username='root')
-                configuration_dir = client.config_read('ovs.core.cfgdir')
-                with Remote(client.ip, [LocalStorageRouterClient]) as remote:
+        client = None
+        storage_drivers_left = False
+        storage_driver_to_remove = StorageDriver(storagedriver_guid)
+
+        vpool = storage_driver_to_remove.vpool
+        storage_router = storage_driver_to_remove.storagerouter
+        storage_router_online = True
+        storage_routers_offline = [StorageRouter(storage_router_guid) for storage_router_guid in offline_storage_router_guids]
+
+        # 1. Validations
+        for sr in [sd.storagerouter for sd in vpool.storagedrivers]:
+            if sr in storage_routers_offline:
+                logger.info('Storage Router {0} with IP {1} was skipped from volumedriver responsiveness check'.format(sr.name, sr.ip))
+                continue
+            logger.info('Verifying Storage Router {0} with IP is responsive'.format(sr.name, sr.ip))
+            if sr != storage_router:
+                storage_drivers_left = True
+            try:
+                temp_client = SSHClient(sr, username='root')
+                configuration_dir = temp_client.config_read('ovs.core.cfgdir')
+                with Remote(temp_client.ip, [LocalStorageRouterClient]) as remote:
                     lsrc = remote.LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
-                    lsrc.server_revision()
-        except UnableToConnectException:
-            raise RuntimeError('Not all StorageRouters are reachable')
-        except Exception, ex:
-            if 'ClusterNotReachableException' in str(ex):
-                raise RuntimeError('Not all StorageDrivers are reachable, please (re)start them and try again')
-            else:
-                raise
+                    lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
+                client = temp_client
+            except UnableToConnectException:
+                if sr == storage_router:
+                    logger.info('Current Storage Driver to be removed from vPool is offline')
+                    storage_router_online = False
+                else:
+                    raise RuntimeError('Not all StorageRouters are reachable')
+            except Exception, ex:
+                if 'ClusterNotReachableException' in str(ex):
+                    raise RuntimeError('Not all StorageDrivers are reachable, please (re)start them and try again')
+                else:
+                    raise
 
-        # Some more checking
-        for current_storagedriver in vpool.storagedrivers:
-            if current_storagedriver.guid != storagedriver_guid:
-                storagedrivers_left = True
-        if storagedrivers_left is False and pmachine.guid in pmachine_guids and vpool.guid in vpool_guids:
+        if client is None:
+            raise RuntimeError('Could not found any responsive node in the cluster')
+
+        vpool_guids = set()
+        pmachine_guids = set()
+        for virtual_machine in VMachineList.get_customer_vmachines():
+            if virtual_machine.vpool_guid is not None:
+                vpool_guids.add(virtual_machine.vpool_guid)
+            pmachine_guids.add(virtual_machine.pmachine_guid)
+
+        if storage_drivers_left is False and storage_router.pmachine.guid in pmachine_guids and vpool.guid in vpool_guids and storage_router_online is True:
             raise RuntimeError('There are still vMachines served from the given Storage Driver')
-        if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id):
+        if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storage_driver_to_remove.storagedriver_id) and storage_router_online is True:
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
 
-        voldrv_service = 'volumedriver_{0}'.format(vpool.name)
-        dtl_service = 'dtl_{0}'.format(vpool.name)
-        albaproxy_service = 'albaproxy_{0}'.format(vpool.name)
-        removal_mdsservices = [mds_service for mds_service in vpool.mds_services
-                               if mds_service.service.storagerouter_guid == storagerouter.guid]
+        # 2. Unconfigure management center
+        errors_found = False
+        logger.info('Storage Router for current Storage Driver is {0}'.format('OFFLINE' if storage_router_online is True else 'ONLINE'))
+        if storage_router_online is True:
+            logger.info('Checking if management center changes required')
+            try:
+                mgmt_center = Factory.get_mgmtcenter(pmachine=storage_router.pmachine)
+                if mgmt_center and mgmt_center.is_host_configured_for_vpool(vpool.guid, storage_router.pmachine.ip):
+                    logger.info('Unconfiguring vPool for host')
+                    mgmt_center.unconfigure_vpool_for_host(vpool.guid, storage_drivers_left is False, storage_router.pmachine.ip)
+            except Exception as ex:
+                logger.error('Unconfiguring the management center for current host failed with error: {0}'.format(ex))
+                errors_found = True
 
-        # Unconfigure or reconfigure the MDSes
+        # 3. Unconfigure or reconfigure the MDSes
+        logger.info('Reconfiguring MDSes')
         vdisks = []
-        for mds in removal_mdsservices:
+        mds_services_to_remove = [mds_service for mds_service in vpool.mds_services if mds_service.service.storagerouter_guid == storage_router.guid]
+        for mds in mds_services_to_remove:
             for junction in mds.vdisks:
-                vdisks.append(junction.vdisk)
-        for vdisk in vdisks:
-            if vdisk.storagedriver_id:
-                MDSServiceController.ensure_safety(vdisk=vdisk,
-                                                   excluded_storagerouters=[storagerouter])
+                vdisk = junction.vdisk
+                if vdisk in vdisks:
+                    continue
+                vdisks.append(vdisk)
+                if vdisk.storagedriver_id is not None:
+                    try:
+                        MDSServiceController.ensure_safety(vdisk=vdisk,
+                                                           excluded_storagerouters=[storage_router] + storage_routers_offline)
+                    except Exception as ex:
+                        logger.error('MDS safety could not be ensured for virtual disk {0} with guid {1} with error: {2}'.format(vdisk.name, vdisk.guid, ex))
+                        errors_found = True
 
-        voldrv_arakoon_cluster_id = 'voldrv'
-        config = ArakoonClusterConfig(voldrv_arakoon_cluster_id)
-        config.load_config(client)
-        arakoon_node_configs = []
-        for node in config.nodes:
-            arakoon_node_configs.append(ArakoonNodeConfig(node.name, node.ip, node.client_port))
-        vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), voldrv_arakoon_cluster_id, arakoon_node_configs)
+        # 4. Reconfigure volumedriver arakoon cluster
+        try:
+            if storage_drivers_left is True:
+                logger.info('Reconfiguring volumedriver arakoon cluster')
+                config = ArakoonClusterConfig(StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV)
+                config.load_config(client)
+                arakoon_node_configs = []
+                for node in config.nodes:
+                    arakoon_node_configs.append(ArakoonNodeConfig(node.name, node.ip, node.client_port))
 
-        if not offline:
-            client = SSHClient(ip, username='root')
+                node_configs = []
+                for storage_driver in vpool.storagedrivers:
+                    if storage_driver != storage_driver_to_remove:
+                        node_configs.append(ClusterNodeConfig(str(storage_driver.storagedriver_id),
+                                                              str(storage_driver.cluster_ip),
+                                                              storage_driver.ports[0],
+                                                              storage_driver.ports[1],
+                                                              storage_driver.ports[2]))
+                vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV, arakoon_node_configs)
+                # noinspection PyArgumentList
+                vrouter_clusterregistry.erase_node_configs()
+                vrouter_clusterregistry.set_node_configs(node_configs)
+                srclient = StorageDriverClient.load(vpool)
+                for storage_driver in vpool.storagedrivers:
+                    if storage_driver_to_remove != storage_driver:
+                        srclient.update_cluster_node_configs(str(storage_driver.storagedriver_id))
+        except Exception as ex:
+            logger.error('Reconfiguring volumedriver arakoon cluster failed with error: {0}'.format(ex))
+            errors_found = True
+
+        # 5. Disable and stop DTL, voldrv and albaproxy services
+        if storage_router_online is True:
+            dtl_service = 'dtl_{0}'.format(vpool.name)
+            voldrv_service = 'volumedriver_{0}'.format(vpool.name)
+            albaproxy_service = 'albaproxy_{0}'.format(vpool.name)
+            client = SSHClient(storage_router, username='root')
             configuration_dir = client.config_read('ovs.core.cfgdir')
 
-            if ServiceManager.has_service(voldrv_service, client=client):
-                ServiceManager.disable_service(voldrv_service, client=client)
-                ServiceManager.stop_service(voldrv_service, client=client)
-            if ServiceManager.has_service(dtl_service, client=client):
-                ServiceManager.disable_service(dtl_service, client=client)
-                ServiceManager.stop_service(dtl_service, client=client)
+            for service in [voldrv_service, dtl_service]:
+                try:
+                    if ServiceManager.has_service(service, client=client):
+                        logger.info('Disabling service {0}'.format(service))
+                        ServiceManager.disable_service(service, client=client)
+                        logger.info('Stopping service {0}'.format(service))
+                        ServiceManager.stop_service(service, client=client)
+                        logger.info('Removing service {0}'.format(service))
+                        ServiceManager.remove_service(service, client=client)
+                except Exception as ex:
+                    logger.error('Disabling/stopping service {0} failed with error: {1}'.format(service.name, ex))
+                    errors_found = True
 
-            if not storagedrivers_left:
+            if storage_drivers_left is False:
                 try:
                     if ServiceManager.has_service(albaproxy_service, client=client):
                         ServiceManager.start_service(albaproxy_service, client=client)
                         tries = 10
                         running = False
-                        port = storagedriver.alba_proxy.service.ports[0]
+                        port = storage_driver_to_remove.alba_proxy.service.ports[0]
                         while running is False and tries > 0:
                             logger.debug('Waiting for the Alba proxy to start up again...')
                             tries -= 1
@@ -966,123 +1032,149 @@ class StorageRouterController(object):
                     storagedriver_client = LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
                     # noinspection PyArgumentList
                     storagedriver_client.destroy_filesystem()
-                    # noinspection PyArgumentList
-                    vrouter_clusterregistry.erase_node_configs()
                 except RuntimeError as ex:
                     logger.error('Could not destroy filesystem or erase node configs: {0}'.format(ex))
-                if ServiceManager.has_service(albaproxy_service, client=client):
-                    ServiceManager.stop_service(albaproxy_service, client=client)
-        else:
-            client = None
+                    errors_found = True
+                try:
+                    if ServiceManager.has_service(albaproxy_service, client=client):
+                        ServiceManager.stop_service(albaproxy_service, client=client)
+                        ServiceManager.remove_service(albaproxy_service, client=client)
+                except Exception as ex:
+                    logger.error('Disabling/stopping service {0} failed with error: {1}'.format(albaproxy_service.name, ex))
+                    errors_found = True
 
-        # Unconfigure vpool on management
-        logger.debug('Unconfigure vPool from MgmtCenter')
-        mgmtcenter = Factory.get_mgmtcenter(storagerouter.pmachine)
-        if mgmtcenter:
-            mgmtcenter.unconfigure_vpool_for_host(vpool.guid, not storagedrivers_left, storagerouter.pmachine.ip)
-
-        if not offline:
-            # KVM pool
-            if pmachine.hvtype == 'KVM':
+            # 6. Clean up vPool on KVM host
+            if storage_router.pmachine.hvtype == 'KVM':
+                logger.info('Removing vPool from KVM host')
                 # 'Name                 State      Autostart '
                 # '-------------------------------------------'
                 # ' vpool1               active     yes'
                 # ' vpool2               active     no'
-                vpool_overview = client.run('virsh pool-list --all').splitlines()
+                command = 'virsh pool-list --all'
+                logger.info('  Executing command: {0}'.format(command))
+                vpool_overview = client.run(command).splitlines()
                 vpool_overview.pop(1)  # Pop   ---------------
                 vpool_overview.pop(0)  # Pop   Name   State   Autostart
                 for vpool_info in vpool_overview:
                     vpool_name = vpool_info.split()[0].strip()
                     if vpool.name == vpool_name:
-                        client.run('virsh pool-destroy {0}'.format(vpool.name))
                         try:
-                            client.run('virsh pool-undefine {0}'.format(vpool.name))
+                            command = 'virsh pool-destroy {0}'.format(vpool.name)
+                            logger.info('  Executing command: {0}'.format(command))
+                            client.run(command)
                         except Exception as ex:
-                            logger.info('Got error during pool-undefine: {0}'.format(ex))
+                            logger.error('Failed to destroy vPool on KVM host with error: {0}'.format(ex))
+                            errors_found = True
+                        try:
+                            command = 'virsh pool-undefine {0}'.format(vpool.name)
+                            logger.info('  Executing command: {0}'.format(command))
+                            client.run(command)
+                        except Exception as ex:
+                            logger.error('Got error during pool-undefine: {0}'.format(ex))
+                            errors_found = True
                         break
 
-            # Remove services
-            services_to_remove = [voldrv_service, dtl_service]
-            if storagedriver.alba_proxy is not None:
-                services_to_remove.append(albaproxy_service)
-            for service in services_to_remove:
-                if ServiceManager.has_service(service, client=client):
-                    ServiceManager.remove_service(service, client=client)
-
-        # Reconfigure volumedriver
-        if storagedrivers_left is True:
-            node_configs = []
-            for current_storagedriver in vpool.storagedrivers:
-                if current_storagedriver.guid != storagedriver_guid:
-                    node_configs.append(ClusterNodeConfig(str(current_storagedriver.storagedriver_id),
-                                                          str(current_storagedriver.cluster_ip),
-                                                          current_storagedriver.ports[0],
-                                                          current_storagedriver.ports[1],
-                                                          current_storagedriver.ports[2]))
-            vrouter_clusterregistry.set_node_configs(node_configs)
-            srclient = StorageDriverClient.load(vpool)
-            for current_storagedriver in vpool.storagedrivers:
-                if storagedriver.guid != current_storagedriver.guid:
-                    srclient.update_cluster_node_configs(str(current_storagedriver.storagedriver_id))
-
-        for mds_service in removal_mdsservices:
+        # 7. Removing MDS services
+        logger.info('Removing MDS services')
+        for mds_service in mds_services_to_remove:
             # All MDSServiceVDisk object should have been deleted above
-            MDSServiceController.remove_mds_service(mds_service=mds_service,
-                                                    vpool=vpool,
-                                                    reconfigure=False,
-                                                    allow_offline=offline)
+            try:
+                MDSServiceController.remove_mds_service(mds_service=mds_service,
+                                                        vpool=vpool,
+                                                        reconfigure=False,
+                                                        allow_offline=not storage_router_online)
+            except Exception as ex:
+                logger.error('Failed to remove MDS service from model with error: {0}'.format(ex))
+                errors_found = True
 
-        if not offline:
+        # 8. Clean up directories and files
+        if storage_router_online is True:
             # Cleanup directories/files
-            dirs_to_remove = [storagedriver.mountpoint,
+            logger.info('Deleting vPool related directories and files')
+            configuration_dir = client.config_read('ovs.core.cfgdir')
+            dirs_to_remove = [storage_driver_to_remove.mountpoint,
                               '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool.name)]
             files_to_remove = ['{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name)]
-            for sd_partition in storagedriver.partitions:
+            for sd_partition in storage_driver_to_remove.partitions:
                 dirs_to_remove.append(sd_partition.path)
                 sd_partition.delete()
 
             if vpool.backend_type.code == 'alba':
                 files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.cfg'.format(configuration_dir, vpool.name))
                 files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.json'.format(configuration_dir, vpool.name))
-            if storagerouter.pmachine.hvtype == 'VMWARE' and Configuration.get('ovs.storagedriver.vmware_mode') == 'ganesha':
+            if storage_router.pmachine.hvtype == 'VMWARE' and Configuration.get('ovs.storagedriver.vmware_mode') == 'ganesha':
                 files_to_remove.append('{0}/storagedriver/storagedriver/{1}_ganesha.conf'.format(configuration_dir, vpool.name))
 
             for file_name in files_to_remove:
-                if file_name and client.file_exists(file_name):
-                    client.file_delete(file_name)
-                    logger.info('Removed file {0}'.format(file_name))
+                try:
+                    if file_name and client.file_exists(file_name):
+                        client.file_delete(file_name)
+                        logger.info('Removed file {0} on Storage Router with IP {1}'.format(file_name, client.ip))
+                except Exception as ex:
+                    logger.error('Removing file {0} failed with error: {1}'.format(file_name, ex))
+                    errors_found = True
 
-            mountpoints = client.run('mount -v').strip().splitlines()
-            mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2 and
-                           not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc') and
-                           not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run') and
-                           p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
+            try:
+                mountpoints = client.run('mount -v').strip().splitlines()
+                mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2 and
+                               not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc') and
+                               not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run') and
+                               p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
 
-            for dir_name in dirs_to_remove:
-                if dir_name and client.dir_exists(dir_name) and dir_name not in mountpoints and dir_name != '/':
-                    client.dir_delete(dir_name)
-                    logger.info('Recursively removed {0}'.format(dir_name))
+                for dir_name in dirs_to_remove:
+                    if dir_name and client.dir_exists(dir_name) and dir_name not in mountpoints and dir_name != '/':
+                        client.dir_delete(dir_name)
+                        logger.info('Recursively removed {0} on Storage Router with IP {1}'.format(dir_name, client.ip))
+            except Exception as ex:
+                logger.error('Failed to retrieve mountpoint information or delete directories, error: {0}'.format(ex))
+                errors_found = True
 
-        DiskController.sync_with_reality(storagerouter.guid)
+            logger.info('Synchronizing disks in model with reality')
+            try:
+                DiskController.sync_with_reality(storage_router.guid)
+            except Exception as ex:
+                logger.error('Synchronizing with reality failed with error: {0}'.format(ex))
+                errors_found = True
 
-        # First model cleanup
-        if storagedriver.alba_proxy is not None:
-            service = storagedriver.alba_proxy.service
-            storagedriver.alba_proxy.delete()
+        # 9. Model cleanup
+        logger.info('Cleaning up model')
+        if storage_driver_to_remove.alba_proxy is not None:
+            logger.info('  Removing alba proxy service from model')
+            service = storage_driver_to_remove.alba_proxy.service
+            storage_driver_to_remove.alba_proxy.delete()
             service.delete()
-        storagedriver.delete(abandon=['logs'])  # Detach from the log entries
+        storage_driver_to_remove.delete(abandon=['logs'])  # Detach from the log entries
 
-        if storagedrivers_left is False:
+        if storage_drivers_left is False:
             # Final model cleanup
-            for vdisk in vpool.vdisks:
-                for junction in vdisk.mds_services:
-                    junction.delete()
-                vdisk.delete()
-            vpool.delete()
+            try:
+                logger.info('  Removing virtual disks from model')
+                for vdisk in vpool.vdisks:
+                    for junction in vdisk.mds_services:
+                        junction.delete()
+                    vdisk.delete()
+                logger.info('  Removing vPool from model')
+                vpool.delete()
+            except Exception as ex:
+                logger.error('Cleaning up vdisks from the model failed with error: {0}'.format(ex))
+                errors_found = True
         else:
-            VDiskController.dtl_checkup(vpool_guid=vpool.guid)
+            logger.info('Checking DTL for all virtual disks in vPool {0} with guid {1}'.format(vpool.name, vpool.guid))
+            try:
+                VDiskController.dtl_checkup(vpool_guid=vpool.guid, chain_timeout=600)
+            except Exception as ex:
+                logger.error('DTL checkup failed for vPool {0} with guid {1} with error: {2}'.format(vpool.name, vpool.guid, ex))
+                errors_found = True
 
-        MDSServiceController.mds_checkup()
+        logger.info('Running MDS checkup')
+        try:
+            MDSServiceController.mds_checkup()
+        except Exception as ex:
+            logger.error('MDS checkup failed with error: {0}'.format(ex))
+            errors_found = True
+
+        if errors_found is True:
+            raise RuntimeError('1 or more errors occurred while trying to remove the storage driver. Please check /var/log/ovs/lib.log for more information')
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.update_storagedrivers')

@@ -278,7 +278,7 @@ define([
                     }
                 });
             }
-        }
+        };
         self.deleteMgmtCenter = function(guid) {
             var mgmtCenter;
             $.each(self.mgmtCenters(), function(index, mc) {

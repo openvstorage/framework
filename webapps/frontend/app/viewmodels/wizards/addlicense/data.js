@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /*global define */
-define(['knockout'], function(ko){
+define(['knockout', 'jquery'], function(ko, $){
     "use strict";
     var singleton = function() {
         var data = {

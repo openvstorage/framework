@@ -336,11 +336,9 @@ class VDiskController(object):
         if snapshotid is None:
             snapshotid = str(uuid.uuid4())
         metadata = pickle.dumps(metadata)
-        disk.storagedriver_client.create_snapshot(
-            str(disk.volume_id),
-            snapshot_id=snapshotid,
-            metadata=metadata
-        )
+        disk.storagedriver_client.create_snapshot(str(disk.volume_id),
+                                                  snapshot_id=snapshotid,
+                                                  metadata=metadata)
         disk.invalidate_dynamics(['snapshots'])
         return snapshotid
 
@@ -358,7 +356,7 @@ class VDiskController(object):
         if a clone was created from it.
         """
         disk = VDisk(diskguid)
-        if not snapshotid in [snap['guid'] for snap in disk.snapshots]:
+        if snapshotid not in [snap['guid'] for snap in disk.snapshots]:
             raise RuntimeError('Snapshot {0} does not belong to disk {1}'.format(snapshotid, disk.name))
         clones_of_snapshot = VDiskList.get_by_parentsnapshot(snapshotid)
         if len(clones_of_snapshot) > 0:
@@ -428,13 +426,14 @@ class VDiskController(object):
             # Disk might not be attached to a vmachine, but still be a template
             raise RuntimeError('The given vdisk does not belong to a template')
 
-        for storagedriver in vdisk.vpool.storagedrivers:
-            if storagedriver.storagerouter_guid in pmachine.storagerouters_guids:
-                storagedriver_id = storagedriver.storagedriver_id
+        storagedriver = None
+        for sd in vdisk.vpool.storagedrivers:
+            if sd.storagerouter_guid in pmachine.storagerouters_guids:
+                storagedriver = sd
+                break
 
-        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         if storagedriver is None:
-            raise RuntimeError('Could not find StorageDriver with ID {0}'.format(storagedriver_id))
+            raise RuntimeError('Could not find Storage Driver')
 
         new_vdisk = VDisk()
         new_vdisk.copy(vdisk, include=properties_to_clone)
@@ -450,18 +449,15 @@ class VDiskController(object):
         if mds_service is None:
             raise RuntimeError('Could not find a MDS service')
 
-        logger.info('Create disk from template {0} to new disk {1} to location {2}'.format(
-            vdisk.name, new_vdisk.name, disk_path
-        ))
+        logger.info('Create disk from template {0} to new disk {1} to location {2}'.format(vdisk.name, new_vdisk.name, disk_path))
 
         try:
-            volume_id = vdisk.storagedriver_client.create_clone_from_template(
-                target_path=disk_path,
-                metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
-                                                                                port=mds_service.service.ports[0])]),
-                parent_volume_id=str(vdisk.volume_id),
-                node_id=str(storagedriver_id)
-            )
+            backend_config = MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
+                                           port=mds_service.service.ports[0])
+            volume_id = vdisk.storagedriver_client.create_clone_from_template(target_path=disk_path,
+                                                                              metadata_backend_config=MDSMetaDataBackendConfig([backend_config]),
+                                                                              parent_volume_id=str(vdisk.volume_id),
+                                                                              node_id=str(storagedriver.id))
             new_vdisk.volume_id = volume_id
             new_vdisk.save()
             MDSServiceController.ensure_safety(new_vdisk)
@@ -496,7 +492,7 @@ class VDiskController(object):
         VDiskController.create_volume(location, size)
 
         backoff = 1
-        timeout = 30 #  seconds
+        timeout = 30  # seconds
         start = time.time()
         while time.time() < start + timeout:
             vdisk = VDiskList.get_by_devicename_and_vpool(disk_path, storagedriver.vpool)
@@ -507,7 +503,6 @@ class VDiskController(object):
             else:
                 return vdisk.guid
         raise RuntimeError('Disk {0} was not created in {1} seconds.'.format(diskname, timeout))
-
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_volume')

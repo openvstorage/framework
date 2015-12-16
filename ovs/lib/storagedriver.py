@@ -264,7 +264,7 @@ class StorageDriverController(object):
                         storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
                                                                               dls_arakoon_cluster_id='voldrv',
                                                                               dls_arakoon_cluster_nodes=arakoon_nodes)
-                        storagedriver_config.save()
+                        storagedriver_config.save(reload_config=True)
 
     @staticmethod
     def add_storagedriverpartition(storagedriver, partition_info):

@@ -94,6 +94,7 @@ class ArakoonClusterConfig(object):
         """
         Reads a configuration from reality
         """
+        self.nodes = []
         contents = client.file_read(self.filename)
         parser = RawConfigParser()
         parser.readfp(StringIO(contents))

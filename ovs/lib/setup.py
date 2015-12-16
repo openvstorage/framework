@@ -500,62 +500,139 @@ class SetupController(object):
             sys.exit(1)
 
     @staticmethod
-    def remove_node(node_ip):
+    def remove_nodes(node_ips):
+        """
+        Remove the nodes with specified IPs from the cluster
+        :param node_ips: IPs of nodes to remove
+        :type node_ips: str
+        :return: None
+        """
+        from ovs.lib.storagedriver import StorageDriverController
         from ovs.lib.storagerouter import StorageRouterController
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
-        node_ips = list(node.ip for node in StorageRouterList.get_storagerouters())
-        if node_ip not in node_ips:
-            raise RuntimeError('The node({0}) is not in the cluster.'.format(node_ip))
-        
-        # check node state is offline or not
+        SetupController._log_message('+++ Remove nodes started +++')
+
+        ###############
+        # VALIDATIONS #
+        ###############
+        if not isinstance(node_ips, str):
+            raise ValueError('Node IPs must be a comma separated string of IPs or a single IP')
+
+        storage_router_ips_to_remove = set()
+        node_ips = node_ips.rstrip(',')
+        for storage_router_ip in node_ips.split(','):
+            storage_router_ip = storage_router_ip.strip()
+            if not re.match(SSHClient.IP_REGEX, storage_router_ip.strip()):
+                raise ValueError('Invalid IP {0} specified'.format(storage_router_ip))
+            storage_router_ips_to_remove.add(storage_router_ip)
+        storage_routers_to_remove = [StorageRouterList.get_by_ip(storage_router_ip) for storage_router_ip in storage_router_ips_to_remove]
+
+        SetupController._log_message('Following nodes with IPs will be removed from the cluster: {0}'.format(list(storage_router_ips_to_remove)))
+        storage_router_all = StorageRouterList.get_storagerouters()
+        storage_router_masters = StorageRouterList.get_masters()
+        storage_router_all_ips = set([storage_router.ip for storage_router in storage_router_all])
+        storage_router_master_ips = set([storage_router.ip for storage_router in storage_router_masters])
+        unknown_ips = storage_router_ips_to_remove.difference(storage_router_all_ips)
+        if unknown_ips:
+            raise ValueError('Unknown IPs specified\nKnown in model:\n - {0}\nSpecified for removal:\n - {1}'.format('\n - '.join(storage_router_all_ips),
+                                                                                                                     '\n - '.join(unknown_ips)))
+
+        if len(storage_router_ips_to_remove) == len(storage_router_all_ips):
+            raise ValueError("Removing all nodes wouldn't be very smart now, would it?")
+
+        if not storage_router_master_ips.difference(storage_router_ips_to_remove):
+            raise ValueError("Removing all master nodes wouldn't be very smart now, would it?")
+
+        # SetupController._log_message('Verifying nodes are offline')
+        # error_messages = []
+        # for storage_router_ip in storage_router_ips_to_remove:
+        #     try:
+        #         client = SSHClient(storage_router_ip, username='root')
+        #         if client.run('pwd'):  # Creating SSHClient object does not actually connect to the node, client.run actually connects
+        #             error_messages.append(' - Node with IP {0:<15} is ONLINE'.format(storage_router_ip))
+        #     except UnableToConnectException:
+        #         SetupController._log_message('  Node with IP {0:<15} is OFFLINE'.format(storage_router_ip))
+        #     except Exception:
+        #         raise
+        # if len(error_messages) > 0:
+        #     raise RuntimeError('Some nodes are still reachable:\n{0}'.format('\n'.join(error_messages)))
+
+        SetupController._log_message('Creating SSH connections to remaining master nodes')
+        master_ip = None
+        ip_client_map = {}
+        for storage_router in storage_router_masters:
+            try:
+                client = SSHClient(storage_router, username='root')
+                if client.run('pwd'):
+                    SetupController._log_message('  Master node with IP {0:<15} successfully connected'.format(storage_router.ip))
+                    ip_client_map[storage_router.ip] = SSHClient(storage_router.ip, username='root')
+                    if storage_router not in storage_routers_to_remove:
+                        master_ip = storage_router.ip
+            except UnableToConnectException:
+                if storage_router.ip in storage_router_ips_to_remove:
+                    continue
+                raise RuntimeError('Cannot remove nodes while other nodes are offline in the cluster. Include them to remove too or revive them first')
+
+        if len(ip_client_map) == 0 or master_ip is None:
+            raise RuntimeError('Could not connect to any master node in the cluster')
+
+        ###########
+        # REMOVAL #
+        ###########
         try:
-            client = SSHClient(node_ip, username='root')
-            if client:
-                raise RuntimeError('The node({0}) is not offline.'.format(node_ip))
-        except UnableToConnectException:
-            pass
-        except Exception:
-            raise
+            SetupController._log_message('Starting removal of nodes')
+            for storage_router in storage_routers_to_remove:
+                logger.info('  Marking all Storage Drivers served by Storage Router {0} as offline'.format(storage_router.ip))
+                StorageDriverController.move_away(storagerouter_guid=storage_router.guid)
+            for storage_router in storage_routers_to_remove:
+                # 2. Remove vPools
+                SetupController._log_message('  Cleaning up node with IP {0}'.format(storage_router.ip))
+                offline_storage_router_guids = [sr.guid for sr in storage_routers_to_remove]
+                offline_storage_router_guids.remove(storage_router.guid)
+                for storage_driver in storage_router.storagedrivers:
+                    SetupController._log_message('    Removing vPool {0} from node'.format(storage_driver.vpool.name))
+                    StorageRouterController.remove_storagedriver(storagedriver_guid=storage_driver.guid,
+                                                                 offline_storage_router_guids=offline_storage_router_guids)
 
-        print '\n+++ Remove node {0} starts +++\n'.format(node_ip)
-        # Collecting available master nodes
-        masters = StorageRouterList.get_masters()
-        ip_client_map = dict((master.ip, SSHClient(master.ip, username='root')) for master in masters if master.ip != node_ip)
-        if len(ip_client_map) == 0:
-            raise RuntimeError('There is only one node({0}) left in the cluster.'.format(node_ip))
-        # Grab one master node ip
-        master_ip = ip_client_map.keys()[0]
+                # 3. Demote if MASTER
+                if storage_router.node_type == 'MASTER':
+                    SetupController._log_message('    Demoting node')
+                    SetupController._demote_node(cluster_ip=storage_router.ip,
+                                                 master_ip=master_ip,
+                                                 cluster_name=None,
+                                                 ip_client_map=ip_client_map,
+                                                 unique_id=storage_router.machine_id,
+                                                 configure_memcached=True,
+                                                 configure_rabbitmq=True,
+                                                 offline=storage_router.ip not in ip_client_map)
 
-        # Remove all vpools from the node
-        storagerouter = StorageRouterList.get_by_ip(node_ip)
-        for storagedriver in storagerouter.storagedrivers:
-            logger.info('Removing storagedriver {0} from node {1}'.format(storagedriver.guid, node_ip))
-            StorageRouterController.remove_storagedriver(storagedriver.guid, offline=True)
+                # 4. Clean up model
+                SetupController._log_message('    Removing node from model')
+                for disk in storage_router.disks:
+                    for partition in disk.partitions:
+                        partition.delete()
+                    disk.delete()
 
-        # Demote the node if it's Master
-        if storagerouter.node_type == 'MASTER':
-            cluster_name = None
-            SetupController._demote_node(cluster_ip=node_ip,
-                                             master_ip=master_ip,
-                                             cluster_name=cluster_name,
-                                             ip_client_map=ip_client_map,
-                                             unique_id=storagerouter.machine_id, offline=True)
+                # @TODO: When / where should NSM services be cleaned up
 
-        # Cleaned up physical disks of a storagerouter
-        for disk in storagerouter.disks:
-            for partition in disk.partitions:
-                partition.delete()
-            disk.delete()
-
-        # Delete storagerouter and pmachine
-        pmachine=storagerouter.pmachine
-        storagerouter.delete()
-
-        #for vmachine in pmachine.vmachines:
-        #    vmachine.delete()
-        pmachine.delete()
-        print '\n+++ Remove node {0} completes +++\n'.format(node_ip)
+                physical_machine = storage_router.pmachine
+                storage_router.delete()
+                physical_machine.delete()
+                SetupController._log_message('    Successfully removed node')
+        except Exception as exception:
+            print ''  # Spacing
+            print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
+            logger.exception('Unexpected error')
+            logger.error(str(exception))
+            sys.exit(1)
+        except KeyboardInterrupt:
+            print ''
+            print ''
+            print Interactive.boxed_message(['This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.'])
+            logger.error('Keyboard interrupt')
+            sys.exit(1)
+        SetupController._log_message('+++ Remove nodes finished +++')
 
     @staticmethod
     def _prepare_node(cluster_ip, nodes, known_passwords, ip_client_map, hypervisor_info):
@@ -889,8 +966,7 @@ class SetupController(object):
         logger.info('Extra node complete')
 
     @staticmethod
-    def _promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached,
-                      configure_rabbitmq):
+    def _promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached, configure_rabbitmq):
         """
         Promotes a given node
         """
@@ -1011,8 +1087,7 @@ class SetupController(object):
         logger.info('Promote complete')
 
     @staticmethod
-    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached,
-                     configure_rabbitmq, offline=False):
+    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached, configure_rabbitmq, offline=False):
         """
         Demotes a given node
         """
@@ -1021,19 +1096,9 @@ class SetupController(object):
         print '\n+++ Demoting node +++\n'
         logger.info('Demoting node')
 
-        if configure_memcached:
+        if configure_memcached is True and offline is False:
             if SetupController._validate_local_memcache_servers(ip_client_map) is False:
                 raise RuntimeError('Not all memcache nodes can be reached which is required for demoting a node.')
-
-        if not offline:
-            target_client = ip_client_map[cluster_ip]
-            node_name = target_client.run('hostname')
-
-            storagerouter = StorageRouterList.get_by_machine_id(unique_id)
-            storagerouter.node_type = 'EXTRA'
-            storagerouter.save()
-        else:
-            target_client = None
 
         # Find other (arakoon) master nodes
         config = ArakoonClusterConfig('ovsdb')
@@ -1044,6 +1109,10 @@ class SetupController(object):
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
+        storagerouter = StorageRouterList.get_by_machine_id(unique_id)
+        storagerouter.node_type = 'EXTRA'
+        storagerouter.save()
+
         print 'Leaving arakoon cluster'
         logger.info('Leaving arakoon cluster')
         ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'ovsdb')
@@ -1052,9 +1121,9 @@ class SetupController(object):
         logger.info('Distribute configuration files')
         master_client = ip_client_map[master_ip]
         config_types = []
-        if configure_memcached:
+        if configure_memcached is True:
             config_types.append('memcached')
-        if configure_rabbitmq:
+        if configure_rabbitmq is True:
             config_types.append('rabbitmq')
         for config_type in config_types:
             config_file, port = SetupController.generic_configfiles[config_type]
@@ -1083,8 +1152,9 @@ class SetupController(object):
         master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
         slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
 
-        if not offline:
-            if configure_rabbitmq:
+        if offline is False:
+            target_client = ip_client_map[cluster_ip]
+            if configure_rabbitmq is True:
                 print 'Removing/unconfiguring RabbitMQ'
                 logger.debug('Removing/unconfiguring RabbitMQ')
                 if ServiceManager.has_service('rabbitmq-server', client=target_client):
@@ -1097,9 +1167,9 @@ class SetupController(object):
             print 'Removing services'
             logger.info('Removing services')
             services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + ['arakoon-ovsdb'])]
-            if not configure_rabbitmq:
+            if configure_rabbitmq is False:
                 services.remove('rabbitmq-server')
-            if not configure_memcached:
+            if configure_memcached is False:
                 services.remove('memcached')
             for service in services:
                 if ServiceManager.has_service(service, client=target_client):
@@ -1123,7 +1193,9 @@ class SetupController(object):
             print 'Restarting services'
             SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
-        if not offline:
+        if offline is False:
+            target_client = ip_client_map[cluster_ip]
+            node_name = target_client.run('hostname')
             if SetupController._avahi_installed(target_client) is True:
                 SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
             target_client.config_set('ovs.core.nodetype', 'EXTRA')

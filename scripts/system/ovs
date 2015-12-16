@@ -4,23 +4,36 @@ export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps:/op
 export DISPLAY=:0
 
 function show_help {
-    echo "Open vStorage CLI launcer"
-    echo "-------------------------"
+    echo "Open vStorage CLI launcher"
+    echo "--------------------------"
     echo "Usage:"
-    ec  ho "* ovs                       Launch Open vStorage shell (ipython)"
-    echo "* ovs setup                 Launch Open vStorage setup"
-    echo "                              Autodetect required node role (master/extra)"
-    echo "* ovs setup master          Launch Open vStorage setup"
-    echo "                              Install master node"
-    echo "* ovs setup promote         Promote this node (extra -> master)"
-    echo "* ovs setup demote          Demote this node (master -> extra)"
-    echo "* ovs monitor services      Watch Open vStorage services"
-    echo "* ovs monitor heartbeat     Send an internal heartbeat"
-    echo "* ovs stop services         Try to stop all Open vStorage services"
-    echo "* ovs start services        Try to start all Open vStorage servces"
-    echo "* ovs collect logs          Collect all Open vStorage logs to a tarball"
-    echo "                              For support purposes"
-    echo "* ovs unittest <filepath>   Run the unittests in <filepath>"
+    echo "  * Miscellaneous options:"
+    echo "    - ovs                       Launch Open vStorage shell (ipython)"
+    echo "    - ovs help                  Show this help section"
+    echo "    - ovs collect logs          Collect all Open vStorage logs to a tarball (for support purposes)"
+    echo "    - ovs unittest <filepath>   Run the unittests in <filepath>"
+    echo ""
+    echo "  * Setup options:"
+    echo "    - ovs setup                 Launch Open vStorage setup and autodetect required node role (master/extra)"
+    echo "    - ovs setup master          Launch Open vStorage setup and install master node"
+    echo "    - ovs setup extra           Launch Open vStorage setup and install extra node"
+    echo "    - ovs setup promote         Promote this node (extra -> master)"
+    echo "    - ovs setup demote          Demote this node (master -> extra)"
+    echo ""
+    echo "  * Update options:"
+    echo "    - ovs update framework      Update framework components on all nodes in cluster"
+    echo "    - ovs update volumedriver   Update volumedriver components on all nodes in cluster"
+    echo ""
+    echo "  * Remove options:"
+    echo "    - ovs remove nodes <ips>    Remove nodes from cluster (comma separated list of IPs)"
+    echo ""
+    echo "  * Monitor options:"
+    echo "    - ovs monitor services      Watch Open vStorage services"
+    echo "    - ovs monitor heartbeat     Send an internal heartbeat"
+    echo ""
+    echo "  * Services options:"
+    echo "    - ovs stop services         Try to stop all Open vStorage services"
+    echo "    - ovs start services        Try to start all Open vStorage services"
 }
 
 if [ "$1" = "help" ] ; then
@@ -48,17 +61,17 @@ elif [ "$1" = "update" ] ; then
         rm /tmp/update
     fi
 elif [ "$1" = "remove" ] ; then
-    if [ "$2" = "node" ] ; then
-        python -c "from ovs.lib.setup import SetupController; SetupController.remove_node('$3')"
+    if [ "$2" = "nodes" ] ; then
+        python -c "from ovs.lib.setup import SetupController; SetupController.remove_nodes('$3')"
     fi
 elif [ "$1" = "monitor" ] ; then
     if [ "$2" = "services" ] ; then
         service_manager=`cat /proc/1/comm`
         if test "$service_manager" = "systemd"
         then
-          watch -n 1 'echo "OVS running processes:";echo; systemctl -l | grep ovs- | grep "loaded active" | sort; echo; echo "OVS non-running processes:"; systemctl -a | grep ovs- | grep "loaded inactive" | sort; echo; echo "OVS disabled services:"; systemctl list-unit-files | grep ovs- | grep disabled | sort'
+            watch -n 1 'echo "OVS running processes:";echo; systemctl -l | grep ovs- | grep "loaded active" | sort; echo; echo "OVS non-running processes:"; systemctl -a | grep ovs- | grep "loaded inactive" | sort; echo; echo "OVS disabled services:"; systemctl list-unit-files | grep ovs- | grep disabled | sort'
         else
-          watch -n 1 'echo "\nOVS running processes:\n";initctl list | grep ovs | grep start/running | sort;echo "\nOVS non-running processes:\n";initctl list | grep ovs | grep -v start/running | sort'
+            watch -n 1 'echo "\nOVS running processes:\n";initctl list | grep ovs | grep start/running | sort;echo "\nOVS non-running processes:\n";initctl list | grep ovs | grep -v start/running | sort'
         fi
     elif [ "$2" = "heartbeat" ] ; then
         python /opt/OpenvStorage/ovs/extensions/generic/heartbeat.py
@@ -71,7 +84,7 @@ elif [ "$1" = "stop" ] ; then
             do
             SERVICE=${SERVICE%.*}
             echo "Stopping: $SERVICE"
-            stop $SERVICE
+            stop ${SERVICE}
             done
     else
         show_help
@@ -82,7 +95,7 @@ elif [ "$1" = "start" ] ; then
             do
             SERVICE=${SERVICE%.*}
             echo "Starting: $SERVICE"
-            start $SERVICE
+            start ${SERVICE}
             done
     else
         show_help
@@ -90,19 +103,19 @@ elif [ "$1" = "start" ] ; then
 elif [ "$1" = "collect" ] ; then
     if [ "$2" = "logs" ] ; then
         LOGFILE=/tmp/ovs-`hostname`-`date "+%Y%m%d%H%M%S"`-logs.tar
-        rm -f $LOGFILE
-        rm -f $LOGFILE.gz
-        touch $LOGFILE
-        tar uvf $LOGFILE /var/log/arakoon* > /dev/null 2>&1
-        tar uvf $LOGFILE /var/log/logstash* > /dev/null 2>&1
-        tar uvf $LOGFILE /var/log/nginx* > /dev/null 2>&1
-        tar uvf $LOGFILE /var/log/ovs* > /dev/null 2>&1
-        tar uvf $LOGFILE /var/log/rabbitmq* > /dev/null 2>&1
-        tar uvf $LOGFILE /var/log/upstart* > /dev/null 2>&1
-        tar uvf $LOGFILE /var/log/*log > /dev/null 2>&1
-        tar uvf $LOGFILE /var/log/dmesg* > /dev/null 2>&1
-        gzip $LOGFILE > /dev/null
-        echo $LOGFILE.gz
+        rm -f ${LOGFILE}
+        rm -f ${LOGFILE}.gz
+        touch ${LOGFILE}
+        tar uvf ${LOGFILE} /var/log/arakoon* > /dev/null 2>&1
+        tar uvf ${LOGFILE} /var/log/logstash* > /dev/null 2>&1
+        tar uvf ${LOGFILE} /var/log/nginx* > /dev/null 2>&1
+        tar uvf ${LOGFILE} /var/log/ovs* > /dev/null 2>&1
+        tar uvf ${LOGFILE} /var/log/rabbitmq* > /dev/null 2>&1
+        tar uvf ${LOGFILE} /var/log/upstart* > /dev/null 2>&1
+        tar uvf ${LOGFILE} /var/log/*log > /dev/null 2>&1
+        tar uvf ${LOGFILE} /var/log/dmesg* > /dev/null 2>&1
+        gzip ${LOGFILE} > /dev/null
+        echo ${LOGFILE}.gz
     else
         show_help
     fi
