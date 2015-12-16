@@ -336,6 +336,19 @@ class ArakoonInstaller(object):
         logger.debug('Shrinking cluster {0} from {1} completed'.format(cluster_name, deleted_node_ip))
 
     @staticmethod
+    def deploy_cluster(cluster_name, node_ip):
+        """
+        (Re)deploys a given cluster
+        :param cluster_name: Name of the cluster to (re)deploy
+        :param node_ip: IP address of one of the cluster's nodes
+        """
+        logger.debug('(Re)deploying cluster {0} from {1}'.format(cluster_name, node_ip))
+        client = SSHClient(node_ip)
+        config = ArakoonClusterConfig(cluster_name)
+        config.load_config(client)
+        ArakoonInstaller._deploy(config)
+
+    @staticmethod
     def _get_free_ports(client):
         node_name = System.get_my_machine_id(client)
         clusters = []
@@ -400,10 +413,11 @@ class ArakoonInstaller(object):
             # Creates services for/on all nodes in the config
             base_name = 'ovs-arakoon'
             target_name = 'ovs-arakoon-{0}'.format(config.cluster_id)
-            ServiceManager.prepare_template(base_name, target_name, ovs_client)
-            ServiceManager.add_service(target_name, root_client, params={'CLUSTER': config.cluster_id,
-                                                                         'NODE_ID': node.name,
-                                                                         'CONFIG_FILE': config.filename})
+            ServiceManager.add_service(base_name, root_client,
+                                       params={'CLUSTER': config.cluster_id,
+                                               'NODE_ID': node.name,
+                                               'CONFIG_FILE': config.filename},
+                                       target_name=target_name)
             logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
 
     @staticmethod

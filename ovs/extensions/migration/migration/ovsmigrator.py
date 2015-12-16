@@ -62,4 +62,21 @@ class OVSMigrator(object):
 
             working_version = 2
 
+        # Version 3 introduced:
+        # - New arakoon clients
+        if working_version < 3:
+            from ovs.extensions.db.arakoon import ArakoonInstaller
+            reload(ArakoonInstaller)
+            from ovs.extensions.db.arakoon import ArakoonInstaller
+            from ovs.extensions.generic.sshclient import SSHClient
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
+            master = StorageRouterList.get_masters()[0]
+            client = SSHClient(master)
+            if client.dir_exists(ArakoonInstaller.ArakoonInstaller.ARAKOON_CONFIG_DIR):
+                for cluster_name in client.dir_list(ArakoonInstaller.ArakoonInstaller.ARAKOON_CONFIG_DIR):
+                    try:
+                        ArakoonInstaller.ArakoonInstaller.deploy_cluster(cluster_name, master.ip)
+                    except:
+                        pass
+
         return working_version
