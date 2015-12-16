@@ -59,6 +59,7 @@ class LogHandler(object):
     """
 
     cache = {}
+    propagate_cache = {}
     targets = {'lib': 'lib',
                'api': 'api',
                'extensions': 'extensions',
@@ -90,6 +91,7 @@ class LogHandler(object):
         self.logger.propagate = propagate
         self.logger.setLevel(getattr(logging, Configuration.get('ovs.logging.level')))
         self.logger.addHandler(handler)
+        self._key = '{0}_{1}'.format(source, name)
 
     @staticmethod
     def load_path(source):
@@ -108,11 +110,23 @@ class LogHandler(object):
         if key not in LogHandler.cache:
             logger = LogHandler(source, name, propagate)
             LogHandler.cache[key] = logger
+        if key not in LogHandler.propagate_cache:
+            LogHandler.propagate_cache[key] = propagate
         return LogHandler.cache[key]
+
+    def _fix_propagate(self):
+        """
+        Obey propagate flag as initially called
+        - celery will overwrite it to catch the logging
+        """
+        propagate = LogHandler.propagate_cache.get(self._key, None)
+        if propagate is not None:
+            self.logger.propagate = propagate
 
     @_ignore_formatting_errors()
     def info(self, msg, *args, **kwargs):
         """ Info """
+        self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
@@ -121,6 +135,7 @@ class LogHandler(object):
     @_ignore_formatting_errors()
     def error(self, msg, *args, **kwargs):
         """ Error """
+        self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
@@ -129,6 +144,7 @@ class LogHandler(object):
     @_ignore_formatting_errors()
     def debug(self, msg, *args, **kwargs):
         """ Debug """
+        self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
@@ -137,6 +153,7 @@ class LogHandler(object):
     @_ignore_formatting_errors()
     def warning(self, msg, *args, **kwargs):
         """ Warning """
+        self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
@@ -145,6 +162,7 @@ class LogHandler(object):
     @_ignore_formatting_errors()
     def log(self, msg, *args, **kwargs):
         """ Log """
+        self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
@@ -153,6 +171,7 @@ class LogHandler(object):
     @_ignore_formatting_errors()
     def critical(self, msg, *args, **kwargs):
         """ Critical """
+        self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
@@ -161,6 +180,7 @@ class LogHandler(object):
     @_ignore_formatting_errors()
     def exception(self, msg, *args, **kwargs):
         """ Exception """
+        self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
