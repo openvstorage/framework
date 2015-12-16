@@ -544,20 +544,6 @@ class SetupController(object):
         if not storage_router_master_ips.difference(storage_router_ips_to_remove):
             raise ValueError("Removing all master nodes wouldn't be very smart now, would it?")
 
-        # SetupController._log_message('Verifying nodes are offline')
-        # error_messages = []
-        # for storage_router_ip in storage_router_ips_to_remove:
-        #     try:
-        #         client = SSHClient(storage_router_ip, username='root')
-        #         if client.run('pwd'):  # Creating SSHClient object does not actually connect to the node, client.run actually connects
-        #             error_messages.append(' - Node with IP {0:<15} is ONLINE'.format(storage_router_ip))
-        #     except UnableToConnectException:
-        #         SetupController._log_message('  Node with IP {0:<15} is OFFLINE'.format(storage_router_ip))
-        #     except Exception:
-        #         raise
-        # if len(error_messages) > 0:
-        #     raise RuntimeError('Some nodes are still reachable:\n{0}'.format('\n'.join(error_messages)))
-
         SetupController._log_message('Creating SSH connections to remaining master nodes')
         master_ip = None
         ip_client_map = {}
