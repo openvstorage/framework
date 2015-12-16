@@ -93,7 +93,7 @@ class ArakoonClusterConfig(object):
     def load_config(self, client):
         """
         Reads a configuration from reality
-        :param client: client with which the config should be loaded
+        :param client: Client which will load the configuration
         """
         contents = client.file_read(self.filename)
         parser = RawConfigParser()
@@ -134,7 +134,7 @@ class ArakoonClusterConfig(object):
     def write_config(self, client):
         """
         Writes the configuration down to in the format expected by Arakoon
-        :param client: client with which the config should be written
+        :param client: Client with which the config should be written
         """
         (temp_handle, temp_filename) = tempfile.mkstemp()
         contents = RawConfigParser()
@@ -152,7 +152,7 @@ class ArakoonClusterConfig(object):
     def delete_config(self, client):
         """
         Deletes a configuration file
-        :param client: client to use for deleting the configuration file
+        :param client: Client to use for deleting the configuration file
         """
         client.dir_delete(self._dir)
 
@@ -201,11 +201,11 @@ class ArakoonInstaller(object):
     def create_cluster(cluster_name, ip, base_dir, plugins=None, locked=True):
         """
         Creates a cluster
-        :param locked: indicates whether the create should run in a locked context (e.g. to prevent port conflicts)
-        :param plugins: plugins that should be added to the configuration file
-        :param base_dir: base directory that should contain the data and tlogs
-        :param ip: ip address of the first node of the new cluster
-        :param cluster_name: name of the cluster
+        :param locked: Indicates whether the create should run in a locked context (e.g. to prevent port conflicts)
+        :param plugins: Plugins that should be added to the configuration file
+        :param base_dir: Base directory that should contain the data and tlogs
+        :param ip: IP address of the first node of the new cluster
+        :param cluster_name: Name of the cluster
         """
         logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
         base_dir = base_dir.rstrip('/')
@@ -251,8 +251,8 @@ class ArakoonInstaller(object):
     def delete_cluster(cluster_name, ip):
         """
         Deletes a complete cluster
-        :param ip: ip address of the last node of a cluster
-        :param cluster_name: name of the cluster to remove
+        :param ip: IP address of the last node of a cluster
+        :param cluster_name: Name of the cluster to remove
         """
         logger.debug('Deleting cluster {0} on {1}'.format(cluster_name, ip))
         config = ArakoonClusterConfig(cluster_name)
@@ -267,10 +267,10 @@ class ArakoonInstaller(object):
     def extend_cluster(master_ip, new_ip, cluster_name, base_dir):
         """
         Extends a cluster to a given new node
-        :param base_dir: base directory that will hold the db and tlogs
-        :param cluster_name: name of the cluster to be extended
-        :param new_ip: ip address of the node to be added
-        :param master_ip: ip of one of the already existing nodes
+        :param base_dir: Base directory that will hold the db and tlogs
+        :param cluster_name: Name of the cluster to be extended
+        :param new_ip: IP address of the node to be added
+        :param master_ip: IP of one of the already existing nodes
         """
         logger.debug('Extending cluster {0} from {1} to {2}'.format(cluster_name, master_ip, new_ip))
         base_dir = base_dir.rstrip('/')
@@ -318,9 +318,9 @@ class ArakoonInstaller(object):
     def shrink_cluster(remaining_node_ip, deleted_node_ip, cluster_name):
         """
         Removes a node from a cluster, the old node will become a slave
-        :param cluster_name: the name of the cluster to shrink
-        :param deleted_node_ip: the ip of the node that should be deleted
-        :param remaining_node_ip: the ip of a remaining node
+        :param cluster_name: The name of the cluster to shrink
+        :param deleted_node_ip: The ip of the node that should be deleted
+        :param remaining_node_ip: The ip of a remaining node
         """
         logger.debug('Shrinking cluster {0} from {1}'.format(cluster_name, deleted_node_ip))
         client = SSHClient(remaining_node_ip)
@@ -410,8 +410,8 @@ class ArakoonInstaller(object):
     def start(cluster_name, client):
         """
         Starts an arakoon cluster
-        :param client: client on which to start the service
-        :param cluster_name: the name of the cluster service to start
+        :param client: Client on which to start the service
+        :param cluster_name: The name of the cluster service to start
         """
         if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
                 ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is False:
@@ -421,8 +421,8 @@ class ArakoonInstaller(object):
     def stop(cluster_name, client):
         """
         Stops an arakoon service
-        :param client: client on which to stop the service
-        :param cluster_name: the name of the cluster service to stop
+        :param client: Client on which to stop the service
+        :param cluster_name: The name of the cluster service to stop
         """
         if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
                 ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is True:
@@ -432,8 +432,8 @@ class ArakoonInstaller(object):
     def remove(cluster_name, client):
         """
         Removes an arakoon service
-        :param client: client on which to remove the service
-        :param cluster_name: the name of the cluster service to remove
+        :param client: Client on which to remove the service
+        :param cluster_name: The name of the cluster service to remove
         """
         if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.remove_service('arakoon-{0}'.format(cluster_name), client=client)
@@ -442,9 +442,9 @@ class ArakoonInstaller(object):
     def deploy_to_slave(master_ip, slave_ip, cluster_name):
         """
         Deploys the configuration file to a slave
-        :param cluster_name: name of the cluster of which to deploy the configuration file
-        :param slave_ip: ip of the slave to deploy to
-        :param master_ip: ip of the node to deploy from
+        :param cluster_name: Name of the cluster of which to deploy the configuration file
+        :param slave_ip: IP of the slave to deploy to
+        :param master_ip: IP of the node to deploy from
         """
         client = SSHClient(master_ip)
         config = ArakoonClusterConfig(cluster_name)
@@ -456,9 +456,9 @@ class ArakoonInstaller(object):
     def remove_from_slave(master_ip, slave_ip, cluster_name):
         """
         Removes everything related to a given cluster from the slave
-        :param cluster_name: name of the cluster to remove from the slave
-        :param slave_ip: ip of the slave to remove the config file from
-        :param master_ip: ip of a remaining node in the cluster
+        :param cluster_name: Mame of the cluster to remove from the slave
+        :param slave_ip: IP of the slave to remove the config file from
+        :param master_ip: IP of a remaining node in the cluster
         """
         client = SSHClient(master_ip)
         config = ArakoonClusterConfig(cluster_name)
@@ -470,8 +470,8 @@ class ArakoonInstaller(object):
     def wait_for_cluster(cluster_name, sshclient):
         """
         Waits for an Arakoon cluster to be available (by sending a nop)
-        :param sshclient: client on which to wait for the cluster
-        :param cluster_name: name of the cluster to wait on
+        :param sshclient: Client on which to wait for the cluster
+        :param cluster_name: Name of the cluster to wait on
         """
         logger.debug('Waiting for cluster {0}'.format(cluster_name))
         from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -485,8 +485,8 @@ class ArakoonInstaller(object):
     def restart_cluster(cluster_name, master_ip):
         """
         Execute a restart sequence (Executed after arakoon and/or alba package upgrade)
-        :param master_ip: ip of one of the cluster nodes
-        :param cluster_name: name of the cluster to restart
+        :param master_ip: IP of one of the cluster nodes
+        :param cluster_name: Name of the cluster to restart
         """
         logger.debug('Restart sequence for {0} via {1}'.format(cluster_name, master_ip))
 
@@ -514,9 +514,9 @@ class ArakoonInstaller(object):
     def restart_cluster_add(cluster_name, current_ips, new_ip):
         """
         Execute a (re)start sequence after adding a new node to a cluster.
-        :param new_ip: ip of the newly added node
-        :param current_ips: ips of the previous nodes
-        :param cluster_name: name of the cluster to restart
+        :param new_ip: IP of the newly added node
+        :param current_ips: IPs of the previous nodes
+        :param cluster_name: Name of the cluster to restart
         """
         logger.debug('Restart sequence (add) for {0}'.format(cluster_name))
         logger.debug('Current ips: {0}'.format(', '.join(current_ips)))
@@ -551,8 +551,8 @@ class ArakoonInstaller(object):
     def restart_cluster_remove(cluster_name, remaining_ips):
         """
         Execute a restart sequence after removing a node from a cluster
-        :param remaining_ips: ips of the remaining nodes after shrink
-        :param cluster_name: name of the cluster to restart
+        :param remaining_ips: IPs of the remaining nodes after shrink
+        :param cluster_name: Name of the cluster to restart
         """
         logger.debug('Restart sequence (remove) for {0}'.format(cluster_name))
         logger.debug('Remaining ips: {0}'.format(', '.join(remaining_ips)))
