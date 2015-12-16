@@ -33,7 +33,7 @@ from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.generic.configuration import Configuration
@@ -41,6 +41,7 @@ from ovs.lib.helpers.decorators import log
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.helpers.decorators import ensure_single, add_hooks
 from ovs.log.logHandler import LogHandler
+from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient
 
 logger = LogHandler.get('lib', name='storagedriver')
 
@@ -74,19 +75,33 @@ class StorageDriverController(object):
         :param storagedriver_id: ID of the storagedriver to update its status
         """
         pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
+        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+        storagerouter = storagedriver.storagerouter
         if pmachine.mgmtcenter:
             # Update status
             pmachine.invalidate_dynamics(['host_status'])
             host_status = pmachine.host_status
-            if host_status != 'RUNNING':
-                # Host is stopped
-                storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-                storagedriver_client = StorageDriverClient.load(storagedriver.vpool)
-                storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
         else:
             # No management Center, cannot update status via api
-            # @TODO: should we try manually (ping, ssh)?
-            pass
+            logger.info('Updating status of pmachine {0} using SSHClient'.format(pmachine.name))
+            host_status = 'RUNNING'
+            try:
+                client = SSHClient(storagerouter, username='root')
+                configuration_dir = client.config_read('ovs.core.cfgdir')
+                logger.info('SSHClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
+                with Remote(client.ip, [LocalStorageRouterClient]) as remote:
+                    lsrc = remote.LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir,
+                                                                                                             storagedriver.vpool.name))
+                    lsrc.server_revision()
+                logger.info('LocalStorageRouterClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
+            except Exception as ex:
+                logger.error('Connectivity check failed, assuming host {0} is halted. {1}'.format(pmachine.name, ex))
+                host_status = 'HALTED'
+            if host_status != 'RUNNING':
+                # Host is stopped
+                storagedriver_client = StorageDriverClient.load(storagedriver.vpool)
+                storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
+
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.volumedriver_error')
