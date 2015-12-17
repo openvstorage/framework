@@ -169,4 +169,21 @@ class VDiskViewSet(viewsets.ViewSet):
         return VDiskController.create_snapshot.delay(diskguid=vdisk.guid,
                                                      metadata=metadata,
                                                      snapshotid=snapshot_id)
+
+    @action()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VDisk)
+    def create_from_template(self, vdisk, devicename, pmachineguid, machineguid=None):
+        """
+        Create a new vdisk from a template vDisk
+        :param vdisk: Guid of the template virtual disk
+        :param devicename: Name of the new vdisk
+        :param pmachineguid: Guid of pmachine to create new vdisk on
+        :param machineguid: (optional) Guid of the machine to assign disk to
+        """
+        return VDiskController.create_from_template.delay(diskguid=vdisk.guid,
+                                                          devicename=devicename,
+                                                          pmachineguid=pmachineguid,
+                                                          machineguid=machineguid)
     

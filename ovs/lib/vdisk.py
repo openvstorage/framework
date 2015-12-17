@@ -402,20 +402,22 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_from_template')
-    def create_from_template(diskguid, machinename, devicename, pmachineguid, machineguid=None):
+    def create_from_template(diskguid, devicename, pmachineguid, machinename='', machineguid=None):
         """
         Create a disk from a template
 
         :param diskguid: Guid of the disk
         :param machinename: Name of the machine
         :param devicename: Device file name for the disk (eg: my_disk-flat.vmdk)
-        :param pmachineguid: Guid of the physical machine hosting the template
+        :param pmachineguid: Guid of pmachine to create new vdisk on
         :param machineguid: Guid of the machine to assign disk to
         :return diskguid: Guid of new disk
         """
-
         pmachine = PMachine(pmachineguid)
         hypervisor = Factory.get(pmachine)
+        if machineguid is not None:
+            new_vdisk_vmachine = VMachine(machineguid)
+            machinename = new_vdisk_vmachine.name
         disk_path = hypervisor.get_disk_path(machinename, devicename)
 
         description = '{0} {1}'.format(machinename, devicename)
@@ -427,6 +429,8 @@ class VDiskController(object):
         if vdisk.vmachine and not vdisk.vmachine.is_vtemplate:
             # Disk might not be attached to a vmachine, but still be a template
             raise RuntimeError('The given vdisk does not belong to a template')
+        if not vdisk.is_vtemplate:
+            raise RuntimeError('The given vdisk is not a template')
 
         for storagedriver in vdisk.vpool.storagedrivers:
             if storagedriver.storagerouter_guid in pmachine.storagerouters_guids:
@@ -443,7 +447,7 @@ class VDiskController(object):
         new_vdisk.parent_vdisk = vdisk
         new_vdisk.name = '{0}-clone'.format(vdisk.name)
         new_vdisk.description = description
-        new_vdisk.vmachine = VMachine(machineguid) if machineguid else vdisk.vmachine
+        new_vdisk.vmachine = new_vdisk_vmachine if machineguid else vdisk.vmachine
         new_vdisk.save()
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, new_vdisk.vpool)
