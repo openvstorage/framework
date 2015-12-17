@@ -94,7 +94,10 @@ class OAuth2TokenView(View):
                     access_token, _ = Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)
                 except ValueError as error:
                     return HttpResponseBadRequest, {'error': str(error)}
-                Toolbox.clean_tokens(client)
+                try:
+                    Toolbox.clean_tokens(client)
+                except Exception as error:
+                    logger.error('Error during session cleanup: {0}'.format(error))
                 return HttpResponse, {'access_token': access_token.access_token,
                                       'token_type': 'bearer',
                                       'expires_in': 3600}
