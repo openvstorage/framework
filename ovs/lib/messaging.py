@@ -36,10 +36,10 @@ def synchronized():
             """
             filemutex = FileMutex('messaging')
             try:
-                filemutex.acquire(wait=5)
+                filemutex.acquire(wait=60)
                 mutex = VolatileMutex('messaging')
                 try:
-                    mutex.acquire(wait=5)
+                    mutex.acquire(wait=60)
                     return f(*args, **kw)
                 finally:
                     mutex.release()
