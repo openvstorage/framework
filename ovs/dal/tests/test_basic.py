@@ -1220,7 +1220,7 @@ class Basic(TestCase):
         machine.save()
         guid = machine.guid
 
-        machine = TestMachine(machine.guid, hook=update)
+        machine = TestMachine(machine.guid, _hook=update)
         self.assertEqual(machine.name, 'one', 'The machine\'s name should still be one')
         self.assertFalse(machine._metadata['cache'], 'The machine should be loaded from persistent store')
         machine = TestMachine(machine.guid)
@@ -1245,7 +1245,7 @@ class Basic(TestCase):
         guid = machine.guid
 
         with self.assertRaises(ObjectNotFoundException):
-            _ = TestMachine(guid, hook=delete)
+            _ = TestMachine(guid, _hook=delete)
 
     def test_object_save_reverseindex_build(self):
         """
@@ -1388,6 +1388,31 @@ class Basic(TestCase):
         # Raise error by attempting to pop from empty list
         with self.assertRaises(IndexError):
             datalist2.pop(0)
+
+    def test_error_during_save(self):
+        """
+        Validates whether an error during save doesn't leave the system in an inconsistent state
+        """
+        def raise_error():
+            raise RuntimeError()
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        try:
+            disk2.save(_hook=raise_error)
+        except RuntimeError:
+            pass
+        self.assertEqual(len(machine.disks), 1, 'There should be one disk')
+        for disk in machine.disks:
+            disk.delete()
+        machine.delete()
 
 if __name__ == '__main__':
     import unittest
