@@ -988,7 +988,10 @@ class StorageRouterController(object):
             for vpool_info in vpool_overview:
                 vpool_name = vpool_info.split()[0].strip()
                 if vpool.name == vpool_name:
-                    client.run('virsh pool-destroy {0}'.format(vpool.name))
+                    try:
+                        client.run('virsh pool-destroy {0}'.format(vpool.name))
+                    except Exception as ex:
+                        logger.info('Got error during pool-destroy: {0}'.format(ex))
                     try:
                         client.run('virsh pool-undefine {0}'.format(vpool.name))
                     except Exception as ex:
