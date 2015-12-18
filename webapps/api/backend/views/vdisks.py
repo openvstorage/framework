@@ -103,6 +103,7 @@ class VDiskViewSet(viewsets.ViewSet):
         return VDiskController.get_config_params.delay(vdisk_guid=vdisk.guid)
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
@@ -122,6 +123,7 @@ class VDiskViewSet(viewsets.ViewSet):
                                            detached=True)
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
@@ -135,6 +137,7 @@ class VDiskViewSet(viewsets.ViewSet):
                                                       snapshotid=snapshot_id)
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
@@ -146,6 +149,7 @@ class VDiskViewSet(viewsets.ViewSet):
         return VDiskController.set_as_template.delay(diskguid=vdisk.guid)
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
@@ -171,6 +175,7 @@ class VDiskViewSet(viewsets.ViewSet):
                                                      snapshotid=snapshot_id)
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
@@ -186,3 +191,4 @@ class VDiskViewSet(viewsets.ViewSet):
                                                           devicename=devicename,
                                                           pmachineguid=pmachineguid,
                                                           machineguid=machineguid)
+
