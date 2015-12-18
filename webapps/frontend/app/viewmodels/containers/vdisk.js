@@ -96,11 +96,11 @@ define([
                 } else {
                     self.dtlEnabled(true);
                     if (self.dtlTargets().length === 0) {
-                        self.dtlTarget(undefined);
+                        self.dtlTarget(null);
                         $.each(self.dtlModes(), function(index, item) {
                             item.disabled = true;
                         })
-                    } else if (self.dtlTarget() === undefined) {
+                    } else if (self.dtlTarget() === null) {
                         self.dtlTarget(self.dtlTargets()[0]);
                     }
                 }
@@ -114,7 +114,7 @@ define([
                         dtl_enabled: self.dtlEnabled(),
                         dedupe_mode: self.dedupeMode() !== undefined ? self.dedupeMode().name : undefined,
                         write_buffer: self.writeBuffer(),
-                        dtl_target: self.dtlTarget(),
+                        dtl_target: self.dtlTarget() || null,
                         cache_strategy: self.cacheStrategy(),
                         readcache_limit: self.readCacheLimit() || null}
             },
@@ -123,7 +123,7 @@ define([
                 self.scoSize(configData.sco_size);
                 self.dtlMode(configData.dtl_mode);
                 self.dedupeMode({name: configData.dedupe_mode, disabled: false});
-                self.dtlTarget(configData.dtl_target === null ? undefined : configData.dtl_target);
+                self.dtlTarget(configData.dtl_target === null ? null : configData.dtl_target);
                 self.cacheStrategy(configData.cache_strategy);
                 self.readCacheLimit(configData.readcache_limit);
             }
@@ -250,7 +250,7 @@ define([
                                     self.oldConfiguration(oldConfig);
                                 } else if (key === 'dtl_target' && value === null) {
                                     oldConfig = self.oldConfiguration();
-                                    oldConfig.dtl_target = undefined;
+                                    oldConfig.dtl_target = null;
                                     self.oldConfiguration(oldConfig);
                                 }
                             });
