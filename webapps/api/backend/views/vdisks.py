@@ -186,4 +186,3 @@ class VDiskViewSet(viewsets.ViewSet):
                                                           devicename=devicename,
                                                           pmachineguid=pmachineguid,
                                                           machineguid=machineguid)
-    
