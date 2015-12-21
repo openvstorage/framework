@@ -47,6 +47,8 @@ define(['knockout', 'ovs/generic'], function(ko, generic){
                             }
                             if (partition.in_use === false) {
                                 dictionary[role].disabled = false;
+                                if (role === 'DB') { hide_db = false; }
+                                if (role === 'SCRUB') { hide_scrub = false; }
                             }
                         }
                     });
