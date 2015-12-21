@@ -681,11 +681,13 @@ class VDiskController(object):
         """
         required_params = {'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
                            'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
-                           'dtl_target': (str, Toolbox.regex_ip),
                            'dedupe_mode': (str, StorageDriverClient.VDISK_DEDUPE_MAP.keys()),
                            'write_buffer': (int, {'min': 128, 'max': 10 * 1024}),
                            'cache_strategy': (str, StorageDriverClient.VDISK_CACHE_MAP.keys()),
                            'readcache_limit': (int, {'min': 1, 'max': 10 * 1024}, False)}
+
+        if new_config_params.get('dtl_target') is not None:
+            required_params.update({'dtl_target': (str, Toolbox.regex_ip)})
 
         Toolbox.verify_required_params(required_params, new_config_params)
 
@@ -717,13 +719,13 @@ class VDiskController(object):
         # 2nd Check for DTL changes
         new_dtl_mode = new_config_params['dtl_mode']
         old_dtl_mode = old_config_params['dtl_mode']
-        new_dtl_target = new_config_params['dtl_target']
+        new_dtl_target = new_config_params.get('dtl_target')
         old_dtl_target = old_config_params['dtl_target']
         if old_dtl_mode != new_dtl_mode or new_dtl_target != old_dtl_target:
             if old_dtl_mode != new_dtl_mode and new_dtl_mode == 'no_sync':
                 logger.info('Disabling DTL for vDisk {0}'.format(vdisk_guid))
                 vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
-            elif (new_dtl_target != old_dtl_target or old_dtl_mode != new_dtl_mode) and new_dtl_mode != 'no_sync':
+            elif (new_dtl_target is not None and new_dtl_target != old_dtl_target or old_dtl_mode != new_dtl_mode) and new_dtl_mode != 'no_sync':
                 logger.info('Changing DTL to use global values for vDisk {0}'.format(vdisk_guid))
                 sr_target = StorageRouterList.get_by_ip(new_dtl_target)
                 if sr_target is None:
