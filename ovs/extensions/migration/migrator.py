@@ -22,7 +22,7 @@ class Migrator(object):
         pass
 
     @staticmethod
-    def migrate(master_ips, extra_ips):
+    def migrate(master_ips=None, extra_ips=None):
         """
         Executes all migrations. It keeps track of an internal "migration version" which is always increasing by one
         :param master_ips: IP addresses of the MASTER nodes
