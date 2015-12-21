@@ -22,8 +22,12 @@ class Migrator(object):
         pass
 
     @staticmethod
-    def migrate():
-        """ Executes all migrations. It keeps track of an internal "migration version" which is always increasing by one """
+    def migrate(master_ips, extra_ips):
+        """
+        Executes all migrations. It keeps track of an internal "migration version" which is always increasing by one
+        :param master_ips: IP addresses of the MASTER nodes
+        :param extra_ips: IP addresses of the EXTRA nodes
+        """
 
         data = Configuration.get('ovs.core.versions') if Configuration.exists('ovs.core.versions') else {}
         migrators = []
@@ -39,7 +43,7 @@ class Migrator(object):
         end_version = 0
         for identifier, method in migrators:
             base_version = data[identifier] if identifier in data else 0
-            version = method(base_version)
+            version = method(base_version, master_ips, extra_ips)
             if version > end_version:
                 end_version = version
             data[identifier] = end_version
