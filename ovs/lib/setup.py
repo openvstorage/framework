@@ -1099,6 +1099,7 @@ class SetupController(object):
    {{rabbit, [{{tcp_listeners, [{0}]}},
               {{default_user, <<"{1}">>}},
               {{default_pass, <<"{2}">>}},
+              {{log_levels, [{{connection, warning}}]}},
               {{vm_memory_high_watermark, 0.2}}]}}
 ].
 EOF
