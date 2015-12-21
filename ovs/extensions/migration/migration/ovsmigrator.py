@@ -71,13 +71,14 @@ class OVSMigrator(object):
             reload(ArakoonInstaller)
             from ovs.extensions.db.arakoon import ArakoonInstaller
             from ovs.extensions.generic.sshclient import SSHClient
-            for ip in master_ips:
-                client = SSHClient(ip)
-                if client.dir_exists(ArakoonInstaller.ArakoonInstaller.ARAKOON_CONFIG_DIR):
-                    for cluster_name in client.dir_list(ArakoonInstaller.ArakoonInstaller.ARAKOON_CONFIG_DIR):
-                        try:
-                            ArakoonInstaller.ArakoonInstaller.deploy_cluster(cluster_name, ip)
-                        except:
-                            pass
+            if master_ips is not None:
+                for ip in master_ips:
+                    client = SSHClient(ip)
+                    if client.dir_exists(ArakoonInstaller.ArakoonInstaller.ARAKOON_CONFIG_DIR):
+                        for cluster_name in client.dir_list(ArakoonInstaller.ArakoonInstaller.ARAKOON_CONFIG_DIR):
+                            try:
+                                ArakoonInstaller.ArakoonInstaller.deploy_cluster(cluster_name, ip)
+                            except:
+                                pass
 
         return working_version
