@@ -29,14 +29,16 @@ class OVSMigrator(object):
         pass
 
     @staticmethod
-    def migrate(previous_version):
+    def migrate(previous_version, master_ips=None, extra_ips=None):
         """
         Migrates from any version to any version, running all migrations required
         If previous_version is for example 0 and this script is at
         verison 3 it will execute two steps:
           - 1 > 2
           - 2 > 3
-        @param previous_version: The previous version from which to start the migration.
+        :param previous_version: The previous version from which to start the migration.
+        :param master_ips: IP addresses of the MASTER nodes
+        :param extra_ips: IP addresses of the EXTRA nodes
         """
 
         working_version = previous_version
@@ -69,14 +71,14 @@ class OVSMigrator(object):
             reload(ArakoonInstaller)
             from ovs.extensions.db.arakoon import ArakoonInstaller
             from ovs.extensions.generic.sshclient import SSHClient
-            from ovs.dal.lists.storagerouterlist import StorageRouterList
-            master = StorageRouterList.get_masters()[0]
-            client = SSHClient(master)
-            if client.dir_exists(ArakoonInstaller.ArakoonInstaller.ARAKOON_CONFIG_DIR):
-                for cluster_name in client.dir_list(ArakoonInstaller.ArakoonInstaller.ARAKOON_CONFIG_DIR):
-                    try:
-                        ArakoonInstaller.ArakoonInstaller.deploy_cluster(cluster_name, master.ip)
-                    except:
-                        pass
+            if master_ips is not None:
+                for ip in master_ips:
+                    client = SSHClient(ip)
+                    if client.dir_exists(ArakoonInstaller.ArakoonInstaller.ARAKOON_CONFIG_DIR):
+                        for cluster_name in client.dir_list(ArakoonInstaller.ArakoonInstaller.ARAKOON_CONFIG_DIR):
+                            try:
+                                ArakoonInstaller.ArakoonInstaller.deploy_cluster(cluster_name, ip)
+                            except:
+                                pass
 
         return working_version
