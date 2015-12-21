@@ -42,8 +42,6 @@ define(['knockout', 'ovs/generic'], function(ko, generic){
                     }
                     $.each(partitions, function (index, partition) {
                         if (partition.guid === data.partition().guid())  {
-                            if (role === 'DB') { hide_db = false; }
-                            if (role === 'SCRUB') { hide_scrub = false; }
                             if (partition.in_use === true) {
                                 dictionary[role].disabled = true;
                             }
@@ -54,8 +52,8 @@ define(['knockout', 'ovs/generic'], function(ko, generic){
                     });
                 }
             });
-            if (hide_db === true) { roles.remove(db); }
-            if (hide_scrub === true) { roles.remove(scrub); }
+            if (hide_db === true) { dictionary['DB'].disabled = true; }
+            if (hide_scrub === true) { dictionary['SCRUB'].disabled = true; }
             return roles
         });
         return data;
