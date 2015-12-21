@@ -29,7 +29,7 @@ class OVSMigrator(object):
         pass
 
     @staticmethod
-    def migrate(previous_version, master_ips, extra_ips):
+    def migrate(previous_version, master_ips=None, extra_ips=None):
         """
         Migrates from any version to any version, running all migrations required
         If previous_version is for example 0 and this script is at
