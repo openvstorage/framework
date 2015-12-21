@@ -29,14 +29,16 @@ class OVSMigrator(object):
         pass
 
     @staticmethod
-    def migrate(previous_version):
+    def migrate(previous_version, master_ips, extra_ips):
         """
         Migrates from any version to any version, running all migrations required
         If previous_version is for example 0 and this script is at
         verison 3 it will execute two steps:
           - 1 > 2
           - 2 > 3
-        @param previous_version: The previous version from which to start the migration.
+        :param previous_version: The previous version from which to start the migration.
+        :param master_ips: IP addresses of the MASTER nodes
+        :param extra_ips: IP addresses of the EXTRA nodes
         """
 
         working_version = previous_version
