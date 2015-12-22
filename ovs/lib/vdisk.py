@@ -400,20 +400,22 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_from_template')
-    def create_from_template(diskguid, machinename, devicename, pmachineguid, machineguid=None):
+    def create_from_template(diskguid, devicename, pmachineguid, machinename='', machineguid=None):
         """
         Create a disk from a template
 
         :param diskguid: Guid of the disk
         :param machinename: Name of the machine
         :param devicename: Device file name for the disk (eg: my_disk-flat.vmdk)
-        :param pmachineguid: Guid of the physical machine hosting the template
+        :param pmachineguid: Guid of pmachine to create new vdisk on
         :param machineguid: Guid of the machine to assign disk to
         :return diskguid: Guid of new disk
         """
-
         pmachine = PMachine(pmachineguid)
         hypervisor = Factory.get(pmachine)
+        if machineguid is not None:
+            new_vdisk_vmachine = VMachine(machineguid)
+            machinename = new_vdisk_vmachine.name
         disk_path = hypervisor.get_disk_path(machinename, devicename)
 
         description = '{0} {1}'.format(machinename, devicename)
@@ -425,6 +427,8 @@ class VDiskController(object):
         if vdisk.vmachine and not vdisk.vmachine.is_vtemplate:
             # Disk might not be attached to a vmachine, but still be a template
             raise RuntimeError('The given vdisk does not belong to a template')
+        if not vdisk.is_vtemplate:
+            raise RuntimeError('The given vdisk is not a template')
 
         storagedriver = None
         for sd in vdisk.vpool.storagedrivers:
@@ -442,7 +446,7 @@ class VDiskController(object):
         new_vdisk.parent_vdisk = vdisk
         new_vdisk.name = '{0}-clone'.format(vdisk.name)
         new_vdisk.description = description
-        new_vdisk.vmachine = VMachine(machineguid) if machineguid else vdisk.vmachine
+        new_vdisk.vmachine = new_vdisk_vmachine if machineguid else vdisk.vmachine
         new_vdisk.save()
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, new_vdisk.vpool)
@@ -672,11 +676,13 @@ class VDiskController(object):
         """
         required_params = {'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
                            'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
-                           'dtl_target': (str, Toolbox.regex_ip),
                            'dedupe_mode': (str, StorageDriverClient.VDISK_DEDUPE_MAP.keys()),
                            'write_buffer': (int, {'min': 128, 'max': 10 * 1024}),
                            'cache_strategy': (str, StorageDriverClient.VDISK_CACHE_MAP.keys()),
                            'readcache_limit': (int, {'min': 1, 'max': 10 * 1024}, False)}
+
+        if new_config_params.get('dtl_target') is not None:
+            required_params.update({'dtl_target': (str, Toolbox.regex_ip)})
 
         Toolbox.verify_required_params(required_params, new_config_params)
 
@@ -708,13 +714,13 @@ class VDiskController(object):
         # 2nd Check for DTL changes
         new_dtl_mode = new_config_params['dtl_mode']
         old_dtl_mode = old_config_params['dtl_mode']
-        new_dtl_target = new_config_params['dtl_target']
+        new_dtl_target = new_config_params.get('dtl_target')
         old_dtl_target = old_config_params['dtl_target']
         if old_dtl_mode != new_dtl_mode or new_dtl_target != old_dtl_target:
             if old_dtl_mode != new_dtl_mode and new_dtl_mode == 'no_sync':
                 logger.info('Disabling DTL for vDisk {0}'.format(vdisk_guid))
                 vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
-            elif (new_dtl_target != old_dtl_target or old_dtl_mode != new_dtl_mode) and new_dtl_mode != 'no_sync':
+            elif (new_dtl_target is not None and new_dtl_target != old_dtl_target or old_dtl_mode != new_dtl_mode) and new_dtl_mode != 'no_sync':
                 logger.info('Changing DTL to use global values for vDisk {0}'.format(vdisk_guid))
                 sr_target = StorageRouterList.get_by_ip(new_dtl_target)
                 if sr_target is None:

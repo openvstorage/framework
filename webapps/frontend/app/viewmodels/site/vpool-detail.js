@@ -360,7 +360,7 @@ define([
         // Durandal
         self.activate = function(mode, guid) {
             self.vPool(new VPool(guid));
-            self.refresher.init(self.load, 5000);
+            self.refresher.init(self.load, 60000);
             self.refresher.run();
             self.refresher.start();
             self.shared.footerData(self.vPool);

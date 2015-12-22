@@ -78,7 +78,8 @@ class Upstart(object):
         for key, value in params.iteritems():
             template_file = template_file.replace('<{0}>'.format(key), value)
         if '<SERVICE_NAME>' in template_file:
-            template_file = template_file.replace('<SERVICE_NAME>', name.lstrip('ovs-'))
+            service_name = name if target_name is None else target_name
+            template_file = template_file.replace('<SERVICE_NAME>', service_name.lstrip('ovs-'))
 
         dependencies = ''
         if additional_dependencies:

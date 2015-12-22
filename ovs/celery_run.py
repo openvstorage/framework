@@ -80,7 +80,10 @@ def task_postrun_handler(sender=None, task_id=None, task=None, args=None, kwargs
     Hook for celery postrun event
     """
     _ = sender, task, args, kwargs, kwds
-    MessageController.fire(MessageController.Type.TASK_COMPLETE, task_id)
+    try:
+        MessageController.fire(MessageController.Type.TASK_COMPLETE, task_id)
+    except Exception as ex:
+        loghandler.error('Caught error during postrun handler: {0}'.format(ex))
 
 
 @worker_process_init.connect

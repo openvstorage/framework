@@ -57,17 +57,24 @@ class UpdateController(object):
             upgrade_file = '/etc/ready_for_upgrade'
             upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
             storage_routers = StorageRouterList.get_storagerouters()
-            ssh_clients = [SSHClient(storage_router.ip, 'root') for storage_router in storage_routers]
+            ssh_clients = []
+            master_ips = []
+            extra_ips = []
+            for sr in storage_routers:
+                ssh_clients.append(SSHClient(sr.ip, username='root'))
+                if sr.node_type == 'MASTER':
+                    master_ips.append(sr.ip)
+                elif sr.node_type == 'EXTRA':
+                    extra_ips.append(sr.ip)
             this_client = [client for client in ssh_clients if client.is_local is True][0]
 
-            # Commence update !!!!!!!
-            # 0. Create locks
+            # Create locks
             UpdateController._log_message('Creating lock files', client_ip=this_client.ip)
             for client in ssh_clients:
                 client.run('touch {0}'.format(upgrade_file))  # Prevents manual install or upgrade individual packages
                 client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Prevents clicking x times on 'Update' btn
 
-            # 1. Check requirements
+            # Check requirements
             packages_to_update = set()
             all_services_to_restart = []
             for client in ssh_clients:
@@ -90,7 +97,7 @@ class UpdateController(object):
             UpdateController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
             UpdateController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
 
-            # 2. Stop services
+            # Stop services
             if UpdateController._change_services_state(services=services_to_restart,
                                                        ssh_clients=ssh_clients,
                                                        action='stop') is False:
@@ -108,7 +115,7 @@ class UpdateController(object):
                                               client_ip=this_client.ip, severity='error')
                 return
 
-            # 3. Update packages
+            # Update packages
             failed_clients = []
             for client in ssh_clients:
                 PackageManager.update(client=client)
@@ -139,7 +146,19 @@ class UpdateController(object):
                                               'error')
                 return
 
-            # 4. Start services
+            # Migrate code
+            for client in ssh_clients:
+                try:
+                    UpdateController._log_message('Started code migration', client.ip)
+                    with Remote(client.ip, [Migrator]) as remote:
+                        remote.Migrator.migrate(master_ips, extra_ips)
+                    UpdateController._log_message('Finished code migration', client.ip)
+                except Exception as ex:
+                    UpdateController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
+                    UpdateController._log_message('Code migration failed with error: {0}'.format(ex), client.ip, 'error')
+                    return
+
+            # Start services
             UpdateController._log_message('Starting services', client_ip=this_client.ip)
             model_services = []
             if 'arakoon-ovsdb' in services_to_restart:
@@ -152,7 +171,7 @@ class UpdateController(object):
                                                     ssh_clients=ssh_clients,
                                                     action='start')
 
-            # 5. Migrate
+            # Migrate model
             UpdateController._log_message('Started model migration', client_ip=this_client.ip)
             try:
                 from ovs.dal.helpers import Migration
@@ -164,18 +183,7 @@ class UpdateController(object):
                                               severity='error')
                 return
 
-            for client in ssh_clients:
-                try:
-                    UpdateController._log_message('Started code migration', client.ip)
-                    with Remote(client.ip, [Migrator]) as remote:
-                        remote.Migrator.migrate()
-                    UpdateController._log_message('Finished code migration', client.ip)
-                except Exception as ex:
-                    UpdateController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
-                    UpdateController._log_message('Code migration failed with error: {0}'.format(ex), client.ip, 'error')
-                    return
-
-            # 6. Post upgrade actions
+            # Post upgrade actions
             UpdateController._log_message('Executing post upgrade actions', client_ip=this_client.ip)
             for client in ssh_clients:
                 with Remote(client.ip, [Toolbox, SSHClient]) as remote:
@@ -190,7 +198,7 @@ class UpdateController(object):
                             UpdateController._log_message('Post upgrade action failed with error: {0}'.format(ex),
                                                           client.ip, 'error')
 
-            # 7. Start watcher and restart support-agent
+            # Start watcher and restart support-agent
             UpdateController._change_services_state(services=services_to_restart,
                                                     ssh_clients=ssh_clients,
                                                     action='start')
