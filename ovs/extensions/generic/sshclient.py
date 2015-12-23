@@ -182,9 +182,10 @@ class SSHClient(object):
         return "".join([("\\" + _) if _ in " '\";`|" else _ for _ in path_to_check])
 
     @connected()
-    def run(self, command, debug=False):
+    def run(self, command, debug=False, suppress_logging=False):
         """
         Executes a shell command
+        :param suppress_logging: Do not log anything
         :param command: Command to execute
         :param debug: Extended logging and stderr output returned
         """
@@ -193,7 +194,8 @@ class SSHClient(object):
                 try:
                     process = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
                 except OSError as ose:
-                    logger.error('Command: "{0}" failed with output: "{1}"'.format(command, str(ose)))
+                    if suppress_logging is False:
+                        logger.error('Command: "{0}" failed with output: "{1}"'.format(command, str(ose)))
                     raise CalledProcessError(1, command, str(ose))
                 out, err = process.communicate()
                 if debug:
@@ -204,7 +206,8 @@ class SSHClient(object):
                     return out.strip()
 
             except CalledProcessError as cpe:
-                logger.error('Command: "{0}" failed with output: "{1}"'.format(command, cpe.output))
+                if suppress_logging is False:
+                    logger.error('Command: "{0}" failed with output: "{1}"'.format(command, cpe.output))
                 raise cpe
         else:
             _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
@@ -212,7 +215,8 @@ class SSHClient(object):
             if exit_code != 0:  # Raise same error as check_output
                 stderr = ''.join(stderr.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 stdout = ''.join(stdout.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
-                logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
+                if suppress_logging is False:
+                    logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
                 raise CalledProcessError(exit_code, command, stderr)
             if debug:
                 return '\n'.join(line.rstrip() for line in stdout).strip(), stderr
@@ -395,7 +399,7 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
                 return os.path.realpath(path)
         else:
             try:
-                real_path = self.run('readlink {0}'.format(path))
+                real_path = self.run('readlink {0}'.format(path), suppress_logging=True)
                 if real_path:
                     return "/".join(path.split('/')[:-1] + [real_path])
             except:
