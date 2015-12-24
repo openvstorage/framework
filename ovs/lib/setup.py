@@ -28,6 +28,7 @@ from paramiko import AuthenticationException
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
+from ovs.extensions.db.etcd.installer import EtcdInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.remote import Remote
@@ -56,7 +57,7 @@ class SetupController(object):
 
     # Services
     model_services = ['memcached', 'arakoon-ovsdb']
-    master_services = model_services + ['rabbitmq-server']
+    master_services = model_services + ['rabbitmq-server', 'etcd-config']
     extra_node_services = ['workers', 'volumerouter-consumer']
     master_node_services = master_services + ['scheduled-tasks', 'snmp', 'webapp-api', 'nginx',
                                               'volumerouter-consumer'] + extra_node_services
@@ -665,6 +666,10 @@ class SetupController(object):
         result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, target_client.config_read('ovs.core.ovsdb'), locked=False)
         arakoon_ports = [result['client_port'], result['messaging_port']]
 
+        print 'Setting up Etcd'
+        logger.info('Setting up Etcd')
+        EtcdInstaller.create_cluster('config', cluster_ip, target_client.config_read('ovs.core.ovsdb'))
+
         SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
         config_types = []
@@ -777,6 +782,7 @@ class SetupController(object):
         print 'Configuring services'
         logger.info('Copying client configurations')
         ArakoonInstaller.deploy_to_slave(master_ip, cluster_ip, 'ovsdb')
+        EtcdInstaller.deploy_to_slave(master_ip, cluster_ip, 'config')
         config_types = []
         if configure_rabbitmq:
             config_types.append('rabbitmq')
@@ -873,6 +879,10 @@ class SetupController(object):
         result = ArakoonInstaller.extend_cluster(master_ip, cluster_ip, 'ovsdb', target_client.config_read('ovs.core.ovsdb'))
         arakoon_ports = [result['client_port'], result['messaging_port']]
 
+        print 'Joining etcd cluster'
+        logger.info('Joining arakoon cluster')
+        EtcdInstaller.extend_cluster(master_ip, cluster_ip, 'config', target_client.config_read('ovs.core.ovsdb'))
+
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
         config_types = []
@@ -895,6 +905,7 @@ class SetupController(object):
         print 'Restarting master node services'
         logger.info('Restarting master node services')
         ArakoonInstaller.restart_cluster_add('ovsdb', master_nodes, cluster_ip)
+        EtcdInstaller.restart_cluster_add('config', master_ip, cluster_ip)
         PersistentFactory.store = None
         VolatileFactory.store = None
 
@@ -984,6 +995,10 @@ class SetupController(object):
         print 'Leaving arakoon cluster'
         logger.info('Leaving arakoon cluster')
         ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'ovsdb')
+
+        print 'Leaving etcd cluster'
+        logger.info('Leaving etcd cluster')
+        EtcdInstaller.shrink_cluster(master_ip, cluster_ip, 'config')
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
@@ -1240,6 +1255,8 @@ EOF
             services = SetupController.master_node_services
             if 'arakoon-ovsdb' in services:
                 services.remove('arakoon-ovsdb')
+            if 'etcd-config' in services:
+                services.remove('etcd-config')
             worker_queue = '{0},ovs_masters'.format(unique_id)
         else:
             services = SetupController.extra_node_services
