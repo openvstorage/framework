@@ -160,7 +160,7 @@ class EtcdInstaller(object):
                                            'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1'),
                                            'INITIAL_CLUSTER': ','.join(current_cluster)},
                                    target_name=target_name)
-        EtcdInstaller.start(cluster_name, target_name)
+        EtcdInstaller.start(cluster_name, slave_client)
 
     @staticmethod
     def start(cluster_name, client):
