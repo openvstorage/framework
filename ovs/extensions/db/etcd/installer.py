@@ -29,7 +29,7 @@ class EtcdInstaller(object):
     WAL_DIR = '{0}/etcd/{1}/wal'
     SERVER_URL = 'http://{0}:2380'
     CLIENT_URL = 'http://{0}:2379'
-    MEMBER_REGEX = re.compile(ur'^[^:]+: name=(?P<name>[^ ]+) peerURLs=(?P<peer>[^ ]+) clientURLs=(?P<client>[^ ]+)$')
+    MEMBER_REGEX = re.compile(ur'^(?P<id>[^:]+): name=(?P<name>[^ ]+) peerURLs=(?P<peer>[^ ]+) clientURLs=(?P<client>[^ ]+)$')
 
     def __init__(self):
         """
@@ -230,9 +230,14 @@ class EtcdInstaller(object):
         old_client = SSHClient(removed_ip, username='root')
         node_name = System.get_my_machine_id(old_client)
         current_client = SSHClient(remaining_ip, username='root')
+        node_id = None
+        for item in current_client.run('etcdctl member list').splitlines():
+            info = re.search(EtcdInstaller.MEMBER_REGEX, item).groupdict()
+            if info['name'] == node_name:
+                node_id = info['id']
 
         EtcdInstaller.stop(cluster_name, old_client)
-        current_client.run('etcdctl member remove {0}'.format(node_name))
+        current_client.run('etcdctl member remove {0}'.format(node_id))
         EtcdInstaller.deploy_to_slave(remaining_ip, removed_ip, cluster_name)
 
         logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))
