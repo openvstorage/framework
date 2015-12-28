@@ -32,7 +32,7 @@ define([
 
         callData = {
             type: type,
-            timeout: generic.tryGet(options, 'timeout', 1000 * 60 * 60),
+            timeout: generic.tryGet(options, 'timeout', 1000 * 30),
             contentType: 'application/json',
             headers: { Accept: 'application/json; version=*' }
         };

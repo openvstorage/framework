@@ -446,7 +446,7 @@ class StorageRouterController(object):
         arakoon_node_configs = []
         for node in config.nodes:
             arakoon_nodes.append({'node_id': node.name, 'host': node.ip, 'port': node.client_port})
-            arakoon_node_configs.append(ArakoonNodeConfig(node.name, node.ip, node.client_port))
+            arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
         node_configs = []
         for existing_storagedriver in StorageDriverList.get_storagedrivers():
             if existing_storagedriver.vpool_guid == vpool.guid:
@@ -965,7 +965,7 @@ class StorageRouterController(object):
                 config.load_config(client)
                 arakoon_node_configs = []
                 for node in config.nodes:
-                    arakoon_node_configs.append(ArakoonNodeConfig(node.name, node.ip, node.client_port))
+                    arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
 
                 node_configs = []
                 for storage_driver in vpool.storagedrivers:
