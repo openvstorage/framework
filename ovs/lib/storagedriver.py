@@ -80,7 +80,6 @@ class StorageDriverController(object):
         if pmachine.mgmtcenter:
             # Update status
             pmachine.invalidate_dynamics(['host_status'])
-            host_status = pmachine.host_status
         else:
             # No management Center, cannot update status via api
             logger.info('Updating status of pmachine {0} using SSHClient'.format(pmachine.name))
@@ -102,7 +101,6 @@ class StorageDriverController(object):
                 storagedriver_client = StorageDriverClient.load(storagedriver.vpool)
                 storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
 
-
     @staticmethod
     @celery.task(name='ovs.storagedriver.volumedriver_error')
     @log('VOLUMEDRIVER_TASK')
@@ -119,13 +117,16 @@ class StorageDriverController(object):
 
     @staticmethod
     @add_hooks('setup', 'demote')
-    def on_demote(cluster_ip, master_ip):
+    def on_demote(cluster_ip, master_ip, offline_node_ips=None):
         """
         Handles the demote for the StorageDrivers
         :param cluster_ip: IP of the node to demote
         :param master_ip: IP of the master node
+        :param offline_node_ips: IPs of nodes which are offline
         """
-        client = SSHClient(cluster_ip, username='root')
+        if offline_node_ips is None:
+            offline_node_ips = []
+        client = SSHClient(cluster_ip, username='root') if cluster_ip not in offline_node_ips else None
         servicetype = ServiceTypeList.get_by_name('Arakoon')
         current_service = None
         remaining_ips = []
@@ -133,19 +134,20 @@ class StorageDriverController(object):
             if service.name == 'arakoon-voldrv':
                 if service.storagerouter.ip == cluster_ip:
                     current_service = service
-                else:
+                elif service.storagerouter.ip not in offline_node_ips:
                     remaining_ips.append(service.storagerouter.ip)
         if current_service is not None:
             print '* Shrink StorageDriver cluster'
-            ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'voldrv')
-            if ServiceManager.has_service(current_service.name, client=client) is True:
+            ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'voldrv', offline_node_ips)
+            if client is not None and ServiceManager.has_service(current_service.name, client=client) is True:
                 ServiceManager.stop_service(current_service.name, client=client)
                 ServiceManager.remove_service(current_service.name, client=client)
             ArakoonInstaller.restart_cluster_remove('voldrv', remaining_ips)
             current_service.delete()
             for storagerouter in StorageRouterList.get_storagerouters():
-                ArakoonInstaller.deploy_to_slave(master_ip, storagerouter.ip, 'voldrv')
-            StorageDriverController._configure_arakoon_to_volumedriver()
+                if storagerouter.ip not in offline_node_ips and storagerouter.ip != master_ip:
+                    ArakoonInstaller.deploy_to_slave(master_ip, storagerouter.ip, 'voldrv')
+            StorageDriverController._configure_arakoon_to_volumedriver(offline_node_ips)
 
     @staticmethod
     @add_hooks('setup', 'extranode')
@@ -156,11 +158,24 @@ class StorageDriverController(object):
         :param master_ip: IP of the master node
         """
         _ = master_ip  # The master_ip will be passed in by caller
+        deployed = False
+        client_list = []
+        service_found = False
         servicetype = ServiceTypeList.get_by_name('Arakoon')
         for service in servicetype.services:
             if service.name == 'arakoon-voldrv':
+                service_found = True
+                if service.storagerouter not in client_list:
+                    try:
+                        SSHClient(service.storagerouter)
+                        client_list.append(service.storagerouter)
+                    except UnableToConnectException:
+                        continue
                 ArakoonInstaller.deploy_to_slave(service.storagerouter.ip, cluster_ip, 'voldrv')
+                deployed = True
                 break
+        if service_found is True and deployed is False:
+            raise RuntimeError('Failed to deploy arakoon config for voldrv cluster to slave with IP {0}'.format(cluster_ip))
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=crontab(minute='15', hour='*'))
@@ -248,10 +263,14 @@ class StorageDriverController(object):
             StorageDriverController._configure_arakoon_to_volumedriver()
 
     @staticmethod
-    def _configure_arakoon_to_volumedriver():
+    def _configure_arakoon_to_volumedriver(offline_node_ips=None):
         print 'Update existing vPools'
         logger.info('Update existing vPools')
+        if offline_node_ips is None:
+            offline_node_ips = []
         for storagerouter in StorageRouterList.get_storagerouters():
+            if storagerouter.ip in offline_node_ips:
+                continue
             client = SSHClient(storagerouter.ip)
             config = ArakoonClusterConfig('voldrv')
             config.load_config(client)

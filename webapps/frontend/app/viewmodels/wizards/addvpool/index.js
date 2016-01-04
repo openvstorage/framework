@@ -69,6 +69,7 @@ define([
         data.name('');
         data.partitions(undefined);
         data.port(80);
+        data.readCacheSize(undefined);
         data.rdmaEnabled(false);
         data.scoSize(4);
         data.scrubAvailable(false);
@@ -77,5 +78,6 @@ define([
         data.storageIP(undefined);
         data.storageRouters([]);
         data.writeBuffer(undefined);
+        data.writeCacheSize(undefined);
     };
 });

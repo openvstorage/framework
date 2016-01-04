@@ -178,6 +178,14 @@ class ArakoonInstaller(object):
 
     @staticmethod
     def archive_existing_arakoon_data(ip, directory, top_dir, cluster_name):
+        """
+        Copy existing arakoon data, when setting up a new arakoon cluster, to the side
+        :param ip: IP on which to check for existing data
+        :param directory: Directory to check for existence
+        :param top_dir: Top directory
+        :param cluster_name: Name of arakoon cluster
+        :return: None
+        """
         new_client = SSHClient(ip)
         logger.debug('archive - check if {0} exists'.format(directory))
         if new_client.dir_exists(directory):
@@ -316,24 +324,30 @@ class ArakoonInstaller(object):
                 'messaging_port': ports[1]}
 
     @staticmethod
-    def shrink_cluster(remaining_node_ip, deleted_node_ip, cluster_name):
+    def shrink_cluster(remaining_node_ip, deleted_node_ip, cluster_name, offline_nodes=None):
         """
         Removes a node from a cluster, the old node will become a slave
         :param cluster_name: The name of the cluster to shrink
         :param deleted_node_ip: The ip of the node that should be deleted
         :param remaining_node_ip: The ip of a remaining node
+        :param offline_nodes: Storage Routers which are offline
         """
         logger.debug('Shrinking cluster {0} from {1}'.format(cluster_name, deleted_node_ip))
         client = SSHClient(remaining_node_ip)
         config = ArakoonClusterConfig(cluster_name)
         config.load_config(client)
 
+        if offline_nodes is None:
+            offline_nodes = []
+
         for node in config.nodes[:]:
             if node.ip == deleted_node_ip:
                 config.nodes.remove(node)
-                ArakoonInstaller._destroy_node(config, node)
-        ArakoonInstaller._deploy(config)
-        ArakoonInstaller.deploy_to_slave(remaining_node_ip, deleted_node_ip, cluster_name)
+                if node.ip not in offline_nodes:
+                    ArakoonInstaller._destroy_node(config, node)
+        ArakoonInstaller._deploy(config, offline_nodes)
+        if deleted_node_ip not in offline_nodes:
+            ArakoonInstaller.deploy_to_slave(remaining_node_ip, deleted_node_ip, cluster_name)
         logger.debug('Shrinking cluster {0} from {1} completed'.format(cluster_name, deleted_node_ip))
 
     @staticmethod
@@ -392,12 +406,16 @@ class ArakoonInstaller(object):
         logger.debug('Destroy node {0} in cluster {1} completed'.format(node.ip, config.cluster_id))
 
     @staticmethod
-    def _deploy(config):
+    def _deploy(config, offline_nodes=None):
         """
         Deploys a complete cluster: Distributing the configuration files, creating directories and services
         """
         logger.debug('Deploying cluster {0}'.format(config.cluster_id))
+        if offline_nodes is None:
+            offline_nodes = []
         for node in config.nodes:
+            if node.ip in offline_nodes:
+                continue
             logger.debug('  Deploying cluster {0} on {1}'.format(config.cluster_id, node.ip))
             ovs_client = SSHClient(node.ip)
             root_client = SSHClient(node.ip, username='root')

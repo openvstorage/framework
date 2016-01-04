@@ -160,7 +160,7 @@ class MDSServiceController(object):
         :param reconfigure: Indicates whether reconfiguration is required
         :param allow_offline: Indicates whether it's OK that the node for which mds services are cleaned is offline
         """
-        if len(mds_service.vdisks_guids) > 0:
+        if len(mds_service.vdisks_guids) > 0 and allow_offline is False:
             raise RuntimeError('Cannot remove MDSService that is still serving disks')
 
         mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
@@ -170,6 +170,10 @@ class MDSServiceController(object):
         for sd_partition in mds_service.storagedriver_partitions:
             directories_to_clean.append(sd_partition.path)
             sd_partition.delete()
+
+        if allow_offline is True:  # Certain vdisks might still be attached to this offline MDS service --> Delete relations
+            for junction in mds_service.vdisks:
+                junction.delete()
 
         mds_service.delete()
         mds_service.service.delete()
@@ -299,6 +303,9 @@ class MDSServiceController(object):
         logger.debug('MDS safety: vDisk {0}: Start checkup for virtual disk {1}'.format(vdisk.guid, vdisk.name))
         vdisk.reload_client()
         vdisk.invalidate_dynamics(['info', 'storagedriver_id', 'storagerouter_guid'])
+        if vdisk.storagerouter_guid is None:
+            raise ValueError('Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any Storage Router'.format(vdisk.name, vdisk.guid))
+
         if excluded_storagerouters is None:
             excluded_storagerouters = []
 
@@ -621,8 +628,8 @@ class MDSServiceController(object):
         for storagedriver in vpool.storagedrivers:
             storagerouter = storagedriver.storagerouter
             if check_online is True:
-                client = SSHClient(storagerouter)
                 try:
+                    client = SSHClient(storagerouter)
                     client.run('pwd')
                 except UnableToConnectException:
                     continue
@@ -682,11 +689,12 @@ class MDSServiceController(object):
                         client = SSHClient(storagerouter, username = 'root')
                         client.run('pwd')
                         mds_dict[vpool][storagerouter]['client'] = client
-                        logger.info('MDS checkup - vPool {0} - Storage Router {1}: ONLINE'.format(vpool.name, storagerouter.name))
+                        logger.info('MDS checkup - vPool {0} - Storage Router {1} - ONLINE'.format(vpool.name, storagerouter.name))
                     except UnableToConnectException:
-                        logger.info('MDS checkup - vPool {0} - Storage Router {1}: OFFLINE'.format(vpool.name, storagerouter.name))
+                        logger.info('MDS checkup - vPool {0} - Storage Router {1} - OFFLINE'.format(vpool.name, storagerouter.name))
                 mds_dict[vpool][storagerouter]['services'].append(mds_service)
 
+        failures = []
         max_load = Configuration.get('ovs.storagedriver.mds.maxload')
         for vpool, storagerouter_info in mds_dict.iteritems():
             # 1. First, make sure there's at least one MDS on every StorageRouter that's not overloaded
@@ -705,7 +713,7 @@ class MDSServiceController(object):
                     if load < max_load:
                         has_room = True
                         break
-                logger.info('MDS checkup - vPool {0} - Storage Router {1} - Capacity reached: {2}'.format(vpool.name, storagerouter.name, has_room))
+                logger.info('MDS checkup - vPool {0} - Storage Router {1} - Capacity available: {2}'.format(vpool.name, storagerouter.name, has_room))
                 if has_room is False and client is not None:
                     mds_service = MDSServiceController.prepare_mds_service(storagerouter=storagerouter,
                                                                            vpool=vpool,
@@ -714,7 +722,7 @@ class MDSServiceController(object):
                     if mds_service is None:
                         raise RuntimeError('Could not add MDS node')
                     mds_services.append(mds_service)
-            mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool)
+            mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool, True)
             for storagerouter in storagerouter_info:
                 client = mds_dict[vpool][storagerouter]['client']
                 if client is None:
@@ -730,7 +738,12 @@ class MDSServiceController(object):
             # 2. Per VPool, execute a safety check, making sure the master/slave configuration is optimal.
             logger.info('MDS checkup - vPool {0} - Ensuring safety for all virtual disks'.format(vpool.name))
             for vdisk in vpool.vdisks:
-                MDSServiceController.ensure_safety(vdisk)
+                try:
+                    MDSServiceController.ensure_safety(vdisk)
+                except Exception as ex:
+                    failures.append('Ensure safety for vDisk {0} with guid {1} failed with error: {2}'.format(vdisk.name, vdisk.guid, ex))
+        if len(failures) > 0:
+            raise Exception('\n - ' + '\n - '.join(failures))
         logger.info('MDS checkup - Finished')
 
 

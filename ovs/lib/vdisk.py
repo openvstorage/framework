@@ -840,6 +840,7 @@ class VDiskController(object):
                            'dtl_enabled': (bool, None)}
         vdisk = VDisk(vdisk_guid) if vdisk_guid else None
         vpool = VPool(vpool_guid) if vpool_guid else None
+        errors_found = False
         root_client_map = {}
         vpool_dtl_config_cache = {}
         vdisks = VDiskList.get_vdisks() if vdisk is None and vpool is None else vpool.vdisks if vpool is not None else [vdisk]
@@ -858,8 +859,15 @@ class VDiskController(object):
             volume_id = str(vdisk.volume_id)
             vpool_config = vpool_dtl_config_cache[vpool.guid]
             dtl_vpool_enabled = vpool_config['dtl_enabled']
-            current_dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id)
-            current_dtl_config_mode = vdisk.storagedriver_client.get_dtl_config_mode(volume_id)
+            try:
+                current_dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id)
+                current_dtl_config_mode = vdisk.storagedriver_client.get_dtl_config_mode(volume_id)
+            except RuntimeError as rte:
+                # Can occur when a volume has not been stolen yet from a dead node
+                logger.error('Retrieving DTL configuration from storage driver failed with error: {0}'.format(rte))
+                errors_found = True
+                continue
+
             if dtl_vpool_enabled is False and (current_dtl_config is None or current_dtl_config.host == 'null'):
                 logger.info('    DTL is globally disabled for vPool {0} with guid {1}'.format(vpool.name, vpool.guid))
                 vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
@@ -950,6 +958,9 @@ class VDiskController(object):
                 logger.info('        DTL config that will be set -->  Host: {0}, Port: {1}, Mode: {2}'.format(dtl_target.ip, port, vpool_dtl_mode))
                 dtl_config = DTLConfig(str(dtl_target.ip), port, StorageDriverClient.VDISK_DTL_MODE_MAP[vpool_dtl_mode])
                 vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
+        if errors_found is True:
+            logger.error('DTL checkup ended with errors')
+            raise Exception('DTL checkup failed with errors. Please check /var/log/ovs/lib.log for more information')
         logger.info('DTL checkup ended')
 
     @staticmethod

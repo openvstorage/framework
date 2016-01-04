@@ -22,6 +22,7 @@ from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.fs.exportfs import Nfsexports
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
@@ -90,7 +91,17 @@ class VPoolController(object):
         if not vpool.storagedrivers or not vpool.storagedrivers[0].storagerouter:
             return {}
 
-        client = SSHClient(vpool.storagedrivers[0].storagerouter)
+        client = None
+        for sd in vpool.storagedrivers:
+            try:
+                client = SSHClient(sd.storagerouter)
+                client.run('pwd')
+                break
+            except UnableToConnectException:
+                client = None
+                pass
+        if client is None:
+            raise RuntimeError('Could not find an online storage router to retrieve vPool configuration from')
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
         storagedriver_config.load(client)
 

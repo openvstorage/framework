@@ -39,14 +39,14 @@ function show_help {
 if [ "$1" = "help" ] ; then
     show_help
 elif [ "$1" = "setup" ] ; then
-    if [ "$#" -ne 2 ] ; then
+    if [ "$#" -lt 2 ] ; then
         python -c "from ovs.lib.setup import SetupController; SetupController.setup_node()"
     elif [ "$2" = "master" ] || [ "$2" = "extra" ] ; then
         python -c "from ovs.lib.setup import SetupController; SetupController.setup_node(force_type='$2')"
     elif [ "$2" = "promote" ] ; then
         python -c "from ovs.lib.setup import SetupController; SetupController.promote_or_demote_node('promote')"
     elif [ "$2" = "demote" ] ; then
-        python -c "from ovs.lib.setup import SetupController; SetupController.promote_or_demote_node('demote')"
+        python -c "from ovs.lib.setup import SetupController; SetupController.promote_or_demote_node('demote', '$3')"
     else
         show_help
     fi
@@ -59,10 +59,14 @@ elif [ "$1" = "update" ] ; then
         echo 'date >> /var/log/ovs/update.log; python -c "from ovs.lib.update import UpdateController; UpdateController.update_volumedriver()" &>> /var/log/ovs/update.log; echo "done" >> /var/log/ovs/update.log' > /tmp/update
         at -f /tmp/update now
         rm /tmp/update
+    else
+        show_help
     fi
 elif [ "$1" = "remove" ] ; then
     if [ "$2" = "nodes" ] ; then
-        python -c "from ovs.lib.setup import SetupController; SetupController.remove_nodes('$3')"
+        python -c "from ovs.lib.setup import SetupController; SetupController.remove_nodes(\"$3\")"
+    else
+        show_help
     fi
 elif [ "$1" = "monitor" ] ; then
     if [ "$2" = "services" ] ; then

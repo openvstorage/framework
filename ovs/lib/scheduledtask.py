@@ -217,7 +217,7 @@ class ScheduledTaskController(object):
                     logger.info('Gather Scrub - Storage Router {0:<15} has SCRUB partition at {1}'.format(storage_driver.storagerouter.ip, partition.path))
                     if storage_driver.storagerouter not in scrub_locations:
                         try:
-                            _ = SSHClient(storage_driver.storagerouter.ip)
+                            _ = SSHClient(storage_driver.storagerouter)
                             scrub_locations[storage_driver.storagerouter] = str(partition.path)
                         except UnableToConnectException:
                             logger.warning('Gather Scrub - Storage Router {0:<15} is not reachable'.format(storage_driver.storagerouter.ip))
