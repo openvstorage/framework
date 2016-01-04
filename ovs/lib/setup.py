@@ -254,9 +254,9 @@ class SetupController(object):
                             master_password = SetupController._ask_validate_password(master_ip, username='root')
                             known_passwords[master_ip] = master_password
                         for sr_ip, sr_name in storagerouters.iteritems():
-                            SetupController.discovered_nodes = {sr_name: {'ip': sr_ip,
-                                                                          'type': 'unknown',
-                                                                          'ip_list': [sr_ip]}}
+                            SetupController.discovered_nodes[sr_name] = {'ip': sr_ip,
+                                                                         'type': 'unknown',
+                                                                         'ip_list': [sr_ip]}
                             nodes.append(sr_ip)
                         if node_ip not in ip_client_map:
                             ip_client_map[node_ip] = SSHClient(node_ip, username='root', password=node_password)

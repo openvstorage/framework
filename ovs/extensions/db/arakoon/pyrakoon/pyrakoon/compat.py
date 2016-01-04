@@ -998,10 +998,9 @@ class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
                             if self.master_id != node and not \
                                 self._validate_master_id(self.master_id):
                                 self.master_id = None
-                            else:
                                 LOGGER.warning(
-                                    'Node "%s" doesn\'t know the master',
-                                    node)
+                                    'Node "%s" thinks the master is "%s", but actually it isn\'t',
+                                    node, tmp_master)
                     except Exception:
                         LOGGER.exception(
                             'Unable to validate master on node %s', tmp_master)
