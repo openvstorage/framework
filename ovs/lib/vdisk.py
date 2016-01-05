@@ -133,10 +133,9 @@ class VDiskController(object):
         """
         vdisk = VDisk(diskguid)
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-        storagerouter = StorageRouter(vdisk.storagerouter_guid)
         location = os.path.join(storagedriver.mountpoint, vdisk.devicename)
         logger.info('Deleting disk {0} on location {1}'.format(vdisk.name, location))
-        VDiskController.delete_volume.s(location=location).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id)).get(timeout=300)
+        VDiskController.delete_volume(location=location)
         logger.info('Deleted disk {0}'.format(location))
 
 

@@ -202,4 +202,5 @@ class VDiskViewSet(viewsets.ViewSet):
         Delete vdisk
         @param vdisk Guid of the vdisk to delete:
         """
-        return VDiskController.delete.delay(diskguid=vdisk.guid)
+        storagerouter = StorageRouter(vdisk.storagerouter_guid)
+        return VDiskController.delete.s(diskguid=vdisk.guid).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
