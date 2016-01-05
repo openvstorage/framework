@@ -32,6 +32,7 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -381,10 +382,11 @@ class SetupController(object):
             sys.exit(1)
 
     @staticmethod
-    def promote_or_demote_node(node_action):
+    def promote_or_demote_node(node_action, cluster_ip=None):
         """
         Promotes or demotes the local node
         :param node_action: Demote or promote
+        :param cluster_ip: IP of node to promote or demote
         """
 
         if node_action not in ('promote', 'demote'):
@@ -407,63 +409,103 @@ class SetupController(object):
                 raise RuntimeError('This node should be a master.')
             elif node_type not in ['MASTER', 'EXTRA']:
                 raise RuntimeError('This node is not correctly configured.')
+            elif cluster_ip and not re.match(Toolbox.regex_ip, cluster_ip):
+                raise RuntimeError('Incorrect IP provided ({0})'.format(cluster_ip))
 
-            target_password = SetupController._ask_validate_password('127.0.0.1', username='root',
-                                                                     node_string='this node')
-            target_client = SSHClient('127.0.0.1', username='root', password=target_password)
+            master_ip = None
+            offline_nodes = []
+            if node_action == 'demote' and cluster_ip:
+                from ovs.dal.lists.storagerouterlist import StorageRouterList
+                from ovs.lib.storagedriver import StorageDriverController
 
-            unique_id = System.get_my_machine_id(target_client)
-            ip = target_client.config_read('ovs.grid.ip')
+                ip = cluster_ip
+                online = True
+                unique_id = None
+                cluster_name = None
+                ip_client_map = {}
+                configure_rabbitmq = True
+                configure_memcached = True
+                for storage_router in StorageRouterList.get_storagerouters():
+                    try:
+                        client = SSHClient(storage_router.ip, username='root')
+                        client.run('pwd')
+                        if storage_router.node_type == 'MASTER':
+                            master_ip = storage_router.ip
+                        ip_client_map[storage_router.ip] = client
+                    except UnableToConnectException:
+                        if storage_router.ip == cluster_ip:
+                            online = False
+                            unique_id = storage_router.machine_id
+                            StorageDriverController.move_away(storagerouter_guid=storage_router.guid)
+                        offline_nodes.append(storage_router)
+                if online is True:
+                    raise RuntimeError("If the node is online, please use 'ovs setup demote' executed on the node you wish to demote")
 
-            cluster_name = None
-            if SetupController._avahi_installed(target_client):
-                with open(SetupController.avahi_filename, 'r') as avahi_file:
-                    avahi_contents = avahi_file.read()
-                match_groups = re.search('>ovs_cluster_(?P<cluster>[^_]+)_.+?<', avahi_contents).groupdict()
-                if 'cluster' not in match_groups:
-                    raise RuntimeError('No cluster information found.')
-                cluster_name = match_groups['cluster']
-                discovery_result = SetupController._discover_nodes(target_client)
-                master_nodes = [this_node_name for this_node_name, node_properties in discovery_result[cluster_name].iteritems() if node_properties.get('type') == 'master']
-                nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
-                if len(master_nodes) == 0:
-                    if node_action == 'promote':
-                        raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
-                    else:
-                        raise RuntimeError('It is not possible to remove the only master in cluster {0}'.format(cluster_name))
-                master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
-                nodes.append(ip)  # The client node is never included in the discovery results
             else:
-                master_nodes = []
-                nodes = []
-                try:
-                    from ovs.dal.lists.storagerouterlist import StorageRouterList
-                    with Remote(target_client.ip, [StorageRouterList],
-                                username='root',
-                                password=target_password,
-                                strict_host_key_checking=False) as remote:
-                        for sr in remote.StorageRouterList.get_storagerouters():
-                            nodes.append(sr.ip)
-                            if sr.machine_id != unique_id and sr.node_type == 'MASTER':
-                                master_nodes.append(ip)
-                except Exception, ex:
-                    logger.error('Error loading storagerouters: {0}'.format(ex))
-                if len(master_nodes) == 0:
-                    if node_action == 'promote':
-                        raise RuntimeError('No master node could be found')
-                    else:
-                        raise RuntimeError('It is not possible to remove the only master')
-                master_ip = master_nodes[0]
+                target_password = SetupController._ask_validate_password('127.0.0.1', username='root',
+                                                                         node_string='this node')
+                target_client = SSHClient('127.0.0.1', username='root', password=target_password)
 
-            ip_client_map = dict((node_ip, SSHClient(node_ip, username='root')) for node_ip in nodes if node_ip)
-            configure_rabbitmq = True
-            configure_memcached = True
-            preconfig = '/tmp/openvstorage_preconfig.cfg'
-            if os.path.exists(preconfig):
-                config = RawConfigParser()
-                config.read(preconfig)
-                configure_memcached = config.getboolean('setup', 'configure_memcached')
-                configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
+                unique_id = System.get_my_machine_id(target_client)
+                ip = target_client.config_read('ovs.grid.ip')
+
+                cluster_name = None
+                if SetupController._avahi_installed(target_client):
+                    with open(SetupController.avahi_filename, 'r') as avahi_file:
+                        avahi_contents = avahi_file.read()
+                    match_groups = re.search('>ovs_cluster_(?P<cluster>[^_]+)_.+?<', avahi_contents).groupdict()
+                    if 'cluster' not in match_groups:
+                        raise RuntimeError('No cluster information found.')
+                    cluster_name = match_groups['cluster']
+                    discovery_result = SetupController._discover_nodes(target_client)
+                    master_nodes = [this_node_name for this_node_name, node_properties in discovery_result[cluster_name].iteritems() if node_properties.get('type') == 'master']
+                    nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
+                    if len(master_nodes) == 0:
+                        if node_action == 'promote':
+                            raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
+                        else:
+                            raise RuntimeError('It is not possible to remove the only master in cluster {0}'.format(cluster_name))
+                    for node_name, node_info in discovery_result[cluster_name].iteritems():
+                        if node_info['ip'] != ip:
+                            master_ip = node_info['ip']
+                            break
+                    nodes.append(ip)  # The client node is never included in the discovery results
+                else:
+                    master_nodes = []
+                    nodes = []
+                    try:
+                        from ovs.dal.lists.storagerouterlist import StorageRouterList
+                        with Remote(target_client.ip, [StorageRouterList],
+                                    username='root',
+                                    password=target_password,
+                                    strict_host_key_checking=False) as remote:
+                            for sr in remote.StorageRouterList.get_storagerouters():
+                                nodes.append(sr.ip)
+                                if sr.machine_id != unique_id and sr.node_type == 'MASTER':
+                                    master_nodes.append(ip)
+                    except Exception, ex:
+                        logger.error('Error loading storagerouters: {0}'.format(ex))
+                    if len(master_nodes) == 0:
+                        if node_action == 'promote':
+                            raise RuntimeError('No master node could be found')
+                        else:
+                            raise RuntimeError('It is not possible to remove the only master')
+                    for possible_ip in master_nodes:
+                        if ip != possible_ip:
+                            master_ip = possible_ip
+                            break
+
+                ip_client_map = dict((node_ip, SSHClient(node_ip, username='root')) for node_ip in nodes if node_ip)
+                configure_rabbitmq = True
+                configure_memcached = True
+                preconfig = '/tmp/openvstorage_preconfig.cfg'
+                if os.path.exists(preconfig):
+                    config = RawConfigParser()
+                    config.read(preconfig)
+                    configure_memcached = config.getboolean('setup', 'configure_memcached')
+                    configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
+            if master_ip is None:
+                raise RuntimeError('Failed to retrieve another responsive MASTER node')
             if node_action == 'promote':
                 SetupController._promote_node(cluster_ip=ip,
                                               master_ip=master_ip,
@@ -479,7 +521,8 @@ class SetupController(object):
                                              ip_client_map=ip_client_map,
                                              unique_id=unique_id,
                                              configure_memcached=configure_memcached,
-                                             configure_rabbitmq=configure_rabbitmq)
+                                             configure_rabbitmq=configure_rabbitmq,
+                                             offline_nodes=offline_nodes)
 
             print ''
             print Interactive.boxed_message(['{0} complete.'.format(node_action.capitalize())])
@@ -497,6 +540,146 @@ class SetupController(object):
             print Interactive.boxed_message(['This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.'])
             logger.error('Keyboard interrupt')
             sys.exit(1)
+
+    @staticmethod
+    def remove_nodes(node_ips):
+        """
+        Remove the nodes with specified IPs from the cluster
+        :param node_ips: IPs of nodes to remove
+        :type node_ips: str
+        :return: None
+        """
+        from ovs.lib.storagedriver import StorageDriverController
+        from ovs.lib.storagerouter import StorageRouterController
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
+        from ovs.dal.lists.vdisklist import VDiskList
+
+        SetupController._log_message('+++ Remove nodes started +++')
+        SetupController._log_message('\nWARNING: Some of these steps may take a very long time, please check /var/log/ovs/lib.log on this node for more logging information\n\n')
+
+        ###############
+        # VALIDATIONS #
+        ###############
+        if not isinstance(node_ips, str):
+            raise ValueError('Node IPs must be a comma separated string of IPs or a single IP')
+
+        storage_router_ips_to_remove = set()
+        node_ips = node_ips.rstrip(',')
+        for storage_router_ip in node_ips.split(','):
+            storage_router_ip = storage_router_ip.strip()
+            if not storage_router_ip:
+                raise ValueError("An IP or multiple IPs of the Storage Routers to remove must be provided")
+            if not re.match(SSHClient.IP_REGEX, storage_router_ip.strip()):
+                raise ValueError('Invalid IP {0} specified'.format(storage_router_ip))
+            storage_router_ips_to_remove.add(storage_router_ip)
+
+        SetupController._log_message('Following nodes with IPs will be removed from the cluster: {0}'.format(list(storage_router_ips_to_remove)))
+        storage_router_all = StorageRouterList.get_storagerouters()
+        storage_router_masters = StorageRouterList.get_masters()
+        storage_router_all_ips = set([storage_router.ip for storage_router in storage_router_all])
+        storage_router_master_ips = set([storage_router.ip for storage_router in storage_router_masters])
+        storage_routers_to_remove = [StorageRouterList.get_by_ip(storage_router_ip) for storage_router_ip in storage_router_ips_to_remove]
+        unknown_ips = storage_router_ips_to_remove.difference(storage_router_all_ips)
+        if unknown_ips:
+            raise ValueError('Unknown IPs specified\nKnown in model:\n - {0}\nSpecified for removal:\n - {1}'.format('\n - '.join(storage_router_all_ips),
+                                                                                                                     '\n - '.join(unknown_ips)))
+
+        if len(storage_router_ips_to_remove) == len(storage_router_all_ips):
+            raise RuntimeError("Removing all nodes wouldn't be very smart now, would it?")
+
+        if not storage_router_master_ips.difference(storage_router_ips_to_remove):
+            raise RuntimeError("Removing all master nodes wouldn't be very smart now, would it?")
+
+        if System.get_my_storagerouter() in storage_routers_to_remove:
+            raise RuntimeError('The node to be removed cannot be identical to the node on which the removal is initiated')
+
+        SetupController._log_message('Creating SSH connections to remaining master nodes')
+        master_ip = None
+        ip_client_map = {}
+        storage_routers_offline = []
+        storage_routers_to_remove_online = []
+        storage_routers_to_remove_offline = []
+        for storage_router in storage_router_all:
+            try:
+                client = SSHClient(storage_router, username='root')
+                if client.run('pwd'):
+                    SetupController._log_message('  Node with IP {0:<15} successfully connected to'.format(storage_router.ip))
+                    ip_client_map[storage_router.ip] = SSHClient(storage_router.ip, username='root')
+                    if storage_router not in storage_routers_to_remove and storage_router.node_type == 'MASTER':
+                        master_ip = storage_router.ip
+                if storage_router in storage_routers_to_remove:
+                    storage_routers_to_remove_online.append(storage_router)
+            except UnableToConnectException:
+                SetupController._log_message('  Node with IP {0:<15} is unreachable'.format(storage_router.ip))
+                storage_routers_offline.append(storage_router)
+                if storage_router in storage_routers_to_remove:
+                    storage_routers_to_remove_offline.append(storage_router)
+
+        if len(ip_client_map) == 0 or master_ip is None:
+            raise RuntimeError('Could not connect to any master node in the cluster')
+
+        if len(storage_routers_to_remove_online) > 0 and len(storage_routers_to_remove_offline) > 0:
+            raise RuntimeError('Both on- and offline nodes have been specified for removal')  # Technically (might be) possible, but to prevent screw-ups
+
+        online_storage_router_guids = [sr.guid for sr in storage_routers_to_remove_online]
+        for vd in VDiskList.get_vdisks():
+            if vd.storagerouter_guid and vd.storagerouter_guid in online_storage_router_guids:
+                raise RuntimeError("Still vDisks attached to Storage Router with guid {0}".format(vd.storagerouter_guid))
+
+        ###########
+        # REMOVAL #
+        ###########
+        try:
+            SetupController._log_message('Starting removal of nodes')
+            for storage_router in storage_routers_to_remove:
+                if storage_router in storage_routers_to_remove_offline:
+                    SetupController._log_message('  Marking all Storage Drivers served by Storage Router {0} as offline'.format(storage_router.ip))
+                    StorageDriverController.move_away(storagerouter_guid=storage_router.guid)
+            for storage_router in storage_routers_to_remove:
+                # 2. Remove vPools
+                SetupController._log_message('  Cleaning up node with IP {0}'.format(storage_router.ip))
+                storage_routers_offline_guids = [sr.guid for sr in storage_routers_offline if sr.guid != storage_router.guid]
+                for storage_driver in storage_router.storagedrivers:
+                    SetupController._log_message('    Removing vPool {0} from node'.format(storage_driver.vpool.name))
+                    StorageRouterController.remove_storagedriver(storagedriver_guid=storage_driver.guid,
+                                                                 offline_storage_router_guids=storage_routers_offline_guids)
+
+                # 3. Demote if MASTER
+                if storage_router.node_type == 'MASTER':
+                    SetupController._demote_node(cluster_ip=storage_router.ip,
+                                                 master_ip=master_ip,
+                                                 cluster_name=None,
+                                                 ip_client_map=ip_client_map,
+                                                 unique_id=storage_router.machine_id,
+                                                 configure_memcached=True,
+                                                 configure_rabbitmq=True,
+                                                 offline_nodes=storage_routers_offline)
+
+                # 4. Clean up model
+                SetupController._log_message('    Removing node from model')
+                SetupController._run_hooks('remove', storage_router.ip)
+
+                for disk in storage_router.disks:
+                    for partition in disk.partitions:
+                        partition.delete()
+                    disk.delete()
+
+                storage_router.delete()
+                storage_router.pmachine.delete()
+                SetupController._log_message('    Successfully removed node')
+        except Exception as exception:
+            print ''  # Spacing
+            print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
+            logger.exception('Unexpected error')
+            logger.error(str(exception))
+            sys.exit(1)
+        except KeyboardInterrupt:
+            print ''
+            print ''
+            print Interactive.boxed_message(['This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.'])
+            logger.error('Keyboard interrupt')
+            sys.exit(1)
+        SetupController._log_message('+++ Remove nodes finished +++')
 
     @staticmethod
     def _prepare_node(cluster_ip, nodes, known_passwords, ip_client_map, hypervisor_info):
@@ -830,14 +1013,12 @@ class SetupController(object):
         logger.info('Extra node complete')
 
     @staticmethod
-    def _promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached,
-                      configure_rabbitmq):
+    def _promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached, configure_rabbitmq):
         """
         Promotes a given node
         """
         from ovs.dal.lists.storagerouterlist import StorageRouterList
         from ovs.dal.lists.servicetypelist import ServiceTypeList
-        from ovs.dal.lists.servicelist import ServiceList
         from ovs.dal.hybrids.service import Service
 
         print '\n+++ Promoting node +++\n'
@@ -905,9 +1086,6 @@ class SetupController(object):
         service.storagerouter = storagerouter
         service.save()
 
-        master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
-        slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
-
         if configure_rabbitmq:
             SetupController._configure_rabbitmq(target_client)
 
@@ -937,11 +1115,12 @@ class SetupController(object):
                 Toolbox.change_service_state(target_client, service, 'start', logger)
 
         print 'Restarting services'
-        SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
+        master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
+        SetupController._restart_framework_and_memcache_services(master_ips, ip_client_map)
 
         if SetupController._run_hooks('promote', cluster_ip, master_ip):
             print 'Restarting services'
-            SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
+            SetupController._restart_framework_and_memcache_services(master_ips, ip_client_map)
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -951,8 +1130,7 @@ class SetupController(object):
         logger.info('Promote complete')
 
     @staticmethod
-    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached,
-                     configure_rabbitmq):
+    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached, configure_rabbitmq, offline_nodes=None):
         """
         Demotes a given node
         """
@@ -961,16 +1139,12 @@ class SetupController(object):
         print '\n+++ Demoting node +++\n'
         logger.info('Demoting node')
 
-        if configure_memcached:
+        if offline_nodes is None:
+            offline_nodes = []
+
+        if configure_memcached is True and len(offline_nodes) == 0:
             if SetupController._validate_local_memcache_servers(ip_client_map) is False:
                 raise RuntimeError('Not all memcache nodes can be reached which is required for demoting a node.')
-
-        target_client = ip_client_map[cluster_ip]
-        node_name = target_client.run('hostname')
-
-        storagerouter = StorageRouterList.get_by_machine_id(unique_id)
-        storagerouter.node_type = 'EXTRA'
-        storagerouter.save()
 
         # Find other (arakoon) master nodes
         config = ArakoonClusterConfig('ovsdb')
@@ -981,17 +1155,27 @@ class SetupController(object):
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
-        print 'Leaving arakoon cluster'
-        logger.info('Leaving arakoon cluster')
-        ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'ovsdb')
+        storagerouter = StorageRouterList.get_by_machine_id(unique_id)
+        storagerouter.node_type = 'EXTRA'
+        storagerouter.save()
+
+        print 'Leaving arakoon ovsdb cluster'
+        logger.info('Leaving arakoon ovsdb cluster')
+        offline_node_ips = [node.ip for node in offline_nodes]
+        ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'ovsdb', offline_node_ips)
+        master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
+        slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
+        for ip in master_ips + slave_ips:
+            if ip != master_ip and ip not in offline_node_ips:
+                ArakoonInstaller.deploy_to_slave(master_ip, ip, 'ovsdb')
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
         master_client = ip_client_map[master_ip]
         config_types = []
-        if configure_memcached:
+        if configure_memcached is True:
             config_types.append('memcached')
-        if configure_rabbitmq:
+        if configure_rabbitmq is True:
             config_types.append('rabbitmq')
         for config_type in config_types:
             config_file, port = SetupController.generic_configfiles[config_type]
@@ -1017,66 +1201,67 @@ class SetupController(object):
             if service.name == 'arakoon-ovsdb':
                 service.delete()
 
-        master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
-        slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
+        if storagerouter not in offline_nodes:
+            target_client = ip_client_map[cluster_ip]
+            if configure_rabbitmq is True:
+                print 'Removing/unconfiguring RabbitMQ'
+                logger.debug('Removing/unconfiguring RabbitMQ')
+                if ServiceManager.has_service('rabbitmq-server', client=target_client):
+                    target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
+                    target_client.run('rabbitmqctl reset; sleep 5;')
+                    target_client.run('rabbitmqctl stop; sleep 5;')
+                    Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', logger)
+                    target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
-        if configure_rabbitmq:
-            print 'Removing/unconfiguring RabbitMQ'
-            logger.debug('Removing/unconfiguring RabbitMQ')
-            if ServiceManager.has_service('rabbitmq-server', client=target_client):
-                target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
-                target_client.run('rabbitmqctl reset; sleep 5;')
-                target_client.run('rabbitmqctl stop; sleep 5;')
-                Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', logger)
-                target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
+            print 'Removing services'
+            logger.info('Removing services')
+            services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + ['arakoon-ovsdb'])]
+            if configure_rabbitmq is False:
+                services.remove('rabbitmq-server')
+            if configure_memcached is False:
+                services.remove('memcached')
+            for service in services:
+                if ServiceManager.has_service(service, client=target_client):
+                    logger.debug('Removing service {0}'.format(service))
+                    Toolbox.change_service_state(target_client, service, 'stop', logger)
+                    ServiceManager.remove_service(service, client=target_client)
 
-        print 'Removing services'
-        logger.info('Removing services')
-        services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + ['arakoon-ovsdb'])]
-        if not configure_rabbitmq:
-            services.remove('rabbitmq-server')
-        if not configure_memcached:
-            services.remove('memcached')
-        for service in services:
-            if ServiceManager.has_service(service, client=target_client):
-                logger.debug('Removing service {0}'.format(service))
-                Toolbox.change_service_state(target_client, service, 'stop', logger)
-                ServiceManager.remove_service(service, client=target_client)
-
-        if ServiceManager.has_service('workers', client=target_client):
-            ServiceManager.add_service(name='workers',
-                                       client=target_client,
-                                       params={'MEMCACHE_NODE_IP': cluster_ip,
-                                               'WORKER_QUEUE': '{0}'.format(unique_id)})
+            if ServiceManager.has_service('workers', client=target_client):
+                ServiceManager.add_service(name='workers',
+                                           client=target_client,
+                                           params={'MEMCACHE_NODE_IP': cluster_ip,
+                                                   'WORKER_QUEUE': '{0}'.format(unique_id)})
 
         SetupController._configure_amqp_to_volumedriver(ip_client_map)
 
         print 'Restarting services'
         logger.debug('Restarting services')
-        SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
+        SetupController._restart_framework_and_memcache_services(master_ips, ip_client_map)
 
-        if SetupController._run_hooks('demote', cluster_ip, master_ip):
+        if SetupController._run_hooks('demote', cluster_ip, master_ip, offline_node_ips=offline_node_ips):
             print 'Restarting services'
-            SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
+            SetupController._restart_framework_and_memcache_services(master_ips, ip_client_map)
 
-        if SetupController._avahi_installed(target_client) is True:
-            SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
-        target_client.config_set('ovs.core.nodetype', 'EXTRA')
+        if storagerouter not in offline_nodes:
+            target_client = ip_client_map[cluster_ip]
+            node_name = target_client.run('hostname')
+            if SetupController._avahi_installed(target_client) is True:
+                SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
+            target_client.config_set('ovs.core.nodetype', 'EXTRA')
 
         logger.info('Demote complete')
 
     @staticmethod
-    def _restart_framework_and_memcache_services(masters, slaves, clients):
+    def _restart_framework_and_memcache_services(masters, clients):
         memcached = 'memcached'
         watcher = 'watcher-framework'
-        for ip in masters + slaves:
-            if ServiceManager.has_service(watcher, clients[ip]):
-                Toolbox.change_service_state(clients[ip], watcher, 'stop', logger)
-        for ip in masters:
-            Toolbox.change_service_state(clients[ip], memcached, 'restart', logger)
-        for ip in masters + slaves:
-            if ServiceManager.has_service(watcher, clients[ip]):
-                Toolbox.change_service_state(clients[ip], watcher, 'start', logger)
+        for ip, client in clients.iteritems():
+            if ServiceManager.has_service(watcher, client):
+                Toolbox.change_service_state(client, watcher, 'stop', logger)
+            if ip in masters:
+                Toolbox.change_service_state(client, memcached, 'restart', logger)
+            if ServiceManager.has_service(watcher, client):
+                Toolbox.change_service_state(client, watcher, 'start', logger)
         VolatileFactory.store = None
 
     @staticmethod
@@ -1154,8 +1339,7 @@ EOF
         print 'Update existing vPools'
         logger.info('Update existing vPools')
         for node_ip in node_ips:
-            with Remote(node_ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration],
-                        'ovs') as remote:
+            with Remote(node_ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration], 'ovs') as remote:
                 login = remote.Configuration.get('ovs.core.broker.login')
                 password = remote.Configuration.get('ovs.core.broker.password')
                 protocol = remote.Configuration.get('ovs.core.broker.protocol')
@@ -1165,8 +1349,7 @@ EOF
 
                 uris = []
                 for node in [n.strip() for n in cfg.get('main', 'nodes').split(',')]:
-                    uris.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(protocol, login, password, cfg.get(node,
-                                                                                                           'location'))})
+                    uris.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(protocol, login, password, cfg.get(node, 'location'))})
 
                 configuration_dir = '{0}/storagedriver/storagedriver'.format(remote.Configuration.get('ovs.core.cfgdir'))
                 if not remote.os.path.exists(configuration_dir):
@@ -1388,11 +1571,11 @@ EOF
         return rabbitmq_running, same_process
 
     @staticmethod
-    def _run_hooks(hook_type, cluster_ip, master_ip=None):
+    def _run_hooks(hook_type, cluster_ip, master_ip=None, **kwargs):
         """
         Execute hooks
         """
-        if hook_type != 'firstnode' and master_ip is None:
+        if hook_type not in ('firstnode', 'remove') and master_ip is None:
             raise ValueError('Master IP needs to be specified')
 
         functions = Toolbox.fetch_hooks('setup', hook_type)
@@ -1401,9 +1584,9 @@ EOF
             print '\n+++ Running hooks +++\n'
         for function in functions:
             if master_ip is None:
-                function(cluster_ip=cluster_ip)
+                function(cluster_ip=cluster_ip, **kwargs)
             else:
-                function(cluster_ip=cluster_ip, master_ip=master_ip)
+                function(cluster_ip=cluster_ip, master_ip=master_ip, **kwargs)
         return functions_found
 
     @staticmethod

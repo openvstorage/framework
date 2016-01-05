@@ -20,7 +20,7 @@ define(['knockout'], function(ko){
             machineGuid:  ko.observable(),
             vm:           ko.observable(),
             isConsistent: ko.observable(false),
-            isSticky:     ko.observable(false),
+            isSticky:     ko.observable(false)
         };
     };
     return singleton();
