@@ -192,3 +192,14 @@ class VDiskViewSet(viewsets.ViewSet):
                                                           pmachineguid=pmachineguid,
                                                           machineguid=machineguid)
 
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VDisk)
+    def delete(self, vdisk):
+        """
+        Delete vdisk
+        @param vdisk Guid of the vdisk to delete:
+        """
+        return VDiskController.delete.delay(diskguid=vdisk.guid)

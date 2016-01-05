@@ -125,6 +125,22 @@ class VDiskController(object):
                 mutex.release()
 
     @staticmethod
+    @celery.task(name='ovs.vdisk.delete')
+    def delete(diskguid):
+        """
+        Delete a vdisk through API
+        @param diskguid: GUID of the vdisk to delete
+        """
+        vdisk = VDisk(diskguid)
+        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+        storagerouter = StorageRouter(vdisk.storagerouter_guid)
+        location = os.path.join(storagedriver.mountpoint, vdisk.devicename)
+        logger.info('Deleting disk {0} on location {1}'.format(vdisk.name, location))
+        VDiskController.delete_volume.s(location=location).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id)).get(timeout=300)
+        logger.info('Deleted disk {0}'.format(location))
+
+
+    @staticmethod
     @celery.task(name='ovs.vdisk.resize_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def resize_from_voldrv(volumename, volumesize, volumepath, storagedriver_id):
@@ -542,8 +558,6 @@ class VDiskController(object):
         """
         Create a volume using filesystem calls
         Calls "rm" to delete raw file
-        TODO: use volumedriver API
-        TODO: delete VDisk from model
 
         @param location: location, filename
         @return None
