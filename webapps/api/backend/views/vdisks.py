@@ -192,3 +192,15 @@ class VDiskViewSet(viewsets.ViewSet):
                                                           pmachineguid=pmachineguid,
                                                           machineguid=machineguid)
 
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VDisk)
+    def delete(self, vdisk):
+        """
+        Delete vdisk
+        @param vdisk Guid of the vdisk to delete:
+        """
+        storagerouter = StorageRouter(vdisk.storagerouter_guid)
+        return VDiskController.delete.s(diskguid=vdisk.guid).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
