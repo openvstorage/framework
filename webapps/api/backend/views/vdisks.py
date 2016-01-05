@@ -127,7 +127,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def removesnapshot(self, vdisk, snapshot_id):
+    def remove_snapshot(self, vdisk, snapshot_id):
         """
         Remove a snapshot from a VDisk
         :param vdisk: Guid of the virtual disk whose snapshot is to be removed
