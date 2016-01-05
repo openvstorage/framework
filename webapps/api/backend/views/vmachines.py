@@ -259,3 +259,17 @@ class VMachineViewSet(viewsets.ViewSet):
         return VMachineController.clone.delay(machineguid=vmachine.guid,
                                               timestamp=snapshot_timestamp,
                                               name=new_machine_name)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VMachine)
+    def delete_snapshot(self, vmachine, snapshot_timestamp):
+        """
+        Delete a snapshot based on a snapshot timestamp
+        @param vmachine: GUID of the source vmachine
+        @param snapshot_timestamp: timestamp of the snapshot
+        """
+        return VMachineController.delete_snapshot.delay(vmachineguid=vmachine.guid,
+                                                        timestamp=snapshot_timestamp)
