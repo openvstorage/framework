@@ -504,6 +504,25 @@ class VMachineController(object):
             raise RuntimeError('Failed to snapshot vMachine {0}'.format(machine.name))
 
     @staticmethod
+    @celery.task(name='ovs.machine.delete_snapshot')
+    def delete_snapshot(vmachineguid, timestamp):
+        """
+        Remove a snapshot from the vmachine
+        @param vmachineguid: Guid of the virtual machine
+        @param timestampt: timestamp of the snapshot
+        """
+        vmachine = VMachine(vmachineguid)
+        vmachine_snapshots = [snap for snap in vmachine.snapshots if snap['timestamp'] == str(timestamp)]
+        if len(vmachine_snapshots) != 1:
+            raise RuntimeError('Snapshot {0} does not belong to vmachine {1}'.format(timestamp, vmachine.name))
+        vmachine_snapshot = vmachine_snapshots[0]
+        logger.info('Deleting snapshot {0} from vmachine {1}'.format(timestamp, vmachine.name))
+        for diskguid, snapshotid in vmachine_snapshot['snapshots'].items():
+            VDiskController.delete_snapshot(diskguid, snapshotid)
+        logger.info('Deleted snapshot {0}'.format(timestamp))
+        vmachine.invalidate_dynamics(['snapshots'])
+
+    @staticmethod
     @celery.task(name='ovs.machine.sync_with_hypervisor')
     @log('VOLUMEDRIVER_TASK')
     def sync_with_hypervisor(vmachineguid, storagedriver_id=None):
