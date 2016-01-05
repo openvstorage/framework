@@ -103,7 +103,7 @@ class SSHClient(object):
 
         self.ip = ip
         local_ips = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
-        self.local_ips = [ip.strip() for ip in local_ips]
+        self.local_ips = [lip.strip() for lip in local_ips]
         self.is_local = self.ip in self.local_ips
 
         if self.is_local is False and storagerouter is not None:

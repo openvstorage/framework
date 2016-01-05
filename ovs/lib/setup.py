@@ -276,7 +276,12 @@ class SetupController(object):
                                         if node_properties.get('type', None) == 'master']
                         if len(master_nodes) == 0:
                             raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
-                        master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
+                        for node_name, node_info in discovery_result[cluster_name].iteritems():
+                            if node_info['ip'] != ip:
+                                master_ip = node_info['ip']
+                                break
+                        if master_ip is None:
+                            raise RuntimeError('Could not find appropriate master')
                         master_password = SetupController._ask_validate_password(master_ip, username='root')
                         known_passwords[master_ip] = master_password
                         if master_ip not in ip_client_map:
@@ -432,7 +437,13 @@ class SetupController(object):
                         raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
                     else:
                         raise RuntimeError('It is not possible to remove the only master in cluster {0}'.format(cluster_name))
-                master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
+                master_ip = None
+                for node_name, node_info in discovery_result[cluster_name].iteritems():
+                    if node_info['ip'] != ip:
+                        master_ip = node_info['ip']
+                        break
+                if master_ip is None:
+                    raise RuntimeError('Could not find appropriate master')
                 nodes.append(ip)  # The client node is never included in the discovery results
             else:
                 master_nodes = []
@@ -515,28 +526,19 @@ class SetupController(object):
         print 'Exchanging SSH keys and updating hosts files'
         logger.info('Exchanging SSH keys and updating hosts files')
         passwords = {}
-        first_request = True
-        prev_node_password = ''
+        password = None
+        if known_passwords:
+            password = known_passwords.values()[0]
         for node in nodes:
             if node in known_passwords:
                 passwords[node] = known_passwords[node]
                 if node not in ip_client_map:
                     ip_client_map[node] = SSHClient(node, username='root', password=known_passwords[node])
                 continue
-            if first_request is True:
-                prev_node_password = SetupController._ask_validate_password(node, username='root')
-                logger.debug('Custom password for {0}'.format(node))
-                passwords[node] = prev_node_password
-                first_request = False
-                if node not in ip_client_map:
-                    ip_client_map[node] = SSHClient(node, username='root', password=prev_node_password)
-            else:
-                this_node_password = SetupController._ask_validate_password(node, username='root',
-                                                                            previous=prev_node_password)
-                passwords[node] = this_node_password
-                prev_node_password = this_node_password
-                if node not in ip_client_map:
-                    ip_client_map[node] = SSHClient(node, username='root', password=this_node_password)
+            password = SetupController._ask_validate_password(node, username='root', previous=password)
+            passwords[node] = password
+            if node not in ip_client_map:
+                ip_client_map[node] = SSHClient(node, username='root', password=password)
 
         logger.debug('Nodes: {0}'.format(nodes))
         logger.debug('Discovered nodes: \n{0}'.format(SetupController.discovered_nodes))
@@ -724,7 +726,7 @@ class SetupController(object):
 
         print 'Starting services'
         logger.info('Starting services for join master')
-        for service in SetupController.master_services:
+        for service in [s for s in SetupController.master_services if s not in ['etcd-config']]:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'start', logger)
@@ -880,7 +882,7 @@ class SetupController(object):
         arakoon_ports = [result['client_port'], result['messaging_port']]
 
         print 'Joining etcd cluster'
-        logger.info('Joining arakoon cluster')
+        logger.info('Joining etcd cluster')
         EtcdInstaller.extend_cluster(master_ip, cluster_ip, 'config', target_client.config_read('ovs.core.ovsdb'))
 
         print 'Distribute configuration files'
@@ -905,7 +907,6 @@ class SetupController(object):
         print 'Restarting master node services'
         logger.info('Restarting master node services')
         ArakoonInstaller.restart_cluster_add('ovsdb', master_nodes, cluster_ip)
-        EtcdInstaller.restart_cluster_add('config', master_ip, cluster_ip)
         PersistentFactory.store = None
         VolatileFactory.store = None
 
@@ -1436,17 +1437,18 @@ EOF
                     return None
                 except AuthenticationException:
                     pass
-                extra = ''
                 if previous is not None:
-                    extra = ', just press enter if identical as above'
-                password = Interactive.ask_password('Enter the {0} password for {1}{2}'.format(
+                    try:
+                        client = SSHClient(ip, username=username, password=previous)
+                        client.run('ls /')
+                        return previous
+                    except:
+                        pass
+                password = Interactive.ask_password('Enter the {0} password for {1}'.format(
                     username,
-                    ip if node_string is None else node_string,
-                    extra
+                    ip if node_string is None else node_string
                 ))
-                if password == '':
-                    password = previous
-                if password is None:
+                if password in ['', None]:
                     continue
                 client = SSHClient(ip, username=username, password=password)
                 client.run('ls /')

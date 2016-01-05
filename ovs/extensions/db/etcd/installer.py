@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import re
+import time
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
@@ -45,7 +46,7 @@ class EtcdInstaller(object):
         :param ip: IP address of the first node of the new cluster
         :param cluster_name: Name of the cluster
         """
-        logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
+        logger.debug('Creating cluster "{0}" on {1}'.format(cluster_name, ip))
         base_dir = base_dir.rstrip('/')
 
         client = SSHClient(ip, username='root')
@@ -72,8 +73,10 @@ class EtcdInstaller(object):
                                            'INITIAL_STATE': 'new',
                                            'INITIAL_PEERS': '-initial-advertise-peer-urls {0}'.format(EtcdInstaller.SERVER_URL.format(ip))},
                                    target_name=target_name)
+        EtcdInstaller.start(cluster_name, client)
+        EtcdInstaller.wait_for_cluster(cluster_name, client)
 
-        logger.debug('Creating cluster {0} on {1} completed'.format(cluster_name, ip))
+        logger.debug('Creating cluster "{0}" on {1} completed'.format(cluster_name, ip))
 
     @staticmethod
     def extend_cluster(master_ip, new_ip, cluster_name, base_dir):
@@ -84,10 +87,13 @@ class EtcdInstaller(object):
         :param new_ip: IP address of the node to be added
         :param master_ip: IP of one of the already existing nodes
         """
-        logger.debug('Extending cluster {0} from {1} to {2}'.format(cluster_name, master_ip, new_ip))
+        logger.debug('Extending cluster "{0}" from {1} to {2}'.format(cluster_name, master_ip, new_ip))
         base_dir = base_dir.rstrip('/')
 
         client = SSHClient(master_ip, username='root')
+        if not EtcdInstaller._is_healty(cluster_name, client):
+            raise RuntimeError('Cluster "{0}" unhealthy, aborting extend'.format(cluster_name))
+
         current_cluster = []
         for item in client.run('etcdctl member list').splitlines():
             info = re.search(EtcdInstaller.MEMBER_REGEX, item).groupdict()
@@ -120,7 +126,12 @@ class EtcdInstaller(object):
                                            'INITIAL_PEERS': ''},
                                    target_name=target_name)
 
-        logger.debug('Extending cluster {0} from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
+        master_client = SSHClient(master_ip, username='root')
+        master_client.run('etcdctl member add {0} {1}'.format(node_name, EtcdInstaller.SERVER_URL.format(new_ip)))
+        EtcdInstaller.start(cluster_name, client)
+        EtcdInstaller.wait_for_cluster(cluster_name, client)
+
+        logger.debug('Extending cluster "{0}" from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
 
     @staticmethod
     def shrink_cluster(remaining_node_ip, deleted_node_ip, cluster_name):
@@ -130,11 +141,26 @@ class EtcdInstaller(object):
         :param deleted_node_ip: The ip of the node that should be deleted
         :param remaining_node_ip: The ip of a remaining node
         """
-        logger.debug('Shrinking cluster {0} from {1}'.format(cluster_name, deleted_node_ip))
+        logger.debug('Shrinking cluster "{0}" from {1}'.format(cluster_name, deleted_node_ip))
 
+        current_client = SSHClient(remaining_node_ip, username='root')
+        if not EtcdInstaller._is_healty(cluster_name, current_client):
+            raise RuntimeError('Cluster "{0}" unhealthy, aborting shrink'.format(cluster_name))
+
+        old_client = SSHClient(deleted_node_ip, username='root')
+        node_name = System.get_my_machine_id(old_client)
+        node_id = None
+        for item in current_client.run('etcdctl member list').splitlines():
+            info = re.search(EtcdInstaller.MEMBER_REGEX, item).groupdict()
+            if info['name'] == node_name:
+                node_id = info['id']
+        if node_id is None:
+            raise RuntimeError('Could not locate {0} in the cluster'.format(deleted_node_ip))
+        current_client.run('etcdctl member remove {0}'.format(node_id))
         EtcdInstaller.deploy_to_slave(remaining_node_ip, deleted_node_ip, cluster_name)
+        EtcdInstaller.wait_for_cluster(cluster_name, current_client)
 
-        logger.debug('Shrinking cluster {0} from {1} completed'.format(cluster_name, deleted_node_ip))
+        logger.debug('Shrinking cluster "{0}" from {1} completed'.format(cluster_name, deleted_node_ip))
 
     @staticmethod
     def deploy_to_slave(master_ip, slave_ip, cluster_name):
@@ -195,49 +221,37 @@ class EtcdInstaller(object):
             ServiceManager.remove_service('etcd-{0}'.format(cluster_name), client=client)
 
     @staticmethod
-    def restart_cluster_add(cluster_name, current_ip, new_ip):
+    def wait_for_cluster(cluster_name, client):
         """
-        Execute a (re)start sequence after adding a new node to a cluster.
-        :param new_ip: IP of the newly added node
-        :param current_ip: IP of one of the existing nodes
-        :param cluster_name: Name of the cluster to restart
+        Validates the health of the etcd cluster is healthy
+        :param client: The client on which to validate the cluster
+        :param cluster_name: Name of the cluster
         """
-        logger.debug('Restart sequence (add) for {0}'.format(cluster_name))
-        logger.debug('Current ip: {0}'.format(current_ip))
-        logger.debug('New ip: {0}'.format(new_ip))
-
-        new_client = SSHClient(new_ip, username='root')
-        node_name = System.get_my_machine_id(new_client)
-        current_client = SSHClient(current_ip, username='root')
-
-        current_client.run('etcdctl member add {0} {1}'.format(node_name, EtcdInstaller.SERVER_URL.format(new_ip)))
-        EtcdInstaller.start(cluster_name, new_client)
-
-        logger.debug('Started node {0} for cluster {1}'.format(new_ip, cluster_name))
+        logger.debug('Waiting for cluster "{0}"'.format(cluster_name))
+        tries = 5
+        healthy = EtcdInstaller._is_healty(cluster_name, client)
+        while healthy is False and tries > 0:
+            tries -= 1
+            time.sleep(5 - tries)
+            healthy = EtcdInstaller._is_healty(cluster_name, client)
+        if healthy is False:
+            raise RuntimeError('Etcd cluster "{0}" could not be started correctly'.format(cluster_name))
+        logger.debug('Cluster "{0}" running'.format(cluster_name))
 
     @staticmethod
-    def restart_cluster_remove(cluster_name, remaining_ip, removed_ip):
+    def _is_healty(cluster_name, client):
         """
-        Execute a restart sequence after removing a node from a cluster
-        :param remaining_ip: IPs of the one of the remaining nodes after shrink
-        :param removed_ip: IP of the node which is removed
-        :param cluster_name: Name of the cluster to restart
+        Indicates whether a given cluster is healthy
+        :param cluster_name: name of the cluster
+        :param client: client on which to check
         """
-        logger.debug('Restart sequence (remove) for {0}'.format(cluster_name))
-        logger.debug('Remaining ip: {0}'.format(remaining_ip))
-        logger.debug('Removed ip: {0}'.format(removed_ip))
-
-        old_client = SSHClient(removed_ip, username='root')
-        node_name = System.get_my_machine_id(old_client)
-        current_client = SSHClient(remaining_ip, username='root')
-        node_id = None
-        for item in current_client.run('etcdctl member list').splitlines():
-            info = re.search(EtcdInstaller.MEMBER_REGEX, item).groupdict()
-            if info['name'] == node_name:
-                node_id = info['id']
-
-        EtcdInstaller.stop(cluster_name, old_client)
-        current_client.run('etcdctl member remove {0}'.format(node_id))
-        EtcdInstaller.deploy_to_slave(remaining_ip, removed_ip, cluster_name)
-
-        logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))
+        try:
+            output = client.run('etcdctl cluster-health')
+            if 'cluster is healthy' not in output:
+                logger.debug('  Cluster "{0}" is not healthy: {1}'.format(cluster_name, ' - '.join(output.splitlines())))
+                return False
+            logger.debug('  Cluster "{0}" is healthy'.format(cluster_name))
+            return True
+        except Exception as ex:
+            logger.debug('  Cluster "{0}" is not healthy: {1}'.format(cluster_name, ex))
+            return False
