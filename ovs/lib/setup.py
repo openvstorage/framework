@@ -670,7 +670,7 @@ class SetupController(object):
 
         print 'Setting up Etcd'
         logger.info('Setting up Etcd')
-        EtcdInstaller.create_cluster('config', cluster_ip, target_client.config_read('ovs.core.ovsdb'))
+        EtcdInstaller.create_cluster('config', cluster_ip)
 
         SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
@@ -883,7 +883,7 @@ class SetupController(object):
 
         print 'Joining etcd cluster'
         logger.info('Joining etcd cluster')
-        EtcdInstaller.extend_cluster(master_ip, cluster_ip, 'config', target_client.config_read('ovs.core.ovsdb'))
+        EtcdInstaller.extend_cluster(master_ip, cluster_ip, 'config')
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')

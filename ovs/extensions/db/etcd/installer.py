@@ -26,6 +26,7 @@ class EtcdInstaller(object):
     """
     class to dynamically install/(re)configure etcd cluster
     """
+    DB_DIR_CONFIG = 'ovs.core.ovsdb'
     DATA_DIR = '{0}/etcd/{1}/data'
     WAL_DIR = '{0}/etcd/{1}/wal'
     SERVER_URL = 'http://{0}:2380'
@@ -39,7 +40,7 @@ class EtcdInstaller(object):
         raise RuntimeError('EtcdInstaller is a complete static helper class')
 
     @staticmethod
-    def create_cluster(cluster_name, ip, base_dir):
+    def create_cluster(cluster_name, ip):
         """
         Creates a cluster
         :param base_dir: Base directory that should contain the data
@@ -47,14 +48,15 @@ class EtcdInstaller(object):
         :param cluster_name: Name of the cluster
         """
         logger.debug('Creating cluster "{0}" on {1}'.format(cluster_name, ip))
-        base_dir = base_dir.rstrip('/')
 
         client = SSHClient(ip, username='root')
         node_name = System.get_my_machine_id(client)
+        base_dir = client.config_read(EtcdInstaller.DB_DIR_CONFIG).rstrip('/')
 
         data_dir = EtcdInstaller.DATA_DIR.format(base_dir, cluster_name)
         wal_dir = EtcdInstaller.WAL_DIR.format(base_dir, cluster_name)
         abs_paths = [data_dir, wal_dir]
+        client.dir_delete(abs_paths)
         client.dir_create(abs_paths)
         client.dir_chmod(abs_paths, 0755, recursive=True)
         client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
@@ -79,7 +81,7 @@ class EtcdInstaller(object):
         logger.debug('Creating cluster "{0}" on {1} completed'.format(cluster_name, ip))
 
     @staticmethod
-    def extend_cluster(master_ip, new_ip, cluster_name, base_dir):
+    def extend_cluster(master_ip, new_ip, cluster_name):
         """
         Extends a cluster to a given new node
         :param base_dir: Base directory that will hold the data
@@ -88,7 +90,6 @@ class EtcdInstaller(object):
         :param master_ip: IP of one of the already existing nodes
         """
         logger.debug('Extending cluster "{0}" from {1} to {2}'.format(cluster_name, master_ip, new_ip))
-        base_dir = base_dir.rstrip('/')
 
         client = SSHClient(master_ip, username='root')
         if not EtcdInstaller._is_healty(cluster_name, client):
@@ -101,11 +102,13 @@ class EtcdInstaller(object):
 
         client = SSHClient(new_ip, username='root')
         node_name = System.get_my_machine_id(client)
+        base_dir = client.config_read(EtcdInstaller.DB_DIR_CONFIG).rstrip('/')
         current_cluster.append('{0}={1}'.format(node_name, EtcdInstaller.SERVER_URL.format(new_ip)))
 
         data_dir = EtcdInstaller.DATA_DIR.format(base_dir, cluster_name)
         wal_dir = EtcdInstaller.WAL_DIR.format(base_dir, cluster_name)
         abs_paths = [data_dir, wal_dir]
+        client.dir_delete(abs_paths)
         client.dir_create(abs_paths)
         client.dir_chmod(abs_paths, 0755, recursive=True)
         client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
@@ -181,6 +184,13 @@ class EtcdInstaller(object):
         base_name = 'ovs-etcd-proxy'
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
         EtcdInstaller.stop(cluster_name, slave_client)
+
+        base_dir = slave_client.config_read(EtcdInstaller.DB_DIR_CONFIG).rstrip('/')
+        data_dir = EtcdInstaller.DATA_DIR.format(base_dir, cluster_name)
+        wal_dir = EtcdInstaller.WAL_DIR.format(base_dir, cluster_name)
+        abs_paths = [data_dir, wal_dir]
+        slave_client.dir_delete(abs_paths)
+
         ServiceManager.add_service(base_name, slave_client,
                                    params={'CLUSTER': cluster_name,
                                            'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1'),
