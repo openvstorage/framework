@@ -887,12 +887,13 @@ class ArakoonClientConfig :
 
 # Actual client implementation
 class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
-    def __init__(self, config):
+    def __init__(self, config, timeout=0):
         self._config = config
         self.master_id = None
 
         self._lock = threading.RLock()
         self._connections = dict()
+        self._timeout = timeout
 
     @property
     def connected(self):
@@ -917,7 +918,9 @@ class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
                     connection = self._send_to_master(bytes_)
                     return utils.read_blocking(message.receive(),
                         connection.read)
-                except (errors.NotMaster, ArakoonNoMaster):
+                except (errors.NotMaster,
+                        ArakoonNoMaster,
+                        ArakoonSockReadNoBytes):
                     self.master_id = None
                     self.drop_connections()
 
@@ -1040,7 +1043,8 @@ class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
         if not connection:
             node_location = self._config.getNodeLocation(node_id)
             connection = _ClientConnection(node_location,
-                self._config.getClusterId())
+                                           self._config.getClusterId(),
+                                           self._timeout)
             connection.connect()
 
             self._connections[node_id] = connection
@@ -1049,11 +1053,15 @@ class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
 
 
 class _ClientConnection(object):
-    def __init__(self, address, cluster_id):
+    def __init__(self, address, cluster_id, timeout=0):
         self._address = address
         self._connected = False
         self._socket = None
         self._cluster_id = cluster_id
+        if (isinstance(timeout, (int, float)) and timeout > 0) or timeout is None:
+            self._timeout = timeout
+        else:
+            self._timeout = ArakoonClientConfig.getConnectionTimeout()
 
     def connect(self):
         if self._socket:
@@ -1061,8 +1069,7 @@ class _ClientConnection(object):
             self._socket = None
 
         try:
-            self._socket = socket.create_connection(self._address,
-                ArakoonClientConfig.getConnectionTimeout())
+            self._socket = socket.create_connection(self._address, self._timeout)
             self._socket.setblocking(False)
 
             data = protocol.build_prologue(self._cluster_id)
@@ -1102,10 +1109,9 @@ class _ClientConnection(object):
 
         bytes_remaining = count
         result = []
-        timeout = ArakoonClientConfig.getConnectionTimeout()
 
         while bytes_remaining > 0:
-            reads, _, _ = select.select([self._socket], [], [], timeout)
+            reads, _, _ = select.select([self._socket], [], [], self._timeout)
 
             if self._socket in reads:
                 try:
