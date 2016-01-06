@@ -476,7 +476,7 @@ class VDiskController(object):
             volume_id = vdisk.storagedriver_client.create_clone_from_template(target_path=disk_path,
                                                                               metadata_backend_config=MDSMetaDataBackendConfig([backend_config]),
                                                                               parent_volume_id=str(vdisk.volume_id),
-                                                                              node_id=str(storagedriver.id))
+                                                                              node_id=str(storagedriver.storagedriver_id))
             new_vdisk.volume_id = volume_id
             new_vdisk.save()
             MDSServiceController.ensure_safety(new_vdisk)
