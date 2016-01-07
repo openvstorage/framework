@@ -103,9 +103,11 @@ class ArakoonClusterConfig(object):
 
         if parser.has_option('global', 'plugins'):
             self._plugins = [plugin.strip() for plugin in parser.get('global', 'plugins').split(',')]
-        for key in self._extra_globals:
+        for key in self._extra_globals.keys():
             if parser.has_option('global', key):
                 self._extra_globals[key] = parser.get('global', key)
+            else:
+                del self._extra_globals[key]
         for node in parser.get('global', 'cluster').split(','):
             node = node.strip()
             self.nodes.append(ArakoonNodeConfig(name=node,
