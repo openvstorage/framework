@@ -42,13 +42,10 @@ class EtcdConfiguration(object):
     def get(key):
         key_entries = key.split('|')
         client = etcd.Client(port=2379, use_proxies=True)
-        data = client.read(key_entries[0]).value
+        data = json.loads(client.read(key_entries[0]).value)
         if len(key_entries) == 1:
-            try:
-                return json.loads(data)
-            except ValueError:
-                return data
-        temp_data = json.loads(data)
+            return data
+        temp_data = data
         for entry in key_entries[1].split('.'):
             temp_data = temp_data[entry]
         return temp_data
@@ -66,15 +63,14 @@ class EtcdConfiguration(object):
             data = {}
         temp_config = data
         entries = key_entries[1].split('.')
-        if len(entries) > 1:
-            for entry in entries[:-1]:
-                if entry in temp_config:
-                    temp_config = temp_config[entry]
-                else:
-                    temp_config[entry] = {}
-                    temp_config = temp_config[entry]
-            temp_config[entries[-1]] = value
-        client.write(key_entries[0], data)
+        for entry in entries[:-1]:
+            if entry in temp_config:
+                temp_config = temp_config[entry]
+            else:
+                temp_config[entry] = {}
+                temp_config = temp_config[entry]
+        temp_config[entries[-1]] = value
+        client.write(key_entries[0], json.dumps(data))
 
     @staticmethod
     def delete(key, remove_root=False):
@@ -96,7 +92,7 @@ class EtcdConfiguration(object):
             del temp_config[entries[-1]]
         if len(entries) == 1 and remove_root is True:
             del data[entries[0]]
-        client.write(key_entries[0], data)
+        client.write(key_entries[0], json.dumps(data))
 
     @staticmethod
     def exists(key):
