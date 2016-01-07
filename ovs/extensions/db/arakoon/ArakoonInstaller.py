@@ -96,18 +96,19 @@ class ArakoonClusterConfig(object):
         Reads a configuration from reality
         :param client: Client which will load the configuration
         """
-        self.nodes = []
         contents = client.file_read(self.filename)
         parser = RawConfigParser()
         parser.readfp(StringIO(contents))
 
-        if parser.has_option('global', 'plugins'):
-            self._plugins = [plugin.strip() for plugin in parser.get('global', 'plugins').split(',')]
-        for key in self._extra_globals.keys():
-            if parser.has_option('global', key):
-                self._extra_globals[key] = parser.get('global', key)
+        self.nodes = []
+        self._extra_globals = {}
+        for key in parser.options('global'):
+            if key == 'plugins':
+                self._plugins = [plugin.strip() for plugin in parser.get('global', 'plugins').split(',')]
+            elif key in ['cluster_id', 'cluster']:
+                pass  # Ignore these
             else:
-                del self._extra_globals[key]
+                self._extra_globals[key] = parser.get('global', key)
         for node in parser.get('global', 'cluster').split(','):
             node = node.strip()
             self.nodes.append(ArakoonNodeConfig(name=node,
