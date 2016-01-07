@@ -663,9 +663,13 @@ class SetupController(object):
                     for partition in disk.partitions:
                         partition.delete()
                     disk.delete()
-
-                storage_router.delete()
+                for service in storage_router.services:
+                    if service.abm_service is not None:
+                        service.abm_service.delete()
+                    service.delete()
                 storage_router.pmachine.delete()
+                storage_router.delete()
+
                 SetupController._log_message('    Successfully removed node')
         except Exception as exception:
             print ''  # Spacing
