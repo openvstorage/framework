@@ -637,7 +637,8 @@ class SetupController(object):
                     StorageDriverController.move_away(storagerouter_guid=storage_router.guid)
                     for storagedriver in storage_router.storagedrivers:
                         target_sr = None
-                        for sr in storagedriver.storagerouters:
+                        for sd in storagedriver.vpool.storagedrivers:
+                            sr = sd.storagerouter
                             if sr.guid != storage_router and sr not in storage_routers_to_remove:
                                 target_sr = sr
                                 break
