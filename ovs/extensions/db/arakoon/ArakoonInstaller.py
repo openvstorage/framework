@@ -83,6 +83,7 @@ class ArakoonClusterConfig(object):
         self.cluster_id = cluster_id
         self._dir = ArakoonClusterConfig.ARAKOON_CONFIG_DIR.format(self.cluster_id)
         self.filename = ArakoonClusterConfig.ARAKOON_CONFIG_FILE.format(self.cluster_id)
+        self._extra_globals = {'__tainted_tlog_entries_per_file': 5000}
         self.nodes = []
         self._plugins = []
         if isinstance(plugins, list):
@@ -95,13 +96,19 @@ class ArakoonClusterConfig(object):
         Reads a configuration from reality
         :param client: Client which will load the configuration
         """
-        self.nodes = []
         contents = client.file_read(self.filename)
         parser = RawConfigParser()
         parser.readfp(StringIO(contents))
 
-        if parser.has_option('global', 'plugins'):
-            self._plugins = [plugin.strip() for plugin in parser.get('global', 'plugins').split(',')]
+        self.nodes = []
+        self._extra_globals = {}
+        for key in parser.options('global'):
+            if key == 'plugins':
+                self._plugins = [plugin.strip() for plugin in parser.get('global', 'plugins').split(',')]
+            elif key in ['cluster_id', 'cluster']:
+                pass  # Ignore these
+            else:
+                self._extra_globals[key] = parser.get('global', key)
         for node in parser.get('global', 'cluster').split(','):
             node = node.strip()
             self.nodes.append(ArakoonNodeConfig(name=node,
@@ -119,6 +126,8 @@ class ArakoonClusterConfig(object):
         data = {'global': {'cluster_id': self.cluster_id,
                            'cluster': ','.join(sorted(node.name for node in self.nodes)),
                            'plugins': ','.join(sorted(self._plugins))}}
+        for key, value in self._extra_globals.iteritems():
+            data['global'][key] = value
         for node in self.nodes:
             data[node.name] = {'name': node.name,
                                'ip': node.ip,

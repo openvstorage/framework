@@ -23,8 +23,8 @@ logger = LogHandler.get('extensions', 'pyrakoon')
 
 
 class ArakoonAdminClient(object):
-    def __init__(self, node_id, config):
-        self._client = _ArakoonAdminClient(node_id, config)
+    def __init__(self, node_id, config, timeout=None):
+        self._client = _ArakoonAdminClient(node_id, config, timeout)
 
     @utils.update_argspec('self', 'n')
     @_convert_exceptions
@@ -34,8 +34,8 @@ class ArakoonAdminClient(object):
 
 
 class _ArakoonAdminClient(_ArakoonClient, admin.ClientMixin):
-    def __init__(self, node_id, config):
-        super(_ArakoonAdminClient, self).__init__(config)
+    def __init__(self, node_id, config, timeout=None):
+        super(_ArakoonAdminClient, self).__init__(config, timeout)
         self._node_id = node_id
 
     def _process(self, message):

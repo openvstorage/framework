@@ -344,7 +344,7 @@ class ScheduledTaskController(object):
         return vdisk_guids
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.collapse_arakoon', schedule=crontab(minute='30', hour='0'))
+    @celery.task(name='ovs.scheduled.collapse_arakoon', schedule=crontab(minute='10', hour='0,2,4,6,8,10,12,14,16,18,20,22'))
     @ensure_single(task_name='ovs.scheduled.collapse_arakoon')
     def collapse_arakoon():
         """
