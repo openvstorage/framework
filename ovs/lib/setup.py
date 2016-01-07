@@ -1116,11 +1116,12 @@ class SetupController(object):
 
         print 'Restarting services'
         master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
-        SetupController._restart_framework_and_memcache_services(master_ips, ip_client_map)
+        slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
+        SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if SetupController._run_hooks('promote', cluster_ip, master_ip):
             print 'Restarting services'
-            SetupController._restart_framework_and_memcache_services(master_ips, ip_client_map)
+            SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -1236,11 +1237,11 @@ class SetupController(object):
 
         print 'Restarting services'
         logger.debug('Restarting services')
-        SetupController._restart_framework_and_memcache_services(master_ips, ip_client_map)
+        SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if SetupController._run_hooks('demote', cluster_ip, master_ip, offline_node_ips=offline_node_ips):
             print 'Restarting services'
-            SetupController._restart_framework_and_memcache_services(master_ips, ip_client_map)
+            SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if storagerouter not in offline_nodes:
             target_client = ip_client_map[cluster_ip]
@@ -1252,16 +1253,17 @@ class SetupController(object):
         logger.info('Demote complete')
 
     @staticmethod
-    def _restart_framework_and_memcache_services(masters, clients):
+    def _restart_framework_and_memcache_services(masters, slaves, clients):
         memcached = 'memcached'
         watcher = 'watcher-framework'
-        for ip, client in clients.iteritems():
-            if ServiceManager.has_service(watcher, client):
-                Toolbox.change_service_state(client, watcher, 'stop', logger)
-            if ip in masters:
-                Toolbox.change_service_state(client, memcached, 'restart', logger)
-            if ServiceManager.has_service(watcher, client):
-                Toolbox.change_service_state(client, watcher, 'start', logger)
+        for ip in masters + slaves:
+            if ServiceManager.has_service(watcher, clients[ip]):
+                Toolbox.change_service_state(clients[ip], watcher, 'stop', logger)
+        for ip in masters:
+            Toolbox.change_service_state(clients[ip], memcached, 'restart', logger)
+        for ip in masters + slaves:
+            if ServiceManager.has_service(watcher, clients[ip]):
+                Toolbox.change_service_state(clients[ip], watcher, 'start', logger)
         VolatileFactory.store = None
 
     @staticmethod
