@@ -8,6 +8,9 @@ else
   dir=`mktemp -d`
   cd $dir
   git clone https://github.com/openvstorage/pyrakoon.git
+  cd pyrakoon
+  git log -1 --format="%H" > $1/ovs/extensions/db/arakoon/pyrakoon/pyrakoon.version
+  cd ..
   rm -rf $1/ovs/extensions/db/arakoon/pyrakoon/pyrakoon
   mv pyrakoon/pyrakoon $1/ovs/extensions/db/arakoon/pyrakoon/
   cd $1
