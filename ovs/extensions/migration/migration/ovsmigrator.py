@@ -71,6 +71,7 @@ class OVSMigrator(object):
             reload(ArakoonInstaller)
             from ovs.extensions.db.arakoon import ArakoonInstaller
             from ovs.extensions.generic.sshclient import SSHClient
+            from ovs.extensions.generic.configuration import Configuration
             if master_ips is not None:
                 for ip in master_ips:
                     client = SSHClient(ip)
@@ -80,5 +81,7 @@ class OVSMigrator(object):
                                 ArakoonInstaller.ArakoonInstaller.deploy_cluster(cluster_name, ip)
                             except:
                                 pass
+            if Configuration.exists('ovs.core.storage.persistent'):
+                Configuration.set('ovs.core.storage.persistent', 'pyrakoon')
 
         return working_version
