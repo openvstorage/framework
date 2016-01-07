@@ -635,6 +635,12 @@ class SetupController(object):
                 if storage_router in storage_routers_to_remove_offline:
                     SetupController._log_message('  Marking all Storage Drivers served by Storage Router {0} as offline'.format(storage_router.ip))
                     StorageDriverController.move_away(storagerouter_guid=storage_router.guid)
+                    for storage_driver in storage_router.storagedrivers:
+                        old_storage_router_path = os.path.join(storage_driver.mountpoint, storage_router.machine_id)
+                        if os.path.exists(old_storage_router_path):
+                            # make sure files are "stolen" from the watcher
+                            os.path.listdir(old_storage_router_path)
+                            
             for storage_router in storage_routers_to_remove:
                 # 2. Remove vPools
                 SetupController._log_message('  Cleaning up node with IP {0}'.format(storage_router.ip))
@@ -664,8 +670,12 @@ class SetupController(object):
                         partition.delete()
                     disk.delete()
 
+                pmachine = storage_router.pmachine
+                for vmachine in pmachine.vmachines:
+                    vmachine.delete(abandon=['vdisks'])
                 storage_router.delete()
-                storage_router.pmachine.delete()
+                pmachine.delete()
+
                 SetupController._log_message('    Successfully removed node')
         except Exception as exception:
             print ''  # Spacing
