@@ -79,7 +79,7 @@ class StorageRouterController(object):
     """
     ARAKOON_CLUSTER_ID_VOLDRV = 'voldrv'
     SUPPORT_AGENT = 'support-agent'
-    PARTITION_DEFAULT_USAGES = {DiskPartition.ROLES.DB: (20, 10),  # 1st number is exact size in GiB, 2nd number is percentage (highest of the 2 will be taken)
+    PARTITION_DEFAULT_USAGES = {DiskPartition.ROLES.DB: (40, 20),  # 1st number is exact size in GiB, 2nd number is percentage (highest of the 2 will be taken)
                                 DiskPartition.ROLES.SCRUB: (0, 0)}
 
     @staticmethod
