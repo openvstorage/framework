@@ -84,4 +84,6 @@ class OVSMigrator(object):
             if Configuration.exists('ovs.core.storage.persistent'):
                 Configuration.set('ovs.core.storage.persistent', 'pyrakoon')
 
+            working_version = 3
+
         return working_version
