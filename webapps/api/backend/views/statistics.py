@@ -18,14 +18,12 @@ Statistics module
 
 import datetime
 import memcache
-import os
-from ConfigParser import RawConfigParser
 from backend.decorators import required_roles, load, log
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 
 
 class MemcacheViewSet(viewsets.ViewSet):
@@ -41,10 +39,7 @@ class MemcacheViewSet(viewsets.ViewSet):
         """
         Get the memcache nodes
         """
-        memcache_ini = RawConfigParser()
-        memcache_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-        nodes = [node.strip() for node in memcache_ini.get('main', 'nodes').split(',')]
-        return [memcache_ini.get(node, 'location') for node in nodes]
+        return EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
 
     @staticmethod
     def _node_stats(host):

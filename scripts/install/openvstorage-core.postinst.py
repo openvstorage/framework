@@ -60,10 +60,6 @@ if not os.path.exists('/etc/rsyslog.d/90-ovs.conf') or '$KLogPermitNonKernelFaci
     check_output('echo "\$KLogPermitNonKernelFacility on" > /etc/rsyslog.d/90-ovs.conf', shell=True)
     check_output('service rsyslog restart', shell=True)
 
-# Creating configuration file
-if not os.path.isfile('/opt/OpenvStorage/config/ovs.json'):
-    check_output('cp /opt/OpenvStorage/config/templates/ovs.json /opt/OpenvStorage/config/ovs.json', shell=True)
-
 # Configure SSH
 config_file = '/etc/ssh/sshd_config'
 ssh_content_before = None

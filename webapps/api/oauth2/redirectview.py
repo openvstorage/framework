@@ -21,7 +21,7 @@ import urllib
 import base64
 import requests
 import datetime
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.extensions.generic.system import System
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
@@ -48,7 +48,7 @@ class OAuth2RedirectView(View):
         Handles token post
         """
         _ = args, kwargs
-        html_endpoint = Configuration.get('ovs.webapps.html_endpoint')
+        html_endpoint = EtcdConfiguration.get('/ovs/framework/webapps|html_endpoint')
         if 'code' not in request.GET:
             logger.error('Got OAuth2 redirection request without code')
             return HttpResponseRedirect, html_endpoint
@@ -63,9 +63,9 @@ class OAuth2RedirectView(View):
             logger.error('Error {0} during OAuth2 redirection request: {1}'.format(error, description))
             return HttpResponseRedirect, html_endpoint
 
-        base_url = Configuration.get('ovs.webapps.oauth2.token_uri')
-        client_id = Configuration.get('ovs.webapps.oauth2.client_id')
-        client_secret = Configuration.get('ovs.webapps.oauth2.client_secret')
+        base_url = EtcdConfiguration.get('/ovs/framework/webapps|oauth2.token_uri')
+        client_id = EtcdConfiguration.get('/ovs/framework/webapps|oauth2.client_id')
+        client_secret = EtcdConfiguration.get('/ovs/framework/webapps|oauth2.client_secret')
         parameters = {'grant_type': 'authorization_code',
                       'redirect_url': 'https://{0}/api/oauth2/redirect/'.format(System.get_my_storagerouter().ip),
                       'client_id': client_id,

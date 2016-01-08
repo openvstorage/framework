@@ -21,7 +21,6 @@ import sys
 sys.path.append('/opt/OpenvStorage')
 
 import os
-from ConfigParser import RawConfigParser
 from kombu import Queue
 from celery import Celery
 from celery.signals import task_postrun, worker_process_init
@@ -30,17 +29,10 @@ from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 
-memcache_ini = RawConfigParser()
-memcache_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-memcache_nodes = [node.strip() for node in memcache_ini.get('main', 'nodes').split(',')]
-memcache_servers = map(lambda n: memcache_ini.get(n, 'location'), memcache_nodes)
-
-rmq_ini = RawConfigParser()
-rmq_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-rmq_nodes = [node.strip() for node in rmq_ini.get('main', 'nodes').split(',')]
-rmq_servers = map(lambda n: rmq_ini.get(n, 'location'), rmq_nodes)
+memcache_servers = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
+rmq_servers = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
 
 unique_id = System.get_my_machine_id()
 
@@ -55,9 +47,9 @@ celery = Celery('ovs', include=include)
 
 celery.conf.CELERY_RESULT_BACKEND = "cache"
 celery.conf.CELERY_CACHE_BACKEND = 'memcached://{0}/'.format(';'.join(memcache_servers))
-celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(Configuration.get('ovs.core.broker.protocol'),
-                                                                Configuration.get('ovs.core.broker.login'),
-                                                                Configuration.get('ovs.core.broker.password'),
+celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(EtcdConfiguration.get('/ovs/framework/messagequeue|protocol'),
+                                                                EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
+                                                                EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
                                                                 server)
                                    for server in rmq_servers])
 celery.conf.CELERY_DEFAULT_QUEUE = 'ovs_generic'

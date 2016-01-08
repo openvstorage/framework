@@ -16,7 +16,7 @@ import time
 from subprocess import check_output, CalledProcessError
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.extensions.os.os import OSManager
 
 from ovs.log.logHandler import LogHandler
@@ -25,10 +25,10 @@ logger = LogHandler.get('extensions', name='heartbeat')
 ARP_TIMEOUT = 30
 current_time = int(time.time())
 machine_id = System.get_my_machine_id()
-amqp = '{0}://{1}:{2}@{3}//'.format(Configuration.get('ovs.core.broker.protocol'),
-                                    Configuration.get('ovs.core.broker.login'),
-                                    Configuration.get('ovs.core.broker.password'),
-                                    Configuration.get('ovs.grid.ip'))
+amqp = '{0}://{1}:{2}@{3}//'.format(EtcdConfiguration.get('/ovs/framework/messagequeue|protocol'),
+                                    EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
+                                    EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
+                                    EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(machine_id)))
 
 celery_path = OSManager.get_path('celery')
 worker_states = check_output("{0} inspect ping -b {1} 2> /dev/null | grep OK | perl -pe 's/\x1b\[[0-9;]*m//g' || true".format(celery_path, amqp), shell=True)

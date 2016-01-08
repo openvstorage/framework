@@ -19,7 +19,7 @@ Contains the loghandler module
 import inspect
 import logging
 import os
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 
 
 def _ignore_formatting_errors():
@@ -79,7 +79,7 @@ class LogHandler(object):
             raise RuntimeError('Cannot invoke instance from outside this class. Please use LogHandler.get(source, name=None) instead')
 
         if name is None:
-            name = Configuration.get('ovs.logging.default_name')
+            name = 'logger'
 
         log_filename = LogHandler.load_path(source)
 
@@ -89,15 +89,14 @@ class LogHandler(object):
 
         self.logger = logging.getLogger(name)
         self.logger.propagate = propagate
-        self.logger.setLevel(getattr(logging, Configuration.get('ovs.logging.level')))
+        self.logger.setLevel(getattr(logging, 'DEBUG'))
         self.logger.addHandler(handler)
         self._key = '{0}_{1}'.format(source, name)
 
     @staticmethod
     def load_path(source):
-        log_filename = '{0}/{1}.log'.format(
-            Configuration.get('ovs.logging.path'),
-            LogHandler.targets[source] if source in LogHandler.targets else Configuration.get('ovs.logging.default_file')
+        log_filename = '/var/log/ovs/{0}.log'.format(
+            LogHandler.targets[source] if source in LogHandler.targets else 'generic'
         )
         if not os.path.exists(log_filename):
             open(log_filename, 'a').close()

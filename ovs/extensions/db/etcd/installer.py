@@ -26,7 +26,7 @@ class EtcdInstaller(object):
     """
     class to dynamically install/(re)configure etcd cluster
     """
-    DB_DIR_CONFIG = 'ovs.core.ovsdb'
+    DB_DIR = '/opt/OpenvStorage/db'
     DATA_DIR = '{0}/etcd/{1}/data'
     WAL_DIR = '{0}/etcd/{1}/wal'
     SERVER_URL = 'http://{0}:2380'
@@ -51,10 +51,9 @@ class EtcdInstaller(object):
 
         client = SSHClient(ip, username='root')
         node_name = System.get_my_machine_id(client)
-        base_dir = client.config_read(EtcdInstaller.DB_DIR_CONFIG).rstrip('/')
 
-        data_dir = EtcdInstaller.DATA_DIR.format(base_dir, cluster_name)
-        wal_dir = EtcdInstaller.WAL_DIR.format(base_dir, cluster_name)
+        data_dir = EtcdInstaller.DATA_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
+        wal_dir = EtcdInstaller.WAL_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
         abs_paths = [data_dir, wal_dir]
         client.dir_delete(abs_paths)
         client.dir_create(abs_paths)
@@ -102,11 +101,10 @@ class EtcdInstaller(object):
 
         client = SSHClient(new_ip, username='root')
         node_name = System.get_my_machine_id(client)
-        base_dir = client.config_read(EtcdInstaller.DB_DIR_CONFIG).rstrip('/')
         current_cluster.append('{0}={1}'.format(node_name, EtcdInstaller.SERVER_URL.format(new_ip)))
 
-        data_dir = EtcdInstaller.DATA_DIR.format(base_dir, cluster_name)
-        wal_dir = EtcdInstaller.WAL_DIR.format(base_dir, cluster_name)
+        data_dir = EtcdInstaller.DATA_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
+        wal_dir = EtcdInstaller.WAL_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
         abs_paths = [data_dir, wal_dir]
         client.dir_delete(abs_paths)
         client.dir_create(abs_paths)
@@ -185,9 +183,8 @@ class EtcdInstaller(object):
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
         EtcdInstaller.stop(cluster_name, slave_client)
 
-        base_dir = slave_client.config_read(EtcdInstaller.DB_DIR_CONFIG).rstrip('/')
-        data_dir = EtcdInstaller.DATA_DIR.format(base_dir, cluster_name)
-        wal_dir = EtcdInstaller.WAL_DIR.format(base_dir, cluster_name)
+        data_dir = EtcdInstaller.DATA_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
+        wal_dir = EtcdInstaller.WAL_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
         abs_paths = [data_dir, wal_dir]
         slave_client.dir_delete(abs_paths)
 

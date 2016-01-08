@@ -36,7 +36,7 @@ from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, Arakoon
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.lib.helpers.decorators import log
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.helpers.decorators import ensure_single, add_hooks
@@ -87,7 +87,7 @@ class StorageDriverController(object):
             host_status = 'RUNNING'
             try:
                 client = SSHClient(storagerouter, username='root')
-                configuration_dir = client.config_read('ovs.core.cfgdir')
+                configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
                 logger.info('SSHClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
                 with Remote(client.ip, [LocalStorageRouterClient]) as remote:
                     lsrc = remote.LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir,
@@ -260,9 +260,8 @@ class StorageDriverController(object):
                 arakoon_nodes.append({'host': node.ip,
                                       'port': node.client_port,
                                       'node_id': node.name})
-            with Remote(storagerouter.ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration], 'ovs') as remote:
-                configuration_dir = '{0}/storagedriver/storagedriver'.format(
-                    remote.Configuration.get('ovs.core.cfgdir'))
+            with Remote(storagerouter.ip, [os, RawConfigParser, EtcdConfiguration, StorageDriverConfiguration], 'ovs') as remote:
+                configuration_dir = '{0}/storagedriver/storagedriver'.format(EtcdConfiguration.get('/ovs/framework/paths|cfgdir'))
                 if not remote.os.path.exists(configuration_dir):
                     remote.os.makedirs(configuration_dir)
                 for json_file in remote.os.listdir(configuration_dir):

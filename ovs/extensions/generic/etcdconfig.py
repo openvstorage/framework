@@ -18,6 +18,8 @@ Generic module for managing configuration in Etcd
 
 import json
 import etcd
+import random
+import string
 
 
 class EtcdConfiguration(object):
@@ -29,7 +31,19 @@ class EtcdConfiguration(object):
     key  = <etcd path>[|<json path>]
     etcd path = slash-delimited path
     json path = dot-delimited path
-    If no json path is given, the raw etcd data is returned
+
+    Examples:
+        > EtcdConfiguration.set('/foo', 1)
+        > print EtcdConfiguration.get('/foo')
+        < 1
+        > EtcdConfiguration.set('/foo', {'bar': 1})
+        > print EtcdConfiguration.get('/foo')
+        < {u'bar': 1}
+        > print EtcdConfiguration.get('/foo|bar')
+        < 1
+        > EtcdConfiguration.set('/bar|a.b', 'test')
+        > print EtcdConfiguration.get('/bar')
+        < {u'a': {u'b': u'test'}}
     """
 
     def __init__(self):
@@ -41,8 +55,7 @@ class EtcdConfiguration(object):
     @staticmethod
     def get(key):
         key_entries = key.split('|')
-        client = etcd.Client(port=2379, use_proxies=True)
-        data = json.loads(client.read(key_entries[0]).value)
+        data = EtcdConfiguration._get(key_entries[0])
         if len(key_entries) == 1:
             return data
         temp_data = data
@@ -53,12 +66,11 @@ class EtcdConfiguration(object):
     @staticmethod
     def set(key, value):
         key_entries = key.split('|')
-        client = etcd.Client(port=2379, use_proxies=True)
         if len(key_entries) == 1:
-            client.write(key_entries[0], json.dumps(value))
+            EtcdConfiguration._set(key_entries[0], value)
             return
         try:
-            data = json.loads(client.read(key_entries[0]).value)
+            data = EtcdConfiguration._get(key_entries[0])
         except etcd.EtcdKeyNotFound:
             data = {}
         temp_config = data
@@ -70,16 +82,15 @@ class EtcdConfiguration(object):
                 temp_config[entry] = {}
                 temp_config = temp_config[entry]
         temp_config[entries[-1]] = value
-        client.write(key_entries[0], json.dumps(data))
+        EtcdConfiguration._set(key_entries[0], data)
 
     @staticmethod
     def delete(key, remove_root=False):
         key_entries = key.split('|')
-        client = etcd.Client(port=2379, use_proxies=True)
         if len(key_entries) == 1:
-            client.delete(key_entries[0])
+            EtcdConfiguration._delete(key_entries[0])
             return
-        data = json.loads(client.read(key_entries[0]).value)
+        data = EtcdConfiguration._get(key_entries[0])
         temp_config = data
         entries = key_entries[1].split('.')
         if len(entries) > 1:
@@ -92,7 +103,7 @@ class EtcdConfiguration(object):
             del temp_config[entries[-1]]
         if len(entries) == 1 and remove_root is True:
             del data[entries[0]]
-        client.write(key_entries[0], json.dumps(data))
+        EtcdConfiguration._set(key_entries[0], data)
 
     @staticmethod
     def exists(key):
@@ -101,3 +112,73 @@ class EtcdConfiguration(object):
             return True
         except (KeyError, etcd.EtcdKeyNotFound):
             return False
+
+    @staticmethod
+    def initialize_host(host_id):
+        base_config = {'/storagedriver': {'mds_maxload': 75,
+                                          'rsp': '/var/rsp',
+                                          'vmware_mode': 'ganesha'},
+                       '/ports': {'storagedriver': [[26200, 26299]],
+                                  'mds': [[26300, 26399]],
+                                  'arakoon': [26400]},
+                       '/setupcompleted': False,
+                       '/type': 'UNCONFIGURED'}
+        for key, value in base_config.iteritems():
+            EtcdConfiguration._set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value)
+
+    @staticmethod
+    def initialize():
+        cluster_id = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
+        webapps_secret = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
+        base_config = {'/cluster_id': cluster_id,
+                       '/registered': False,
+                       '/memcache': {'endpoints': []},
+                       '/messagequeue': {'endpoints': [],
+                                         'protocol': 'amqp',
+                                         'user': 'ovs',
+                                         'port': 5672,
+                                         'password': '0penv5tor4ge',
+                                         'queues': {'storagedriver': 'volumerouter'}},
+                       '/plugins/installed': {'backends': [],
+                                              'generic': []},
+                       '/versions': {'ovs': 4},
+                       '/stores': {'persistent': 'pyrakoon',
+                                   'volatile': 'memcache'},
+                       '/paths': {'cfgdir': '/opt/OpenvStorage/config',
+                                  'basedir': '/opt/OpenvStorage',
+                                  'ovsdb': '/opt/OpenvStorage/db'},
+                       '/support': {'enablesupport': False,
+                                    'enabled': True,
+                                    'interval': 60},
+                       '/storagedriver': {'mds_safety': 2,
+                                          'mds_tlogs': 100},
+                       '/webapps': {'uiname': 'api',
+                                    'appname': 'api',
+                                    'dir': 'webapps',
+                                    'dbname': 'api.sqlite3',
+                                    'secret': webapps_secret,
+                                    'html_endpoint': '/',
+                                    'oauth2': {'mode': 'local'}}}
+        for key, value in base_config.iteritems():
+            EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value)
+
+    @staticmethod
+    def _delete(key):
+        client = etcd.Client(port=2379, use_proxies=True)
+        client.delete(key)
+
+    @staticmethod
+    def _get(key):
+        client = etcd.Client(port=2379, use_proxies=True)
+        return json.loads(client.read(key).value)
+
+    @staticmethod
+    def _set(key, value):
+        client = etcd.Client(port=2379, use_proxies=True)
+        client.write(key, json.dumps(value))
+        try:
+            from ovs.extensions.storage.persistentfactory import PersistentFactory
+            client = PersistentFactory.get_client()
+            client.set(key, value)
+        except:
+            pass

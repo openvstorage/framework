@@ -19,6 +19,7 @@ from ConfigParser import RawConfigParser
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.extensions.services.service import ServiceManager
 from StringIO import StringIO
 from ovs.log.logHandler import LogHandler
@@ -365,7 +366,7 @@ class ArakoonInstaller(object):
                             exclude_ports.append(node.messaging_port)
                 except:
                     logger.error('  Could not load port information of cluster {0}'.format(cluster_name))
-        ports = System.get_free_ports(client.config_read('ovs.ports.arakoon'), exclude_ports, 2, client)
+        ports = System.get_free_ports(EtcdConfiguration.get('/ovs/framework/hosts/{0}/ports|arakoon'.format(node_name)), exclude_ports, 2, client)
         logger.debug('  Loaded free ports {0} based on existing clusters {1}'.format(ports, clusters))
         return ports
 
