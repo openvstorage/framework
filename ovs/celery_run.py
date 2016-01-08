@@ -60,6 +60,7 @@ celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(Configuration.ge
                                                                 Configuration.get('ovs.core.broker.password'),
                                                                 server)
                                    for server in rmq_servers])
+celery.conf.BROKER_CONNECTION_MAX_RETRIES = 5
 celery.conf.CELERY_DEFAULT_QUEUE = 'ovs_generic'
 celery.conf.CELERY_QUEUES = tuple([Queue('ovs_generic', routing_key='generic.#'),
                                    Queue('ovs_masters', routing_key='masters.#'),

@@ -647,7 +647,7 @@ class SetupController(object):
                             old_storage_router_path = '{0}/{1}'.format(storagedriver.mountpoint, storage_router.machine_id)
                             if client.dir_exists(old_storage_router_path):
                                 # make sure files are "stolen" from the watcher
-                                client.dir_list(old_storage_router_path)
+                                client.run('ls -Ral {0}'.format(SSHClient.shell_safe(old_storage_router_path)))
 
             for storage_router in storage_routers_to_remove:
                 # 2. Remove vPools
@@ -1255,11 +1255,11 @@ class SetupController(object):
 
         print 'Restarting services'
         logger.debug('Restarting services')
-        SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
+        SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map, offline_node_ips)
 
         if SetupController._run_hooks('demote', cluster_ip, master_ip, offline_node_ips=offline_node_ips):
             print 'Restarting services'
-            SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
+            SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map, offline_node_ips)
 
         if storagerouter not in offline_nodes:
             target_client = ip_client_map[cluster_ip]
@@ -1271,17 +1271,22 @@ class SetupController(object):
         logger.info('Demote complete')
 
     @staticmethod
-    def _restart_framework_and_memcache_services(masters, slaves, clients):
+    def _restart_framework_and_memcache_services(masters, slaves, clients, offline_node_ips=None):
+        if offline_node_ips is None:
+            offline_node_ips = []
         memcached = 'memcached'
         watcher = 'watcher-framework'
         for ip in masters + slaves:
-            if ServiceManager.has_service(watcher, clients[ip]):
-                Toolbox.change_service_state(clients[ip], watcher, 'stop', logger)
+            if ip not in offline_node_ips:
+                if ServiceManager.has_service(watcher, clients[ip]):
+                    Toolbox.change_service_state(clients[ip], watcher, 'stop', logger)
         for ip in masters:
-            Toolbox.change_service_state(clients[ip], memcached, 'restart', logger)
+            if ip not in offline_node_ips:
+                Toolbox.change_service_state(clients[ip], memcached, 'restart', logger)
         for ip in masters + slaves:
-            if ServiceManager.has_service(watcher, clients[ip]):
-                Toolbox.change_service_state(clients[ip], watcher, 'start', logger)
+            if ip not in offline_node_ips:
+                if ServiceManager.has_service(watcher, clients[ip]):
+                    Toolbox.change_service_state(clients[ip], watcher, 'start', logger)
         VolatileFactory.store = None
 
     @staticmethod
