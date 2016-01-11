@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /*global define */
-define([
-    'knockout', 'jquery'
-], function(ko, $){
+define(['knockout'], function(ko){
     "use strict";
     var nameRegex, hostRegex, ipRegex, singleton;
     nameRegex = /^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$/;

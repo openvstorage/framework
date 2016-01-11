@@ -162,28 +162,28 @@ class Toolbox(object):
         status = ServiceManager.is_enabled(name, client=client)
         if status is False:
             if logger is not None:
-                logger.debug('  Enabling service {0}'.format(name))
+                logger.debug('  {0:<15} - Enabling service {1}'.format(client.ip, name))
             ServiceManager.enable_service(name, client=client)
 
         status = ServiceManager.get_service_status(name, client=client)
         if status is False and state in ['start', 'restart']:
             if logger is not None:
-                logger.debug('  Starting service {0}'.format(name))
+                logger.debug('  {0:<15} - Starting service {1}'.format(client.ip, name))
             ServiceManager.start_service(name, client=client)
             action = 'started'
         elif status is True and state == 'stop':
             if logger is not None:
-                logger.debug('  Stopping service {0}'.format(name))
+                logger.debug('  {0:<15} - Stopping service {1}'.format(client.ip, name))
             ServiceManager.stop_service(name, client=client)
             action = 'stopped'
         elif status is True and state == 'restart':
             if logger is not None:
-                logger.debug('  Restarting service {0}'.format(name))
+                logger.debug('  {0:<15} - Restarting service {1}'.format(client.ip, name))
             ServiceManager.restart_service(name, client=client)
             action = 'restarted'
 
         if action is None:
             print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
         else:
-            logger.debug('  Service {0} {1}'.format(name, action))
+            logger.debug('  {0:<15} - Service {1} {2}'.format(client.ip, name, action))
             print '  [{0}] {1} {2}'.format(client.ip, name, action)

@@ -30,7 +30,7 @@ define([
         self.storageRouterHeaders = [
             { key: 'name',         value: $.t('ovs:updates.name'),               width: 300 },
             { key: 'framework',    value: $.t('ovs:updates.framework.title'),    width: undefined },
-            { key: 'volumedriver', value: $.t('ovs:updates.volumedriver.title'), width: 400 },
+            { key: 'volumedriver', value: $.t('ovs:updates.volumedriver.title'), width: 400 }
         ];
 
         // Handles
@@ -165,7 +165,7 @@ define([
                 var guiDownMessage = self.updates().framework.guiDown === true ? '<br /><br />' + $.t('ovs:updates.framework.gui_unavailable') : '';
                 var downtimeMessage = downtimes.length === 0 ? '' : '<br /><br />' + $.t('ovs:downtime.general', { multiple: downtimes.length > 1 ? 's': '' }) + '<ul><li>' + downtimes.join('</li><li>') + '</li></ul>';
                 var prereqMessage = prerequisites.length === 0 ? '' : '<br /><br />' + (prerequisites.length !== 1 ? $.t('ovs:prerequisites.multiple') : $.t('ovs:prerequisites.singular')) + '<ul><li>' + prerequisites.join('</li><li>') + '</li></ul>';
-                var button_options = prerequisites.length === 0 ? [$.t('ovs:generic.no'), $.t('ovs:generic.yes')] : [$.t('ovs:generic.cancel')]
+                var button_options = prerequisites.length === 0 ? [$.t('ovs:generic.no'), $.t('ovs:generic.yes')] : [$.t('ovs:generic.cancel')];
                 app.showMessage(
                     $.t('ovs:updates.framework.start_update_question', { what: $.t('ovs:updates.framework.title'), guidown: guiDownMessage, downtime: downtimeMessage, prerequisites: prereqMessage }).trim(),
                     $.t('ovs:generic.areyousure'),
@@ -229,7 +229,7 @@ define([
 
                 var downtimeMessage = downtimes.length === 0 ? '' : '<br /><br />' + $.t('ovs:downtime.general', { multiple: downtimes.length > 1 ? 's': '' }) + '<ul><li>' + downtimes.join('</li><li>') + '</li></ul>';
                 var prereqMessage = prerequisites.length === 0 ? '' : '<br /><br />' + (prerequisites.length !== 1 ? $.t('ovs:prerequisites.multiple') : $.t('ovs:prerequisites.singular')) + '<ul><li>' + prerequisites.join('</li><li>') + '</li></ul>';
-                var button_options = prerequisites.length === 0 ? [$.t('ovs:generic.no'), $.t('ovs:generic.yes')] : [$.t('ovs:generic.cancel')]
+                var button_options = prerequisites.length === 0 ? [$.t('ovs:generic.no'), $.t('ovs:generic.yes')] : [$.t('ovs:generic.cancel')];
                 app.showMessage(
                     $.t('ovs:updates.volumedriver.start_update_question', { what: $.t('ovs:updates.volumedriver.title'), downtime: downtimeMessage, prerequisites: prereqMessage }).trim(),
                     $.t('ovs:generic.areyousure'),

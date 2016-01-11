@@ -116,13 +116,16 @@ class StorageDriverController(object):
 
     @staticmethod
     @add_hooks('setup', 'demote')
-    def on_demote(cluster_ip, master_ip):
+    def on_demote(cluster_ip, master_ip, offline_node_ips=None):
         """
         Handles the demote for the StorageDrivers
         :param cluster_ip: IP of the node to demote
         :param master_ip: IP of the master node
+        :param offline_node_ips: IPs of nodes which are offline
         """
-        client = SSHClient(cluster_ip, username='root')
+        if offline_node_ips is None:
+            offline_node_ips = []
+        client = SSHClient(cluster_ip, username='root') if cluster_ip not in offline_node_ips else None
         servicetype = ServiceTypeList.get_by_name('Arakoon')
         current_service = None
         remaining_ips = []
@@ -130,17 +133,17 @@ class StorageDriverController(object):
             if service.name == 'arakoon-voldrv':
                 if service.storagerouter.ip == cluster_ip:
                     current_service = service
-                else:
+                elif service.storagerouter.ip not in offline_node_ips:
                     remaining_ips.append(service.storagerouter.ip)
         if current_service is not None:
             print '* Shrink StorageDriver cluster'
-            ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'voldrv')
-            if ServiceManager.has_service(current_service.name, client=client) is True:
+            ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'voldrv', offline_node_ips)
+            if client is not None and ServiceManager.has_service(current_service.name, client=client) is True:
                 ServiceManager.stop_service(current_service.name, client=client)
                 ServiceManager.remove_service(current_service.name, client=client)
             ArakoonInstaller.restart_cluster_remove('voldrv', remaining_ips)
             current_service.delete()
-            StorageDriverController._configure_arakoon_to_volumedriver()
+            StorageDriverController._configure_arakoon_to_volumedriver(offline_node_ips)
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=crontab(minute='15', hour='*'))
@@ -222,9 +225,11 @@ class StorageDriverController(object):
             StorageDriverController._configure_arakoon_to_volumedriver()
 
     @staticmethod
-    def _configure_arakoon_to_volumedriver():
+    def _configure_arakoon_to_volumedriver(offline_node_ips=None):
         print 'Update existing vPools'
         logger.info('Update existing vPools')
+        if offline_node_ips is None:
+            offline_node_ips = []
         for storagerouter in StorageRouterList.get_storagerouters():
             config = ArakoonClusterConfig('voldrv')
             config.load_config()
@@ -249,7 +254,7 @@ class StorageDriverController(object):
                         storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
                                                                               dls_arakoon_cluster_id='voldrv',
                                                                               dls_arakoon_cluster_nodes=arakoon_nodes)
-                        storagedriver_config.save()
+                        storagedriver_config.save(reload_config=True)
 
     @staticmethod
     def add_storagedriverpartition(storagedriver, partition_info):

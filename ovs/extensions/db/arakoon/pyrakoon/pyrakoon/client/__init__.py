@@ -209,6 +209,15 @@ class SocketClient(object, AbstractClient):
         import socket
 
         self._socket = socket.create_connection(self._address)
+
+        after_idle_sec = 20
+        interval_sec = 20
+        max_fails = 3
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, after_idle_sec)
+        self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, interval_sec)
+        self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, max_fails)
+
         prologue = protocol.build_prologue(self._cluster_id)
         self._socket.sendall(prologue)
 

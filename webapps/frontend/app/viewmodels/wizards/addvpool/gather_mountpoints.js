@@ -47,7 +47,7 @@ define([
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.over_allocation'));
             }
             if (self.data.scrubAvailable() === false) {
-                reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_role', { what: 'SRUB' }));
+                reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_role', { what: 'SCRUB' }));
             }
             var valid = reasons.length === 0;
             if (self.activateResult.valid === false) {

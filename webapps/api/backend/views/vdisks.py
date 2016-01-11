@@ -127,7 +127,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def removesnapshot(self, vdisk, snapshot_id):
+    def remove_snapshot(self, vdisk, snapshot_id):
         """
         Remove a snapshot from a VDisk
         :param vdisk: Guid of the virtual disk whose snapshot is to be removed
@@ -192,3 +192,15 @@ class VDiskViewSet(viewsets.ViewSet):
                                                           pmachineguid=pmachineguid,
                                                           machineguid=machineguid)
 
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VDisk)
+    def delete(self, vdisk):
+        """
+        Delete vdisk
+        @param vdisk Guid of the vdisk to delete:
+        """
+        storagerouter = StorageRouter(vdisk.storagerouter_guid)
+        return VDiskController.delete.s(diskguid=vdisk.guid).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))

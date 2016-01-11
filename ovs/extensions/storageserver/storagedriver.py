@@ -321,7 +321,6 @@ class StorageDriverConfiguration(object):
         contents = '{}'
         if client is None:
             if os.path.isfile(self.path):
-                logger.debug('Loading file {0}'.format(self.path))
                 with open(self.path, 'r') as config_file:
                     contents = config_file.read()
                     self.is_new = False
@@ -329,7 +328,6 @@ class StorageDriverConfiguration(object):
                 logger.debug('Could not find file {0}, a new one will be created'.format(self.path))
         else:
             if client.file_exists(self.path):
-                logger.debug('Loading file {0}'.format(self.path))
                 contents = client.file_read(self.path)
                 self.is_new = False
             else:

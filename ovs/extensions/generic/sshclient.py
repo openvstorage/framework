@@ -177,7 +177,7 @@ class SSHClient(object):
         self.client.close()
 
     @staticmethod
-    def _shell_safe(path_to_check):
+    def shell_safe(path_to_check):
         """Makes sure that the given path/string is escaped and safe for shell"""
         return "".join([("\\" + _) if _ in " '\";`|" else _ for _ in path_to_check])
 
@@ -231,7 +231,7 @@ class SSHClient(object):
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
-            directory = self._shell_safe(directory)
+            directory = self.shell_safe(directory)
             if self.is_local is True:
                 if not os.path.exists(directory):
                     os.makedirs(directory)
@@ -247,7 +247,7 @@ class SSHClient(object):
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
-            directory = self._shell_safe(directory)
+            directory = self.shell_safe(directory)
             real_path = self.file_read_link(directory)
             if real_path and follow_symlinks is True:
                 self.file_unlink(directory.rstrip('/'))
@@ -271,10 +271,10 @@ class SSHClient(object):
         :param directory: Directory to check for existence
         """
         if self.is_local is True:
-            return os.path.isdir(self._shell_safe(directory))
+            return os.path.isdir(self.shell_safe(directory))
         else:
             command = """import os, json
-print json.dumps(os.path.isdir('{0}'))""".format(self._shell_safe(directory))
+print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
             return json.loads(self.run('python -c """{0}"""'.format(command)))
 
     def dir_chmod(self, directories, mode, recursive=False):
@@ -284,7 +284,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(self._shell_safe(directory))
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
-            directory = self._shell_safe(directory)
+            directory = self.shell_safe(directory)
             if self.is_local is True:
                 os.chmod(directory, mode)
                 if recursive is True:
@@ -309,7 +309,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(self._shell_safe(directory))
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
-            directory = self._shell_safe(directory)
+            directory = self.shell_safe(directory)
             if self.is_local is True:
                 os.chown(directory, uid, gid)
                 if recursive is True:
@@ -326,10 +326,10 @@ print json.dumps(os.path.isdir('{0}'))""".format(self._shell_safe(directory))
         :param directory: Directory to list
         """
         if self.is_local is True:
-            return os.listdir(self._shell_safe(directory))
+            return os.listdir(self.shell_safe(directory))
         else:
             command = """import os, json
-print json.dumps(os.listdir('{0}'))""".format(self._shell_safe(directory))
+print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
             return json.loads(self.run('python -c """{0}"""'.format(command)))
 
     def symlink(self, links):
@@ -338,7 +338,7 @@ print json.dumps(os.listdir('{0}'))""".format(self._shell_safe(directory))
                 os.symlink(source, link_name)
         else:
             for link_name, source in links.iteritems():
-                self.run('ln -s {0} {1}'.format(self._shell_safe(source), self._shell_safe(link_name)))
+                self.run('ln -s {0} {1}'.format(self.shell_safe(source), self.shell_safe(link_name)))
 
     def file_create(self, filenames):
         if isinstance(filenames, basestring):
@@ -347,7 +347,7 @@ print json.dumps(os.listdir('{0}'))""".format(self._shell_safe(directory))
             if not filename.startswith('/'):
                 raise ValueError('Absolute path required for filename {0}'.format(filename))
 
-            filename = self._shell_safe(filename)
+            filename = self.shell_safe(filename)
             if self.is_local is True:
                 if not self.dir_exists(directory=os.path.dirname(filename)):
                     self.dir_create(os.path.dirname(filename))
@@ -366,7 +366,7 @@ print json.dumps(os.listdir('{0}'))""".format(self._shell_safe(directory))
         if isinstance(filenames, basestring):
             filenames = [filenames]
         for filename in filenames:
-            filename = self._shell_safe(filename)
+            filename = self.shell_safe(filename)
             if self.is_local is True:
                 if '*' in filename:
                     for fn in glob.glob(filename):
@@ -385,7 +385,7 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
                         self.run('rm -f "{0}"'.format(filename))
 
     def file_unlink(self, path):
-        path = self._shell_safe(path)
+        path = self.shell_safe(path)
         if self.is_local is True:
             if os.path.islink(path):
                 os.unlink(path)
@@ -393,7 +393,7 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
             self.run("unlink {0}".format(path))
 
     def file_read_link(self, path):
-        path = self._shell_safe(path.rstrip('/'))
+        path = self.shell_safe(path.rstrip('/'))
         if self.is_local is True:
             if os.path.islink(path):
                 return os.path.realpath(path)
@@ -458,10 +458,10 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
         :param filename: File to check for existence
         """
         if self.is_local is True:
-            return os.path.isfile(self._shell_safe(filename))
+            return os.path.isfile(self.shell_safe(filename))
         else:
             command = """import os, json
-print json.dumps(os.path.isfile('{0}'))""".format(self._shell_safe(filename))
+print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             return json.loads(self.run('python -c """{0}"""'.format(command)))
 
     def file_attribs(self, filename, mode):

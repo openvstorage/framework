@@ -695,7 +695,8 @@ class DataObject(object):
                                 except ObjectNotFoundException:
                                     pass
                         else:
-                            raise LinkedObjectException('There are {0} items left in self.{1}'.format(len(items), key))
+                            multi = 'are {0} items'.format(len(items)) if len(items) > 1 else 'is 1 item'
+                            raise LinkedObjectException('There {0} left in self.{1}'.format(multi, key))
                 elif items is not None:
                     # No list (so a 1-to-1 relation), so there should be an object, or None
                     item = items  # More clear naming

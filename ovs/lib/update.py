@@ -150,8 +150,13 @@ class UpdateController(object):
             for client in ssh_clients:
                 try:
                     UpdateController._log_message('Started code migration', client.ip)
-                    with Remote(client.ip, [Migrator]) as remote:
-                        remote.Migrator.migrate(master_ips, extra_ips)
+                    try:
+                        with Remote(client.ip, [Migrator]) as remote:
+                            remote.Migrator.migrate(master_ips, extra_ips)
+                    except EOFError as eof:
+                        UpdateController._log_message('EOFError during code migration, retrying {0}'.format(eof), client.ip, 'warning')
+                        with Remote(client.ip, [Migrator]) as remote:
+                            remote.Migrator.migrate(master_ips, extra_ips)
                     UpdateController._log_message('Finished code migration', client.ip)
                 except Exception as ex:
                     UpdateController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)

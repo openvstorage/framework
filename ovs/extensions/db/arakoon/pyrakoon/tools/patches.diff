@@ -169,7 +169,7 @@
 
  class ClientMixin: #pylint: disable=W0232,R0904,old-style-class
      '''Mixin providing client actions for standard cluster functionality
-@@ -225,7 +225,7 @@
+@@ -234,7 +234,7 @@
              for part in message.serialize():
                  self._socket.sendall(part)
 
