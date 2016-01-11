@@ -777,7 +777,6 @@ class SetupController(object):
 
         print 'Configuring services'
         logger.info('Copying client configurations')
-        ArakoonInstaller.deploy_to_slave(master_ip, cluster_ip, 'ovsdb')
         EtcdInstaller.deploy_to_slave(master_ip, cluster_ip, 'config')
 
         EtcdConfiguration.initialize_host(machine_id)

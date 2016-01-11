@@ -53,9 +53,9 @@ class EtcdConfiguration(object):
         _ = self
 
     @staticmethod
-    def get(key):
+    def get(key, raw=False):
         key_entries = key.split('|')
-        data = EtcdConfiguration._get(key_entries[0])
+        data = EtcdConfiguration._get(key_entries[0], raw)
         if len(key_entries) == 1:
             return data
         temp_data = data
@@ -64,13 +64,13 @@ class EtcdConfiguration(object):
         return temp_data
 
     @staticmethod
-    def set(key, value):
+    def set(key, value, raw=False):
         key_entries = key.split('|')
         if len(key_entries) == 1:
-            EtcdConfiguration._set(key_entries[0], value)
+            EtcdConfiguration._set(key_entries[0], value, raw)
             return
         try:
-            data = EtcdConfiguration._get(key_entries[0])
+            data = EtcdConfiguration._get(key_entries[0], raw)
         except etcd.EtcdKeyNotFound:
             data = {}
         temp_config = data
@@ -82,15 +82,15 @@ class EtcdConfiguration(object):
                 temp_config[entry] = {}
                 temp_config = temp_config[entry]
         temp_config[entries[-1]] = value
-        EtcdConfiguration._set(key_entries[0], data)
+        EtcdConfiguration._set(key_entries[0], data, raw)
 
     @staticmethod
-    def delete(key, remove_root=False):
+    def delete(key, remove_root=False, raw=False):
         key_entries = key.split('|')
         if len(key_entries) == 1:
             EtcdConfiguration._delete(key_entries[0])
             return
-        data = EtcdConfiguration._get(key_entries[0])
+        data = EtcdConfiguration._get(key_entries[0], raw)
         temp_config = data
         entries = key_entries[1].split('.')
         if len(entries) > 1:
@@ -103,7 +103,7 @@ class EtcdConfiguration(object):
             del temp_config[entries[-1]]
         if len(entries) == 1 and remove_root is True:
             del data[entries[0]]
-        EtcdConfiguration._set(key_entries[0], data)
+        EtcdConfiguration._set(key_entries[0], data, raw)
 
     @staticmethod
     def exists(key):
@@ -112,6 +112,10 @@ class EtcdConfiguration(object):
             return True
         except (KeyError, etcd.EtcdKeyNotFound):
             return False
+
+    @staticmethod
+    def list(key):
+        return EtcdConfiguration._list(key)
 
     @staticmethod
     def initialize_host(host_id):
@@ -124,7 +128,7 @@ class EtcdConfiguration(object):
                        '/setupcompleted': False,
                        '/type': 'UNCONFIGURED'}
         for key, value in base_config.iteritems():
-            EtcdConfiguration._set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value)
+            EtcdConfiguration._set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value, raw=False)
 
     @staticmethod
     def initialize():
@@ -160,7 +164,13 @@ class EtcdConfiguration(object):
                                     'html_endpoint': '/',
                                     'oauth2': {'mode': 'local'}}}
         for key, value in base_config.iteritems():
-            EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value)
+            EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
+
+    @staticmethod
+    def _list(key):
+        client = etcd.Client(port=2379, use_proxies=True)
+        for child in client.get(key).children:
+            yield child.key.replace('{0}/'.format(key), '')
 
     @staticmethod
     def _delete(key):
@@ -168,14 +178,20 @@ class EtcdConfiguration(object):
         client.delete(key)
 
     @staticmethod
-    def _get(key):
+    def _get(key, raw):
         client = etcd.Client(port=2379, use_proxies=True)
-        return json.loads(client.read(key).value)
+        data = client.read(key).value
+        if raw is True:
+            return data
+        return json.loads(data)
 
     @staticmethod
-    def _set(key, value):
+    def _set(key, value, raw):
         client = etcd.Client(port=2379, use_proxies=True)
-        client.write(key, json.dumps(value))
+        data = value
+        if raw is False:
+            data = json.dumps(value)
+        client.write(key, data)
         try:
             from ovs.extensions.storage.persistentfactory import PersistentFactory
             client = PersistentFactory.get_client()

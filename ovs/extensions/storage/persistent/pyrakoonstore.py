@@ -20,8 +20,10 @@ import os
 import time
 import json
 import random
+from StringIO import StringIO
 from threading import Lock, current_thread
 from ConfigParser import RawConfigParser
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNotFound, ArakoonSockNotReadable, ArakoonSockReadNoBytes
 from ovs.extensions.storage.exceptions import KeyNotFoundException
@@ -55,18 +57,19 @@ class PyrakoonStore(object):
     * Raises generic exception
     """
 
-    ARAKOON_CONFIG_FILE = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
+    ETCD_CONFIG_KEY = '/ovs/arakoon/{0}/config'
 
     def __init__(self, cluster):
         """
         Initializes the client
         """
+        contents = EtcdConfiguration.get(PyrakoonStore.ETCD_CONFIG_KEY.format(cluster), raw=True)
         parser = RawConfigParser()
-        parser.read(PyrakoonStore.ARAKOON_CONFIG_FILE.format(cluster))
+        parser.readfp(StringIO(contents))
         nodes = {}
         for node in parser.get('global', 'cluster').split(','):
             node = node.strip()
-            nodes[node] = ([parser.get(node, 'ip')], parser.get(node, 'client_port'))
+            nodes[node] = ([parser.get(node, 'ip')], int(parser.get(node, 'client_port')))
         self._config = ArakoonClientConfig(cluster, nodes)
         self._client = ArakoonClient(self._config)
         self._identifier = int(round(random.random() * 10000000))
