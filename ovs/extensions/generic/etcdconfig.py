@@ -179,12 +179,7 @@ class EtcdConfiguration(object):
                                     'interval': 60},
                        '/storagedriver': {'mds_safety': 2,
                                           'mds_tlogs': 100},
-                       '/webapps': {'uiname': 'api',
-                                    'appname': 'api',
-                                    'dir': 'webapps',
-                                    'dbname': 'api.sqlite3',
-                                    'secret': webapps_secret,
-                                    'html_endpoint': '/',
+                       '/webapps': {'html_endpoint': '/',
                                     'oauth2': {'mode': 'local'}}}
         for key, value in base_config.iteritems():
             EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
