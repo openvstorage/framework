@@ -16,18 +16,21 @@
 Django settings module
 """
 import os
+from subprocess import check_output
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from django.conf.global_settings import TEMPLATE_CONTEXT_PROCESSORS
+
+IPADDRESSES = [ip.strip() for ip in check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()]
 
 DEBUG = False
 TEMPLATE_DEBUG = DEBUG
 
 UNIQUE_ID = System.get_my_machine_id()
-UI_NAME = EtcdConfiguration.get('/ovs/framework/webapps|uiname')
-APP_NAME = EtcdConfiguration.get('/ovs/framework/webapps|appname')
+UI_NAME = 'api'
+APP_NAME = 'api'
 BASE_WWW_DIR = os.path.dirname(__file__)
 
-BASE_FOLDER = os.path.join(EtcdConfiguration.get('/ovs/framework/paths|basedir'), EtcdConfiguration.get('/ovs/framework/webapps|dir'), APP_NAME)
+BASE_FOLDER = os.path.join('/opt/OpenvStorage/webapps', APP_NAME)
 VERSION = (1,)  # This tuple should contain all supported versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
 
 BASE_LOG_DIR = '/var/log/ovs'
@@ -44,11 +47,11 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_FOLDER + '/' + EtcdConfiguration.get('/ovs/framework/webapps|dbname')
+        'NAME': BASE_FOLDER + '/api.sqlite3'
     }
 }
 
-ALLOWED_HOSTS = [EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(UNIQUE_ID))]
+ALLOWED_HOSTS = IPADDRESSES + ['localhost']
 TIME_ZONE = 'Europe/Brussels'
 LANGUAGE_CODE = 'en-us'
 LOGIN_URL = APP_NAME + '.frontend.login_view'
@@ -71,7 +74,7 @@ STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 )
 
-SECRET_KEY = EtcdConfiguration.get('/ovs/framework/webapps|secret')
+SECRET_KEY = check_output('cat /etc/openvstorage_id', shell=True)
 
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
@@ -91,7 +94,6 @@ AUTHENTICATION_BACKENDS = (
     APP_NAME + '.oauth2.backend.OAuth2Backend',
 )
 
-from django.conf.global_settings import TEMPLATE_CONTEXT_PROCESSORS
 TEMPLATE_CONTEXT_PROCESSORS += (
     'django.core.context_processors.request',
 )
