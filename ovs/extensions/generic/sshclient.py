@@ -103,7 +103,7 @@ class SSHClient(object):
 
         self.ip = ip
         local_ips = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
-        self.local_ips = [ip.strip() for ip in local_ips]
+        self.local_ips = [lip.strip() for lip in local_ips]
         self.is_local = self.ip in self.local_ips
 
         if self.is_local is False and storagerouter is not None:
@@ -475,34 +475,6 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             check_output(command, shell=True)
         else:
             self.run(command)
-
-    @connected()
-    def config_read(self, key):
-        if self.is_local is True:
-            from ovs.extensions.generic.configuration import Configuration
-            return Configuration.get(key)
-        else:
-            read = """
-import sys, json
-sys.path.append('/opt/OpenvStorage')
-from ovs.extensions.generic.configuration import Configuration
-print json.dumps(Configuration.get('{0}'))
-""".format(key)
-            return json.loads(self.run('python -c """{0}"""'.format(read)))
-
-    @connected()
-    def config_set(self, key, value):
-        if self.is_local is True:
-            from ovs.extensions.generic.configuration import Configuration
-            Configuration.set(key, value)
-        else:
-            write = """
-import sys, json
-sys.path.append('/opt/OpenvStorage')
-from ovs.extensions.generic.configuration import Configuration
-Configuration.set('{0}', json.loads('{1}'))
-""".format(key, json.dumps(value).replace('"', '\\"'))
-            self.run('python -c """{0}"""'.format(write))
 
     def rawconfig_read(self, filename):
         contents = self.file_read(filename)

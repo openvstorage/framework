@@ -17,17 +17,17 @@ Django settings module
 """
 import os
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 
 DEBUG = False
 TEMPLATE_DEBUG = DEBUG
 
 UNIQUE_ID = System.get_my_machine_id()
-UI_NAME = Configuration.get('ovs.webapps.main.uiname')
-APP_NAME = Configuration.get('ovs.webapps.main.appname')
+UI_NAME = EtcdConfiguration.get('/ovs/framework/webapps|uiname')
+APP_NAME = EtcdConfiguration.get('/ovs/framework/webapps|appname')
 BASE_WWW_DIR = os.path.dirname(__file__)
 
-BASE_FOLDER = os.path.join(Configuration.get('ovs.core.basedir'), Configuration.get('ovs.webapps.dir'), APP_NAME)
+BASE_FOLDER = os.path.join(EtcdConfiguration.get('/ovs/framework/paths|basedir'), EtcdConfiguration.get('/ovs/framework/webapps|dir'), APP_NAME)
 VERSION = (1,)  # This tuple should contain all supported versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
 
 BASE_LOG_DIR = '/var/log/ovs'
@@ -44,11 +44,11 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_FOLDER + '/' + Configuration.get('ovs.webapps.main.dbname')
+        'NAME': BASE_FOLDER + '/' + EtcdConfiguration.get('/ovs/framework/webapps|dbname')
     }
 }
 
-ALLOWED_HOSTS = [Configuration.get('ovs.grid.ip')]
+ALLOWED_HOSTS = [EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(UNIQUE_ID))]
 TIME_ZONE = 'Europe/Brussels'
 LANGUAGE_CODE = 'en-us'
 LOGIN_URL = APP_NAME + '.frontend.login_view'
@@ -71,7 +71,7 @@ STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 )
 
-SECRET_KEY = Configuration.get('ovs.webapps.main.secret')
+SECRET_KEY = EtcdConfiguration.get('/ovs/framework/webapps|secret')
 
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',

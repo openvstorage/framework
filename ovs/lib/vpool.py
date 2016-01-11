@@ -22,6 +22,8 @@ from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.fs.exportfs import Nfsexports
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.system import System
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
@@ -54,7 +56,8 @@ class VPoolController(object):
         storagedriver.save()
         if storagedriver.storagerouter.pmachine.hvtype == 'VMWARE':
             client = SSHClient(storagedriver.storagerouter)
-            if client.config_read('ovs.storagedriver.vmware_mode') == 'classic':
+            machine_id = System.get_my_machine_id(client)
+            if EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|vmware_mode'.format(machine_id)) == 'classic':
                 nfs = Nfsexports()
                 nfs.unexport(mountpoint)
                 nfs.export(mountpoint)

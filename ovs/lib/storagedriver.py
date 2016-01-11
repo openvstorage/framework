@@ -30,13 +30,12 @@ from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
-from ovs.dal.lists.servicelist import ServiceList
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.lib.helpers.decorators import log
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.helpers.decorators import ensure_single, add_hooks
@@ -86,7 +85,7 @@ class StorageDriverController(object):
             host_status = 'RUNNING'
             try:
                 client = SSHClient(storagerouter, username='root')
-                configuration_dir = client.config_read('ovs.core.cfgdir')
+                configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
                 logger.info('SSHClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
                 with Remote(client.ip, [LocalStorageRouterClient]) as remote:
                     lsrc = remote.LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir,
@@ -144,38 +143,7 @@ class StorageDriverController(object):
                 ServiceManager.remove_service(current_service.name, client=client)
             ArakoonInstaller.restart_cluster_remove('voldrv', remaining_ips)
             current_service.delete()
-            for storagerouter in StorageRouterList.get_storagerouters():
-                if storagerouter.ip not in offline_node_ips and storagerouter.ip != master_ip:
-                    ArakoonInstaller.deploy_to_slave(master_ip, storagerouter.ip, 'voldrv')
             StorageDriverController._configure_arakoon_to_volumedriver(offline_node_ips)
-
-    @staticmethod
-    @add_hooks('setup', 'extranode')
-    def on_extranode(cluster_ip, master_ip=None):
-        """
-        An extra node is added, make sure it has the voldrv arakoon client file if possible
-        :param cluster_ip: IP of the extra node
-        :param master_ip: IP of the master node
-        """
-        _ = master_ip  # The master_ip will be passed in by caller
-        deployed = False
-        client_list = []
-        service_found = False
-        servicetype = ServiceTypeList.get_by_name('Arakoon')
-        for service in servicetype.services:
-            if service.name == 'arakoon-voldrv':
-                service_found = True
-                if service.storagerouter not in client_list:
-                    try:
-                        SSHClient(service.storagerouter)
-                        client_list.append(service.storagerouter)
-                    except UnableToConnectException:
-                        continue
-                ArakoonInstaller.deploy_to_slave(service.storagerouter.ip, cluster_ip, 'voldrv')
-                deployed = True
-                break
-        if service_found is True and deployed is False:
-            raise RuntimeError('Failed to deploy arakoon config for voldrv cluster to slave with IP {0}'.format(cluster_ip))
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=crontab(minute='15', hour='*'))
@@ -237,9 +205,6 @@ class StorageDriverController(object):
                                                      ip=storagerouter.ip,
                                                      base_dir=partition.folder)
             current_services.append(add_service(storagerouter, result))
-            for sr_ip in all_sr_ips:
-                if sr_ip not in current_ips:
-                    ArakoonInstaller.deploy_to_slave(storagerouter.ip, sr_ip, cluster_name)
             ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
             current_ips.append(storagerouter.ip)
             StorageDriverController._configure_arakoon_to_volumedriver()
@@ -256,9 +221,6 @@ class StorageDriverController(object):
                 )
                 add_service(storagerouter, result)
                 current_ips.append(storagerouter.ip)
-                for sr_ip in all_sr_ips:
-                    if sr_ip not in current_ips:
-                        ArakoonInstaller.deploy_to_slave(current_services[0].storagerouter.ip, sr_ip, cluster_name)
                 ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
             StorageDriverController._configure_arakoon_to_volumedriver()
 
@@ -269,19 +231,15 @@ class StorageDriverController(object):
         if offline_node_ips is None:
             offline_node_ips = []
         for storagerouter in StorageRouterList.get_storagerouters():
-            if storagerouter.ip in offline_node_ips:
-                continue
-            client = SSHClient(storagerouter.ip)
             config = ArakoonClusterConfig('voldrv')
-            config.load_config(client)
+            config.load_config()
             arakoon_nodes = []
             for node in config.nodes:
                 arakoon_nodes.append({'host': node.ip,
                                       'port': node.client_port,
                                       'node_id': node.name})
-            with Remote(storagerouter.ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration], 'ovs') as remote:
-                configuration_dir = '{0}/storagedriver/storagedriver'.format(
-                    remote.Configuration.get('ovs.core.cfgdir'))
+            with Remote(storagerouter.ip, [os, RawConfigParser, EtcdConfiguration, StorageDriverConfiguration], 'ovs') as remote:
+                configuration_dir = '{0}/storagedriver/storagedriver'.format(EtcdConfiguration.get('/ovs/framework/paths|cfgdir'))
                 if not remote.os.path.exists(configuration_dir):
                     remote.os.makedirs(configuration_dir)
                 for json_file in remote.os.listdir(configuration_dir):

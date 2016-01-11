@@ -24,11 +24,12 @@ import time
 import base64
 import urllib2
 from paramiko import AuthenticationException
-
+from etcd import EtcdConnectionFailed
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.db.etcd.installer import EtcdInstaller
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import SSHClient
@@ -51,13 +52,11 @@ class SetupController(object):
     """
 
     # Generic configuration files
-    generic_configfiles = {'memcached': ('/opt/OpenvStorage/config/memcacheclient.cfg', 11211),
-                           'rabbitmq': ('/opt/OpenvStorage/config/rabbitmqclient.cfg', 5672)}
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
 
     # Services
     model_services = ['memcached', 'arakoon-ovsdb']
-    master_services = model_services + ['rabbitmq-server']
+    master_services = model_services + ['rabbitmq-server', 'etcd-config']
     extra_node_services = ['workers', 'volumerouter-consumer']
     master_node_services = master_services + ['scheduled-tasks', 'snmp', 'webapp-api', 'nginx',
                                               'volumerouter-consumer'] + extra_node_services
@@ -142,12 +141,16 @@ class SetupController(object):
             else:
                 target_node_password = target_password
             target_client = SSHClient(ip, username='root', password=target_node_password)
+            unique_id = System.get_my_machine_id(target_client)
             ip_client_map[ip] = target_client
 
             logger.debug('Target client loaded')
 
-            if target_client.config_read('ovs.core.setupcompleted') is True:
-                raise RuntimeError('This node has already been configured for Open vStorage. Re-running the setup is not supported.')
+            try:
+                if EtcdConfiguration.get('/ovs/framework/hosts/{0}/setupcompleted'.format(unique_id)) is True:
+                    raise RuntimeError('This node has already been configured for Open vStorage. Re-running the setup is not supported.')
+            except EtcdConnectionFailed:
+                pass
 
             print '\n+++ Collecting cluster information +++\n'
             logger.info('Collecting cluster information')
@@ -157,12 +160,11 @@ class SetupController(object):
             SetupController.host_ips = set(ipaddresses)
 
             # Check whether running local or remote
-            unique_id = System.get_my_machine_id(target_client)
             local_unique_id = System.get_my_machine_id()
             remote_install = unique_id != local_unique_id
             logger.debug('{0} installation'.format('Remote' if remote_install else 'Local'))
             try:
-                _ = Configuration.get('ovs.grid.ip')
+                target_client.file_exists('/etc/openvstorage_id')
             except:
                 raise RuntimeError("The 'openvstorage' package is not installed on {0}".format(ip))
 
@@ -276,7 +278,12 @@ class SetupController(object):
                                         if node_properties.get('type', None) == 'master']
                         if len(master_nodes) == 0:
                             raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
-                        master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
+                        for node_name, node_info in discovery_result[cluster_name].iteritems():
+                            if node_info['ip'] != ip:
+                                master_ip = node_info['ip']
+                                break
+                        if master_ip is None:
+                            raise RuntimeError('Could not find appropriate master')
                         master_password = SetupController._ask_validate_password(master_ip, username='root')
                         known_passwords[master_ip] = master_password
                         if master_ip not in ip_client_map:
@@ -370,9 +377,9 @@ class SetupController(object):
 
         except Exception as exception:
             print ''  # Spacing
-            print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
             logger.exception('Unexpected error')
             logger.error(str(exception))
+            print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
             sys.exit(1)
         except KeyboardInterrupt:
             print ''
@@ -399,10 +406,11 @@ class SetupController(object):
             print '\n+++ Collecting information +++\n'
             logger.info('Collecting information')
 
-            if Configuration.get('ovs.core.setupcompleted') is False:
+            machine_id = System.get_my_machine_id()
+            if EtcdConfiguration.get('/ovs/framework/hosts/{0}/setupcompleted'.format(machine_id)) is False:
                 raise RuntimeError('No local OVS setup found.')
 
-            node_type = Configuration.get('ovs.core.nodetype')
+            node_type = EtcdConfiguration.get('/ovs/framework/hosts/{0}/type'.format(machine_id))
             if node_action == 'promote' and node_type == 'MASTER':
                 raise RuntimeError('This node is already master.')
             elif node_action == 'demote' and node_type == 'EXTRA':
@@ -530,9 +538,9 @@ class SetupController(object):
 
         except Exception as exception:
             print ''  # Spacing
-            print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
             logger.exception('Unexpected error')
             logger.error(str(exception))
+            print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
             sys.exit(1)
         except KeyboardInterrupt:
             print ''
@@ -715,28 +723,19 @@ class SetupController(object):
         print 'Exchanging SSH keys and updating hosts files'
         logger.info('Exchanging SSH keys and updating hosts files')
         passwords = {}
-        first_request = True
-        prev_node_password = ''
+        password = None
+        if known_passwords:
+            password = known_passwords.values()[0]
         for node in nodes:
             if node in known_passwords:
                 passwords[node] = known_passwords[node]
                 if node not in ip_client_map:
                     ip_client_map[node] = SSHClient(node, username='root', password=known_passwords[node])
                 continue
-            if first_request is True:
-                prev_node_password = SetupController._ask_validate_password(node, username='root')
-                logger.debug('Custom password for {0}'.format(node))
-                passwords[node] = prev_node_password
-                first_request = False
-                if node not in ip_client_map:
-                    ip_client_map[node] = SSHClient(node, username='root', password=prev_node_password)
-            else:
-                this_node_password = SetupController._ask_validate_password(node, username='root',
-                                                                            previous=prev_node_password)
-                passwords[node] = this_node_password
-                prev_node_password = this_node_password
-                if node not in ip_client_map:
-                    ip_client_map[node] = SSHClient(node, username='root', password=this_node_password)
+            password = SetupController._ask_validate_password(node, username='root', previous=password)
+            passwords[node] = password
+            if node not in ip_client_map:
+                ip_client_map[node] = SSHClient(node, username='root', password=password)
 
         logger.debug('Nodes: {0}'.format(nodes))
         logger.debug('Discovered nodes: \n{0}'.format(SetupController.discovered_nodes))
@@ -859,33 +858,31 @@ class SetupController(object):
 
         print '\n+++ Setting up first node +++\n'
         logger.info('Setting up first node')
+        cluster_ip = target_client.ip
+        machine_id = System.get_my_machine_id(target_client)
+
+        print 'Setting up Etcd'
+        logger.info('Setting up Etcd')
+        EtcdInstaller.create_cluster('config', cluster_ip)
+        EtcdConfiguration.initialize()
+        EtcdConfiguration.initialize_host(machine_id)
 
         print 'Setting up Arakoon'
         logger.info('Setting up Arakoon')
-        cluster_ip = target_client.ip
-        result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, target_client.config_read('ovs.core.ovsdb'), locked=False)
+        result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, EtcdConfiguration.get('/ovs/framework/paths|ovsdb'), locked=False)
         arakoon_ports = [result['client_port'], result['messaging_port']]
 
         SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
-        config_types = []
-        if configure_rabbitmq:
-            config_types.append('rabbitmq')
-            SetupController._configure_rabbitmq(target_client)
-        if configure_memcached:
-            config_types.append('memcached')
-            SetupController._configure_memcached(target_client)
 
         print 'Build configuration files'
         logger.info('Build configuration files')
-        for config_type in config_types:
-            config_file, port = SetupController.generic_configfiles[config_type]
-            config = RawConfigParser()
-            config.add_section('main')
-            config.set('main', 'nodes', unique_id)
-            config.add_section(unique_id)
-            config.set(unique_id, 'location', '{0}:{1}'.format(cluster_ip, port))
-            target_client.rawconfig_write(config_file, config)
+        if configure_rabbitmq:
+            SetupController._configure_rabbitmq(target_client)
+            EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', ['{0}:{1}'.format(cluster_ip, 5672)])
+        if configure_memcached:
+            SetupController._configure_memcached(target_client)
+            EtcdConfiguration.set('/ovs/framework/memcache|endpoints', ['{0}:{1}'.format(cluster_ip, 11211)])
 
         print 'Starting model services'
         logger.debug('Starting model services')
@@ -914,13 +911,11 @@ class SetupController(object):
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
-        target_client.config_set('ovs.grid.ip', cluster_ip)
-        target_client.config_set('ovs.support.cid', Toolbox.get_hash())
-        target_client.config_set('ovs.support.nid', Toolbox.get_hash())
+        EtcdConfiguration.set('/ovs/framework/hosts/{0}/ip'.format(machine_id), cluster_ip)
 
         print 'Starting services'
         logger.info('Starting services for join master')
-        for service in SetupController.master_services:
+        for service in [s for s in SetupController.master_services if s not in ['etcd-config']]:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'start', logger)
@@ -936,8 +931,6 @@ class SetupController(object):
 
         SetupController._run_hooks('firstnode', cluster_ip)
 
-        target_client.config_set('ovs.support.cid', Toolbox.get_hash())
-        target_client.config_set('ovs.support.nid', Toolbox.get_hash())
         if enable_heartbeats is None:
             print '\n+++ Heartbeat +++\n'
             logger.info('Heartbeat')
@@ -945,8 +938,9 @@ class SetupController(object):
                                              'The metadata contains anonymous data like Open vStorage\'s version and status of the Open vStorage services. These heartbeats are optional and can be turned on/off at any time via the GUI.'],
                                             character=None)
             enable_heartbeats = Interactive.ask_yesno('Do you want to enable Heartbeats?', default_value=True)
-        if enable_heartbeats is True:
-            target_client.config_set('ovs.support.enabled', True)
+        if enable_heartbeats is False:
+            EtcdConfiguration.set('/ovs/framework/support|enabled', False)
+        else:
             service = 'support-agent'
             ServiceManager.add_service(service, client=target_client)
             ServiceManager.enable_service(service, client=target_client)
@@ -954,9 +948,9 @@ class SetupController(object):
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
-        target_client.config_set('ovs.core.setupcompleted', True)
-        target_client.config_set('ovs.core.nodetype', 'MASTER')
-        target_client.config_set('ovs.core.install_time', time.time())
+        EtcdConfiguration.set('/ovs/framework/hosts/{0}/setupcompleted'.format(machine_id), True)
+        EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'MASTER')
+        EtcdConfiguration.set('/ovs/framework/install_time', time.time())
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
 
         logger.info('First node complete')
@@ -972,32 +966,17 @@ class SetupController(object):
         logger.info('Adding extra node')
 
         target_client = ip_client_map[cluster_ip]
+        machine_id = System.get_my_machine_id(target_client)
         SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'extra')
 
         print 'Configuring services'
         logger.info('Copying client configurations')
-        ArakoonInstaller.deploy_to_slave(master_ip, cluster_ip, 'ovsdb')
-        config_types = []
-        if configure_rabbitmq:
-            config_types.append('rabbitmq')
-        if configure_memcached:
-            config_types.append('memcached')
-        master_client = ip_client_map[master_ip]
-        for config_type in config_types:
-            config = SetupController.generic_configfiles[config_type][0]
-            client_config = master_client.rawconfig_read(config)
-            target_client.rawconfig_write(config, client_config)
+        EtcdInstaller.deploy_to_slave(master_ip, cluster_ip, 'config')
 
-        cid = master_client.config_read('ovs.support.cid')
-        enabled = master_client.config_read('ovs.support.enabled')
-        enablesupport = master_client.config_read('ovs.support.enablesupport')
-        registered = master_client.config_read('ovs.core.registered')
-        target_client.config_set('ovs.support.nid', Toolbox.get_hash())
-        target_client.config_set('ovs.support.cid', cid)
-        target_client.config_set('ovs.support.enabled', enabled)
-        target_client.config_set('ovs.support.enablesupport', enablesupport)
-        target_client.config_set('ovs.core.registered', registered)
+        EtcdConfiguration.initialize_host(machine_id)
+
+        enabled = EtcdConfiguration.get('/ovs/framework/support|enabled')
         if enabled is True:
             service = 'support-agent'
             ServiceManager.add_service(service, client=target_client)
@@ -1007,9 +986,7 @@ class SetupController(object):
         node_name = target_client.run('hostname')
         SetupController._finalize_setup(target_client, node_name, 'EXTRA', hypervisor_info, unique_id)
 
-        print 'Updating configuration files'
-        logger.info('Updating configuration files')
-        target_client.config_set('ovs.grid.ip', cluster_ip)
+        EtcdConfiguration.set('/ovs/framework/hosts/{0}/ip'.format(machine_id), cluster_ip)
 
         print 'Starting services'
         ServiceManager.enable_service('watcher-framework', client=target_client)
@@ -1024,9 +1001,8 @@ class SetupController(object):
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
-        target_client.config_set('ovs.core.setupcompleted', True)
-        target_client.config_set('ovs.core.nodetype', 'EXTRA')
-        target_client.config_set('ovs.core.install_time', time.time())
+        EtcdConfiguration.set('/ovs/framework/hosts/{0}/setupcompleted'.format(machine_id), True)
+        EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'EXTRA')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
         logger.info('Extra node complete')
 
@@ -1047,7 +1023,9 @@ class SetupController(object):
                 raise RuntimeError('Not all memcache nodes can be reached which is required for promoting a node.')
 
         target_client = ip_client_map[cluster_ip]
+        machine_id = System.get_my_machine_id(target_client)
         node_name = target_client.run('hostname')
+        master_client = ip_client_map[master_ip]
 
         storagerouter = StorageRouterList.get_by_machine_id(unique_id)
         storagerouter.node_type = 'MASTER'
@@ -1069,27 +1047,23 @@ class SetupController(object):
 
         print 'Joining arakoon cluster'
         logger.info('Joining arakoon cluster')
-        result = ArakoonInstaller.extend_cluster(master_ip, cluster_ip, 'ovsdb', target_client.config_read('ovs.core.ovsdb'))
+        result = ArakoonInstaller.extend_cluster(master_ip, cluster_ip, 'ovsdb', EtcdConfiguration.get('/ovs/framework/paths|ovsdb'))
         arakoon_ports = [result['client_port'], result['messaging_port']]
 
-        print 'Distribute configuration files'
-        logger.info('Distribute configuration files')
-        config_types = []
-        if configure_rabbitmq:
-            config_types.append('rabbitmq')
+        print 'Joining etcd cluster'
+        logger.info('Joining etcd cluster')
+        EtcdInstaller.extend_cluster(master_ip, cluster_ip, 'config')
+
+        print 'Update configurations'
+        logger.info('Update configurations')
         if configure_memcached:
-            config_types.append('memcached')
-        master_client = ip_client_map[master_ip]
-        for config_type in config_types:
-            config_file, port = SetupController.generic_configfiles[config_type]
-            config = master_client.rawconfig_read(config_file)
-            config_nodes = [n.strip() for n in config.get('main', 'nodes').split(',')]
-            if unique_id not in config_nodes:
-                config.set('main', 'nodes', ', '.join(config_nodes + [unique_id]))
-                config.add_section(unique_id)
-                config.set(unique_id, 'location', '{0}:{1}'.format(cluster_ip, port))
-            for node_client in ip_client_map.itervalues():
-                node_client.rawconfig_write(config_file, config)
+            endpoints = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
+            endpoints.append('{0}:{1}'.format(cluster_ip, 11211))
+            EtcdConfiguration.set('/ovs/framework/memcache|endpoints', endpoints)
+        if configure_rabbitmq:
+            endpoints = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
+            endpoints.append('{0}:{1}'.format(cluster_ip, 5672))
+            EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
 
         print 'Restarting master node services'
         logger.info('Restarting master node services')
@@ -1143,7 +1117,7 @@ class SetupController(object):
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
-        target_client.config_set('ovs.core.nodetype', 'MASTER')
+        EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'MASTER')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
 
         logger.info('Promote complete')
@@ -1264,9 +1238,10 @@ class SetupController(object):
         if storagerouter not in offline_nodes:
             target_client = ip_client_map[cluster_ip]
             node_name = target_client.run('hostname')
+            machine_id = System.get_my_machine_id(target_client)
             if SetupController._avahi_installed(target_client) is True:
                 SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
-            target_client.config_set('ovs.core.nodetype', 'EXTRA')
+            EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'EXTRA')
 
         logger.info('Demote complete')
 
@@ -1301,9 +1276,9 @@ class SetupController(object):
     def _configure_rabbitmq(client):
         print 'Setting up RabbitMQ'
         logger.debug('Setting up RabbitMQ')
-        rabbitmq_port = client.config_read('ovs.core.broker.port')
-        rabbitmq_login = client.config_read('ovs.core.broker.login')
-        rabbitmq_password = client.config_read('ovs.core.broker.password')
+        rabbitmq_port = EtcdConfiguration.get('/ovs/framework/messagequeue|port')
+        rabbitmq_login = EtcdConfiguration.get('/ovs/framework/messagequeue|user')
+        rabbitmq_password = EtcdConfiguration.get('/ovs/framework/messagequeue|password')
         client.run("""cat > /etc/rabbitmq/rabbitmq.config << EOF
 [
    {{rabbit, [{{tcp_listeners, [{0}]}},
@@ -1364,19 +1339,16 @@ EOF
         print 'Update existing vPools'
         logger.info('Update existing vPools')
         for node_ip in node_ips:
-            with Remote(node_ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration], 'ovs') as remote:
-                login = remote.Configuration.get('ovs.core.broker.login')
-                password = remote.Configuration.get('ovs.core.broker.password')
-                protocol = remote.Configuration.get('ovs.core.broker.protocol')
-
-                cfg = remote.RawConfigParser()
-                cfg.read('/opt/OpenvStorage/config/rabbitmqclient.cfg')
+            with Remote(node_ip, [os, RawConfigParser, EtcdConfiguration, StorageDriverConfiguration], 'ovs') as remote:
+                login = remote.EtcdConfiguration.get('/ovs/framework/messagequeue|user')
+                password = remote.EtcdConfiguration.get('/ovs/framework/messagequeue|password')
+                protocol = remote.EtcdConfiguration.get('/ovs/framework/messagequeue|protocol')
 
                 uris = []
-                for node in [n.strip() for n in cfg.get('main', 'nodes').split(',')]:
-                    uris.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(protocol, login, password, cfg.get(node, 'location'))})
+                for endpoint in remote.EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints'):
+                    uris.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(protocol, login, password, endpoint)})
 
-                configuration_dir = '{0}/storagedriver/storagedriver'.format(remote.Configuration.get('ovs.core.cfgdir'))
+                configuration_dir = '{0}/storagedriver/storagedriver'.format(remote.EtcdConfiguration.get('/ovs/framework/paths|cfgdir'))
                 if not remote.os.path.exists(configuration_dir):
                     remote.os.makedirs(configuration_dir)
                 for json_file in remote.os.listdir(configuration_dir):
@@ -1386,7 +1358,7 @@ EOF
                             continue  # There's also a .cfg file, so this is an alba_proxy configuration file
                         storagedriver_config = remote.StorageDriverConfiguration('storagedriver', vpool_name)
                         storagedriver_config.load()
-                        storagedriver_config.configure_event_publisher(events_amqp_routing_key=remote.Configuration.get('ovs.core.broker.queues.storagedriver'),
+                        storagedriver_config.configure_event_publisher(events_amqp_routing_key=remote.EtcdConfiguration.get('/ovs/framework/messagequeue|queues.storagedriver'),
                                                                        events_amqp_uris=uris)
                         storagedriver_config.save()
 
@@ -1448,6 +1420,8 @@ EOF
             services = SetupController.master_node_services
             if 'arakoon-ovsdb' in services:
                 services.remove('arakoon-ovsdb')
+            if 'etcd-config' in services:
+                services.remove('etcd-config')
             worker_queue = '{0},ovs_masters'.format(unique_id)
         else:
             services = SetupController.extra_node_services
@@ -1627,17 +1601,18 @@ EOF
                     return None
                 except AuthenticationException:
                     pass
-                extra = ''
                 if previous is not None:
-                    extra = ', just press enter if identical as above'
-                password = Interactive.ask_password('Enter the {0} password for {1}{2}'.format(
+                    try:
+                        client = SSHClient(ip, username=username, password=previous)
+                        client.run('ls /')
+                        return previous
+                    except:
+                        pass
+                password = Interactive.ask_password('Enter the {0} password for {1}'.format(
                     username,
-                    ip if node_string is None else node_string,
-                    extra
+                    ip if node_string is None else node_string
                 ))
-                if password == '':
-                    password = previous
-                if password is None:
+                if password in ['', None]:
                     continue
                 client = SSHClient(ip, username=username, password=password)
                 client.run('ls /')
@@ -1656,10 +1631,7 @@ EOF
         """
         if len(ip_client_map) <= 1:
             return True
-        client = ip_client_map.values()[0]
-        config = client.rawconfig_read('{0}/{1}'.format(client.config_read('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-        nodes = [node.strip() for node in config.get('main', 'nodes').split(',')]
-        ips = map(lambda n: config.get(n, 'location').split(':')[0], nodes)
+        ips = [endpoint.split(':')[0] for endpoint in EtcdConfiguration.get('/ovs/framework/memcache|endpoints')]
         for ip in ips:
             if ip not in ip_client_map:
                 return False

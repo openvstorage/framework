@@ -28,7 +28,7 @@ import pyinotify
 from ConfigParser import RawConfigParser
 from ovs.extensions.rabbitmq.processor import process
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('extensions', name='consumer')
@@ -50,10 +50,11 @@ def run_event_consumer():
     """
     Check whether to run the event consumer
     """
-    rmq_config = RawConfigParser()
-    rmq_config.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-    machine_id = System.get_my_machine_id()
-    return rmq_config.has_section(machine_id)
+    my_ip = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(System.get_my_machine_id()))
+    for endpoint in EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints'):
+        if endpoint.startswith(my_ip):
+            return True
+    return False
 
 
 def callback(ch, method, properties, body):
@@ -133,11 +134,7 @@ if __name__ == '__main__':
                 logger.debug('{0}: {1}'.format(key.name, [current_map['task'].__name__ for current_map in mapping[key]]))
 
             # Starting connection and handling
-            rmq_ini = RawConfigParser()
-            rmq_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-            rmq_nodes = [node.strip() for node in rmq_ini.get('main', 'nodes').split(',')]
-            this_server = '{0}:{1}'.format(Configuration.get('ovs.grid.ip'), Configuration.get('ovs.core.broker.port'))
-            rmq_servers = [this_server] + [server for server in map(lambda n: rmq_ini.get(n, 'location'), rmq_nodes) if server != this_server]
+            rmq_servers = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
             channel = None
             server = ''
             loglevel = logging.root.manager.disable  # Workaround for disabling logging
@@ -148,8 +145,8 @@ if __name__ == '__main__':
                         pika.ConnectionParameters(host=server.split(':')[0],
                                                   port=int(server.split(':')[1]),
                                                   credentials=pika.PlainCredentials(
-                                                      Configuration.get('ovs.core.broker.login'),
-                                                      Configuration.get('ovs.core.broker.password'))
+                                                      EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
+                                                      EtcdConfiguration.get('/ovs/framework/messagequeue|password'))
                                                   )
                     )
                     channel = connection.channel()

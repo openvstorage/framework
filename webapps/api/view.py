@@ -20,7 +20,7 @@ import json
 import time
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.api.client import OVSClient
 from django.views.generic import View
@@ -70,7 +70,7 @@ class MetadataView(View):
                         plugins[backend_type.code] = []
                     plugins[backend_type.code] += ['backend', 'gui']
             # - Generic plugins, as added to the configuration file(s)
-            generic_plugins = Configuration.get('ovs.plugins.generic')
+            generic_plugins = EtcdConfiguration.get('/ovs/framework/plugins/installed|generic')
             for plugin_name in generic_plugins:
                 if plugin_name not in plugins:
                     plugins[plugin_name] = []
@@ -78,18 +78,13 @@ class MetadataView(View):
             data['plugins'] = plugins
 
             # Fill identification
-            data['identification'] = {'cluster_id': Configuration.get('ovs.support.cid')}
+            data['identification'] = {'cluster_id': EtcdConfiguration.get('/ovs/framework/cluster_id')}
 
             # Registration data
-            registered = Configuration.get('ovs.core.registered')
+            registered = EtcdConfiguration.get('/ovs/framework/registered')
             data['registration']['registered'] = registered
             if registered is False:
-                cluster_install_time = None
-                for storagerouter in StorageRouterList.get_storagerouters():
-                    client = SSHClient(storagerouter)
-                    install_time = client.config_read('ovs.core.install_time')
-                    if cluster_install_time is None or (install_time is not None and install_time < cluster_install_time):
-                        cluster_install_time = install_time
+                cluster_install_time = EtcdConfiguration.get('/ovs/framework/install_time')
                 if cluster_install_time is not None:
                     timeout_days = 30 * 24 * 60 * 60
                     data['registration']['remaining'] = (timeout_days - time.time() + cluster_install_time) / 24 / 60 / 60
@@ -97,8 +92,8 @@ class MetadataView(View):
             # Get authentication metadata
             authentication_metadata = {'ip': System.get_my_storagerouter().ip}
             for key in ['mode', 'authorize_uri', 'client_id', 'scope']:
-                if Configuration.exists('ovs.webapps.oauth2.{0}'.format(key)):
-                    authentication_metadata[key] = Configuration.get('ovs.webapps.oauth2.{0}'.format(key))
+                if EtcdConfiguration.exists('/ovs/framework/webapps|oauth2.{0}'.format(key)):
+                    authentication_metadata[key] = EtcdConfiguration.get('/ovs/framework/webapps|oauth2.{0}'.format(key))
             data['authentication_metadata'] = authentication_metadata
 
             # Gather authorization metadata

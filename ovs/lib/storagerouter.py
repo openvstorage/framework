@@ -42,7 +42,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.api.client import OVSClient
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
@@ -335,7 +335,8 @@ class StorageRouterController(object):
 
         # 11. Check available IP addresses
         ipaddresses = metadata['ipaddresses']
-        grid_ip = client.config_read('ovs.grid.ip')
+        machine_id = System.get_my_machine_id(client)
+        grid_ip = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(machine_id))
         if grid_ip in ipaddresses:
             ipaddresses.remove(grid_ip)
         if not ipaddresses:
@@ -616,7 +617,7 @@ class StorageRouterController(object):
                                                                                      'role': DiskPartition.ROLES.WRITE,
                                                                                      'sub_role': StorageDriverPartition.SUBROLE.DTL,
                                                                                      'partition': largest_write_mountpoint})
-        rsppath = '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool_name)
+        rsppath = '{0}/{1}'.format(EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(machine_id)), vpool_name)
         dirs2create.append(sdp_dtl.path)
         dirs2create.append(sdp_fd.path)
         dirs2create.append(rsppath)
@@ -625,7 +626,7 @@ class StorageRouterController(object):
         if backend_type.code == 'alba' and frag_size is None:
             raise ValueError('Something went wrong trying to calculate the fragment cache size')
 
-        config_dir = '{0}/storagedriver/storagedriver'.format(client.config_read('ovs.core.cfgdir'))
+        config_dir = '{0}/storagedriver/storagedriver'.format(EtcdConfiguration.get('/ovs/framework/paths|cfgdir'))
         client.dir_create(config_dir)
         alba_proxy = storagedriver.alba_proxy
         if alba_proxy is None and vpool.backend_type.code == 'alba':
@@ -660,7 +661,11 @@ class StorageRouterController(object):
             }))
 
         # Possible modes: ['classic', 'ganesha']
-        volumedriver_mode = Configuration.get('ovs.storagedriver.vmware_mode') if storagerouter.pmachine.hvtype == 'VMWARE' else 'classic'
+        machine_id = System.get_my_machine_id(client)
+        if storagerouter.pmachine.hvtype == 'VMWARE':
+            volumedriver_mode = EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|vmware_mode'.format(machine_id))
+        else:
+            volumedriver_mode = 'classic'
         if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'ganesha':
             ganesha_config = '/opt/OpenvStorage/config/storagedriver/storagedriver/{0}_ganesha.conf'.format(vpool_name)
             contents = ''
@@ -705,9 +710,9 @@ class StorageRouterController(object):
 
         queue_urls = []
         for current_storagerouter in StorageRouterList.get_masters():
-            queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(Configuration.get('ovs.core.broker.protocol'),
-                                                                      Configuration.get('ovs.core.broker.login'),
-                                                                      Configuration.get('ovs.core.broker.password'),
+            queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(EtcdConfiguration.get('/ovs/framework/messagequeue|protocol'),
+                                                                      EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
+                                                                      EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
                                                                       current_storagerouter.ip)})
 
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
@@ -753,7 +758,7 @@ class StorageRouterController(object):
         storagedriver_config.configure_file_driver(fd_cache_path=sdp_fd.path,
                                                    fd_extent_cache_capacity='1024',
                                                    fd_namespace='fd-{0}-{1}'.format(vpool_name, vpool.guid))
-        storagedriver_config.configure_event_publisher(events_amqp_routing_key=Configuration.get('ovs.core.broker.queues.storagedriver'),
+        storagedriver_config.configure_event_publisher(events_amqp_routing_key=EtcdConfiguration.get('/ovs/framework/messagequeue|queues.storagedriver'),
                                                        events_amqp_uris=queue_urls)
         storagedriver_config.configure_threadpool_component(num_threads=16)
         storagedriver_config.save(client, reload_config=False)
@@ -916,7 +921,7 @@ class StorageRouterController(object):
                 storage_drivers_left = True
             try:
                 temp_client = SSHClient(sr, username='root')
-                configuration_dir = temp_client.config_read('ovs.core.cfgdir')
+                configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
                 with Remote(temp_client.ip, [LocalStorageRouterClient]) as remote:
                     lsrc = remote.LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
                     lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
@@ -1011,7 +1016,7 @@ class StorageRouterController(object):
                         logger.error('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed with error: {3}'.format(storage_driver.guid, vdisk.guid, vdisk.name, ex))
 
         config = ArakoonClusterConfig(StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV)
-        config.load_config(client)
+        config.load_config()
         arakoon_node_configs = []
         offline_node_ips = [sr.ip for sr in storage_routers_offline]
         for node in config.nodes:
@@ -1159,15 +1164,16 @@ class StorageRouterController(object):
         if storage_router_online is True:
             # Cleanup directories/files
             logger.info('Remove Storage Driver - Guid {0} - Deleting vPool related directories and files'.format(storage_driver.guid))
-            configuration_dir = client.config_read('ovs.core.cfgdir')
+            configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
+            machine_id = System.get_my_machine_id(client)
             dirs_to_remove.append(storage_driver.mountpoint)
-            dirs_to_remove.append('{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool.name))
+            dirs_to_remove.append('{0}/{1}'.format(EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(machine_id), vpool.name)))
             files_to_remove = ['{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name)]
 
             if vpool.backend_type.code == 'alba':
                 files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.cfg'.format(configuration_dir, vpool.name))
                 files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.json'.format(configuration_dir, vpool.name))
-            if storage_router.pmachine.hvtype == 'VMWARE' and Configuration.get('ovs.storagedriver.vmware_mode') == 'ganesha':
+            if storage_router.pmachine.hvtype == 'VMWARE' and EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|vmware_mode'.format(machine_id)) == 'ganesha':
                 files_to_remove.append('{0}/storagedriver/storagedriver/{1}_ganesha.conf'.format(configuration_dir, vpool.name))
 
             for file_name in files_to_remove:
@@ -1324,10 +1330,10 @@ class StorageRouterController(object):
         :param storagerouter_guid: Storage Router guid to get support information for
         """
         return {'storagerouter_guid': storagerouter_guid,
-                'nodeid': Configuration.get('ovs.support.nid'),
-                'clusterid': Configuration.get('ovs.support.cid'),
-                'enabled': Configuration.get('ovs.support.enabled'),
-                'enablesupport': Configuration.get('ovs.support.enablesupport')}
+                'nodeid': System.get_my_machine_id(),
+                'clusterid': EtcdConfiguration.get('/ovs/framework/cluster_id'),
+                'enabled': EtcdConfiguration.get('/ovs/framework/support|enabled'),
+                'enablesupport': EtcdConfiguration.get('ovs/framework/support|enablesupport')}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_support_metadata')
@@ -1370,9 +1376,9 @@ class StorageRouterController(object):
                 clients.append((SSHClient(storagerouter), SSHClient(storagerouter, username='root')))
         except UnableToConnectException:
             raise RuntimeError('Not all StorageRouters are reachable')
+        EtcdConfiguration.set('/ovs/framework/support|enabled', enable)
+        EtcdConfiguration.set('/ovs/framework/support|enablesupport', enable_support)
         for ovs_client, root_client in clients:
-            ovs_client.config_set('ovs.support.enabled', enable)
-            ovs_client.config_set('ovs.support.enablesupport', enable_support)
             if enable_support is False:
                 root_client.run('service openvpn stop')
                 root_client.file_delete('/etc/openvpn/ovs_*')
@@ -1734,7 +1740,8 @@ class StorageRouterController(object):
         """
         Gets `number` free ports ports that are not in use and not reserved
         """
-        port_range = client.config_read('ovs.ports.storagedriver')
+        machine_id = System.get_my_machine_id(client)
+        port_range = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
         ports = System.get_free_ports(port_range, ports_in_use, number, client)
 
         return ports if number != 1 else ports[0]

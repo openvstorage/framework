@@ -20,7 +20,7 @@ import sys
 import json
 from unittest import TestCase
 from ovs.lib.tests.mockups import StorageDriverModule, StorageDriverClient
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -101,7 +101,7 @@ class MDSServices(TestCase):
             if client.exists(key):
                 return client.get(key)
 
-        Configuration.get = staticmethod(_get)
+        EtcdConfiguration.get = staticmethod(_get)
 
         # Cleaning storage
         VolatileFactory.store.clean()
@@ -117,10 +117,10 @@ class MDSServices(TestCase):
         VolatileFactory.store = DummyVolatileStore()
         VolatileFactory.store.clean()
 
-        client.set('ovs.logging.path', '/var/log/ovs')
-        client.set('ovs.logging.level', 'DEBUG')
-        client.set('ovs.logging.default_file', 'generic')
-        client.set('ovs.logging.default_name', 'logger')
+        client.set('/ovs/framework/logging|path', '/var/log/ovs')
+        client.set('/ovs/framework/logging|level', 'DEBUG')
+        client.set('/ovs/framework/logging|default_file', 'generic')
+        client.set('/ovs/framework/logging|default_name', 'logger')
 
     @classmethod
     def tearDownClass(cls):

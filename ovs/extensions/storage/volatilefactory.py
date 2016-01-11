@@ -17,7 +17,7 @@ Generic volatile factory.
 """
 import os
 from ConfigParser import RawConfigParser
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 
 
 class VolatileFactory(object):
@@ -33,20 +33,13 @@ class VolatileFactory(object):
 
         if not hasattr(VolatileFactory, 'store') or VolatileFactory.store is None:
             if client_type is None:
-                client_type = Configuration.get('ovs.core.storage.volatile')
+                client_type = EtcdConfiguration.get('/ovs/framework/stores|volatile')
 
             VolatileFactory.store = None
             if client_type == 'memcache':
                 from ovs.extensions.storage.volatile.memcachestore import MemcacheStore
-                memcache_servers = list()
-                memcache_config = RawConfigParser()
-                memcache_config.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-                nodes = [node.strip() for node in memcache_config.get('main', 'nodes').split(',')]
-                nodes.sort()
-                for node in nodes:
-                    location = memcache_config.get(node, 'location')
-                    memcache_servers.append(location)
-                VolatileFactory.store = MemcacheStore(memcache_servers)
+                nodes = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
+                VolatileFactory.store = MemcacheStore(nodes)
             if client_type == 'default':
                 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
                 VolatileFactory.store = DummyVolatileStore()

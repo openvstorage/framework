@@ -24,7 +24,7 @@ from ovs.celery_run import celery
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.api.client import OVSClient
 from ovs.extensions.support.agent import SupportAgent
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 from ovs.dal.hybrids.license import License
 from ovs.dal.lists.licenselist import LicenseList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -182,7 +182,7 @@ class LicenseController(object):
         SupportAgent().run()  # Execute a single heartbeat run
         client = OVSClient('monitoring.openvstorage.com', 443, credentials=None, verify=True, version=1)
         task_id = client.post('/support/register/',
-                              data={'cluster_id': Configuration.get('ovs.support.cid'),
+                              data={'cluster_id': EtcdConfiguration.get('/ovs/framework/cluster_id'),
                                     'name': name,
                                     'email': email,
                                     'company': company,
@@ -191,9 +191,7 @@ class LicenseController(object):
                                     'register_only': True})
         if task_id:
             client.wait_for_task(task_id, timeout=120)
-        for storagerouter in StorageRouterList.get_storagerouters():
-            client = SSHClient(storagerouter)
-            client.config_set('ovs.core.registered', True)
+        EtcdConfiguration.set('/ovs/framework/registered', True)
 
     @staticmethod
     def _encode(data):
