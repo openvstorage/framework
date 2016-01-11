@@ -17,9 +17,32 @@ Generic module for managing configuration in Etcd
 """
 
 import json
+import time
 import etcd
 import random
 import string
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('extensions', name='etcdconfiguration')
+
+
+def low_slow_calls(f):
+    def new_function(*args, **kwargs):
+        start = time.time()
+        try:
+            return f(*args, **kwargs)
+        finally:
+            key_info = ''
+            if 'key' in kwargs:
+                key_info = ' (key: {0})'.format(kwargs['key'])
+            elif len(args) > 0:
+                key_info = ' (key: {0})'.format(args[0])
+            duration = time.time() - start
+            if duration > 1:
+                logger.warning('Call to {0}{1} took {2}s'.format(f.__name__, key_info, duration))
+    new_function.__name__ = f.__name__
+    new_function.__module__ = f.__module__
+    return new_function
 
 
 class EtcdConfiguration(object):
@@ -167,17 +190,20 @@ class EtcdConfiguration(object):
             EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
 
     @staticmethod
+    @low_slow_calls
     def _list(key):
         client = etcd.Client(port=2379, use_proxies=True)
         for child in client.get(key).children:
             yield child.key.replace('{0}/'.format(key), '')
 
     @staticmethod
+    @low_slow_calls
     def _delete(key):
         client = etcd.Client(port=2379, use_proxies=True)
         client.delete(key)
 
     @staticmethod
+    @low_slow_calls
     def _get(key, raw):
         client = etcd.Client(port=2379, use_proxies=True)
         data = client.read(key).value
@@ -186,6 +212,7 @@ class EtcdConfiguration(object):
         return json.loads(data)
 
     @staticmethod
+    @low_slow_calls
     def _set(key, value, raw):
         client = etcd.Client(port=2379, use_proxies=True)
         data = value

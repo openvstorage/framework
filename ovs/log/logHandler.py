@@ -19,7 +19,6 @@ Contains the loghandler module
 import inspect
 import logging
 import os
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
 
 
 def _ignore_formatting_errors():

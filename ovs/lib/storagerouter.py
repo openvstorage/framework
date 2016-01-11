@@ -1016,7 +1016,7 @@ class StorageRouterController(object):
                         logger.error('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed with error: {3}'.format(storage_driver.guid, vdisk.guid, vdisk.name, ex))
 
         config = ArakoonClusterConfig(StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV)
-        config.load_config(client)
+        config.load_config()
         arakoon_node_configs = []
         offline_node_ips = [sr.ip for sr in storage_routers_offline]
         for node in config.nodes:
@@ -1165,8 +1165,9 @@ class StorageRouterController(object):
             # Cleanup directories/files
             logger.info('Remove Storage Driver - Guid {0} - Deleting vPool related directories and files'.format(storage_driver.guid))
             configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
+            machine_id = System.get_my_machine_id(client)
             dirs_to_remove.append(storage_driver.mountpoint)
-            dirs_to_remove.append('{0}/{1}'.format(EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(machine_id), vpool.name))
+            dirs_to_remove.append('{0}/{1}'.format(EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(machine_id), vpool.name)))
             files_to_remove = ['{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name)]
 
             if vpool.backend_type.code == 'alba':
