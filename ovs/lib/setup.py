@@ -23,9 +23,9 @@ import json
 import time
 import base64
 import urllib2
+import ConfigParser
 from paramiko import AuthenticationException
 from etcd import EtcdConnectionFailed
-from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.db.etcd.installer import EtcdInstaller
@@ -103,7 +103,7 @@ class SetupController(object):
         # Support non-interactive setup
         preconfig = '/tmp/openvstorage_preconfig.cfg'
         if os.path.exists(preconfig):
-            config = RawConfigParser()
+            config = ConfigParser.RawConfigParser()
             config.read(preconfig)
             ip = config.get('setup', 'target_ip')
             target_password = config.get('setup', 'target_password')  # @TODO: Replace by using "known_passwords"
@@ -124,7 +124,10 @@ class SetupController(object):
                 known_passwords = json.loads(config.get('setup', 'passwords'))
             if config.has_option('setup', 'external_etcd'):
                 external_etcd = json.loads(config.get('setup', 'external_etcd'))
-            enable_heartbeats = config.getboolean('setup', 'enable_heartbeats')
+            try:
+                enable_heartbeats = config.getboolean('setup', 'enable_heartbeats')
+            except ConfigParser.NoOptionError:
+                enable_heartbeats = False
 
         try:
             if force_type is not None:
