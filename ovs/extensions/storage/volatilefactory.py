@@ -17,7 +17,7 @@ Generic volatile factory.
 """
 import os
 from ConfigParser import RawConfigParser
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 
 
 class VolatileFactory(object):

@@ -20,7 +20,7 @@ import json
 import time
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.api.client import OVSClient
 from django.views.generic import View

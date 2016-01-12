@@ -29,7 +29,7 @@ from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 
 memcache_servers = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
 rmq_servers = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')

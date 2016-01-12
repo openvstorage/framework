@@ -21,7 +21,7 @@ import json
 from celery.task.control import revoke
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 import volumedriver.storagerouter.FileSystemEvents_pb2 as FileSystemEvents
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from google.protobuf.descriptor import FieldDescriptor

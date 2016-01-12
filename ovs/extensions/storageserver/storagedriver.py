@@ -19,7 +19,7 @@ Wrapper class for the storagedriver client of the voldrv team
 import os
 import json
 import copy
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.remote import Remote
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter import storagerouterclient

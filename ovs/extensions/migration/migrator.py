@@ -14,7 +14,7 @@
 import os
 import imp
 import inspect
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 
 
 class Migrator(object):

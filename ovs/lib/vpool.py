@@ -23,7 +23,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.fs.exportfs import Nfsexports
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient

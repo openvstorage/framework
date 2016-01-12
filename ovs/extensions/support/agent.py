@@ -24,7 +24,7 @@ import base64
 import requests
 from subprocess import check_output
 from ConfigParser import RawConfigParser
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.system import System
 from ovs.extensions.packages.package import PackageManager
 from ovs.log.logHandler import LogHandler
