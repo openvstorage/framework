@@ -23,9 +23,9 @@ import json
 import time
 import base64
 import urllib2
-import ConfigParser
 from paramiko import AuthenticationException
 from etcd import EtcdConnectionFailed
+from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.db.etcd.installer import EtcdInstaller
@@ -103,7 +103,7 @@ class SetupController(object):
         # Support non-interactive setup
         preconfig = '/tmp/openvstorage_preconfig.cfg'
         if os.path.exists(preconfig):
-            config = ConfigParser.RawConfigParser()
+            config = RawConfigParser()
             config.read(preconfig)
             ip = config.get('setup', 'target_ip')
             target_password = config.get('setup', 'target_password')  # @TODO: Replace by using "known_passwords"
@@ -124,9 +124,9 @@ class SetupController(object):
                 known_passwords = json.loads(config.get('setup', 'passwords'))
             if config.has_option('setup', 'external_etcd'):
                 external_etcd = json.loads(config.get('setup', 'external_etcd'))
-            try:
+            if config.has_option('setup', 'enable_heartbeats'):
                 enable_heartbeats = config.getboolean('setup', 'enable_heartbeats')
-            except ConfigParser.NoOptionError:
+            else:
                 enable_heartbeats = False
 
         try:
@@ -516,7 +516,7 @@ class SetupController(object):
                 configure_memcached = True
                 preconfig = '/tmp/openvstorage_preconfig.cfg'
                 if os.path.exists(preconfig):
-                    config = ConfigParser.RawConfigParser()
+                    config = RawConfigParser()
                     config.read(preconfig)
                     configure_memcached = config.getboolean('setup', 'configure_memcached')
                     configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
@@ -1358,7 +1358,7 @@ EOF
         print 'Update existing vPools'
         logger.info('Update existing vPools')
         for node_ip in node_ips:
-            with Remote(node_ip, [os, ConfigParser.RawConfigParser, EtcdConfiguration, StorageDriverConfiguration], 'ovs') as remote:
+            with Remote(node_ip, [os, RawConfigParser, EtcdConfiguration, StorageDriverConfiguration], 'ovs') as remote:
                 login = remote.EtcdConfiguration.get('/ovs/framework/messagequeue|user')
                 password = remote.EtcdConfiguration.get('/ovs/framework/messagequeue|password')
                 protocol = remote.EtcdConfiguration.get('/ovs/framework/messagequeue|protocol')
