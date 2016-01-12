@@ -21,7 +21,7 @@ import urllib
 import base64
 import requests
 import datetime
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.system import System
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt

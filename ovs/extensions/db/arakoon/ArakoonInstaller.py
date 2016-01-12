@@ -19,7 +19,7 @@ from ConfigParser import RawConfigParser
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.services.service import ServiceManager
 from StringIO import StringIO
 from ovs.log.logHandler import LogHandler

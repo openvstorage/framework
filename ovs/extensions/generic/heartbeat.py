@@ -16,7 +16,7 @@ import time
 from subprocess import check_output, CalledProcessError
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.os.os import OSManager
 
 from ovs.log.logHandler import LogHandler

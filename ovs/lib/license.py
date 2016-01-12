@@ -24,7 +24,7 @@ from ovs.celery_run import celery
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.api.client import OVSClient
 from ovs.extensions.support.agent import SupportAgent
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.dal.hybrids.license import License
 from ovs.dal.lists.licenselist import LicenseList
 from ovs.dal.lists.storagerouterlist import StorageRouterList

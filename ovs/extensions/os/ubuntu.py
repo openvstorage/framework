@@ -18,7 +18,7 @@ Ubuntu OS module
 
 from subprocess import CalledProcessError
 from subprocess import check_output
-from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.system import System
 
 

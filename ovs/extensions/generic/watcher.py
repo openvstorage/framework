@@ -120,7 +120,7 @@ def services_running(target):
             # RabbitMQ
             _log(target, 'Test rabbitMQ...', 0)
             import pika
-            from ovs.extensions.generic.etcdconfig import EtcdConfiguration
+            from ovs.extensions.db.etcd.configuration import EtcdConfiguration
             rmq_servers = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
             good_node = False
             for server in rmq_servers:
