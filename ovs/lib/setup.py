@@ -124,7 +124,7 @@ class SetupController(object):
                 known_passwords = json.loads(config.get('setup', 'passwords'))
             if config.has_option('setup', 'external_etcd'):
                 external_etcd = json.loads(config.get('setup', 'external_etcd'))
-            enable_heartbeats = False
+            enable_heartbeats = config.getboolean('setup', 'enable_heartbeats')
 
         try:
             if force_type is not None:
