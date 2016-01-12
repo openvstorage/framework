@@ -171,6 +171,7 @@ class EtcdInstaller(object):
         :param slave_ip: IP of the slave to deploy to
         :param master_ip: IP of the node to deploy from
         """
+        logger.debug('  Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, master_ip, slave_ip))
         master_client = SSHClient(master_ip, username='root')
         slave_client = SSHClient(slave_ip, username='root')
 
@@ -179,6 +180,17 @@ class EtcdInstaller(object):
             info = re.search(EtcdInstaller.MEMBER_REGEX, item).groupdict()
             current_cluster.append('{0}={1}'.format(info['name'], info['peer']))
 
+        EtcdInstaller._setup_proxy(','.join(current_cluster), slave_client, cluster_name)
+        logger.debug('  Setting up proxy "{0}" from {1} to {2} completed'.format(cluster_name, master_ip, slave_ip))
+
+    @staticmethod
+    def use_external(external, slave_ip, cluster_name):
+        logger.debug('Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, external, slave_ip))
+        EtcdInstaller._setup_proxy(external, SSHClient(slave_ip, username='root'), cluster_name)
+        logger.debug('Setting up proxy "{0}" from {1} to {2} completed'.format(cluster_name, external, slave_ip))
+
+    @staticmethod
+    def _setup_proxy(initial_cluster, slave_client, cluster_name):
         base_name = 'ovs-etcd-proxy'
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
         EtcdInstaller.stop(cluster_name, slave_client)
@@ -187,11 +199,15 @@ class EtcdInstaller(object):
         wal_dir = EtcdInstaller.WAL_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
         abs_paths = [data_dir, wal_dir]
         slave_client.dir_delete(abs_paths)
+        slave_client.dir_create(data_dir)
+        slave_client.dir_chmod(data_dir, 0755, recursive=True)
+        slave_client.dir_chown(data_dir, 'ovs', 'ovs', recursive=True)
 
         ServiceManager.add_service(base_name, slave_client,
                                    params={'CLUSTER': cluster_name,
+                                           'DATA_DIR': data_dir,
                                            'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1'),
-                                           'INITIAL_CLUSTER': ','.join(current_cluster)},
+                                           'INITIAL_CLUSTER': initial_cluster},
                                    target_name=target_name)
         EtcdInstaller.start(cluster_name, slave_client)
 

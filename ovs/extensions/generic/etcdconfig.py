@@ -137,6 +137,10 @@ class EtcdConfiguration(object):
             return False
 
     @staticmethod
+    def dir_exists(key):
+        return EtcdConfiguration._dir_exists(key)
+
+    @staticmethod
     def list(key):
         return EtcdConfiguration._list(key)
 
@@ -154,10 +158,10 @@ class EtcdConfiguration(object):
             EtcdConfiguration._set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value, raw=False)
 
     @staticmethod
-    def initialize():
+    def initialize(external_etcd=None):
         cluster_id = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
-        webapps_secret = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
         base_config = {'/cluster_id': cluster_id,
+                       '/external_etcd': external_etcd,
                        '/registered': False,
                        '/memcache': {'endpoints': []},
                        '/messagequeue': {'endpoints': [],
@@ -186,21 +190,30 @@ class EtcdConfiguration(object):
 
     @staticmethod
     @log_slow_calls
+    def _dir_exists(key):
+        try:
+            client = EtcdConfiguration._get_client()
+            return client.get(key).dir
+        except (KeyError, etcd.EtcdKeyNotFound):
+            return False
+
+    @staticmethod
+    @log_slow_calls
     def _list(key):
-        client = etcd.Client(port=2379, use_proxies=True)
+        client = EtcdConfiguration._get_client()
         for child in client.get(key).children:
             yield child.key.replace('{0}/'.format(key), '')
 
     @staticmethod
     @log_slow_calls
     def _delete(key):
-        client = etcd.Client(port=2379, use_proxies=True)
+        client = EtcdConfiguration._get_client()
         client.delete(key)
 
     @staticmethod
     @log_slow_calls
     def _get(key, raw):
-        client = etcd.Client(port=2379, use_proxies=True)
+        client = EtcdConfiguration._get_client()
         data = client.read(key).value
         if raw is True:
             return data
@@ -209,7 +222,7 @@ class EtcdConfiguration(object):
     @staticmethod
     @log_slow_calls
     def _set(key, value, raw):
-        client = etcd.Client(port=2379, use_proxies=True)
+        client = EtcdConfiguration._get_client()
         data = value
         if raw is False:
             data = json.dumps(value)
@@ -220,3 +233,7 @@ class EtcdConfiguration(object):
             client.set(key, value)
         except:
             pass
+
+    @staticmethod
+    def _get_client():
+        return etcd.Client(port=2379, use_proxies=True)

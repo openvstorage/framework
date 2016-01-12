@@ -367,7 +367,7 @@ class ArakoonInstaller(object):
         node_name = System.get_my_machine_id(client)
         clusters = []
         exclude_ports = []
-        if EtcdConfiguration.exists(ArakoonInstaller.ETCD_CONFIG_ROOT):
+        if EtcdConfiguration.dir_exists(ArakoonInstaller.ETCD_CONFIG_ROOT):
             for cluster_name in EtcdConfiguration.list(ArakoonInstaller.ETCD_CONFIG_ROOT):
                 try:
                     config = ArakoonClusterConfig(cluster_name)

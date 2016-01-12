@@ -96,6 +96,7 @@ class SetupController(object):
         join_cluster = False
         configure_memcached = True
         configure_rabbitmq = True
+        external_etcd = None  # Example: 'abcdef0123456789=http://1.2.3.4:2380'
         enable_heartbeats = True
         ip_client_map = {}
 
@@ -121,6 +122,8 @@ class SetupController(object):
                 SetupController.discovered_nodes = json.loads(config.get('setup', 'other_nodes'))
             if config.has_option('setup', 'passwords'):
                 known_passwords = json.loads(config.get('setup', 'passwords'))
+            if config.has_option('setup', 'external_etcd'):
+                external_etcd = json.loads(config.get('setup', 'external_etcd'))
             enable_heartbeats = False
 
         try:
@@ -344,7 +347,8 @@ class SetupController(object):
                                                   hypervisor_info=hypervisor_info,
                                                   enable_heartbeats=enable_heartbeats,
                                                   configure_memcached=configure_memcached,
-                                                  configure_rabbitmq=configure_rabbitmq)
+                                                  configure_rabbitmq=configure_rabbitmq,
+                                                  external_etcd=external_etcd)
             else:
                 # Deciding master/extra
                 SetupController._setup_extra_node(cluster_ip=cluster_ip,
@@ -354,7 +358,8 @@ class SetupController(object):
                                                   ip_client_map=ip_client_map,
                                                   hypervisor_info=hypervisor_info,
                                                   configure_memcached=configure_memcached,
-                                                  configure_rabbitmq=configure_rabbitmq)
+                                                  configure_rabbitmq=configure_rabbitmq,
+                                                  external_etcd=external_etcd)
 
                 print 'Analyzing cluster layout'
                 logger.info('Analyzing cluster layout')
@@ -851,7 +856,7 @@ class SetupController(object):
 
     @staticmethod
     def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats,
-                          configure_memcached, configure_rabbitmq):
+                          configure_memcached, configure_rabbitmq, external_etcd):
         """
         Sets up the first node services. This node is always a master
         """
@@ -863,8 +868,11 @@ class SetupController(object):
 
         print 'Setting up Etcd'
         logger.info('Setting up Etcd')
-        EtcdInstaller.create_cluster('config', cluster_ip)
-        EtcdConfiguration.initialize()
+        if external_etcd is None:
+            EtcdInstaller.create_cluster('config', cluster_ip)
+        else:
+            EtcdInstaller.use_external(external_etcd, cluster_ip, 'config')
+        EtcdConfiguration.initialize(external_etcd=external_etcd)
         EtcdConfiguration.initialize_host(machine_id)
 
         print 'Setting up Arakoon'
@@ -957,7 +965,7 @@ class SetupController(object):
 
     @staticmethod
     def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map, hypervisor_info,
-                          configure_memcached, configure_rabbitmq):
+                          configure_memcached, configure_rabbitmq, external_etcd):
         """
         Sets up an additional node
         """
@@ -972,7 +980,10 @@ class SetupController(object):
 
         print 'Configuring services'
         logger.info('Copying client configurations')
-        EtcdInstaller.deploy_to_slave(master_ip, cluster_ip, 'config')
+        if external_etcd is None:
+            EtcdInstaller.deploy_to_slave(master_ip, cluster_ip, 'config')
+        else:
+            EtcdInstaller.use_external(external_etcd, cluster_ip, 'config')
 
         EtcdConfiguration.initialize_host(machine_id)
 
@@ -1050,9 +1061,11 @@ class SetupController(object):
         result = ArakoonInstaller.extend_cluster(master_ip, cluster_ip, 'ovsdb', EtcdConfiguration.get('/ovs/framework/paths|ovsdb'))
         arakoon_ports = [result['client_port'], result['messaging_port']]
 
-        print 'Joining etcd cluster'
-        logger.info('Joining etcd cluster')
-        EtcdInstaller.extend_cluster(master_ip, cluster_ip, 'config')
+        external_etcd = EtcdConfiguration.get('/ovs/framework/external_etcd')
+        if external_etcd is None:
+            print 'Joining etcd cluster'
+            logger.info('Joining etcd cluster')
+            EtcdInstaller.extend_cluster(master_ip, cluster_ip, 'config')
 
         print 'Update configurations'
         logger.info('Update configurations')
@@ -1141,7 +1154,7 @@ class SetupController(object):
 
         # Find other (arakoon) master nodes
         config = ArakoonClusterConfig('ovsdb')
-        config.load_config(SSHClient(master_ip, username='root'))
+        config.load_config()
         master_nodes = [node.ip for node in config.nodes]
         if cluster_ip in master_nodes:
             master_nodes.remove(cluster_ip)
@@ -1158,9 +1171,12 @@ class SetupController(object):
         ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'ovsdb', offline_node_ips)
         master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
         slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
-        for ip in master_ips + slave_ips:
-            if ip != master_ip and ip not in offline_node_ips:
-                ArakoonInstaller.deploy_to_slave(master_ip, ip, 'ovsdb')
+
+        external_etcd = EtcdConfiguration.get('/ovs/framework/external_etcd')
+        if external_etcd is None:
+            print 'Leaving Etcd cluster'
+            logger.info('Leaving Etcd cluster')
+            EtcdInstaller.shrink_cluster(master_ip, cluster_ip, 'config')
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
