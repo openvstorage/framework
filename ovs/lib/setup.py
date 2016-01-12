@@ -516,7 +516,7 @@ class SetupController(object):
                 configure_memcached = True
                 preconfig = '/tmp/openvstorage_preconfig.cfg'
                 if os.path.exists(preconfig):
-                    config = RawConfigParser()
+                    config = ConfigParser.RawConfigParser()
                     config.read(preconfig)
                     configure_memcached = config.getboolean('setup', 'configure_memcached')
                     configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
@@ -1358,7 +1358,7 @@ EOF
         print 'Update existing vPools'
         logger.info('Update existing vPools')
         for node_ip in node_ips:
-            with Remote(node_ip, [os, RawConfigParser, EtcdConfiguration, StorageDriverConfiguration], 'ovs') as remote:
+            with Remote(node_ip, [os, ConfigParser.RawConfigParser, EtcdConfiguration, StorageDriverConfiguration], 'ovs') as remote:
                 login = remote.EtcdConfiguration.get('/ovs/framework/messagequeue|user')
                 password = remote.EtcdConfiguration.get('/ovs/framework/messagequeue|password')
                 protocol = remote.EtcdConfiguration.get('/ovs/framework/messagequeue|protocol')
