@@ -127,7 +127,7 @@ class SetupController(object):
             if config.has_option('setup', 'enable_heartbeats'):
                 enable_heartbeats = config.getboolean('setup', 'enable_heartbeats')
             else:
-                enable_heartbeats = False
+                enable_heartbeats = True
 
         try:
             if force_type is not None:
