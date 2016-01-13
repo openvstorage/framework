@@ -111,7 +111,7 @@ class EtcdConfiguration(object):
     def delete(key, remove_root=False, raw=False):
         key_entries = key.split('|')
         if len(key_entries) == 1:
-            EtcdConfiguration._delete(key_entries[0])
+            EtcdConfiguration._delete(key_entries[0], recursive=True)
             return
         data = EtcdConfiguration._get(key_entries[0], raw)
         temp_config = data
@@ -206,9 +206,9 @@ class EtcdConfiguration(object):
 
     @staticmethod
     @log_slow_calls
-    def _delete(key):
+    def _delete(key, recursive):
         client = EtcdConfiguration._get_client()
-        client.delete(key)
+        client.delete(key, recursive=recursive)
 
     @staticmethod
     @log_slow_calls
