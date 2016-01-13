@@ -210,6 +210,7 @@ class EtcdInstaller(object):
                                            'INITIAL_CLUSTER': initial_cluster},
                                    target_name=target_name)
         EtcdInstaller.start(cluster_name, slave_client)
+        EtcdInstaller.wait_for_cluster(cluster_name, slave_client)
 
     @staticmethod
     def start(cluster_name, client):
