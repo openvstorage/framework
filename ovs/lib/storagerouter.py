@@ -42,7 +42,6 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.api.client import OVSClient
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.remote import Remote
@@ -53,6 +52,7 @@ from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
@@ -1032,7 +1032,7 @@ class StorageRouterController(object):
             voldrv_service = 'volumedriver_{0}'.format(vpool.name)
             albaproxy_service = 'albaproxy_{0}'.format(vpool.name)
             client = SSHClient(storage_router, username='root')
-            configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
+            configuration_dir = client.config_read('ovs.core.cfgdir')
 
             for service in [voldrv_service, dtl_service]:
                 try:

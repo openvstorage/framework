@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from subprocess import check_output, CalledProcessError, PIPE, Popen
+from ConfigParser import RawConfigParser
 from ovs.log.logHandler import LogHandler
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.helpers import Descriptor
@@ -38,30 +39,29 @@ def connected():
     Makes sure a call is executed against a connected client if required
     """
 
-    def wrap(outer_function):
+    def wrap(f):
         """
         Wrapper function
-        :param outer_function: Function to wrap
         """
 
-        def inner_function(self, *args, **kwargs):
+        def new_function(self, *args, **kwargs):
             """
             Wrapped function
-            :param self
+
             """
             try:
                 if self.client is not None and not self.client.is_connected():
                     self._connect()
-                return outer_function(self, *args, **kwargs)
+                return f(self, *args, **kwargs)
             except AttributeError as ex:
                 if "'NoneType' object has no attribute 'open_session'" in str(ex):
                     self._connect()  # Reconnect
-                    return outer_function(self, *args, **kwargs)
+                    return f(self, *args, **kwargs)
                 raise
 
-        inner_function.__name__ = outer_function.__name__
-        inner_function.__module__ = outer_function.__module__
-        return inner_function
+        new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
+        return new_function
 
     return wrap
 
@@ -69,15 +69,11 @@ def connected():
 def is_connected(self):
     """
     Monkey-patch method to check whether the Paramiko client is connected
-    :param self
     """
     return self._transport is not None
 
 
 class UnableToConnectException(Exception):
-    """
-    Custom exception thrown when client cannot connect to remote side
-    """
     pass
 
 
@@ -182,10 +178,7 @@ class SSHClient(object):
 
     @staticmethod
     def shell_safe(path_to_check):
-        """
-        Makes sure that the given path/string is escaped and safe for shell
-        :param path_to_check: Path to make safe for shell
-        """
+        """Makes sure that the given path/string is escaped and safe for shell"""
         return "".join([("\\" + _) if _ in " '\";`|" else _ for _ in path_to_check])
 
     @connected()
@@ -285,13 +278,6 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
             return json.loads(self.run('python -c """{0}"""'.format(command)))
 
     def dir_chmod(self, directories, mode, recursive=False):
-        """
-        Chmod a or multiple directories
-        :param directories: Directories to chmod
-        :param mode: Mode to chmod
-        :param recursive: Chmod the directories recursively or not
-        :return: None
-        """
         if not isinstance(mode, int):
             raise ValueError('Mode should be an integer')
 
@@ -310,14 +296,6 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
                 self.run('chmod {0} {1} {2}'.format(recursive_str, oct(mode), directory))
 
     def dir_chown(self, directories, user, group, recursive=False):
-        """
-        Chown a or multiple directories
-        :param directories: Directories to chown
-        :param user: User to assign to directories
-        :param group: Group to assign to directories
-        :param recursive: Chown the directories recursively or not
-        :return: None
-        """
         all_users = [user_info[0] for user_info in pwd.getpwall()]
         all_groups = [group_info[0] for group_info in grp.getgrall()]
 
@@ -355,11 +333,6 @@ print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
             return json.loads(self.run('python -c """{0}"""'.format(command)))
 
     def symlink(self, links):
-        """
-        Create symlink
-        :param links: Dictionary containing the absolute path of the files and their link which needs to be created
-        :return: None
-        """
         if self.is_local is True:
             for link_name, source in links.iteritems():
                 os.symlink(source, link_name)
@@ -368,11 +341,6 @@ print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
                 self.run('ln -s {0} {1}'.format(self.shell_safe(source), self.shell_safe(link_name)))
 
     def file_create(self, filenames):
-        """
-        Create a or multiple files
-        :param filenames: Files to create
-        :return: None
-        """
         if isinstance(filenames, basestring):
             filenames = [filenames]
         for filename in filenames:
@@ -417,11 +385,6 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
                         self.run('rm -f "{0}"'.format(filename))
 
     def file_unlink(self, path):
-        """
-        Unlink a file
-        :param path: Path of the file to unlink
-        :return: None
-        """
         path = self.shell_safe(path)
         if self.is_local is True:
             if os.path.islink(path):
@@ -430,11 +393,6 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
             self.run("unlink {0}".format(path))
 
     def file_read_link(self, path):
-        """
-        Read the symlink of the specified path
-        :param path: Path of the symlink
-        :return: None
-        """
         path = self.shell_safe(path.rstrip('/'))
         if self.is_local is True:
             if os.path.islink(path):
@@ -517,3 +475,24 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             check_output(command, shell=True)
         else:
             self.run(command)
+
+    def rawconfig_read(self, filename):
+        contents = self.file_read(filename)
+        handle, temp_filename = tempfile.mkstemp()
+        with open(temp_filename, 'w') as configfile:
+            configfile.write(contents)
+        os.close(handle)
+        rawconfig = RawConfigParser()
+        rawconfig.read(temp_filename)
+        os.remove(temp_filename)
+        return rawconfig
+
+    def rawconfig_write(self, filename, rawconfig):
+        handle, temp_filename = tempfile.mkstemp()
+        with open(temp_filename, 'w') as configfile:
+            rawconfig.write(configfile)
+        with open(temp_filename, 'r') as configfile:
+            contents = configfile.read()
+            self.file_write(filename, contents)
+        os.close(handle)
+        os.remove(temp_filename)
