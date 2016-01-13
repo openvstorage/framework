@@ -450,7 +450,7 @@ class StorageRouterController(object):
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
 
         config = ArakoonClusterConfig(StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV)
-        config.load_config(client)
+        config.load_config()
         arakoon_nodes = []
         arakoon_node_configs = []
         for node in config.nodes:
