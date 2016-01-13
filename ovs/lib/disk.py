@@ -86,7 +86,7 @@ class DiskController(object):
                             partition_name = device_name
                             if device_name.startswith('nvme') or device_name.startswith('loop'):
                                 device_name = device_name[:0 - int(len(partition_id)) - 1]
-                            elif device_name.startswith('md') and 'p' in device_name:
+                            elif device_name.startswith('md'):
                                 device_name = device_name[:device_name.index('p')]
                             else:
                                 device_name = device_name[:0 - int(len(partition_id))]
@@ -100,15 +100,9 @@ class DiskController(object):
                             partition_name = device_name
                             partition_id = match.groups()[1]
                             device_name = match.groups()[0]
-                    if device_name.startswith('md') and 'p' in device_name:
-                        md_device = device_name[:device_name.index('p')]
-                        sectors = int(client.run('cat /sys/block/{0}/{1}/size'.format(md_device, device_name)))
-                        sector_size = int(client.run('cat /sys/block/{0}/{1}/queue/hw_sector_size'.format(md_device, device_name)))
-                        rotational = int(client.run('cat /sys/block/{0}/{1}/queue/rotational'.format(md_device, device_name)))
-                    else:
-                        sectors = int(client.run('cat /sys/block/{0}/size'.format(device_name)))
-                        sector_size = int(client.run('cat /sys/block/{0}/queue/hw_sector_size'.format(device_name)))
-                        rotational = int(client.run('cat /sys/block/{0}/queue/rotational'.format(device_name)))
+                    sectors = int(client.run('cat /sys/block/{0}/size'.format(device_name)))
+                    sector_size = int(client.run('cat /sys/block/{0}/queue/hw_sector_size'.format(device_name)))
+                    rotational = int(client.run('cat /sys/block/{0}/queue/rotational'.format(device_name)))
 
                     if sectors == 0:
                         continue
