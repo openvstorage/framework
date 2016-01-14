@@ -124,7 +124,10 @@ class SetupController(object):
                 known_passwords = json.loads(config.get('setup', 'passwords'))
             if config.has_option('setup', 'external_etcd'):
                 external_etcd = json.loads(config.get('setup', 'external_etcd'))
-            enable_heartbeats = False
+            if config.has_option('setup', 'enable_heartbeats'):
+                enable_heartbeats = config.getboolean('setup', 'enable_heartbeats')
+            else:
+                enable_heartbeats = True
 
         try:
             if force_type is not None:
@@ -357,14 +360,12 @@ class SetupController(object):
                                                   unique_id=unique_id,
                                                   ip_client_map=ip_client_map,
                                                   hypervisor_info=hypervisor_info,
-                                                  configure_memcached=configure_memcached,
-                                                  configure_rabbitmq=configure_rabbitmq,
                                                   external_etcd=external_etcd)
 
                 print 'Analyzing cluster layout'
                 logger.info('Analyzing cluster layout')
                 config = ArakoonClusterConfig('ovsdb')
-                config.load_config(SSHClient(master_ip, username='root', password=known_passwords[master_ip]))
+                config.load_config()
                 logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), 'ovsdb'))
                 if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
                     SetupController._promote_node(cluster_ip=cluster_ip,
@@ -460,7 +461,7 @@ class SetupController(object):
                 target_client = SSHClient('127.0.0.1', username='root', password=target_password)
 
                 unique_id = System.get_my_machine_id(target_client)
-                ip = target_client.config_read('ovs.grid.ip')
+                ip = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(unique_id))
 
                 cluster_name = None
                 if SetupController._avahi_installed(target_client):
@@ -964,8 +965,7 @@ class SetupController(object):
         logger.info('First node complete')
 
     @staticmethod
-    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map, hypervisor_info,
-                          configure_memcached, configure_rabbitmq, external_etcd):
+    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map, hypervisor_info, external_etcd):
         """
         Sets up an additional node
         """
@@ -1044,7 +1044,7 @@ class SetupController(object):
 
         # Find other (arakoon) master nodes
         config = ArakoonClusterConfig('ovsdb')
-        config.load_config(SSHClient(master_ip, username='root'))
+        config.load_config()
         master_nodes = [node.ip for node in config.nodes]
         if cluster_ip in master_nodes:
             master_nodes.remove(cluster_ip)
@@ -1069,11 +1069,11 @@ class SetupController(object):
 
         print 'Update configurations'
         logger.info('Update configurations')
-        if configure_memcached:
+        if configure_memcached is True:
             endpoints = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
             endpoints.append('{0}:{1}'.format(cluster_ip, 11211))
             EtcdConfiguration.set('/ovs/framework/memcache|endpoints', endpoints)
-        if configure_rabbitmq:
+        if configure_rabbitmq is True:
             endpoints = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
             endpoints.append('{0}:{1}'.format(cluster_ip, 5672))
             EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
@@ -1168,7 +1168,7 @@ class SetupController(object):
         print 'Leaving arakoon ovsdb cluster'
         logger.info('Leaving arakoon ovsdb cluster')
         offline_node_ips = [node.ip for node in offline_nodes]
-        ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'ovsdb', offline_node_ips)
+        ArakoonInstaller.shrink_cluster(cluster_ip, 'ovsdb', offline_node_ips)
         master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
         slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
 
@@ -1178,24 +1178,20 @@ class SetupController(object):
             logger.info('Leaving Etcd cluster')
             EtcdInstaller.shrink_cluster(master_ip, cluster_ip, 'config')
 
-        print 'Distribute configuration files'
-        logger.info('Distribute configuration files')
-        master_client = ip_client_map[master_ip]
-        config_types = []
+        print 'Update configurations'
+        logger.info('Update configurations')
         if configure_memcached is True:
-            config_types.append('memcached')
+            endpoints = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
+            endpoint = '{0}:{1}'.format(cluster_ip, 11211)
+            if endpoint in endpoints:
+                endpoints.remove(endpoint)
+            EtcdConfiguration.set('/ovs/framework/memcache|endpoints', endpoints)
         if configure_rabbitmq is True:
-            config_types.append('rabbitmq')
-        for config_type in config_types:
-            config_file, port = SetupController.generic_configfiles[config_type]
-            config = master_client.rawconfig_read(config_file)
-            config_nodes = [n.strip() for n in config.get('main', 'nodes').split(',')]
-            if unique_id in config_nodes:
-                config_nodes.remove(unique_id)
-                config.set('main', 'nodes', ', '.join(config_nodes))
-                config.remove_section(unique_id)
-            for node_client in ip_client_map.itervalues():
-                node_client.rawconfig_write(config_file, config)
+            endpoints = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
+            endpoint = '{0}:{1}'.format(cluster_ip, 5672)
+            if endpoint in endpoints:
+                endpoints.remove(endpoint)
+            EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
 
         print 'Restarting master node services'
         logger.info('Restarting master node services')

@@ -123,6 +123,7 @@ class StorageDriverController(object):
         :param master_ip: IP of the master node
         :param offline_node_ips: IPs of nodes which are offline
         """
+        _ = master_ip
         if offline_node_ips is None:
             offline_node_ips = []
         client = SSHClient(cluster_ip, username='root') if cluster_ip not in offline_node_ips else None
@@ -137,13 +138,13 @@ class StorageDriverController(object):
                     remaining_ips.append(service.storagerouter.ip)
         if current_service is not None:
             print '* Shrink StorageDriver cluster'
-            ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, 'voldrv', offline_node_ips)
+            ArakoonInstaller.shrink_cluster(cluster_ip, 'voldrv', offline_node_ips)
             if client is not None and ServiceManager.has_service(current_service.name, client=client) is True:
                 ServiceManager.stop_service(current_service.name, client=client)
                 ServiceManager.remove_service(current_service.name, client=client)
             ArakoonInstaller.restart_cluster_remove('voldrv', remaining_ips)
             current_service.delete()
-            StorageDriverController._configure_arakoon_to_volumedriver(offline_node_ips)
+            StorageDriverController._configure_arakoon_to_volumedriver()
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=crontab(minute='15', hour='*'))
@@ -225,11 +226,9 @@ class StorageDriverController(object):
             StorageDriverController._configure_arakoon_to_volumedriver()
 
     @staticmethod
-    def _configure_arakoon_to_volumedriver(offline_node_ips=None):
+    def _configure_arakoon_to_volumedriver():
         print 'Update existing vPools'
         logger.info('Update existing vPools')
-        if offline_node_ips is None:
-            offline_node_ips = []
         for storagerouter in StorageRouterList.get_storagerouters():
             config = ArakoonClusterConfig('voldrv')
             config.load_config()

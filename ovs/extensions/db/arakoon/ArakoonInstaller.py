@@ -328,12 +328,11 @@ class ArakoonInstaller(object):
                 'messaging_port': ports[1]}
 
     @staticmethod
-    def shrink_cluster(remaining_node_ip, deleted_node_ip, cluster_name, offline_nodes=None):
+    def shrink_cluster(deleted_node_ip, cluster_name, offline_nodes=None):
         """
         Removes a node from a cluster, the old node will become a slave
         :param cluster_name: The name of the cluster to shrink
         :param deleted_node_ip: The ip of the node that should be deleted
-        :param remaining_node_ip: The ip of a remaining node
         :param offline_nodes: Storage Routers which are offline
         """
         logger.debug('Shrinking cluster {0} from {1}'.format(cluster_name, deleted_node_ip))
@@ -392,7 +391,6 @@ class ArakoonInstaller(object):
         logger.debug('Destroy node {0} in cluster {1}'.format(node.ip, config.cluster_id))
 
         # Removes services for a cluster on a given node
-        ovs_client = SSHClient(node.ip)
         root_client = SSHClient(node.ip, username='root')
         ArakoonInstaller.stop(config.cluster_id, client=root_client)
         ArakoonInstaller.remove(config.cluster_id, client=root_client)
@@ -402,7 +400,7 @@ class ArakoonInstaller(object):
             root_client.dir_delete([directory])
 
         # Removes a configuration file from a node
-        config.delete_config(ovs_client)
+        config.delete_config()
         logger.debug('Destroy node {0} in cluster {1} completed'.format(node.ip, config.cluster_id))
 
     @staticmethod

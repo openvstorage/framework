@@ -20,6 +20,7 @@ import copy
 import time
 from celery.result import ResultSet
 from celery.schedules import crontab
+from ConfigParser import RawConfigParser
 from datetime import datetime
 from datetime import timedelta
 from ovs.celery_run import celery
@@ -29,8 +30,9 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.servicelist import ServiceList
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.arakoon.pyrakoon.tools.admin import ArakoonClientConfig, ArakoonAdminClient
-from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -39,6 +41,7 @@ from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vmachine import VMachineController
 from ovs.log.logHandler import LogHandler
+from StringIO import StringIO
 from time import mktime
 from volumedriver.storagerouter import storagerouterclient
 
@@ -359,8 +362,9 @@ class ScheduledTaskController(object):
 
         for cluster, storagerouter in arakoon_clusters.iteritems():
             logger.info('  Collapsing cluster {0}'.format(cluster))
-            client = SSHClient(storagerouter)
-            parser = client.rawconfig_read(PyrakoonStore.ARAKOON_CONFIG_FILE.format(cluster))
+            contents = EtcdConfiguration.get(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(cluster), raw=True)
+            parser = RawConfigParser()
+            parser.readfp(StringIO(contents))
             nodes = {}
             for node in parser.get('global', 'cluster').split(','):
                 node = node.strip()
