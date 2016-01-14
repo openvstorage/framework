@@ -362,7 +362,7 @@ class MDSServiceController(object):
         # If MDS already in use, take current load, else take next load
         tlogs = EtcdConfiguration.get('/ovs/framework/storagedriver|mds_tlogs')
         safety = EtcdConfiguration.get('/ovs/framework/storagedriver|mds_safety')
-        max_load = EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|mds_maxload'.format(vdisk_storagerouter.machine_id))
+        max_load = EtcdConfiguration.get('/ovs/framework/storagedriver|mds_maxload')
         for service in services:
             if service == master_service or service in slave_services:
                 load = services_load[service][0]
@@ -695,11 +695,11 @@ class MDSServiceController(object):
                 mds_dict[vpool][storagerouter]['services'].append(mds_service)
 
         failures = []
+        max_load = EtcdConfiguration.get('/ovs/framework/storagedriver|mds_maxload')
         for vpool, storagerouter_info in mds_dict.iteritems():
             # 1. First, make sure there's at least one MDS on every StorageRouter that's not overloaded
             # If not, create an extra MDS for that StorageRouter
             for storagerouter in storagerouter_info:
-                max_load = EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|mds_maxload'.format(storagerouter.machine_id))
                 client = mds_dict[vpool][storagerouter]['client']
                 mds_services = mds_dict[vpool][storagerouter]['services']
                 has_room = False

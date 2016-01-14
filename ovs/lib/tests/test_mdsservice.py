@@ -538,7 +538,7 @@ class MDSServices(TestCase):
         )
         vdisks = {}
         for sr in storagerouters.values():
-            client.set('/ovs/framework/hosts/{0}/storagedriver|mds_maxload'.format(sr.machine_id), 75)
+            client.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
         for mds_service in mds_services.itervalues():
             vdisks.update(self._create_vdisks_for_mds_service(2, len(vdisks) + 1, mds_service=mds_service))
 
@@ -728,7 +728,7 @@ class MDSServices(TestCase):
              'mds_services': [(1, 1), (2, 2), (3, 2), (4, 3), (5, 4), (6, 5), (7, 5), (8, 6), (9, 7)]}  # (<id>, <storagedriver_id>)
         )
         for sr in storagerouters.values():
-            client.set('/ovs/framework/hosts/{0}/storagedriver|mds_maxload'.format(sr.machine_id), 75)
+            client.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(self._create_vdisks_for_mds_service(1, len(vdisks) + 1, mds_service=mds_service))
@@ -1078,7 +1078,7 @@ class MDSServices(TestCase):
              'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)]}  # (<id>, <storagedriver_id>)
         )
         for sr in storagerouters.values():
-            client.set('/ovs/framework/hosts/{0}/storagedriver|mds_maxload'.format(sr.machine_id), 55)
+            client.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 55)
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(self._create_vdisks_for_mds_service(2, len(vdisks) + 1, mds_service=mds_service))
@@ -1263,7 +1263,7 @@ class MDSServices(TestCase):
              'mds_services': [(1, 1), (2, 2), (3, 2), (4, 3), (5, 4), (6, 5), (7, 5), (8, 6), (9, 7)]}  # (<id>, <storagedriver_id>)
         )
         for sr in storagerouters.values():
-            client.set('/ovs/framework/hosts/{0}/storagedriver|mds_maxload'.format(sr.machine_id), 35)
+            client.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 35)
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(self._create_vdisks_for_mds_service(1, len(vdisks) + 1, mds_service=mds_service))

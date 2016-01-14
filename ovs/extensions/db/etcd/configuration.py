@@ -27,7 +27,16 @@ logger = LogHandler.get('extensions', name='etcdconfiguration')
 
 
 def log_slow_calls(f):
+    """
+    Wrapper to print duration when call takes > 1s
+    :param f: Function to wrap
+    :return: Wrapped function
+    """
     def new_function(*args, **kwargs):
+        """
+        Execute function
+        :return: Function output
+        """
         start = time.time()
         try:
             return f(*args, **kwargs)
@@ -77,6 +86,12 @@ class EtcdConfiguration(object):
 
     @staticmethod
     def get(key, raw=False):
+        """
+        Get value from etcd
+        :param key: Key to get
+        :param raw: Raw data if True else json format
+        :return: Value for key
+        """
         key_entries = key.split('|')
         data = EtcdConfiguration._get(key_entries[0], raw)
         if len(key_entries) == 1:
@@ -88,6 +103,13 @@ class EtcdConfiguration(object):
 
     @staticmethod
     def set(key, value, raw=False):
+        """
+        Set value in etcd
+        :param key: Key to store
+        :param value: Value to store
+        :param raw: Raw data if True else json format
+        :return: None
+        """
         key_entries = key.split('|')
         if len(key_entries) == 1:
             EtcdConfiguration._set(key_entries[0], value, raw)
@@ -109,6 +131,13 @@ class EtcdConfiguration(object):
 
     @staticmethod
     def delete(key, remove_root=False, raw=False):
+        """
+        Delete key - value from etcd
+        :param key: Key to delete
+        :param remove_root: Remove root
+        :param raw: Raw data if True else json format
+        :return: None
+        """
         key_entries = key.split('|')
         if len(key_entries) == 1:
             EtcdConfiguration._delete(key_entries[0])
@@ -130,6 +159,11 @@ class EtcdConfiguration(object):
 
     @staticmethod
     def exists(key):
+        """
+        Check if key exists in etcd
+        :param key: Key to check
+        :return: True if exists
+        """
         try:
             _ = EtcdConfiguration.get(key)
             return True
@@ -138,16 +172,30 @@ class EtcdConfiguration(object):
 
     @staticmethod
     def dir_exists(key):
+        """
+        Check if directory exists in etcd
+        :param key: Directory to check
+        :return: True if exists
+        """
         return EtcdConfiguration._dir_exists(key)
 
     @staticmethod
     def list(key):
+        """
+        List all keys in tree
+        :param key: Key to list
+        :return: Generator object
+        """
         return EtcdConfiguration._list(key)
 
     @staticmethod
     def initialize_host(host_id):
-        base_config = {'/storagedriver': {'mds_maxload': 75,
-                                          'rsp': '/var/rsp',
+        """
+        Initialize keys when setting up a host
+        :param host_id: ID of the host
+        :return: None
+        """
+        base_config = {'/storagedriver': {'rsp': '/var/rsp',
                                           'vmware_mode': 'ganesha'},
                        '/ports': {'storagedriver': [[26200, 26299]],
                                   'mds': [[26300, 26399]],
@@ -159,6 +207,11 @@ class EtcdConfiguration(object):
 
     @staticmethod
     def initialize(external_etcd=None):
+        """
+        Initialize general keys for all hosts in cluster
+        :param external_etcd: ETCD runs on another host outside the cluster
+        :return: None
+        """
         cluster_id = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
         base_config = {'/cluster_id': cluster_id,
                        '/external_etcd': external_etcd,
@@ -182,7 +235,8 @@ class EtcdConfiguration(object):
                                     'enabled': True,
                                     'interval': 60},
                        '/storagedriver': {'mds_safety': 2,
-                                          'mds_tlogs': 100},
+                                          'mds_tlogs': 100,
+                                          'mds_maxload': 75},
                        '/webapps': {'html_endpoint': '/',
                                     'oauth2': {'mode': 'local'}}}
         for key, value in base_config.iteritems():
