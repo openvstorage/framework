@@ -173,6 +173,7 @@ class ArakoonInstaller(object):
     ARAKOON_CATCHUP_COMMAND = 'arakoon --node {0} -config {1} -catchup-only'
     ETCD_CONFIG_ROOT = '/ovs/arakoon'
     ETCD_CONFIG_KEY = '/ovs/arakoon/{0}/config'
+    ETCD_CONFIG_PATH = 'etcd://127.0.0.1:2379/ovs/arakoon/{0}/config'
 
     def __init__(self):
         """
@@ -274,6 +275,7 @@ class ArakoonInstaller(object):
         # Cleans up a complete cluster (remove services, directories and configuration files)
         for node in config.nodes:
             ArakoonInstaller._destroy_node(config, node)
+        EtcdConfiguration.delete('{0}/{1}'.format(ArakoonInstaller.ETCD_CONFIG_ROOT, cluster_name), raw=True)
         logger.debug('Deleting cluster {0} on {1} completed'.format(cluster_name, ip))
 
     @staticmethod
@@ -431,7 +433,7 @@ class ArakoonInstaller(object):
             ServiceManager.add_service(base_name, root_client,
                                        params={'CLUSTER': config.cluster_id,
                                                'NODE_ID': node.name,
-                                               'CONFIG_FILE': '/tmp/arakoon-{0}.ini'.format(config.cluster_id)},
+                                               'CONFIG_PATH': ArakoonInstaller.ETCD_CONFIG_PATH.format(config.cluster_id)},
                                        target_name=target_name)
             logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
 
@@ -529,11 +531,8 @@ class ArakoonInstaller(object):
         if len(config.nodes) > 1:
             logger.debug('Catching up new node {0} for cluster {1}'.format(new_ip, cluster_name))
             node_name = [node.name for node in config.nodes if node.ip == new_ip][0]
-            temp_filename = '/tmp/arakoon-{0}.ini'.format(cluster_name)
-            contents = EtcdConfiguration.get(ArakoonInstaller.ETCD_CONFIG_KEY.format(cluster_name), raw=True)
-            client.file_write(temp_filename, contents)
-            client.run(ArakoonInstaller.ARAKOON_CATCHUP_COMMAND.format(node_name, temp_filename))
-            client.file_delete(temp_filename)
+            config_path = ArakoonInstaller.ETCD_CONFIG_PATH.format(cluster_name)
+            client.run(ArakoonInstaller.ARAKOON_CATCHUP_COMMAND.format(node_name, config_path))
             logger.debug('Catching up new node {0} for cluster {1} completed'.format(new_ip, cluster_name))
 
         threshold = 2 if new_ip in current_ips else 1

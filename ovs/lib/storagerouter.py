@@ -24,7 +24,7 @@ import time
 import random
 from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
-
+from StringIO import StringIO
 from ovs.celery_run import celery
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
@@ -398,7 +398,8 @@ class StorageRouterController(object):
                 if successful is False:
                     raise RuntimeError('Could not load metadata from remote environment {0}'.format(connection_host))
                 vpool.metadata = {'metadata': metadata,
-                                  'preset': preset_name}
+                                  'preset': preset_name,
+                                  'backend_guid': backend_guid}
             elif vpool.backend_type.code in ['ceph_s3', 'amazon_s3', 'swift_s3']:
                 if vpool.backend_type.code in ['swift_s3']:
                     strict_consistency = 'false'
@@ -645,20 +646,22 @@ class StorageRouterController(object):
                 config.add_section(section)
                 for key, value in vpool.metadata['metadata'][section].iteritems():
                     config.set(section, key, value)
+            config_io = StringIO()
+            config.write(config_io)
             cache_dir = sdp_frag.path
             root_client.dir_create(cache_dir)
-            System.write_config(config, '{0}/{1}_alba.cfg'.format(config_dir, vpool_name), client)
-
-            # manifest cache is in memory
-            client.file_write('{0}/{1}_alba.json'.format(config_dir, vpool_name), json.dumps({
+            backend_id = vpool.metadata['backend_guid']
+            config_tree = '/ovs/alba/backends/{0}/proxies/{1}/config/{{0}}'.format(backend_id, alba_proxy.guid)
+            EtcdConfiguration.set(config_tree.format('abm'), config_io.getvalue().trim(), raw=True)
+            EtcdConfiguration.set(config_tree.format('main'), json.dumps({
                 'log_level': 'info',
                 'port': alba_proxy.service.ports[0],
                 'ips': ['127.0.0.1'],
                 'manifest_cache_size': 100000,
                 'fragment_cache_dir': cache_dir,
                 'fragment_cache_size': frag_size,
-                'albamgr_cfg_file': '{0}/{1}_alba.cfg'.format(config_dir, vpool_name)
-            }))
+                'albamgr_cfg_file': 'etcd://127.0.0.1:2379/{0}'.format(config_tree.format('abm'))
+            }), raw=True)
 
         # Possible modes: ['classic', 'ganesha']
         machine_id = System.get_my_machine_id(client)
@@ -781,7 +784,8 @@ class StorageRouterController(object):
                   'UUID': str(uuid.uuid4()),
                   'OVS_UID': check_output('id -u ovs', shell=True).strip(),
                   'OVS_GID': check_output('id -g ovs', shell=True).strip(),
-                  'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
+                  'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30)),
+                  'BACKEND_ID': vpool.metadata['backend_guid']}
 
         logger.info('volumedriver_mode: {0}'.format(volumedriver_mode))
         logger.info('backend_type: {0}'.format(vpool.backend_type.code))
@@ -790,6 +794,7 @@ class StorageRouterController(object):
         ServiceManager.start_service(dtl_service, client=root_client)
         if vpool.backend_type.code == 'alba':
             alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
+            params['PROXY_ID'] = storagedriver.alba_proxy_guid
             ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name=alba_proxy_service)
             ServiceManager.start_service(alba_proxy_service, client=root_client)
             dependencies = [alba_proxy_service]
@@ -1169,8 +1174,9 @@ class StorageRouterController(object):
             files_to_remove = ['{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name)]
 
             if vpool.backend_type.code == 'alba':
-                files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.cfg'.format(configuration_dir, vpool.name))
-                files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.json'.format(configuration_dir, vpool.name))
+                backend_id = vpool.metadata['backend_guid']
+                config_tree = '/ovs/alba/backends/{0}/proxies/{1}'.format(backend_id, storage_driver.alba_proxy.guid)
+                EtcdConfiguration.delete(config_tree)
             if storage_router.pmachine.hvtype == 'VMWARE' and EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|vmware_mode'.format(machine_id)) == 'ganesha':
                 files_to_remove.append('{0}/storagedriver/storagedriver/{1}_ganesha.conf'.format(configuration_dir, vpool.name))
 
