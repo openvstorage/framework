@@ -105,8 +105,8 @@ class VPoolController(object):
                 pass
         if client is None:
             raise RuntimeError('Could not find an online storage router to retrieve vPool configuration from')
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
-        storagedriver_config.load(client)
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, vpool.storagedrivers[0].storagedriver_id)
+        storagedriver_config.load()
 
         dtl = storagedriver_config.configuration.get('failovercache', {})
         file_system = storagedriver_config.configuration.get('filesystem', {})

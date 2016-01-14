@@ -229,31 +229,24 @@ class StorageDriverController(object):
     def _configure_arakoon_to_volumedriver():
         print 'Update existing vPools'
         logger.info('Update existing vPools')
-        for storagerouter in StorageRouterList.get_storagerouters():
-            config = ArakoonClusterConfig('voldrv')
-            config.load_config()
-            arakoon_nodes = []
-            for node in config.nodes:
-                arakoon_nodes.append({'host': node.ip,
-                                      'port': node.client_port,
-                                      'node_id': node.name})
-            with Remote(storagerouter.ip, [os, RawConfigParser, EtcdConfiguration, StorageDriverConfiguration], 'ovs') as remote:
-                configuration_dir = '{0}/storagedriver/storagedriver'.format(EtcdConfiguration.get('/ovs/framework/paths|cfgdir'))
-                if not remote.os.path.exists(configuration_dir):
-                    remote.os.makedirs(configuration_dir)
-                for json_file in remote.os.listdir(configuration_dir):
-                    vpool_name = json_file.replace('.json', '')
-                    if json_file.endswith('.json'):
-                        if remote.os.path.exists('{0}/{1}.cfg'.format(configuration_dir, vpool_name)):
-                            continue  # There's also a .cfg file, so this is an alba_proxy configuration file
-                        storagedriver_config = remote.StorageDriverConfiguration('storagedriver', vpool_name)
-                        storagedriver_config.load()
-                        storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id='voldrv',
-                                                                       vregistry_arakoon_cluster_nodes=arakoon_nodes)
-                        storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
-                                                                              dls_arakoon_cluster_id='voldrv',
-                                                                              dls_arakoon_cluster_nodes=arakoon_nodes)
-                        storagedriver_config.save(reload_config=True)
+        config = ArakoonClusterConfig('voldrv')
+        config.load_config()
+        arakoon_nodes = []
+        for node in config.nodes:
+            arakoon_nodes.append({'host': node.ip,
+                                  'port': node.client_port,
+                                  'node_id': node.name})
+        if EtcdConfiguration.exists('/ovs/vpools'):
+            for vpool_guid in EtcdConfiguration.list('/ovs/vpools'):
+                for storagedriver_id in EtcdConfiguration.list('/ovs/vpools/{0}/hosts'.format(vpool_guid)):
+                    storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_guid, storagedriver_id)
+                    storagedriver_config.load()
+                    storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id='voldrv',
+                                                                   vregistry_arakoon_cluster_nodes=arakoon_nodes)
+                    storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
+                                                                          dls_arakoon_cluster_id='voldrv',
+                                                                          dls_arakoon_cluster_nodes=arakoon_nodes)
+                    storagedriver_config.save(reload_config=True)
 
     @staticmethod
     def add_storagedriverpartition(storagedriver, partition_info):

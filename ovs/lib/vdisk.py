@@ -633,10 +633,8 @@ class VDiskController(object):
         vdisk = VDisk(vdisk_guid)
         vpool = VPool(vdisk.vpool_guid)
 
-        vpool_client = SSHClient(vpool.storagedrivers[0].storagerouter)
-
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
-        storagedriver_config.load(vpool_client)
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, vpool.storagedrivers[0].storagedriver_id)
+        storagedriver_config.load()
         volume_manager = storagedriver_config.configuration.get('volume_manager', {})
 
         volume_id = str(vdisk.volume_id)
