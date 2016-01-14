@@ -910,6 +910,7 @@ class StorageRouterController(object):
         storage_router = storage_driver.storagerouter
         storage_router_online = True
         storage_routers_offline = [StorageRouter(storage_router_guid) for storage_router_guid in offline_storage_router_guids]
+        configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
 
         # Validations
         logger.info('Remove Storage Driver - Guid {0} - Checking availability of related Storage Routers'.format(storage_driver.guid, storage_driver.name))
@@ -921,7 +922,6 @@ class StorageRouterController(object):
                 storage_drivers_left = True
             try:
                 temp_client = SSHClient(sr, username='root')
-                configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
                 with Remote(temp_client.ip, [LocalStorageRouterClient]) as remote:
                     lsrc = remote.LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
                     lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
@@ -1032,7 +1032,6 @@ class StorageRouterController(object):
             voldrv_service = 'volumedriver_{0}'.format(vpool.name)
             albaproxy_service = 'albaproxy_{0}'.format(vpool.name)
             client = SSHClient(storage_router, username='root')
-            configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
 
             for service in [voldrv_service, dtl_service]:
                 try:
@@ -1164,10 +1163,9 @@ class StorageRouterController(object):
         if storage_router_online is True:
             # Cleanup directories/files
             logger.info('Remove Storage Driver - Guid {0} - Deleting vPool related directories and files'.format(storage_driver.guid))
-            configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
             machine_id = System.get_my_machine_id(client)
             dirs_to_remove.append(storage_driver.mountpoint)
-            dirs_to_remove.append('{0}/{1}'.format(EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(machine_id), vpool.name)))
+            dirs_to_remove.append('{0}/{1}'.format(EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(machine_id)), vpool.name))
             files_to_remove = ['{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name)]
 
             if vpool.backend_type.code == 'alba':
