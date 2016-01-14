@@ -71,7 +71,7 @@ class DiskController(object):
                 context = remote.Context()
                 devices = [device for device in context.list_devices(subsystem='block')
                            if ('ID_TYPE' in device and device['ID_TYPE'] == 'disk') or
-                              ('DEVNAME' in device and ('loop' in device['DEVNAME'] or 'nvme' in device['DEVNAME']))]
+                              ('DEVNAME' in device and ('loop' in device['DEVNAME'] or 'nvme' in device['DEVNAME'] or 'md' in device['DEVNAME']))]
                 for device in devices:
                     is_partition = device['DEVTYPE'] == 'partition'
                     device_path = device['DEVNAME']
@@ -86,6 +86,8 @@ class DiskController(object):
                             partition_name = device_name
                             if device_name.startswith('nvme') or device_name.startswith('loop'):
                                 device_name = device_name[:0 - int(len(partition_id)) - 1]
+                            elif device_name.startswith('md'):
+                                device_name = device_name[:device_name.index('p')]
                             else:
                                 device_name = device_name[:0 - int(len(partition_id))]
                         else:
@@ -101,6 +103,7 @@ class DiskController(object):
                     sectors = int(client.run('cat /sys/block/{0}/size'.format(device_name)))
                     sector_size = int(client.run('cat /sys/block/{0}/queue/hw_sector_size'.format(device_name)))
                     rotational = int(client.run('cat /sys/block/{0}/queue/rotational'.format(device_name)))
+
                     if sectors == 0:
                         continue
                     if device_name not in configuration:
