@@ -275,6 +275,7 @@ class ArakoonInstaller(object):
         # Cleans up a complete cluster (remove services, directories and configuration files)
         for node in config.nodes:
             ArakoonInstaller._destroy_node(config, node)
+        EtcdConfiguration.delete('{0}/{1}'.format(ArakoonInstaller.ETCD_CONFIG_ROOT, cluster_name), raw=True)
         logger.debug('Deleting cluster {0} on {1} completed'.format(cluster_name, ip))
 
     @staticmethod
