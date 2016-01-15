@@ -652,7 +652,7 @@ class StorageRouterController(object):
             root_client.dir_create(cache_dir)
             backend_id = vpool.metadata['backend_guid']
             config_tree = '/ovs/alba/backends/{0}/proxies/{1}/config/{{0}}'.format(backend_id, alba_proxy.guid)
-            EtcdConfiguration.set(config_tree.format('abm'), config_io.getvalue().trim(), raw=True)
+            EtcdConfiguration.set(config_tree.format('abm'), config_io.getvalue().strip(), raw=True)
             EtcdConfiguration.set(config_tree.format('main'), json.dumps({
                 'log_level': 'info',
                 'port': alba_proxy.service.ports[0],
