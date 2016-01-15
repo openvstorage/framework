@@ -1358,7 +1358,7 @@ EOF
         for endpoint in EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints'):
             uris.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(protocol, login, password, endpoint)})
 
-        if EtcdConfiguration.exists('/ovs/vpools'):
+        if EtcdConfiguration.dir_exists('/ovs/vpools'):
             for vpool_guid in EtcdConfiguration.list('/ovs/vpools'):
                 for storagedriver_id in EtcdConfiguration.list('/ovs/vpools/{0}/hosts'.format(vpool_guid)):
                     storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_guid, storagedriver_id)

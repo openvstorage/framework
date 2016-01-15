@@ -236,7 +236,7 @@ class StorageDriverController(object):
             arakoon_nodes.append({'host': node.ip,
                                   'port': node.client_port,
                                   'node_id': node.name})
-        if EtcdConfiguration.exists('/ovs/vpools'):
+        if EtcdConfiguration.dir_exists('/ovs/vpools'):
             for vpool_guid in EtcdConfiguration.list('/ovs/vpools'):
                 for storagedriver_id in EtcdConfiguration.list('/ovs/vpools/{0}/hosts'.format(vpool_guid)):
                     storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_guid, storagedriver_id)
