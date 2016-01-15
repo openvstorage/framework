@@ -315,7 +315,7 @@ class StorageDriverConfiguration(object):
         """
         contents = '{}'
         if EtcdConfiguration.exists(self.path):
-            contents = EtcdConfiguration.get(self.path)
+            contents = EtcdConfiguration.get(self.path, raw=True)
             self.is_new = False
         else:
             logger.debug('Could not find config {0}, a new one will be created'.format(self.path))
@@ -330,7 +330,7 @@ class StorageDriverConfiguration(object):
         """
         self._validate()
         contents = json.dumps(self.configuration, indent=4)
-        EtcdConfiguration.set(self.path, contents)
+        EtcdConfiguration.set(self.path, contents, raw=True)
         if self.config_type == 'storagedriver' and reload_config is True:
             if len(self.dirty_entries) > 0:
                 if client is None:

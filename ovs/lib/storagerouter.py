@@ -660,7 +660,7 @@ class StorageRouterController(object):
                 'manifest_cache_size': 100000,
                 'fragment_cache_dir': cache_dir,
                 'fragment_cache_size': frag_size,
-                'albamgr_cfg_file': 'etcd://127.0.0.1:2379/{0}'.format(config_tree.format('abm'))
+                'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm'))
             }), raw=True)
 
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
