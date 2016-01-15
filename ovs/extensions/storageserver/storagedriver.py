@@ -280,7 +280,7 @@ class StorageDriverConfiguration(object):
         },
     }
 
-    def __init__(self, config_type, vpool_name, number=None):
+    def __init__(self, config_type, vpool_guid, storagedriver_id):
         """
         Initializes the class
         """
@@ -292,20 +292,15 @@ class StorageDriverConfiguration(object):
             """
             return lambda **kwargs: self._add(sct, **kwargs)
 
-        if config_type not in ['storagedriver', 'metadataserver']:
-            raise RuntimeError('Invalid configuration type. Allowed: storagedriver, metadataserver')
+        if config_type != 'storagedriver':
+            raise RuntimeError('Invalid configuration type. Allowed: storagedriver')
         self.config_type = config_type
-        self.vpool_name = vpool_name
         self.configuration = {}
+        self.path = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool_guid, storagedriver_id)
+        self.remote_path = 'etcd://127.0.0.1:2379{0}'.format(self.path)
         self.is_new = True
         self.dirty_entries = []
-        self.number = number
         self.params = copy.deepcopy(StorageDriverConfiguration.parameters)  # Never use parameters directly
-        self.base_path = '{0}/storagedriver/{1}'.format(EtcdConfiguration.get('/ovs/framework/paths|cfgdir'), self.config_type)
-        if self.number is None:
-            self.path = '{0}/{1}.json'.format(self.base_path, self.vpool_name)
-        else:
-            self.path = '{0}/{1}_{2}.json'.format(self.base_path, self.vpool_name, self.number)
         # Fix some manual "I know what I'm doing" overrides
         backend_connection_manager = 'backend_connection_manager'
         self.params[self.config_type][backend_connection_manager]['optional'].append('s3_connection_strict_consistency')
@@ -313,25 +308,17 @@ class StorageDriverConfiguration(object):
         for section in self.params[self.config_type]:
             setattr(self, 'configure_{0}'.format(section), make_configure(section))
 
-    def load(self, client=None):
+    def load(self):
         """
         Loads the configuration from a given file, optionally a remote one
         :param client: If provided, load remote configuration
         """
         contents = '{}'
-        if client is None:
-            if os.path.isfile(self.path):
-                with open(self.path, 'r') as config_file:
-                    contents = config_file.read()
-                    self.is_new = False
-            else:
-                logger.debug('Could not find file {0}, a new one will be created'.format(self.path))
+        if EtcdConfiguration.exists(self.path):
+            contents = EtcdConfiguration.get(self.path, raw=True)
+            self.is_new = False
         else:
-            if client.file_exists(self.path):
-                contents = client.file_read(self.path)
-                self.is_new = False
-            else:
-                logger.debug('Could not find file {0}, a new one will be created'.format(self.path))
+            logger.debug('Could not find config {0}, a new one will be created'.format(self.path))
         self.dirty_entries = []
         self.configuration = json.loads(contents)
 
@@ -342,24 +329,17 @@ class StorageDriverConfiguration(object):
         :param reload_config: Reload the running Storage Driver configuration
         """
         self._validate()
-        contents = json.dumps(self.configuration, indent=2)
-        if client is None:
-            if not os.path.exists(self.base_path):
-                os.makedirs(self.base_path)
-            with open(self.path, 'w') as config_file:
-                config_file.write(contents)
-        else:
-            client.dir_create(self.base_path)
-            client.file_write(self.path, contents)
+        contents = json.dumps(self.configuration, indent=4)
+        EtcdConfiguration.set(self.path, contents, raw=True)
         if self.config_type == 'storagedriver' and reload_config is True:
             if len(self.dirty_entries) > 0:
                 if client is None:
                     logger.info('Applying local storagedriver configuration changes')
-                    changes = LSRClient(self.path).update_configuration(self.path)
+                    changes = LSRClient(self.remote_path).update_configuration(self.path)
                 else:
                     logger.info('Applying storagedriver configuration changes on {0}'.format(client.ip))
                     with Remote(client.ip, [LSRClient]) as remote:
-                        changes = copy.deepcopy(remote.LocalStorageRouterClient(self.path).update_configuration(self.path))
+                        changes = copy.deepcopy(remote.LocalStorageRouterClient(self.remote_path).update_configuration(self.path))
                 for change in changes:
                     if change['param_name'] not in self.dirty_entries:
                         raise RuntimeError('Unexpected configuration change: {0}'.format(change['param_name']))

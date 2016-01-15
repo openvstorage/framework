@@ -106,6 +106,7 @@ class MDSServiceController(object):
         storagedrivers = [sd for sd in vpool.storagedrivers if sd.storagerouter_guid == storagerouter.guid]
         if not storagedrivers:
             raise RuntimeError('Expected to find a configured storagedriver for vpool {0} on storage router {1}'.format(vpool.name, storagerouter.name))
+        storagedriver = storagedrivers[0]
 
         # MODEL UPDATES
         # 1. Service
@@ -124,11 +125,11 @@ class MDSServiceController(object):
 
         # 2. Storage driver partitions
         from ovs.lib.storagedriver import StorageDriverController
-        sdp = StorageDriverController.add_storagedriverpartition(storagedrivers[0], {'size': None,
-                                                                                     'role': DiskPartition.ROLES.DB,
-                                                                                     'sub_role': StorageDriverPartition.SUBROLE.MDS,
-                                                                                     'partition': db_partition,
-                                                                                     'mds_service': mds_service})
+        sdp = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                 'role': DiskPartition.ROLES.DB,
+                                                                                 'sub_role': StorageDriverPartition.SUBROLE.MDS,
+                                                                                 'partition': db_partition,
+                                                                                 'mds_service': mds_service})
 
         # CONFIGURATIONS
         # 1. Volumedriver
@@ -136,15 +137,16 @@ class MDSServiceController(object):
         for service in mdsservice_type.services:
             if service.storagerouter_guid == storagerouter.guid:
                 mds_service = service.mds_service
-                if mds_service.vpool_guid == vpool.guid:
-                    mds_nodes.append({'host': service.storagerouter.ip,
-                                      'port': service.ports[0],
-                                      'db_directory': sdp.path,
-                                      'scratch_directory': sdp.path})
+                if mds_service is not None:
+                    if mds_service.vpool_guid == vpool.guid:
+                        mds_nodes.append({'host': service.storagerouter.ip,
+                                          'port': service.ports[0],
+                                          'db_directory': sdp.path,
+                                          'scratch_directory': sdp.path})
 
         # Generate the correct section in the Storage Driver's configuration
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
-        storagedriver_config.load(client)
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
+        storagedriver_config.load()
         storagedriver_config.clean()  # Clean out obsolete values
         storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
         storagedriver_config.save(client, reload_config=reload_config)
@@ -195,7 +197,8 @@ class MDSServiceController(object):
                                               'scratch_directory': sdp[0]})
 
                 # Generate the correct section in the Storage Driver's configuration
-                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
+                storagedriver = [sd for sd in storagerouter.storagedrivers if sd.vpool_guid == vpool.guid][0]
+                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
                 storagedriver_config.load(client)
                 storagedriver_config.clean()  # Clean out obsolete values
                 storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
@@ -728,7 +731,8 @@ class MDSServiceController(object):
                 if client is None:
                     logger.info('MDS checkup - vPool {0} - Storage Router {1} - Marked as offline, not setting default MDS configuration'.format(vpool.name, storagerouter.name))
                     continue
-                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
+                storagedriver = [sd for sd in storagerouter.storagedrivers if sd.vpool_guid == vpool.guid][0]
+                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
                 storagedriver_config.load(client)
                 if storagedriver_config.is_new is False:
                     logger.info('MDS checkup - vPool {0} - Storage Router {1} - Storing default MDS configuration: {2}'.format(vpool.name, storagerouter.name, mds_config_set[storagerouter.guid]))

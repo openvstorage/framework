@@ -652,7 +652,7 @@ class StorageRouterController(object):
             root_client.dir_create(cache_dir)
             backend_id = vpool.metadata['backend_guid']
             config_tree = '/ovs/alba/backends/{0}/proxies/{1}/config/{{0}}'.format(backend_id, alba_proxy.guid)
-            EtcdConfiguration.set(config_tree.format('abm'), config_io.getvalue().trim(), raw=True)
+            EtcdConfiguration.set(config_tree.format('abm'), config_io.getvalue().strip(), raw=True)
             EtcdConfiguration.set(config_tree.format('main'), json.dumps({
                 'log_level': 'info',
                 'port': alba_proxy.service.ports[0],
@@ -660,8 +660,11 @@ class StorageRouterController(object):
                 'manifest_cache_size': 100000,
                 'fragment_cache_dir': cache_dir,
                 'fragment_cache_size': frag_size,
-                'albamgr_cfg_file': 'etcd://127.0.0.1:2379/{0}'.format(config_tree.format('abm'))
+                'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm'))
             }), raw=True)
+
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
+        storagedriver_config.load()
 
         # Possible modes: ['classic', 'ganesha']
         machine_id = System.get_my_machine_id(client)
@@ -676,6 +679,7 @@ class StorageRouterController(object):
                 contents += client.file_read('/opt/OpenvStorage/config/templates/{0}.conf'.format(template))
             params = {'VPOOL_NAME': vpool_name,
                       'VPOOL_MOUNTPOINT': '/mnt/{0}'.format(vpool_name),
+                      'CONFIG_PATH': storagedriver_config.remote_path,
                       'NFS_FILESYSTEM_ID': storagerouter.ip.split('.', 2)[-1]}
             for key, value in params.iteritems():
                 contents = contents.replace('<{0}>'.format(key), value)
@@ -718,8 +722,6 @@ class StorageRouterController(object):
                                                                       EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
                                                                       current_storagerouter.ip)})
 
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
-        storagedriver_config.load(client)
         storagedriver_config.clean()  # Clean out obsolete values
         if vpool.backend_type.code == 'alba':
             storagedriver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
@@ -781,6 +783,7 @@ class StorageRouterController(object):
         params = {'VPOOL_MOUNTPOINT': storagedriver.mountpoint,
                   'HYPERVISOR_TYPE': storagerouter.pmachine.hvtype,
                   'VPOOL_NAME': vpool_name,
+                  'CONFIG_PATH': storagedriver_config.remote_path,
                   'UUID': str(uuid.uuid4()),
                   'OVS_UID': check_output('id -u ovs', shell=True).strip(),
                   'OVS_GID': check_output('id -g ovs', shell=True).strip(),
@@ -852,8 +855,8 @@ class StorageRouterController(object):
             if sr.ip not in ip_client_map:
                 continue
             node_client = ip_client_map[sr.ip]['ovs']
-            storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
-            storagedriver_config.load(node_client)
+            storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
+            storagedriver_config.load()
             if storagedriver_config.is_new is False:
                 storagedriver_config.clean()  # Clean out obsolete values
                 storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
@@ -928,7 +931,8 @@ class StorageRouterController(object):
             try:
                 temp_client = SSHClient(sr, username='root')
                 with Remote(temp_client.ip, [LocalStorageRouterClient]) as remote:
-                    lsrc = remote.LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
+                    path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id)
+                    lsrc = remote.LocalStorageRouterClient(path)
                     lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
                 client = temp_client
                 logger.info('Remove Storage Driver - Guid {0} - Storage Router {1} with IP {2} is online'.format(storage_driver.guid, sr.name, sr.ip))
@@ -1073,7 +1077,8 @@ class StorageRouterController(object):
                         logger.info('Remove Storage Driver - Guid {0} - Alba proxy running'.format(storage_driver.guid))
 
                     logger.info('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs'.format(storage_driver.guid))
-                    storagedriver_client = LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
+                    path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id)
+                    storagedriver_client = LocalStorageRouterClient(path)
                     # noinspection PyArgumentList
                     storagedriver_client.destroy_filesystem()
                     # noinspection PyArgumentList
@@ -1171,8 +1176,9 @@ class StorageRouterController(object):
             machine_id = System.get_my_machine_id(client)
             dirs_to_remove.append(storage_driver.mountpoint)
             dirs_to_remove.append('{0}/{1}'.format(EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(machine_id)), vpool.name))
-            files_to_remove = ['{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name)]
+            EtcdConfiguration.delete('/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id))
 
+            files_to_remove = []
             if vpool.backend_type.code == 'alba':
                 backend_id = vpool.metadata['backend_guid']
                 config_tree = '/ovs/alba/backends/{0}/proxies/{1}'.format(backend_id, storage_driver.alba_proxy.guid)

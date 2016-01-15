@@ -1350,29 +1350,22 @@ EOF
     def _configure_amqp_to_volumedriver(node_ips):
         print 'Update existing vPools'
         logger.info('Update existing vPools')
-        for node_ip in node_ips:
-            with Remote(node_ip, [os, RawConfigParser, EtcdConfiguration, StorageDriverConfiguration], 'ovs') as remote:
-                login = remote.EtcdConfiguration.get('/ovs/framework/messagequeue|user')
-                password = remote.EtcdConfiguration.get('/ovs/framework/messagequeue|password')
-                protocol = remote.EtcdConfiguration.get('/ovs/framework/messagequeue|protocol')
+        login = EtcdConfiguration.get('/ovs/framework/messagequeue|user')
+        password = EtcdConfiguration.get('/ovs/framework/messagequeue|password')
+        protocol = EtcdConfiguration.get('/ovs/framework/messagequeue|protocol')
 
-                uris = []
-                for endpoint in remote.EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints'):
-                    uris.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(protocol, login, password, endpoint)})
+        uris = []
+        for endpoint in EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints'):
+            uris.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(protocol, login, password, endpoint)})
 
-                configuration_dir = '{0}/storagedriver/storagedriver'.format(remote.EtcdConfiguration.get('/ovs/framework/paths|cfgdir'))
-                if not remote.os.path.exists(configuration_dir):
-                    remote.os.makedirs(configuration_dir)
-                for json_file in remote.os.listdir(configuration_dir):
-                    vpool_name = json_file.replace('.json', '')
-                    if json_file.endswith('.json'):
-                        if remote.os.path.exists('{0}/{1}.cfg'.format(configuration_dir, vpool_name)):
-                            continue  # There's also a .cfg file, so this is an alba_proxy configuration file
-                        storagedriver_config = remote.StorageDriverConfiguration('storagedriver', vpool_name)
-                        storagedriver_config.load()
-                        storagedriver_config.configure_event_publisher(events_amqp_routing_key=remote.EtcdConfiguration.get('/ovs/framework/messagequeue|queues.storagedriver'),
-                                                                       events_amqp_uris=uris)
-                        storagedriver_config.save()
+        if EtcdConfiguration.dir_exists('/ovs/vpools'):
+            for vpool_guid in EtcdConfiguration.list('/ovs/vpools'):
+                for storagedriver_id in EtcdConfiguration.list('/ovs/vpools/{0}/hosts'.format(vpool_guid)):
+                    storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_guid, storagedriver_id)
+                    storagedriver_config.load()
+                    storagedriver_config.configure_event_publisher(events_amqp_routing_key=EtcdConfiguration.get('/ovs/framework/messagequeue|queues.storagedriver'),
+                                                                   events_amqp_uris=uris)
+                    storagedriver_config.save()
 
     @staticmethod
     def _avahi_installed(client):

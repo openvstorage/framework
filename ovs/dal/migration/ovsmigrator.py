@@ -374,7 +374,7 @@ class OVSMigrator(object):
                     storagedriver.save()
                 if migrated_objects:
                     print 'Loading sizes'
-                    config = StorageDriverConfiguration('storagedriver', storagedriver.vpool.name)
+                    config = StorageDriverConfiguration('storagedriver', storagedriver.vpool_guid, storagedriver.storagedriver_id)
                     config.load(SSHClient(storagedriver.storagerouter, username='ovs'))
                     for readcache in config.configuration.get('content_addressed_cache', {}).get('clustercache_mount_points', []):
                         path = readcache.get('path', '').rsplit('/', 1)[0]
