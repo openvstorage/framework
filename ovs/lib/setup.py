@@ -381,6 +381,17 @@ class SetupController(object):
                                              'Point your browser to https://{0} to use Open vStorage'.format(cluster_ip)])
             logger.info('Setup complete')
 
+            try:
+                # Try to trigger setups from possibly installed other packages
+                sys.path.append('/opt/asd-manager/')
+                from source.asdmanager import setup
+                print ''
+                print 'A local ASD Manager was detected for which the setup will now be launched.'
+                print ''
+                setup()
+            except:
+                pass
+
         except Exception as exception:
             print ''  # Spacing
             logger.exception('Unexpected error')
