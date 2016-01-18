@@ -165,7 +165,7 @@ class EtcdConfiguration(object):
         :return: True if exists
         """
         try:
-            _ = EtcdConfiguration.get(key)
+            EtcdConfiguration.get(key)
             return True
         except (KeyError, etcd.EtcdKeyNotFound):
             return False
