@@ -23,7 +23,7 @@ import random
 from threading import Lock, current_thread
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
-from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNotFound, ArakoonSockNotReadable, ArakoonSockReadNoBytes
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNotFound, ArakoonSockNotReadable, ArakoonSockReadNoBytes, ArakoonSockSendError
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.log.logHandler import LogHandler
 
@@ -143,7 +143,7 @@ class PyrakoonStore(object):
             start = time.time()
             try:
                 return_value = method(*args, **kwargs)
-            except (ArakoonSockNotReadable, ArakoonSockReadNoBytes):
+            except (ArakoonSockNotReadable, ArakoonSockReadNoBytes, ArakoonSockSendError):
                 logger.debug('Error during arakoon call {0}, retry'.format(method.__name__))
                 time.sleep(1)
                 return_value = method(*args, **kwargs)
