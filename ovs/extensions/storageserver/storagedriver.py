@@ -335,11 +335,11 @@ class StorageDriverConfiguration(object):
             if len(self.dirty_entries) > 0:
                 if client is None:
                     logger.info('Applying local storagedriver configuration changes')
-                    changes = LSRClient(self.remote_path).update_configuration(self.path)
+                    changes = LSRClient(self.remote_path).update_configuration(self.remote_path)
                 else:
                     logger.info('Applying storagedriver configuration changes on {0}'.format(client.ip))
                     with Remote(client.ip, [LSRClient]) as remote:
-                        changes = copy.deepcopy(remote.LocalStorageRouterClient(self.remote_path).update_configuration(self.path))
+                        changes = copy.deepcopy(remote.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
                 for change in changes:
                     if change['param_name'] not in self.dirty_entries:
                         raise RuntimeError('Unexpected configuration change: {0}'.format(change['param_name']))
