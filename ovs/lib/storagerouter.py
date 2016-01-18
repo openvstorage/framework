@@ -1205,7 +1205,6 @@ class StorageRouterController(object):
                 for dir_name in dirs_to_remove:
                     if dir_name and client.dir_exists(dir_name) and dir_name not in mountpoints and dir_name != '/':
                         client.dir_delete(dir_name)
-                        logger.info('Remove Storage Driver - Guid {0} - Recursively removed {1} on Storage Router with IP {2}'.format(storage_driver.guid, dir_name, client.ip))
             except Exception as ex:
                 logger.error('Remove Storage Driver - Guid {0} - Failed to retrieve mountpoint information or delete directories, error: {1}'.format(storage_driver.guid, ex))
                 errors_found = True
