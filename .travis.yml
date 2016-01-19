@@ -1,0 +1,14 @@
+language: python
+sudo: required
+dist: trusty
+before_install:
+  - sudo echo "deb http://apt.openvstorage.org unstable main" > /etc/apt/sources.list.d/ovsaptrepo.list
+  - sudo apt-get -qq update
+  - sudo apt-get install -y git
+  - sudo apt-get install -y --force-yes openvstorage
+before_script:
+  - rm -rf /opt/OpenvStorage
+  - git clone https://github.com/openvstorage/openvstorage.git /opt/OpenvStorage
+script:
+  - ovs unittest /opt/OpenvStorage/ovs/dal/tests/test_basic.py
+  - ovs unittest /opt/OpenvStorage/ovs/dal/tests/test_hybrids.py
