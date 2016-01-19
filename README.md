@@ -10,6 +10,8 @@ This repo is your starting point to experiment with Open vStorage.
 
 The Open vStorage Framework is built using python (Django, Celery) and javascript.
 
+[![Build Status](https://travis-ci.org/openvstorage/openvstorage.svg?branch=master)](https://travis-ci.org/openvstorage/openvstorage)
+
 ## Get started
 
 On our community website you can find [more information](https://www.openvstorage.org) and [how to get started with an installation](https://openvstorage.gitbooks.io/openvstorage/content/Installation/index.html).
