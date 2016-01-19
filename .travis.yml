@@ -1,6 +1,7 @@
-language: python
 sudo: required
 dist: trusty
+notifications:
+  email: false
 before_install:
   - sudo echo "deb http://apt.openvstorage.org unstable main" | sudo tee -a /etc/apt/sources.list
   - sudo rm -f /var/lib/apt/lists/*
