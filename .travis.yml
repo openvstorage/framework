@@ -12,6 +12,7 @@ before_install:
 before_script:
   - sudo rm -rf /opt/OpenvStorage
   - sudo chmod 777 /opt
+  - sudo chmod 777 /var/log/ovs
   - git clone https://github.com/openvstorage/openvstorage.git /opt/OpenvStorage
   - export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages/:/usr/lib/python2.7/dist-packages
 script:
