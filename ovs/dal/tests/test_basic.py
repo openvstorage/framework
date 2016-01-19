@@ -1415,9 +1415,6 @@ class Basic(TestCase):
             disk.delete()
         machine.delete()
 
-    def test_travis(self):
-        self.assertTrue(False)
-
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)
