@@ -13,7 +13,7 @@ before_script:
   - sudo rm -rf /opt/OpenvStorage
   - sudo chmod 777 /opt
   - git clone https://github.com/openvstorage/openvstorage.git /opt/OpenvStorage
-  - export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages/
+  - export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages/:/usr/lib/python2.7/dist-packages
 script:
   - ovs unittest /opt/OpenvStorage/ovs/dal/tests/test_basic.py
   - ovs unittest /opt/OpenvStorage/ovs/dal/tests/test_hybrids.py
