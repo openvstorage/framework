@@ -117,7 +117,7 @@ limitations under the License.
                 <div class="col-lg-7">
                     <span data-bind="dropdown: {
                                          key: 'name', keyisfunction: false,
-                                         items: data.albaBackend().presetNames, target: data.albaPreset,
+                                         items: data.albaBackend().presets, target: data.albaPreset,
                                          text: function(item) {
                                              var text = item.name + ': ' + item.policies.join(', ');
                                              return text;

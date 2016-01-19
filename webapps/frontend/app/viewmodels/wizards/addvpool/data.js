@@ -23,7 +23,7 @@ define(['knockout'], function(ko){
         var wizardData = {
             accesskey:               ko.observable(''),
             albaBackend:             ko.observable(),
-            albaBackends:            ko.observableArray(),
+            albaBackends:            ko.observableArray([]),
             albaPreset:              ko.observable(),
             backend:                 ko.observable('alba'),
             backends:                ko.observableArray(['alba', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']),
@@ -72,7 +72,7 @@ define(['knockout'], function(ko){
             writeCacheSize:          ko.observable(1).extend({numeric: {min: 1, max: 10240}}),
             writeCacheAvailableSize: ko.observable()
         }, resetAlbaBackends = function() {
-            wizardData.albaBackends(undefined);
+            wizardData.albaBackends([]);
             wizardData.albaBackend(undefined);
             wizardData.albaPreset(undefined);
         };

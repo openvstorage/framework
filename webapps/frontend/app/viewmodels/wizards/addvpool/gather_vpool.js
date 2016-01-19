@@ -15,15 +15,15 @@
 define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/api', 'ovs/generic',
-    '../../containers/storagerouter', '../../containers/storagedriver', '../../containers/vpool', './data'
-], function($, ko, shared, api, generic, StorageRouter, StorageDriver, VPool, data) {
+    '../../containers/albabackend', '../../containers/storagerouter', '../../containers/storagedriver', '../../containers/vpool', './data'
+], function($, ko, shared, api, generic, AlbaBackend, StorageRouter, StorageDriver, VPool, data) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.shared                   = shared;
-        self.data                     = data;
+        self.data   = data;
+        self.shared = shared;
 
         //Handles
         self.checkS3Handle            = undefined;
@@ -137,46 +137,6 @@ define([
                                 mtptDeferred.resolve();
                             })
                             .fail(mtptDeferred.reject);
-                    }).promise(),
-                    $.Deferred(function(physicalMetadataDeferred) {
-                        generic.xhrAbort(self.loadStorageRouterHandle);
-                        self.loadStorageRouterHandle = api.post('storagerouters/' + self.data.target().guid() + '/get_metadata')
-                            .then(self.shared.tasks.wait)
-                            .then(function(data) {
-                                var write;
-                                self.data.mountpoints(data.mountpoints);
-                                self.data.partitions(data.partitions);
-                                self.data.ipAddresses(data.ipaddresses);
-                                self.data.sharedSize(data.shared_size);
-                                self.data.scrubAvailable(data.scrub_available);
-                                self.data.readCacheAvailableSize(data.readcache_size);
-                                self.data.writeCacheAvailableSize(data.writecache_size);
-                                self.data.readCacheSize(Math.floor(data.readcache_size / 1024 / 1024 / 1024));
-                                if (self.data.readCacheAvailableSize() === 0) {
-                                    write = Math.floor((data.writecache_size + data.shared_size) / 1024 / 1024 / 1024) - 1;
-                                } else {
-                                    write = Math.floor((data.writecache_size + data.shared_size) / 1024 / 1024 / 1024);
-                                }
-                                self.data.writeCacheSize(write);
-                            })
-                            .done(function() {
-                                var requiredRoles = ['READ', 'WRITE', 'DB'];
-                                $.each(self.data.partitions(), function(role, partitions) {
-                                   if (requiredRoles.contains(role) && partitions.length > 0) {
-                                       generic.removeElement(requiredRoles, role);
-                                   }
-                                });
-                                $.each(requiredRoles, function(index, role) {
-                                    validationResult.valid = false;
-                                    validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_role', { what: role }));
-                                });
-                                if (self.data.backend() === 'distributed' && self.data.mountpoints().length === 0) {
-                                    validationResult.valid = false;
-                                    validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_mountpoints'));
-                                }
-                                physicalMetadataDeferred.resolve();
-                            })
-                            .fail(physicalMetadataDeferred.reject);
                     }).promise()
                 ])
                     .always(function() {
@@ -252,11 +212,24 @@ define([
                         $.when.apply($, calls)
                             .then(function() {
                                 if (available_backends.length > 0) {
-                                    self.data.albaBackends(available_backends);
-                                    self.data.albaBackend(available_backends[0]);
-                                    self.data.albaPreset(available_backends[0].presetNames()[0]);
+                                    var guids = [], abData = {};
+                                    $.each(available_backends, function(index, item) {
+                                        guids.push(item.guid);
+                                        abData[item.guid] = item;
+                                    });
+                                    generic.crossFiller(
+                                        guids, self.data.albaBackends,
+                                        function(guid) {
+                                            return new AlbaBackend(guid);
+                                        }, 'guid'
+                                    );
+                                    $.each(self.data.albaBackends(), function(index, albaBackend) {
+                                        albaBackend.fillData(abData[albaBackend.guid()]);
+                                    });
+                                    self.data.albaBackend(self.data.albaBackends()[0]);
+                                    self.data.albaPreset(self.data.albaBackends()[0].presets()[0]);
                                 } else {
-                                    self.data.albaBackends(undefined);
+                                    self.data.albaBackends([]);
                                     self.data.albaBackend(undefined);
                                     self.data.albaPreset(undefined);
                                 }
@@ -264,7 +237,7 @@ define([
                             })
                             .done(albaDeferred.resolve)
                             .fail(function() {
-                                self.data.albaBackends(undefined);
+                                self.data.albaBackends([]);
                                 self.data.albaBackend(undefined);
                                 self.data.albaPreset(undefined);
                                 self.albaBackendLoading(false);
@@ -273,7 +246,7 @@ define([
                             });
                     })
                     .fail(function() {
-                        self.data.albaBackends(undefined);
+                        self.data.albaBackends([]);
                         self.data.albaBackend(undefined);
                         self.albaBackendLoading(false);
                         self.invalidAlbaInfo(true);
