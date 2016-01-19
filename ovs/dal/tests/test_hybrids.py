@@ -150,5 +150,5 @@ class Hybrid(TestCase):
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Hybrid)
-    result = unittest.TextTestRunner(verbosity=2).run(suite)
+    result = not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful()
     sys.exit(result)
