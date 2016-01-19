@@ -13,7 +13,7 @@ before_script:
   - sudo chmod 777 /opt
   - sudo chmod 777 /var/log/ovs
   - sudo chmod 777 /run
-  - mv openvstorage/openvstorage /opt/OpenvStorage
+  - mv ../openvstorage /opt/OpenvStorage
   - export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages/:/usr/lib/python2.7/dist-packages
 script:
   - ovs unittest /opt/OpenvStorage/ovs/dal/tests/test_basic.py

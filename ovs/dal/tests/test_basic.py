@@ -16,6 +16,7 @@
 """
 Basic test module
 """
+import sys
 import uuid
 import time
 from unittest import TestCase
@@ -1414,7 +1415,11 @@ class Basic(TestCase):
             disk.delete()
         machine.delete()
 
+    def test_travis(self):
+        self.assertTrue(False)
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
+    sys.exit(result)
