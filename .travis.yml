@@ -9,6 +9,7 @@ before_install:
   - sudo apt-get install -y --force-yes openvstorage
 before_script:
   - sudo rm -rf /opt/OpenvStorage
+  - sudo chmod 777 /opt
   - git clone https://github.com/openvstorage/openvstorage.git /opt/OpenvStorage
 script:
   - ovs unittest /opt/OpenvStorage/ovs/dal/tests/test_basic.py
