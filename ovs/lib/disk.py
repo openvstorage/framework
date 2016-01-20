@@ -67,13 +67,13 @@ class DiskController(object):
                 if match is not None:
                     mount_mapping[match.groups()[0]] = match.groups()[1]
             # Gather raid information
-            raid_members = []
             try:
                 md_information = client.run('mdadm --detail /dev/md*', suppress_logging=True)
-                for member in re.findall(' +[0-9]+ + [0-9]+ + [0-9]+ + [0-9]+ +[^/]+/dev/([a-z0-9]+)', md_information):
-                    raid_members.append(member)
             except CalledProcessError:
-                pass
+                md_information = ''
+            raid_members = []
+            for _, member in re.findall('( +[0-9]+){4} +[^/]+/dev/([a-z0-9]+)', md_information):
+                raid_members.append(member)
             # Gather disk information
             with Remote(storagerouter.ip, [Context, os]) as remote:
                 context = remote.Context()
