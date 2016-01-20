@@ -33,6 +33,7 @@ define([
 
         // Observables
         self.backendConnection  = ko.observable();
+        self.backendPreset      = ko.observable();
         self.backendLogin       = ko.observable();
         self.backendRead        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendReadSpeed   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
@@ -85,6 +86,9 @@ define([
             generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.backendConnection, data, 'connection');
+            if (data.hasOwnProperty('metadata') && data.metadata.hasOwnProperty('preset')) {
+                self.backendPreset(data.metadata.preset);
+            }
             generic.trySet(self.backendLogin, data, 'login');
             generic.trySet(self.rdmaEnabled, data, 'rdma_enabled');
             if (data.hasOwnProperty('backend_type_guid')) {
