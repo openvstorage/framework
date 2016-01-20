@@ -66,6 +66,7 @@ define([
         self.snapshots           = ko.observableArray([]);
         self.storageRouterGuid   = ko.observable();
         self.storedData          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.totalCacheHits      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.vMachineGuid        = ko.observable();
         self.vpoolGuid           = ko.observable();
         self.writeSpeed          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
@@ -180,6 +181,7 @@ define([
                 self.iops(stats['4k_operations_ps']);
                 self.cacheHits(stats.cache_hits_ps);
                 self.cacheMisses(stats.cache_misses_ps);
+                self.totalCacheHits(stats.cache_hits);
                 self.readSpeed(stats.data_read_ps);
                 self.writeSpeed(stats.data_written_ps);
                 self.backendWritten(stats.backend_data_written);

@@ -235,7 +235,8 @@
         "xmlrpcport": "XML-RPC",
         "sticky": "Sticky",
         "removesnapshot": "Remove Snapshot",
-        "yes": "Yes"
+        "yes": "Yes",
+        "failuredomains": "Failure Domains"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -327,7 +328,9 @@
     "vpools" : {
         "add": "Add new vPool",
         "backend": "Backend",
+        "backendconnectionpreset": "Connection (Preset)",
         "backendconnection": "Connection",
+        "backendpreset": "Preset",
         "backendlogin": "Login",
         "backendtype": "Type",
         "cache_strategy": "Cache Strategy",

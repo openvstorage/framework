@@ -36,10 +36,10 @@ define([
                 (!self.data()() || (self.data()().hasOwnProperty('length') && self.data()().length === 0))
             );
         }).extend({ rateLimit: 50 });
-        self.cacheHits = ko.computed(function() {
+        self.totalCacheHits = ko.computed(function() {
             var total = 0;
             if (self.hasData()) {
-                total = self._fetchData(self.data()(), 'cacheHits');
+                total = self._fetchData(self.data()(), 'totalCacheHits');
             }
             return generic.formatNumber(total);
         });
