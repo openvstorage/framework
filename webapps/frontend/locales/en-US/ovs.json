@@ -235,7 +235,8 @@
         "xmlrpcport": "XML-RPC",
         "sticky": "Sticky",
         "removesnapshot": "Remove Snapshot",
-        "yes": "Yes"
+        "yes": "Yes",
+        "failuredomains": "Failure Domains"
     },
     "storagerouters": {
         "title": "Storage Routers",

@@ -15,8 +15,8 @@
 define([
     'knockout', 'jquery',
     'ovs/shared', 'ovs/generic', 'ovs/api', 'ovs/refresher',
-    '../containers/vmachine', '../containers/vpool', '../containers/storagerouter'
-], function(ko, $, shared, generic, api, Refresher, VMachine, VPool, StorageRouter) {
+    '../containers/vmachine', '../containers/vpool', '../containers/storagerouter', '../containers/failuredomain'
+], function(ko, $, shared, generic, api, Refresher, VMachine, VPool, StorageRouter, FailureDomain) {
     "use strict";
     return function() {
         var self = this;
@@ -37,15 +37,18 @@ define([
         self.loadVPoolsHandle         = undefined;
         self.loadVMachinesHandle      = undefined;
         self.loadVMachineGuidsHandle  = undefined;
+        self.loadFailureDomainsHandle = undefined;
 
         // Observ ables
         self.storageRoutersLoading = ko.observable(false);
+        self.failureDomainsLoading = ko.observable(false);
         self.vPoolsLoading         = ko.observable(false);
         self.vMachinesLoading      = ko.observable(false);
         self.topVPoolMode          = ko.observable('topstoreddata');
         self.topVmachineMode       = ko.observable('topstoreddata');
         self.storageRouters        = ko.observableArray([]);
         self.vPools                = ko.observableArray([]);
+        self.failureDomains        = ko.observableArray([]);
         self.amountOfVMachines     = ko.observable(0);
         self.topVMachines          = ko.observableArray([]);
         self.topVpoolModes         = ko.observableArray(['topstoreddata', 'topbandwidth']);
@@ -107,15 +110,68 @@ define([
             });
             return generic.formatSpeed(total);
         });
+        self.orderedStorageRouters = ko.computed(function() {
+            var dataset = {};
+            $.each(self.storageRouters(), function(index, storageRouter) {
+                var guid = storageRouter.primaryFailureDomainGuid(),
+                    color = storageRouter.statusColor();
+                if (guid !== undefined) {
+                    if (!dataset.hasOwnProperty(guid)) {
+                        dataset[guid] = {
+                            green: 0,
+                            orange: 0,
+                            red: 0,
+                            lightgrey: 0
+                        };
+                    }
+                    dataset[guid][color] += 1
+                }
+            });
+            return dataset;
+        });
 
         // Functions
         self.load = function() {
             return $.Deferred(function(deferred) {
                 self.loadStorageRouters()
+                    .then(self.loadFailureDomains)
                     .then(self.loadVPools)
                     .then(self.loadVMachines)
                     .done(deferred.resolve)
                     .fail(deferred.reject);
+            }).promise();
+        };
+        self.loadFailureDomains = function() {
+            return $.Deferred(function(deferred) {
+                self.failureDomainsLoading(true);
+                if (generic.xhrCompleted(self.loadFailureDomainsHandle)) {
+                    self.loadFailureDomainsHandle = api.get('failure_domains', {
+                        queryparams: { contents: 'name', sort: 'name' }
+                    })
+                        .done(function(data) {
+                            var guids = [], fdata = {};
+                            $.each(data.data, function(index, item) {
+                                guids.push(item.guid);
+                                fdata[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.failureDomains,
+                                function(guid) {
+                                    return new FailureDomain(guid);
+                                }, 'guid'
+                            );
+                            $.each(self.failureDomains(), function(index, failureDomain) {
+                                failureDomain.fillData(fdata[failureDomain.guid()]);
+                            });
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject)
+                        .always(function() {
+                            self.failureDomainsLoading(false);
+                        });
+                } else {
+                    deferred.reject();
+                }
             }).promise();
         };
         self.loadVMachines = function() {
@@ -181,8 +237,7 @@ define([
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
                     self.loadStorageRoutersHandle = api.get('storagerouters', {
                         queryparams: {
-                            contents: 'status,vdisks_guids',
-                            sort: 'name,vdisks_guids'
+                            contents: 'status,primary_failure_domain'
                         }
                     })
                         .done(function(data) {
