@@ -72,7 +72,7 @@ class DiskController(object):
             except CalledProcessError:
                 md_information = ''
             raid_members = []
-            for _, member in re.findall('( +[0-9]+){4} +[^/]+/dev/([a-z0-9]+)', md_information):
+            for member in re.findall('(?: +[0-9]+){4} +[^/]+/dev/([a-z0-9]+)', md_information):
                 raid_members.append(member)
             # Gather disk information
             with Remote(storagerouter.ip, [Context, os]) as remote:
