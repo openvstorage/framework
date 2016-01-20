@@ -29,7 +29,6 @@ define([
         self.checkS3Handle            = undefined;
         self.checkMtptHandle          = undefined;
         self.fetchAlbaVPoolHandle     = undefined;
-        self.loadStorageRouterHandle  = undefined;
         self.loadStorageRoutersHandle = undefined;
         self.loadStorageDriversHandle = {};
 
@@ -227,7 +226,7 @@ define([
                                         albaBackend.fillData(abData[albaBackend.guid()]);
                                     });
                                     self.data.albaBackend(self.data.albaBackends()[0]);
-                                    self.data.albaPreset(self.data.albaBackends()[0].presets()[0]);
+                                    self.data.albaPreset(self.data.albaBackends()[0].enhancedPresets()[0]);
                                 } else {
                                     self.data.albaBackends([]);
                                     self.data.albaBackend(undefined);

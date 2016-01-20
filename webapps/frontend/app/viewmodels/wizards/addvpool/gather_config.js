@@ -105,12 +105,14 @@ define([
                         self.data.writeCacheAvailableSize(data.writecache_size);
                     })
                     .done(function() {
-                        var readOverlap,
+                        var dbOverlap,
+                            readOverlap,
                             writeOverlap,
                             requiredRoles = ['READ', 'WRITE', 'DB'],
                             dbPartitionGuids = [],
                             readPartitionGuids = [],
-                            writePartitionGuids = [];
+                            writePartitionGuids = [],
+                            nsmPartitionGuids = self.data.albaBackend().metadataInformation().nsm_partition_guids;
                         $.each(self.data.partitions(), function(role, partitions) {
                             if (requiredRoles.contains(role) && partitions.length > 0) {
                                 generic.removeElement(requiredRoles, role);
@@ -133,13 +135,15 @@ define([
                             validationResult.valid = false;
                             validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_mountpoints'));
                         }
-                        readOverlap = generic.overlap(dbPartitionGuids, readPartitionGuids);
-                        writeOverlap = generic.overlap(dbPartitionGuids, writePartitionGuids);
+                        dbOverlap = generic.overlap(dbPartitionGuids, nsmPartitionGuids);
+                        readOverlap = dbOverlap && generic.overlap(dbPartitionGuids, readPartitionGuids);
+                        writeOverlap = dbOverlap && generic.overlap(dbPartitionGuids, writePartitionGuids);
                         if (readOverlap || writeOverlap) {
                             var write, max = 0, scoSize = self.data.scoSize() * 1024 * 1024,
-                                fragSize = self.data.albaPreset().fragment_size,
+                                fragSize = self.data.albaPreset().fragSize,
                                 totalSize = self.data.albaBackend().totalSize();
-                            $.each(self.data.albaBackend().enhancedPresets()[0].policies, function(index, policy) {
+                            $.each(self.data.albaPreset().policies, function(index, policy) {
+                                // For more information about below formula: see http://jira.cloudfounders.com/browse/OVS-3553
                                 var sizeToReserve = totalSize / scoSize * (1200 + (policy.k + policy.m) * (25 * scoSize / policy.k / fragSize + 56));
                                 if (sizeToReserve > max) {
                                     max = sizeToReserve;
@@ -161,14 +165,14 @@ define([
                                     self.data.writeCacheAvailableSize(0);
                                 }
                             }
-                            if (self.data.readCacheAvailableSize() + self.data.sharedSize() <= 10 * 1024 * 1024 * 1024) {
-                                validationResult.valid = false;
-                                validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.insufficient_readcache_size'));
-                            }
-                            if (self.data.writeCacheAvailableSize() + self.data.sharedSize() <= 10 * 1024 * 1024 * 1024) {
-                                validationResult.valid = false;
-                                validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.insufficient_writecache_size'));
-                            }
+                        }
+                        if (self.data.readCacheAvailableSize() + self.data.sharedSize() <= 10 * 1024 * 1024 * 1024) {
+                            validationResult.valid = false;
+                            validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.insufficient_space_left', { what: 'READ' }));
+                        }
+                        if (self.data.writeCacheAvailableSize() + self.data.sharedSize() <= 10 * 1024 * 1024 * 1024) {
+                            validationResult.valid = false;
+                            validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.insufficient_space_left', { what: 'WRITE' }));
                         }
 
                         self.data.readCacheSize(Math.floor(self.data.readCacheAvailableSize() / 1024 / 1024 / 1024));
