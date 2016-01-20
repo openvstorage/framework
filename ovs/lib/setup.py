@@ -284,7 +284,7 @@ class SetupController(object):
                                         if node_properties.get('type', None) == 'master']
                         if len(master_nodes) == 0:
                             raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
-                        for node_name, node_info in discovery_result[cluster_name].iteritems():
+                        for _, node_info in discovery_result[cluster_name].iteritems():
                             if node_info['ip'] != ip:
                                 master_ip = node_info['ip']
                                 break

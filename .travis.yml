@@ -1,0 +1,20 @@
+language: python
+sudo: required
+dist: trusty
+notifications:
+  email: false
+before_install:
+  - sudo echo "deb http://apt.openvstorage.org unstable main" | sudo tee -a /etc/apt/sources.list
+  - sudo rm -f /var/lib/apt/lists/*
+  - sudo apt-get -qq update
+  - sudo apt-get install -y --force-yes openvstorage
+before_script:
+  - sudo rm -rf /opt/OpenvStorage
+  - sudo chmod 777 /opt
+  - sudo chmod 777 /var/log/ovs
+  - sudo chmod 777 /run
+  - mv ../openvstorage /opt/OpenvStorage
+  - export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages/:/usr/lib/python2.7/dist-packages
+script:
+  - ovs unittest /opt/OpenvStorage/ovs/dal/tests/test_basic.py
+  - ovs unittest /opt/OpenvStorage/ovs/dal/tests/test_hybrids.py
