@@ -317,7 +317,8 @@ class StorageDriverConfiguration(object):
         if EtcdConfiguration.dir_exists(self.path.format('')):
             self.is_new = False
             for key in self.params[self.config_type]:
-                self.configuration[key] = json.loads(EtcdConfiguration.get(self.path.format(key), raw=True))
+                if EtcdConfiguration.exists(self.path.format(key)):
+                    self.configuration[key] = json.loads(EtcdConfiguration.get(self.path.format(key), raw=True))
         else:
             logger.debug('Could not find config {0}, a new one will be created'.format(self.path.format('')))
         self.dirty_entries = []

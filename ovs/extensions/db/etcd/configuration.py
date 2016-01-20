@@ -21,8 +21,11 @@ import time
 import etcd
 import random
 import string
+import logging
 from ovs.log.logHandler import LogHandler
 
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('requests').setLevel(logging.WARNING)
 logger = LogHandler.get('extensions', name='etcdconfiguration')
 
 
