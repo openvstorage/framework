@@ -205,7 +205,6 @@ class StorageRouterController(object):
         connection_port = ''
         connection_username = ''
         connection_password = ''
-
         client = SSHClient(ip)
         unique_id = System.get_my_machine_id(client)
 
@@ -871,8 +870,9 @@ class StorageRouterController(object):
                   'UUID': str(uuid.uuid4()),
                   'OVS_UID': check_output('id -u ovs', shell=True).strip(),
                   'OVS_GID': check_output('id -g ovs', shell=True).strip(),
-                  'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30)),
-                  'BACKEND_ID': vpool.metadata['backend_guid']}
+                  'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
+        if vpool.backend_type.code == 'alba':
+            params['BACKEND_ID'] = vpool.metadata['backend_guid']
 
         logger.info('volumedriver_mode: {0}'.format(volumedriver_mode))
         logger.info('backend_type: {0}'.format(vpool.backend_type.code))
@@ -892,6 +892,7 @@ class StorageRouterController(object):
         else:
             template_name = 'ovs-volumedriver'
         voldrv_service = 'ovs-volumedriver_{0}'.format(vpool.name)
+
         ServiceManager.add_service(name=template_name, params=params, client=root_client, target_name=voldrv_service, additional_dependencies=dependencies)
 
         if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'classic':

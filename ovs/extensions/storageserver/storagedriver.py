@@ -311,7 +311,6 @@ class StorageDriverConfiguration(object):
     def load(self):
         """
         Loads the configuration from a given file, optionally a remote one
-        :param client: If provided, load remote configuration
         """
         self.configuration = {}
         if EtcdConfiguration.dir_exists(self.path.format('')):

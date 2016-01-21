@@ -176,14 +176,6 @@ define([
                                 }
                             }
                         }
-                        if (self.data.readCacheAvailableSize() + self.data.sharedSize() <= 10 * 1024 * 1024 * 1024) {
-                            self.activateResult.valid = false;
-                            self.activateResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.insufficient_space_left', { what: 'READ' }));
-                        }
-                        if (self.data.writeCacheAvailableSize() + self.data.sharedSize() <= 10 * 1024 * 1024 * 1024) {
-                            self.activateResult.valid = false;
-                            self.activateResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.insufficient_space_left', { what: 'WRITE' }));
-                        }
 
                         self.data.readCacheSize(Math.floor(self.data.readCacheAvailableSize() / 1024 / 1024 / 1024));
                         if (self.data.readCacheAvailableSize() === 0) {

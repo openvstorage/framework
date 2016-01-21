@@ -112,7 +112,7 @@ define([
                             dbPartitionGuids = [],
                             readPartitionGuids = [],
                             writePartitionGuids = [],
-                            nsmPartitionGuids = self.data.albaBackend().metadataInformation().nsm_partition_guids;
+                            nsmPartitionGuids = self.data.albaBackend() !== undefined ? self.data.albaBackend().metadataInformation().nsm_partition_guids : [];
                         $.each(self.data.partitions(), function(role, partitions) {
                             if (requiredRoles.contains(role) && partitions.length > 0) {
                                 generic.removeElement(requiredRoles, role);
@@ -165,14 +165,6 @@ define([
                                     self.data.writeCacheAvailableSize(0);
                                 }
                             }
-                        }
-                        if (self.data.readCacheAvailableSize() + self.data.sharedSize() <= 10 * 1024 * 1024 * 1024) {
-                            validationResult.valid = false;
-                            validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.insufficient_space_left', { what: 'READ' }));
-                        }
-                        if (self.data.writeCacheAvailableSize() + self.data.sharedSize() <= 10 * 1024 * 1024 * 1024) {
-                            validationResult.valid = false;
-                            validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.insufficient_space_left', { what: 'WRITE' }));
                         }
 
                         self.data.readCacheSize(Math.floor(self.data.readCacheAvailableSize() / 1024 / 1024 / 1024));
