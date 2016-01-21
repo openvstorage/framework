@@ -86,7 +86,14 @@ class ServiceManager(object):
         ServiceManager.ImplementationClass = None
 
     @staticmethod
+    def has_fleet_client():
+        return HAS_FLEET_CLIENT
+
+    @staticmethod
     def setup_fleet():
+        if HAS_FLEET_CLIENT is False:
+            logger.info('Cannot use fleet because the client is not installed')
+            return False
         if ServiceManager.has_fleet():
             if ServiceManager._is_fleet_running_and_usable():
                 logger.info('Fleet service is running')

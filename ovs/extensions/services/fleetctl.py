@@ -46,6 +46,11 @@ class FleetCtl(object):
         """
         if params is None:
             params = {}
+        client_ip = FleetCtl._get_client_ip(client)
+
+        if FleetCtl.has_service(name, client):
+            logger.info('Not re-adding service {0} to machine {1}'.format(name, client_ip))
+            return
 
         name = Systemd._get_name(name, client, '/opt/OpenvStorage/config/templates/systemd/')
         template_service = '/opt/OpenvStorage/config/templates/systemd/{0}.service'
@@ -69,7 +74,7 @@ class FleetCtl(object):
                 dependencies += '{0}.service '.format(service)
         template_file = template_file.replace('<ADDITIONAL_DEPENDENCIES>', dependencies)
 
-        client_ip = FleetCtl._get_client_ip(client)
+
         template_file += "\n[X-Fleet]\nMachineID={0}".format(FleetCtl._get_id_from_ip(client_ip))
         fleet_name = "{0}@{1}.service".format(name, client_ip)
 
@@ -79,7 +84,7 @@ class FleetCtl(object):
         FLEET_CLIENT.set_unit_desired_state(unit, 'loaded')
         time.sleep(1)
         unit = FleetCtl._get_unit(fleet_name)
-        logger.debug('Created unit {0}'.format(unit.as_dict()))
+        logger.info('Created unit {0}'.format(unit.as_dict()))
 
     @staticmethod
     def get_service_status(name, client):
