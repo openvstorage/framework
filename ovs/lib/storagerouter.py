@@ -339,9 +339,37 @@ class StorageRouterController(object):
                 if total_available == 0:
                     error_messages.append('Not enough available space for {0}'.format(required_role))
 
+        policies = []
+        sco_size = current_storage_driver_config['sco_size'] if current_storage_driver_config else parameters['config_params']['sco_size']
+        sco_size *= 1024.0 ** 2
+        frag_size = None
+        total_size = None
+        nsm_partition_guids = set()
+        # @TODO: Get rid of this shit solution, add_vpool should for extend and new vpool always get identical parameters --> backend_info can be queried for in both cases
+        if vpool is not None and parameters['type'] == 'alba':
+            from ovs.dal.hybrids.albabackend import AlbaBackend
+            backend = AlbaBackend(vpool.metadata['backend_guid'])
+            policies = vpool.metadata['backend_info']['policies']
+            frag_size = vpool.metadata['backend_info']['frag_size']
+            total_size = vpool.metadata['backend_info']['total_size']
+            nsm_partition_guids = set(backend.metadata_information['nsm_partition_guids'])
+        elif parameters['type'] == 'alba':
+            preset_info = [preset for preset in backend_info['presets'] if preset_name == preset['name']][0]
+            frag_size = float(preset_info['fragment_size'])
+            total_size = float(backend_info['ns_statistics']['global']['size'])
+            nsm_partition_guids = set(backend_info['metadata_information']['nsm_partition_guids'])
+            for policy_info in preset_info['policies']:
+                policy = json.loads('[{0}]'.format(policy_info.strip('()')))
+                policies.append([policy[0], policy[1]])
+
+        metadata_backend_info = {'policies': policies,
+                                 'sco_size': sco_size,
+                                 'frag_size': frag_size,
+                                 'total_size': total_size,
+                                 'nsm_partition_guids': list(nsm_partition_guids)}
+
         # Check mountpoints are mounted
         db_partition_guids = set()
-        nsm_partition_guids = set(backend_info['metadata_information']['nsm_partition_guids'])
         read_partition_guids = set()
         write_partition_guids = set()
         for role, part_info in partition_info.iteritems():
@@ -362,19 +390,10 @@ class StorageRouterController(object):
         sizes_to_reserve = [0]
 
         if read_overlap is True or write_overlap is True:
-            sco_size = current_storage_driver_config['sco_size'] if current_storage_driver_config else parameters['config_params']['sco_size']
-            sco_size *= 1024.0 ** 2
-            preset_info = [preset for preset in backend_info['presets'] if preset_name == preset['name']][0]
-            frag_size = float(preset_info['fragment_size'])
-            total_size = float(backend_info['ns_statistics']['global']['size'])
-
-            for policy_info in preset_info['policies']:
-                policy = json.loads('[{0}]'.format(policy_info.strip('()')))
-                policy_k = policy[0]
-                policy_m = policy[1]
-                size_to_reserve = int(total_size / sco_size * (1200 + (policy_k + policy_m) * (25 * sco_size / policy_k / frag_size + 56)))
+            for policy in policies:
+                size_to_reserve = int(total_size / sco_size * (1200 + (policy[0] + policy[1]) * (25 * sco_size / policy[0] / frag_size + 56)))
                 sizes_to_reserve.append(size_to_reserve)
-                # For more information about above formula: see http://jira.cloudfounders.com/browse/OVS-3553
+            # For more information about above formula: see http://jira.cloudfounders.com/browse/OVS-3553
 
         # Check over-allocation for DB
         db_available_size = partition_info[DiskPartition.ROLES.DB][0]['available']
@@ -412,8 +431,8 @@ class StorageRouterController(object):
                                                                                                                                 (writecache_size_available + shared_size_available) / 1024.0 ** 3,
                                                                                                                                 writecache_size_requested / 1024.0 ** 3))
         if readcache_size_requested + writecache_size_requested > readcache_size_available + writecache_size_available + shared_size_available:
-            error_messages.append('Too much space request. Available: {0:.2f} GiB, Requested: {1:.2f} GiB'.format((readcache_size_available + writecache_size_available + shared_size_available) / 1024.0 ** 3,
-                                                                                                                  (readcache_size_requested + writecache_size_requested) / 1024.0 ** 3))
+            error_messages.append('Too much space requested. Available: {0:.2f} GiB, Requested: {1:.2f} GiB'.format((readcache_size_available + writecache_size_available + shared_size_available) / 1024.0 ** 3,
+                                                                                                                    (readcache_size_requested + writecache_size_requested) / 1024.0 ** 3))
 
         if StorageRouterController._check_scrub_partition_present() is False:
             error_messages.append('At least 1 Storage Router must have a {0} partition'.format(DiskPartition.ROLES.SCRUB))
@@ -458,6 +477,7 @@ class StorageRouterController(object):
                 vpool.metadata = vpool_metadata
             elif vpool.backend_type.code == 'alba':
                 vpool.metadata = {'metadata': vpool_metadata,
+                                  'backend_info': metadata_backend_info,
                                   'preset': parameters['connection_backend']['preset_name'],
                                   'backend_guid': parameters['connection_backend']['backend']}
             elif vpool.backend_type.code in ['ceph_s3', 'amazon_s3', 'swift_s3']:
@@ -483,6 +503,10 @@ class StorageRouterController(object):
             vpool.connection = '{0}:{1}'.format(connection_host, connection_port) if connection_host else None
             vpool.description = '{0} {1}'.format(vpool.backend_type.code, vpool_name)
             vpool.rdma_enabled = parameters['config_params']['dtl_transport'] == StorageDriverClient.FRAMEWORK_DTL_TRANSPORT_RSOCKET
+            vpool.save()
+        elif vpool.backend_type.code == 'alba':
+            # TODO: Get rid of this crap once add vpool wizard has been reworked, then we can ask live what is the current backend information instead of storing 'old' info in model
+            vpool.metadata['backend_info'] = metadata_backend_info
             vpool.save()
 
         local_backend_data = {}

@@ -1121,7 +1121,7 @@ class SetupController(object):
             Toolbox.change_service_state(target_client, 'rabbitmq-server', 'start', logger)
             SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
-        SetupController._configure_amqp_to_volumedriver(ip_client_map)
+        SetupController._configure_amqp_to_volumedriver()
 
         print 'Starting services'
         logger.info('Starting services')
@@ -1248,7 +1248,7 @@ class SetupController(object):
                                            params={'MEMCACHE_NODE_IP': cluster_ip,
                                                    'WORKER_QUEUE': '{0}'.format(unique_id)})
 
-        SetupController._configure_amqp_to_volumedriver(ip_client_map)
+        SetupController._configure_amqp_to_volumedriver()
 
         print 'Restarting services'
         logger.debug('Restarting services')
@@ -1358,7 +1358,7 @@ EOF
         client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
 
     @staticmethod
-    def _configure_amqp_to_volumedriver(node_ips):
+    def _configure_amqp_to_volumedriver():
         print 'Update existing vPools'
         logger.info('Update existing vPools')
         login = EtcdConfiguration.get('/ovs/framework/messagequeue|user')
