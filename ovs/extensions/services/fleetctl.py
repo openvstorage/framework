@@ -46,6 +46,9 @@ class FleetCtl(object):
         """
         if params is None:
             params = {}
+        if additional_dependencies is None:
+            additional_dependencies = []
+
         client_ip = FleetCtl._get_client_ip(client)
 
         if FleetCtl.has_service(name, client):
@@ -69,11 +72,9 @@ class FleetCtl(object):
             template_file = template_file.replace('<SERVICE_NAME>', service_name.lstrip('ovs-'))
 
         dependencies = ''
-        if additional_dependencies:
-            for service in additional_dependencies:
-                dependencies += '{0}.service '.format(service)
+        for service in additional_dependencies:
+            dependencies += '{0}.service '.format(service)
         template_file = template_file.replace('<ADDITIONAL_DEPENDENCIES>', dependencies)
-
 
         template_file += "\n[X-Fleet]\nMachineID={0}".format(FleetCtl._get_id_from_ip(client_ip))
         fleet_name = "{0}@{1}.service".format(name, client_ip)

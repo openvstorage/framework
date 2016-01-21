@@ -23,12 +23,6 @@ from ovs.extensions.services.systemd import Systemd
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('extensions', name='servicemanager')
-try:
-    from ovs.extensions.services.fleetctl import FleetCtl
-    HAS_FLEET_CLIENT = True
-except ImportError as ie:
-    logger.info('No fleet client detected {0}'.format(ie))
-    HAS_FLEET_CLIENT = False
 
 class ServiceManager(object):
     """
@@ -57,21 +51,11 @@ class ServiceManager(object):
                         else:
                             raise RuntimeError('The ServiceManager is unrecognizable')
                     elif 'systemd' in init_info:
-                        if HAS_FLEET_CLIENT is True:
-                            try:
-                                if ServiceManager.has_fleet():
-                                    if ServiceManager._is_fleet_running_and_usable():
-                                        pass
-                                    else:
-                                        ServiceManager.setup_fleet()
-                                    ServiceManager.ImplementationClass = FleetCtl
-                                else:
-                                    ServiceManager.ImplementationClass = Systemd
-                            except CalledProcessError as cpe:
-                                logger.warning('Could not determine if fleet can be used. {0}'.format(cpe))
-                                ServiceManager.ImplementationClass = Systemd
-                        else:
-                            ServiceManager.ImplementationClass = Systemd
+                        ServiceManager.ImplementationClass = Systemd
+                        if ServiceManager.has_fleet_client() is True and ServiceManager.has_fleet() and \
+                                ServiceManager._is_fleet_running_and_usable():
+                            from ovs.extensions.services.fleetctl import FleetCtl
+                            ServiceManager.ImplementationClass = FleetCtl
                     else:
                         raise RuntimeError('There was no known ServiceManager detected')
                 except Exception as ex:
@@ -87,18 +71,24 @@ class ServiceManager(object):
 
     @staticmethod
     def has_fleet_client():
-        return HAS_FLEET_CLIENT
+        try:
+            from ovs.extensions.services.fleetctl import FleetCtl
+            has_fleet_client = True
+        except ImportError as ie:
+            logger.info('No fleet client detected {0}'.format(ie))
+            has_fleet_client = False
+        return has_fleet_client
 
     @staticmethod
     def setup_fleet():
-        if HAS_FLEET_CLIENT is False:
+        if ServiceManager.has_fleet_client() is False:
             logger.info('Cannot use fleet because the client is not installed')
-            return False
+            return
         if ServiceManager.has_fleet():
             if ServiceManager._is_fleet_running_and_usable():
                 logger.info('Fleet service is running')
                 ServiceManager.reload()
-                return True
+                return
             else:
                 check_output('systemctl start fleet', shell=True)
                 start = time.time()
@@ -106,7 +96,7 @@ class ServiceManager(object):
                     if ServiceManager._is_fleet_running_and_usable():
                         logger.info('Fleet service is running and usable')
                         ServiceManager.reload()
-                        return True
+                        return
                     time.sleep(1)
                 raise RuntimeError('Can not use fleet to manage services.')
 
@@ -123,11 +113,8 @@ class ServiceManager(object):
     @staticmethod
     def _is_fleet_running_and_usable():
         try:
-            is_fleetd_running = 'active' in check_output('systemctl is-active fleet || true', shell=True).strip()
-            if is_fleetd_running:
-                is_fleetd_usable = "Error" not in check_output('fleetctl list-machines 2>&1 || true', shell=True).strip()
-                return is_fleetd_usable
-            return is_fleetd_running
+            is_fleetd_usable = "Error" not in check_output('fleetctl list-machines 2>&1 || true', shell=True).strip()
+            return is_fleetd_usable
         except CalledProcessError as cpe:
             logger.warning('Could not determine if fleetd is running. {0}'.format(cpe))
             return False
