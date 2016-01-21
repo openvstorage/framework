@@ -243,7 +243,7 @@ class SetupController(object):
                                             known_passwords[master_ip] = node_password
                                         elif master_ip is None:
                                             master_ip = sr.ip
-                        except Exception, ex:
+                        except Exception as ex:
                             logger.error('Error loading storagerouters: {0}'.format(ex))
                         if len(storagerouters) == 0:
                             logger.debug('No StorageRouters could be loaded, cannot join the cluster')
@@ -508,7 +508,7 @@ class SetupController(object):
                                 nodes.append(sr.ip)
                                 if sr.machine_id != unique_id and sr.node_type == 'MASTER':
                                     master_nodes.append(ip)
-                    except Exception, ex:
+                    except Exception as ex:
                         logger.error('Error loading storagerouters: {0}'.format(ex))
                     if len(master_nodes) == 0:
                         if node_action == 'promote':
@@ -887,6 +887,11 @@ class SetupController(object):
         EtcdConfiguration.initialize(external_etcd=external_etcd)
         EtcdConfiguration.initialize_host(machine_id)
 
+        if ServiceManager.has_fleet():
+            print('Setting up fleet ')
+            logger.info('Setting up fleet')
+            ServiceManager.setup_fleet()
+
         print 'Setting up Arakoon'
         logger.info('Setting up Arakoon')
         result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, EtcdConfiguration.get('/ovs/framework/paths|ovsdb'), locked=False)
@@ -997,6 +1002,11 @@ class SetupController(object):
             EtcdInstaller.use_external(external_etcd, cluster_ip, 'config')
 
         EtcdConfiguration.initialize_host(machine_id)
+
+        if ServiceManager.has_fleet():
+            print('Setting up fleet ')
+            logger.info('Setting up fleet')
+            ServiceManager.setup_fleet()
 
         enabled = EtcdConfiguration.get('/ovs/framework/support|enabled')
         if enabled is True:

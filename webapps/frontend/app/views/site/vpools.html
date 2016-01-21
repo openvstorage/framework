@@ -41,7 +41,12 @@ limitations under the License.
                         <span data-part="lazy-entry" data-bind="translate: 'ovs:generic.backendtypes.' + item().code()"></span>
                     </span>
                 </td>
-                <td><span data-bind="text: backendConnection"></span></td>
+                <td>
+                    <span data-bind="text: backendConnection"></span>
+                    <span data-bind="visible: backendPreset() !== undefined">
+                        (<span data-bind="text: backendPreset"></span>)
+                    </span>
+                </td>
                 <td><span data-bind="shortText: backendLogin() !== undefined ? backendLogin() : '', maxLength: 25"></span></td>
             </tr>
         </table>

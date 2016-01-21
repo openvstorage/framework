@@ -33,6 +33,7 @@ define([
 
         // Observables
         self.backendConnection  = ko.observable();
+        self.backendPreset      = ko.observable();
         self.backendLogin       = ko.observable();
         self.backendRead        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendReadSpeed   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
@@ -56,6 +57,7 @@ define([
         self.storageDriverGuids = ko.observableArray([]);
         self.storageRouterGuids = ko.observableArray([]);
         self.storedData         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.totalCacheHits     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.vDisks             = ko.observableArray([]);
         self.vMachines          = ko.observableArray([]);
         self.writeSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
@@ -87,6 +89,9 @@ define([
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.metadata, data, 'metadata');
             generic.trySet(self.backendConnection, data, 'connection');
+            if (data.hasOwnProperty('metadata') && data.metadata.hasOwnProperty('preset')) {
+                self.backendPreset(data.metadata.preset);
+            }
             generic.trySet(self.backendLogin, data, 'login');
             generic.trySet(self.rdmaEnabled, data, 'rdma_enabled');
             if (data.hasOwnProperty('backend_type_guid')) {
@@ -110,6 +115,7 @@ define([
                 self.iops(stats['4k_operations_ps']);
                 self.cacheHits(stats.cache_hits_ps);
                 self.cacheMisses(stats.cache_misses_ps);
+                self.totalCacheHits(stats.cache_hits);
                 self.readSpeed(stats.data_read_ps);
                 self.writeSpeed(stats.data_written_ps);
                 self.backendWritten(stats.backend_data_written);

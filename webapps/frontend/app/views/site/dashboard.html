@@ -23,7 +23,7 @@ limitations under the License.
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.storagerouter.title"></b>
                     <div style="float:right;">
-                        <span data-bind="visible: storageRoutersLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
+                        <span data-bind="visible: storageRoutersLoading() || failureDomainsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <a data-bind="popover: {
                                           title: 'ovs:dashboard.panels.storagerouter.helptitle',
                                           content: 'ovs:dashboard.panels.storagerouter.helpcontent'
@@ -34,30 +34,40 @@ limitations under the License.
                 </div>
                 <div class="panel-body">
                     <div data-bind="lazylist: {
-                                        displaymode: 'table', items: storageRouters,
-                                        loadedObservable: 'loaded', colspan: 4
+                                        displaymode: 'table', items: failureDomains,
+                                        loadedObservable: 'loaded', colspan: 5
                                     }" >
                         <table data-dummy="dummy">
                             <thead data-part="head">
                                 <tr>
-                                    <th></th>
-                                    <th data-i18n="ovs:generic.name"></th>
-                                    <th data-i18n="ovs:generic.ip"></th>
-                                    <th data-i18n="ovs:generic.vdisks"></th>
+                                    <th data-i18n="ovs:generic.failuredomains"></th>
+                                    <th data-i18n="ovs:generic.storagerouters" colspan="4"></th>
                                 </tr>
                             </thead>
                             <tbody data-dummy="dummy">
                                 <tr data-part="table-entry">
-                                        <td>
-                                            <span class="fa pointer" data-i18n="[html]ovs:icons.storagerouter"
-                                                  data-bind="tooltip: 'ovs:generic.states.storagerouter.' + status(),
-                                                             style: { color: statusColor() }"></span>
+                                        <td data-bind="shortText: name(), maxLength: 20"></td>
+                                        <td style="padding-left: 0; padding-right: 0; width: 35px;">
+                                            <span class="label label-success pointer"
+                                                  data-bind="tooltip: 'ovs:generic.states.storagerouter.ok',
+                                                             text: $root.orderedStorageRouters()[guid()].green"></span>
                                         </td>
-                                        <td>
-                                            <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
+                                        <td style="padding-left: 0; padding-right: 0; width: 35px;">
+                                            <span class="label label-warning pointer"
+                                                  data-bind="tooltip: 'ovs:generic.states.storagerouter.warning',
+                                                             text: $root.orderedStorageRouters()[guid()].orange"></span>
                                         </td>
-                                        <td data-bind="text: ipAddress"></td>
-                                        <td data-bind="text: vDisks().length"></td>
+                                        <td style="padding-left: 0; padding-right: 0; width: 35px;">
+                                            <span class="label label-danger pointer"
+                                                  data-bind="tooltip: 'ovs:generic.states.storagerouter.failure',
+                                                             text: $root.orderedStorageRouters()[guid()].red"></span>
+                                        </td>
+                                        <td style="padding-left: 0; padding-right: 0; width: 35px;">
+                                            <span class="label pointer"
+                                                  data-bind="tooltip: 'ovs:generic.states.storagerouter.unknown',
+                                                             text: $root.orderedStorageRouters()[guid()].lightgrey"
+                                                  style="background-color: #888888;"></span>
+                                        </td>
                                 </tr>
                             </tbody>
                         </table>

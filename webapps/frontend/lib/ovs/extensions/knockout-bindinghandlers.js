@@ -59,7 +59,7 @@ define([
                 .style('display', 'block')
                 .style('margin', 'auto')
                 .attr('width', 300)
-                .attr('height', 200);
+                .attr('height', 205);
             arc = d3.svg.arc()
                 .innerRadius(80)
                 .outerRadius(150)

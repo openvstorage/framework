@@ -66,6 +66,14 @@ class DiskController(object):
                 match = re.search('/dev/(.+?) on (/.*?) type.*', mount)
                 if match is not None:
                     mount_mapping[match.groups()[0]] = match.groups()[1]
+            # Gather raid information
+            try:
+                md_information = client.run('mdadm --detail /dev/md*', suppress_logging=True)
+            except CalledProcessError:
+                md_information = ''
+            raid_members = []
+            for member in re.findall('(?: +[0-9]+){4} +[^/]+/dev/([a-z0-9]+)', md_information):
+                raid_members.append(member)
             # Gather disk information
             with Remote(storagerouter.ip, [Context, os]) as remote:
                 context = remote.Context()
@@ -105,6 +113,8 @@ class DiskController(object):
                     rotational = int(client.run('cat /sys/block/{0}/queue/rotational'.format(device_name)))
 
                     if sectors == 0:
+                        continue
+                    if device_name in raid_members:
                         continue
                     if device_name not in configuration:
                         configuration[device_name] = {'partitions': {}}
