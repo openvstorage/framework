@@ -16,6 +16,7 @@
 Fleetctl module
 """
 import time
+from subprocess import check_output
 
 try:
     import fleet.v1 as fleet
@@ -200,8 +201,12 @@ class FleetCtl(object):
     @staticmethod
     def _get_client_ip(client):
         if client.ip == '127.0.0.1':
-            from ovs.extensions.generic.system import System
-            return System.get_my_storagerouter().pmachine.ip
+            ips = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).split('\n')
+            fleet_machines = dict((m['primaryIP'], m['id']) for m in FLEET_CLIENT.list_machines())
+            match = set(fleet_machines.keys()).intersection(set(ips))
+            if len(match) == 1:
+                return match[0]
+            raise ValueError('Could not determine a match between this node and running fleet nodes')
         return client.ip
 
     @staticmethod
