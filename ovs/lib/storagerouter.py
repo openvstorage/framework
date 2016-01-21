@@ -871,8 +871,6 @@ class StorageRouterController(object):
                   'OVS_UID': check_output('id -u ovs', shell=True).strip(),
                   'OVS_GID': check_output('id -g ovs', shell=True).strip(),
                   'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
-        if vpool.backend_type.code == 'alba':
-            params['BACKEND_ID'] = vpool.metadata['backend_guid']
 
         logger.info('volumedriver_mode: {0}'.format(volumedriver_mode))
         logger.info('backend_type: {0}'.format(vpool.backend_type.code))
@@ -882,6 +880,7 @@ class StorageRouterController(object):
         if vpool.backend_type.code == 'alba':
             alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
             params['PROXY_ID'] = storagedriver.alba_proxy_guid
+            params['BACKEND_ID'] = vpool.metadata['backend_guid']
             ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name=alba_proxy_service)
             ServiceManager.start_service(alba_proxy_service, client=root_client)
             dependencies = [alba_proxy_service]
