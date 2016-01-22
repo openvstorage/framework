@@ -16,6 +16,7 @@
 Fleetctl module
 """
 import time
+from subprocess import check_output
 
 try:
     import fleet.v1 as fleet
@@ -32,6 +33,7 @@ logger = LogHandler.get('extensions', name='fleetctl')
 class FleetCtl(object):
     """
     Contains all logic related to managing services through fleet
+    Allows services not managed by fleet to be managed through this extension - delegates to systemd
     """
 
     @staticmethod
@@ -89,16 +91,16 @@ class FleetCtl(object):
 
     @staticmethod
     def get_service_status(name, client):
-        if FleetCtl.has_service(name, client):
+        if FleetCtl._has_service(name, client):
             fleet_name = FleetCtl._get_unit_name(name, client)
             unit = FleetCtl._get_unit(fleet_name)
             logger.debug('Fleet unit {0} status {1}'.format(fleet_name, unit.as_dict()['currentState']))
             return unit.as_dict()['currentState'] == 'launched'
-        return False
+        return Systemd.get_service_status(name, client)
 
     @staticmethod
     def remove_service(name, client):
-        if FleetCtl.has_service(name, client):
+        if FleetCtl._has_service(name, client):
             fleet_name = FleetCtl._get_unit_name(name, client)
             unit = FleetCtl._get_unit(fleet_name)
             FleetCtl.stop_service(name, client)
@@ -107,9 +109,10 @@ class FleetCtl(object):
             logger.debug('Fleet destroy unit {0} {1}'.format(fleet_name, result))
             while time.time() - start < 60:
                 time.sleep(1)
-                if FleetCtl.has_service(name, client) is False:
+                if FleetCtl._has_service(name, client) is False:
                     return
             logger.warning('Failed to remove unit {0} after 60 seconds'.format(fleet_name))
+        return Systemd.remove_service(name, client)
 
     @staticmethod
     def disable_service(name, client):
@@ -123,7 +126,7 @@ class FleetCtl(object):
 
     @staticmethod
     def start_service(name, client):
-        if FleetCtl.has_service(name, client):
+        if FleetCtl._has_service(name, client):
             fleet_name = FleetCtl._get_unit_name(name, client)
             start = time.time()
             while time.time() - start < 60:
@@ -138,11 +141,11 @@ class FleetCtl(object):
                 logger.warning('Failed to start unit {0}'.format(unit.as_dict()))
             logger.debug('Fleet start unit {0} > {1}'.format(fleet_name, unit.as_dict()['currentState']))
             return unit.as_dict()['currentState']
-        return 'Service not found'
+        return Systemd.start_service(name, client)
 
     @staticmethod
     def stop_service(name, client):
-        if FleetCtl.has_service(name, client):
+        if FleetCtl._has_service(name, client):
             fleet_name = FleetCtl._get_unit_name(name, client)
             start = time.time()
             while time.time() - start < 60:
@@ -157,22 +160,31 @@ class FleetCtl(object):
                 logger.warning('Failed to stop unit {0}'.format(unit.as_dict()))
             logger.debug('Fleet stop unit {0} {1}'.format(fleet_name, unit.as_dict()['currentState']))
             return unit.as_dict()['currentState']
-        return 'Service not found'
+        return Systemd.stop_service(name, client)
 
     @staticmethod
     def restart_service(name, client):
+        if not FleetCtl.has_service(name, client):
+            return Systemd.restart_service(name, client)
         FleetCtl.stop_service(name, client)
         FleetCtl.start_service(name, client)
         return FleetCtl.get_service_status(name, client)
 
     @staticmethod
-    def has_service(name, client):
+    def _has_service(name, client):
         fleet_name = FleetCtl._get_unit_name(name, client)
         try:
             FleetCtl._get_unit(fleet_name)
             return True
         except (ValueError, RuntimeError):
             return False
+
+    @staticmethod
+    def has_service(name, client):
+        fleet_has_service = FleetCtl._has_service(name, client)
+        if not fleet_has_service:
+            return Systemd.has_service(name, client)
+        return fleet_has_service
 
     @staticmethod
     def is_enabled(name, client):
@@ -189,8 +201,12 @@ class FleetCtl(object):
     @staticmethod
     def _get_client_ip(client):
         if client.ip == '127.0.0.1':
-            from ovs.extensions.generic.system import System
-            return System.get_my_storagerouter().pmachine.ip
+            ips = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).split('\n')
+            fleet_machines = dict((m['primaryIP'], m['id']) for m in FLEET_CLIENT.list_machines())
+            match = set(fleet_machines.keys()).intersection(set(ips))
+            if len(match) == 1:
+                return match[0]
+            raise ValueError('Could not determine a match between this node and running fleet nodes')
         return client.ip
 
     @staticmethod
