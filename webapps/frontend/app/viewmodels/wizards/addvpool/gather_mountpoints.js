@@ -85,42 +85,6 @@ define([
                 if (self.data.target() === undefined && self.data.storageRouter() !== undefined) {
                     self.data.target(self.data.storageRouter);
                 }
-                api.post('storagerouters/' + self.data.target().guid() + '/get_metadata')
-                    .then(self.shared.tasks.wait)
-                    .then(function(data) {
-                        var write;
-                        self.data.mountpoints(data.mountpoints);
-                        self.data.partitions(data.partitions);
-                        self.data.ipAddresses(data.ipaddresses);
-                        self.data.sharedSize(data.shared_size);
-                        self.data.scrubAvailable(data.scrub_available);
-                        self.data.readCacheAvailableSize(data.readcache_size);
-                        self.data.writeCacheAvailableSize(data.writecache_size);
-                        self.data.readCacheSize(Math.floor(data.readcache_size / 1024 / 1024 / 1024));
-                        if (self.data.readCacheAvailableSize() === 0) {
-                            write = Math.floor((data.writecache_size + data.shared_size) / 1024 / 1024 / 1024) - 1;
-                        } else {
-                            write = Math.floor((data.writecache_size + data.shared_size) / 1024 / 1024 / 1024);
-                        }
-                        self.data.writeCacheSize(write);
-                    })
-                    .done(function() {
-                        self.activateResult = { valid: true, reasons: [], fields: [] };
-                        var requiredRoles = ['READ', 'WRITE', 'DB'];
-                        $.each(self.data.partitions(), function(role, partitions) {
-                           if (requiredRoles.contains(role) && partitions.length > 0) {
-                               generic.removeElement(requiredRoles, role);
-                           }
-                        });
-                        $.each(requiredRoles, function(index, role) {
-                            self.activateResult.valid = false;
-                            self.activateResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_role', { what: role }));
-                        });
-                        if (self.data.backend() === 'distributed' && self.data.mountpoints().length === 0) {
-                            self.activateResult.valid = false;
-                            self.activateResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_mountpoints'));
-                        }
-                    });
                 if (data.vPool() !== undefined) {
                     self.data.vPool().load('storagedrivers', { skipDisks: true })
                         .then(function() {
@@ -134,6 +98,93 @@ define([
                             self.data.name(self.data.vPool().name());
                         })
                 }
+                api.post('storagerouters/' + self.data.target().guid() + '/get_metadata')
+                    .then(self.shared.tasks.wait)
+                    .then(function(data) {
+                        self.data.mountpoints(data.mountpoints);
+                        self.data.partitions(data.partitions);
+                        self.data.ipAddresses(data.ipaddresses);
+                        self.data.sharedSize(data.shared_size);
+                        self.data.scrubAvailable(data.scrub_available);
+                        self.data.readCacheAvailableSize(data.readcache_size);
+                        self.data.writeCacheAvailableSize(data.writecache_size);
+                    })
+                    .done(function() {
+                        self.activateResult = { valid: true, reasons: [], fields: [] };
+                        var dbOverlap,
+                            readOverlap,
+                            writeOverlap,
+                            requiredRoles = ['READ', 'WRITE', 'DB'],
+                            dbPartitionGuids = [],
+                            readPartitionGuids = [],
+                            writePartitionGuids = [],
+                            nsmPartitionGuids = data.vPool().metadata().backend_info.nsm_partition_guids;
+                        $.each(self.data.partitions(), function(role, partitions) {
+                            if (requiredRoles.contains(role) && partitions.length > 0) {
+                                generic.removeElement(requiredRoles, role);
+                            }
+                            $.each(partitions, function(index, partition) {
+                                if (role === 'READ') {
+                                    readPartitionGuids.push(partition.guid);
+                                } else if (role === 'WRITE') {
+                                    writePartitionGuids.push(partition.guid);
+                                } else if (role === 'DB') {
+                                    dbPartitionGuids.push(partition.guid);
+                                }
+                            });
+                        });
+
+                        $.each(requiredRoles, function(index, role) {
+                            self.activateResult.valid = false;
+                            self.activateResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_role', { what: role }));
+                        });
+                        if (self.data.backend() === 'distributed' && self.data.mountpoints().length === 0) {
+                            self.activateResult.valid = false;
+                            self.activateResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_mountpoints'));
+                        }
+
+                        dbOverlap = generic.overlap(dbPartitionGuids, nsmPartitionGuids);
+                        readOverlap = dbOverlap && generic.overlap(dbPartitionGuids, readPartitionGuids);
+                        writeOverlap = dbOverlap && generic.overlap(dbPartitionGuids, writePartitionGuids);
+                        if (readOverlap || writeOverlap) {
+                            var write, max = 0,
+                                policies = data.vPool().metadata().backend_info.policies,
+                                scoSize = data.vPool().metadata().backend_info.sco_size,
+                                fragSize = data.vPool().metadata().backend_info.frag_size,
+                                totalSize = data.vPool().metadata().backend_info.total_size;
+                            $.each(policies, function(index, policy) {
+                                // For more information about below formula: see http://jira.cloudfounders.com/browse/OVS-3553
+                                var sizeToReserve = totalSize / scoSize * (1200 + (policy[0] + policy[1]) * (25 * scoSize / policy[0] / fragSize + 56));
+                                if (sizeToReserve > max) {
+                                    max = sizeToReserve;
+                                }
+                            });
+                            if (readOverlap && writeOverlap) { // Only 1 DB role possible ==> READ and WRITE must be shared
+                                self.data.sharedSize(self.data.sharedSize() - max);
+                                if (self.data.sharedSize() < 0) {
+                                    self.data.sharedSize(0);
+                                }
+                            } else if (readOverlap) {
+                                self.data.readCacheAvailableSize(self.data.readCacheAvailableSize() - max);
+                                if (self.data.readCacheAvailableSize() < 0) {
+                                    self.data.readCacheAvailableSize(0);
+                                }
+                            } else if (writeOverlap) {
+                                self.data.writeCacheAvailableSize(self.data.writeCacheAvailableSize() - max);
+                                if (self.data.writeCacheAvailableSize() < 0) {
+                                    self.data.writeCacheAvailableSize(0);
+                                }
+                            }
+                        }
+
+                        self.data.readCacheSize(Math.floor(self.data.readCacheAvailableSize() / 1024 / 1024 / 1024));
+                        if (self.data.readCacheAvailableSize() === 0) {
+                            write = Math.floor((self.data.writeCacheAvailableSize() + self.data.sharedSize()) / 1024 / 1024 / 1024) - 1;
+                        } else {
+                            write = Math.floor((self.data.writeCacheAvailableSize() + self.data.sharedSize()) / 1024 / 1024 / 1024);
+                        }
+                        self.data.writeCacheSize(write);
+                    })
             }
         }
     };

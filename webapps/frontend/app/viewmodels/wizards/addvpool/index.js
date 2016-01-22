@@ -33,7 +33,7 @@ define([
             data.target(options.pendingStorageRouters()[0]);
         } else {
             self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addvpool.title')));
-            self.steps([new GatherVPool(), new GatherMountPoints(), new GatherConfig(), new IntegrateMgmt(), new Confirm()]);
+            self.steps([new GatherVPool(), new GatherConfig(), new GatherMountPoints(), new IntegrateMgmt(), new Confirm()]);
             data.storageRouter([]);
             data.target(undefined);
         }
@@ -46,7 +46,7 @@ define([
         // Cleaning data
         data.accesskey('');
         data.albaBackend(undefined);
-        data.albaBackends(undefined);
+        data.albaBackends([]);
         data.backend('alba');
         data.backends(['alba', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']);
         data.cacheStrategy('on_read');

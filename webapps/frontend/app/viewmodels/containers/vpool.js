@@ -49,6 +49,7 @@ define([
         self.iops               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.loaded             = ko.observable(false);
         self.loading            = ko.observable(false);
+        self.metadata           = ko.observable();
         self.name               = ko.observable();
         self.rdmaEnabled        = ko.observable();
         self.readSpeed          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
@@ -86,6 +87,7 @@ define([
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.size, data, 'size');
+            generic.trySet(self.metadata, data, 'metadata');
             generic.trySet(self.backendConnection, data, 'connection');
             if (data.hasOwnProperty('metadata') && data.metadata.hasOwnProperty('preset')) {
                 self.backendPreset(data.metadata.preset);

@@ -375,7 +375,7 @@ class OVSMigrator(object):
                 if migrated_objects:
                     print 'Loading sizes'
                     config = StorageDriverConfiguration('storagedriver', storagedriver.vpool_guid, storagedriver.storagedriver_id)
-                    config.load(SSHClient(storagedriver.storagerouter, username='ovs'))
+                    config.load()
                     for readcache in config.configuration.get('content_addressed_cache', {}).get('clustercache_mount_points', []):
                         path = readcache.get('path', '').rsplit('/', 1)[0]
                         size = int(readcache['size'].strip('KiB')) * 1024 if 'size' in readcache else None
@@ -440,11 +440,8 @@ class OVSMigrator(object):
         # Distributed scrubbing
         if working_version < 6:
             from ovs.dal.hybrids.diskpartition import DiskPartition
-            from ovs.dal.lists.servicetypelist import ServiceTypeList
             from ovs.dal.lists.storagedriverlist import StorageDriverList
-            from ovs.dal.lists.storagerouterlist import StorageRouterList
             from ovs.extensions.generic.sshclient import SSHClient
-            from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
             for storage_driver in StorageDriverList.get_storagedrivers():
                 root_client = SSHClient(storage_driver.storagerouter, username='root')
                 for partition in storage_driver.partitions:

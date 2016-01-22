@@ -16,11 +16,10 @@
 StorageRouter module
 """
 import os
-import re
 import copy
-import uuid
 import json
 import time
+import uuid
 import random
 from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
@@ -176,6 +175,8 @@ class StorageRouterController(object):
                                    'write_buffer': (int, {'min': 128, 'max': 10240}),
                                    'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
                                    'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys())})
+        alba_connection_backend_params = {'backend': (str, Toolbox.regex_guid),
+                                          'preset_name': (str, Toolbox.regex_preset)}
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
                            'storagerouter_ip': (str, Toolbox.regex_ip),
@@ -197,22 +198,23 @@ class StorageRouterController(object):
         ###############
         ip = parameters['storagerouter_ip']
         vpool_name = parameters['vpool_name']
-
+        backend_info = {}
+        preset_name = None
+        vpool_metadata = None
+        connection_host = ''
+        connection_port = ''
+        connection_username = ''
+        connection_password = ''
         client = SSHClient(ip)
         unique_id = System.get_my_machine_id(client)
 
-        # 1. Check parameters
+        # Check parameters
         if not isinstance(parameters, dict):
             raise ValueError('Parameters should be of type "dict"')
         Toolbox.verify_required_params(required_params, parameters)
 
-        # 2. Check vPool name validity
+        # Check parameters for new vPool
         vpool = VPoolList.get_vpool_by_name(vpool_name)
-        name_regex = "^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$"
-        if not re.match(name_regex, vpool_name):
-            raise RuntimeError("Invalid name for vpool")
-
-        # 3. Check parameters for new vPool
         backend_type = BackendTypeList.get_backend_type_by_code(parameters['type'])
         if vpool is None:
             sco_size = parameters['config_params']['sco_size']
@@ -222,14 +224,50 @@ class StorageRouterController(object):
 
             if parameters['type'] in ['local', 'distributed']:
                 Toolbox.verify_required_params(required_params_for_new_distributed_vpool, parameters)
+                vpool_metadata = {'backend_type': 'LOCAL'}
             else:
                 Toolbox.verify_required_params(required_params_for_new_vpool, parameters)
+                connection_host = parameters['connection_host']
+                connection_port = parameters['connection_port']
+                connection_username = parameters['connection_username']
+                connection_password = parameters['connection_password']
+                if parameters['type'] == 'alba':
+                    Toolbox.verify_required_params(alba_connection_backend_params, parameters['connection_backend'])
 
-        # 4. Check backend type existence
+                    if connection_host == '':
+                        connection_host = StorageRouterList.get_masters()[0].ip
+                        connection_port = 443
+                        clients = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')
+                        oauth_client = None
+                        for current_client in clients:
+                            if current_client.user.group.name == 'administrators':
+                                oauth_client = current_client
+                                break
+                        if oauth_client is None:
+                            raise RuntimeError('Could not find INTERNAL CLIENT_CREDENTIALS client in administrator group.')
+                        ovs_client = OVSClient(connection_host, connection_port,
+                                               credentials=(oauth_client.client_id, oauth_client.client_secret),
+                                               version=1)
+                    else:
+                        ovs_client = OVSClient(connection_host, connection_port,
+                                               credentials=(connection_username, connection_password),
+                                               version=1)
+
+                    backend_guid = parameters['connection_backend']['backend']
+                    preset_name = parameters['connection_backend']['preset_name']
+                    backend_info = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': '_dynamics'})
+                    if preset_name not in [preset['name'] for preset in backend_info['presets']]:
+                        raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_guid))
+                    task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(backend_guid))
+                    successful, vpool_metadata = ovs_client.wait_for_task(task_id, timeout=300)
+                    if successful is False:
+                        raise RuntimeError('Could not load metadata from remote environment {0}'.format(connection_host))
+
+        # Check backend type existence
         if backend_type.code not in ['alba', 'distributed', 'ceph_s3', 'amazon_s3', 'swift_s3', 'local']:
             raise ValueError('Unsupported backend type specified: "{0}"'.format(backend_type.code))
 
-        # 5. Check storagerouter existence
+        # Check storagerouter existence
         storagerouter = None
         for current_storagerouter in StorageRouterList.get_storagerouters():
             if current_storagerouter.ip == ip and current_storagerouter.machine_id == unique_id:
@@ -238,7 +276,7 @@ class StorageRouterController(object):
         if storagerouter is None:
             raise RuntimeError('Could not find Storage Router with given IP address')
 
-        # 6. Check duplicate vPool name
+        # Check duplicate vPool name
         storagedriver = None
         all_storagerouters = [storagerouter]
         current_storage_driver_config = {}
@@ -264,7 +302,7 @@ class StorageRouterController(object):
                     storagedriver = vpool_storagedriver
             all_storagerouters += [sd.storagerouter for sd in vpool.storagedrivers]
 
-        # 7. Check storagerouter connectivity
+        # Check storagerouter connectivity
         ip_client_map = {}
         offline_nodes_detected = False
         for sr in all_storagerouters:
@@ -280,26 +318,7 @@ class StorageRouterController(object):
             except Exception as ex:
                 raise RuntimeError('Something went wrong building SSH connections. {0}'.format(ex))
 
-        # 8. Check over-allocation for read, write cache
-        metadata = StorageRouterController.get_metadata(storagerouter.guid)
-        shared_size_available = metadata['shared_size']
-        readcache_size_available = metadata['readcache_size']
-        readcache_size_requested = parameters['readcache_size'] * 1024 ** 3
-        writecache_size_available = metadata['writecache_size']
-        writecache_size_requested = parameters['writecache_size'] * 1024 ** 3
-        if readcache_size_requested > readcache_size_available + shared_size_available:
-            raise ValueError('Too much space request for {0} cache. Available: {1:.2f} GiB, Requested: {2:.2f} GiB'.format(DiskPartition.ROLES.READ,
-                                                                                                                           (readcache_size_available + shared_size_available) / 1024.0 ** 3,
-                                                                                                                           readcache_size_requested / 1024.0 ** 3))
-        if writecache_size_requested > writecache_size_available + shared_size_available:
-            raise ValueError('Too much space request for {0} cache. Available: {1:.2f} GiB, Requested: {2:.2f} GiB'.format(DiskPartition.ROLES.WRITE,
-                                                                                                                           (writecache_size_available + shared_size_available) / 1024.0 ** 3,
-                                                                                                                           writecache_size_requested / 1024.0 ** 3))
-        if readcache_size_requested + writecache_size_requested > readcache_size_available + writecache_size_available + shared_size_available:
-            raise ValueError('Too much space request. Available: {0:.2f} GiB, Requested: {1:.2f} GiB'.format((readcache_size_available + writecache_size_available + shared_size_available) / 1024.0 ** 3,
-                                                                                                             (readcache_size_requested + writecache_size_requested) / 1024.0 ** 3))
-
-        # 9. Check partition role presence
+        # Check partition role presence
         arakoon_service_found = False
         for service in ServiceTypeList.get_by_name('Arakoon').services:
             if service.name == 'arakoon-voldrv':
@@ -307,11 +326,9 @@ class StorageRouterController(object):
                 break
 
         error_messages = []
-        if StorageRouterController._check_scrub_partition_present() is False:
-            error_messages.append('At least 1 Storage Router must have a {0} partition'.format(DiskPartition.ROLES.SCRUB))
-
+        metadata = StorageRouterController.get_metadata(storagerouter.guid)
         partition_info = metadata['partitions']
-        for required_role in [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE]:
+        for required_role in [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.DB]:
             if required_role not in partition_info:
                 error_messages.append('Missing required partition role {0}'.format(required_role))
             elif len(partition_info[required_role]) == 0:
@@ -321,26 +338,118 @@ class StorageRouterController(object):
                 if total_available == 0:
                     error_messages.append('Not enough available space for {0}'.format(required_role))
 
-        # 10. Check mountpoints are mounted
+        policies = []
+        sco_size = current_storage_driver_config['sco_size'] if current_storage_driver_config else parameters['config_params']['sco_size']
+        sco_size *= 1024.0 ** 2
+        frag_size = None
+        total_size = None
+        nsm_partition_guids = set()
+        # @TODO: Get rid of this shit solution, add_vpool should for extend and new vpool always get identical parameters --> backend_info can be queried for in both cases
+        if vpool is not None and parameters['type'] == 'alba':
+            from ovs.dal.hybrids.albabackend import AlbaBackend
+            backend = AlbaBackend(vpool.metadata['backend_guid'])
+            policies = vpool.metadata['backend_info']['policies']
+            frag_size = vpool.metadata['backend_info']['frag_size']
+            total_size = vpool.metadata['backend_info']['total_size']
+            nsm_partition_guids = set(backend.metadata_information['nsm_partition_guids'])
+        elif parameters['type'] == 'alba':
+            preset_info = [preset for preset in backend_info['presets'] if preset_name == preset['name']][0]
+            frag_size = float(preset_info['fragment_size'])
+            total_size = float(backend_info['ns_statistics']['global']['size'])
+            nsm_partition_guids = set(backend_info['metadata_information']['nsm_partition_guids'])
+            for policy_info in preset_info['policies']:
+                policy = json.loads('[{0}]'.format(policy_info.strip('()')))
+                policies.append([policy[0], policy[1]])
+
+        metadata_backend_info = {'policies': policies,
+                                 'sco_size': sco_size,
+                                 'frag_size': frag_size,
+                                 'total_size': total_size,
+                                 'nsm_partition_guids': list(nsm_partition_guids)}
+
+        # Check mountpoints are mounted
+        db_partition_guids = set()
+        read_partition_guids = set()
+        write_partition_guids = set()
         for role, part_info in partition_info.iteritems():
             for part in part_info:
                 if not os.path.ismount(part['mountpoint']) and part['mountpoint'] != DiskPartition.VIRTUAL_STORAGE_LOCATION:
                     error_messages.append('Mountpoint {0} is not mounted'.format(part['mountpoint']))
+                if role == 'DB':
+                    db_partition_guids.add(part['guid'])
+                elif role == 'READ':
+                    read_partition_guids.add(part['guid'])
+                elif role == 'WRITE':
+                    write_partition_guids.add(part['guid'])
+
+        # Calculate alba metadata overhead
+        db_overlap = len(db_partition_guids.intersection(nsm_partition_guids)) > 0  # We only want to take DB partitions into account already claimed by the NSM clusters
+        read_overlap = db_overlap and len(db_partition_guids.intersection(read_partition_guids)) > 0
+        write_overlap = db_overlap and len(db_partition_guids.intersection(write_partition_guids)) > 0
+        sizes_to_reserve = [0]
+
+        if read_overlap is True or write_overlap is True:
+            for policy in policies:
+                size_to_reserve = int(total_size / sco_size * (1200 + (policy[0] + policy[1]) * (25 * sco_size / policy[0] / frag_size + 56)))
+                sizes_to_reserve.append(size_to_reserve)
+            # For more information about above formula: see http://jira.cloudfounders.com/browse/OVS-3553
+
+        # Check over-allocation for DB
+        db_available_size = partition_info[DiskPartition.ROLES.DB][0]['available']
+        db_required_size = StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3 + max(sizes_to_reserve)
+
+        if db_available_size < db_required_size:
+            error_messages.append('Assigned partition for DB role should be at least {0:.2f} GB'.format(db_required_size / 1024.0 ** 3))
+
+        # Check over-allocation for read, write cache
+        shared_size_available = metadata['shared_size']
+        readcache_size_available = metadata['readcache_size']
+        writecache_size_available = metadata['writecache_size']
+
+        if read_overlap is True and write_overlap is True:
+            shared_size_available -= max(sizes_to_reserve)
+            if shared_size_available < 0:
+                shared_size_available = 0
+        elif read_overlap is True:
+            readcache_size_available -= max(sizes_to_reserve)
+            if readcache_size_available < 0:
+                readcache_size_available = 0
+        elif write_overlap is True:
+            writecache_size_available -= max(sizes_to_reserve)
+            if writecache_size_available < 0:
+                writecache_size_available = 0
+
+        readcache_size_requested = parameters['readcache_size'] * 1024 ** 3
+        writecache_size_requested = parameters['writecache_size'] * 1024 ** 3
+        if readcache_size_requested > readcache_size_available + shared_size_available:
+            error_messages.append('Too much space request for {0} cache. Available: {1:.2f} GiB, Requested: {2:.2f} GiB'.format(DiskPartition.ROLES.READ,
+                                                                                                                                (readcache_size_available + shared_size_available) / 1024.0 ** 3,
+                                                                                                                                readcache_size_requested / 1024.0 ** 3))
+        if writecache_size_requested > writecache_size_available + shared_size_available:
+            error_messages.append('Too much space request for {0} cache. Available: {1:.2f} GiB, Requested: {2:.2f} GiB'.format(DiskPartition.ROLES.WRITE,
+                                                                                                                                (writecache_size_available + shared_size_available) / 1024.0 ** 3,
+                                                                                                                                writecache_size_requested / 1024.0 ** 3))
+        if readcache_size_requested + writecache_size_requested > readcache_size_available + writecache_size_available + shared_size_available:
+            error_messages.append('Too much space requested. Available: {0:.2f} GiB, Requested: {1:.2f} GiB'.format((readcache_size_available + writecache_size_available + shared_size_available) / 1024.0 ** 3,
+                                                                                                                    (readcache_size_requested + writecache_size_requested) / 1024.0 ** 3))
+
+        if StorageRouterController._check_scrub_partition_present() is False:
+            error_messages.append('At least 1 Storage Router must have a {0} partition'.format(DiskPartition.ROLES.SCRUB))
 
         if arakoon_service_found is False and (DiskPartition.ROLES.DB not in partition_info or len(partition_info[DiskPartition.ROLES.DB]) == 0):
             error_messages.append('DB partition role required')
 
-        if error_messages:
-            raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
-
-        # 11. Check available IP addresses
+        # Check available IP addresses
         ipaddresses = metadata['ipaddresses']
         machine_id = System.get_my_machine_id(client)
         grid_ip = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(machine_id))
         if grid_ip in ipaddresses:
             ipaddresses.remove(grid_ip)
         if not ipaddresses:
-            raise RuntimeError('No available IP addresses found suitable for Storage Router storage IP')
+            error_messages.append('No available IP addresses found suitable for Storage Router storage IP')
+
+        if error_messages:
+            raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
 
         ###################
         # CREATE SERVICES #
@@ -363,43 +472,13 @@ class StorageRouterController(object):
             new_vpool = True
             vpool = VPool()
             vpool.backend_type = backend_type
-            connection_host = parameters.get('connection_host', '')
-            connection_port = parameters.get('connection_port', '')
-            connection_username = parameters.get('connection_username', '')
-            connection_password = parameters.get('connection_password', '')
             if vpool.backend_type.code in ['local', 'distributed']:
-                vpool.metadata = {'backend_type': 'LOCAL'}
+                vpool.metadata = vpool_metadata
             elif vpool.backend_type.code == 'alba':
-                if connection_host == '':
-                    connection_host = StorageRouterList.get_masters()[0].ip
-                    connection_port = 443
-                    clients = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')
-                    oauth_client = None
-                    for current_client in clients:
-                        if current_client.user.group.name == 'administrators':
-                            oauth_client = current_client
-                            break
-                    if oauth_client is None:
-                        raise RuntimeError('Could not find INTERNAL CLIENT_CREDENTIALS client in administrator group.')
-                    ovs_client = OVSClient(connection_host, connection_port,
-                                           credentials=(oauth_client.client_id, oauth_client.client_secret),
-                                           version=1)
-                else:
-                    ovs_client = OVSClient(connection_host, connection_port,
-                                           credentials=(connection_username, connection_password),
-                                           version=1)
-                backend_guid = parameters['connection_backend']['backend']
-                preset_name = parameters['connection_backend']['metadata']
-                backend_info = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': '_dynamics'})
-                if preset_name not in [preset['name'] for preset in backend_info['presets']]:
-                    raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_guid))
-                task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(backend_guid))
-                successful, metadata = ovs_client.wait_for_task(task_id, timeout=300)
-                if successful is False:
-                    raise RuntimeError('Could not load metadata from remote environment {0}'.format(connection_host))
-                vpool.metadata = {'metadata': metadata,
-                                  'preset': preset_name,
-                                  'backend_guid': backend_guid}
+                vpool.metadata = {'metadata': vpool_metadata,
+                                  'backend_info': metadata_backend_info,
+                                  'preset': parameters['connection_backend']['preset_name'],
+                                  'backend_guid': parameters['connection_backend']['backend']}
             elif vpool.backend_type.code in ['ceph_s3', 'amazon_s3', 'swift_s3']:
                 if vpool.backend_type.code in ['swift_s3']:
                     strict_consistency = 'false'
@@ -423,6 +502,10 @@ class StorageRouterController(object):
             vpool.connection = '{0}:{1}'.format(connection_host, connection_port) if connection_host else None
             vpool.description = '{0} {1}'.format(vpool.backend_type.code, vpool_name)
             vpool.rdma_enabled = parameters['config_params']['dtl_transport'] == StorageDriverClient.FRAMEWORK_DTL_TRANSPORT_RSOCKET
+            vpool.save()
+        elif vpool.backend_type.code == 'alba':
+            # TODO: Get rid of this crap once add vpool wizard has been reworked, then we can ask live what is the current backend information instead of storing 'old' info in model
+            vpool.metadata['backend_info'] = metadata_backend_info
             vpool.save()
 
         local_backend_data = {}
@@ -581,8 +664,8 @@ class StorageRouterController(object):
 
         # 4. Assign DB
         db_info = partition_info[DiskPartition.ROLES.DB][0]
-        size = StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3
-        percentage = db_info['available'] * StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][1] / 100.0
+        size = StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3 + max(sizes_to_reserve)
+        percentage = db_info['available'] * StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][1] / 100.0 + max(sizes_to_reserve)
         sdp_tlogs = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
                                                                                        'role': DiskPartition.ROLES.DB,
                                                                                        'sub_role': StorageDriverPartition.SUBROLE.TLOG,
@@ -787,8 +870,7 @@ class StorageRouterController(object):
                   'UUID': str(uuid.uuid4()),
                   'OVS_UID': check_output('id -u ovs', shell=True).strip(),
                   'OVS_GID': check_output('id -g ovs', shell=True).strip(),
-                  'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30)),
-                  'BACKEND_ID': vpool.metadata['backend_guid']}
+                  'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
 
         logger.info('volumedriver_mode: {0}'.format(volumedriver_mode))
         logger.info('backend_type: {0}'.format(vpool.backend_type.code))
@@ -798,6 +880,7 @@ class StorageRouterController(object):
         if vpool.backend_type.code == 'alba':
             alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
             params['PROXY_ID'] = storagedriver.alba_proxy_guid
+            params['BACKEND_ID'] = vpool.metadata['backend_guid']
             ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name=alba_proxy_service)
             ServiceManager.start_service(alba_proxy_service, client=root_client)
             dependencies = [alba_proxy_service]
@@ -808,6 +891,7 @@ class StorageRouterController(object):
         else:
             template_name = 'ovs-volumedriver'
         voldrv_service = 'ovs-volumedriver_{0}'.format(vpool.name)
+
         ServiceManager.add_service(name=template_name, params=params, client=root_client, target_name=voldrv_service, additional_dependencies=dependencies)
 
         if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'classic':
