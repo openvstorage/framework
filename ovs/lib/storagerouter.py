@@ -1176,7 +1176,6 @@ class StorageRouterController(object):
             machine_id = System.get_my_machine_id(client)
             dirs_to_remove.append(storage_driver.mountpoint)
             dirs_to_remove.append('{0}/{1}'.format(EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(machine_id)), vpool.name))
-            EtcdConfiguration.delete('/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id))
 
             files_to_remove = []
             if vpool.backend_type.code == 'alba':
@@ -1216,6 +1215,8 @@ class StorageRouterController(object):
                 logger.error('Remove Storage Driver - Guid {0} - Synchronizing disks with reality failed with error: {1}'.format(storage_driver.guid, ex))
                 errors_found = True
 
+        EtcdConfiguration.delete('/ovs/vpools/{0}/hosts/{1}'.format(vpool.guid, storage_driver.storagedriver_id))
+
         # Model cleanup
         logger.info('Remove Storage Driver - Guid {0} - Cleaning up model'.format(storage_driver.guid))
         if storage_driver.alba_proxy is not None:
@@ -1226,6 +1227,7 @@ class StorageRouterController(object):
         storage_driver.delete(abandon=['logs'])  # Detach from the log entries
 
         if storage_drivers_left is False:
+            EtcdConfiguration.delete('/ovs/vpools/{0}'.format(vpool.guid))
             try:
                 logger.info('Remove Storage Driver - Guid {0} - Removing virtual disks from model'.format(storage_driver.guid))
                 for vdisk in vpool.vdisks:

@@ -259,7 +259,8 @@ class EtcdConfiguration(object):
     def _list(key):
         client = EtcdConfiguration._get_client()
         for child in client.get(key).children:
-            yield child.key.replace('{0}/'.format(key), '')
+            if child.key != key:
+                yield child.key.replace('{0}/'.format(key), '')
 
     @staticmethod
     @log_slow_calls
