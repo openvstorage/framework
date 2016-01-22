@@ -23,7 +23,7 @@ sys.path.append('/opt/OpenvStorage')
 import os
 from kombu import Queue
 from celery import Celery
-from celery.signals import task_postrun, worker_process_init
+from celery.signals import task_postrun, worker_process_init, after_setup_logger, after_setup_task_logger
 from ovs.lib.messaging import MessageController
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -89,6 +89,17 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
     _ = args, kwargs, kwds
     VolatileFactory.store = None
     PersistentFactory.store = None
+
+
+@after_setup_task_logger.connect
+@after_setup_logger.connect
+def load_ovs_logger(**kwargs):
+    if 'logger' in kwargs:
+        logger = kwargs['logger']
+        if len(logger.handlers) > 0:
+            logger.handlers[0] = loghandler.handler
+        else:
+            logger.addHandler(loghandler.handler)
 
 
 if __name__ == '__main__':

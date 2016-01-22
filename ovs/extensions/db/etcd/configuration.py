@@ -241,7 +241,8 @@ class EtcdConfiguration(object):
                                           'mds_tlogs': 100,
                                           'mds_maxload': 75},
                        '/webapps': {'html_endpoint': '/',
-                                    'oauth2': {'mode': 'local'}}}
+                                    'oauth2': {'mode': 'local'}},
+                       '/logging': {'target': 'redis'}}
         for key, value in base_config.iteritems():
             EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
 

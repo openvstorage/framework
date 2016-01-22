@@ -16,9 +16,10 @@
 Contains the loghandler module
 """
 
+import os
+import sys
 import inspect
 import logging
-import os
 
 
 def _ignore_formatting_errors():
@@ -80,16 +81,27 @@ class LogHandler(object):
         if name is None:
             name = 'logger'
 
-        log_filename = LogHandler.load_path(source)
+        formatter = logging.Formatter('%(asctime)s - %(process)s/%(thread)d - %(levelname)s - {0} - %(name)s - %(message)s'.format(source))
 
-        formatter = logging.Formatter('%(asctime)s - [%(process)s] - [%(levelname)s] - [{0}] - [%(name)s] - %(message)s'.format(source))
-        handler = logging.FileHandler(log_filename)
-        handler.setFormatter(formatter)
+        target = 'stdout'
+        try:
+            from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+            target = EtcdConfiguration.get('/ovs/framework/logging|target')
+        except:
+            pass
 
-        self.logger = logging.getLogger(name)
+        if target == 'redis':
+            from redislog import handlers, logger
+            self.handler = handlers.RedisHandler.to('ovs:logging')
+            self.handler.setFormatter(formatter)
+            self.logger = logger.RedisLogger(name)
+        else:
+            self.handler = logging.StreamHandler(sys.stdout)
+            self.handler.setFormatter(formatter)
+            self.logger = logging.getLogger(name)
+        self.logger.addHandler(self.handler)
         self.logger.propagate = propagate
         self.logger.setLevel(getattr(logging, 'DEBUG'))
-        self.logger.addHandler(handler)
         self._key = '{0}_{1}'.format(source, name)
 
     @staticmethod
