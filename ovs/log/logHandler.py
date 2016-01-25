@@ -83,16 +83,18 @@ class LogHandler(object):
 
         formatter = logging.Formatter('%(asctime)s - %(process)s/%(thread)d - %(levelname)s - {0} - %(name)s - %(message)s'.format(source))
 
-        target = 'stdout'
+        logging_target = {'type': 'stdout'}
         try:
             from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-            target = EtcdConfiguration.get('/ovs/framework/logging|target')
+            logging_target = EtcdConfiguration.get('/ovs/framework/logging')
         except:
             pass
 
-        if target == 'redis':
+        if logging_target['type'] == 'redis':
             from redislog import handlers, logger
-            self.handler = handlers.RedisHandler.to('ovs:logging')
+            self.handler = handlers.RedisHandler.to(channel=logging_target.get('channel', 'ovs:logging'),
+                                                    host=logging_target.get('host', 'localhost'),
+                                                    port=logging_target.get('port', 6379))
             self.handler.setFormatter(formatter)
             self.logger = logger.RedisLogger(name)
         else:

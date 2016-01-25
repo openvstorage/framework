@@ -98,6 +98,7 @@ class SetupController(object):
         configure_rabbitmq = True
         external_etcd = None  # Example: 'abcdef0123456789=http://1.2.3.4:2380'
         enable_heartbeats = True
+        logging_target = None
         ip_client_map = {}
 
         # Support non-interactive setup
@@ -126,8 +127,8 @@ class SetupController(object):
                 external_etcd = json.loads(config.get('setup', 'external_etcd'))
             if config.has_option('setup', 'enable_heartbeats'):
                 enable_heartbeats = config.getboolean('setup', 'enable_heartbeats')
-            else:
-                enable_heartbeats = True
+            if config.has_option('setup', 'logging_target'):
+                logging_target = json.loads(config.get('setup', 'logging_target'))
 
         try:
             if force_type is not None:
@@ -351,7 +352,8 @@ class SetupController(object):
                                                   enable_heartbeats=enable_heartbeats,
                                                   configure_memcached=configure_memcached,
                                                   configure_rabbitmq=configure_rabbitmq,
-                                                  external_etcd=external_etcd)
+                                                  external_etcd=external_etcd,
+                                                  logging_target=logging_target)
             else:
                 # Deciding master/extra
                 SetupController._setup_extra_node(cluster_ip=cluster_ip,
@@ -868,7 +870,7 @@ class SetupController(object):
 
     @staticmethod
     def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats,
-                          configure_memcached, configure_rabbitmq, external_etcd):
+                          configure_memcached, configure_rabbitmq, external_etcd, logging_target):
         """
         Sets up the first node services. This node is always a master
         """
@@ -884,7 +886,7 @@ class SetupController(object):
             EtcdInstaller.create_cluster('config', cluster_ip)
         else:
             EtcdInstaller.use_external(external_etcd, cluster_ip, 'config')
-        EtcdConfiguration.initialize(external_etcd=external_etcd)
+        EtcdConfiguration.initialize(external_etcd=external_etcd, logging_target=logging_target)
         EtcdConfiguration.initialize_host(machine_id)
 
         if ServiceManager.has_fleet():

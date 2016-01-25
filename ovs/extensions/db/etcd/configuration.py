@@ -209,11 +209,11 @@ class EtcdConfiguration(object):
             EtcdConfiguration._set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value, raw=False)
 
     @staticmethod
-    def initialize(external_etcd=None):
+    def initialize(external_etcd=None, logging_target=None):
         """
         Initialize general keys for all hosts in cluster
         :param external_etcd: ETCD runs on another host outside the cluster
-        :return: None
+        :param logging_target: Configures (overwrites) logging configuration
         """
         cluster_id = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
         base_config = {'/cluster_id': cluster_id,
@@ -242,7 +242,9 @@ class EtcdConfiguration(object):
                                           'mds_maxload': 75},
                        '/webapps': {'html_endpoint': '/',
                                     'oauth2': {'mode': 'local'}},
-                       '/logging': {'target': 'redis'}}
+                       '/logging': {'type': 'stdout'}}
+        if logging_target is not None:
+            base_config['/logging'] = logging_target
         for key, value in base_config.iteritems():
             EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
 
