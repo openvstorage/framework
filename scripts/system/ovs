@@ -126,6 +126,8 @@ elif [ "$1" = "collect" ] ; then
 elif [ "$1" = "unittest" ] ; then
     shift
     python $@
+elif [ "$#" -ge 1 ] ; then
+    show_help
 else
     ipython
 fi

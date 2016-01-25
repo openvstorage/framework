@@ -996,6 +996,7 @@ class StorageRouterController(object):
             offline_storage_router_guids = []
 
         client = None
+        temp_client = None
         storage_drivers_left = False
 
         vpool = storage_driver.vpool
@@ -1003,10 +1004,13 @@ class StorageRouterController(object):
         storage_router_online = True
         storage_routers_offline = [StorageRouter(storage_router_guid) for storage_router_guid in offline_storage_router_guids]
         configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
+        sr_sd_map = {}
+        for sd in vpool.storagedrivers:
+            sr_sd_map[sd.storagerouter] = sd
 
         # Validations
         logger.info('Remove Storage Driver - Guid {0} - Checking availability of related Storage Routers'.format(storage_driver.guid, storage_driver.name))
-        for sr in [sd.storagerouter for sd in vpool.storagedrivers]:
+        for sr, sd in sr_sd_map.iteritems():
             if sr in storage_routers_offline:
                 logger.info('Remove Storage Driver - Guid {0} - Storage Router {1} with IP {2} is offline'.format(storage_driver.guid, sr.name, sr.ip))
                 continue
@@ -1015,7 +1019,7 @@ class StorageRouterController(object):
             try:
                 temp_client = SSHClient(sr, username='root')
                 with Remote(temp_client.ip, [LocalStorageRouterClient]) as remote:
-                    path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id)
+                    path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
                     lsrc = remote.LocalStorageRouterClient(path)
                     lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
                 client = temp_client
@@ -1028,7 +1032,9 @@ class StorageRouterController(object):
                     raise RuntimeError('Not all StorageRouters are reachable')
             except Exception, ex:
                 if 'ClusterNotReachableException' in str(ex):
-                    raise RuntimeError('Not all StorageDrivers are reachable, please (re)start them and try again')
+                    if len(sr_sd_map) != 1:
+                        raise RuntimeError('Not all StorageDrivers are reachable, please (re)start them and try again')
+                    client = temp_client
                 else:
                     raise
 
@@ -1136,7 +1142,7 @@ class StorageRouterController(object):
                         logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service))
                         ServiceManager.remove_service(service, client=client)
                 except Exception as ex:
-                    logger.error('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed with error: {2}'.format(storage_driver.guid, service.name, ex))
+                    logger.error('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed with error: {2}'.format(storage_driver.guid, service, ex))
                     errors_found = True
 
             if storage_drivers_left is False:

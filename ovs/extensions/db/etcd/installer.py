@@ -43,7 +43,6 @@ class EtcdInstaller(object):
     def create_cluster(cluster_name, ip):
         """
         Creates a cluster
-        :param base_dir: Base directory that should contain the data
         :param ip: IP address of the first node of the new cluster
         :param cluster_name: Name of the cluster
         """
@@ -83,7 +82,6 @@ class EtcdInstaller(object):
     def extend_cluster(master_ip, new_ip, cluster_name):
         """
         Extends a cluster to a given new node
-        :param base_dir: Base directory that will hold the data
         :param cluster_name: Name of the cluster to be extended
         :param new_ip: IP address of the node to be added
         :param master_ip: IP of one of the already existing nodes
@@ -135,33 +133,33 @@ class EtcdInstaller(object):
         logger.debug('Extending cluster "{0}" from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
 
     @staticmethod
-    def shrink_cluster(remaining_node_ip, deleted_node_ip, cluster_name):
+    def shrink_cluster(remaining_node_ip, ip_to_remove, cluster_name, offline_node_ips=None):
         """
         Removes a node from a cluster, the old node will become a slave
         :param cluster_name: The name of the cluster to shrink
-        :param deleted_node_ip: The ip of the node that should be deleted
-        :param remaining_node_ip: The ip of a remaining node
+        :param ip_to_remove: The ip of the node that should be removed from the cluster
+        :param remaining_node_ip: The ip of a remaining node in the cluster
+        :param offline_node_ips: IPs of offline nodes
         """
-        logger.debug('Shrinking cluster "{0}" from {1}'.format(cluster_name, deleted_node_ip))
+        logger.debug('Shrinking cluster "{0}" from {1}'.format(cluster_name, ip_to_remove))
 
         current_client = SSHClient(remaining_node_ip, username='root')
         if not EtcdInstaller._is_healty(cluster_name, current_client):
             raise RuntimeError('Cluster "{0}" unhealthy, aborting shrink'.format(cluster_name))
 
-        old_client = SSHClient(deleted_node_ip, username='root')
-        node_name = System.get_my_machine_id(old_client)
         node_id = None
         for item in current_client.run('etcdctl member list').splitlines():
             info = re.search(EtcdInstaller.MEMBER_REGEX, item).groupdict()
-            if info['name'] == node_name:
+            if EtcdInstaller.CLIENT_URL.format(ip_to_remove) == info['client']:
                 node_id = info['id']
         if node_id is None:
-            raise RuntimeError('Could not locate {0} in the cluster'.format(deleted_node_ip))
+            raise RuntimeError('Could not locate {0} in the cluster'.format(ip_to_remove))
         current_client.run('etcdctl member remove {0}'.format(node_id))
-        EtcdInstaller.deploy_to_slave(remaining_node_ip, deleted_node_ip, cluster_name)
+        if ip_to_remove not in offline_node_ips:
+            EtcdInstaller.deploy_to_slave(remaining_node_ip, ip_to_remove, cluster_name)
         EtcdInstaller.wait_for_cluster(cluster_name, current_client)
 
-        logger.debug('Shrinking cluster "{0}" from {1} completed'.format(cluster_name, deleted_node_ip))
+        logger.debug('Shrinking cluster "{0}" from {1} completed'.format(cluster_name, ip_to_remove))
 
     @staticmethod
     def deploy_to_slave(master_ip, slave_ip, cluster_name):
@@ -185,6 +183,12 @@ class EtcdInstaller(object):
 
     @staticmethod
     def use_external(external, slave_ip, cluster_name):
+        """
+        Setup proxy for external etcd
+        :param external: External etcd info
+        :param slave_ip: IP of slave
+        :param cluster_name: Name of cluster
+        """
         logger.debug('Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, external, slave_ip))
         EtcdInstaller._setup_proxy(external, SSHClient(slave_ip, username='root'), cluster_name)
         logger.debug('Setting up proxy "{0}" from {1} to {2} completed'.format(cluster_name, external, slave_ip))
