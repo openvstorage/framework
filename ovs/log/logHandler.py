@@ -19,6 +19,7 @@ Contains the loghandler module
 import os
 import sys
 import inspect
+import socket
 import logging
 
 
@@ -81,7 +82,7 @@ class LogHandler(object):
         if name is None:
             name = 'logger'
 
-        formatter = logging.Formatter('%(asctime)s - %(process)s/%(thread)d - %(levelname)s - {0} - %(name)s - %(message)s'.format(source))
+        formatter = logging.Formatter('%(asctime)s - {0} - %(process)s/%(thread)d - %(levelname)s - {1} - %(name)s - %(message)s'.format(socket.gethostname(), source))
 
         logging_target = {'type': 'stdout'}
         try:
@@ -90,17 +91,26 @@ class LogHandler(object):
         except:
             pass
 
-        if logging_target['type'] == 'redis':
-            from redislog import handlers, logger
-            self.handler = handlers.RedisHandler.to(channel=logging_target.get('channel', 'ovs:logging'),
-                                                    host=logging_target.get('host', 'localhost'),
-                                                    port=logging_target.get('port', 6379))
-            self.handler.setFormatter(formatter)
-            self.logger = logger.RedisLogger(name)
+        target_type = logging_target['type']
+        if 'OVS_LOGTYPE_OVERRIDE' in os.environ:
+            target_type = os.environ['OVS_LOGTYPE_OVERRIDE']
+
+        if target_type == 'redis':
+            from redis import Redis
+            from ovs.log.redis_logging import RedisListHandler
+            queue = logging_target.get('queue', 'ovs_logging')
+            if '{0}' in queue:
+                queue = queue.format(name)
+            self.handler = RedisListHandler(queue=queue,
+                                            client=Redis(host=logging_target.get('host', 'localhost'),
+                                                         port=logging_target.get('port', 6379)))
+        elif target_type == 'file':
+            log_filename = LogHandler.load_path(source)
+            self.handler = logging.FileHandler(log_filename)
         else:
             self.handler = logging.StreamHandler(sys.stdout)
-            self.handler.setFormatter(formatter)
-            self.logger = logging.getLogger(name)
+        self.handler.setFormatter(formatter)
+        self.logger = logging.getLogger(name)
         self.logger.addHandler(self.handler)
         self.logger.propagate = propagate
         self.logger.setLevel(getattr(logging, 'DEBUG'))

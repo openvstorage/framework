@@ -2,6 +2,7 @@
 cd /opt/OpenvStorage
 export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps:/opt/OpenvStorage/webapps/api"
 export DISPLAY=:0
+export OVS_LOGTYPE_OVERRIDE=file
 
 function show_help {
     echo "Open vStorage CLI launcher"
