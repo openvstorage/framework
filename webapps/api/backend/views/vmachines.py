@@ -83,7 +83,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
-    def destroy(self, vmachine):
+    def delete_vtemplate(self, vmachine):
         """
         Deletes a machine
         """
