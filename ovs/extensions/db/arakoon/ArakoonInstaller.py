@@ -149,7 +149,7 @@ class ArakoonClusterConfig(object):
                 contents.set(section, item, data[section][item])
         config_io = StringIO()
         contents.write(config_io)
-        EtcdConfiguration.set(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(self.cluster_id), config_io.getvalue().strip(), raw=True)
+        EtcdConfiguration.set(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(self.cluster_id), config_io.getvalue(), raw=True)
 
     def delete_config(self):
         """
