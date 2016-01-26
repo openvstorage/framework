@@ -14,7 +14,6 @@
 
 import os
 import time
-import tempfile
 from ConfigParser import RawConfigParser
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import SSHClient
