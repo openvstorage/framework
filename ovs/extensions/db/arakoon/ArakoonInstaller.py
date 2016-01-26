@@ -142,24 +142,23 @@ class ArakoonClusterConfig(object):
         """
         Writes the configuration down to in the format expected by Arakoon
         """
-        (temp_handle, temp_filename) = tempfile.mkstemp()
         contents = RawConfigParser()
         data = self.export()
         for section in data:
             contents.add_section(section)
             for item in data[section]:
                 contents.set(section, item, data[section][item])
-        with open(temp_filename, 'wb') as config_file:
-            contents.write(config_file)
-        with open(temp_filename, 'r') as the_file:
-            EtcdConfiguration.set(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(self.cluster_id), the_file.read(), raw=True)
-        os.remove(temp_filename)
+        config_io = StringIO()
+        contents.write(config_io)
+        EtcdConfiguration.set(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(self.cluster_id), config_io.getvalue().strip(), raw=True)
 
     def delete_config(self):
         """
         Deletes a configuration file
         """
-        EtcdConfiguration.delete(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(self.cluster_id), raw=True)
+        key = ArakoonClusterConfig.ETCD_CONFIG_KEY.format(self.cluster_id)
+        if EtcdConfiguration.exists(key):
+            EtcdConfiguration.delete(key, raw=True)
 
 
 class ArakoonInstaller(object):
