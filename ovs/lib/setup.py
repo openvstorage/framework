@@ -910,6 +910,8 @@ class SetupController(object):
         if configure_memcached:
             SetupController._configure_memcached(target_client)
             EtcdConfiguration.set('/ovs/framework/memcache|endpoints', ['{0}:{1}'.format(cluster_ip, 11211)])
+        SetupController._configure_redis(target_client)
+        Toolbox.change_service_state(target_client, 'redis-server', 'restart', logger)
 
         print 'Starting model services'
         logger.debug('Starting model services')
@@ -1077,6 +1079,8 @@ class SetupController(object):
         SetupController._configure_logstash(target_client)
         if configure_memcached:
             SetupController._configure_memcached(target_client)
+        SetupController._configure_redis(target_client)
+        Toolbox.change_service_state(target_client, 'redis-server', 'restart', logger)
         SetupController._add_services(target_client, unique_id, 'master')
 
         print 'Joining arakoon cluster'
@@ -1306,6 +1310,12 @@ class SetupController(object):
         client.run("""sed -i 's/^-m.*/-m 1024/g' /etc/memcached.conf""")
         client.run("""sed -i -E 's/^-v(.*)/# -v\1/g' /etc/memcached.conf""")  # Put all -v, -vv, ... back in comment
         client.run("""sed -i 's/^# -v[^v]*$/-v/g' /etc/memcached.conf""")     # Uncomment only -v
+
+    @staticmethod
+    def _configure_redis(client):
+        print "Setting up Redis"
+        client.run("""sed -i 's/^# maxmemory <bytes>.*/maxmemory 128mb/g' /etc/redis/redis.conf""")
+        client.run("""sed -i 's/^# maxmemory-policy .*/maxmemory-policy allkeys-lru/g' /etc/redis/redis.conf""")
 
     @staticmethod
     def _configure_rabbitmq(client):
