@@ -156,7 +156,7 @@ class ArakoonClusterConfig(object):
         Deletes a configuration file
         """
         key = ArakoonClusterConfig.ETCD_CONFIG_KEY.format(self.cluster_id)
-        if EtcdConfiguration.exists(key):
+        if EtcdConfiguration.exists(key, raw=True):
             EtcdConfiguration.delete(key, raw=True)
 
 
