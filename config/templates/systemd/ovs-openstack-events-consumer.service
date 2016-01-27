@@ -1,7 +1,7 @@
 [Unit]
 Description=ovs openstack events consumer
-Requires=ovs-watcher-framework.service
-After=ovs-watcher-framework.service
+Requires=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
+After=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
 
 [Service]
 Type=simple

@@ -1001,11 +1001,8 @@ class SetupController(object):
 
         print '\n+++ Adding extra node +++\n'
         logger.info('Adding extra node')
-
         target_client = ip_client_map[cluster_ip]
         machine_id = System.get_my_machine_id(target_client)
-        SetupController._configure_logstash(target_client)
-        SetupController._add_services(target_client, unique_id, 'extra')
 
         print 'Configuring services'
         logger.info('Copying client configurations')
@@ -1013,13 +1010,15 @@ class SetupController(object):
             EtcdInstaller.deploy_to_slave(master_ip, cluster_ip, 'config')
         else:
             EtcdInstaller.use_external(external_etcd, cluster_ip, 'config')
-
         EtcdConfiguration.initialize_host(machine_id)
 
         if ServiceManager.has_fleet():
             print('Setting up fleet ')
             logger.info('Setting up fleet')
             ServiceManager.setup_fleet()
+
+        SetupController._configure_logstash(target_client)
+        SetupController._add_services(target_client, unique_id, 'extra')
 
         enabled = EtcdConfiguration.get('/ovs/framework/support|enabled')
         if enabled is True:
