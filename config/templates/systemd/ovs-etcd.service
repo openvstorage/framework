@@ -3,7 +3,7 @@ Description=Etcd service for cluster <CLUSTER>
 After=local-fs.target network.target
 
 [Service]
-Type=simple
+Type=notify
 User=ovs
 Group=ovs
 Environment=PYTHONPATH=/opt/OpenvStorage

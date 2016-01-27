@@ -1,7 +1,7 @@
 [Unit]
 Description=alba proxy
-Wants=ovs-volumedriver_<VPOOL_NAME>.service
-Before=ovs-volumedriver_<VPOOL_NAME>.service
+Wants=ovs-volumedriver_<VPOOL_NAME><_SERVICE_SUFFIX_>.service
+Before=ovs-volumedriver_<VPOOL_NAME><_SERVICE_SUFFIX_>.service
 
 [Service]
 Type=simple

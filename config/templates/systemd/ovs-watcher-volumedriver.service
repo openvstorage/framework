@@ -1,5 +1,6 @@
 [Unit]
 Description=Watcher for Open vStorage master services
+
 [Service]
 Type=simple
 Environment=PYTHONPATH=/opt/OpenvStorage
