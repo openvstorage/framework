@@ -53,6 +53,7 @@ define([
         self.iops                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.loaded              = ko.observable(false);
         self.loading             = ko.observable(false);
+        self.loadingConfig       = ko.observable(false);
         self.name                = ko.observable();
         self.namespace           = ko.observable();
         self.oldConfiguration    = ko.observable();
@@ -229,6 +230,7 @@ define([
             }).promise();
         };
         self.loadConfiguration = function(reload) {
+            self.loadingConfig(true);
             return $.Deferred(function(deferred) {
                 self.loadConfig = api.get('vdisks/' + self.guid() + '/get_config_params')
                     .then(self.shared.tasks.wait)
@@ -259,7 +261,11 @@ define([
                         }
                         deferred.resolve();
                     })
-                    .fail(deferred.reject);
+                    .fail(deferred.reject)
+                    .always(function() {
+                        self.loadingConfig(false);
+                    });
+
             }).promise();
         };
     };

@@ -189,7 +189,8 @@ limitations under the License.
                             <td style="padding: 0 0 20px 0;">
                                 <h4 data-i18n="ovs:vdisks.detail.configuration"></h4>
                                 <p data-i18n="ovs:vdisks.detail.configurationinfo"></p>
-                                <ul>
+                                <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading" data-bind="visible: loadingConfig() === true"></span>
+                                <ul data-bind="visible: loadingConfig() === false">
                                     <li>
                                         <span data-i18n="ovs:storagedrivers.configuration.general.dtl"></span>
                                         <a data-bind="popover: {
@@ -329,7 +330,8 @@ limitations under the License.
                                                             </div>
                                                         </td>
                                                         <td style="padding: 0;">
-                                                            <input data-bind="value: readCacheLimit, valueUpdate: 'afterkeydown'"
+                                                            <input title="readCacheLimit"
+                                                                   data-bind="value: readCacheLimit, valueUpdate: 'afterkeydown'"
                                                                    size="5"
                                                                    style="height: 25px; text-align: center;"/>
                                                             <span data-i18n="ovs:generic.units.gib"></span>
@@ -374,7 +376,8 @@ limitations under the License.
                                                             </div>
                                                         </td>
                                                         <td style="padding: 0;">
-                                                            <input data-bind="value: writeBuffer"
+                                                            <input title="writeBuffer"
+                                                                   data-bind="value: writeBuffer"
                                                                    size="5"
                                                                    style="height: 25px; text-align: center;"/>
                                                             <span data-i18n="ovs:generic.units.mib"></span>
@@ -390,7 +393,8 @@ limitations under the License.
                                         </div>
                                     </li>
                                 </ul>
-                                <button data-bind="click: function() { $root.saveConfiguration() }, enable: configChanged()" class="btn btn-default" data-i18n="ovs:generic.save"></button>
+                                <button data-bind="click: function() { $root.saveConfiguration() }, enable: configChanged(), visible: loadingConfig() === false"
+                                        class="btn btn-default" data-i18n="ovs:generic.save"></button>
                             </td>
                         </tr>
                     </tbody>
