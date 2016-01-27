@@ -176,7 +176,7 @@ class StorageRouterController(object):
                                    'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
                                    'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys())})
         alba_connection_backend_params = {'backend': (str, Toolbox.regex_guid),
-                                          'preset_name': (str, Toolbox.regex_preset)}
+                                          'metadata': (str, Toolbox.regex_preset)}
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
                            'storagerouter_ip': (str, Toolbox.regex_ip),
@@ -254,7 +254,7 @@ class StorageRouterController(object):
                                                version=1)
 
                     backend_guid = parameters['connection_backend']['backend']
-                    preset_name = parameters['connection_backend']['preset_name']
+                    preset_name = parameters['connection_backend']['metadata']
                     backend_info = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': '_dynamics'})
                     if preset_name not in [preset['name'] for preset in backend_info['presets']]:
                         raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_guid))
@@ -477,7 +477,7 @@ class StorageRouterController(object):
             elif vpool.backend_type.code == 'alba':
                 vpool.metadata = {'metadata': vpool_metadata,
                                   'backend_info': metadata_backend_info,
-                                  'preset': parameters['connection_backend']['preset_name'],
+                                  'preset': parameters['connection_backend']['metadata'],
                                   'backend_guid': parameters['connection_backend']['backend']}
             elif vpool.backend_type.code in ['ceph_s3', 'amazon_s3', 'swift_s3']:
                 if vpool.backend_type.code in ['swift_s3']:
