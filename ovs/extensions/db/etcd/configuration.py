@@ -161,14 +161,15 @@ class EtcdConfiguration(object):
         EtcdConfiguration._set(key_entries[0], data, raw)
 
     @staticmethod
-    def exists(key):
+    def exists(key, raw=False):
         """
         Check if key exists in etcd
         :param key: Key to check
+        :param raw: Process raw data
         :return: True if exists
         """
         try:
-            EtcdConfiguration.get(key)
+            EtcdConfiguration.get(key, raw)
             return True
         except (KeyError, etcd.EtcdKeyNotFound):
             return False
