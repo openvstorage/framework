@@ -144,7 +144,7 @@ class DiskController(object):
                             if device_path in partitions_info:
                                 partition_info = partitions_info[device_path]
                                 offset = int(partition_info['offset'])
-                                size = (int(partition_info['size']))
+                                size = int(partition_info['size'])
                             else:
                                 logger.warning('Could not retrieve partition info for disk/partition {0}'.format(device_path))
                                 continue

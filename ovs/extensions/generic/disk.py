@@ -93,9 +93,13 @@ class DiskTools(object):
         command = "parted -m {0} unit B print -s".format(device)
         logger.debug('Checking partitions with command: {0}'.format(command))
         try:
-            output = check_output(command, shell=True).splitlines()[1:]
+            output = check_output(command, shell=True).splitlines()
         except CalledProcessError as cpe:
             raise RuntimeError('{0} {1}'.format(cpe, cpe.output))
+        for line in output[:]:
+            output.pop(0)
+            if line.startswith('BYT;'):
+                break
         model_info = output.pop(0)
         logger.debug('Got model info: {0}'.format(model_info))
         for line in output:
