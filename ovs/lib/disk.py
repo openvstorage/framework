@@ -28,6 +28,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.disk import DiskTools
 from ovs.lib.helpers.decorators import ensure_single
 
 logger = LogHandler.get('lib', name='disk')
@@ -86,10 +87,10 @@ class DiskController(object):
                     device_name = device_path.split('/')[-1]
                     partition_id = None
                     partition_name = None
-                    extended_parition_info = None
+                    extended_partition_info = None
                     if is_partition is True:
                         if 'ID_PART_ENTRY_NUMBER' in device:
-                            extended_parition_info = True
+                            extended_partition_info = True
                             partition_id = device['ID_PART_ENTRY_NUMBER']
                             partition_name = device_name
                             if device_name.startswith('nvme') or device_name.startswith('loop'):
@@ -100,7 +101,7 @@ class DiskController(object):
                                 device_name = device_name[:0 - int(len(partition_id))]
                         else:
                             logger.debug('Partition {0} has no partition metadata'.format(device_path))
-                            extended_parition_info = False
+                            extended_partition_info = False
                             match = re.match('^(\D+?)(\d+)$', device_name)
                             if match is None:
                                 logger.debug('Could not handle disk/partition {0}'.format(device_path))
@@ -131,7 +132,7 @@ class DiskController(object):
                     if is_partition is True:
                         if 'ID_PART_ENTRY_TYPE' in device and device['ID_PART_ENTRY_TYPE'] == '0x5':
                             continue  # This is an extended partition, let's skip that one
-                        if extended_parition_info is True:
+                        if extended_partition_info is True:
                             offset = int(device['ID_PART_ENTRY_OFFSET']) * sector_size
                             size = int(device['ID_PART_ENTRY_SIZE']) * sector_size
                         else:
@@ -139,10 +140,14 @@ class DiskController(object):
                             if match is None:
                                 logger.debug('Could not handle disk/partition {0}'.format(device_path))
                                 continue  # Unable to handle this disk/partition
-                            fdisk_info = client.run('fdisk -l {0} | grep {1}'.format(match.groups()[0], device_path)).strip()
-                            fdisk_data = filter(None, fdisk_info.split(' '))
-                            offset = int(fdisk_data[1]) * sector_size
-                            size = (int(fdisk_data[2]) - int(fdisk_data[1])) * sector_size
+                            partitions_info = DiskTools.get_partitions_info(match.groups()[0])
+                            if device_path in partitions_info:
+                                partition_info = partitions_info[device_path]
+                                offset = int(partition_info['offset'])
+                                size = (int(partition_info['size']))
+                            else:
+                                logger.warning('Could not retrieve partition info for disk/partition {0}'.format(device_path))
+                                continue
                         configuration[device_name]['partitions'][partition_id] = {'offset': offset,
                                                                                   'size': size,
                                                                                   'path': path,

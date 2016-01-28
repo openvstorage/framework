@@ -81,6 +81,32 @@ class DiskTools(object):
         check_output(command_2, shell=True)
 
     @staticmethod
+    def get_partitions_info(device):
+        """
+        Get partitions info from a device
+        :param device: device name: /dev/sda
+
+        :return: dict {'partition_device': {'key': 'value'}}
+        (!) return values are in B not in sectors
+        """
+        result = {}
+        command = "parted -m {0} unit B print -s".format(device)
+        logger.debug('Checking partitions with command: {0}'.format(command))
+        try:
+            output = check_output(command, shell=True).splitlines()[1:]
+        except CalledProcessError as cpe:
+            raise RuntimeError('{0} {1}'.format(cpe, cpe.output))
+        model_info = output.pop(0)
+        logger.debug('Got model info: {0}'.format(model_info))
+        for line in output:
+            number, start, end, size, fs, name, flags = line.split(':')
+            partition_device = "{0}{1}".format(device, number)
+            result[partition_device] = {'start': start.rstrip('B'),
+                                        'end': end.rstrip('B'),
+                                        'size': size.rstrip('B')}
+        return result
+
+    @staticmethod
     def make_fs(partition):
         """
         Creates a filesystem
