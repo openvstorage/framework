@@ -821,8 +821,8 @@ class StorageRouterController(object):
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
                                                 trigger_gap='1GB',
                                                 backoff_gap='2GB')
-        storagedriver_config.configure_failovercache(failovercache_path=sdp_dtl.path,
-                                                     failovercache_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport])
+        storagedriver_config.configure_distributed_transaction_log(dtl_path=sdp_dtl.path,
+                                                                   dtl_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport])
         storagedriver_config.configure_filesystem(**filesystem_config)
         storagedriver_config.configure_volume_manager(**volume_manager_config)
         storagedriver_config.configure_volume_router(vrouter_id=vrouter_id,
