@@ -73,11 +73,13 @@ class ServiceManager(object):
     def has_fleet_client():
         try:
             from ovs.extensions.services.fleetctl import FleetCtl
-            has_fleet_client = True
+            return True
         except ImportError as ie:
             logger.info('No fleet client detected {0}'.format(ie))
-            has_fleet_client = False
-        return has_fleet_client
+            return False
+        except ValueError as ve:
+            logger.info('Flient client detected, fleet not running {0}'.format(ve))
+            return True
 
     @staticmethod
     def setup_fleet():

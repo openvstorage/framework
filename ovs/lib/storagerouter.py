@@ -176,7 +176,7 @@ class StorageRouterController(object):
                                    'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
                                    'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys())})
         alba_connection_backend_params = {'backend': (str, Toolbox.regex_guid),
-                                          'preset_name': (str, Toolbox.regex_preset)}
+                                          'metadata': (str, Toolbox.regex_preset)}
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
                            'storagerouter_ip': (str, Toolbox.regex_ip),
@@ -254,7 +254,7 @@ class StorageRouterController(object):
                                                version=1)
 
                     backend_guid = parameters['connection_backend']['backend']
-                    preset_name = parameters['connection_backend']['preset_name']
+                    preset_name = parameters['connection_backend']['metadata']
                     backend_info = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': '_dynamics'})
                     if preset_name not in [preset['name'] for preset in backend_info['presets']]:
                         raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_guid))
@@ -477,7 +477,7 @@ class StorageRouterController(object):
             elif vpool.backend_type.code == 'alba':
                 vpool.metadata = {'metadata': vpool_metadata,
                                   'backend_info': metadata_backend_info,
-                                  'preset': parameters['connection_backend']['preset_name'],
+                                  'preset': parameters['connection_backend']['metadata'],
                                   'backend_guid': parameters['connection_backend']['backend']}
             elif vpool.backend_type.code in ['ceph_s3', 'amazon_s3', 'swift_s3']:
                 if vpool.backend_type.code in ['swift_s3']:
@@ -735,7 +735,7 @@ class StorageRouterController(object):
             root_client.dir_create(cache_dir)
             backend_id = vpool.metadata['backend_guid']
             config_tree = '/ovs/alba/backends/{0}/proxies/{1}/config/{{0}}'.format(backend_id, alba_proxy.guid)
-            EtcdConfiguration.set(config_tree.format('abm'), config_io.getvalue().strip(), raw=True)
+            EtcdConfiguration.set(config_tree.format('abm'), config_io.getvalue(), raw=True)
             EtcdConfiguration.set(config_tree.format('main'), json.dumps({
                 'log_level': 'info',
                 'port': alba_proxy.service.ports[0],
@@ -821,8 +821,8 @@ class StorageRouterController(object):
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
                                                 trigger_gap='1GB',
                                                 backoff_gap='2GB')
-        storagedriver_config.configure_failovercache(failovercache_path=sdp_dtl.path,
-                                                     failovercache_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport])
+        storagedriver_config.configure_distributed_transaction_log(dtl_path=sdp_dtl.path,
+                                                                   dtl_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport])
         storagedriver_config.configure_filesystem(**filesystem_config)
         storagedriver_config.configure_volume_manager(**volume_manager_config)
         storagedriver_config.configure_volume_router(vrouter_id=vrouter_id,
@@ -996,6 +996,7 @@ class StorageRouterController(object):
             offline_storage_router_guids = []
 
         client = None
+        temp_client = None
         storage_drivers_left = False
 
         vpool = storage_driver.vpool
@@ -1003,10 +1004,13 @@ class StorageRouterController(object):
         storage_router_online = True
         storage_routers_offline = [StorageRouter(storage_router_guid) for storage_router_guid in offline_storage_router_guids]
         configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
+        sr_sd_map = {}
+        for sd in vpool.storagedrivers:
+            sr_sd_map[sd.storagerouter] = sd
 
         # Validations
         logger.info('Remove Storage Driver - Guid {0} - Checking availability of related Storage Routers'.format(storage_driver.guid, storage_driver.name))
-        for sr in [sd.storagerouter for sd in vpool.storagedrivers]:
+        for sr, sd in sr_sd_map.iteritems():
             if sr in storage_routers_offline:
                 logger.info('Remove Storage Driver - Guid {0} - Storage Router {1} with IP {2} is offline'.format(storage_driver.guid, sr.name, sr.ip))
                 continue
@@ -1015,7 +1019,7 @@ class StorageRouterController(object):
             try:
                 temp_client = SSHClient(sr, username='root')
                 with Remote(temp_client.ip, [LocalStorageRouterClient]) as remote:
-                    path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id)
+                    path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
                     lsrc = remote.LocalStorageRouterClient(path)
                     lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
                 client = temp_client
@@ -1028,7 +1032,9 @@ class StorageRouterController(object):
                     raise RuntimeError('Not all StorageRouters are reachable')
             except Exception, ex:
                 if 'ClusterNotReachableException' in str(ex):
-                    raise RuntimeError('Not all StorageDrivers are reachable, please (re)start them and try again')
+                    if len(sr_sd_map) != 1:
+                        raise RuntimeError('Not all StorageDrivers are reachable, please (re)start them and try again')
+                    client = temp_client
                 else:
                     raise
 
@@ -1136,7 +1142,7 @@ class StorageRouterController(object):
                         logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service))
                         ServiceManager.remove_service(service, client=client)
                 except Exception as ex:
-                    logger.error('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed with error: {2}'.format(storage_driver.guid, service.name, ex))
+                    logger.error('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed with error: {2}'.format(storage_driver.guid, service, ex))
                     errors_found = True
 
             if storage_drivers_left is False:

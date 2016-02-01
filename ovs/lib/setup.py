@@ -58,8 +58,7 @@ class SetupController(object):
     model_services = ['memcached', 'arakoon-ovsdb']
     master_services = model_services + ['rabbitmq-server', 'etcd-config']
     extra_node_services = ['workers', 'volumerouter-consumer']
-    master_node_services = master_services + ['scheduled-tasks', 'snmp', 'webapp-api', 'nginx',
-                                              'volumerouter-consumer'] + extra_node_services
+    master_node_services = master_services + extra_node_services + ['scheduled-tasks', 'snmp', 'webapp-api', 'volumerouter-consumer']
 
     discovered_nodes = {}
     host_ips = set()
@@ -441,6 +440,14 @@ class SetupController(object):
 
             master_ip = None
             offline_nodes = []
+            configure_rabbitmq = True
+            configure_memcached = True
+            preconfig = '/tmp/openvstorage_preconfig.cfg'
+            if os.path.exists(preconfig):
+                config = RawConfigParser()
+                config.read(preconfig)
+                configure_memcached = config.getboolean('setup', 'configure_memcached')
+                configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
             if node_action == 'demote' and cluster_ip:
                 from ovs.dal.lists.storagerouterlist import StorageRouterList
                 from ovs.lib.storagedriver import StorageDriverController
@@ -450,8 +457,6 @@ class SetupController(object):
                 unique_id = None
                 cluster_name = None
                 ip_client_map = {}
-                configure_rabbitmq = True
-                configure_memcached = True
                 for storage_router in StorageRouterList.get_storagerouters():
                     try:
                         client = SSHClient(storage_router.ip, username='root')
@@ -523,14 +528,7 @@ class SetupController(object):
                             break
 
                 ip_client_map = dict((node_ip, SSHClient(node_ip, username='root')) for node_ip in nodes if node_ip)
-                configure_rabbitmq = True
-                configure_memcached = True
-                preconfig = '/tmp/openvstorage_preconfig.cfg'
-                if os.path.exists(preconfig):
-                    config = RawConfigParser()
-                    config.read(preconfig)
-                    configure_memcached = config.getboolean('setup', 'configure_memcached')
-                    configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
+
             if master_ip is None:
                 raise RuntimeError('Failed to retrieve another responsive MASTER node')
             if node_action == 'promote':
@@ -547,8 +545,8 @@ class SetupController(object):
                                              cluster_name=cluster_name,
                                              ip_client_map=ip_client_map,
                                              unique_id=unique_id,
-                                             configure_memcached=configure_memcached,
-                                             configure_rabbitmq=configure_rabbitmq,
+                                             unconfigure_memcached=configure_memcached,
+                                             unconfigure_rabbitmq=configure_rabbitmq,
                                              offline_nodes=offline_nodes)
 
             print ''
@@ -666,7 +664,7 @@ class SetupController(object):
                         target_sr = None
                         for sd in storagedriver.vpool.storagedrivers:
                             sr = sd.storagerouter
-                            if sr.guid != storage_router and sr not in storage_routers_to_remove:
+                            if sr.guid != storage_router and sr not in storage_routers_to_remove and sr not in storage_routers_offline:
                                 target_sr = sr
                                 break
                         if target_sr is not None:
@@ -687,13 +685,21 @@ class SetupController(object):
 
                 # 3. Demote if MASTER
                 if storage_router.node_type == 'MASTER':
+                    unconfigure_rabbitmq = True
+                    unconfigure_memcached = True
+                    preconfig = '/tmp/openvstorage_preconfig.cfg'
+                    if os.path.exists(preconfig):
+                        config = RawConfigParser()
+                        config.read(preconfig)
+                        unconfigure_memcached = config.getboolean('setup', 'configure_memcached')
+                        unconfigure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
                     SetupController._demote_node(cluster_ip=storage_router.ip,
                                                  master_ip=master_ip,
                                                  cluster_name=None,
                                                  ip_client_map=ip_client_map,
                                                  unique_id=storage_router.machine_id,
-                                                 configure_memcached=True,
-                                                 configure_rabbitmq=True,
+                                                 unconfigure_memcached=unconfigure_memcached,
+                                                 unconfigure_rabbitmq=unconfigure_rabbitmq,
                                                  offline_nodes=storage_routers_offline)
 
                 # 4. Clean up model
@@ -709,9 +715,16 @@ class SetupController(object):
                 for vmachine in pmachine.vmachines:
                     vmachine.delete(abandon=['vdisks'])
                 storage_router.delete()
-                pmachine.delete()
+                if len(pmachine.storagerouters) == 0:
+                    pmachine.delete()
+                EtcdConfiguration.delete('/ovs/framework/hosts/{0}'.format(storage_router.machine_id))
 
-                SetupController._log_message('    Successfully removed node')
+                master_ips = [sr.ip for sr in storage_router_masters]
+                slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
+                offline_node_ips = [node.ip for node in storage_routers_offline]
+                SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map, offline_node_ips)
+
+                SetupController._log_message('    Successfully removed node\n')
         except Exception as exception:
             print ''  # Spacing
             print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
@@ -992,11 +1005,8 @@ class SetupController(object):
 
         print '\n+++ Adding extra node +++\n'
         logger.info('Adding extra node')
-
         target_client = ip_client_map[cluster_ip]
         machine_id = System.get_my_machine_id(target_client)
-        SetupController._configure_logstash(target_client)
-        SetupController._add_services(target_client, unique_id, 'extra')
 
         print 'Configuring services'
         logger.info('Copying client configurations')
@@ -1004,13 +1014,15 @@ class SetupController(object):
             EtcdInstaller.deploy_to_slave(master_ip, cluster_ip, 'config')
         else:
             EtcdInstaller.use_external(external_etcd, cluster_ip, 'config')
-
         EtcdConfiguration.initialize_host(machine_id)
 
         if ServiceManager.has_fleet():
             print('Setting up fleet ')
             logger.info('Setting up fleet')
             ServiceManager.setup_fleet()
+
+        SetupController._configure_logstash(target_client)
+        SetupController._add_services(target_client, unique_id, 'extra')
 
         enabled = EtcdConfiguration.get('/ovs/framework/support|enabled')
         if enabled is True:
@@ -1163,7 +1175,7 @@ class SetupController(object):
         logger.info('Promote complete')
 
     @staticmethod
-    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached, configure_rabbitmq, offline_nodes=None):
+    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, unconfigure_memcached, unconfigure_rabbitmq, offline_nodes=None):
         """
         Demotes a given node
         """
@@ -1175,7 +1187,7 @@ class SetupController(object):
         if offline_nodes is None:
             offline_nodes = []
 
-        if configure_memcached is True and len(offline_nodes) == 0:
+        if unconfigure_memcached is True and len(offline_nodes) == 0:
             if SetupController._validate_local_memcache_servers(ip_client_map) is False:
                 raise RuntimeError('Not all memcache nodes can be reached which is required for demoting a node.')
 
@@ -1196,24 +1208,22 @@ class SetupController(object):
         logger.info('Leaving arakoon ovsdb cluster')
         offline_node_ips = [node.ip for node in offline_nodes]
         ArakoonInstaller.shrink_cluster(cluster_ip, 'ovsdb', offline_node_ips)
-        master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
-        slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
 
         external_etcd = EtcdConfiguration.get('/ovs/framework/external_etcd')
         if external_etcd is None:
             print 'Leaving Etcd cluster'
             logger.info('Leaving Etcd cluster')
-            EtcdInstaller.shrink_cluster(master_ip, cluster_ip, 'config')
+            EtcdInstaller.shrink_cluster(master_ip, cluster_ip, 'config', offline_node_ips)
 
         print 'Update configurations'
         logger.info('Update configurations')
-        if configure_memcached is True:
+        if unconfigure_memcached is True:
             endpoints = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
             endpoint = '{0}:{1}'.format(cluster_ip, 11211)
             if endpoint in endpoints:
                 endpoints.remove(endpoint)
             EtcdConfiguration.set('/ovs/framework/memcache|endpoints', endpoints)
-        if configure_rabbitmq is True:
+        if unconfigure_rabbitmq is True:
             endpoints = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
             endpoint = '{0}:{1}'.format(cluster_ip, 5672)
             if endpoint in endpoints:
@@ -1233,9 +1243,15 @@ class SetupController(object):
             if service.name == 'arakoon-ovsdb':
                 service.delete()
 
-        if storagerouter not in offline_nodes:
+        if storagerouter in offline_nodes:
+            if unconfigure_rabbitmq is True:
+                print 'Removing/unconfiguring offline RabbitMQ node'
+                logger.debug('Removing/unconfiguring offline RabbitMQ node')
+                client = ip_client_map[master_ip]
+                client.run('rabbitmqctl forget_cluster_node rabbit@{0}'.format(storagerouter.name))
+        else:
             target_client = ip_client_map[cluster_ip]
-            if configure_rabbitmq is True:
+            if unconfigure_rabbitmq is True:
                 print 'Removing/unconfiguring RabbitMQ'
                 logger.debug('Removing/unconfiguring RabbitMQ')
                 if ServiceManager.has_service('rabbitmq-server', client=target_client):
@@ -1247,10 +1263,10 @@ class SetupController(object):
 
             print 'Removing services'
             logger.info('Removing services')
-            services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + ['arakoon-ovsdb'])]
-            if configure_rabbitmq is False:
+            services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + ['arakoon-ovsdb', 'etcd-config'])]
+            if unconfigure_rabbitmq is False:
                 services.remove('rabbitmq-server')
-            if configure_memcached is False:
+            if unconfigure_memcached is False:
                 services.remove('memcached')
             for service in services:
                 if ServiceManager.has_service(service, client=target_client):
@@ -1268,6 +1284,8 @@ class SetupController(object):
 
         print 'Restarting services'
         logger.debug('Restarting services')
+        master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
+        slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
         SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map, offline_node_ips)
 
         if SetupController._run_hooks('demote', cluster_ip, master_ip, offline_node_ips=offline_node_ips):
@@ -1277,10 +1295,9 @@ class SetupController(object):
         if storagerouter not in offline_nodes:
             target_client = ip_client_map[cluster_ip]
             node_name = target_client.run('hostname')
-            machine_id = System.get_my_machine_id(target_client)
             if SetupController._avahi_installed(target_client) is True:
                 SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
-            EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'EXTRA')
+        EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(storagerouter.machine_id), 'EXTRA')
 
         logger.info('Demote complete')
 
@@ -1618,7 +1635,7 @@ EOF
         functions = Toolbox.fetch_hooks('setup', hook_type)
         functions_found = len(functions) > 0
         if functions_found is True:
-            print '\n+++ Running hooks +++\n'
+            print '\n+++ Running "{0}" hooks +++\n'.format(hook_type)
         for function in functions:
             if master_ip is None:
                 function(cluster_ip=cluster_ip, **kwargs)

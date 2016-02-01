@@ -12,11 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+ArakoonNodeConfig class
+ArakoonClusterConfig class
+ArakoonInstaller class
+"""
+
 import os
 import time
-import tempfile
 from ConfigParser import RawConfigParser
 from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.sshclient import CalledProcessError
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
@@ -142,24 +148,23 @@ class ArakoonClusterConfig(object):
         """
         Writes the configuration down to in the format expected by Arakoon
         """
-        (temp_handle, temp_filename) = tempfile.mkstemp()
         contents = RawConfigParser()
         data = self.export()
         for section in data:
             contents.add_section(section)
             for item in data[section]:
                 contents.set(section, item, data[section][item])
-        with open(temp_filename, 'wb') as config_file:
-            contents.write(config_file)
-        with open(temp_filename, 'r') as the_file:
-            EtcdConfiguration.set(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(self.cluster_id), the_file.read(), raw=True)
-        os.remove(temp_filename)
+        config_io = StringIO()
+        contents.write(config_io)
+        EtcdConfiguration.set(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(self.cluster_id), config_io.getvalue(), raw=True)
 
     def delete_config(self):
         """
         Deletes a configuration file
         """
-        EtcdConfiguration.delete(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(self.cluster_id), raw=True)
+        key = ArakoonClusterConfig.ETCD_CONFIG_KEY.format(self.cluster_id)
+        if EtcdConfiguration.exists(key, raw=True):
+            EtcdConfiguration.delete(key, raw=True)
 
 
 class ArakoonInstaller(object):
@@ -182,34 +187,61 @@ class ArakoonInstaller(object):
         raise RuntimeError('ArakoonInstaller is a complete static helper class')
 
     @staticmethod
-    def archive_existing_arakoon_data(ip, directory, top_dir, cluster_name):
+    def clean_leftover_arakoon_data(ip, directories):
         """
-        Copy existing arakoon data, when setting up a new arakoon cluster, to the side
+        Delete existing arakoon data or copy to the side
+        Directories should be a dict with key the absolute paths and value a boolean indicating archive or delete
+        eg: {'/var/log/arakoon/ovsdb': True,                     --> Files under this directory will be archived
+             '/opt/OpenvStorage/db/arakoon/ovsdb/tlogs': False}  --> Files under this directory will be deleted
         :param ip: IP on which to check for existing data
-        :param directory: Directory to check for existence
-        :param top_dir: Top directory
-        :param cluster_name: Name of arakoon cluster
+        :type ip: str
+
+        :param directories: Directories to archive or delete
+        :type directories: dictionary
+
         :return: None
         """
-        new_client = SSHClient(ip)
-        logger.debug('archive - check if {0} exists'.format(directory))
-        if new_client.dir_exists(directory):
-            logger.debug('archive - from {0}'.format(directory))
-            archive_dir = '/'.join([top_dir, 'archive', cluster_name])
-            if new_client.dir_exists(archive_dir + '/' + os.path.basename(directory)):
-                logger.debug('archive - from existing archive {0}'.format(archive_dir))
-                timestamp = time.strftime('%Y%m%d%H%M%S', time.gmtime())
-                new_archive_dir = archive_dir + '-' + timestamp
-                new_client.dir_create(new_archive_dir)
-                new_client.run('mv {0} {1}'.format(archive_dir, new_archive_dir))
-                logger.debug('archive - to new {0}'.format(new_archive_dir))
-            logger.debug('create archive dir: {0}'.format(archive_dir))
-            new_client.dir_create(archive_dir)
-            logger.debug('archive from {0} to {1}'.format(directory, archive_dir))
-            if cluster_name == os.path.basename(directory) and new_client.dir_list(directory):
-                new_client.run('mv {0}/* {1}'.format(directory, archive_dir))
-            else:
-                new_client.run('mv {0} {1}'.format(directory, archive_dir))
+        root_client = SSHClient(ip, username='root')
+
+        # Verify whether all files to be archived have been released properly
+        open_file_errors = []
+        logger.debug('Cleanup old arakoon - Checking open files')
+        dirs_with_files = {}
+        for directory, archive in directories.iteritems():
+            logger.debug('Cleaning old arakoon - Checking directory {0}'.format(directory))
+            if root_client.dir_exists(directory):
+                logger.debug('Cleaning old arakoon - Directory {0} exists'.format(directory))
+                file_names = root_client.file_list(directory, abs_path=True, recursive=True)
+                if len(file_names) > 0:
+                    logger.debug('Cleaning old arakoon - Files found in directory {0}'.format(directory))
+                    dirs_with_files[directory] = {'files': file_names,
+                                                  'archive': archive}
+                for file_name in file_names:
+                    try:
+                        open_files = root_client.run('lsof {0}'.format(file_name))
+                        if open_files != '':
+                            open_file_errors.append('Open file {0} detected in directory {1}'.format(os.path.basename(file_name), directory))
+                    except CalledProcessError:
+                        continue
+
+        if len(open_file_errors) > 0:
+            raise RuntimeError('\n - ' + '\n - '.join(open_file_errors))
+
+        for directory, info in dirs_with_files.iteritems():
+            if info['archive'] is True:
+                # Create zipped tar
+                logger.debug('Cleanup old arakoon - Start archiving directory {0}'.format(directory))
+                archive_dir = '{0}/archive'.format(directory)
+                if not root_client.dir_exists(archive_dir):
+                    logger.debug('Cleanup old arakoon - Creating archive directory {0}'.format(archive_dir))
+                    root_client.dir_create(archive_dir)
+
+                logger.debug('Cleanup old arakoon - Creating tar file')
+                tar_name = '{0}/{1}.tgz'.format(archive_dir, int(time.time()))
+                root_client.run('cd {0}; tar -cz -f {1} --exclude "archive" *'.format(directory, tar_name))
+
+            logger.debug('Cleanup old arakoon - Removing old files from {0}'.format(directory))
+            root_client.file_delete(info['files'])
 
     @staticmethod
     def create_cluster(cluster_name, ip, base_dir, plugins=None, locked=True):
@@ -230,13 +262,10 @@ class ArakoonInstaller(object):
         home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
         log_dir = ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name)
         tlog_dir = ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)
+        ArakoonInstaller.clean_leftover_arakoon_data(ip, {log_dir: True,
+                                                          home_dir: False,
+                                                          tlog_dir: False})
 
-        ArakoonInstaller.archive_existing_arakoon_data(ip, home_dir, ArakoonInstaller.ARAKOON_BASE_DIR.format(base_dir),
-                                                       cluster_name)
-        ArakoonInstaller.archive_existing_arakoon_data(ip, log_dir, ArakoonInstaller.ARAKOON_LOG_DIR.format(''),
-                                                       cluster_name)
-        ArakoonInstaller.archive_existing_arakoon_data(ip, tlog_dir, ArakoonInstaller.ARAKOON_BASE_DIR.format(base_dir),
-                                                       cluster_name)
         port_mutex = None
         try:
             if locked is True:
@@ -301,13 +330,9 @@ class ArakoonInstaller(object):
         home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
         log_dir = ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name)
         tlog_dir = ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)
-
-        ArakoonInstaller.archive_existing_arakoon_data(new_ip, home_dir,
-                                                       ArakoonInstaller.ARAKOON_BASE_DIR.format(base_dir), cluster_name)
-        ArakoonInstaller.archive_existing_arakoon_data(new_ip, log_dir,
-                                                       ArakoonInstaller.ARAKOON_LOG_DIR.format(''), cluster_name)
-        ArakoonInstaller.archive_existing_arakoon_data(new_ip, tlog_dir,
-                                                       ArakoonInstaller.ARAKOON_BASE_DIR.format(base_dir), cluster_name)
+        ArakoonInstaller.clean_leftover_arakoon_data(new_ip, {log_dir: True,
+                                                              home_dir: False,
+                                                              tlog_dir: False})
 
         try:
             port_mutex.acquire(wait=60)

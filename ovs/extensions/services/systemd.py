@@ -78,6 +78,7 @@ class Systemd(object):
         if '<SERVICE_NAME>' in template_file:
             service_name = name if target_name is None else target_name
             template_file = template_file.replace('<SERVICE_NAME>', service_name.lstrip('ovs-'))
+        template_file = template_file.replace('<_SERVICE_SUFFIX_>', '')
 
         dependencies = ''
         if additional_dependencies:

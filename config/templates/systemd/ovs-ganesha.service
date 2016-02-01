@@ -1,7 +1,7 @@
 [Unit]
 Description=ovs volumedriver
-Requires=ovs-watcher-volumedriver.service <ADDITIONAL_DEPENDENCIES>
-After=ovs-watcher-volumedriver.service
+Requires=ovs-watcher-volumedriver<_SERVICE_SUFFIX_>.service <ADDITIONAL_DEPENDENCIES>
+After=ovs-watcher-volumedriver<_SERVICE_SUFFIX_>.service
 
 [Service]
 Type=simple

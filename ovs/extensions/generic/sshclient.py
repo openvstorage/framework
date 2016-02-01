@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from subprocess import check_output, CalledProcessError, PIPE, Popen
-from ovs.log.logHandler import LogHandler
-from ovs.dal.hybrids.storagerouter import StorageRouter
-from ovs.dal.helpers import Descriptor
-
 import os
 import re
 import grp
@@ -29,6 +24,12 @@ import logging
 import tempfile
 import paramiko
 import socket
+from subprocess import check_output, CalledProcessError, PIPE, Popen
+from ConfigParser import RawConfigParser
+from ovs.dal.helpers import Descriptor
+from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.extensions.generic.remote import Remote
+from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('extensions', name='sshclient')
 
@@ -517,3 +518,37 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             check_output(command, shell=True)
         else:
             self.run(command)
+
+    def file_list(self, directory, abs_path=False, recursive=False):
+        """
+        List all files in directory
+        WARNING: If executed recursively while not locally, this can take quite some time
+
+        :param directory: Directory to list the files in
+        :param abs_path: Return the absolute path of the files or only the file names
+        :param recursive: Loop through the directories recursively
+        :return: List of files in directory
+        """
+        all_files = []
+        directory = self.shell_safe(directory)
+        if self.is_local is True:
+            for root, dirs, files in os.walk(directory):
+                for file_name in files:
+                    if abs_path is True:
+                        all_files.append(os.path.join(root, file_name))
+                    else:
+                        all_files.append(file_name)
+                if recursive is False:
+                    break
+        else:
+            with Remote(self.ip, [os], 'root') as remote:
+                for root, dirs, files in remote.os.walk(directory):
+                    for file_name in files:
+                        if abs_path is True:
+                            all_files.append(os.path.join(root, file_name))
+                        else:
+                            all_files.append(file_name)
+                    if recursive is False:
+                        break
+        return all_files
+

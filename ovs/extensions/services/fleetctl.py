@@ -20,9 +20,14 @@ from subprocess import check_output
 
 try:
     import fleet.v1 as fleet
+    import googleapiclient
+except ImportError as ie:
+    raise ImportError('Fleet python client is not installed. Please check documentation on how to install it. {0}'.format(ie))
+
+try:
     FLEET_CLIENT = fleet.Client('http+unix://%2Fvar%2Frun%2Ffleet.sock')
-except ImportError:
-    raise ImportError('Fleet python client is not installed. Please check documentation on how to install it')
+except googleapiclient.errors.HttpError as he:
+    raise ValueError(he)
 
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.services.systemd import Systemd
@@ -72,13 +77,16 @@ class FleetCtl(object):
         if '<SERVICE_NAME>' in template_file:
             service_name = name if target_name is None else target_name
             template_file = template_file.replace('<SERVICE_NAME>', service_name.lstrip('ovs-'))
+        template_file = template_file.replace('<_SERVICE_SUFFIX_>', '@{0}'.format(client_ip))
 
         dependencies = ''
         for service in additional_dependencies:
-            dependencies += '{0}.service '.format(service)
+            dependencies += '{0}@{1}.service '.format(service, client_ip)
         template_file = template_file.replace('<ADDITIONAL_DEPENDENCIES>', dependencies)
 
         template_file += "\n[X-Fleet]\nMachineID={0}".format(FleetCtl._get_id_from_ip(client_ip))
+        if target_name is not None:
+            name = target_name
         fleet_name = "{0}@{1}.service".format(name, client_ip)
 
         logger.debug('Creating fleet unit {0} {1}'.format(fleet_name, template_file))
@@ -112,17 +120,24 @@ class FleetCtl(object):
                 if FleetCtl._has_service(name, client) is False:
                     return
             logger.warning('Failed to remove unit {0} after 60 seconds'.format(fleet_name))
-        return Systemd.remove_service(name, client)
+        else:
+            return Systemd.remove_service(name, client)
 
     @staticmethod
     def disable_service(name, client):
-        fleet_name = FleetCtl._get_unit_name(name, client)
-        return Systemd.disable_service(fleet_name, client)
+        if FleetCtl._has_service(name, client):
+            fleet_name = FleetCtl._get_unit_name(name, client)
+            client.run('systemctl disable {0}'.format(fleet_name))
+        else:
+            Systemd.disable_service(name, client)
 
     @staticmethod
     def enable_service(name, client):
-        fleet_name = FleetCtl._get_unit_name(name, client)
-        return Systemd.enable_service(fleet_name, client)
+        if FleetCtl._has_service(name, client):
+            fleet_name = FleetCtl._get_unit_name(name, client)
+            client.run('systemctl enable {0}'.format(fleet_name))
+        else:
+            Systemd.enable_service(name, client)
 
     @staticmethod
     def start_service(name, client):
@@ -188,6 +203,10 @@ class FleetCtl(object):
 
     @staticmethod
     def is_enabled(name, client):
+        if FleetCtl._has_service(name, client):
+            fleet_name = FleetCtl._get_unit_name(name, client)
+            output = client.run('systemctl is-enabled {0} || true'.format(fleet_name))
+            return 'enabled' in output
         return Systemd.is_enabled(name, client)
 
     @staticmethod
@@ -203,7 +222,7 @@ class FleetCtl(object):
         if client.ip == '127.0.0.1':
             ips = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).split('\n')
             fleet_machines = dict((m['primaryIP'], m['id']) for m in FLEET_CLIENT.list_machines())
-            match = set(fleet_machines.keys()).intersection(set(ips))
+            match = list(set(fleet_machines.keys()).intersection(set(ips)))
             if len(match) == 1:
                 return match[0]
             raise ValueError('Could not determine a match between this node and running fleet nodes')
@@ -229,7 +248,13 @@ class FleetCtl(object):
 
     @staticmethod
     def _get_unit_name(name, client):
-        name = Systemd._get_name(name, client, '/opt/OpenvStorage/config/templates/systemd/')
+        try:
+            name = Systemd._get_name(name, client, '/opt/OpenvStorage/config/templates/systemd/')
+        except ValueError:
+            try:
+                name = Systemd._get_name(name, client)
+            except ValueError:
+                name = 'ovs-{0}'.format(name)
         client_ip = FleetCtl._get_client_ip(client)
         fleet_name = "{0}@{1}.service".format(name, client_ip)
         return fleet_name

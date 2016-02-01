@@ -16,7 +16,6 @@
 import sys
 import time
 import uuid
-import os
 import logging
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -33,6 +32,11 @@ def _log(log_target, entry, level):
 
 
 def services_running(target):
+    """
+    Check all services are running
+    :param target: Target to check
+    :return: Boolean
+    """
     try:
         key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))
         value = str(time.time())

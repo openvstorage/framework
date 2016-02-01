@@ -90,7 +90,7 @@ define([
                                     $.t('ovs:vmachines.delete.marked'),
                                     $.t('ovs:vmachines.delete.markedmsg', { what: vm.name() })
                                 );
-                                api.del('vmachines/' + vm.guid())
+                                api.post('vmachines/' + vm.guid() + '/delete_vtemplate')
                                     .then(self.shared.tasks.wait)
                                     .done(function() {
                                         generic.alertSuccess(

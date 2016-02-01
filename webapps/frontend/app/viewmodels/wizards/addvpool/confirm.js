@@ -41,7 +41,7 @@ define([
                         connection_username: self.data.accesskey(),
                         connection_password: self.data.secretkey(),
                         connection_backend: {'backend': (self.data.backend() === 'alba' && self.data.albaBackend() !== undefined ? self.data.albaBackend().guid() : undefined),
-                                             'preset_name': (self.data.backend() === 'alba' && self.data.albaPreset() !== undefined ? self.data.albaPreset().name : undefined)},
+                                             'metadata': (self.data.backend() === 'alba' && self.data.albaPreset() !== undefined ? self.data.albaPreset().name : undefined)},
                         storage_ip: self.data.storageIP(),
                         integratemgmt: self.data.integratemgmt(),
                         readcache_size: self.data.readCacheSize(),
