@@ -121,7 +121,7 @@ class LogHandler(object):
             return {'type': 'redis',
                     'queue': queue,
                     'host': logging_target.get('host', 'localhost'),
-                    'post': logging_target.get('port', 6379)}
+                    'port': logging_target.get('port', 6379)}
         if target_type == 'file':
             return {'type': 'file',
                     'filename': LogHandler.load_path(source)}
