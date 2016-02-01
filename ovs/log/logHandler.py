@@ -18,47 +18,43 @@ Contains the loghandler module
 
 import os
 import sys
+import time
 import inspect
 import socket
 import logging
+import itertools
 
 
-def _ignore_formatting_errors():
-    """
-    Decorator to ignore formatting errors during logging
-    """
-    def wrap(f):
+class OVSFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
         """
-        Wrapper function
+        Overrides the default formatter to include UTC offset
         """
-        def new_function(self, msg, *args, **kwargs):
-            """
-            Wrapped function
-            """
-            try:
-                msg = str(msg)
-                return f(self, msg, *args, **kwargs)
-            except TypeError as exception:
-                too_many = 'not all arguments converted during string formatting' in str(exception)
-                not_enough = 'not enough arguments for format string' in str(exception)
-                if too_many or not_enough:
-                    msg = msg.replace('%', '%%')
-                    msg = msg % args
-                    msg = msg.replace('%%', '%')
-                    return f(self, msg, *[], **kwargs)
-                raise
+        _ = datefmt
+        ct = self.converter(record.created)
+        tz = time.altzone if time.daylight and ct.tm_isdst > 0 else time.timezone
+        offset = '{0}{1:0>2}{2:0>2}'.format('-' if tz > 0 else '+', abs(tz) // 3600, abs(tz // 60) % 60)
+        base_time = time.strftime('%Y-%m-%d %H:%M:%S', ct)
+        return '{0} {1:05.0f} {2}'.format(base_time, record.msecs, offset)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
-        return new_function
-    return wrap
+    def format(self, record):
+        if 'hostname' not in record.__dict__:
+            record.hostname = socket.gethostname()
+        if 'sequence' not in record.__dict__:
+            record.sequence = LogHandler.counter.next()
+        return super(OVSFormatter, self).format(record)
 
 
 class LogHandler(object):
     """
-    Log handler
+    Log handler.
+
+    WARNING: This log handler might be highly unreliable if not used correctly. It can log to redis, but if Redis is
+    not working as expected, it will result in lost log messages. If you want reliable logging, do not use Redis at all
+    or log to files and have a separate process forward them to Redis (so logs can be re-send if Redis is unavailable)
     """
 
+    counter = itertools.count()
     cache = {}
     propagate_cache = {}
     targets = {'lib': 'lib',
@@ -82,7 +78,30 @@ class LogHandler(object):
         if name is None:
             name = 'logger'
 
-        formatter = logging.Formatter('%(asctime)s - {0} - %(process)s/%(thread)d - %(levelname)s - {1} - %(name)s - %(message)s'.format(socket.gethostname(), source))
+        formatter = OVSFormatter('%(asctime)s - %(hostname)s - %(process)s/%(thread)d - {0}/%(name)s - %(sequence)s - %(levelname)s - %(message)s'.format(source))
+
+        target_definition = LogHandler.load_target_definition(source, name)
+        if target_definition['type'] == 'redis':
+            from redis import Redis
+            from ovs.log.redis_logging import RedisListHandler
+            self.handler = RedisListHandler(queue=target_definition['queue'],
+                                            client=Redis(host=target_definition['host'],
+                                                         port=target_definition['port']))
+        elif target_definition['type'] == 'file':
+            self.handler = logging.FileHandler(target_definition['filename'])
+        else:
+            self.handler = logging.StreamHandler(sys.stdout)
+        self.handler.setFormatter(formatter)
+        self.logger = logging.getLogger(name)
+        self.logger.addHandler(self.handler)
+        self.logger.propagate = propagate
+        self.logger.setLevel(getattr(logging, 'DEBUG'))
+        self._key = '{0}_{1}'.format(source, name)
+
+    @staticmethod
+    def load_target_definition(source, name=None):
+        if name is None:
+            name = 'logger'
 
         logging_target = {'type': 'stdout'}
         try:
@@ -96,25 +115,17 @@ class LogHandler(object):
             target_type = os.environ['OVS_LOGTYPE_OVERRIDE']
 
         if target_type == 'redis':
-            from redis import Redis
-            from ovs.log.redis_logging import RedisListHandler
             queue = logging_target.get('queue', 'ovs_logging')
             if '{0}' in queue:
                 queue = queue.format(name)
-            self.handler = RedisListHandler(queue=queue,
-                                            client=Redis(host=logging_target.get('host', 'localhost'),
-                                                         port=logging_target.get('port', 6379)))
-        elif target_type == 'file':
-            log_filename = LogHandler.load_path(source)
-            self.handler = logging.FileHandler(log_filename)
-        else:
-            self.handler = logging.StreamHandler(sys.stdout)
-        self.handler.setFormatter(formatter)
-        self.logger = logging.getLogger(name)
-        self.logger.addHandler(self.handler)
-        self.logger.propagate = propagate
-        self.logger.setLevel(getattr(logging, 'DEBUG'))
-        self._key = '{0}_{1}'.format(source, name)
+            return {'type': 'redis',
+                    'queue': queue,
+                    'host': logging_target.get('host', 'localhost'),
+                    'post': logging_target.get('port', 6379)}
+        if target_type == 'file':
+            return {'type': 'file',
+                    'filename': LogHandler.load_path(source)}
+        return {'type': 'stdout'}
 
     @staticmethod
     def load_path(source):
@@ -145,65 +156,107 @@ class LogHandler(object):
         if propagate is not None:
             self.logger.propagate = propagate
 
-    @_ignore_formatting_errors()
     def info(self, msg, *args, **kwargs):
         """ Info """
         self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
-        return self.logger.info(msg, *args, **kwargs)
+        extra = kwargs.get('extra', {})
+        extra['hostname'] = socket.gethostname()
+        extra['sequence'] = LogHandler.counter.next()
+        kwargs['extra'] = extra
+        try:
+            return self.logger.info(msg, *args, **kwargs)
+        except:
+            pass
 
-    @_ignore_formatting_errors()
     def error(self, msg, *args, **kwargs):
         """ Error """
         self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
-        return self.logger.error(msg, *args, **kwargs)
+        extra = kwargs.get('extra', {})
+        extra['hostname'] = socket.gethostname()
+        extra['sequence'] = LogHandler.counter.next()
+        kwargs['extra'] = extra
+        try:
+            return self.logger.error(msg, *args, **kwargs)
+        except:
+            pass
 
-    @_ignore_formatting_errors()
     def debug(self, msg, *args, **kwargs):
         """ Debug """
         self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
-        return self.logger.debug(msg, *args, **kwargs)
+        extra = kwargs.get('extra', {})
+        extra['hostname'] = socket.gethostname()
+        extra['sequence'] = LogHandler.counter.next()
+        kwargs['extra'] = extra
+        try:
+            return self.logger.debug(msg, *args, **kwargs)
+        except:
+            pass
 
-    @_ignore_formatting_errors()
     def warning(self, msg, *args, **kwargs):
         """ Warning """
         self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
-        return self.logger.warning(msg, *args, **kwargs)
+        extra = kwargs.get('extra', {})
+        extra['hostname'] = socket.gethostname()
+        extra['sequence'] = LogHandler.counter.next()
+        kwargs['extra'] = extra
+        try:
+            return self.logger.warning(msg, *args, **kwargs)
+        except:
+            pass
 
-    @_ignore_formatting_errors()
     def log(self, msg, *args, **kwargs):
         """ Log """
         self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
-        return self.logger.log(msg, *args, **kwargs)
+        extra = kwargs.get('extra', {})
+        extra['hostname'] = socket.gethostname()
+        extra['sequence'] = LogHandler.counter.next()
+        kwargs['extra'] = extra
+        try:
+            return self.logger.log(msg, *args, **kwargs)
+        except:
+            pass
 
-    @_ignore_formatting_errors()
     def critical(self, msg, *args, **kwargs):
         """ Critical """
         self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
-        return self.logger.critical(msg, *args, **kwargs)
+        extra = kwargs.get('extra', {})
+        extra['hostname'] = socket.gethostname()
+        extra['sequence'] = LogHandler.counter.next()
+        kwargs['extra'] = extra
+        try:
+            return self.logger.critical(msg, *args, **kwargs)
+        except:
+            pass
 
-    @_ignore_formatting_errors()
     def exception(self, msg, *args, **kwargs):
         """ Exception """
         self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
             print msg
-        return self.logger.exception(msg, *args, **kwargs)
+        extra = kwargs.get('extra', {})
+        extra['hostname'] = socket.gethostname()
+        extra['sequence'] = LogHandler.counter.next()
+        kwargs['extra'] = extra
+        try:
+            return self.logger.exception(msg, *args, **kwargs)
+        except:
+            pass
