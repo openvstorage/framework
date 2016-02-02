@@ -126,6 +126,17 @@ class LogHandler(object):
         return {'type': 'console'}
 
     @staticmethod
+    def get_sink_path(source):
+        target_definition = LogHandler.load_target_definition(source)
+        if target_definition['type'] == 'redis':
+            sink = 'redis://{0}:{1}{2}'.format(target_definition['host'], target_definition['port'], target_definition['queue'])
+        elif target_definition['type'] == 'file':
+            sink = target_definition['filename']
+        else:
+            sink = 'console:'
+        return sink
+
+    @staticmethod
     def load_path(source):
         log_filename = '/var/log/ovs/{0}.log'.format(
             LogHandler.targets[source] if source in LogHandler.targets else 'generic'
