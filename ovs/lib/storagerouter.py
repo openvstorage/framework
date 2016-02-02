@@ -112,10 +112,30 @@ class StorageRouterController(object):
                 claimed_space = 0
                 for storagedriver_partition in disk_partition.storagedrivers:
                     claimed_space += storagedriver_partition.size if storagedriver_partition.size is not None else 0
+                partition_available_space = None
+                if disk_partition.mountpoint is not None:
+                    disk_partition_device = '/dev/{0}{1}'.format(disk.name, disk_partition.id)
+                    try:
+                        output = client.run("df -Pl | grep {0}".format(disk_partition_device))
+                    except Exception as ex:
+                        logger.error('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
+                    else:
+                        if output != '':
+                            try:
+                                _partition, _size, _used, _available, _percent, _mountpoint = output.split()
+                            except ValueError as ve:
+                                logger.error('Unexpected output {0}. {1}'.format(output, ve))
+                            else:
+                                try:
+                                    partition_available_space = int(_available) * 1024
+                                except ValueError as ve:
+                                    logger.error('Could not parse value: {0}. {1}'.format(_available, ve))
 
                 shared = False
                 for role in disk_partition.roles:
                     size = disk_partition.size if disk_partition.size is not None else 0
+                    if partition_available_space is not None:
+                        size = partition_available_space
                     available = size - claimed_space  # Subtract size for roles which have already been claimed by other vpools (but not necessarily already been fully used)
                     # Subtract size for competing roles on the same partition
                     for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_USAGES.iteritems():
