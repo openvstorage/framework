@@ -24,6 +24,7 @@ from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('extensions', name='servicemanager')
 
+
 class ServiceManager(object):
     """
     Factory class returning specialized classes
