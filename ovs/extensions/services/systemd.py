@@ -50,15 +50,6 @@ class Systemd(object):
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
-    def prepare_template(base_name, target_name, client):
-        template_name = '/opt/OpenvStorage/config/templates/systemd/{0}.service'
-        if client.file_exists(template_name.format(base_name)):
-            client.run('cp -f {0} {1}'.format(
-                template_name.format(base_name),
-                template_name.format(target_name)
-            ))
-
-    @staticmethod
     def add_service(name, client, params=None, target_name=None, additional_dependencies=None):
         if params is None:
             params = {}

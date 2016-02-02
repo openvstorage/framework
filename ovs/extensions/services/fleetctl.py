@@ -42,10 +42,6 @@ class FleetCtl(object):
     """
 
     @staticmethod
-    def prepare_template(base_name, target_name, client):
-        return Systemd.prepare_template(base_name, target_name, client)
-
-    @staticmethod
     def add_service(name, client, params=None, target_name=None, additional_dependencies=None):
         """
         This will generate a .service (temporary) file to feed to fleet to start a service
