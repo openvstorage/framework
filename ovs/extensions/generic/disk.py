@@ -47,15 +47,17 @@ class DiskTools(object):
         :return:                None
         """
         # 1. Verify current label type and add GPT label if none present
-        label_type = 'gpt'
         try:
             command_1 = 'parted {0} print | grep "Partition Table"'.format(disk_path)
             logger.info('Checking partition label-type with command: {0}'.format(command_1))
             label_type = check_output(command_1, shell=True).strip().split(': ')[1]
         except CalledProcessError:
+            label_type = 'error'
+        if label_type in ('error', 'unknown'):
             try:
                 logger.info('Adding GPT label and trying to create partition again')
                 check_output('parted {0} -s mklabel gpt'.format(disk_path), shell=True)
+                label_type = 'gpt'
             except Exception as ex:
                 logger.exception('Error during label creation: {0}'.format(ex))
                 raise
