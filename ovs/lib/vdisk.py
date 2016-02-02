@@ -393,8 +393,6 @@ class VDiskController(object):
             raise RuntimeError('Disk {0} is already set as template'.format(disk.name))
         logger.info('Setting disk {0} as template'.format(disk.name))
         disk.storagedriver_client.set_volume_as_template(str(disk.volume_id))
-        disk.is_vtemplate = True
-        disk.save()
 
     @staticmethod
     @celery.task(name='ovs.vdisk.rollback')
