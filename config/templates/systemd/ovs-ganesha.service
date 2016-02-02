@@ -5,7 +5,7 @@ After=ovs-watcher-volumedriver<_SERVICE_SUFFIX_>.service
 
 [Service]
 Type=simple
-Environment=VFS_FSAL_LOGFILE=/var/log/ovs/volumedriver/<VPOOL_NAME>.log
+Environment=VFS_FSAL_LOGSINK=<LOG_SINK>
 Environment=GANESHA_LOG_FILE=/var/log/ovs/volumedriver/<VPOOL_NAME>_ganesha.log
 Environment=GANESHA_CONFIG_FILE=/opt/OpenvStorage/config/storagedriver/storagedriver/<VPOOL_NAME>_ganesha.conf
 Environment=GANESHA_PID_FILE=/var/run/ganesha-<VPOOL_NAME>-cf.pid

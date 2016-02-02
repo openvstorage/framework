@@ -65,6 +65,7 @@ class LogHandler(object):
                'arakoon': 'arakoon',
                'support': 'support',
                'log': 'audit_trails',
+               'storagedriver': 'storagedriver',
                'storagerouterclient': 'storagerouterclient'}
 
     def __init__(self, source, name=None, propagate=True):
@@ -80,7 +81,7 @@ class LogHandler(object):
 
         formatter = OVSFormatter('%(asctime)s - %(hostname)s - %(process)s/%(thread)d - {0}/%(name)s - %(sequence)s - %(levelname)s - %(message)s'.format(source))
 
-        target_definition = LogHandler.load_target_definition(source, name)
+        target_definition = LogHandler.load_target_definition(source)
         if target_definition['type'] == 'redis':
             from redis import Redis
             from ovs.log.redis_logging import RedisListHandler
@@ -99,11 +100,8 @@ class LogHandler(object):
         self._key = '{0}_{1}'.format(source, name)
 
     @staticmethod
-    def load_target_definition(source, name=None):
-        if name is None:
-            name = 'logger'
-
-        logging_target = {'type': 'stdout'}
+    def load_target_definition(source):
+        logging_target = {'type': 'console'}
         try:
             from ovs.extensions.db.etcd.configuration import EtcdConfiguration
             logging_target = EtcdConfiguration.get('/ovs/framework/logging')
@@ -115,17 +113,17 @@ class LogHandler(object):
             target_type = os.environ['OVS_LOGTYPE_OVERRIDE']
 
         if target_type == 'redis':
-            queue = logging_target.get('queue', 'ovs_logging')
+            queue = logging_target.get('queue', '/ovs/logging')
             if '{0}' in queue:
-                queue = queue.format(name)
+                queue = queue.format(source)
             return {'type': 'redis',
-                    'queue': queue,
+                    'queue': '/{0}'.format(queue.lstrip('/')),
                     'host': logging_target.get('host', 'localhost'),
                     'port': logging_target.get('port', 6379)}
         if target_type == 'file':
             return {'type': 'file',
                     'filename': LogHandler.load_path(source)}
-        return {'type': 'stdout'}
+        return {'type': 'console'}
 
     @staticmethod
     def load_path(source):

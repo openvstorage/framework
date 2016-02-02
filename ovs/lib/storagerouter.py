@@ -677,7 +677,7 @@ class StorageRouterController(object):
         volume_manager_config = {"tlog_path": sdp_tlogs.path,
                                  "metadata_path": sdp_metadata.path,
                                  "clean_interval": 1,
-                                 "foc_throttle_usecs": 4000}
+                                 "dtl_throttle_usecs": 4000}
 
         # 5. Create SCRUB storagedriver partition (if necessary)
         sdp_scrub = None
@@ -863,6 +863,14 @@ class StorageRouterController(object):
         if sdp_scrub is not None:
             root_client.dir_chmod(sdp_scrub.path, 0777)  # Used by gather_scrub_work which is a celery task executed by 'ovs' user and should be able to write in it
 
+        target_definition = LogHandler.load_target_definition('storagerouter')
+        if target_definition['type'] == 'redis':
+            log_endpoint = 'redis://{0}:{1}{2}'.format(target_definition['host'], target_definition['port'], target_definition['queue'])
+        elif target_definition['type'] == 'file':
+            log_endpoint = target_definition['filename']
+        else:
+            log_endpoint = 'console:'
+
         params = {'VPOOL_MOUNTPOINT': storagedriver.mountpoint,
                   'HYPERVISOR_TYPE': storagerouter.pmachine.hvtype,
                   'VPOOL_NAME': vpool_name,
@@ -870,6 +878,7 @@ class StorageRouterController(object):
                   'UUID': str(uuid.uuid4()),
                   'OVS_UID': check_output('id -u ovs', shell=True).strip(),
                   'OVS_GID': check_output('id -g ovs', shell=True).strip(),
+                  'LOG_SINK': log_endpoint,
                   'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
 
         logger.info('volumedriver_mode: {0}'.format(volumedriver_mode))

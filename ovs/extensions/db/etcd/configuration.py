@@ -243,7 +243,7 @@ class EtcdConfiguration(object):
                                           'mds_maxload': 75},
                        '/webapps': {'html_endpoint': '/',
                                     'oauth2': {'mode': 'local'}},
-                       '/logging': {'type': 'stdout'}}
+                       '/logging': {'type': 'console'}}
         if logging_target is not None:
             base_config['/logging'] = logging_target
         for key, value in base_config.iteritems():
