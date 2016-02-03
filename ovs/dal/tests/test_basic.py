@@ -1415,6 +1415,28 @@ class Basic(TestCase):
             disk.delete()
         machine.delete()
 
+    def test_shuffle_object_list(self):
+        """
+        Shuffle a data-object list randomly
+        """
+        for i in range(10):
+            disk = TestDisk()
+            disk.name = 'disk{0}'.format(i)
+            disk.save()
+
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.GUIDS,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': []}}).data
+        datalist = DataObjectList(data, TestDisk)
+        starting_order = [disk.name for disk in datalist]
+
+        datalist.shuffle()
+        new_order = [disk.name for disk in datalist]
+
+        self.assertNotEqual(starting_order, new_order, 'Data-object list still has same order after shuffling')
+        self.assertEqual(set(starting_order), set(new_order), 'Items disappeared from the data-object list after shuffling')
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)
