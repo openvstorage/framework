@@ -125,19 +125,24 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 complete_message = 'Ensure single {0} mode - ID {1} - {2}'.format(mode, now, message)
                 getattr(logger, level)(complete_message)
 
-            def update_value(key, append, value_to_store=None):
+            def update_value(key, append, value_to_update=None):
                 """
                 Store the specified value in the PersistentFactory
-                :param key:            Key to store the value for
-                :param append:         If True, the specified value will be appended else element at index 0 will be popped
-                :param value_to_store: Value to append to the list
-                :return:               Updated value
+                :param key:             Key to store the value for
+                :param append:          If True, the specified value will be appended else element at index 0 will be popped
+                :param value_to_update: Value to append to the list or remove from the list
+                :return:                Updated value
                 """
                 with VolatileMutex(name=key, wait=5):
                     if persistent_client.exists(key):
                         val = persistent_client.get(key)
-                        if append is True and value_to_store is not None:
-                            val['values'].append(value_to_store)
+                        if append is True and value_to_update is not None:
+                            val['values'].append(value_to_update)
+                        elif append is False and value_to_update is not None:
+                            for value_item in val['values']:
+                                if value_item == value_to_update:
+                                    val['values'].remove(value_item)
+                                    break
                         elif append is False and len(val['values']) > 0:
                             val['values'].pop(0)
                     else:
@@ -171,15 +176,18 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                         if persistent_client.exists(persistent_key):
                             log_message('Deleting key {0}'.format(persistent_key))
                             persistent_client.delete(persistent_key)
+            elif mode == 'DEDUPED':
+                with VolatileMutex(persistent_key, wait=5):
+                    if extra_task_names is not None:
+                        for task in extra_task_names:
+                            key_to_check = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task)
+                            if persistent_client.exists(key_to_check):
+                                log_message('Execution of task {0} discarded'.format(task_name))
+                                return None
+                    log_message('Setting key {0}'.format(persistent_key))
 
-            elif mode == 'CHAINED':
-                if extra_task_names is not None:
-                    log_message('Extra tasks are not allowed in this mode',
-                                level='error')
-                    raise ValueError('Ensure single {0} mode - ID {1} - Extra tasks are not allowed in this mode'.format(mode, now))
-
-                # 1. Create key to be stored in arakoon and update kwargs with args
-                timeout = kwargs.pop('chain_timeout') if 'chain_timeout' in kwargs else global_timeout
+                # Update kwargs with args
+                timeout = kwargs.pop('ensure_single_timeout') if 'ensure_single_timeout' in kwargs else global_timeout
                 function_info = inspect.getargspec(function)
                 kwargs_dict = {}
                 for index, arg in enumerate(args):
@@ -187,11 +195,76 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 kwargs_dict.update(kwargs)
                 params_info = 'with params {0}'.format(kwargs_dict) if kwargs_dict else 'with default params'
 
-                # 2. Set the key in arakoon if non-existent
+                # Set the key in arakoon if non-existent
                 value = update_value(key=persistent_key,
                                      append=True)
 
-                # 3. Validate whether another job with same params is being executed, skip if so
+                # Validate whether another job with same params is being executed
+                job_counter = 0
+                for item in value['values']:
+                    if item['kwargs'] == kwargs_dict:
+                        job_counter += 1
+                        if job_counter == 2:  # 1st job with same params is being executed, 2nd is scheduled for execution ==> Discard current
+                            log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
+                            return None
+                log_message('New task {0} {1} scheduled for execution'.format(task_name, params_info))
+                update_value(key=persistent_key,
+                             append=True,
+                             value_to_update={'kwargs': kwargs_dict})
+
+                # Poll the arakoon to see whether this call is the only in list, if so --> execute, else wait
+                counter = 0
+                while counter < timeout:
+                    if persistent_client.exists(persistent_key):
+                        values = persistent_client.get(persistent_key)['values']
+                        queued_jobs = [v for v in values if v['kwargs'] == kwargs_dict]
+                        if len(queued_jobs) == 1:
+                            try:
+                                if counter != 0:
+                                    current_time = int(time.time())
+                                    starting_time = int(now.split('_')[0])
+                                    log_message('Task {0} {1} had to wait {2} seconds before being able to start'.format(task_name,
+                                                                                                                         params_info,
+                                                                                                                         current_time - starting_time))
+                                output = function(*args, **kwargs)
+                                log_message('Task {0} finished successfully'.format(task_name))
+                                return output
+                            finally:
+                                update_value(key=persistent_key,
+                                             append=False,
+                                             value_to_update={'kwargs': kwargs_dict})
+                        counter += 1
+                        time.sleep(1)
+                        if counter == timeout:
+                            update_value(key=persistent_key,
+                                         append=False,
+                                         value_to_update={'kwargs': kwargs_dict})
+                            log_message('Could not start task {0} {1}, within expected time ({2}s). Removed it from queue'.format(task_name, params_info, timeout),
+                                        level='error')
+                            raise EnsureSingleTimeoutReached('Ensure single {0} mode - ID {1} - Task {2} could not be started within timeout of {3}s'.format(mode,
+                                                                                                                                                             now,
+                                                                                                                                                             task_name,
+                                                                                                                                                             timeout))
+            elif mode == 'CHAINED':
+                if extra_task_names is not None:
+                    log_message('Extra tasks are not allowed in this mode',
+                                level='error')
+                    raise ValueError('Ensure single {0} mode - ID {1} - Extra tasks are not allowed in this mode'.format(mode, now))
+
+                # Create key to be stored in arakoon and update kwargs with args
+                timeout = kwargs.pop('ensure_single_timeout') if 'ensure_single_timeout' in kwargs else global_timeout
+                function_info = inspect.getargspec(function)
+                kwargs_dict = {}
+                for index, arg in enumerate(args):
+                    kwargs_dict[function_info.args[index]] = arg
+                kwargs_dict.update(kwargs)
+                params_info = 'with params {0}'.format(kwargs_dict) if kwargs_dict else 'with default params'
+
+                # Set the key in arakoon if non-existent
+                value = update_value(key=persistent_key,
+                                     append=True)
+
+                # Validate whether another job with same params is being executed, skip if so
                 for item in value['values'][1:]:  # 1st element is processing job, we check all other queued jobs for identical params
                     if item['kwargs'] == kwargs_dict:
                         log_message('Execution of task {0} {1} discarded because of identical parameters'.format(task_name, params_info))
@@ -199,10 +272,10 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 log_message('New task {0} {1} scheduled for execution'.format(task_name, params_info))
                 update_value(key=persistent_key,
                              append=True,
-                             value_to_store={'kwargs': kwargs_dict,
-                                             'timestamp': now})
+                             value_to_update={'kwargs': kwargs_dict,
+                                              'timestamp': now})
 
-                # 4. Poll the arakoon to see whether this call is the first in list, if so --> execute, else wait
+                # Poll the arakoon to see whether this call is the first in list, if so --> execute, else wait
                 first_element = None
                 counter = 0
                 while first_element != now and counter < timeout:

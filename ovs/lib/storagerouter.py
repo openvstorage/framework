@@ -960,7 +960,7 @@ class StorageRouterController(object):
 
         if offline_nodes_detected is True:
             try:
-                VDiskController.dtl_checkup(vpool_guid=vpool.guid, chain_timeout=600)
+                VDiskController.dtl_checkup(vpool_guid=vpool.guid, ensure_single_timeout=600)
             except:
                 pass
             try:
@@ -969,7 +969,7 @@ class StorageRouterController(object):
             except:
                 pass
         else:
-            VDiskController.dtl_checkup(vpool_guid=vpool.guid, chain_timeout=600)
+            VDiskController.dtl_checkup(vpool_guid=vpool.guid, ensure_single_timeout=600)
             for vdisk in vpool.vdisks:
                 MDSServiceController.ensure_safety(vdisk=vdisk)
 
@@ -1332,7 +1332,7 @@ class StorageRouterController(object):
         else:
             logger.info('Remove Storage Driver - Guid {0} - Checking DTL for all virtual disks in vPool {1} with guid {2}'.format(storage_driver.guid, vpool.name, vpool.guid))
             try:
-                VDiskController.dtl_checkup(vpool_guid=vpool.guid, chain_timeout=600)
+                VDiskController.dtl_checkup(vpool_guid=vpool.guid, ensure_single_timeout=600)
             except Exception as ex:
                 logger.error('Remove Storage Driver - Guid {0} - DTL checkup failed for vPool {1} with guid {2} with error: {3}'.format(storage_driver.guid, vpool.name, vpool.guid, ex))
 
