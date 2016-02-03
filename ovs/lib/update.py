@@ -19,6 +19,7 @@ Module for UpdateController
 import subprocess
 
 from ovs.extensions.generic.filemutex import FileMutex
+from ovs.extensions.generic.filemutex import NoLockAvailableException
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.migration.migrator import Migrator
@@ -214,11 +215,10 @@ class UpdateController(object):
             UpdateController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
             UpdateController._log_message('+++ Finished updating +++')
         except RuntimeError as rte:
-            if 'Could not acquire lock' in rte.message:
-                UpdateController._log_message('Another framework update is currently in progress!')
-            else:
-                UpdateController._log_message('Error during framework update: {0}'.format(rte), severity='error')
-                UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
+            UpdateController._log_message('Error during framework update: {0}'.format(rte), severity='error')
+            UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
+        except NoLockAvailableException:
+            UpdateController._log_message('Another framework update is currently in progress!')
         except Exception as ex:
             UpdateController._log_message('Error during framework update: {0}'.format(ex), severity='error')
             UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
@@ -342,11 +342,10 @@ class UpdateController(object):
             UpdateController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
             UpdateController._log_message('+++ Finished updating +++')
         except RuntimeError as rte:
-            if 'Could not acquire lock' in rte.message:
-                UpdateController._log_message('Another volumedriver update is currently in progress!')
-            else:
-                UpdateController._log_message('Error during volumedriver update: {0}'.format(rte), severity='error')
-                UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
+            UpdateController._log_message('Error during volumedriver update: {0}'.format(rte), severity='error')
+            UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
+        except NoLockAvailableException:
+            UpdateController._log_message('Another volumedriver update is currently in progress!')
         except Exception as ex:
             UpdateController._log_message('Error during volumedriver update: {0}'.format(ex), severity='error')
             UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)

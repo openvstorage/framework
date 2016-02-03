@@ -38,6 +38,7 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
+from ovs.extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.services.service import ServiceManager
@@ -870,8 +871,9 @@ class VDiskController(object):
         vdisks = VDiskList.get_vdisks() if vdisk is None and vpool is None else vpool.vdisks if vpool is not None else [vdisk]
         iteration = 0
         while len(vdisks) > 0:
+            time_to_wait_for_lock = iteration * 10 + 1
             iteration += 1
-            if iteration > 6:
+            if time_to_wait_for_lock > 40:
                 logger.error('Virtual disks with guids {0} could not be checked'.format(', '.join([vdisk.guid for vdisk in vdisks])))
                 errors_found = True
                 break
@@ -902,17 +904,15 @@ class VDiskController(object):
                     vdisks.remove(vdisk)
                     continue
 
-                time_to_wait_for_lock = iteration * 5
                 lock_key = 'dtl_checkup_{0}'.format(vdisk.guid)
                 if dtl_vpool_enabled is False and (current_dtl_config is None or current_dtl_config.host == 'null'):
                     logger.info('    DTL is globally disabled for vPool {0} with guid {1}'.format(vpool.name, vpool.guid))
                     try:
                         with VolatileMutex(lock_key, wait=time_to_wait_for_lock):
                             vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
-                    except RuntimeError as rte:
-                        if 'Could not acquire lock' in rte.message:
-                            logger.info('    Could not acquire lock, continuing with next Virtual Disk')
-                            continue
+                    except NoLockAvailableException:
+                        logger.info('    Could not acquire lock, continuing with next Virtual Disk')
+                        continue
                     vdisks.remove(vdisk)
                     continue
                 elif current_dtl_config_mode == DTLConfigMode.MANUAL and (current_dtl_config is None or current_dtl_config.host == 'null'):
@@ -958,10 +958,9 @@ class VDiskController(object):
                     try:
                         with VolatileMutex(lock_key, wait=time_to_wait_for_lock):
                             vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
-                    except RuntimeError as rte:
-                        if 'Could not acquire lock' in rte.message:
-                            logger.info('    Could not acquire lock, continuing with next Virtual Disk')
-                            continue
+                    except NoLockAvailableException:
+                        logger.info('    Could not acquire lock, continuing with next Virtual Disk')
+                        continue
                     vdisks.remove(vdisk)
                     continue
 
@@ -1006,10 +1005,9 @@ class VDiskController(object):
                     try:
                         with VolatileMutex(lock_key, wait=time_to_wait_for_lock):
                             vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
-                    except RuntimeError as rte:
-                        if 'Could not acquire lock' in rte.message:
-                            logger.info('    Could not acquire lock, continuing with next Virtual Disk')
-                            continue
+                    except NoLockAvailableException:
+                        logger.info('    Could not acquire lock, continuing with next Virtual Disk')
+                        continue
                 vdisks.remove(vdisk)
         if errors_found is True:
             logger.error('DTL checkup ended with errors')

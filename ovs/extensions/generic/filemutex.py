@@ -25,6 +25,13 @@ from ovs.log.logHandler import LogHandler
 logger = LogHandler.get('extensions', 'file mutex')
 
 
+class NoLockAvailableException(Exception):
+    """
+    Custom exception thrown when lock could not be acquired in due time
+    """
+    pass
+
+
 class FileMutex(object):
     """
     This is mutex backed on the filesystem. It's cross thread and cross process. However
@@ -65,6 +72,7 @@ class FileMutex(object):
     def acquire(self, wait=None):
         """
         Acquire a lock on the mutex, optionally given a maximum wait timeout
+        :param wait: Time to wait for lock
         """
         if self._has_lock:
             return True
@@ -80,7 +88,7 @@ class FileMutex(object):
                 passed = time.time() - self._start
                 if passed > wait:
                     logger.error('Lock for {0} could not be acquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
-                    raise RuntimeError('Could not acquire lock %s' % self.key())
+                    raise NoLockAvailableException('Could not acquire lock %s' % self.key())
                 try:
                     fcntl.flock(self._handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     break
