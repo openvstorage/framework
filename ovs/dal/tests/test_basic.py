@@ -1429,14 +1429,10 @@ class Basic(TestCase):
                          'query': {'type': DataList.where_operator.AND,
                                    'items': []}}).data
         datalist = DataObjectList(data, TestDisk)
-        starting_order = []
-        for index, disk in enumerate(datalist):
-            starting_order.append(disk.name)
+        starting_order = [disk.name for disk in datalist]
 
         datalist.shuffle()
-        new_order = []
-        for disk in datalist:
-            new_order.append(disk.name)
+        new_order = [disk.name for disk in datalist]
 
         self.assertNotEqual(starting_order, new_order, 'Data-object list still has same order after shuffling')
         self.assertEqual(set(starting_order), set(new_order), 'Items disappeared from the data-object list after shuffling')

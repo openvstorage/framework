@@ -287,7 +287,4 @@ class DataObjectList(object):
         Randomly shuffle the items in the data-object list
         :return: Shuffled data-object list
         """
-        self.load()
-        objects = [self._objects[guid] for guid in self._guids]
-        random.shuffle(objects)
-        self._guids = [obj.guid for obj in objects]
+        random.shuffle(self._guids)
