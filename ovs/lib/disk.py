@@ -63,9 +63,14 @@ class DiskController(object):
             mount_data = client.run('mount')
             for mount in mount_data.splitlines():
                 mount = mount.strip()
-                match = re.search('/dev/(.+?) on (/.*?) type.*', mount)
+                match = re.search('(/dev/(.+?)) on (/.*?) type.*', mount)
                 if match is not None:
-                    mount_mapping[match.groups()[0]] = match.groups()[1]
+                    dev_name = match.groups()[0]
+                    uuid = client.run('blkid -o value -s UUID {0}'.format(dev_name))
+                    if uuid:
+                        mount_mapping[uuid] = match.groups()[2]
+                    else:
+                        mount_mapping[match.groups()[1]] = match.groups()[2]
             # Gather disk information
             with Remote(storagerouter.ip, [Context, os]) as remote:
                 context = remote.Context()
@@ -80,10 +85,10 @@ class DiskController(object):
                     partition_name = None
                     extended_parition_info = None
                     if is_partition is True:
+                        partition_name = device['ID_FS_UUID'] if 'ID_FS_UUID' in device else device_name
                         if 'ID_PART_ENTRY_NUMBER' in device:
                             extended_parition_info = True
                             partition_id = device['ID_PART_ENTRY_NUMBER']
-                            partition_name = device_name
                             if device_name.startswith('nvme') or device_name.startswith('loop'):
                                 device_name = device_name[:0 - int(len(partition_id)) - 1]
                             else:
@@ -95,7 +100,6 @@ class DiskController(object):
                             if match is None:
                                 logger.debug('Could not handle disk/partition {0}'.format(device_path))
                                 continue  # Unable to handle this disk/partition
-                            partition_name = device_name
                             partition_id = match.groups()[1]
                             device_name = match.groups()[0]
                     sectors = int(client.run('cat /sys/block/{0}/size'.format(device_name)))
