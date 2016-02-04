@@ -946,6 +946,27 @@ class DataObject(object):
             return True
         return not self.__eq__(other)
 
+    def _benchmark(self, iterations=100):
+        import time
+        begin = time.time()
+        stats = {}
+        totals = []
+        for i in range(iterations):
+            istart = time.time()
+            for dynamic in self._dynamics:
+                start = time.time()
+                _ = getattr(self, '_{0}'.format(dynamic.name))()
+                duration = time.time() - start
+                if dynamic.name not in stats:
+                    stats[dynamic.name] = []
+                stats[dynamic.name].append(duration)
+            totals.append(time.time() - istart)
+        print "Object: {0}('{1}')".format(self.__class__.__name__, self._guid)
+        for dyn in stats:
+            print '- {0}: avg {1:.2f}s (min: {2:.2f}s, max: {3:.2f}s)'.format(dyn, sum(stats[dyn]) / float(len(stats[dyn])), min(stats[dyn]), max(stats[dyn]))
+        print 'Took {0:.2f}s for {1} iterations'.format(time.time() - begin, iterations)
+        print 'Avg: {0:.2f}s, min: {1:.2f}s, max: {2:.2f}s'.format(sum(totals) / float(len(totals)), min(totals), max(totals))
+
     @staticmethod
     def enumerator(name, items):
         """
