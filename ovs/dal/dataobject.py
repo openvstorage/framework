@@ -951,11 +951,11 @@ class DataObject(object):
         begin = time.time()
         stats = {}
         totals = []
-        for i in range(iterations):
+        for _ in range(iterations):
             istart = time.time()
             for dynamic in self._dynamics:
                 start = time.time()
-                _ = getattr(self, '_{0}'.format(dynamic.name))()
+                getattr(self, '_{0}'.format(dynamic.name))()
                 duration = time.time() - start
                 if dynamic.name not in stats:
                     stats[dynamic.name] = []
