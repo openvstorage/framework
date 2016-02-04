@@ -32,7 +32,7 @@ from ovs.dal.hybrids.t_testdisk import TestDisk
 from ovs.dal.hybrids.t_testemachine import TestEMachine
 from ovs.dal.datalist import DataList
 from ovs.dal.helpers import Descriptor
-from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.extensions.generic.volatilemutex import VolatileMutex, NoLockAvailableException
 
 
 class Basic(TestCase):
@@ -680,7 +680,7 @@ class Basic(TestCase):
         mutex.release()
         mutex.release()  # Should not raise errors
         mutex._volatile.add(mutex.key(), 1, 10)
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(NoLockAvailableException):
             mutex.acquire(wait=1)
         mutex._volatile.delete(mutex.key())
         mutex.acquire()

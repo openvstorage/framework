@@ -22,10 +22,13 @@ define([
         var self = this;
 
         // Variables
-        self.widgets       = [];
-        self.shared        = shared;
-        self.guard         = { authenticated: true, registered: true };
-        self.refresher     = new Refresher();
+        self.widgets               = [];
+        self.shared                = shared;
+        self.guard                 = { authenticated: true, registered: true };
+        self.refresher             = new Refresher();
+        self.supportInfoHandle     = {};
+        self.supportMetadataHandle = {};
+        self.versionInfoHandle     = {};
 
         // Observables
         self.storageRouters = ko.observableArray([]);
@@ -138,28 +141,37 @@ define([
                                 storageRouter.fillData(sadata[storageRouter.guid()]);
                             }
                             storageRouter.loading(true);
-                            $.when.apply($, [
-                                api.get('storagerouters/' + storageRouter.guid() + '/get_support_info')
+                            var calls = [];
+                            if (generic.xhrCompleted(self.supportInfoHandle[storageRouter.guid()])) {
+                                self.supportInfoHandle[storageRouter.guid()] = api.get('storagerouters/' + storageRouter.guid() + '/get_support_info')
                                     .then(self.shared.tasks.wait)
-                                    .then(function(data) {
+                                    .then(function (data) {
                                         storageRouter.nodeid(data.nodeid);
                                         self.clusterid(data.clusterid);
                                         if (self._enable() === undefined) {
                                             self._enable(data.enabled);
                                             self._enableSupport(data.enablesupport);
                                         }
-                                    }),
-                                api.get('storagerouters/' + storageRouter.guid() + '/get_support_metadata')
+                                    });
+                                calls.push(self.supportInfoHandle[storageRouter.guid()]);
+                            }
+                            if (generic.xhrCompleted(self.supportMetadataHandle[storageRouter.guid()])) {
+                                self.supportMetadataHandle[storageRouter.guid()] = api.get('storagerouters/' + storageRouter.guid() + '/get_support_metadata')
                                     .then(self.shared.tasks.wait)
-                                    .then(function(data) {
+                                    .then(function (data) {
                                         storageRouter.metadata(data);
-                                    }),
-                                api.get('storagerouters/' + storageRouter.guid() + '/get_version_info')
+                                    });
+                                calls.push(self.supportMetadataHandle[storageRouter.guid()]);
+                            }
+                            if (generic.xhrCompleted(self.versionInfoHandle[storageRouter.guid()])) {
+                                self.versionInfoHandle[storageRouter.guid()] = api.get('storagerouters/' + storageRouter.guid() + '/get_version_info')
                                     .then(self.shared.tasks.wait)
-                                    .then(function(data) {
-                                       storageRouter.versions(data.versions);
-                                    })
-                            ])
+                                    .then(function (data) {
+                                        storageRouter.versions(data.versions);
+                                    });
+                                calls.push(self.versionInfoHandle[storageRouter.guid()]);
+                            }
+                            $.when.apply($, calls)
                                 .always(function() {
                                     storageRouter.loading(false);
                                 })
