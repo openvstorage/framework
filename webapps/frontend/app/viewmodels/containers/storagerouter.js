@@ -68,6 +68,7 @@ define([
         self.secondaryFailureDomainGuid = ko.observable();
         self.status                     = ko.observable();
         self.storedData                 = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.totalCacheHits             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.updates                    = ko.observable();
         self.vDisks                     = ko.observableArray([]);
         self.versions                   = ko.observable();
@@ -263,6 +264,7 @@ define([
                 self.cacheHits(stats.cache_hits_ps);
                 self.cacheMisses(stats.cache_misses_ps);
                 self.readSpeed(stats.data_read_ps);
+                self.totalCacheHits(stats.cache_hits);
                 self.writeSpeed(stats.data_written_ps);
                 self.backendWritten(stats.backend_data_written);
                 self.backendRead(stats.backend_data_read);
