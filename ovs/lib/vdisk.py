@@ -750,7 +750,6 @@ class VDiskController(object):
                         if sd.vpool == vdisk.vpool:
                             dtl_config = DTLConfig(str(storagerouter.ip), sd.ports[2], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
                             vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
-                            logger.info('MANUAL DTL CONFIG SET TO {0}'.format(storagerouter.ip))
                             vdisk.has_manual_dtl = True
                             vdisk.save()
                             break
