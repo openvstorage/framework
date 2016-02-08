@@ -308,7 +308,7 @@
                     "no_sync": "Disabled",
                     "sync": "Synchronous"
                 },
-                "dtl_target": "Target",
+                "dtl_target": "Target Failure Domain",
                 "dtl_transport": "Transport Mode",
                 "dtl_transport_modes": {
                     "rdma": "RDMA",
