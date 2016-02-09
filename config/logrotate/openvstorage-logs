@@ -1,16 +1,5 @@
 /var/log/ovs/*.log {
     su ovs ovs
-    rotate 5
-    size 50M
-    compress
-    copytruncate
-    missingok
-    notifempty
-    create 666 ovs ovs
-}
-
-/var/log/arakoon/*/*.log {
-    su ovs ovs
     rotate 10
     size 50M
     compress
