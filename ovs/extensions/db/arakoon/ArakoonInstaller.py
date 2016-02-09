@@ -219,8 +219,8 @@ class ArakoonInstaller(object):
                                                   ip=ip,
                                                   client_port=ports[0],
                                                   messaging_port=ports[1],
-                                                  log_sinks=LogHandler.get_sink_path('arakoon'),
-                                                  crash_log_sinks=LogHandler.get_sink_path('arakoon_crash'),
+                                                  log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                  crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'),
                                                   home=home_dir,
                                                   tlog_dir=tlog_dir))
             ArakoonInstaller._deploy(config)
@@ -280,8 +280,8 @@ class ArakoonInstaller(object):
                                                       ip=new_ip,
                                                       client_port=ports[0],
                                                       messaging_port=ports[1],
-                                                      log_sinks=LogHandler.get_sink_path('arakoon'),
-                                                      crash_log_sinks=LogHandler.get_sink_path('arakoon_crash'),
+                                                      log_sinks=LogHandler.get_sink_path('arakoon_server'),
+                                                      crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'),
                                                       home=home_dir,
                                                       tlog_dir=tlog_dir))
             ArakoonInstaller._deploy(config)

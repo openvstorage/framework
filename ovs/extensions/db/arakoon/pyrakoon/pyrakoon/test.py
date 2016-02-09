@@ -31,7 +31,7 @@ except ImportError:
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, compat, errors, protocol, utils
 from ovs.log.logHandler import LogHandler
 
-LOGGER = LogHandler.get('arakoon', 'pyrakoon', propagate=False)
+LOGGER = LogHandler.get('arakoon_client', 'pyrakoon', propagate=False)
 
 #pylint: disable=R0904
 class FakeClient(object, client.AbstractClient, client.ClientMixin):

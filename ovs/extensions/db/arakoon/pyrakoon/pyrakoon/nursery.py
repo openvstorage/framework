@@ -29,7 +29,7 @@ except ImportError:
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import protocol, utils
 from ovs.log.logHandler import LogHandler
 
-LOGGER = LogHandler.get('arakoon', 'pyrakoon', propagate=False)
+LOGGER = LogHandler.get('arakoon_client', 'pyrakoon', propagate=False)
 
 class NurseryConfigType(protocol.Type):
     '''NurseryConfig type'''

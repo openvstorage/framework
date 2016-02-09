@@ -40,9 +40,6 @@ class PersistentFactory(object):
             if client_type == 'pyrakoon':
                 from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
                 PersistentFactory.store = PyrakoonStore('ovsdb')
-            if client_type == 'arakoon':
-                from ovs.extensions.storage.persistent.arakoonstore import ArakoonStore
-                PersistentFactory.store = ArakoonStore('ovsdb')
             if client_type == 'default':
                 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
                 PersistentFactory.store = DummyPersistentStore()
