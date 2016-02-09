@@ -57,16 +57,6 @@ class LogHandler(object):
     counter = itertools.count()
     cache = {}
     propagate_cache = {}
-    targets = {'lib': 'lib',
-               'api': 'api',
-               'extensions': 'extensions',
-               'dal': 'dal',
-               'celery': 'celery',
-               'arakoon': 'arakoon',
-               'support': 'support',
-               'log': 'audit_trails',
-               'storagedriver': 'storagedriver',
-               'storagerouterclient': 'storagerouterclient'}
 
     def __init__(self, source, name=None, propagate=True):
         """
@@ -138,9 +128,7 @@ class LogHandler(object):
 
     @staticmethod
     def load_path(source):
-        log_filename = '/var/log/ovs/{0}.log'.format(
-            LogHandler.targets[source] if source in LogHandler.targets else 'generic'
-        )
+        log_filename = '/var/log/ovs/{0}.log'.format(source)
         if not os.path.exists(log_filename):
             open(log_filename, 'a').close()
             os.chmod(log_filename, 0o666)

@@ -38,7 +38,7 @@ class ArakoonNodeConfig(object):
     """
     cluster node config parameters
     """
-    def __init__(self, name, ip, client_port, messaging_port, log_dir, home, tlog_dir):
+    def __init__(self, name, ip, client_port, messaging_port, log_sinks, crash_log_sinks, home, tlog_dir):
         """
         Initializes a new Config entry for a single Node
         """
@@ -48,7 +48,8 @@ class ArakoonNodeConfig(object):
         self.messaging_port = int(messaging_port)
         self.tlog_compression = 'snappy'
         self.log_level = 'info'
-        self.log_dir = log_dir
+        self.log_sinks = log_sinks
+        self.crash_log_sinks = crash_log_sinks
         self.home = home
         self.tlog_dir = tlog_dir
         self.fsync = True
@@ -118,7 +119,8 @@ class ArakoonClusterConfig(object):
                                                 ip=parser.get(node, 'ip'),
                                                 client_port=parser.get(node, 'client_port'),
                                                 messaging_port=parser.get(node, 'messaging_port'),
-                                                log_dir=parser.get(node, 'log_dir'),
+                                                log_sinks=parser.get(node, 'log_sinks'),
+                                                crash_log_sinks=parser.get(node, 'crash_log_sinks'),
                                                 home=parser.get(node, 'home'),
                                                 tlog_dir=parser.get(node, 'tlog_dir')))
 
@@ -138,7 +140,8 @@ class ArakoonClusterConfig(object):
                                'messaging_port': node.messaging_port,
                                'tlog_compression': node.tlog_compression,
                                'log_level': node.log_level,
-                               'log_dir': node.log_dir,
+                               'log_sinks': node.log_sinks,
+                               'crash_log_sinks': node.crash_log_sinks,
                                'home': node.home,
                                'tlog_dir': node.tlog_dir,
                                'fsync': 'true' if node.fsync else 'false'}
@@ -171,7 +174,6 @@ class ArakoonInstaller(object):
     """
     class to dynamically install/(re)configure arakoon cluster
     """
-    ARAKOON_LOG_DIR = '/var/log/arakoon/{0}'
     ARAKOON_BASE_DIR = '{0}/arakoon'
     ARAKOON_HOME_DIR = '{0}/arakoon/{1}/db'
     ARAKOON_TLOG_DIR = '{0}/arakoon/{1}/tlogs'
@@ -185,63 +187,6 @@ class ArakoonInstaller(object):
         ArakoonInstaller should not be instantiated
         """
         raise RuntimeError('ArakoonInstaller is a complete static helper class')
-
-    @staticmethod
-    def clean_leftover_arakoon_data(ip, directories):
-        """
-        Delete existing arakoon data or copy to the side
-        Directories should be a dict with key the absolute paths and value a boolean indicating archive or delete
-        eg: {'/var/log/arakoon/ovsdb': True,                     --> Files under this directory will be archived
-             '/opt/OpenvStorage/db/arakoon/ovsdb/tlogs': False}  --> Files under this directory will be deleted
-        :param ip: IP on which to check for existing data
-        :type ip: str
-
-        :param directories: Directories to archive or delete
-        :type directories: dictionary
-
-        :return: None
-        """
-        root_client = SSHClient(ip, username='root')
-
-        # Verify whether all files to be archived have been released properly
-        open_file_errors = []
-        logger.debug('Cleanup old arakoon - Checking open files')
-        dirs_with_files = {}
-        for directory, archive in directories.iteritems():
-            logger.debug('Cleaning old arakoon - Checking directory {0}'.format(directory))
-            if root_client.dir_exists(directory):
-                logger.debug('Cleaning old arakoon - Directory {0} exists'.format(directory))
-                file_names = root_client.file_list(directory, abs_path=True, recursive=True)
-                if len(file_names) > 0:
-                    logger.debug('Cleaning old arakoon - Files found in directory {0}'.format(directory))
-                    dirs_with_files[directory] = {'files': file_names,
-                                                  'archive': archive}
-                for file_name in file_names:
-                    try:
-                        open_files = root_client.run('lsof {0}'.format(file_name))
-                        if open_files != '':
-                            open_file_errors.append('Open file {0} detected in directory {1}'.format(os.path.basename(file_name), directory))
-                    except CalledProcessError:
-                        continue
-
-        if len(open_file_errors) > 0:
-            raise RuntimeError('\n - ' + '\n - '.join(open_file_errors))
-
-        for directory, info in dirs_with_files.iteritems():
-            if info['archive'] is True:
-                # Create zipped tar
-                logger.debug('Cleanup old arakoon - Start archiving directory {0}'.format(directory))
-                archive_dir = '{0}/archive'.format(directory)
-                if not root_client.dir_exists(archive_dir):
-                    logger.debug('Cleanup old arakoon - Creating archive directory {0}'.format(archive_dir))
-                    root_client.dir_create(archive_dir)
-
-                logger.debug('Cleanup old arakoon - Creating tar file')
-                tar_name = '{0}/{1}.tgz'.format(archive_dir, int(time.time()))
-                root_client.run('cd {0}; tar -cz -f {1} --exclude "archive" *'.format(directory, tar_name))
-
-            logger.debug('Cleanup old arakoon - Removing old files from {0}'.format(directory))
-            root_client.file_delete(info['files'])
 
     @staticmethod
     def create_cluster(cluster_name, ip, base_dir, plugins=None, locked=True):
@@ -260,11 +205,7 @@ class ArakoonInstaller(object):
         node_name = System.get_my_machine_id(client)
 
         home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
-        log_dir = ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name)
         tlog_dir = ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)
-        ArakoonInstaller.clean_leftover_arakoon_data(ip, {log_dir: True,
-                                                          home_dir: False,
-                                                          tlog_dir: False})
 
         port_mutex = None
         try:
@@ -278,7 +219,8 @@ class ArakoonInstaller(object):
                                                   ip=ip,
                                                   client_port=ports[0],
                                                   messaging_port=ports[1],
-                                                  log_dir=log_dir,
+                                                  log_sinks=LogHandler.get_sink_path('arakoon'),
+                                                  crash_log_sinks=LogHandler.get_sink_path('arakoon_crash'),
                                                   home=home_dir,
                                                   tlog_dir=tlog_dir))
             ArakoonInstaller._deploy(config)
@@ -328,11 +270,7 @@ class ArakoonInstaller(object):
         node_name = System.get_my_machine_id(client)
 
         home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
-        log_dir = ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name)
         tlog_dir = ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)
-        ArakoonInstaller.clean_leftover_arakoon_data(new_ip, {log_dir: True,
-                                                              home_dir: False,
-                                                              tlog_dir: False})
 
         try:
             port_mutex.acquire(wait=60)
@@ -342,7 +280,8 @@ class ArakoonInstaller(object):
                                                       ip=new_ip,
                                                       client_port=ports[0],
                                                       messaging_port=ports[1],
-                                                      log_dir=log_dir,
+                                                      log_sinks=LogHandler.get_sink_path('arakoon'),
+                                                      crash_log_sinks=LogHandler.get_sink_path('arakoon_crash'),
                                                       home=home_dir,
                                                       tlog_dir=tlog_dir))
             ArakoonInstaller._deploy(config)
@@ -447,7 +386,12 @@ class ArakoonInstaller(object):
             config.write_config()
 
             # Create dirs as root because mountpoint /mnt/cache1 is typically owned by root
-            abs_paths = [node.log_dir, node.tlog_dir, node.home]
+            abs_paths = {node.tlog_dir, node.home}  # That's a set
+            if node.log_sinks.startswith('/'):
+                abs_paths.add(os.path.dirname(os.path.abspath(node.log_sinks)))
+            if node.crash_log_sinks.startswith('/'):
+                abs_paths.add(os.path.dirname(os.path.abspath(node.crash_log_sinks)))
+            abs_paths = list(abs_paths)
             root_client.dir_create(abs_paths)
             root_client.dir_chmod(abs_paths, 0755, recursive=True)
             root_client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
