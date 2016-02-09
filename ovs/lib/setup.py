@@ -342,24 +342,34 @@ class SetupController(object):
                                                                                             'ip': hypervisor_ip,
                                                                                             'password': hypervisor_password})
             if first_node is True:
-                SetupController._setup_first_node(target_client=ip_client_map[cluster_ip],
-                                                  unique_id=unique_id,
-                                                  cluster_name=cluster_name,
-                                                  node_name=node_name,
-                                                  hypervisor_info=hypervisor_info,
-                                                  enable_heartbeats=enable_heartbeats,
-                                                  configure_memcached=configure_memcached,
-                                                  configure_rabbitmq=configure_rabbitmq,
-                                                  external_etcd=external_etcd)
+                try:
+                    SetupController._setup_first_node(target_client=ip_client_map[cluster_ip],
+                                                      unique_id=unique_id,
+                                                      cluster_name=cluster_name,
+                                                      node_name=node_name,
+                                                      hypervisor_info=hypervisor_info,
+                                                      enable_heartbeats=enable_heartbeats,
+                                                      configure_memcached=configure_memcached,
+                                                      configure_rabbitmq=configure_rabbitmq,
+                                                      external_etcd=external_etcd)
+                except Exception:
+                    logger.warning('Setup first node failed, rolling back')
+                    SetupController._rollback_setup_first_node(target_client=ip_client_map[cluster_ip])
+                    raise
             else:
                 # Deciding master/extra
-                SetupController._setup_extra_node(cluster_ip=cluster_ip,
-                                                  master_ip=master_ip,
-                                                  cluster_name=cluster_name,
-                                                  unique_id=unique_id,
-                                                  ip_client_map=ip_client_map,
-                                                  hypervisor_info=hypervisor_info,
-                                                  external_etcd=external_etcd)
+                try:
+                    SetupController._setup_extra_node(cluster_ip=cluster_ip,
+                                                      master_ip=master_ip,
+                                                      cluster_name=cluster_name,
+                                                      unique_id=unique_id,
+                                                      ip_client_map=ip_client_map,
+                                                      hypervisor_info=hypervisor_info,
+                                                      external_etcd=external_etcd)
+                except Exception:
+                    logger.warning('Setup extra node failed, rolling back')
+                    SetupController._rollback_setup_extra_node(target_client=ip_client_map[cluster_ip])
+                    raise
 
                 print 'Analyzing cluster layout'
                 logger.info('Analyzing cluster layout')
@@ -367,13 +377,19 @@ class SetupController(object):
                 config.load_config()
                 logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), 'ovsdb'))
                 if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
-                    SetupController._promote_node(cluster_ip=cluster_ip,
-                                                  master_ip=master_ip,
-                                                  cluster_name=cluster_name,
-                                                  ip_client_map=ip_client_map,
-                                                  unique_id=unique_id,
-                                                  configure_memcached=configure_memcached,
-                                                  configure_rabbitmq=configure_rabbitmq)
+                    try:
+                        SetupController._promote_node(cluster_ip=cluster_ip,
+                                                      master_ip=master_ip,
+                                                      cluster_name=cluster_name,
+                                                      ip_client_map=ip_client_map,
+                                                      unique_id=unique_id,
+                                                      configure_memcached=configure_memcached,
+                                                      configure_rabbitmq=configure_rabbitmq)
+                    except Exception:
+                        logger.warning('Promote node failed, rolling back')
+                        SetupController._rollback_promote_node(target_client=ip_client_map[cluster_ip],
+                                                               master_ip=master_ip)
+                        raise
 
             print ''
             print Interactive.boxed_message(['Setup complete.',
@@ -994,6 +1010,86 @@ class SetupController(object):
         logger.info('First node complete')
 
     @staticmethod
+    def _rollback_setup_first_node(target_client):
+        """
+        Rollback a failed setup - first node
+        """
+        print '\n+++ Rolling back setup of first node +++\n'
+        logger.info('Rolling back setup of first node')
+        cluster_ip = target_client.ip
+        machine_id = System.get_my_machine_id(target_client)
+        try:
+            EtcdConfiguration.delete('/ovs/framework/hosts/{0}/ip'.format(machine_id))
+            EtcdConfiguration.delete('/ovs/framework/hosts/{0}/setupcompleted'.format(machine_id))
+            EtcdConfiguration.delete('/ovs/framework/hosts/{0}/type'.format(machine_id))
+            EtcdConfiguration.delete('/ovs/framework/install_time')
+        except Exception as ex:
+            SetupController._print_log_error('clean config keys', ex)
+        try:
+            target_client.dir_delete('/opt/OpenvStorage/webapps/frontend/logging')
+        except Exception as ex:
+            SetupController._print_log_error('clean config files', ex)
+
+        print 'Stopping model services'
+        logger.debug('Stopping model services')
+        for service in SetupController.model_services + ['watcher-framework', 'workers', 'support-agent']:
+            if ServiceManager.has_service(service, client=target_client):
+                ServiceManager.disable_service(service, client=target_client)
+                Toolbox.change_service_state(target_client, service, 'stop', logger)
+
+        print 'Remove configuration files'
+        logger.info('Remove configuration files')
+        try:
+            if EtcdConfiguration.get('/ovs/framework/messagequeue|endpoint') is not None:
+                try:
+                    SetupController._unconfigure_rabbitmq(target_client)
+                except Exception as ex:
+                    SetupController._print_log_error('unconfigure rabbitmq', ex)
+                EtcdConfiguration.delete('/ovs/framework/messagequeue|endpoint')
+            if EtcdConfiguration.get('/ovs/framework/memcache|endpoints') is not None:
+                ServiceManager.stop_service('memcached', target_client)
+                EtcdConfiguration.delete('/ovs/framework/memcache|endpoints')
+        except Exception as ex:
+            SetupController._print_log_error('remove configuration files', ex)
+
+        SetupController._remove_services(target_client, machine_id, 'master')
+        SetupController._unconfigure_logstash(target_client)
+
+        print 'Unconfigure Arakoon'
+        logger.info('Unconfigure Arakoon')
+        try:
+            ArakoonInstaller.delete_cluster('ovsdb', cluster_ip)
+        except Exception as ex:
+            SetupController._print_log_error('delete cluster', ex)
+
+        try:
+            base_dir = EtcdConfiguration.get('/ovs/framework/paths|ovsdb')
+            cluster_name = 'ovsdb'
+            home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
+            log_dir = ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name)
+            tlog_dir = ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)
+            ArakoonInstaller.clean_leftover_arakoon_data(cluster_ip, {log_dir: True,
+                                                                      home_dir: False,
+                                                                      tlog_dir: False})
+        except Exception as ex:
+            SetupController._print_log_error('clean arakoon data', ex)
+
+        print 'Unconfigure Etcd'
+        logger.info('Unconfigure Etcd')
+        try:
+            external_etcd = EtcdConfiguration.get('/ovs/framework/external_etcd')
+            if external_etcd is None:
+                print 'Removing Etcd cluster'
+                logger.info('Removing Etcd cluster')
+                try:
+                    EtcdInstaller.stop('config', target_client)
+                    EtcdInstaller.remove('config', target_client)
+                except Exception as ex:
+                    SetupController._print_log_error('unconfigure etcd', ex)
+        except Exception as ex:
+            SetupController._print_log_error('unconfigure etcd', ex)
+
+    @staticmethod
     def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map, hypervisor_info, external_etcd):
         """
         Sets up an additional node
@@ -1167,6 +1263,54 @@ class SetupController(object):
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
 
         logger.info('Promote complete')
+
+    @staticmethod
+    def _rollback_promote_node(target_client, master_ip):
+        print '\n Rollback promote node \n'
+        logger.info('Rollback promote node')
+        cluster_ip = target_client.ip
+        machine_id = System.get_my_machine_id(target_client)
+
+        if SetupController._avahi_installed(target_client) is True:
+            SetupController._unconfigure_avahi(target_client)
+
+        print 'Stopping services'
+        logger.info('Stopping services')
+        for service in SetupController.master_services:
+            if ServiceManager.has_service(service, client=target_client):
+                ServiceManager.disable_service(service, client=target_client)
+                Toolbox.change_service_state(target_client, service, 'stop', logger)
+
+        try:
+            endpoints = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
+            endpoint = '{0}:{1}'.format(cluster_ip, 11211)
+            if endpoint in endpoints:
+                endpoints.remove(endpoint)
+                EtcdConfiguration.set('/ovs/framework/memcache|endpoints', endpoints)
+            endpoints = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
+            endpoint = endpoints.append()
+            if endpoint in endpoints:
+                endpoints.remove(endpoint)
+                EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
+        except Exception as ex:
+            SetupController._print_log_error('unconfigure services', ex)
+
+        print 'Unconfigure Arakoon'
+        logger.info('Unconfigure Arakoon')
+        SetupController._remove_services(target_client, machine_id, 'master')
+        try:
+            ArakoonInstaller.shrink_cluster(cluster_ip, 'ovsdb', [])
+        except Exception as ex:
+            SetupController._print_log_error('shrink arakoon cluster', ex)
+
+        try:
+            external_etcd = EtcdConfiguration.get('/ovs/framework/external_etcd')
+            if external_etcd is None:
+                print 'Leaving etcd cluster'
+                logger.info('Leaving etcd cluster')
+                EtcdInstaller.shrink_cluster(master_ip, cluster_ip, 'config')
+        except Exception as ex:
+            SetupController._print_log_error('leave etcd cluster', ex)
 
     @staticmethod
     def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, unconfigure_memcached, unconfigure_rabbitmq, offline_nodes=None):
@@ -1375,6 +1519,14 @@ EOF
         client.run('rabbitmqctl stop; sleep 5;')
 
     @staticmethod
+    def _unconfigure_rabbitmq(client):
+        rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
+        if rabbitmq_running is True:
+            Toolbox.change_service_state(client, 'rabbitmq-server', 'stop', logger)
+        client.file_delete('/etc/rabbitmq/rabbitmq.config')
+
+
+    @staticmethod
     def _check_rabbitmq_and_enable_ha_mode(client):
         if not ServiceManager.has_service('rabbitmq-server', client):
             raise RuntimeError('Service rabbitmq-server has not been added on node {0}'.format(client.ip))
@@ -1426,7 +1578,7 @@ EOF
     @staticmethod
     def _configure_logstash(client):
         if not SetupController._logstash_installed(client):
-            logger.debug("Logstash is not installed, skipping it's configuration")
+            logger.debug("Logstash is not installed, skipping its configuration")
             return False
 
         print 'Configuring logstash'
@@ -1434,6 +1586,19 @@ EOF
         if ServiceManager.has_service('logstash', client) is False:
             ServiceManager.add_service('logstash', client)
         Toolbox.change_service_state(client, 'logstash', 'restart', logger)
+
+    @staticmethod
+    def _unconfigure_logstash(client):
+        if not SetupController._logstash_installed(client):
+            logger.debug("Logstash is not installed, skipping its configuration")
+            return False
+
+        print 'Unconfiguring logstash'
+        logger.info('Unconfiguring logstash')
+        Toolbox.change_service_state(client, 'logstash', 'stop', logger)
+        if ServiceManager.has_service('logstash', client) is True:
+            ServiceManager.remove_service('logstash', client)
+
 
     @staticmethod
     def _configure_avahi(client, cluster_name, node_name, node_type):
@@ -1458,6 +1623,12 @@ EOF
         Toolbox.change_service_state(client, 'avahi-daemon', 'restart', logger)
 
     @staticmethod
+    def _unconfigure_avahi(client):
+        filename = SetupController.avahi_filename
+        if client.file.exists(filename):
+            client.file_delete(filename)
+
+    @staticmethod
     def _add_services(client, unique_id, node_type):
         if node_type == 'master':
             services = SetupController.master_node_services
@@ -1477,6 +1648,28 @@ EOF
         for service in services + ['watcher-framework']:
             logger.debug('Adding service {0}'.format(service))
             ServiceManager.add_service(service, params=params, client=client)
+
+    @staticmethod
+    def _remove_services(client, unique_id, node_type):
+        if node_type == 'master':
+            services = SetupController.master_node_services
+            if 'arakoon-ovsdb' in services:
+                services.remove('arakoon-ovsdb')
+            if 'etcd-config' in services:
+                services.remove('etcd-config')
+            worker_queue = '{0},ovs_masters'.format(unique_id)
+        else:
+            services = SetupController.extra_node_services
+            worker_queue = unique_id
+
+        print 'Removing services'
+        logger.info('Removing services')
+
+        for service in services + ['watcher-framework']:
+            if ServiceManager.has_service(service, client=client):
+                logger.debug('Removing service {0}'.format(service))
+                ServiceManager.stop_service(service, client=client)
+                ServiceManager.remove_service(service, client=client)
 
     @staticmethod
     def _finalize_setup(client, node_name, node_type, hypervisor_info, unique_id):
@@ -1679,3 +1872,8 @@ EOF
             if ip not in ip_client_map:
                 return False
         return True
+
+    @staticmethod
+    def _print_log_error(action, exception):
+        print '\n Failed to {0}. \n Error: {1}'.format(action, exception)
+        logger.warning('Failed to {0}. Error: {1}'.format(action, exception))
