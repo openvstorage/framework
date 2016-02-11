@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <section data-bind="with: storageRouter()">
-	<ol class="breadcrumb">
-	    <li class="active" data-bind="text: name"></li>
-	</ol>
+    <ol class="breadcrumb">
+        <li class="active" data-bind="text: name"></li>
+    </ol>
     <div>
         <ul class="nav nav-tabs">
             <li class="active">
@@ -119,7 +119,9 @@ limitations under the License.
                                                          enabled: $root.canChangePFD,
                                                          items: $root.failureDomains, target: primaryFailureDomain,
                                                          text: function(item) {
-                                                             return item.name();
+                                                             if (item !== undefined) {
+                                                                 return item.name();
+                                                             }
                                                          },
                                                          key: 'guid', keyisfunction: true, small: true
                                                      }">
@@ -198,9 +200,11 @@ limitations under the License.
                                         <!-- ko foreach: $root.vPools() -->
                                             <tr>
                                                 <td>
-                                                    <input type="checkbox" data-bind="attr: { id: 'vpool_' + guid() },
-                                                                                      checked: $root.checkedVPoolGuids().contains(guid()),
-                                                                                      disable: true">
+                                                    <input type="checkbox"
+                                                           title="storageRoutervPoolLink"
+                                                           data-bind="attr: { id: 'vpool_' + guid() },
+                                                                      checked: $root.checkedVPoolGuids().contains(guid()),
+                                                                      disable: true">
                                                 </td>
                                                 <td><span data-bind="text: name()"></span></td>
                                                 <!-- ko foreach: $parents[0].storageDrivers() -->
