@@ -13,8 +13,8 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'knockout', 'ovs/shared', './data', 'ovs/api', 'ovs/generic', '../../containers/storagerouter'
-], function ($, ko, shared, data, api, generic, StorageRouter) {
+    'jquery', 'knockout', 'ovs/shared', './data', 'ovs/api', 'ovs/generic'
+], function ($, ko, shared, data, api, generic) {
     "use strict";
     return function() {
         var self = this;
@@ -24,11 +24,11 @@ define([
         self.shared = shared;
 
         // Handles
-        self.loadSRMetadataHandle     = undefined;
-        self.loadStorageRoutersHandle = undefined;
+        self.loadSRMetadataHandle = undefined;
 
         // Observables
         self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
+        self.initialGetMetadata = ko.observable(true);
 
         // Computed
         self.canContinue = ko.computed(function () {
@@ -54,43 +54,13 @@ define([
             }
         });
 
-        // Functions
-        self.next = function() {
-            return true;
-        };
-
         // Durandal
         self.activate = function() {
-            self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: { contents: 'storagedrivers' }})
-                .done(function(data) {
-                    var guids = [], srdata = {};
-                    $.each(data.data, function(index, item) {
-                        guids.push(item.guid);
-                        srdata[item.guid] = item;
-                    });
-                    generic.crossFiller(
-                        guids, self.data.storageRouters,
-                        function(guid) {
-                            return new StorageRouter(guid);
-                        }, 'guid'
-                    );
-                    $.each(self.data.storageRouters(), function(index, storageRouter) {
-                        storageRouter.fillData(srdata[storageRouter.guid()]);
-                    });
-                });
-            $.each(self.data.storageRouters(), function(index, storageRouter) {
-                if (storageRouter === self.data.target()) {
-                    $.each(self.data.dtlTransportModes(), function (i, key) {
-                        if (key.name === 'rdma') {
-                            self.data.dtlTransportModes()[i].disabled = storageRouter.rdmaCapable() === undefined ? true : !storageRouter.rdmaCapable();
-                            return false;
-                        }
-                    });
-                }
-            });
+            // Reset pre-validation results
+            self.validationResult = { valid: true, reasons: [], fields: [] };
+            self.preValidateResult(self.validationResult);
         };
         self.preValidate = function() {
-            var validationResult = { valid: true, reasons: [], fields: [] };
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadSRMetadataHandle);
                 self.loadSRMetadataHandle = api.post('storagerouters/' + self.data.target().guid() + '/get_metadata')
@@ -103,6 +73,9 @@ define([
                         self.data.scrubAvailable(data.scrub_available);
                         self.data.readCacheAvailableSize(data.readcache_size);
                         self.data.writeCacheAvailableSize(data.writecache_size);
+                        var ff = self.data.mountpoints();
+                        ff.push('/');
+                        self.data.mountpoints(ff);
                     })
                     .done(function() {
                         var dbOverlap,
@@ -128,12 +101,25 @@ define([
                             });
                         });
                         $.each(requiredRoles, function(index, role) {
-                            validationResult.valid = false;
-                            validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_role', { what: role }));
+                            self.validationResult.valid = false;
+                            self.validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_config.missing_role', { what: role }));
                         });
                         if (self.data.backend() === 'distributed' && self.data.mountpoints().length === 0) {
-                            validationResult.valid = false;
-                            validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.missing_mountpoints'));
+                            self.validationResult.valid = false;
+                            self.validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_config.missing_mountpoints'));
+                        }
+                        if (self.data.vPool() !== undefined) {
+                            var storageIP = self.data.storageDrivers()[0].storageIP();
+                            if (self.data.ipAddresses().contains(storageIP)) {
+                                self.data.storageIP(storageIP);
+                            } else {
+                                self.validationResult.valid = false;
+                                self.validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_config.missing_storage_ip', {what: storageIP }));
+                            }
+                        }
+                        if (self.data.scrubAvailable() === false) {
+                            self.validationResult.valid = false;
+                            self.validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_config.missing_role', { what: 'SCRUB' }));
                         }
                         dbOverlap = generic.overlap(dbPartitionGuids, nsmPartitionGuids);
                         readOverlap = dbOverlap && generic.overlap(dbPartitionGuids, readPartitionGuids);
@@ -167,22 +153,25 @@ define([
                             }
                         }
 
-                        self.data.readCacheSize(Math.floor(self.data.readCacheAvailableSize() / 1024 / 1024 / 1024));
-                        if (self.data.readCacheAvailableSize() === 0) {
-                            write = Math.floor((self.data.writeCacheAvailableSize() + self.data.sharedSize()) / 1024 / 1024 / 1024) - 1;
-                        } else {
-                            write = Math.floor((self.data.writeCacheAvailableSize() + self.data.sharedSize()) / 1024 / 1024 / 1024);
+                        if (self.initialGetMetadata() === true) {
+                            self.data.readCacheSize(Math.floor(self.data.readCacheAvailableSize() / 1024 / 1024 / 1024));
+                            if (self.data.readCacheAvailableSize() === 0) {
+                                write = Math.floor((self.data.writeCacheAvailableSize() + self.data.sharedSize()) / 1024 / 1024 / 1024) - 1;
+                            } else {
+                                write = Math.floor((self.data.writeCacheAvailableSize() + self.data.sharedSize()) / 1024 / 1024 / 1024);
+                            }
+                            self.data.writeCacheSize(write);
                         }
-                        self.data.writeCacheSize(write);
                     })
                     .fail(deferred.reject)
                     .always(function() {
-                        self.preValidateResult(validationResult);
-                        if (validationResult.valid) {
+                        self.preValidateResult(self.validationResult);
+                        if (self.validationResult.valid) {
                             deferred.resolve();
                         } else {
                             deferred.reject();
                         }
+                        self.initialGetMetadata(false);
                     });
             }).promise();
         };
