@@ -24,7 +24,7 @@ import time
 import base64
 import urllib2
 from paramiko import AuthenticationException
-from etcd import EtcdConnectionFailed
+from etcd import EtcdConnectionFailed, EtcdKeyNotFound
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
@@ -98,6 +98,7 @@ class SetupController(object):
         external_etcd = None  # Example: 'abcdef0123456789=http://1.2.3.4:2380'
         enable_heartbeats = True
         ip_client_map = {}
+        setupcompleted, promotecompleted = None, None
 
         # Support non-interactive setup
         preconfig = '/tmp/openvstorage_preconfig.cfg'
@@ -128,6 +129,17 @@ class SetupController(object):
             else:
                 enable_heartbeats = True
 
+        # Support resume setup - store entered parameters so when retrying, we have the values
+        resumeconfig = '/tmp/openvstorage_resumeconfig.cfg'
+        r_config = RawConfigParser()
+        if not os.path.exists(resumeconfig):
+            with open(resumeconfig, 'w') as f:
+                f.write('')
+            r_config.read(resumeconfig)
+            r_config.add_section('setup')
+            r_config.add_section('ip_client_map')
+
+
         try:
             if force_type is not None:
                 force_type = force_type.lower()
@@ -152,225 +164,261 @@ class SetupController(object):
             logger.debug('Target client loaded')
 
             try:
-                if EtcdConfiguration.get('/ovs/framework/hosts/{0}/setupcompleted'.format(unique_id)) is True:
+                setupcompleted = EtcdConfiguration.get('/ovs/framework/hosts/{0}/setupcompleted'.format(unique_id)) is True
+                promotecompleted = EtcdConfiguration.get('/ovs/framework/hosts/{0}/promotecompleted'.format(unique_id)) is True
+                if setupcompleted and promotecompleted:
                     raise RuntimeError('This node has already been configured for Open vStorage. Re-running the setup is not supported.')
-            except EtcdConnectionFailed:
+            except (EtcdConnectionFailed, EtcdKeyNotFound):
                 pass
 
-            print '\n+++ Collecting cluster information +++\n'
-            logger.info('Collecting cluster information')
+            if not setupcompleted:
+                print '\n+++ Collecting cluster information +++\n'
+                logger.info('Collecting cluster information')
 
-            ipaddresses = target_client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
-            ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
-            SetupController.host_ips = set(ipaddresses)
+                ipaddresses = target_client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
+                ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
+                SetupController.host_ips = set(ipaddresses)
 
-            # Check whether running local or remote
-            local_unique_id = System.get_my_machine_id()
-            remote_install = unique_id != local_unique_id
-            logger.debug('{0} installation'.format('Remote' if remote_install else 'Local'))
-            try:
-                target_client.file_exists('/etc/openvstorage_id')
-            except:
-                raise RuntimeError("The 'openvstorage' package is not installed on {0}".format(ip))
+                # Check whether running local or remote
+                local_unique_id = System.get_my_machine_id()
+                remote_install = unique_id != local_unique_id
+                logger.debug('{0} installation'.format('Remote' if remote_install else 'Local'))
+                try:
+                    target_client.file_exists('/etc/openvstorage_id')
+                except:
+                    raise RuntimeError("The 'openvstorage' package is not installed on {0}".format(ip))
 
-            # Getting cluster information
-            current_cluster_names = []
-            clusters = []
-            avahi_installed = SetupController._avahi_installed(target_client)
-            discovery_result = {}
-            if avahi_installed is True:
-                discovery_result = SetupController._discover_nodes(target_client)
-                if discovery_result:
-                    clusters = discovery_result.keys()
-                    clusters.sort()
-                    current_cluster_names = clusters[:]
-                    logger.debug('Cluster names: {0}'.format(current_cluster_names))
+                # Getting cluster information
+                current_cluster_names = []
+                clusters = []
+                avahi_installed = SetupController._avahi_installed(target_client)
+                discovery_result = {}
+                if avahi_installed is True:
+                    discovery_result = SetupController._discover_nodes(target_client)
+                    if discovery_result:
+                        clusters = discovery_result.keys()
+                        clusters.sort()
+                        current_cluster_names = clusters[:]
+                        logger.debug('Cluster names: {0}'.format(current_cluster_names))
+                    else:
+                        logger.debug('No clusters found')
                 else:
-                    logger.debug('No clusters found')
-            else:
-                logger.debug('No avahi installed/detected')
+                    logger.debug('No avahi installed/detected')
 
-            local_cluster_name = None
-            if remote_install is True:
-                if os.path.exists(SetupController.avahi_filename):
-                    with open(SetupController.avahi_filename, 'r') as avahi_file:
-                        avahi_contents = avahi_file.read()
-                    match_groups = re.search('>ovs_cluster_(?P<cluster>[^_]+)_.+?<', avahi_contents).groupdict()
-                    if 'cluster' in match_groups:
-                        local_cluster_name = match_groups['cluster']
+                local_cluster_name = None
+                if remote_install is True:
+                    if os.path.exists(SetupController.avahi_filename):
+                        with open(SetupController.avahi_filename, 'r') as avahi_file:
+                            avahi_contents = avahi_file.read()
+                        match_groups = re.search('>ovs_cluster_(?P<cluster>[^_]+)_.+?<', avahi_contents).groupdict()
+                        if 'cluster' in match_groups:
+                            local_cluster_name = match_groups['cluster']
 
-            node_name = target_client.run('hostname')
-            logger.debug('Current host: {0}'.format(node_name))
-            if cluster_name is None:
-                while True:
-                    logger.debug('Cluster selection')
-                    new_cluster = 'Create a new cluster'
-                    join_manually = 'Join {0} cluster'.format('a' if len(clusters) == 0 else 'a different')
-                    cluster_options = [new_cluster] + clusters + [join_manually]
-                    question = 'Select a cluster to join' if len(clusters) > 0 else 'No clusters found'
-                    cluster_name = Interactive.ask_choice(cluster_options, question,
-                                                          default_value=local_cluster_name,
-                                                          sort_choices=False)
-                    if cluster_name == new_cluster:
-                        cluster_name = None
-                        first_node = True
-                    elif cluster_name == join_manually:
-                        cluster_name = None
-                        first_node = False
-                        node_ip = Interactive.ask_string('Please enter the IP of one of the cluster\'s nodes')
-                        if not re.match(SSHClient.IP_REGEX, node_ip):
-                            print 'Incorrect IP provided'
-                            continue
-                        if node_ip in target_client.local_ips:
-                            print "A local ip address was given, please select '{0}'".format(new_cluster)
-                            continue
-                        logger.debug('Trying to manually join cluster on {0}'.format(node_ip))
+                node_name = target_client.run('hostname')
+                logger.debug('Current host: {0}'.format(node_name))
+                if cluster_name is None:
+                    while True:
+                        logger.debug('Cluster selection')
+                        new_cluster = 'Create a new cluster'
+                        join_manually = 'Join {0} cluster'.format('a' if len(clusters) == 0 else 'a different')
+                        cluster_options = [new_cluster] + clusters + [join_manually]
+                        question = 'Select a cluster to join' if len(clusters) > 0 else 'No clusters found'
+                        cluster_name = Interactive.ask_choice(cluster_options, question,
+                                                              default_value=local_cluster_name,
+                                                              sort_choices=False)
+                        if cluster_name == new_cluster:
+                            cluster_name = None
+                            first_node = True
+                        elif cluster_name == join_manually:
+                            cluster_name = None
+                            first_node = False
+                            node_ip = Interactive.ask_string('Please enter the IP of one of the cluster\'s nodes')
+                            if not re.match(SSHClient.IP_REGEX, node_ip):
+                                print 'Incorrect IP provided'
+                                continue
+                            if node_ip in target_client.local_ips:
+                                print "A local ip address was given, please select '{0}'".format(new_cluster)
+                                continue
+                            logger.debug('Trying to manually join cluster on {0}'.format(node_ip))
 
-                        node_password = SetupController._ask_validate_password(node_ip, username='root')
-                        storagerouters = {}
-                        try:
-                            from ovs.dal.lists.storagerouterlist import StorageRouterList
-                            with Remote(node_ip, [StorageRouterList],
-                                        username='root',
-                                        password=node_password,
-                                        strict_host_key_checking=False) as remote:
-                                for sr in remote.StorageRouterList.get_storagerouters():
-                                    storagerouters[sr.ip] = sr.name
-                                    if sr.node_type == 'MASTER':
-                                        if sr.ip == node_ip:
-                                            master_ip = node_ip
-                                            known_passwords[master_ip] = node_password
-                                        elif master_ip is None:
-                                            master_ip = sr.ip
-                        except Exception as ex:
-                            logger.error('Error loading storagerouters: {0}'.format(ex))
-                        if len(storagerouters) == 0:
-                            logger.debug('No StorageRouters could be loaded, cannot join the cluster')
-                            print 'The cluster on the given master node cannot be joined as no StorageRouters could be loaded'
-                            continue
-                        correct = Interactive.ask_yesno(
-                            message='Following StorageRouters were detected:\n    {0}\nAre they correct?'.format(
-                                ', '.join(storagerouters.keys()))
-                        )
-                        if correct is False:
-                            print 'The cluster on the given master node cannot be joined as not all StorageRouters could be loaded'
-                            continue
+                            node_password = SetupController._ask_validate_password(node_ip, username='root')
+                            storagerouters = {}
+                            try:
+                                from ovs.dal.lists.storagerouterlist import StorageRouterList
+                                with Remote(node_ip, [StorageRouterList],
+                                            username='root',
+                                            password=node_password,
+                                            strict_host_key_checking=False) as remote:
+                                    for sr in remote.StorageRouterList.get_storagerouters():
+                                        storagerouters[sr.ip] = sr.name
+                                        if sr.node_type == 'MASTER':
+                                            if sr.ip == node_ip:
+                                                master_ip = node_ip
+                                                known_passwords[master_ip] = node_password
+                                            elif master_ip is None:
+                                                master_ip = sr.ip
+                            except Exception as ex:
+                                logger.error('Error loading storagerouters: {0}'.format(ex))
+                            if len(storagerouters) == 0:
+                                logger.debug('No StorageRouters could be loaded, cannot join the cluster')
+                                print 'The cluster on the given master node cannot be joined as no StorageRouters could be loaded'
+                                continue
+                            correct = Interactive.ask_yesno(
+                                message='Following StorageRouters were detected:\n    {0}\nAre they correct?'.format(
+                                    ', '.join(storagerouters.keys()))
+                            )
+                            if correct is False:
+                                print 'The cluster on the given master node cannot be joined as not all StorageRouters could be loaded'
+                                continue
 
-                        known_passwords[node_ip] = node_password
-                        if master_ip is not None and master_ip not in known_passwords:
+                            known_passwords[node_ip] = node_password
+                            if master_ip is not None and master_ip not in known_passwords:
+                                master_password = SetupController._ask_validate_password(master_ip, username='root')
+                                known_passwords[master_ip] = master_password
+                            for sr_ip, sr_name in storagerouters.iteritems():
+                                SetupController.discovered_nodes[sr_name] = {'ip': sr_ip,
+                                                                             'type': 'unknown',
+                                                                             'ip_list': [sr_ip]}
+                                nodes.append(sr_ip)
+                            if node_ip not in ip_client_map:
+                                ip_client_map[node_ip] = SSHClient(node_ip, username='root', password=node_password)
+                        else:
+                            logger.debug('Cluster {0} selected'.format(cluster_name))
+                            SetupController.discovered_nodes = discovery_result[cluster_name]
+                            nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
+                            if node_name in discovery_result[cluster_name].keys():
+                                continue_install = Interactive.ask_yesno(
+                                    '{0} already exists in cluster {1}. Do you want to continue?'.format(
+                                        node_name, cluster_name
+                                    ), default_value=True
+                                )
+                                if continue_install is False:
+                                    raise ValueError('Duplicate node name found.')
+                            master_nodes = [this_node_name for this_node_name, node_properties in discovery_result[cluster_name].iteritems()
+                                            if node_properties.get('type', None) == 'master']
+                            if len(master_nodes) == 0:
+                                raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
+                            for _, node_info in discovery_result[cluster_name].iteritems():
+                                if node_info['ip'] != ip:
+                                    master_ip = node_info['ip']
+                                    break
+                            if master_ip is None:
+                                raise RuntimeError('Could not find appropriate master')
                             master_password = SetupController._ask_validate_password(master_ip, username='root')
                             known_passwords[master_ip] = master_password
-                        for sr_ip, sr_name in storagerouters.iteritems():
-                            SetupController.discovered_nodes[sr_name] = {'ip': sr_ip,
-                                                                         'type': 'unknown',
-                                                                         'ip_list': [sr_ip]}
-                            nodes.append(sr_ip)
-                        if node_ip not in ip_client_map:
-                            ip_client_map[node_ip] = SSHClient(node_ip, username='root', password=node_password)
-                    else:
-                        logger.debug('Cluster {0} selected'.format(cluster_name))
-                        SetupController.discovered_nodes = discovery_result[cluster_name]
-                        nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
-                        if node_name in discovery_result[cluster_name].keys():
-                            continue_install = Interactive.ask_yesno(
-                                '{0} already exists in cluster {1}. Do you want to continue?'.format(
-                                    node_name, cluster_name
-                                ), default_value=True
-                            )
-                            if continue_install is False:
-                                raise ValueError('Duplicate node name found.')
-                        master_nodes = [this_node_name for this_node_name, node_properties in discovery_result[cluster_name].iteritems()
-                                        if node_properties.get('type', None) == 'master']
-                        if len(master_nodes) == 0:
-                            raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
-                        for _, node_info in discovery_result[cluster_name].iteritems():
-                            if node_info['ip'] != ip:
-                                master_ip = node_info['ip']
+                            if master_ip not in ip_client_map:
+                                ip_client_map[master_ip] = SSHClient(master_ip, username='root', password=master_password)
+                            first_node = False
+                        break
+
+                    if first_node is True and cluster_name is None:
+                        while True:
+                            cluster_name = Interactive.ask_string('Please enter the cluster name')
+                            if cluster_name in current_cluster_names:
+                                print 'The new cluster name should be unique.'
+                            elif not re.match('^[0-9a-zA-Z]+(\-[0-9a-zA-Z]+)*$', cluster_name):
+                                print "The new cluster name can only contain numbers, letters and dashes."
+                            else:
                                 break
-                        if master_ip is None:
-                            raise RuntimeError('Could not find appropriate master')
-                        master_password = SetupController._ask_validate_password(master_ip, username='root')
-                        known_passwords[master_ip] = master_password
-                        if master_ip not in ip_client_map:
-                            ip_client_map[master_ip] = SSHClient(master_ip, username='root', password=master_password)
-                        first_node = False
-                    break
 
-                if first_node is True and cluster_name is None:
-                    while True:
-                        cluster_name = Interactive.ask_string('Please enter the cluster name')
-                        if cluster_name in current_cluster_names:
-                            print 'The new cluster name should be unique.'
-                        elif not re.match('^[0-9a-zA-Z]+(\-[0-9a-zA-Z]+)*$', cluster_name):
-                            print "The new cluster name can only contain numbers, letters and dashes."
-                        else:
-                            break
+                else:  # Automated install
+                    logger.debug('Automated installation')
+                    if SetupController._avahi_installed(target_client):
+                        if cluster_name in discovery_result:
+                            SetupController.discovered_nodes = discovery_result[cluster_name]
+                    nodes = [node_property['ip'] for node_property in SetupController.discovered_nodes.values()]
+                    first_node = not join_cluster
+                if not cluster_name and first_node is False and avahi_installed is True:
+                    raise RuntimeError('The name of the cluster should be known by now.')
 
-            else:  # Automated install
-                logger.debug('Automated installation')
-                if SetupController._avahi_installed(target_client):
-                    if cluster_name in discovery_result:
-                        SetupController.discovered_nodes = discovery_result[cluster_name]
-                nodes = [node_property['ip'] for node_property in SetupController.discovered_nodes.values()]
-                first_node = not join_cluster
-            if not cluster_name and first_node is False and avahi_installed is True:
-                raise RuntimeError('The name of the cluster should be known by now.')
+                # Get target cluster ip
+                ipaddresses = target_client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
+                ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
+                if not cluster_ip:
+                    cluster_ip = Interactive.ask_choice(ipaddresses, 'Select the public ip address of {0}'.format(node_name))
+                    ip_client_map.pop(ip)
+                    ip_client_map[cluster_ip] = SSHClient(cluster_ip, username='root', password=target_node_password)
+                known_passwords[cluster_ip] = target_node_password
+                if cluster_ip not in nodes:
+                    nodes.append(cluster_ip)
+                logger.debug('Cluster ip is selected as {0}'.format(cluster_ip))
 
-            # Get target cluster ip
-            ipaddresses = target_client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
-            ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
-            if not cluster_ip:
-                cluster_ip = Interactive.ask_choice(ipaddresses, 'Select the public ip address of {0}'.format(node_name))
-                ip_client_map.pop(ip)
-                ip_client_map[cluster_ip] = SSHClient(cluster_ip, username='root', password=target_node_password)
-            known_passwords[cluster_ip] = target_node_password
-            if cluster_ip not in nodes:
-                nodes.append(cluster_ip)
-            logger.debug('Cluster ip is selected as {0}'.format(cluster_ip))
+                if target_password is not None:
+                    for node in nodes:
+                        known_passwords[node] = target_password
 
-            if target_password is not None:
-                for node in nodes:
-                    known_passwords[node] = target_password
+                hypervisor_info, ip_client_map = SetupController._prepare_node(cluster_ip=cluster_ip,
+                                                                               nodes=nodes,
+                                                                               known_passwords=known_passwords,
+                                                                               ip_client_map=ip_client_map,
+                                                                               hypervisor_info={'type': hypervisor_type,
+                                                                                                'name': hypervisor_name,
+                                                                                                'username': hypervisor_username,
+                                                                                                'ip': hypervisor_ip,
+                                                                                                'password': hypervisor_password})
 
-            hypervisor_info, ip_client_map = SetupController._prepare_node(cluster_ip=cluster_ip,
-                                                                           nodes=nodes,
-                                                                           known_passwords=known_passwords,
-                                                                           ip_client_map=ip_client_map,
-                                                                           hypervisor_info={'type': hypervisor_type,
-                                                                                            'name': hypervisor_name,
-                                                                                            'username': hypervisor_username,
-                                                                                            'ip': hypervisor_ip,
-                                                                                            'password': hypervisor_password})
-            if first_node is True:
-                try:
-                    SetupController._setup_first_node(target_client=ip_client_map[cluster_ip],
-                                                      unique_id=unique_id,
-                                                      cluster_name=cluster_name,
-                                                      node_name=node_name,
-                                                      hypervisor_info=hypervisor_info,
-                                                      enable_heartbeats=enable_heartbeats,
-                                                      configure_memcached=configure_memcached,
-                                                      configure_rabbitmq=configure_rabbitmq,
-                                                      external_etcd=external_etcd)
-                except Exception as ex:
-                    SetupController._print_log_error('setup first node, rolling back', ex)
-                    SetupController._rollback_setup_first_node(target_client=ip_client_map[cluster_ip])
-                    raise
-            else:
-                # Deciding master/extra
-                try:
-                    SetupController._setup_extra_node(cluster_ip=cluster_ip,
-                                                      master_ip=master_ip,
-                                                      cluster_name=cluster_name,
-                                                      unique_id=unique_id,
-                                                      ip_client_map=ip_client_map,
-                                                      hypervisor_info=hypervisor_info,
-                                                      external_etcd=external_etcd)
-                except Exception as ex:
-                    SetupController._print_log_error('setup extra node, rolling back', ex)
-                    SetupController._rollback_setup_extra_node(target_client=ip_client_map[cluster_ip],
-                                                               )
-                    raise
+                r_config.set('setup', 'cluster_ip', cluster_ip)
+                r_config.set('setup', 'master_ip', master_ip)
+                r_config.set('setup', 'cluster_name', cluster_name)
+                r_config.set('setup', 'unique_id', unique_id)
+                r_config.set('setup', 'configure_memcached', configure_memcached)
+                r_config.set('setup', 'configure_rabbitmq', configure_rabbitmq)
+                for ip, client in ip_client_map.items():
+                    r_config.set('ip_client_map', ip, client.password)
+                with open(resumeconfig, 'w') as fp:
+                    r_config.write(fp)
+
+                if first_node is True:
+                    try:
+                        SetupController._setup_first_node(target_client=ip_client_map[cluster_ip],
+                                                          unique_id=unique_id,
+                                                          cluster_name=cluster_name,
+                                                          node_name=node_name,
+                                                          hypervisor_info=hypervisor_info,
+                                                          enable_heartbeats=enable_heartbeats,
+                                                          configure_memcached=configure_memcached,
+                                                          configure_rabbitmq=configure_rabbitmq,
+                                                          external_etcd=external_etcd)
+                    except Exception as ex:
+                        SetupController._print_log_error('setup first node, rolling back', ex)
+                        SetupController._rollback_setup_first_node(target_client=ip_client_map[cluster_ip])
+                        raise
+                else:
+                    # Deciding master/extra
+                    try:
+                        SetupController._setup_extra_node(cluster_ip=cluster_ip,
+                                                          master_ip=master_ip,
+                                                          cluster_name=cluster_name,
+                                                          unique_id=unique_id,
+                                                          ip_client_map=ip_client_map,
+                                                          hypervisor_info=hypervisor_info,
+                                                          external_etcd=external_etcd)
+                    except Exception as ex:
+                        SetupController._print_log_error('setup extra node, rolling back', ex)
+                        SetupController._rollback_setup_extra_node(target_client=ip_client_map[cluster_ip],
+                                                                   )
+                        raise
+
+            if not promotecompleted:
+                r_config = RawConfigParser()
+                r_config.read(resumeconfig)
+                if cluster_ip is None:
+                    cluster_ip = r_config.get('setup', 'cluster_ip')
+                if master_ip is None:
+                    master_ip = r_config.get('setup', 'master_ip')
+                if cluster_name is None:
+                    cluster_name = r_config.get('setup', 'cluster_name')
+                for item in r_config.items('ip_client_map'):
+                    ip, password = item
+                    if ip not in ip_client_map:
+                        ip_client_map[ip] = SSHClient(ip, username='root', password=password)
+                if unique_id is None:
+                    unique_id = r_config.get('setup', 'unique_id')
+                if configure_memcached is None:
+                    configure_memcached = r_config.get('setup', 'configure_memcached')
+                if configure_rabbitmq is None:
+                    configure_rabbitmq = r_config.get('setup', 'configure_rabbitmq')
+
 
                 print 'Analyzing cluster layout'
                 logger.info('Analyzing cluster layout')
@@ -1305,6 +1353,7 @@ class SetupController(object):
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'MASTER')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
+        EtcdConfiguration.set('/ovs/framework/hosts/{0}/promotecompleted'.format(machine_id), True)
 
         logger.info('Promote complete')
 
