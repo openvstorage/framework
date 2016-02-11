@@ -352,8 +352,8 @@ class SetupController(object):
                                                       configure_memcached=configure_memcached,
                                                       configure_rabbitmq=configure_rabbitmq,
                                                       external_etcd=external_etcd)
-                except Exception:
-                    logger.warning('Setup first node failed, rolling back')
+                except Exception as ex:
+                    SetupController._print_log_error('setup first node, rolling back', ex)
                     SetupController._rollback_setup_first_node(target_client=ip_client_map[cluster_ip])
                     raise
             else:
@@ -366,9 +366,10 @@ class SetupController(object):
                                                       ip_client_map=ip_client_map,
                                                       hypervisor_info=hypervisor_info,
                                                       external_etcd=external_etcd)
-                except Exception:
-                    logger.warning('Setup extra node failed, rolling back')
-                    SetupController._rollback_setup_extra_node(target_client=ip_client_map[cluster_ip])
+                except Exception as ex:
+                    SetupController._print_log_error('setup extra node, rolling back', ex)
+                    SetupController._rollback_setup_extra_node(target_client=ip_client_map[cluster_ip],
+                                                               )
                     raise
 
                 print 'Analyzing cluster layout'
@@ -385,8 +386,8 @@ class SetupController(object):
                                                       unique_id=unique_id,
                                                       configure_memcached=configure_memcached,
                                                       configure_rabbitmq=configure_rabbitmq)
-                    except Exception:
-                        logger.warning('Promote node failed, rolling back')
+                    except Exception as ex:
+                        SetupController._print_log_error('promote node, rolling back', ex)
                         SetupController._rollback_promote_node(target_client=ip_client_map[cluster_ip],
                                                                master_ip=master_ip)
                         raise
@@ -1016,6 +1017,7 @@ class SetupController(object):
         """
         print '\n+++ Rolling back setup of first node +++\n'
         logger.info('Rolling back setup of first node')
+
         cluster_ip = target_client.ip
         machine_id = System.get_my_machine_id(target_client)
         try:
@@ -1030,8 +1032,8 @@ class SetupController(object):
         except Exception as ex:
             SetupController._print_log_error('clean config files', ex)
 
-        print 'Stopping model services'
-        logger.debug('Stopping model services')
+        print 'Stopping services'
+        logger.debug('Stopping services')
         for service in SetupController.model_services + ['watcher-framework', 'workers', 'support-agent']:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.disable_service(service, client=target_client)
@@ -1040,12 +1042,12 @@ class SetupController(object):
         print 'Remove configuration files'
         logger.info('Remove configuration files')
         try:
-            if EtcdConfiguration.get('/ovs/framework/messagequeue|endpoint') is not None:
+            if EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints') is not None:
                 try:
                     SetupController._unconfigure_rabbitmq(target_client)
                 except Exception as ex:
                     SetupController._print_log_error('unconfigure rabbitmq', ex)
-                EtcdConfiguration.delete('/ovs/framework/messagequeue|endpoint')
+                EtcdConfiguration.delete('/ovs/framework/messagequeue|endpoints')
             if EtcdConfiguration.get('/ovs/framework/memcache|endpoints') is not None:
                 ServiceManager.stop_service('memcached', target_client)
                 EtcdConfiguration.delete('/ovs/framework/memcache|endpoints')
@@ -1145,6 +1147,48 @@ class SetupController(object):
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'EXTRA')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
         logger.info('Extra node complete')
+
+    @staticmethod
+    def _rollback_setup_extra_node(target_client):
+        print '\n+++ Rolling back add extra node +++\n'
+        logger.info('Rolling back ad extra node')
+
+        machine_id = System.get_my_machine_id(target_client)
+        try:
+            EtcdConfiguration.delete('/ovs/framework/hosts/{0}/ip'.format(machine_id))
+            EtcdConfiguration.delete('/ovs/framework/hosts/{0}/setupcompleted'.format(machine_id))
+            EtcdConfiguration.delete('/ovs/framework/hosts/{0}/type'.format(machine_id))
+        except Exception as ex:
+            SetupController._print_log_error('clean config keys', ex)
+        try:
+            target_client.dir_delete('/opt/OpenvStorage/webapps/frontend/logging')
+        except Exception as ex:
+            SetupController._print_log_error('clean config files', ex)
+
+        print 'Stopping services'
+        logger.debug('Stopping services')
+        for service in SetupController.model_services + ['watcher-framework', 'workers', 'support-agent']:
+            if ServiceManager.has_service(service, client=target_client):
+                ServiceManager.disable_service(service, client=target_client)
+                Toolbox.change_service_state(target_client, service, 'stop', logger)
+
+        SetupController._remove_services(target_client, machine_id, 'extra')
+        SetupController._unconfigure_logstash(target_client)
+
+        print 'Unconfigure Etcd'
+        logger.info('Unconfigure Etcd')
+        try:
+            external_etcd = EtcdConfiguration.get('/ovs/framework/external_etcd')
+            if external_etcd is None:
+                print 'Removing Etcd cluster'
+                logger.info('Removing Etcd cluster')
+                try:
+                    EtcdInstaller.stop('config', target_client)
+                    EtcdInstaller.remove('config', target_client)
+                except Exception as ex:
+                    SetupController._print_log_error('unconfigure etcd', ex)
+        except Exception as ex:
+            SetupController._print_log_error('unconfigure etcd', ex)
 
     @staticmethod
     def _promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached, configure_rabbitmq):
@@ -1276,7 +1320,9 @@ class SetupController(object):
 
         print 'Stopping services'
         logger.info('Stopping services')
-        for service in SetupController.master_services:
+        for service in SetupController.master_services + ['watcher-framework']:
+            if service in ('etcd-config'):
+                continue
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.disable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'stop', logger)
@@ -1288,7 +1334,6 @@ class SetupController(object):
                 endpoints.remove(endpoint)
                 EtcdConfiguration.set('/ovs/framework/memcache|endpoints', endpoints)
             endpoints = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
-            endpoint = endpoints.append()
             if endpoint in endpoints:
                 endpoints.remove(endpoint)
                 EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
@@ -1625,7 +1670,7 @@ EOF
     @staticmethod
     def _unconfigure_avahi(client):
         filename = SetupController.avahi_filename
-        if client.file.exists(filename):
+        if client.file_exists(filename):
             client.file_delete(filename)
 
     @staticmethod
@@ -1657,15 +1702,13 @@ EOF
                 services.remove('arakoon-ovsdb')
             if 'etcd-config' in services:
                 services.remove('etcd-config')
-            worker_queue = '{0},ovs_masters'.format(unique_id)
         else:
             services = SetupController.extra_node_services
-            worker_queue = unique_id
 
         print 'Removing services'
         logger.info('Removing services')
 
-        for service in services + ['watcher-framework']:
+        for service in services + ['support-agent', 'watcher-framework']:
             if ServiceManager.has_service(service, client=client):
                 logger.debug('Removing service {0}'.format(service))
                 ServiceManager.stop_service(service, client=client)
@@ -1875,5 +1918,5 @@ EOF
 
     @staticmethod
     def _print_log_error(action, exception):
-        print '\n Failed to {0}. \n Error: {1}'.format(action, exception)
+        print '\n Failed to {0}. \n Error: {1} {2}'.format(action, type(exception), exception)
         logger.warning('Failed to {0}. Error: {1}'.format(action, exception))
