@@ -107,11 +107,11 @@ define([
                 $.when.apply($, calls)
                     .done(function() {
                         var map = self.srCanDeleteMap();
+                        if (map === undefined) {
+                            map = {};
+                        }
                         $.each(self.storageRouters(), function(_, sr) {
                             var srGuid = sr.guid();
-                            if (map === undefined) {
-                                map = {};
-                            }
                             if (map[srGuid] === undefined) {
                                 map[srGuid] = null;
                             }
@@ -344,7 +344,7 @@ define([
             });
         };
         self.removeStorageRouter = function(sr) {
-            var single = self.vPool().storageRouterGuids().length == 1;
+            var single = self.vPool().storageRouterGuids().length === 1;
             if (self.srCanDeleteMap() !== undefined && self.srCanDeleteMap()[sr.guid()] === true) {
                 self.updatingStorageRouters(true);
                 app.showMessage(
