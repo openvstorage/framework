@@ -753,8 +753,7 @@ class StorageRouterController(object):
             config.write(config_io)
             cache_dir = sdp_frag.path
             root_client.dir_create(cache_dir)
-            backend_id = vpool.metadata['backend_guid']
-            config_tree = '/ovs/alba/backends/{0}/proxies/{1}/config/{{0}}'.format(backend_id, alba_proxy.guid)
+            config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, alba_proxy.guid)
             EtcdConfiguration.set(config_tree.format('abm'), config_io.getvalue(), raw=True)
             EtcdConfiguration.set(config_tree.format('main'), json.dumps({
                 'log_level': 'info',
@@ -886,6 +885,7 @@ class StorageRouterController(object):
         params = {'VPOOL_MOUNTPOINT': storagedriver.mountpoint,
                   'HYPERVISOR_TYPE': storagerouter.pmachine.hvtype,
                   'VPOOL_NAME': vpool_name,
+                  'VPOOL_GUID': vpool.guid,
                   'CONFIG_PATH': storagedriver_config.remote_path,
                   'UUID': str(uuid.uuid4()),
                   'OVS_UID': check_output('id -u ovs', shell=True).strip(),
@@ -900,7 +900,6 @@ class StorageRouterController(object):
         if vpool.backend_type.code == 'alba':
             alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
             params['PROXY_ID'] = storagedriver.alba_proxy_guid
-            params['BACKEND_ID'] = vpool.metadata['backend_guid']
             ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name=alba_proxy_service)
             ServiceManager.start_service(alba_proxy_service, client=root_client)
             dependencies = [alba_proxy_service]
@@ -1289,8 +1288,7 @@ class StorageRouterController(object):
 
             files_to_remove = []
             if vpool.backend_type.code == 'alba':
-                backend_id = vpool.metadata['backend_guid']
-                config_tree = '/ovs/alba/backends/{0}/proxies/{1}'.format(backend_id, storage_driver.alba_proxy.guid)
+                config_tree = '/ovs/vpools/{0}/proxies/{1}'.format(vpool.guid, storage_driver.alba_proxy.guid)
                 EtcdConfiguration.delete(config_tree)
             if storage_router.pmachine.hvtype == 'VMWARE' and EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|vmware_mode'.format(machine_id)) == 'ganesha':
                 files_to_remove.append('{0}/storagedriver/storagedriver/{1}_ganesha.conf'.format(configuration_dir, vpool.name))
