@@ -73,9 +73,6 @@ define([
                         self.data.scrubAvailable(data.scrub_available);
                         self.data.readCacheAvailableSize(data.readcache_size);
                         self.data.writeCacheAvailableSize(data.writecache_size);
-                        var ff = self.data.mountpoints();
-                        ff.push('/');
-                        self.data.mountpoints(ff);
                     })
                     .done(function() {
                         var dbOverlap,
