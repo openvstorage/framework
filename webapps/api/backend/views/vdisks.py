@@ -15,17 +15,18 @@
 """
 VDisk module
 """
-
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action, link
-from ovs.dal.lists.vdisklist import VDiskList
+from backend.decorators import required_roles, load, return_list, return_object, return_task, log
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.lib.vdisk import VDiskController
-from backend.decorators import required_roles, load, return_list, return_object, return_task, log
+from rest_framework import viewsets
+from rest_framework.decorators import action, link
+from rest_framework.exceptions import NotAcceptable
+from rest_framework.permissions import IsAuthenticated
 
 
 class VDiskViewSet(viewsets.ViewSet):
@@ -83,12 +84,18 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(VDisk)
-    def set_config_params(self, vdisk, new_config_params):
+    def set_config_params(self, vdisk, new_config_params, version):
         """
         Sets configuration parameters to a given vdisk.
         :param vdisk: Guid of the virtual disk to configure
         :param new_config_params: Configuration settings for the virtual disk
+        :param version: API version
         """
+        if version == 1 and 'dtl_target' in new_config_params:
+            storage_router = StorageRouterList.get_by_ip(new_config_params['dtl_target'])
+            if storage_router is None:
+                raise NotAcceptable('API version 1 requires a Storage Router IP')
+            new_config_params['dtl_target'] = storage_router.primary_failure_domain.guid
         return VDiskController.set_config_params.delay(vdisk_guid=vdisk.guid, new_config_params=new_config_params)
 
     @link()
@@ -134,7 +141,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :param snapshot_id: ID of the snapshot to remove
         """
         return VDiskController.delete_snapshot.delay(diskguid=vdisk.guid,
-                                                      snapshotid=snapshot_id)
+                                                     snapshotid=snapshot_id)
 
     @action()
     @log()
@@ -168,8 +175,7 @@ class VDiskViewSet(viewsets.ViewSet):
                     'timestamp': timestamp,
                     'is_consistent': True if consistent else False,
                     'is_sticky': True if sticky else False,
-                    'is_automatic': True if automatic else False
-        }
+                    'is_automatic': True if automatic else False}
         return VDiskController.create_snapshot.delay(diskguid=vdisk.guid,
                                                      metadata=metadata,
                                                      snapshotid=snapshot_id)
@@ -200,7 +206,7 @@ class VDiskViewSet(viewsets.ViewSet):
     def delete(self, vdisk):
         """
         Delete vdisk
-        @param vdisk Guid of the vdisk to delete:
+        :param vdisk: Guid of the vdisk to delete
         """
         storagerouter = StorageRouter(vdisk.storagerouter_guid)
         return VDiskController.delete.s(diskguid=vdisk.guid).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))

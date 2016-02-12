@@ -71,15 +71,15 @@ class VPoolController(object):
         :param vpool_guid: Guid of the vPool to synchronize
         """
         vpool = VPool(vpool_guid)
+        if vpool.status != VPool.STATUSES.RUNNING:
+            raise ValueError('Synchronizing with hypervisor is only allowed if your vPool is in {0} status'.format(VPool.STATUSES.RUNNING))
         for storagedriver in vpool.storagedrivers:
             pmachine = storagedriver.storagerouter.pmachine
             hypervisor = Factory.get(pmachine)
             for vm_object in hypervisor.get_vms_by_nfs_mountinfo(storagedriver.storage_ip, storagedriver.mountpoint):
                 search_vpool = None if pmachine.hvtype == 'KVM' else vpool
-                vmachine = VMachineList.get_by_devicename_and_vpool(
-                    devicename=vm_object['backing']['filename'],
-                    vpool=search_vpool
-                )
+                vmachine = VMachineList.get_by_devicename_and_vpool(devicename=vm_object['backing']['filename'],
+                                                                    vpool=search_vpool)
                 VMachineController.update_vmachine_config(vmachine, vm_object, pmachine)
 
     @staticmethod
