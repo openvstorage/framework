@@ -95,12 +95,8 @@ class StorageRouterController(object):
             ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
             ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses]
             ipaddresses.remove('127.0.0.1')
-        mountpoints = client.run('mount -v').strip().splitlines()
-        mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2 and
-                       not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc') and
-                       not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run') and
-                       p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
 
+        mountpoints = StorageRouterController._get_mountpoints(client)
         partitions = dict((role, []) for role in DiskPartition.ROLES)
         shared_size = 0
         readcache_size = 0
@@ -1209,10 +1205,11 @@ class StorageRouterController(object):
                         logger.info('Remove Storage Driver - Guid {0} - Alba proxy running'.format(storage_driver.guid))
 
                     logger.info('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs'.format(storage_driver.guid))
-                    path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id)
-                    storagedriver_client = LocalStorageRouterClient(path)
-                    # noinspection PyArgumentList
-                    storagedriver_client.destroy_filesystem()
+                    with Remote(client.ip, [LocalStorageRouterClient], username='root') as remote:
+                        path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id)
+                        storagedriver_client = remote.LocalStorageRouterClient(path)
+                        storagedriver_client.destroy_filesystem()
+
                     # noinspection PyArgumentList
                     vrouter_clusterregistry.erase_node_configs()
                 except RuntimeError as ex:
@@ -1327,12 +1324,7 @@ class StorageRouterController(object):
                     errors_found = True
 
             try:
-                mountpoints = client.run('mount -v').strip().splitlines()
-                mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2 and
-                               not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc') and
-                               not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run') and
-                               p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
-
+                mountpoints = StorageRouterController._get_mountpoints(client)
                 for dir_name in dirs_to_remove:
                     if dir_name and client.dir_exists(dir_name) and dir_name not in mountpoints and dir_name != '/':
                         client.dir_delete(dir_name)
@@ -1842,3 +1834,17 @@ class StorageRouterController(object):
                     if DiskPartition.ROLES.SCRUB in partition.roles:
                         return True
         return False
+
+    @staticmethod
+    def _get_mountpoints(client):
+        """
+        Retrieve the mountpoints
+        :param client: SSHClient to retrieve the mountpoints on
+        :return: List of mountpoints
+        """
+        mountpoints = []
+        for mountpoint in client.run('mount -v').strip().splitlines():
+            mp = mountpoint.split(' ')[2] if len(mountpoint.split(' ')) > 2 else None
+            if mp and not mp.startswith('/dev') and not mp.startswith('/proc') and not mp.startswith('/sys') and not mp.startswith('/run') and not mp.startswith('/mnt/alba-asd') and mp != '/':
+                mountpoints.append(mp)
+        return mountpoints
