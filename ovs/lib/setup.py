@@ -356,7 +356,7 @@ class SetupController(object):
                                                                                                 'username': hypervisor_username,
                                                                                                 'ip': hypervisor_ip,
                                                                                                 'password': hypervisor_password})
-
+                r_config.read(resumeconfig)
                 r_config.set('setup', 'cluster_ip', cluster_ip)
                 r_config.set('setup', 'master_ip', master_ip)
                 r_config.set('setup', 'cluster_name', cluster_name)
