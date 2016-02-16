@@ -395,8 +395,7 @@ class SetupController(object):
                                                           external_etcd=external_etcd)
                     except Exception as ex:
                         SetupController._print_log_error('setup extra node, rolling back', ex)
-                        SetupController._rollback_setup_extra_node(target_client=ip_client_map[cluster_ip],
-                                                                   )
+                        SetupController._rollback_setup_extra_node(target_client=ip_client_map[cluster_ip])
                         raise
 
                     if not promotecompleted:
@@ -436,8 +435,13 @@ class SetupController(object):
                                                               configure_rabbitmq=configure_rabbitmq)
                             except Exception as ex:
                                 SetupController._print_log_error('promote node, rolling back', ex)
-                                SetupController._rollback_promote_node(target_client=ip_client_map[cluster_ip],
-                                                                       master_ip=master_ip)
+                                SetupController._demote_node(cluster_ip=cluster_ip,
+                                                             master_ip=master_ip,
+                                                             cluster_name=cluster_name,
+                                                             ip_client_map=ip_client_map,
+                                                             unique_id=unique_id,
+                                                             unconfigure_memcached=configure_memcached,
+                                                             unconfigure_rabbitmq=configure_rabbitmq)
                                 raise
 
             print ''
@@ -1052,6 +1056,7 @@ class SetupController(object):
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/setupcompleted'.format(machine_id), True)
+        EtcdConfiguration.set('/ovs/framework/hosts/{0}/promotecompleted'.format(machine_id), True)
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'MASTER')
         EtcdConfiguration.set('/ovs/framework/install_time', time.time())
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
@@ -1358,55 +1363,6 @@ class SetupController(object):
         logger.info('Promote complete')
 
     @staticmethod
-    def _rollback_promote_node(target_client, master_ip):
-        print '\n Rollback promote node \n'
-        logger.info('Rollback promote node')
-        cluster_ip = target_client.ip
-        machine_id = System.get_my_machine_id(target_client)
-
-        if SetupController._avahi_installed(target_client) is True:
-            SetupController._unconfigure_avahi(target_client)
-
-        print 'Stopping services'
-        logger.info('Stopping services')
-        for service in SetupController.master_services + ['watcher-framework']:
-            if service in ('etcd-config'):
-                continue
-            if ServiceManager.has_service(service, client=target_client):
-                ServiceManager.disable_service(service, client=target_client)
-                Toolbox.change_service_state(target_client, service, 'stop', logger)
-
-        try:
-            endpoints = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
-            endpoint = '{0}:{1}'.format(cluster_ip, 11211)
-            if endpoint in endpoints:
-                endpoints.remove(endpoint)
-                EtcdConfiguration.set('/ovs/framework/memcache|endpoints', endpoints)
-            endpoints = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
-            if endpoint in endpoints:
-                endpoints.remove(endpoint)
-                EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
-        except Exception as ex:
-            SetupController._print_log_error('unconfigure services', ex)
-
-        print 'Unconfigure Arakoon'
-        logger.info('Unconfigure Arakoon')
-        SetupController._remove_services(target_client, machine_id, 'master')
-        try:
-            ArakoonInstaller.shrink_cluster(cluster_ip, 'ovsdb', [])
-        except Exception as ex:
-            SetupController._print_log_error('shrink arakoon cluster', ex)
-
-        try:
-            external_etcd = EtcdConfiguration.get('/ovs/framework/external_etcd')
-            if external_etcd is None:
-                print 'Leaving etcd cluster'
-                logger.info('Leaving etcd cluster')
-                EtcdInstaller.shrink_cluster(master_ip, cluster_ip, 'config')
-        except Exception as ex:
-            SetupController._print_log_error('leave etcd cluster', ex)
-
-    @staticmethod
     def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, unconfigure_memcached, unconfigure_rabbitmq, offline_nodes=None):
         """
         Demotes a given node
@@ -1424,13 +1380,16 @@ class SetupController(object):
                 raise RuntimeError('Not all memcache nodes can be reached which is required for demoting a node.')
 
         # Find other (arakoon) master nodes
-        config = ArakoonClusterConfig('ovsdb')
-        config.load_config()
-        master_nodes = [node.ip for node in config.nodes]
-        if cluster_ip in master_nodes:
-            master_nodes.remove(cluster_ip)
-        if len(master_nodes) == 0:
-            raise RuntimeError('There should be at least one other master node')
+        try:
+            config = ArakoonClusterConfig('ovsdb')
+            config.load_config()
+            master_nodes = [node.ip for node in config.nodes]
+            if cluster_ip in master_nodes:
+                master_nodes.remove(cluster_ip)
+            if len(master_nodes) == 0:
+                raise RuntimeError('There should be at least one other master node')
+        except Exception as ex:
+            SetupController._print_log_error('find arakoon master nodes', ex)
 
         storagerouter = StorageRouterList.get_by_machine_id(unique_id)
         storagerouter.node_type = 'EXTRA'
@@ -1439,35 +1398,47 @@ class SetupController(object):
         print 'Leaving arakoon ovsdb cluster'
         logger.info('Leaving arakoon ovsdb cluster')
         offline_node_ips = [node.ip for node in offline_nodes]
-        ArakoonInstaller.shrink_cluster(cluster_ip, 'ovsdb', offline_node_ips)
+        try:
+            ArakoonInstaller.shrink_cluster(cluster_ip, 'ovsdb', offline_node_ips)
+        except Exception as ex:
+            SetupController._print_log_error('leave arakoon ovsdb cluster', ex)
 
-        external_etcd = EtcdConfiguration.get('/ovs/framework/external_etcd')
-        if external_etcd is None:
-            print 'Leaving Etcd cluster'
-            logger.info('Leaving Etcd cluster')
-            EtcdInstaller.shrink_cluster(master_ip, cluster_ip, 'config', offline_node_ips)
+        try:
+            external_etcd = EtcdConfiguration.get('/ovs/framework/external_etcd')
+            if external_etcd is None:
+                print 'Leaving Etcd cluster'
+                logger.info('Leaving Etcd cluster')
+                EtcdInstaller.shrink_cluster(master_ip, cluster_ip, 'config', offline_node_ips)
+        except Exception as ex:
+            SetupController._print_log_error('leave etcd cluster', ex)
 
         print 'Update configurations'
         logger.info('Update configurations')
-        if unconfigure_memcached is True:
-            endpoints = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
-            endpoint = '{0}:{1}'.format(cluster_ip, 11211)
-            if endpoint in endpoints:
-                endpoints.remove(endpoint)
-            EtcdConfiguration.set('/ovs/framework/memcache|endpoints', endpoints)
-        if unconfigure_rabbitmq is True:
-            endpoints = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
-            endpoint = '{0}:{1}'.format(cluster_ip, 5672)
-            if endpoint in endpoints:
-                endpoints.remove(endpoint)
-            EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
+        try:
+            if unconfigure_memcached is True:
+                endpoints = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
+                endpoint = '{0}:{1}'.format(cluster_ip, 11211)
+                if endpoint in endpoints:
+                    endpoints.remove(endpoint)
+                EtcdConfiguration.set('/ovs/framework/memcache|endpoints', endpoints)
+            if unconfigure_rabbitmq is True:
+                endpoints = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
+                endpoint = '{0}:{1}'.format(cluster_ip, 5672)
+                if endpoint in endpoints:
+                    endpoints.remove(endpoint)
+                EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
+        except Exception as ex:
+            SetupController._print_log_error('update configurations', ex)
 
         print 'Restarting master node services'
         logger.info('Restarting master node services')
         remaining_nodes = ip_client_map.keys()[:]
         if cluster_ip in remaining_nodes:
             remaining_nodes.remove(cluster_ip)
-        ArakoonInstaller.restart_cluster_remove('ovsdb', remaining_nodes)
+        try:
+            ArakoonInstaller.restart_cluster_remove('ovsdb', remaining_nodes)
+        except Exception as ex:
+            SetupController._print_log_error('restart arakoon cluster', ex)
         PersistentFactory.store = None
         VolatileFactory.store = None
 
@@ -1480,18 +1451,24 @@ class SetupController(object):
                 print 'Removing/unconfiguring offline RabbitMQ node'
                 logger.debug('Removing/unconfiguring offline RabbitMQ node')
                 client = ip_client_map[master_ip]
-                client.run('rabbitmqctl forget_cluster_node rabbit@{0}'.format(storagerouter.name))
+                try:
+                    client.run('rabbitmqctl forget_cluster_node rabbit@{0}'.format(storagerouter.name))
+                except Exception as ex:
+                    SetupController._print_log_error('forget RabbitMQ cluster node', ex)
         else:
             target_client = ip_client_map[cluster_ip]
             if unconfigure_rabbitmq is True:
                 print 'Removing/unconfiguring RabbitMQ'
                 logger.debug('Removing/unconfiguring RabbitMQ')
-                if ServiceManager.has_service('rabbitmq-server', client=target_client):
-                    target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
-                    target_client.run('rabbitmqctl reset; sleep 5;')
-                    target_client.run('rabbitmqctl stop; sleep 5;')
-                    Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', logger)
-                    target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
+                try:
+                    if ServiceManager.has_service('rabbitmq-server', client=target_client):
+                        target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
+                        target_client.run('rabbitmqctl reset; sleep 5;')
+                        target_client.run('rabbitmqctl stop; sleep 5;')
+                        Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', logger)
+                        target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
+                except Exception as ex:
+                    SetupController._print_log_error('remove/unconfigure RabbitMQ', ex)
 
             print 'Removing services'
             logger.info('Removing services')
@@ -1503,16 +1480,21 @@ class SetupController(object):
             for service in services:
                 if ServiceManager.has_service(service, client=target_client):
                     logger.debug('Removing service {0}'.format(service))
-                    Toolbox.change_service_state(target_client, service, 'stop', logger)
-                    ServiceManager.remove_service(service, client=target_client)
+                    try:
+                        Toolbox.change_service_state(target_client, service, 'stop', logger)
+                        ServiceManager.remove_service(service, client=target_client)
+                    except Exception as ex:
+                        SetupController._print_log_error('remove service {0}'.format(service), ex)
 
             if ServiceManager.has_service('workers', client=target_client):
                 ServiceManager.add_service(name='workers',
                                            client=target_client,
                                            params={'MEMCACHE_NODE_IP': cluster_ip,
                                                    'WORKER_QUEUE': '{0}'.format(unique_id)})
-
-        SetupController._configure_amqp_to_volumedriver()
+        try:
+            SetupController._configure_amqp_to_volumedriver()
+        except Exception as ex:
+            SetupController._print_log_error('configure amqp to volumedriver', ex)
 
         print 'Restarting services'
         logger.debug('Restarting services')

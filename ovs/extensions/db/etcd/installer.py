@@ -49,8 +49,11 @@ class EtcdInstaller(object):
         logger.debug('Creating cluster "{0}" on {1}'.format(cluster_name, ip))
 
         client = SSHClient(ip, username='root')
-        node_name = System.get_my_machine_id(client)
+        target_name = 'ovs-etcd-{0}'.format(cluster_name)
+        if ServiceManager.get_service_status(target_name, client) is True:
+            return
 
+        node_name = System.get_my_machine_id(client)
         data_dir = EtcdInstaller.DATA_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
         wal_dir = EtcdInstaller.WAL_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
         abs_paths = [data_dir, wal_dir]
@@ -60,7 +63,6 @@ class EtcdInstaller(object):
         client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
 
         base_name = 'ovs-etcd'
-        target_name = 'ovs-etcd-{0}'.format(cluster_name)
         ServiceManager.add_service(base_name, client,
                                    params={'CLUSTER': cluster_name,
                                            'NODE_ID': node_name,
