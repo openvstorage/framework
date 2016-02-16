@@ -399,46 +399,46 @@ class SetupController(object):
                                                                    )
                         raise
 
-            if not promotecompleted:
-                r_config = RawConfigParser()
-                r_config.read(resumeconfig)
-                if cluster_ip is None:
-                    cluster_ip = r_config.get('setup', 'cluster_ip')
-                if master_ip is None:
-                    master_ip = r_config.get('setup', 'master_ip')
-                if cluster_name is None:
-                    cluster_name = r_config.get('setup', 'cluster_name')
-                for item in r_config.items('ip_client_map'):
-                    ip, password = item
-                    if ip not in ip_client_map:
-                        ip_client_map[ip] = SSHClient(ip, username='root', password=password)
-                if unique_id is None:
-                    unique_id = r_config.get('setup', 'unique_id')
-                if configure_memcached is None:
-                    configure_memcached = r_config.get('setup', 'configure_memcached')
-                if configure_rabbitmq is None:
-                    configure_rabbitmq = r_config.get('setup', 'configure_rabbitmq')
+                    if not promotecompleted:
+                        r_config = RawConfigParser()
+                        r_config.read(resumeconfig)
+                        if cluster_ip is None:
+                            cluster_ip = r_config.get('setup', 'cluster_ip')
+                        if master_ip is None:
+                            master_ip = r_config.get('setup', 'master_ip')
+                        if cluster_name is None:
+                            cluster_name = r_config.get('setup', 'cluster_name')
+                        for item in r_config.items('ip_client_map'):
+                            ip, password = item
+                            if ip not in ip_client_map:
+                                ip_client_map[ip] = SSHClient(ip, username='root', password=password)
+                        if unique_id is None:
+                            unique_id = r_config.get('setup', 'unique_id')
+                        if configure_memcached is None:
+                            configure_memcached = r_config.get('setup', 'configure_memcached')
+                        if configure_rabbitmq is None:
+                            configure_rabbitmq = r_config.get('setup', 'configure_rabbitmq')
 
 
-                print 'Analyzing cluster layout'
-                logger.info('Analyzing cluster layout')
-                config = ArakoonClusterConfig('ovsdb')
-                config.load_config()
-                logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), 'ovsdb'))
-                if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
-                    try:
-                        SetupController._promote_node(cluster_ip=cluster_ip,
-                                                      master_ip=master_ip,
-                                                      cluster_name=cluster_name,
-                                                      ip_client_map=ip_client_map,
-                                                      unique_id=unique_id,
-                                                      configure_memcached=configure_memcached,
-                                                      configure_rabbitmq=configure_rabbitmq)
-                    except Exception as ex:
-                        SetupController._print_log_error('promote node, rolling back', ex)
-                        SetupController._rollback_promote_node(target_client=ip_client_map[cluster_ip],
-                                                               master_ip=master_ip)
-                        raise
+                        print 'Analyzing cluster layout'
+                        logger.info('Analyzing cluster layout')
+                        config = ArakoonClusterConfig('ovsdb')
+                        config.load_config()
+                        logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), 'ovsdb'))
+                        if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
+                            try:
+                                SetupController._promote_node(cluster_ip=cluster_ip,
+                                                              master_ip=master_ip,
+                                                              cluster_name=cluster_name,
+                                                              ip_client_map=ip_client_map,
+                                                              unique_id=unique_id,
+                                                              configure_memcached=configure_memcached,
+                                                              configure_rabbitmq=configure_rabbitmq)
+                            except Exception as ex:
+                                SetupController._print_log_error('promote node, rolling back', ex)
+                                SetupController._rollback_promote_node(target_client=ip_client_map[cluster_ip],
+                                                                       master_ip=master_ip)
+                                raise
 
             print ''
             print Interactive.boxed_message(['Setup complete.',
