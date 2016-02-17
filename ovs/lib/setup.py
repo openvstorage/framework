@@ -138,7 +138,8 @@ class SetupController(object):
             r_config.read(resumeconfig)
             r_config.add_section('setup')
             r_config.add_section('ip_client_map')
-
+            with open(resumeconfig, 'w') as fp:
+                r_config.write(fp)
 
         try:
             if force_type is not None:
@@ -954,7 +955,6 @@ class SetupController(object):
         """
         Sets up the first node services. This node is always a master
         """
-
         print '\n+++ Setting up first node +++\n'
         logger.info('Setting up first node')
         cluster_ip = target_client.ip
@@ -974,19 +974,30 @@ class SetupController(object):
             logger.info('Setting up fleet')
             ServiceManager.setup_fleet()
 
-        print 'Setting up Arakoon'
-        logger.info('Setting up Arakoon')
-        result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, EtcdConfiguration.get('/ovs/framework/paths|ovsdb'), locked=False)
-        arakoon_ports = [result['client_port'], result['messaging_port']]
+        try:
+            arakooncompleted = EtcdConfiguration.get('/ovs/framework/hosts/{0}/arakooncompleted'.format(unique_id)) is True
+        except EtcdKeyNotFound:
+            arakooncompleted = None
+        if arakooncompleted is None:
+            print 'Setting up Arakoon'
+            logger.info('Setting up Arakoon')
+            result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, EtcdConfiguration.get('/ovs/framework/paths|ovsdb'), locked=False)
+            arakoon_ports = [result['client_port'], result['messaging_port']]
+            EtcdConfiguration.set('/ovs/framework/hosts/{0}/arakooncompleted'.format(unique_id), True)
 
         SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
 
         print 'Build configuration files'
         logger.info('Build configuration files')
-        if configure_rabbitmq:
+        try:
+            rabbitmqcompleted = EtcdConfiguration.get('/ovs/framework/hosts/{0}/rabbitmqcompleted'.format(unique_id)) is True
+        except EtcdKeyNotFound:
+            rabbitmqcompleted = None
+        if configure_rabbitmq and (rabbitmqcompleted is None):
             SetupController._configure_rabbitmq(target_client)
             EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', ['{0}:{1}'.format(cluster_ip, 5672)])
+            EtcdConfiguration.set('/ovs/framework/hosts/{0}/rabbitmqcompleted'.format(unique_id), True)
         if configure_memcached:
             SetupController._configure_memcached(target_client)
             EtcdConfiguration.set('/ovs/framework/memcache|endpoints', ['{0}:{1}'.format(cluster_ip, 11211)])
@@ -1027,7 +1038,13 @@ class SetupController(object):
                 ServiceManager.enable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'start', logger)
         # Enable HA for the rabbitMQ queues
-        SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
+        try:
+            rabbitmqcompletedha = EtcdConfiguration.get('/ovs/framework/hosts/{0}/rabbitmqcompletedha'.format(unique_id)) is True
+        except EtcdKeyNotFound:
+            rabbitmqcompletedha = None
+        if rabbitmqcompletedha is None:
+            SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
+            EtcdConfiguration.set('/ovs/framework/hosts/{0}/rabbitmqcompletedha'.format(unique_id), True)
 
         ServiceManager.enable_service('watcher-framework', client=target_client)
         Toolbox.change_service_state(target_client, 'watcher-framework', 'start', logger)

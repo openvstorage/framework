@@ -50,7 +50,8 @@ class EtcdInstaller(object):
 
         client = SSHClient(ip, username='root')
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
-        if ServiceManager.get_service_status(target_name, client) is True:
+        if ServiceManager.has_service(target_name, client) and \
+            ServiceManager.get_service_status(target_name, client) is True:
             return
 
         node_name = System.get_my_machine_id(client)
