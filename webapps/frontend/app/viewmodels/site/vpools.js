@@ -34,7 +34,8 @@ define([
             { key: 'iops',              value: $.t('ovs:generic.iops'),                   width: 100       },
             { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),             width: 180       },
             { key: 'backendConnection', value: $.t('ovs:vpools.backendconnectionpreset'), width: 230       },
-            { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),            width: undefined }
+            { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),            width: undefined },
+            { key: 'status',            value: $.t('ovs:generic.status'),                 width: 80        }
         ];
         self.vPoolCache = {};
 

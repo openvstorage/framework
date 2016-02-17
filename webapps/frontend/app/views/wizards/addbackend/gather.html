@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <div>
-    <form role="form form-horizontal" class="form-horizontal">
+    <form class="form-horizontal">
         <p data-i18n="ovs:wizards.addbackend.gather.basicinfo"></p>
         <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
             <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addbackend.gather.name"></label>
@@ -28,7 +28,7 @@ limitations under the License.
                 <span data-bind="dropdown: {
                          items: data.backendTypes, target: data.backendType,
                          text: function(item) {
-                             return $.t('ovs:generic.backendtypes.' + item.name().toLowerCase());
+                             return $.t('ovs:generic.backendtypes.' + item.code());
                          }
                      }">
                 </span>

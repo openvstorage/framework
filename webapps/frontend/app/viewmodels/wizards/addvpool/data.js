@@ -37,7 +37,6 @@ define(['knockout'], function(ko){
             dtlModes:                ko.observableArray([{name: 'no_sync', disabled: false}, {name: 'a_sync', disabled: false}, {name: 'sync', disabled: false}]),
             dtlTransportMode:        ko.observable({name: 'tcp'}),
             dtlTransportModes:       ko.observableArray([{name: 'tcp', disabled: false}, {name: 'rdma', disabled: true}]),
-            extendVpool:             ko.observable(false),
             hasMgmtCenter:           ko.observable(false),
             host:                    ko.observable('').extend({ regex: hostRegex }),
             integratemgmt:           ko.observable(),
@@ -63,7 +62,6 @@ define(['knockout'], function(ko){
             storageDriver:           ko.observable(),
             storageDrivers:          ko.observableArray([]),
             storageIP:               ko.observable().extend({ regex: ipRegex, identifier: 'storageip' }),
-            storageRouter:           ko.observable(),
             storageRouters:          ko.observableArray([]),
             target:                  ko.observable(),
             vPool:                   ko.observable(),
@@ -95,6 +93,11 @@ define(['knockout'], function(ko){
                 wizardData.writeBuffer.min = 256;
             }
             wizardData.writeBuffer(wizardData.writeBuffer());
+        });
+
+        // Computed
+        wizardData.vPoolAdd = ko.computed(function() {
+            return wizardData.vPool() === undefined;
         });
 
         return wizardData;
