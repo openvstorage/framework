@@ -52,6 +52,7 @@ class EtcdInstaller(object):
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
         if ServiceManager.has_service(target_name, client) and \
             ServiceManager.get_service_status(target_name, client) is True:
+            logger.info('Service {0} already configured and running'.format(target_name))
             return
 
         node_name = System.get_my_machine_id(client)
@@ -94,6 +95,12 @@ class EtcdInstaller(object):
         client = SSHClient(master_ip, username='root')
         if not EtcdInstaller._is_healty(cluster_name, client):
             raise RuntimeError('Cluster "{0}" unhealthy, aborting extend'.format(cluster_name))
+
+        cluster_members = client.run('etcdctl member list').splitlines()
+        for cluster_member in cluster_members:
+            if EtcdInstaller.SERVER_URL.format(new_ip) in cluster_member:
+                logger.info('Node {0} already member of etcd cluster'.format(new_ip))
+                return
 
         current_cluster = []
         for item in client.run('etcdctl member list').splitlines():
@@ -200,6 +207,9 @@ class EtcdInstaller(object):
     def _setup_proxy(initial_cluster, slave_client, cluster_name):
         base_name = 'ovs-etcd-proxy'
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
+        if ServiceManager.has_service(target_name, slave_client) and ServiceManager.get_service_status(target_name, slave_client) is True:
+            logger.info('Service {0} already configured and running'.format(target_name))
+            return
         EtcdInstaller.stop(cluster_name, slave_client)
 
         data_dir = EtcdInstaller.DATA_DIR.format(EtcdInstaller.DB_DIR, cluster_name)

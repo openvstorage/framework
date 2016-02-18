@@ -131,15 +131,17 @@ class SetupController(object):
 
         # Support resume setup - store entered parameters so when retrying, we have the values
         resumeconfig = '/tmp/openvstorage_resumeconfig.cfg'
-        r_config = RawConfigParser()
         if not os.path.exists(resumeconfig):
             with open(resumeconfig, 'w') as f:
                 f.write('')
-            r_config.read(resumeconfig)
+        r_config = RawConfigParser()
+        r_config.read(resumeconfig)
+        if not r_config.has_section('setup'):
             r_config.add_section('setup')
+        if not r_config.has_section('ip_client_map'):
             r_config.add_section('ip_client_map')
-            with open(resumeconfig, 'w') as fp:
-                r_config.write(fp)
+        with open(resumeconfig, 'w') as fp:
+            r_config.write(fp)
 
         try:
             if force_type is not None:
@@ -217,6 +219,24 @@ class SetupController(object):
 
                 node_name = target_client.run('hostname')
                 logger.debug('Current host: {0}'.format(node_name))
+                if r_config.has_option('setup', 'cluster_name'):
+                    cluster_name = r_config.get('setup', 'cluster_name')
+                if r_config.has_option('setup', 'master_ip'):
+                    master_ip = r_config.get('setup', 'master_ip')
+                if r_config.has_option('setup', 'cluster_ip'):
+                    cluster_ip = r_config.get('setup', 'cluster_ip')
+
+                if r_config.has_option('setup', 'hypervisor_type'):
+                    hypervisor_type = r_config.get('setup', 'hypervisor_type')
+                if r_config.has_option('setup', 'hypervisor_name'):
+                    hypervisor_name = r_config.get('setup', 'hypervisor_name')
+                if r_config.has_option('setup', 'hypervisor_ip'):
+                    hypervisor_ip = r_config.get('setup', 'hypervisor_ip')
+                if r_config.has_option('setup', 'hypervisor_username'):
+                    hypervisor_username = r_config.get('setup', 'hypervisor_username')
+                if r_config.has_option('setup', 'hypervisor_password'):
+                    hypervisor_password = r_config.get('setup', 'hypervisor_password')
+
                 if cluster_name is None:
                     while True:
                         logger.debug('Cluster selection')
@@ -364,6 +384,11 @@ class SetupController(object):
                 r_config.set('setup', 'unique_id', unique_id)
                 r_config.set('setup', 'configure_memcached', configure_memcached)
                 r_config.set('setup', 'configure_rabbitmq', configure_rabbitmq)
+                r_config.set('setup', 'hypervisor_type', hypervisor_info.get('type', None))
+                r_config.set('setup', 'hypervisor_name', hypervisor_info.get('name', None))
+                r_config.set('setup', 'hypervisor_ip', hypervisor_info.get('ip', None))
+                r_config.set('setup', 'hypervisor_username', hypervisor_info.get('username', None))
+                r_config.set('setup', 'hypervisor_password', hypervisor_info.get('password', None))
                 for ip, client in ip_client_map.items():
                     r_config.set('ip_client_map', ip, client.password)
                 with open(resumeconfig, 'w') as fp:
@@ -974,30 +999,20 @@ class SetupController(object):
             logger.info('Setting up fleet')
             ServiceManager.setup_fleet()
 
-        try:
-            arakooncompleted = EtcdConfiguration.get('/ovs/framework/hosts/{0}/arakooncompleted'.format(unique_id)) is True
-        except EtcdKeyNotFound:
-            arakooncompleted = None
-        if arakooncompleted is None:
-            print 'Setting up Arakoon'
-            logger.info('Setting up Arakoon')
-            result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, EtcdConfiguration.get('/ovs/framework/paths|ovsdb'), locked=False)
-            arakoon_ports = [result['client_port'], result['messaging_port']]
-            EtcdConfiguration.set('/ovs/framework/hosts/{0}/arakooncompleted'.format(unique_id), True)
+        print 'Setting up Arakoon'
+        logger.info('Setting up Arakoon')
+        result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, EtcdConfiguration.get('/ovs/framework/paths|ovsdb'), locked=False)
+        arakoon_ports = [result['client_port'], result['messaging_port']]
 
         SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
 
         print 'Build configuration files'
         logger.info('Build configuration files')
-        try:
-            rabbitmqcompleted = EtcdConfiguration.get('/ovs/framework/hosts/{0}/rabbitmqcompleted'.format(unique_id)) is True
-        except EtcdKeyNotFound:
-            rabbitmqcompleted = None
-        if configure_rabbitmq and (rabbitmqcompleted is None):
+
+        if configure_rabbitmq:
             SetupController._configure_rabbitmq(target_client)
             EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', ['{0}:{1}'.format(cluster_ip, 5672)])
-            EtcdConfiguration.set('/ovs/framework/hosts/{0}/rabbitmqcompleted'.format(unique_id), True)
         if configure_memcached:
             SetupController._configure_memcached(target_client)
             EtcdConfiguration.set('/ovs/framework/memcache|endpoints', ['{0}:{1}'.format(cluster_ip, 11211)])
@@ -1018,14 +1033,16 @@ class SetupController(object):
         logger.info('Finalizing setup')
         storagerouter = SetupController._finalize_setup(target_client, node_name, 'MASTER', hypervisor_info, unique_id)
 
-        from ovs.dal.lists.servicetypelist import ServiceTypeList
-        from ovs.dal.hybrids.service import Service
-        service = Service()
-        service.name = 'arakoon-ovsdb'
-        service.type = ServiceTypeList.get_by_name('Arakoon')
-        service.ports = arakoon_ports
-        service.storagerouter = storagerouter
-        service.save()
+        from ovs.dal.lists.servicelist import ServiceList
+        if 'arakoon-ovsdb' not in [s.name for s in ServiceList.get_services()]:
+            from ovs.dal.lists.servicetypelist import ServiceTypeList
+            from ovs.dal.hybrids.service import Service
+            service = Service()
+            service.name = 'arakoon-ovsdb'
+            service.type = ServiceTypeList.get_by_name('Arakoon')
+            service.ports = arakoon_ports
+            service.storagerouter = storagerouter
+            service.save()
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
@@ -1038,13 +1055,7 @@ class SetupController(object):
                 ServiceManager.enable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'start', logger)
         # Enable HA for the rabbitMQ queues
-        try:
-            rabbitmqcompletedha = EtcdConfiguration.get('/ovs/framework/hosts/{0}/rabbitmqcompletedha'.format(unique_id)) is True
-        except EtcdKeyNotFound:
-            rabbitmqcompletedha = None
-        if rabbitmqcompletedha is None:
-            SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
-            EtcdConfiguration.set('/ovs/framework/hosts/{0}/rabbitmqcompletedha'.format(unique_id), True)
+        SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
         ServiceManager.enable_service('watcher-framework', client=target_client)
         Toolbox.change_service_state(target_client, 'watcher-framework', 'start', logger)
@@ -1066,9 +1077,10 @@ class SetupController(object):
             EtcdConfiguration.set('/ovs/framework/support|enabled', False)
         else:
             service = 'support-agent'
-            ServiceManager.add_service(service, client=target_client)
-            ServiceManager.enable_service(service, client=target_client)
-            Toolbox.change_service_state(target_client, service, 'start', logger)
+            if not ServiceManager.has_service(service, target_client):
+                ServiceManager.add_service(service, client=target_client)
+                ServiceManager.enable_service(service, client=target_client)
+                Toolbox.change_service_state(target_client, service, 'start', logger)
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -1191,9 +1203,10 @@ class SetupController(object):
         enabled = EtcdConfiguration.get('/ovs/framework/support|enabled')
         if enabled is True:
             service = 'support-agent'
-            ServiceManager.add_service(service, client=target_client)
-            ServiceManager.enable_service(service, client=target_client)
-            Toolbox.change_service_state(target_client, service, 'start', logger)
+            if not ServiceManager.has_service(service, target_client):
+                ServiceManager.add_service(service, client=target_client)
+                ServiceManager.enable_service(service, client=target_client)
+                Toolbox.change_service_state(target_client, service, 'start', logger)
 
         node_name = target_client.run('hostname')
         SetupController._finalize_setup(target_client, node_name, 'EXTRA', hypervisor_info, unique_id)
@@ -1267,6 +1280,7 @@ class SetupController(object):
         """
         from ovs.dal.lists.storagerouterlist import StorageRouterList
         from ovs.dal.lists.servicetypelist import ServiceTypeList
+        from ovs.dal.lists.servicelist import ServiceList
         from ovs.dal.hybrids.service import Service
 
         print '\n+++ Promoting node +++\n'
@@ -1314,12 +1328,16 @@ class SetupController(object):
         logger.info('Update configurations')
         if configure_memcached is True:
             endpoints = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
-            endpoints.append('{0}:{1}'.format(cluster_ip, 11211))
-            EtcdConfiguration.set('/ovs/framework/memcache|endpoints', endpoints)
+            endpoint = '{0}:{1}'.format(cluster_ip, 11211)
+            if endpoint not in endpoints:
+                endpoints.append(endpoint)
+                EtcdConfiguration.set('/ovs/framework/memcache|endpoints', endpoints)
         if configure_rabbitmq is True:
             endpoints = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
-            endpoints.append('{0}:{1}'.format(cluster_ip, 5672))
-            EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
+            endpoint = '{0}:{1}'.format(cluster_ip, 5672)
+            if endpoint not in endpoint:
+                endpoints.append(endpoint)
+                EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
 
         print 'Restarting master node services'
         logger.info('Restarting master node services')
@@ -1327,27 +1345,29 @@ class SetupController(object):
         PersistentFactory.store = None
         VolatileFactory.store = None
 
-        service = Service()
-        service.name = 'arakoon-ovsdb'
-        service.type = ServiceTypeList.get_by_name('Arakoon')
-        service.ports = arakoon_ports
-        service.storagerouter = storagerouter
-        service.save()
+        if 'arakoon-ovsdb' not in [s.name for s in ServiceList.get_services()]:
+            service = Service()
+            service.name = 'arakoon-ovsdb'
+            service.type = ServiceTypeList.get_by_name('Arakoon')
+            service.ports = arakoon_ports
+            service.storagerouter = storagerouter
+            service.save()
 
         if configure_rabbitmq:
             SetupController._configure_rabbitmq(target_client)
-
             # Copy rabbitmq cookie
-            logger.debug('Copying Rabbit MQ cookie')
             rabbitmq_cookie_file = '/var/lib/rabbitmq/.erlang.cookie'
-            contents = master_client.file_read(rabbitmq_cookie_file)
-            master_hostname = master_client.run('hostname')
-            target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
-            target_client.file_write(rabbitmq_cookie_file, contents)
-            target_client.file_attribs(rabbitmq_cookie_file, mode=400)
-            target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
-            target_client.run('rabbitmqctl join_cluster rabbit@{0}; sleep 5;'.format(master_hostname))
-            target_client.run('rabbitmqctl stop; sleep 5;')
+            if not target_client.file_exists(rabbitmq_cookie_file):
+                logger.debug('Copying Rabbit MQ cookie')
+
+                contents = master_client.file_read(rabbitmq_cookie_file)
+                master_hostname = master_client.run('hostname')
+                target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
+                target_client.file_write(rabbitmq_cookie_file, contents)
+                target_client.file_attribs(rabbitmq_cookie_file, mode=400)
+                target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
+                target_client.run('rabbitmqctl join_cluster rabbit@{0}; sleep 5;'.format(master_hostname))
+                target_client.run('rabbitmqctl stop; sleep 5;')
 
             # Enable HA for the rabbitMQ queues
             Toolbox.change_service_state(target_client, 'rabbitmq-server', 'start', logger)
@@ -1566,7 +1586,8 @@ class SetupController(object):
         rabbitmq_port = EtcdConfiguration.get('/ovs/framework/messagequeue|port')
         rabbitmq_login = EtcdConfiguration.get('/ovs/framework/messagequeue|user')
         rabbitmq_password = EtcdConfiguration.get('/ovs/framework/messagequeue|password')
-        client.run("""cat > /etc/rabbitmq/rabbitmq.config << EOF
+        if not client.file_exists('/etc/rabbitmq/rabbitmq.config'):
+            client.run("""cat > /etc/rabbitmq/rabbitmq.config << EOF
 [
    {{rabbit, [{{tcp_listeners, [{0}]}},
               {{default_user, <<"{1}">>}},
@@ -1698,6 +1719,10 @@ EOF
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
 
+        if client.file_exists(SetupController.avahi_filename):
+            logger.info('Avahi already configured')
+            return
+
         client.run("""cat > {3} <<EOF
 <?xml version="1.0" standalone='no'?>
 <!--*-nxml-*-->
@@ -1739,8 +1764,9 @@ EOF
         params = {'MEMCACHE_NODE_IP': client.ip,
                   'WORKER_QUEUE': worker_queue}
         for service in services + ['watcher-framework']:
-            logger.debug('Adding service {0}'.format(service))
-            ServiceManager.add_service(service, params=params, client=client)
+            if not ServiceManager.has_service(service, client):
+                logger.debug('Adding service {0}'.format(service))
+                ServiceManager.add_service(service, params=params, client=client)
 
     @staticmethod
     def _remove_services(client, unique_id, node_type):
