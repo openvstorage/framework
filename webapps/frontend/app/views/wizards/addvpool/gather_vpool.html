@@ -36,7 +36,8 @@ limitations under the License.
                 </span>
             </div>
         </div>
-        <div data-bind="visible: data.backend() === 'alba' && data.vPoolAdd()">
+        <p data-bind="visible: data.v260Migration" data-i18n="ovs:wizards.extend_vpool.gather_vpool.migration"></p>
+        <div data-bind="visible: data.backend() === 'alba' && data.editBackend()">
             <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
                 <div class="col-lg-3"></div>
                 <div class="col-lg-7">
@@ -45,7 +46,7 @@ limitations under the License.
                 </div>
             </div>
         </div>
-        <div data-bind="visible: data.backend() !== 'local' && data.backend() !== 'distributed' && (data.backend() !== 'alba' || !data.localHost()) && data.vPoolAdd()">
+        <div data-bind="visible: data.backend() !== 'local' && data.backend() !== 'distributed' && (data.backend() !== 'alba' || !data.localHost()) && (data.vPoolAdd() || (data.backend() === 'alba' && data.v260Migration()))">
             <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('host') }">
                 <label class="col-lg-3 control-label" for="inputVpoolHost" data-i18n="ovs:wizards.add_vpool.gather_vpool.host"></label>
                 <div class="col-lg-4">
@@ -72,7 +73,7 @@ limitations under the License.
             </div>
         </div>
         <div data-bind="visible: data.backend() === 'alba'">
-            <div data-bind="visible: !data.localHost() && data.vPoolAdd()">
+            <div data-bind="visible: !data.localHost() && data.editBackend()">
                 <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
                     <label class="col-lg-3 control-label" for="inputVpoolClientId" data-i18n="ovs:wizards.add_vpool.gather_vpool.client_id"></label>
                     <div class="col-lg-7">
@@ -95,9 +96,9 @@ limitations under the License.
                     <!-- /ko -->
                     <!-- ko if: data.albaBackends() !== undefined && data.albaBackends().length > 0 -->
                         <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaBackend() === undefined)"></span>
-                        <span data-bind="visible: (data.vPoolAdd() === true || data.albaBackend() !== undefined),
+                        <span data-bind="visible: (data.editBackend() === true || data.albaBackend() !== undefined),
                                          dropdown: {
-                                             enabled: data.vPoolAdd,
+                                             enabled: data.editBackend,
                                              key: 'guid', keyisfunction: false,
                                              items: data.albaBackends, target: data.albaBackend,
                                              text: function(item) {
@@ -111,7 +112,7 @@ limitations under the License.
                     <button class="btn btn-default"  style="margin-left: 10px;"
                             data-bind="click: loadAlbaBackends, style: {
                                            'margin-top': (data.albaBackends() !== undefined && data.albaBackends().length > 0 ? '-26px' : '')
-                                       }, enable: !albaBackendLoading(), visible: data.vPoolAdd()">
+                                       }, enable: !albaBackendLoading(), visible: data.editBackend()">
                         <span class="fa fa-" data-bind="css: { 'fa-spin': albaBackendLoading() }" data-i18n="[html]ovs:icons.load"></span>
                         <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
                     </button>
@@ -121,9 +122,9 @@ limitations under the License.
                 <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset"></label>
                 <div class="col-lg-7">
                     <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaPreset() === undefined)"></span>
-                    <span data-bind="visible: (data.vPoolAdd() === true || data.albaPreset() !== undefined),
+                    <span data-bind="visible: (data.editBackend() === true || data.albaPreset() !== undefined),
                                      dropdown: {
-                                         enabled: data.vPoolAdd,
+                                         enabled: data.editBackend,
                                          key: 'name', keyisfunction: false,
                                          items: data.albaBackend().enhancedPresets, target: data.albaPreset,
                                          text: function(item) {

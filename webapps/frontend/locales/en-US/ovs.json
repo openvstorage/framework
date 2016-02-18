@@ -842,7 +842,8 @@
             },
             "gather_vpool": {
                 "basic_info": "Basic vPool information",
-                "information": "Extending a vPool does not allow to reconfigure the name and backend information"
+                "information": "Extending a vPool does not allow to reconfigure the name and backend information",
+                "migration": "This vPool was created using an old verion of Open vStorage. Please enter all Backend related information again."
             }
         },
         "shrink_vpool": {

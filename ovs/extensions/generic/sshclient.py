@@ -25,7 +25,6 @@ import tempfile
 import paramiko
 import socket
 from subprocess import check_output, CalledProcessError, PIPE, Popen
-from ConfigParser import RawConfigParser
 from ovs.dal.helpers import Descriptor
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.remote import Remote

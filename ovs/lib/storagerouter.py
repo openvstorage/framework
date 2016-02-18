@@ -213,8 +213,6 @@ class StorageRouterController(object):
         ###############
         ip = parameters['storagerouter_ip']
         vpool_name = parameters['vpool_name']
-        backend_info = {}
-        preset_name = None
         vpool_metadata = None
         connection_host = ''
         connection_port = ''
@@ -244,37 +242,6 @@ class StorageRouterController(object):
                 connection_port = parameters['connection_port']
                 connection_username = parameters['connection_username']
                 connection_password = parameters['connection_password']
-                if backend_type.code == 'alba':
-                    Toolbox.verify_required_params(alba_connection_backend_params, parameters['connection_backend'])
-
-                    if connection_host == '':
-                        connection_host = StorageRouterList.get_masters()[0].ip
-                        connection_port = 443
-                        clients = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')
-                        oauth_client = None
-                        for current_client in clients:
-                            if current_client.user.group.name == 'administrators':
-                                oauth_client = current_client
-                                break
-                        if oauth_client is None:
-                            raise RuntimeError('Could not find INTERNAL CLIENT_CREDENTIALS client in administrator group.')
-                        ovs_client = OVSClient(connection_host, connection_port,
-                                               credentials=(oauth_client.client_id, oauth_client.client_secret),
-                                               version=1)
-                    else:
-                        ovs_client = OVSClient(connection_host, connection_port,
-                                               credentials=(connection_username, connection_password),
-                                               version=1)
-
-                    backend_guid = parameters['connection_backend']['backend']
-                    preset_name = parameters['connection_backend']['metadata']
-                    backend_info = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': '_dynamics'})
-                    if preset_name not in [preset['name'] for preset in backend_info['presets']]:
-                        raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_guid))
-                    task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(backend_guid))
-                    successful, vpool_metadata = ovs_client.wait_for_task(task_id, timeout=300)
-                    if successful is False:
-                        raise RuntimeError('Could not load metadata from remote environment {0}'.format(connection_host))
 
             sco_size = parameters['config_params']['sco_size']
             write_buffer = parameters['config_params']['write_buffer']
@@ -356,20 +323,62 @@ class StorageRouterController(object):
                 if total_available == 0:
                     error_messages.append('Not enough available space for {0}'.format(required_role))
 
+        backend_name = None
+        connection_info = None
         policies = []
         sco_size = current_storage_driver_config['sco_size'] if current_storage_driver_config else parameters['config_params']['sco_size']
         sco_size *= 1024.0 ** 2
         frag_size = None
         total_size = None
         nsm_partition_guids = set()
-        if vpool is not None and backend_type.code == 'alba':  # Extend scenario, retrieve backend information from vpool.metadata
-            from ovs.dal.hybrids.albabackend import AlbaBackend
-            backend = AlbaBackend(vpool.metadata['backend_guid'])
-            policies = vpool.metadata['backend_info']['policies']
-            frag_size = vpool.metadata['backend_info']['frag_size']
-            total_size = vpool.metadata['backend_info']['total_size']
-            nsm_partition_guids = set(backend.metadata_information['nsm_partition_guids'])
-        elif backend_type.code == 'alba':  # Add vPool scenario, retrieve backend information via API
+        if backend_type.code == 'alba':
+            if vpool is None or vpool.metadata.get('connection') is None:
+                Toolbox.verify_required_params(alba_connection_backend_params, parameters['connection_backend'])
+                if connection_host == '':
+                    connection_host = StorageRouterList.get_masters()[0].ip
+                    connection_port = 443
+                    clients = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')
+                    oauth_client = None
+                    for current_client in clients:
+                        if current_client.user.group.name == 'administrators':
+                            oauth_client = current_client
+                            break
+                    if oauth_client is None:
+                        raise RuntimeError('Could not find INTERNAL CLIENT_CREDENTIALS client in administrator group.')
+                    ovs_client = OVSClient(connection_host, connection_port,
+                                           credentials=(oauth_client.client_id, oauth_client.client_secret),
+                                           version=1)
+                    connection_info = {'host': connection_host,
+                                       'port': connection_port,
+                                       'client_id': oauth_client.client_id,
+                                       'client_secret': oauth_client.client_secret,
+                                       'local': True}
+                else:
+                    ovs_client = OVSClient(connection_host, connection_port,
+                                           credentials=(connection_username, connection_password),
+                                           version=1)
+                    connection_info = {'host': connection_host,
+                                       'port': connection_port,
+                                       'client_id': connection_username,
+                                       'client_secret': connection_password,
+                                       'local': False}
+                backend_guid = parameters['connection_backend']['backend']
+                preset_name = parameters['connection_backend']['metadata']
+                backend_info = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': '_dynamics'})
+                backend_name = backend_info['name']
+                if preset_name not in [preset['name'] for preset in backend_info['presets']]:
+                    raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_guid))
+                task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(backend_guid))
+                successful, vpool_metadata = ovs_client.wait_for_task(task_id, timeout=300)
+                if successful is False:
+                    raise RuntimeError('Could not load metadata from remote environment {0}'.format(connection_host))
+            else:
+                connection_info = vpool.metadata['connection']
+                preset_name = vpool.metadata['preset']
+                ovs_client = OVSClient(connection_info['host'], connection_info['port'],
+                                       credentials=(connection_info['client_id'], connection_info['client_secret']),
+                                       version=1)
+                backend_info = ovs_client.get('/alba/backends/{0}/'.format(vpool.metadata['backend_guid']), params={'contents': '_dynamics'})
             preset_info = [preset for preset in backend_info['presets'] if preset_name == preset['name']][0]
             frag_size = float(preset_info['fragment_size'])
             total_size = float(backend_info['ns_statistics']['global']['size'])
@@ -479,13 +488,12 @@ class StorageRouterController(object):
             if vpool.backend_type.code in ['local', 'distributed']:
                 vpool.metadata = vpool_metadata
             elif vpool.backend_type.code == 'alba':
-                from ovs.dal.hybrids.albabackend import AlbaBackend
-                backend = AlbaBackend(parameters['connection_backend']['backend'])
-                vpool.metadata = {'name': backend.backend.name,
+                vpool.metadata = {'name': backend_name,
                                   'metadata': vpool_metadata,
                                   'backend_info': metadata_backend_info,
+                                  'connection': connection_info,
                                   'preset': parameters['connection_backend']['metadata'],
-                                  'backend_guid': backend.guid}
+                                  'backend_guid': parameters['connection_backend']['backend']}
             elif vpool.backend_type.code in ['ceph_s3', 'amazon_s3', 'swift_s3']:
                 if vpool.backend_type.code in ['swift_s3']:
                     strict_consistency = 'false'
@@ -514,6 +522,10 @@ class StorageRouterController(object):
         else:
             vpool.status = VPool.STATUSES.EXTENDING
             if vpool.backend_type.code == 'alba':
+                if vpool.metadata.get('connection') is None:
+                    vpool.metadata['connection'] = connection_info
+                    vpool.metadata['backend_guid'] = parameters['connection_backend']['backend']
+                    vpool.metadata['name'] = backend_name
                 vpool.metadata['backend_info'] = metadata_backend_info
             vpool.save()
 

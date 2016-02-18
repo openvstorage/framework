@@ -68,7 +68,8 @@ define(['knockout'], function(ko){
             vPools:                  ko.observableArray([]),
             writeBuffer:             ko.observable(128).extend({numeric: {min: 128, max: 10240}}),
             writeCacheSize:          ko.observable(1).extend({numeric: {min: 1, max: 10240}}),
-            writeCacheAvailableSize: ko.observable()
+            writeCacheAvailableSize: ko.observable(),
+            v260Migration:           ko.observable(false)
         }, resetAlbaBackends = function() {
             wizardData.albaBackends([]);
             wizardData.albaBackend(undefined);
@@ -98,6 +99,9 @@ define(['knockout'], function(ko){
         // Computed
         wizardData.vPoolAdd = ko.computed(function() {
             return wizardData.vPool() === undefined;
+        });
+        wizardData.editBackend = ko.computed(function() {
+            return wizardData.vPoolAdd() || wizardData.v260Migration();
         });
 
         return wizardData;
