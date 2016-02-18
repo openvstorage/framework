@@ -465,7 +465,6 @@ class UpdateController(object):
                         vmware_mode = EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|vmware_mode'.format(host_id))
                         dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
                         ServiceManager.add_service(name='ovs-dtl', params=params, client=client, target_name=dtl_service)
-                        ServiceManager.start_service(dtl_service, client=client)
                         if vpool.backend_type.code == 'alba':
                             alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
                             dependencies = [alba_proxy_service]
