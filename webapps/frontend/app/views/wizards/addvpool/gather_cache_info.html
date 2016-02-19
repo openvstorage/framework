@@ -14,37 +14,39 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <div>
-    <form role="form form-horizontal" class="form-horizontal">
-        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.basicinfo"></p>
+    <form class="form-horizontal">
+        <p data-i18n="ovs:wizards.add_vpool.gather_cache_info.basic_info"></p>
         <div class="form-group" style="padding-left: 40px;" data-bind="visible: data.backend() === 'distributed'">
-            <label class="col-lg-2 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.mountpoint">
+            <label class="col-lg-2 control-label" data-i18n="ovs:wizards.add_vpool.gather_cache_info.mountpoint">
                    style="text-align: left; padding-right: 0;"></label>
             <div class="col-lg-6">
                 <span data-bind="dropdown: { items: data.mountpoints, target: data.distributedMtpt }"></span>
             </div>
         </div>
         <div class="form-group" style="padding-left: 40px;" data-bind="css: { 'has-error': canContinue().fields.contains('readCacheSize') }">
-            <label class="col-lg-2 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.readcache_size"
+            <label class="col-lg-2 control-label" data-i18n="ovs:wizards.add_vpool.gather_cache_info.readcache_size"
                    style="text-align: left; padding-right: 0;"></label>
             <div class="col-lg-2">
-                <input type="text" id="readCacheSize" class="form-control" data-bind="value: data.readCacheSize, valueUpdate: 'afterkeydown'" />
+                <input type="text" id="readCacheSize" class="form-control" title="readCacheSize"
+                       data-bind="value: data.readCacheSize, valueUpdate: 'afterkeydown'" />
             </div>
             <div class="col-lg-6" style="padding: 0; margin-top: 8px;">
                 <span data-i18n="ovs:generic.units.gib"></span>
             </div>
         </div>
         <div class="form-group" style="padding-left: 40px;" data-bind="css: { 'has-error': canContinue().fields.contains('writeCacheSize') }">
-            <label class="col-lg-2 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.writecache_size"
+            <label class="col-lg-2 control-label" data-i18n="ovs:wizards.add_vpool.gather_cache_info.writecache_size"
                    style="text-align: left; padding-right: 0;"></label>
             <div class="col-lg-2">
-                <input type="text" id="writeCacheSize" class="form-control" data-bind="value: data.writeCacheSize, valueUpdate: 'afterkeydown'" />
+                <input type="text" id="writeCacheSize" class="form-control" title="writeCacheSize"
+                       data-bind="value: data.writeCacheSize, valueUpdate: 'afterkeydown'" />
             </div>
             <div class="col-lg-6" style="padding: 0; margin-top: 8px;">
                 <span data-i18n="ovs:generic.units.gib"></span>
             </div>
         </div>
         <div class="form-group" style="padding-left: 40px;">
-            <label class="col-lg-2 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.ipaddress" style="text-align: left; padding-right: 0;"></label>
+            <label class="col-lg-2 control-label" data-i18n="ovs:wizards.add_vpool.gather_cache_info.ip_address" style="text-align: left; padding-right: 0;"></label>
             <div class="col-lg-4">
                 <span data-bind="dropdown: {
                                      items: data.ipAddresses,
@@ -58,20 +60,20 @@ limitations under the License.
          data-bind="visible: (data.readCacheAvailableSize() !== undefined && data.readCacheAvailableSize() > 0) ||
                              (data.writeCacheAvailableSize() !== undefined && data.writeCacheAvailableSize() > 0) ||
                              (data.sharedSize() !== undefined && data.sharedSize() > 0)">
-        <span data-i18n="ovs:wizards.addvpool.gathermountpoints.information"></span>
+        <span data-i18n="ovs:wizards.add_vpool.gather_cache_info.information"></span>
         <ul>
             <li data-bind="visible: data.readCacheAvailableSize() !== undefined && data.readCacheAvailableSize() > 0">
-                <span data-i18n="ovs:wizards.addvpool.gathermountpoints.readcache_size"></span>
+                <span data-i18n="ovs:wizards.add_vpool.gather_cache_info.readcache_size"></span>
                 <span data-bind="text: Math.floor(data.readCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>
             </li>
             <li data-bind="visible: data.writeCacheAvailableSize() !== undefined && data.writeCacheAvailableSize() > 0">
-                <span data-i18n="ovs:wizards.addvpool.gathermountpoints.writecache_size"></span>
+                <span data-i18n="ovs:wizards.add_vpool.gather_cache_info.writecache_size"></span>
                 <span data-bind="text: Math.floor(data.writeCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>
             </li>
             <li data-bind="visible: data.sharedSize() !== undefined && data.sharedSize() > 0">
-                <span data-i18n="ovs:wizards.addvpool.gathermountpoints.shared_available"></span>
+                <span data-i18n="ovs:wizards.add_vpool.gather_cache_info.shared_available"></span>
                 <span data-bind="text: Math.floor(data.sharedSize() / 1024 / 1024 / 1024)"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>
             </li>

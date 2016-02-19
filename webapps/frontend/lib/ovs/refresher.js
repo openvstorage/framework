@@ -12,21 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /*global define, window */
-define(function(){
+define(['jquery'], function($){
     "use strict";
     return function() {
         var self = this;
 
         self.refreshTimeout = undefined;
+        self.skipPause = false;
 
         self.init = function(load, interval) {
             self.load = load;
             self.interval = interval;
+            self.running = false;
         };
         self.start = function() {
             self.stop();
             self.refreshTimeout = window.setInterval(function() {
-                self.load();
+                self.run();
             }, self.interval);
         };
         self.stop = function() {
@@ -46,7 +48,19 @@ define(function(){
             self.load = load;
         };
         self.run = function() {
-            self.load();
+            var chainDeferred = $.Deferred(), chainPromise = chainDeferred.promise();
+            chainDeferred.resolve();
+            chainPromise.then(function() {
+                    self.running = true;
+                })
+                .then(self.load)
+                .always(function() {
+                    self.running = false;
+                    if (self.skipPause === true) {
+                        self.skipPause = false;
+                        self.run();
+                    }
+                });
         };
     };
 });

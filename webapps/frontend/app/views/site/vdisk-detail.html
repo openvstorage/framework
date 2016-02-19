@@ -143,7 +143,7 @@ limitations under the License.
             <li class="active" data-bind="tooltip: 'ovs:generic.snapshots'">
                 <a href="#snapshots" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.snapshot"></a>
             </li>
-            <li data-bind="tooltip: 'ovs:generic.management', visible: $root.shared.user.roles().contains('manage'), click: $root.loadAllConfigurations">
+            <li data-bind="tooltip: 'ovs:generic.management', visible: $root.shared.user.roles().contains('manage'), click: loadAllConfigurations">
                 <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
             </li>
         </ul>
@@ -246,7 +246,9 @@ limitations under the License.
                                                                                  items: dtlTargets,
                                                                                  target: dtlTarget,
                                                                                  text: function(item) {
-                                                                                     return item;
+                                                                                     if (item !== undefined && item !== null) {
+                                                                                         return item.name;
+                                                                                     }
                                                                                  },
                                                                                  small: true,
                                                                                  emptyisloading: true
