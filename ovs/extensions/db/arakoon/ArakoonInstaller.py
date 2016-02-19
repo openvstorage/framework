@@ -433,7 +433,7 @@ class ArakoonInstaller(object):
         logger.debug('Destroy node {0} in cluster {1} completed'.format(node.ip, config.cluster_id))
 
     @staticmethod
-    def deploy(config, offline_nodes=None):
+    def _deploy(config, offline_nodes=None):
         """
         Deploys a complete cluster: Distributing the configuration files, creating directories and services
         """
