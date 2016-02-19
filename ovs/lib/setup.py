@@ -1417,16 +1417,13 @@ class SetupController(object):
                 raise RuntimeError('Not all memcache nodes can be reached which is required for demoting a node.')
 
         # Find other (arakoon) master nodes
-        try:
-            config = ArakoonClusterConfig('ovsdb')
-            config.load_config()
-            master_nodes = [node.ip for node in config.nodes]
-            if cluster_ip in master_nodes:
-                master_nodes.remove(cluster_ip)
-            if len(master_nodes) == 0:
-                raise RuntimeError('There should be at least one other master node')
-        except Exception as ex:
-            SetupController._print_log_error('find arakoon master nodes', ex)
+        config = ArakoonClusterConfig('ovsdb')
+        config.load_config()
+        master_nodes = [node.ip for node in config.nodes]
+        if cluster_ip in master_nodes:
+            master_nodes.remove(cluster_ip)
+        if len(master_nodes) == 0:
+            raise RuntimeError('There should be at least one other master node')
 
         storagerouter = StorageRouterList.get_by_machine_id(unique_id)
         storagerouter.node_type = 'EXTRA'
@@ -1435,10 +1432,7 @@ class SetupController(object):
         print 'Leaving arakoon ovsdb cluster'
         logger.info('Leaving arakoon ovsdb cluster')
         offline_node_ips = [node.ip for node in offline_nodes]
-        try:
-            ArakoonInstaller.shrink_cluster(cluster_ip, 'ovsdb', offline_node_ips)
-        except Exception as ex:
-            SetupController._print_log_error('leave arakoon ovsdb cluster', ex)
+        ArakoonInstaller.shrink_cluster(cluster_ip, 'ovsdb', offline_node_ips)
 
         try:
             external_etcd = EtcdConfiguration.get('/ovs/framework/external_etcd')
@@ -1472,10 +1466,8 @@ class SetupController(object):
         remaining_nodes = ip_client_map.keys()[:]
         if cluster_ip in remaining_nodes:
             remaining_nodes.remove(cluster_ip)
-        try:
-            ArakoonInstaller.restart_cluster_remove('ovsdb', remaining_nodes)
-        except Exception as ex:
-            SetupController._print_log_error('restart arakoon cluster', ex)
+
+        ArakoonInstaller.restart_cluster_remove('ovsdb', remaining_nodes)
         PersistentFactory.store = None
         VolatileFactory.store = None
 
