@@ -259,7 +259,13 @@ class ArakoonInstaller(object):
         client = SSHClient(ip)
         if ArakoonInstaller.is_running(cluster_name, client):
             logger.info('Arakoon service running for cluster {0}'.format(cluster_name))
-            return
+            config = ArakoonClusterConfig(cluster_name, plugins)
+            config.load_config()
+            for node in config.nodes:
+                if node.ip == ip:
+                    return {'client_port': node.client_port,
+                            'messaging_port': node.messaging_port}
+
         node_name = System.get_my_machine_id(client)
 
         home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
