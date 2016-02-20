@@ -1,4 +1,4 @@
-# Docker environments
+# Docker environments (draft spec not ready to go)
 
 ## goals
 
