@@ -406,7 +406,6 @@ class SetupController(object):
                                                           configure_rabbitmq=configure_rabbitmq,
                                                           external_etcd=external_etcd)
                     except Exception as ex:
-                        raise
                         SetupController._print_log_error('setup first node, rolling back', ex)
                         SetupController._rollback_setup(target_client=ip_client_map[cluster_ip],
                                                         node='first')
@@ -490,7 +489,6 @@ class SetupController(object):
                 pass
 
         except Exception as exception:
-            raise
             print ''  # Spacing
             logger.exception('Unexpected error')
             logger.error(str(exception))
@@ -1320,17 +1318,16 @@ class SetupController(object):
             SetupController._configure_rabbitmq(target_client)
             # Copy rabbitmq cookie
             rabbitmq_cookie_file = '/var/lib/rabbitmq/.erlang.cookie'
-            if not target_client.file_exists(rabbitmq_cookie_file):
-                logger.debug('Copying Rabbit MQ cookie')
 
-                contents = master_client.file_read(rabbitmq_cookie_file)
-                master_hostname = master_client.run('hostname')
-                target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
-                target_client.file_write(rabbitmq_cookie_file, contents)
-                target_client.file_attribs(rabbitmq_cookie_file, mode=400)
-                target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
-                target_client.run('rabbitmqctl join_cluster rabbit@{0}; sleep 5;'.format(master_hostname))
-                target_client.run('rabbitmqctl stop; sleep 5;')
+            logger.debug('Copying Rabbit MQ cookie')
+            contents = master_client.file_read(rabbitmq_cookie_file)
+            master_hostname = master_client.run('hostname')
+            target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
+            target_client.file_write(rabbitmq_cookie_file, contents)
+            target_client.file_attribs(rabbitmq_cookie_file, mode=400)
+            target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
+            target_client.run('rabbitmqctl join_cluster rabbit@{0}; sleep 5;'.format(master_hostname))
+            target_client.run('rabbitmqctl stop; sleep 5;')
 
             # Enable HA for the rabbitMQ queues
             Toolbox.change_service_state(target_client, 'rabbitmq-server', 'start', logger)
