@@ -257,6 +257,15 @@ class ArakoonInstaller(object):
         base_dir = base_dir.rstrip('/')
 
         client = SSHClient(ip)
+        if ArakoonInstaller.is_running(cluster_name, client):
+            logger.info('Arakoon service running for cluster {0}'.format(cluster_name))
+            config = ArakoonClusterConfig(cluster_name, plugins)
+            config.load_config()
+            for node in config.nodes:
+                if node.ip == ip:
+                    return {'client_port': node.client_port,
+                            'messaging_port': node.messaging_port}
+
         node_name = System.get_my_machine_id(client)
 
         home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
@@ -448,18 +457,20 @@ class ArakoonInstaller(object):
 
             # Create dirs as root because mountpoint /mnt/cache1 is typically owned by root
             abs_paths = [node.log_dir, node.tlog_dir, node.home]
-            root_client.dir_create(abs_paths)
-            root_client.dir_chmod(abs_paths, 0755, recursive=True)
-            root_client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
+            if not root_client.dir_exists(abs_paths):
+                root_client.dir_create(abs_paths)
+                root_client.dir_chmod(abs_paths, 0755, recursive=True)
+                root_client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
 
             # Creates services for/on all nodes in the config
             base_name = 'ovs-arakoon'
             target_name = 'ovs-arakoon-{0}'.format(config.cluster_id)
-            ServiceManager.add_service(base_name, root_client,
-                                       params={'CLUSTER': config.cluster_id,
-                                               'NODE_ID': node.name,
-                                               'CONFIG_PATH': ArakoonInstaller.ETCD_CONFIG_PATH.format(config.cluster_id)},
-                                       target_name=target_name)
+            if not ServiceManager.has_service(target_name, root_client):
+                ServiceManager.add_service(base_name, root_client,
+                                           params={'CLUSTER': config.cluster_id,
+                                                   'NODE_ID': node.name,
+                                                   'CONFIG_PATH': ArakoonInstaller.ETCD_CONFIG_PATH.format(config.cluster_id)},
+                                           target_name=target_name)
             logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
 
     @staticmethod
@@ -483,6 +494,17 @@ class ArakoonInstaller(object):
         if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
                 ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.stop_service('arakoon-{0}'.format(cluster_name), client=client)
+
+    @staticmethod
+    def is_running(cluster_name, client):
+        """
+        Checks if arakoon service is running
+        :param client: Client on which to stop the service
+        :param cluster_name: The name of the cluster service to stop
+        """
+        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client):
+            return ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client)
+        return False
 
     @staticmethod
     def remove(cluster_name, client):
@@ -545,11 +567,15 @@ class ArakoonInstaller(object):
         :param current_ips: IPs of the previous nodes
         :param cluster_name: Name of the cluster to restart
         """
+
         logger.debug('Restart sequence (add) for {0}'.format(cluster_name))
         logger.debug('Current ips: {0}'.format(', '.join(current_ips)))
         logger.debug('New ip: {0}'.format(new_ip))
 
         client = SSHClient(new_ip)
+        if ArakoonInstaller.is_running(cluster_name, client):
+            logger.info('Arakoon service for {0} is already running'.format(cluster_name))
+            return
         config = ArakoonClusterConfig(cluster_name)
         config.load_config()
 
