@@ -1538,8 +1538,7 @@ class SetupController(object):
         rabbitmq_port = EtcdConfiguration.get('/ovs/framework/messagequeue|port')
         rabbitmq_login = EtcdConfiguration.get('/ovs/framework/messagequeue|user')
         rabbitmq_password = EtcdConfiguration.get('/ovs/framework/messagequeue|password')
-        if not client.file_exists('/etc/rabbitmq/rabbitmq.config'):
-            client.run("""cat > /etc/rabbitmq/rabbitmq.config << EOF
+        client.run("""cat > /etc/rabbitmq/rabbitmq.config << EOF
 [
    {{rabbit, [{{tcp_listeners, [{0}]}},
               {{default_user, <<"{1}">>}},
@@ -1675,10 +1674,6 @@ EOF
     def _configure_avahi(client, cluster_name, node_name, node_type):
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
-
-        if client.file_exists(SetupController.avahi_filename):
-            logger.info('Avahi already configured')
-            return
 
         client.run("""cat > {3} <<EOF
 <?xml version="1.0" standalone='no'?>

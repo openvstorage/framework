@@ -162,22 +162,22 @@ class EtcdInstaller(object):
             info = re.search(EtcdInstaller.MEMBER_REGEX, item).groupdict()
             if EtcdInstaller.CLIENT_URL.format(ip_to_remove) == info['client']:
                 node_id = info['id']
-        if node_id is None:
-            raise RuntimeError('Could not locate {0} in the cluster'.format(ip_to_remove))
-        current_client.run('etcdctl member remove {0}'.format(node_id))
+        if node_id is not None:
+            current_client.run('etcdctl member remove {0}'.format(node_id))
         if ip_to_remove not in offline_node_ips:
-            EtcdInstaller.deploy_to_slave(remaining_node_ip, ip_to_remove, cluster_name)
+            EtcdInstaller.deploy_to_slave(remaining_node_ip, ip_to_remove, cluster_name, force=True)
         EtcdInstaller.wait_for_cluster(cluster_name, current_client)
 
         logger.debug('Shrinking cluster "{0}" from {1} completed'.format(cluster_name, ip_to_remove))
 
     @staticmethod
-    def deploy_to_slave(master_ip, slave_ip, cluster_name):
+    def deploy_to_slave(master_ip, slave_ip, cluster_name, force=False):
         """
         Deploys the configuration file to a slave
         :param cluster_name: Name of the cluster of which to deploy the configuration file
         :param slave_ip: IP of the slave to deploy to
         :param master_ip: IP of the node to deploy from
+        :param force: force deployment, even if a process is running with that name
         """
         logger.debug('  Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, master_ip, slave_ip))
         master_client = SSHClient(master_ip, username='root')
@@ -188,7 +188,7 @@ class EtcdInstaller(object):
             info = re.search(EtcdInstaller.MEMBER_REGEX, item).groupdict()
             current_cluster.append('{0}={1}'.format(info['name'], info['peer']))
 
-        EtcdInstaller._setup_proxy(','.join(current_cluster), slave_client, cluster_name)
+        EtcdInstaller._setup_proxy(','.join(current_cluster), slave_client, cluster_name, force=True)
         logger.debug('  Setting up proxy "{0}" from {1} to {2} completed'.format(cluster_name, master_ip, slave_ip))
 
     @staticmethod
@@ -204,10 +204,11 @@ class EtcdInstaller(object):
         logger.debug('Setting up proxy "{0}" from {1} to {2} completed'.format(cluster_name, external, slave_ip))
 
     @staticmethod
-    def _setup_proxy(initial_cluster, slave_client, cluster_name):
+    def _setup_proxy(initial_cluster, slave_client, cluster_name, force=False):
         base_name = 'ovs-etcd-proxy'
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
-        if ServiceManager.has_service(target_name, slave_client) and ServiceManager.get_service_status(target_name, slave_client) is True:
+        if force is False and ServiceManager.has_service(target_name, slave_client) and \
+            ServiceManager.get_service_status(target_name, slave_client) is True:
             logger.info('Service {0} already configured and running'.format(target_name))
             return
         EtcdInstaller.stop(cluster_name, slave_client)
