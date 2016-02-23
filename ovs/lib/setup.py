@@ -1693,12 +1693,6 @@ EOF
         Toolbox.change_service_state(client, 'avahi-daemon', 'restart', logger)
 
     @staticmethod
-    def _unconfigure_avahi(client):
-        filename = SetupController.avahi_filename
-        if client.file_exists(filename):
-            client.file_delete(filename)
-
-    @staticmethod
     def _add_services(client, unique_id, node_type):
         if node_type == 'master':
             services = SetupController.master_node_services
