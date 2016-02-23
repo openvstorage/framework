@@ -199,6 +199,8 @@ class EtcdConfiguration(object):
         :param host_id: ID of the host
         :return: None
         """
+        if EtcdConfiguration.exists('/ovs/framework/hosts/{0}/setupcompleted'.format(host_id)):
+            return
         base_config = {'/storagedriver': {'rsp': '/var/rsp',
                                           'vmware_mode': 'ganesha'},
                        '/ports': {'storagedriver': [[26200, 26299]],
@@ -218,6 +220,8 @@ class EtcdConfiguration(object):
         :return: None
         """
         cluster_id = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
+        if EtcdConfiguration.exists('/ovs/framework/cluster_id'):
+            return
         base_config = {'/cluster_id': cluster_id,
                        '/external_etcd': external_etcd,
                        '/registered': False,
