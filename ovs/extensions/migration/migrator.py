@@ -15,6 +15,7 @@ import os
 import imp
 import inspect
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.system import System
 
 
 class Migrator(object):
@@ -28,8 +29,9 @@ class Migrator(object):
         :param master_ips: IP addresses of the MASTER nodes
         :param extra_ips: IP addresses of the EXTRA nodes
         """
-
-        data = EtcdConfiguration.get('/ovs/framework/versions') if EtcdConfiguration.exists('/ovs/framework/versions') else {}
+        machine_id = System.get_my_machine_id()
+        key = '/ovs/framework/hosts/{0}/versions'.format(machine_id)
+        data = EtcdConfiguration.get(key) if EtcdConfiguration.exists(key) else {}
         migrators = []
         path = os.path.join(os.path.dirname(__file__), 'migration')
         for filename in os.listdir(path):
@@ -48,4 +50,4 @@ class Migrator(object):
                 end_version = version
             data[identifier] = end_version
 
-        EtcdConfiguration.set('/ovs/framework/versions', data)
+        EtcdConfiguration.set(key, data)

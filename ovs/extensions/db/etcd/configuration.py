@@ -207,6 +207,7 @@ class EtcdConfiguration(object):
                                   'mds': [[26300, 26399]],
                                   'arakoon': [26400]},
                        '/setupcompleted': False,
+                       '/versions': {'ovs': 4},
                        '/type': 'UNCONFIGURED'}
         for key, value in base_config.iteritems():
             EtcdConfiguration._set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value, raw=False)
@@ -233,7 +234,6 @@ class EtcdConfiguration(object):
                                          'queues': {'storagedriver': 'volumerouter'}},
                        '/plugins/installed': {'backends': [],
                                               'generic': []},
-                       '/versions': {'ovs': 4},
                        '/stores': {'persistent': 'pyrakoon',
                                    'volatile': 'memcache'},
                        '/paths': {'cfgdir': '/opt/OpenvStorage/config',

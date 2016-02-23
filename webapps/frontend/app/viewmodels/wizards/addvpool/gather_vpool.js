@@ -69,30 +69,24 @@ define([
                         reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.no_credentials'));
                     }
                 }
-                if (self.data.backend() === 'alba') {
-                    if (self.data.albaBackend() === undefined) {
-                        valid = false;
-                        reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.choose_backend'));
-                        fields.push('backend');
-                    }
-                    if (self.invalidAlbaInfo() && !self.data.localHost()) {
-                        valid = false;
-                        reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.invalid_alba_info'));
-                        fields.push('clientid');
-                        fields.push('clientsecret');
-                        fields.push('host');
-                    }
-                }
                 if (preValidation.valid === false) {
                     showErrors = true;
                     reasons = reasons.concat(preValidation.reasons);
                     fields = fields.concat(preValidation.fields);
                 }
-            } else {
-                if (self.data.vPool().backendType().code() === 'alba') {
-                    if (self.data.albaBackend() === undefined || self.data.albaPreset() === undefined) {
-                        valid = false;  // Don't allow to continue as long as alba stuff hasn't been loaded yet
-                    }
+            }
+            if (self.data.backend() === 'alba' && self.data.editBackend()) {
+                if (self.data.albaBackend() === undefined) {
+                    valid = false;
+                    reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.choose_backend'));
+                    fields.push('backend');
+                }
+                if (self.invalidAlbaInfo() && !self.data.localHost()) {
+                    valid = false;
+                    reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.invalid_alba_info'));
+                    fields.push('clientid');
+                    fields.push('clientsecret');
+                    fields.push('host');
                 }
             }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
@@ -333,21 +327,40 @@ define([
                 self.data.writeBuffer(currentConfig.write_buffer);
                 self.data.cacheStrategy(currentConfig.cache_strategy);
                 self.data.dtlTransportMode({name: currentConfig.dtl_transport});
-
+                var metadata = self.data.vPool().metadata();
                 if (self.data.vPool().backendType().code() === 'alba') {
-                    $.when.apply($, [self.loadAlbaBackends()])
-                        .done(function() {
-                            $.each(self.data.albaBackends(), function(_, albaBackend) {
-                                if (albaBackend.guid() === self.data.vPool().metadata().backend_guid) {
-                                    self.data.albaBackend(albaBackend);
-                                    $.each(albaBackend.enhancedPresets(), function(_, preset) {
-                                        if (preset.name === self.data.vPool().backendPreset()) {
-                                            self.data.albaPreset(preset);
-                                        }
-                                    });
-                                }
+                    if (metadata.hasOwnProperty('connection')) {
+                        // Created in or after 2.7.0
+                        self.data.v260Migration(false);
+                        self.data.localHost(metadata.connection.local);
+                        if (metadata.connection.local) {
+                            self.data.accesskey('');
+                            self.data.secretkey('');
+                            self.data.host('');
+                            self.data.port('');
+                        } else {
+                            self.data.accesskey(metadata.connection.client_id);
+                            self.data.secretkey(metadata.connection.client_secret);
+                            self.data.host(metadata.connection.host);
+                            self.data.port(metadata.connection.port);
+                        }
+                        self.loadAlbaBackends()
+                            .done(function () {
+                                $.each(self.data.albaBackends(), function (_, albaBackend) {
+                                    if (albaBackend.guid() === metadata.backend_guid) {
+                                        self.data.albaBackend(albaBackend);
+                                        $.each(albaBackend.enhancedPresets(), function (_, preset) {
+                                            if (preset.name === self.data.vPool().backendPreset()) {
+                                                self.data.albaPreset(preset);
+                                            }
+                                        });
+                                    }
+                                });
                             });
-                        })
+                    } else {
+                        // Created before 2.7.0
+                        self.data.v260Migration(true);
+                    }
                 }
             }
         };

@@ -14,6 +14,7 @@
 
 import re
 import time
+from subprocess import CalledProcessError
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
@@ -169,6 +170,15 @@ class EtcdInstaller(object):
         EtcdInstaller.wait_for_cluster(cluster_name, current_client)
 
         logger.debug('Shrinking cluster "{0}" from {1} completed'.format(cluster_name, ip_to_remove))
+
+    @staticmethod
+    def has_cluster(ip, cluster_name):
+        logger.debug('Checking whether {0} has cluster "{1}" running'.format(ip, cluster_name))
+        client = SSHClient(ip, username='root')
+        try:
+            return client.run('etcdctl member list').strip() != ''
+        except CalledProcessError:
+            return False
 
     @staticmethod
     def deploy_to_slave(master_ip, slave_ip, cluster_name, force=False):
