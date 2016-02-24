@@ -14,6 +14,7 @@
 import os
 import imp
 import inspect
+from etcd import EtcdConnectionFailed
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.system import System
 
@@ -31,7 +32,15 @@ class Migrator(object):
         """
         machine_id = System.get_my_machine_id()
         key = '/ovs/framework/hosts/{0}/versions'.format(machine_id)
-        data = EtcdConfiguration.get(key) if EtcdConfiguration.exists(key) else {}
+        try:
+            data = EtcdConfiguration.get(key) if EtcdConfiguration.exists(key) else {}
+        except EtcdConnectionFailed:
+            import json  # Most likely 2.6 to 2.7 migration
+            data = {}
+            filename = '/opt/OpenvStorage/config/ovs.json'
+            if os.path.exists(filename):
+                with open(filename) as config_file:
+                    data = json.load(config_file).get('core', {}).get('versions', {})
         migrators = []
         path = os.path.join(os.path.dirname(__file__), 'migration')
         for filename in os.listdir(path):
