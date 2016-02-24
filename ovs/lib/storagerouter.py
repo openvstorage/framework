@@ -101,11 +101,11 @@ class StorageRouterController(object):
         shared_size = 0
         readcache_size = 0
         writecache_size = 0
-        used_space_by_roles = 0
 
         for disk in storagerouter.disks:
             for disk_partition in disk.partitions:
                 claimed_space = 0
+                used_space_by_roles = 0
                 for storagedriver_partition in disk_partition.storagedrivers:
                     claimed_space += storagedriver_partition.size if storagedriver_partition.size is not None else 0
                     _directory_used_size = 0
