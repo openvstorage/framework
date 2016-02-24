@@ -105,8 +105,26 @@ class StorageRouterController(object):
         for disk in storagerouter.disks:
             for disk_partition in disk.partitions:
                 claimed_space = 0
+                used_space_by_roles = 0
                 for storagedriver_partition in disk_partition.storagedrivers:
                     claimed_space += storagedriver_partition.size if storagedriver_partition.size is not None else 0
+                    _directory_used_size = 0
+                    try:
+                        output = client.run('du -Pl {0}'.format(storagedriver_partition.path))
+                    except Exception as ex:
+                        logger.error('Failed to get directory usage for {0}. {1}'.format(storagedriver_partition.path, ex))
+                    else:
+                        try:
+                            _used_size, _ = output.split('\t')
+                        except ValueError as ve:
+                            logger.error('Unexpected output for directory {0}. "{1}" . {2}'.format(storagedriver_partition.path, output, ve))
+                        else:
+                            try:
+                                _directory_used_size = int(_used_size) * 1024
+                            except ValueError as ve:
+                                logger.error('Could not parse value: {0}. {1}'.format(_used_size, ve))
+                    used_space_by_roles += _directory_used_size
+
                 partition_available_space = None
                 if disk_partition.mountpoint is not None:
                     disk_partition_device = '/dev/{0}{1}'.format(disk.name, disk_partition.id)
@@ -130,8 +148,11 @@ class StorageRouterController(object):
                 for role in disk_partition.roles:
                     size = disk_partition.size if disk_partition.size is not None else 0
                     if partition_available_space is not None:
-                        size = partition_available_space
-                    available = size - claimed_space  # Subtract size for roles which have already been claimed by other vpools (but not necessarily already been fully used)
+                        # Take available space reported by df then add back used by roles so that the only used space reported is space not managed by us
+                        # then we'll subtract the roles reserved size
+                        available = partition_available_space + used_space_by_roles - claimed_space
+                    else:
+                        available = size - claimed_space  # Subtract size for roles which have already been claimed by other vpools (but not necessarily already been fully used)
                     # Subtract size for competing roles on the same partition
                     for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_USAGES.iteritems():
                         if sub_role in disk_partition.roles and sub_role != role:
