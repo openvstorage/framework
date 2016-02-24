@@ -464,6 +464,8 @@ class OVSMigrator(object):
         # Version 7 introduced:
         # - vPool status
         if working_version < 7:
+            from ovs.dal.hybrids import vpool
+            reload(vpool)
             from ovs.dal.hybrids.vpool import VPool
             from ovs.dal.lists.vpoollist import VPoolList
             for vpool in VPoolList.get_vpools():
