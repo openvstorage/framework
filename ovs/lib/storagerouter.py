@@ -108,23 +108,22 @@ class StorageRouterController(object):
                 claimed_space = 0
                 for storagedriver_partition in disk_partition.storagedrivers:
                     claimed_space += storagedriver_partition.size if storagedriver_partition.size is not None else 0
+                    _directory_used_size = 0
                     try:
-                        output = client.run('du -Pl | grep {0}'.format(storagedriver_partition.path))
+                        output = client.run('du -Pl {0}'.format(storagedriver_partition.path))
                     except Exception as ex:
                         logger.error('Failed to get directory usage for {0}. {1}'.format(storagedriver_partition.path, ex))
                     else:
-                        if output != '':
+                        try:
+                            _used_size, _ = output.split('\t')
+                        except ValueError as ve:
+                            logger.error('Unexpected output for directory {0}. "{1}" . {2}'.format(storagedriver_partition.path, output, ve))
+                        else:
                             try:
-                                _used_size, _ = output.split('\t')
+                                _directory_used_size = int(_used_size) * 1024
                             except ValueError as ve:
-                                logger.error('Unexpected output {0}. {1}'.format(output, ve))
-                            else:
-                                try:
-                                    _directory_used_size = int(_used_size)
-                                except ValueError as ve:
-                                    logger.error('Could not parse value: {0}. {1}'.format(_used_size, ve))
-                                else:
-                                    _directory_used_size = 0
+                                logger.error('Could not parse value: {0}. {1}'.format(_used_size, ve))
+                    print('{0} = {1}'.format(storagedriver_partition.path, _directory_used_size))
                     used_space_by_roles += _directory_used_size
 
                 partition_available_space = None
