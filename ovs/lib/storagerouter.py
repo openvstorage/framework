@@ -123,7 +123,6 @@ class StorageRouterController(object):
                                 _directory_used_size = int(_used_size) * 1024
                             except ValueError as ve:
                                 logger.error('Could not parse value: {0}. {1}'.format(_used_size, ve))
-                    print('{0} = {1}'.format(storagedriver_partition.path, _directory_used_size))
                     used_space_by_roles += _directory_used_size
 
                 partition_available_space = None
@@ -150,10 +149,10 @@ class StorageRouterController(object):
                     size = disk_partition.size if disk_partition.size is not None else 0
                     if partition_available_space is not None:
                         # Take available space reported by df then add back used by roles so that the only used space reported is space not managed by us
-                        # later we'll subtract the roles reserved size
-                        size = partition_available_space + used_space_by_roles
-
-                    available = size - claimed_space  # Subtract size for roles which have already been claimed by other vpools (but not necessarily already been fully used)
+                        # then we'll subtract the roles reserved size
+                        available = partition_available_space + used_space_by_roles - claimed_space
+                    else:
+                        available = size - claimed_space  # Subtract size for roles which have already been claimed by other vpools (but not necessarily already been fully used)
                     # Subtract size for competing roles on the same partition
                     for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_USAGES.iteritems():
                         if sub_role in disk_partition.roles and sub_role != role:
