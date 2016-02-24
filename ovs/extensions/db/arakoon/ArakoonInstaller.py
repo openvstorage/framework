@@ -465,12 +465,11 @@ class ArakoonInstaller(object):
             # Creates services for/on all nodes in the config
             base_name = 'ovs-arakoon'
             target_name = 'ovs-arakoon-{0}'.format(config.cluster_id)
-            if not ServiceManager.has_service(target_name, root_client):
-                ServiceManager.add_service(base_name, root_client,
-                                           params={'CLUSTER': config.cluster_id,
-                                                   'NODE_ID': node.name,
-                                                   'CONFIG_PATH': ArakoonInstaller.ETCD_CONFIG_PATH.format(config.cluster_id)},
-                                           target_name=target_name)
+            ServiceManager.add_service(base_name, root_client,
+                                       params={'CLUSTER': config.cluster_id,
+                                               'NODE_ID': node.name,
+                                               'CONFIG_PATH': ArakoonInstaller.ETCD_CONFIG_PATH.format(config.cluster_id)},
+                                       target_name=target_name)
             logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
 
     @staticmethod
