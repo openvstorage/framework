@@ -14,7 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <section>
-    <h2 data-i18n="ovs:vdisks.title"></h2>
+    <div>
+        <h2 class="pull-left" data-i18n="ovs:vdisks.title"></h2>
+        <button class="btn btn-default pull-right" id="buttonAddVdisk"
+                data-bind="click: addVDisk, enable: $root.shared.user.roles().contains('manage')"
+                style="margin-top: 20px; margin-bottom: 10px;">
+            <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
+            <span data-i18n="ovs:vdisks.add"></span>
+        </button>
+    </div>
     <div data-bind="pager: { loadData: loadVDisks, headers: vDiskHeaders, refreshInterval: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem" data-bind="attr: { id: 'vdisk_' + guid() }">
