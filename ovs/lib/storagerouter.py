@@ -226,8 +226,7 @@ class StorageRouterController(object):
                                          'connection_backend': (dict, None),
                                          'connection_username': (str, None),
                                          'connection_password': (str, None)}
-        required_params_for_new_distributed_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
-                                                     'config_params': sd_config_params}
+        required_params_for_new_distributed_vpool = {'config_params': sd_config_params}
 
         ###############
         # VALIDATIONS #
@@ -495,6 +494,14 @@ class StorageRouterController(object):
         if not ipaddresses:
             error_messages.append('No available IP addresses found suitable for Storage Router storage IP')
 
+        # Check storage IP (for VMWARE)
+        storage_ip = parameters['storage_ip']
+        if vpool is not None:
+            for storagedriver in vpool.storagedrivers:
+                if storagedriver.storage_ip != storage_ip:
+                    error_messages.append('Storage IP {0} is not identical to previously configured storage IPs'.format(storage_ip))
+                    break
+
         if error_messages:
             raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
 
@@ -626,7 +633,7 @@ class StorageRouterController(object):
         storagedriver.ports = ports
         storagedriver.vpool = vpool
         storagedriver.cluster_ip = grid_ip
-        storagedriver.storage_ip = '127.0.0.1' if storagerouter.pmachine.hvtype == 'KVM' else parameters['storage_ip']
+        storagedriver.storage_ip = '127.0.0.1' if storagerouter.pmachine.hvtype == 'KVM' else storage_ip
         storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
         storagedriver.mountpoint_dfs = local_backend_data.get('local_connection_path')
         storagedriver.description = storagedriver.name
