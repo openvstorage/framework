@@ -22,6 +22,7 @@ import etcd
 import random
 import string
 import logging
+import signal
 from ovs.log.logHandler import LogHandler
 
 logging.getLogger('urllib3').setLevel(logging.WARNING)
@@ -291,9 +292,15 @@ class EtcdConfiguration(object):
             data = json.dumps(value)
         client.write(key, data)
         try:
+            def escape(*args, **kwargs):
+                _ = args, kwargs
+                raise RuntimeError()
             from ovs.extensions.storage.persistentfactory import PersistentFactory
             client = PersistentFactory.get_client()
+            signal.signal(signal.SIGALRM, escape)
+            signal.alarm(0.5)  # Wait only 0.5 seconds. This is a backup and should not slow down the system
             client.set(key, value)
+            signal.alarm(0)
         except:
             pass
 

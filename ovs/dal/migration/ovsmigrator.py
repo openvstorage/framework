@@ -468,7 +468,8 @@ class OVSMigrator(object):
             reload(vpool)
             from ovs.dal.hybrids.vpool import VPool
             from ovs.dal.lists.vpoollist import VPoolList
-            for vpool in VPoolList.get_vpools():
+            for _vpool in VPoolList.get_vpools():
+                vpool = VPool(_vpool.guid)
                 if hasattr(vpool, 'status') and vpool.status is None:
                     vpool.status = VPool.STATUSES.RUNNING
                     vpool.save()
