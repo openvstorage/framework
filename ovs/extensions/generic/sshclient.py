@@ -198,13 +198,17 @@ class SSHClient(object):
                         logger.error('Command: "{0}" failed with output: "{1}"'.format(command, str(ose)))
                     raise CalledProcessError(1, command, str(ose))
                 out, err = process.communicate()
+                out = out.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+                err = err.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+                exit_code = process.returncode
+                if exit_code != 0:  # Raise same error as check_output
+                    raise CalledProcessError(exit_code, command, err)
                 if debug:
                     logger.debug('stdout: {0}'.format(out))
                     logger.debug('stderr: {0}'.format(err))
                     return out.strip(), err
                 else:
                     return out.strip()
-
             except CalledProcessError as cpe:
                 if suppress_logging is False:
                     logger.error('Command: "{0}" failed with output: "{1}"'.format(command, cpe.output))
