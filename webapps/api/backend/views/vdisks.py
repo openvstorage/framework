@@ -166,7 +166,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :param devicename: Name of the new vdisk
         :param size: size of  virtual disk
         :param vpool_guid: Guid of vPool to create new vdisk on
-        :param storagerouter_guid: (optional) Guid of the storagerouter_guid to assign disk to
+        :param storagerouter_guid: Guid of the storagerouter_guid to assign disk to
         """
         storagerouter = StorageRouter(storagerouter_guid)
         for storagedriver in storagerouter.storagedrivers:

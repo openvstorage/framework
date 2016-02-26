@@ -117,6 +117,22 @@
         "vpool": "vPool"
     },
     "wizards" : {
+        "add_vdisk": {
+            "title": "Voeg een nieuwe vDisk toe",
+            "gather": {
+                "complete":"vDisk toegevoegd",
+                "failed":"vDisk aanmaak mislukt",
+                "initial_storagerouter": "Storage Router:",
+                "inprogress":"Bezig met aanmaken vDisk",
+                "invalid_name": "De vDisk name is onjuist. Enkel letters a-z, nummers en - (niet als eerste of laatste karakter). Minimaal 3 en maximaal 50 karakters",
+                "name": "Naam:",
+                "size": "Grootte:",
+                "size_unit": "Eenheid:",
+                "started":"vDisk aanmaak gestart",
+                "success":"vDisk correct aangemaakt",
+                "vpool": "vPool:"
+            }
+        },
         "clone": {
             "title": "Kloon",
             "gather": {
