@@ -104,7 +104,7 @@ class Upstart(object):
                     return status, output
                 return status
             # Normal cases - or if the above code didn't yield an outcome
-            if 'start/running' in output or 'is running' in output:
+            if 'start' in output or 'is running' in output:
                 if return_output is True:
                     return True, output
                 return True
