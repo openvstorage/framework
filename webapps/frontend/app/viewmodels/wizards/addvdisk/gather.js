@@ -38,10 +38,6 @@ define([
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
 
-        self.finish = function() {
-            return true;
-        };
-
         self.activate = function() {
             generic.xhrAbort(self.loadStorageRoutersHandle);
             self.loadStorageRoutersHandle = api.get('storagerouters', {
@@ -107,10 +103,10 @@ define([
                 deferred.resolve();
                 api.post('vdisks', {
                     data: {
-                        name: self.data.name(),
+                        devicename: self.data.name(),
                         size: self.data.size(),
-                        vpoolguid: self.data.vPool().guid,
-                        storagerouterguid: self.data.storageRouter().guid
+                        vpool_guid: self.data.vPool().guid(),
+                        storagerouter_guid: self.data.storageRouter().guid()
                     }
                 })
                     .done(function() {

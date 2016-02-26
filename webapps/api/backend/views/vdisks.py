@@ -159,6 +159,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write'])
     @return_task()
+    @load(StorageRouter)
     def create(self, devicename, size, vpool_guid, storagerouter_guid):
         """
         Create a new vdisk
@@ -169,11 +170,10 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         storagerouter = StorageRouter(storagerouter_guid)
         for storagedriver in storagerouter.storagedrivers:
-            for vpool in storagedriver.vpools:
-                if vpool.guid == vpool_guid:
-                    return VDiskController.create_new.delay(devicename=devicename,
-                                                            size=size,
-                                                            storagedriver_guid=storagedriver.guid)
+            if storagedriver.vpool.guid == vpool_guid:
+                return VDiskController.create_new.delay(diskname=devicename,
+                                                        size=size,
+                                                        storagedriver_guid=storagedriver.guid)
         raise NotAcceptable('No storagedriver found for vPool: {0} and storageRouter: {1}'.format(vpool_guid,
                                                                                                   storagerouter_guid))
 
