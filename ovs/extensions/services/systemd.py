@@ -92,13 +92,19 @@ class Systemd(object):
             raise Exception('Add {0}.service failed, {1}'.format(name, output))
 
     @staticmethod
-    def get_service_status(name, client):
+    def get_service_status(name, client, return_output=False):
         name = Systemd._get_name(name, client)
         output = client.run('systemctl is-active {0} || true'.format(name))
         if 'active' == output:
+            if return_output is True:
+                return True, output
             return True
         if 'inactive' == output:
+            if return_output is True:
+                return False, output
             return False
+        if return_output is True:
+            return False, output
         return False
 
     @staticmethod
@@ -130,6 +136,9 @@ class Systemd(object):
 
     @staticmethod
     def start_service(name, client):
+        status, output = Systemd.get_service_status(name, client, True)
+        if status is True:
+            return output
         try:
             name = Systemd._get_name(name, client)
             output = client.run('systemctl start {0}.service'.format(name))
@@ -140,6 +149,9 @@ class Systemd(object):
 
     @staticmethod
     def stop_service(name, client):
+        status, output = Systemd.get_service_status(name, client, True)
+        if status is False:
+            return output
         try:
             name = Systemd._get_name(name, client)
             output = client.run('systemctl stop {0}.service'.format(name))

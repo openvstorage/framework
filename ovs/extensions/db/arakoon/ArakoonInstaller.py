@@ -479,8 +479,7 @@ class ArakoonInstaller(object):
         :param client: Client on which to start the service
         :param cluster_name: The name of the cluster service to start
         """
-        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
-                ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is False:
+        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.start_service('arakoon-{0}'.format(cluster_name), client=client)
 
     @staticmethod
@@ -490,8 +489,7 @@ class ArakoonInstaller(object):
         :param client: Client on which to stop the service
         :param cluster_name: The name of the cluster service to stop
         """
-        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
-                ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is True:
+        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.stop_service('arakoon-{0}'.format(cluster_name), client=client)
 
     @staticmethod

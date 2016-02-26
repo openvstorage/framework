@@ -1499,14 +1499,10 @@ class StorageRouterController(object):
                 if not ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
                     ServiceManager.add_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
                     ServiceManager.enable_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-                if not ServiceManager.get_service_status(StorageRouterController.SUPPORT_AGENT, client=root_client):
-                    ServiceManager.start_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-                else:
-                    ServiceManager.restart_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                ServiceManager.restart_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
             else:
                 if ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
-                    if ServiceManager.get_service_status(StorageRouterController.SUPPORT_AGENT, client=root_client):
-                        ServiceManager.stop_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                    ServiceManager.stop_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
                     ServiceManager.remove_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
         return True
 

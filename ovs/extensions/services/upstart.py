@@ -107,7 +107,7 @@ class Upstart(object):
             if return_output is True:
                 return False, output
             return False
-        except CalledProcessError, ex:
+        except CalledProcessError as ex:
             logger.error('Get {0}.service status failed: {1}'.format(name, ex))
             raise Exception('Retrieving status for service "{0}" failed'.format(name))
 
@@ -130,6 +130,9 @@ class Upstart(object):
 
     @staticmethod
     def start_service(name, client):
+        status, output = Upstart.get_service_status(name, client, True)
+        if status is True:
+            return output
         try:
             name = Upstart._get_name(name, client)
             client.run('service {0} start'.format(name))
@@ -152,6 +155,9 @@ class Upstart(object):
 
     @staticmethod
     def stop_service(name, client):
+        status, output = Upstart.get_service_status(name, client, True)
+        if status is False:
+            return output
         try:
             name = Upstart._get_name(name, client)
             client.run('service {0} stop'.format(name))
