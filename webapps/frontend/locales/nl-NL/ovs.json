@@ -70,7 +70,7 @@
         "no": "Nee"
     },
     "vdisks": {
-        "add": "Voeg nieuwe vDisk toe"
+        "add": "Maak een nieuwe vDisk aan"
     },
     "vpools" : {
         "title": "vPools",
@@ -118,9 +118,9 @@
     },
     "wizards" : {
         "add_vdisk": {
-            "title": "Voeg een nieuwe vDisk toe",
+            "title": "Maak een nieuwe vDisk aan",
             "gather": {
-                "complete":"vDisk toegevoegd",
+                "complete":"vDisk aangemaakt",
                 "failed":"vDisk aanmaak mislukt",
                 "initial_storagerouter": "Storage Router:",
                 "inprogress":"Bezig met aanmaken vDisk",
