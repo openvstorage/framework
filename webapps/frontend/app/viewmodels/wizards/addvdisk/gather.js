@@ -13,9 +13,8 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'knockout',
-    'ovs/shared', 'ovs/api', 'ovs/generic', './data', '../../containers/vpool', '../../containers/storagerouter'
-], function($, ko, shared, api, generic, data, VPool, StorageRouter) {
+    'jquery', 'knockout', 'ovs/api', 'ovs/generic', './data', '../../containers/vpool', '../../containers/storagerouter'
+], function($, ko, api, generic, data, VPool, StorageRouter) {
     "use strict";
     return function() {
         var self = this;
@@ -34,7 +33,7 @@ define([
                 valid = false;
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_name'));
-            };
+            }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
 
@@ -55,9 +54,7 @@ define([
                     generic.crossFiller(
                         guids, self.data.storageRouters,
                         function(guid) {
-                            if (self.data.vPool() === undefined || !self.data.vPool().storageRouterGuids().contains(guid)) {
-                                return new StorageRouter(guid);
-                            }
+                            return new StorageRouter(guid);
                         }, 'guid'
                     );
                     $.each(self.data.storageRouters(), function(index, storageRouter) {
@@ -93,14 +90,13 @@ define([
                     });
             }
 
-        }
+        };
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 generic.alertInfo(
                     $.t('ovs:wizards.add_vdisk.gather.started'),
-                    $.t('ovs:wizards.add_vdisk.gather.inprogress', { what: self.data.name() })
+                    $.t('ovs:wizards.add_vdisk.gather.inprogress')
                 );
-                deferred.resolve();
                 api.post('vdisks', {
                     data: {
                         devicename: self.data.name(),
@@ -112,19 +108,17 @@ define([
                     .done(function() {
                         generic.alertSuccess(
                             $.t('ovs:wizards.add_vdisk.gather.complete'),
-                            $.t('ovs:wizards.add_vdisk.gather.success', { what: self.data.name() })
+                            $.t('ovs:wizards.add_vdisk.gather.success')
                         );
                     })
                     .fail(function(error) {
                         error = $.parseJSON(error.responseText);
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:wizards.add_vdisk.gather.failed', {
-                                what: self.data.name(),
-                                why: error.detail
-                            })
+                            $.t('ovs:wizards.add_vdisk.gather.failed')
                         );
                     });
+                deferred.resolve();
             }).promise();
         };
     };

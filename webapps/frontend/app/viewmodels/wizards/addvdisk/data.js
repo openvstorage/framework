@@ -34,10 +34,10 @@ define(['knockout'], function(ko){
         wizardData.size = ko.computed( function () {
             var size = wizardData.size_entry();
             if (wizardData.size_unit() === 'gib') {
-                size *= 1000;
+                size *= 1024;
             }
             if (wizardData.size_unit() === 'tib') {
-                size *= 1000000;
+                size *= 1024 * 1024;
             }
             return size;
         });

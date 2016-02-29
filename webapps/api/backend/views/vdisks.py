@@ -159,14 +159,14 @@ class VDiskViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write'])
     @return_task()
-    @load(StorageRouter)
+    @load()
     def create(self, devicename, size, vpool_guid, storagerouter_guid):
         """
         Create a new vdisk
         :param devicename: Name of the new vdisk
         :param size: size of  virtual disk
         :param vpool_guid: Guid of vPool to create new vdisk on
-        :param storagerouter_guid: Guid of the storagerouter_guid to assign disk to
+        :param storagerouter_guid: Guid of the storagerouter to assign disk to
         """
         storagerouter = StorageRouter(storagerouter_guid)
         for storagedriver in storagerouter.storagedrivers:

@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <div>
-    <form role="form form-horizontal" class="form-horizontal">
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('name', canContinue().fields) !== -1 }">
+    <form class="form-horizontal">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
             <label class="col-lg-3 control-label" for="addVdisk" data-i18n="ovs:wizards.add_vdisk.gather.name"></label>
             <div class="col-lg-7">
                 <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
