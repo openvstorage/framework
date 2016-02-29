@@ -41,7 +41,8 @@ define(['knockout'], function(ko){
         wizardData.storageRoutersByVpool = ko.computed(function() {
             var i, result = [];
             for (i = 0; i < wizardData.storageRouters().length; i++) {
-                if (wizardData.storageRouters()[i].vPoolGuids.contains(wizardData.vPool().guid())) {
+                if (wizardData.vPool() !== undefined &&
+                       wizardData.storageRouters()[i].vPoolGuids.contains(wizardData.vPool().guid())) {
                     result.push(wizardData.storageRouters()[i]);
                 }
             }

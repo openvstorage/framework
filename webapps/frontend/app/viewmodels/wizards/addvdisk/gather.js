@@ -86,10 +86,6 @@ define([
                                 storageRouter.fillData(srdata[storageRouter.guid()]);
                             }
                         });
-                        //self.data.storageRouter([]);
-                        if (self.data.storageRouters.length > 0) {
-                            self.data.storageRouter = self.data.storageRouters()[0];
-                        }
                     });
             }
         };
