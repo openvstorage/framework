@@ -36,11 +36,5 @@ define([
         data.name('');
         data.size_entry(1);
         data.size_unit('gib');
-        if (data.vPools.length > 0) {
-            data.vPool(data.vPools()[0])
-        }
-        if (data.storageRouters.length > 0) {
-            data.storageRouter(data.storageRouters()[0])
-        }
     };
 });

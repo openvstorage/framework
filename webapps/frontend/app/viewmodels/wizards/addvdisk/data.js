@@ -22,7 +22,7 @@ define(['knockout'], function(ko){
             name:                       ko.observable('').extend({ regex: nameRegex }),
             size_entry:                 ko.observable(0).extend({ numeric: { min: 1, max: 999 } }),
             size_unit:                  ko.observable('gib'),
-            size_units:                 ko.observableArray(['mib', 'gib', 'tib']),
+            size_units:                 ko.observableArray(['gib', 'tib']),
             storageRouter:              ko.observable(),
             storageRouters:             ko.observableArray([]),
             vPool:                      ko.observable(),
@@ -32,11 +32,8 @@ define(['knockout'], function(ko){
         // Computed
         wizardData.size = ko.computed(function () {
             var size = wizardData.size_entry();
-            if (wizardData.size_unit() === 'gib') {
-                size *= 1024;
-            }
             if (wizardData.size_unit() === 'tib') {
-                size *= 1024 * 1024;
+                size *= 1024;
             }
             return size;
         });
