@@ -159,6 +159,28 @@ class VDiskViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write'])
     @return_task()
+    @load()
+    def create(self, devicename, size, vpool_guid, storagerouter_guid):
+        """
+        Create a new vdisk
+        :param devicename: Name of the new vdisk
+        :param size: size of  virtual disk
+        :param vpool_guid: Guid of vPool to create new vdisk on
+        :param storagerouter_guid: Guid of the storagerouter to assign disk to
+        """
+        storagerouter = StorageRouter(storagerouter_guid)
+        for storagedriver in storagerouter.storagedrivers:
+            if storagedriver.vpool.guid == vpool_guid:
+                return VDiskController.create_new.delay(diskname=devicename,
+                                                        size=size,
+                                                        storagedriver_guid=storagedriver.guid)
+        raise NotAcceptable('No storagedriver found for vPool: {0} and storageRouter: {1}'.format(vpool_guid,
+                                                                                                  storagerouter_guid))
+
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
     @load(VDisk)
     def create_snapshot(self, vdisk, name, timestamp, consistent=False, automatic=False, sticky=False, snapshot_id=None):
         """
