@@ -29,6 +29,8 @@ define(['knockout'], function(ko){
             backends:                ko.observableArray(['alba', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']),
             cacheStrategies:         ko.observableArray(['on_read', 'on_write', 'none']),
             cacheStrategy:           ko.observable(''),
+            clusterSize:             ko.observable(4),
+            clusterSizes:            ko.observableArray([4, 8, 16, 32, 64]),
             dedupeMode:              ko.observable(''),
             dedupeModes:             ko.observableArray(['dedupe', 'non_dedupe']),
             distributedMtpt:         ko.observable(),

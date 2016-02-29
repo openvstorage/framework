@@ -298,6 +298,7 @@
                     "on_write": "Cache On Write"
                 },
                 "caching": "Caching",
+                "cluster_size": "Cluster size",
                 "dedupe": "Deduplication",
                 "dedupe_help_message": "Deduplication will calculate an MD5 sum for each write resulting in performance loss, but better cache performance",
                 "dedupe_help_title": "Help - Deduplication",
@@ -342,6 +343,7 @@
         "backendlogin": "Login",
         "backendtype": "Type",
         "cache_strategy": "Cache Strategy",
+        "cluster_size": "Cluster Size",
         "configuration": "Configurations",
         "dedupe_mode": "Dedupe Mode",
         "dtl": "DTL",

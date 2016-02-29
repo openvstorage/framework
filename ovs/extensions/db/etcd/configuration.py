@@ -16,17 +16,21 @@
 Generic module for managing configuration in Etcd
 """
 
+import etcd
 import json
 import time
-import etcd
 import random
-import string
-import logging
 import signal
+import string
 from ovs.log.logHandler import LogHandler
+from requests.packages.urllib3 import disable_warnings
+from requests.packages.urllib3.exceptions import InsecurePlatformWarning
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from requests.packages.urllib3.exceptions import SNIMissingWarning
 
-logging.getLogger('urllib3').setLevel(logging.WARNING)
-logging.getLogger('requests').setLevel(logging.WARNING)
+disable_warnings(InsecurePlatformWarning)
+disable_warnings(InsecureRequestWarning)
+disable_warnings(SNIMissingWarning)
 logger = LogHandler.get('extensions', name='etcdconfiguration')
 
 
@@ -292,12 +296,12 @@ class EtcdConfiguration(object):
             data = json.dumps(value)
         client.write(key, data)
         try:
-            def escape(*args, **kwargs):
+            def _escape(*args, **kwargs):
                 _ = args, kwargs
                 raise RuntimeError()
             from ovs.extensions.storage.persistentfactory import PersistentFactory
             client = PersistentFactory.get_client()
-            signal.signal(signal.SIGALRM, escape)
+            signal.signal(signal.SIGALRM, _escape)
             signal.alarm(0.5)  # Wait only 0.5 seconds. This is a backup and should not slow down the system
             client.set(key, value)
             signal.alarm(0)

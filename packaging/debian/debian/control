@@ -9,13 +9,13 @@ Package: openvstorage-core
 Architecture: amd64
 Pre-Depends: python (>= 2.7.2)
 Depends: rabbitmq-server (>= 3.2.4), python-memcache (>= 1.47-2), memcached (>= 1.4.7),
- volumedriver-server (= 5.7.2), arakoon (>= 1.9.0), arakoon (<< 1.10), alba (>= 0.9.0), alba (<< 1.10), lsscsi (>= 0.27-2), libvirt0 (>= 1.1.1),
+ volumedriver-server (>= 5.7.2), volumedriver-server (<< 5.8), arakoon (>= 1.9.0), arakoon (<< 1.10), alba (>= 0.9.0), alba (<< 1.10), lsscsi (>= 0.27-2), libvirt0 (>= 1.1.1),
  python-libvirt (>= 1.1.1), python-dev (>= 2.7.5), python-pyinotify, sudo,
  libev4 (>= 1:4.11-1), python-boto, nfs-kernel-server, python-suds-jurko, python-datadiff,
  ipython, devscripts, openssh-server, python-paramiko, python-rpyc, python-librabbitmq (>= 1.5.2),
  python-pysnmp4, python-kombu (>= 3.0.7), python-celery (>= 3.1.18), python-pika, etcd, python-etcd,
  python-six, python-protobuf, python-pyudev, sshpass, openvstorage-cinder-plugin, python-billiard (>= 3.3.0.20),
- python-requests
+ python-requests (>=2.9.1)
 Recommends: avahi-utils (>= 0.6.31), openvpn, ntp
 Suggests: logstash (>= 1.4.0-1-c82dc09), virtinst (>= 0.600.4)
 Description: openvStorage core

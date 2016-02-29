@@ -401,6 +401,11 @@ class UpdateController(object):
     @staticmethod
     @add_hooks('update', 'postupgrade')
     def post_upgrade(client):
+        """
+        Upgrade actions after the new packages have actually been installed
+        :param client: SSHClient object
+        :return: None
+        """
         # If we can reach Etcd with a valid config, and there's still an old config file present, delete it
         from ovs.extensions.db.etcd.configuration import EtcdConfiguration
         path = '/opt/OpenvStorage/config/ovs.json'
@@ -448,7 +453,9 @@ class UpdateController(object):
                         config['distributed_transaction_log'] = {}
                         config['distributed_transaction_log']['dtl_transport'] = config['failovercache']['failovercache_transport']
                         config['distributed_transaction_log']['dtl_path'] = config['failovercache']['failovercache_path']
+                        config['volume_manager']['dtl_throttle_usecs'] = config['volume_manager']['foc_throttle_usecs']
                         del config['failovercache']
+                        del config['volume_manager']['foc_throttle_usecs']
                         sdc = remote.StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
                         sdc.configuration = config
                         sdc.save(reload_config=False)

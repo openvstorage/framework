@@ -208,6 +208,7 @@ class StorageRouterController(object):
         sd_config_params = (dict, {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
                                    'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
                                    'dedupe_mode': (str, StorageDriverClient.VPOOL_DEDUPE_MAP.keys()),
+                                   'cluster_size': (int, StorageDriverClient.CLUSTER_SIZES),
                                    'write_buffer': (int, {'min': 128, 'max': 10240}),
                                    'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
                                    'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys())})
@@ -497,8 +498,8 @@ class StorageRouterController(object):
         # Check storage IP (for VMWARE)
         storage_ip = parameters['storage_ip']
         if vpool is not None:
-            for storagedriver in vpool.storagedrivers:
-                if storagedriver.storage_ip != storage_ip:
+            for existing_storagedriver in vpool.storagedrivers:
+                if existing_storagedriver.storage_ip != storage_ip:
                     error_messages.append('Storage IP {0} is not identical to previously configured storage IPs'.format(storage_ip))
                     break
 
@@ -741,7 +742,7 @@ class StorageRouterController(object):
         volume_manager_config = {"tlog_path": sdp_tlogs.path,
                                  "metadata_path": sdp_metadata.path,
                                  "clean_interval": 1,
-                                 "foc_throttle_usecs": 4000}
+                                 "dtl_throttle_usecs": 4000}
 
         # 5. Create SCRUB storagedriver partition (if necessary)
         sdp_scrub = None
@@ -838,6 +839,7 @@ class StorageRouterController(object):
             sco_size = config_params['sco_size']
             dtl_mode = config_params['dtl_mode']
             dedupe_mode = config_params['dedupe_mode']
+            cluster_size = config_params['cluster_size']
             dtl_transport = config_params['dtl_transport']
             cache_strategy = config_params['cache_strategy']
             tlog_multiplier = StorageDriverClient.TLOG_MULTIPLIER_MAP[sco_size]
@@ -846,6 +848,7 @@ class StorageRouterController(object):
             sco_size = current_storage_driver_config['sco_size']
             dtl_mode = current_storage_driver_config['dtl_mode']
             dedupe_mode = current_storage_driver_config['dedupe_mode']
+            cluster_size = current_storage_driver_config['cluster_size']
             dtl_transport = current_storage_driver_config['dtl_transport']
             cache_strategy = current_storage_driver_config['cache_strategy']
             tlog_multiplier = current_storage_driver_config['tlog_multiplier']
@@ -858,10 +861,11 @@ class StorageRouterController(object):
             filesystem_config['fs_dtl_mode'] = StorageDriverClient.VPOOL_DTL_MODE_MAP[dtl_mode]
             filesystem_config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE
 
-        volume_manager_config["read_cache_default_mode"] = StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode]
-        volume_manager_config["read_cache_default_behaviour"] = StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy]
-        volume_manager_config["number_of_scos_in_tlog"] = tlog_multiplier
-        volume_manager_config["non_disposable_scos_factor"] = sco_factor
+        volume_manager_config['default_cluster_size'] = cluster_size * 1024
+        volume_manager_config['read_cache_default_mode'] = StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode]
+        volume_manager_config['read_cache_default_behaviour'] = StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy]
+        volume_manager_config['number_of_scos_in_tlog'] = tlog_multiplier
+        volume_manager_config['non_disposable_scos_factor'] = sco_factor
 
         queue_urls = []
         for current_storagerouter in StorageRouterList.get_masters():
@@ -899,7 +903,7 @@ class StorageRouterController(object):
                                                      vrouter_file_write_threshold=1024,
                                                      vrouter_min_workers=4,
                                                      vrouter_max_workers=16,
-                                                     vrouter_sco_multiplier=sco_size / 4 * 1024,  # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB),
+                                                     vrouter_sco_multiplier=sco_size * 1024 / cluster_size,  # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB),
                                                      vrouter_backend_sync_timeout_ms=5000,
                                                      vrouter_migrate_timeout_ms=5000)
         storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
@@ -1499,14 +1503,10 @@ class StorageRouterController(object):
                 if not ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
                     ServiceManager.add_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
                     ServiceManager.enable_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-                if not ServiceManager.get_service_status(StorageRouterController.SUPPORT_AGENT, client=root_client):
-                    ServiceManager.start_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-                else:
-                    ServiceManager.restart_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                ServiceManager.restart_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
             else:
                 if ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
-                    if ServiceManager.get_service_status(StorageRouterController.SUPPORT_AGENT, client=root_client):
-                        ServiceManager.stop_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                    ServiceManager.stop_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
                     ServiceManager.remove_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
         return True
 
