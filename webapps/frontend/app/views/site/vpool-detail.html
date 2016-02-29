@@ -108,6 +108,21 @@ limitations under the License.
                             <td><span data-bind="text: iops"></span></td>
                             <td data-i18n="ovs:vpools.backendlogin"></td>
                             <td><span data-bind="text: backendLogin() ? backendLogin() : '-'"></span></td>
+                            <td data-i18n="ovs:vpools.cluster_size"></td>
+                            <td>
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry">
+                                        <span data-bind="text: item().cluster_size"></span>
+                                        <span data-i18n="ovs:generic.units.kib"></span>
+                                    </span>
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:vpools.backendconnection"></td>
+                            <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
                             <td data-i18n="ovs:vpools.write_buffer"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
@@ -119,10 +134,15 @@ limitations under the License.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
-                            <td data-i18n="ovs:vpools.backendconnection"></td>
-                            <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
+                            <td data-i18n="ovs:generic.writespeed"></td>
+                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <!-- ko if: backendPreset() === undefined -->
+                                <td colspan="2" >&nbsp;</td>
+                            <!-- /ko -->
+                            <!-- ko if: backendPreset() !== undefined -->
+                                <td data-i18n="ovs:vpools.backendpreset"></td>
+                                <td><span data-bind="text: backendPreset"></span></td>
+                            <!-- /ko -->
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry">
@@ -143,15 +163,9 @@ limitations under the License.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.writespeed"></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
-                            <!-- ko if: backendPreset() === undefined -->
-                                <td colspan="2" >&nbsp;</td>
-                            <!-- /ko -->
-                            <!-- ko if: backendPreset() !== undefined -->
-                                <td data-i18n="ovs:vpools.backendpreset"></td>
-                                <td><span data-bind="text: backendPreset"></span></td>
-                            <!-- /ko -->
+                            <td data-i18n="ovs:generic.nrofvmachines"></td>
+                            <td><span data-bind="text: vMachines().length"></span></td>
+                            <td colspan="2">&nbsp;</td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry"
@@ -166,11 +180,6 @@ limitations under the License.
                                                      translate: 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + item().dtl_transport"></span>
                                 </span>
                             </td>
-                        </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.nrofvmachines"></td>
-                            <td><span data-bind="text: vMachines().length"></span></td>
-                            <td colspan="4">&nbsp;</td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.nrofvdisks"></td>

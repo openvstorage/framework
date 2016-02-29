@@ -45,6 +45,7 @@ define([
         data.backend('alba');
         data.backends(['alba', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']);
         data.cacheStrategy('on_read');
+        data.clusterSize(4);
         data.dedupeMode('dedupe');
         data.distributedMtpt(undefined);
         data.dtlEnabled(true);

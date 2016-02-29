@@ -323,6 +323,7 @@ define([
                 self.data.scoSize(currentConfig.sco_size);
                 self.data.dedupeMode(currentConfig.dedupe_mode);
                 self.data.dtlEnabled(currentConfig.dtl_enabled);
+                self.data.clusterSize(currentConfig.cluster_size);
                 self.data.dtlMode({name: currentConfig.dtl_mode});
                 self.data.writeBuffer(currentConfig.write_buffer);
                 self.data.cacheStrategy(currentConfig.cache_strategy);
