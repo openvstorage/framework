@@ -497,8 +497,8 @@ class StorageRouterController(object):
         # Check storage IP (for VMWARE)
         storage_ip = parameters['storage_ip']
         if vpool is not None:
-            for storagedriver in vpool.storagedrivers:
-                if storagedriver.storage_ip != storage_ip:
+            for existing_storagedriver in vpool.storagedrivers:
+                if existing_storagedriver.storage_ip != storage_ip:
                     error_messages.append('Storage IP {0} is not identical to previously configured storage IPs'.format(storage_ip))
                     break
 
