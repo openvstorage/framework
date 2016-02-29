@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /*global define */
-define(['knockout'], function(ko){
+define(['jquery', 'knockout'], function($, ko){
     "use strict";
     var nameRegex, singleton;
     nameRegex = /^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$/;
@@ -39,13 +39,13 @@ define(['knockout'], function(ko){
         });
 
         wizardData.storageRoutersByVpool = ko.computed(function() {
-            var i, result = [];
-            for (i = 0; i < wizardData.storageRouters().length; i++) {
+            var result = [];
+            $.each(wizardData.storageRouters(), function(index, storageRouter) {
                 if (wizardData.vPool() !== undefined &&
-                       wizardData.storageRouters()[i].vPoolGuids.contains(wizardData.vPool().guid())) {
-                    result.push(wizardData.storageRouters()[i]);
+                    storageRouter.vPoolGuids.contains(wizardData.vPool().guid())) {
+                    result.push(storageRouter);
                 }
-            }
+            });
             return result;
         });
 

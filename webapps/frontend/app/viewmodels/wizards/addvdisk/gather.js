@@ -20,11 +20,9 @@ define([
         var self = this;
 
         // Variables
-        self.data   = data;
+        self.data = data;
         self.loadStorageRoutersHandle = undefined;
         self.loadvPoolsHandle = undefined;
-
-        // Observables
 
         // Computed
         self.canContinue = ko.computed(function() {
@@ -33,6 +31,16 @@ define([
                 valid = false;
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_name'));
+            }
+            if (self.data.vPool() === undefined) {
+                valid = false;
+                fields.push('vpool');
+                reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_vpool'));
+            }
+            if (self.data.name() === undefined) {
+                valid = false;
+                fields.push('storageouter');
+                reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_storagerouter'));
             }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
@@ -65,7 +73,7 @@ define([
                     });
                 self.loadStorageRoutersHandle = api.get('storagerouters', {
                     queryparams: {
-                        contents: 'storagedrivers,vpools,vpools_guids',
+                        contents: 'storagedrivers,vpools_guids',
                         sort: 'name'
                     }
                 })
