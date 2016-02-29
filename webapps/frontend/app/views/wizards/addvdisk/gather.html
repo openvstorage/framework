@@ -36,7 +36,7 @@ limitations under the License.
                 </span>
             </div>
         </div>
-        <div class="form-group">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.vpool"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: {
@@ -53,7 +53,7 @@ limitations under the License.
                 </span>
             </div>
         </div>
-        <div class="form-group">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.initial_storagerouter"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: {
