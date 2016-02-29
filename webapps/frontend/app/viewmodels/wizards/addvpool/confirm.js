@@ -51,6 +51,7 @@ define([
                             'dtl_mode': self.data.dtlMode().name,
                             'sco_size': self.data.scoSize(),
                             'dedupe_mode': self.data.dedupeMode(),
+                            'cluster_size': self.data.clusterSize(),
                             'write_buffer': self.data.writeBuffer(),
                             'dtl_transport': self.data.dtlTransportMode().name,
                             'cache_strategy': self.data.cacheStrategy()

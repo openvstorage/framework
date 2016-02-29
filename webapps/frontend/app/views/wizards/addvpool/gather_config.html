@@ -168,6 +168,28 @@ limitations under the License.
                             <tr>
                                 <td style="width: 40%; padding: 0; border: 0;">
                                     <div style="margin-top: 5px;">
+                                        <span data-i18n="ovs:storagedrivers.configuration.general.cluster_size"></span>:
+                                    </div>
+                                </td>
+                                <td style="padding: 0; border: 0;">
+                                    <span data-bind="dropdown: {
+                                                         enabled: data.vPoolAdd,
+                                                         items: data.clusterSizes,
+                                                         target: data.clusterSize,
+                                                         text: function(item) {
+                                                             if (item === undefined || item === null) {
+                                                                 return '-';
+                                                             }
+                                                             return item + ' ' + $.t('ovs:generic.units.kib');
+                                                         },
+                                                         small: true
+                                                     }">
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="width: 40%; padding: 0; border: 0;">
+                                    <div style="margin-top: 5px;">
                                         <span data-i18n="ovs:storagedrivers.configuration.general.write_buffer"></span>:
                                     </div>
                                 </td>
