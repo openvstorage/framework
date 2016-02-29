@@ -23,9 +23,12 @@ import random
 import signal
 import string
 from ovs.log.logHandler import LogHandler
-from requests import packages
-reload(packages)  # Required for 2.6 > 2.7 upgrade (new requests.packages module)
-from requests.packages.urllib3 import disable_warnings
+try:
+    from requests.packages.urllib3 import disable_warnings
+except ImportError:
+    import requests
+    reload(requests)  # Required for 2.6 > 2.7 upgrade (new requests.packages module)
+    from requests.packages.urllib3 import disable_warnings
 from requests.packages.urllib3.exceptions import InsecurePlatformWarning
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from requests.packages.urllib3.exceptions import SNIMissingWarning
