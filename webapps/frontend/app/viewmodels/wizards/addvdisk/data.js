@@ -19,19 +19,18 @@ define(['knockout'], function(ko){
 
     singleton = function() {
         var wizardData = {
-            name:           ko.observable('').extend({ regex: nameRegex }),
-            size_entry:     ko.observable(0).extend({ numeric: { min: 1, max: 999 } }),
-            size_unit:      ko.observable('gib'),
-            size_units:     ko.observableArray(['mib', 'gib', 'tib']),
-            target:         ko.observable(),
-            storageRouter:  ko.observable(),
-            storageRouters: ko.observableArray([]),
-            vPool:          ko.observable(),
-            vPools:         ko.observableArray([])
+            name:                       ko.observable('').extend({ regex: nameRegex }),
+            size_entry:                 ko.observable(0).extend({ numeric: { min: 1, max: 999 } }),
+            size_unit:                  ko.observable('gib'),
+            size_units:                 ko.observableArray(['mib', 'gib', 'tib']),
+            storageRouter:              ko.observable(),
+            storageRouters:             ko.observableArray([]),
+            vPool:                      ko.observable(),
+            vPools:                     ko.observableArray([])
         };
 
         // Computed
-        wizardData.size = ko.computed( function () {
+        wizardData.size = ko.computed(function () {
             var size = wizardData.size_entry();
             if (wizardData.size_unit() === 'gib') {
                 size *= 1024;
@@ -42,7 +41,18 @@ define(['knockout'], function(ko){
             return size;
         });
 
+        wizardData.storageRoutersByVpool = ko.computed(function() {
+            var i, result = [];
+            for (i = 0; i < wizardData.storageRouters().length; i++) {
+                if (wizardData.storageRouters()[i].vPoolGuids.contains(wizardData.vPool().guid())) {
+                    result.push(wizardData.storageRouters()[i]);
+                }
+            }
+            return result;
+        });
+
         return wizardData;
     };
+
     return singleton();
 });

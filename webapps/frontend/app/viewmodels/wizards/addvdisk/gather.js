@@ -38,32 +38,7 @@ define([
         });
 
         self.activate = function() {
-            generic.xhrAbort(self.loadStorageRoutersHandle);
-            self.loadStorageRoutersHandle = api.get('storagerouters', {
-                queryparams: {
-                    contents: 'storagedrivers',
-                    sort: 'name'
-                }
-            })
-                .done(function(data) {
-                    var guids = [], srdata = {};
-                    $.each(data.data, function(index, item) {
-                        guids.push(item.guid);
-                        srdata[item.guid] = item;
-                    });
-                    generic.crossFiller(
-                        guids, self.data.storageRouters,
-                        function(guid) {
-                            return new StorageRouter(guid);
-                        }, 'guid'
-                    );
-                    $.each(self.data.storageRouters(), function(index, storageRouter) {
-                        storageRouter.fillData(srdata[storageRouter.guid()]);
-                    });
-                    if (self.data.target() === undefined && self.data.storageRouters().length > 0) {
-                        self.data.target(self.data.storageRouters()[0]);
-                    }
-                });
+            generic.xhrAbort(self.loadVPoolsHandle);
             if (generic.xhrCompleted(self.loadVPoolsHandle)) {
                 self.loadVPoolsHandle = api.get('vpools', {
                         queryparams: {
@@ -88,8 +63,35 @@ define([
                             }
                         });
                     });
+                self.loadStorageRoutersHandle = api.get('storagerouters', {
+                    queryparams: {
+                        contents: 'storagedrivers,vpools,vpools_guids',
+                        sort: 'name'
+                    }
+                })
+                    .done(function(data) {
+                        var guids = [], srdata = {};
+                        $.each(data.data, function(index, item) {
+                            guids.push(item.guid);
+                            srdata[item.guid] = item;
+                        });
+                        generic.crossFiller(
+                            guids, self.data.storageRouters,
+                            function(guid) {
+                                return new StorageRouter(guid);
+                            }, 'guid'
+                        );
+                        $.each(self.data.storageRouters(), function(index, storageRouter) {
+                            if (guids.contains(storageRouter.guid())) {
+                                storageRouter.fillData(srdata[storageRouter.guid()]);
+                            }
+                        });
+                        //self.data.storageRouter([]);
+                        if (self.data.storageRouters.length > 0) {
+                            self.data.storageRouter = self.data.storageRouters()[0];
+                        }
+                    });
             }
-
         };
         self.finish = function() {
             return $.Deferred(function(deferred) {
