@@ -9,7 +9,7 @@
 /var/log/arakoon/*/*.log {
     su ovs ovs
     rotate 10
-    size 20M
+    size 19M
     compress
     delaycompress
     notifempty
