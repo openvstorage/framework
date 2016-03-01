@@ -27,7 +27,10 @@ try:
     from requests.packages.urllib3 import disable_warnings
 except ImportError:
     import requests
-    reload(requests)  # Required for 2.6 > 2.7 upgrade (new requests.packages module)
+    try:
+        reload(requests)  # Required for 2.6 > 2.7 upgrade (new requests.packages module)
+    except ImportError:
+        pass  # So, this reload fails because of some FileNodeWarning that can't be found. But it did reload. Yay.
     from requests.packages.urllib3 import disable_warnings
 from requests.packages.urllib3.exceptions import InsecurePlatformWarning
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
