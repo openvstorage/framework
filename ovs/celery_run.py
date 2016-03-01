@@ -62,8 +62,7 @@ celery.conf.CELERY_QUEUES = tuple([Queue('ovs_generic', routing_key='generic.#')
 celery.conf.CELERY_DEFAULT_EXCHANGE = 'generic'
 celery.conf.CELERY_DEFAULT_EXCHANGE_TYPE = 'topic'
 celery.conf.CELERY_DEFAULT_ROUTING_KEY = 'generic.default'
-celery.conf.CELERY_ACKS_LATE = True          # This, together with the below PREFETCH_MULTIPLIER, makes sure that the
-celery.conf.CELERYD_PREFETCH_MULTIPLIER = 1  # workers basically won't be prefetching tasks, to prevent deadlocks
+celery.conf.CELERYD_PREFETCH_MULTIPLIER = 1  # This makes sure that the workers won't be pre-fetching tasks, this to prevent deadlocks
 celery.conf.CELERYBEAT_SCHEDULE = {}
 
 loghandler = LogHandler.get('celery', name='celery')
