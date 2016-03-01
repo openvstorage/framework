@@ -14,8 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <div>
-    <form id="form.gather.vpool" role="form form-horizontal" class="form-horizontal">
-        <p data-i18n="ovs:wizards.addvpool.gatherconfig.basicinfo"></p>
+    <form id="form.gather.vpool" class="form-horizontal">
+        <p data-i18n="ovs:wizards.add_vpool.gather_config.basic_info"
+           data-bind="visible: data.vPool() === undefined"></p>
+        <p data-i18n="ovs:wizards.extend_vpool.gather_config.basic_info"
+           data-bind="visible: data.vPool() !== undefined"></p>
         <ul>
             <li>
                 <span data-i18n="ovs:storagedrivers.configuration.general.dtl"></span>:
@@ -40,6 +43,7 @@ limitations under the License.
                                 </td>
                                 <td style="padding: 0; border: 0">
                                     <span data-bind="dropdown: {
+                                                         enabled: data.vPoolAdd,
                                                          items: data.dtlModes,
                                                          target: dtlMode,
                                                          text: function(item) {
@@ -58,6 +62,7 @@ limitations under the License.
                                 </td>
                                 <td style="padding: 0; border: 0">
                                     <span data-bind="dropdown: {
+                                                         enabled: data.vPoolAdd,
                                                          items: data.dtlTransportModes,
                                                          target: data.dtlTransportMode,
                                                          text: function(item) {
@@ -85,6 +90,7 @@ limitations under the License.
                                 </td>
                                 <td style="padding: 0; border: 0;">
                                     <span data-bind="dropdown: {
+                                                         enabled: data.vPoolAdd,
                                                          items: data.cacheStrategies,
                                                          target: data.cacheStrategy,
                                                          text: function(item) {
@@ -117,6 +123,7 @@ limitations under the License.
                                 </td>
                                 <td style="padding: 0; border: 0;">
                                     <span data-bind="dropdown: {
+                                                         enabled: data.vPoolAdd,
                                                          items: data.dedupeModes,
                                                          target: data.dedupeMode,
                                                          text: function(item) {
@@ -144,6 +151,7 @@ limitations under the License.
                                 </td>
                                 <td style="padding: 0; border: 0;">
                                     <span data-bind="dropdown: {
+                                                         enabled: data.vPoolAdd,
                                                          items: data.scoSizes,
                                                          target: data.scoSize,
                                                          text: function(item) {
@@ -160,13 +168,36 @@ limitations under the License.
                             <tr>
                                 <td style="width: 40%; padding: 0; border: 0;">
                                     <div style="margin-top: 5px;">
+                                        <span data-i18n="ovs:storagedrivers.configuration.general.cluster_size"></span>:
+                                    </div>
+                                </td>
+                                <td style="padding: 0; border: 0;">
+                                    <span data-bind="dropdown: {
+                                                         enabled: data.vPoolAdd,
+                                                         items: data.clusterSizes,
+                                                         target: data.clusterSize,
+                                                         text: function(item) {
+                                                             if (item === undefined || item === null) {
+                                                                 return '-';
+                                                             }
+                                                             return item + ' ' + $.t('ovs:generic.units.kib');
+                                                         },
+                                                         small: true
+                                                     }">
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="width: 40%; padding: 0; border: 0;">
+                                    <div style="margin-top: 5px;">
                                         <span data-i18n="ovs:storagedrivers.configuration.general.write_buffer"></span>:
                                     </div>
                                 </td>
                                 <td style="padding: 0; border: 0;">
-                                    <input data-bind="value: data.writeBuffer"
+                                    <input data-bind="value: data.writeBuffer, disable: !data.vPoolAdd()"
                                            id="writeBuffer"
                                            size="5"
+                                           title="writeBuffer"
                                            style="height: 25px; text-align: center;"/>
                                     <span data-bind="translate: 'ovs:generic.units.mib'"></span>
                                 </td>
@@ -177,6 +208,9 @@ limitations under the License.
             </li>
         </ul>
     </form>
+    <div class="alert alert-info" data-bind="visible: !data.vPoolAdd()" style="margin-top: 20px;">
+        <span data-i18n="ovs:wizards.extend_vpool.gather_config.information"></span>
+    </div>
     <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
         <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>

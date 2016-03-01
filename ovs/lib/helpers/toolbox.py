@@ -67,14 +67,22 @@ class Toolbox(object):
         return functions
 
     @staticmethod
-    def verify_required_params(required_params, actual_params):
+    def verify_required_params(required_params, actual_params, exact_match=False):
         """
         Verify whether the actual parameters match the required parameters
         :param required_params: Required parameters which actual parameters have to meet
         :param actual_params: Actual parameters to check for validity
+        :param exact_match: Keys of both dictionaries must be identical
         :return: None
         """
         error_messages = []
+        if not isinstance(required_params, dict) or not isinstance(actual_params, dict):
+            raise RuntimeError('Required and actual parameters must be of type dictionary')
+
+        if exact_match is True:
+            for key in set(actual_params.keys()).difference(required_params.keys()):
+                error_messages.append('Missing key "{0}" in required_params'.format(key))
+
         for required_key, key_info in required_params.iteritems():
             expected_type = key_info[0]
             expected_value = key_info[1]
@@ -84,7 +92,7 @@ class Toolbox(object):
                 continue
 
             if required_key not in actual_params:
-                error_messages.append('Missing required param "{0}"'.format(required_key))
+                error_messages.append('Missing required param "{0}" in actual parameters'.format(required_key))
                 continue
 
             actual_value = actual_params[required_key]

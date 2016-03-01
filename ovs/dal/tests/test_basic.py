@@ -32,7 +32,7 @@ from ovs.dal.hybrids.t_testdisk import TestDisk
 from ovs.dal.hybrids.t_testemachine import TestEMachine
 from ovs.dal.datalist import DataList
 from ovs.dal.helpers import Descriptor
-from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.extensions.generic.volatilemutex import VolatileMutex, NoLockAvailableException
 
 
 class Basic(TestCase):
@@ -680,7 +680,7 @@ class Basic(TestCase):
         mutex.release()
         mutex.release()  # Should not raise errors
         mutex._volatile.add(mutex.key(), 1, 10)
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(NoLockAvailableException):
             mutex.acquire(wait=1)
         mutex._volatile.delete(mutex.key())
         mutex.acquire()
@@ -1414,6 +1414,28 @@ class Basic(TestCase):
         for disk in machine.disks:
             disk.delete()
         machine.delete()
+
+    def test_shuffle_object_list(self):
+        """
+        Shuffle a data-object list randomly
+        """
+        for i in range(10):
+            disk = TestDisk()
+            disk.name = 'disk{0}'.format(i)
+            disk.save()
+
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.GUIDS,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': []}}).data
+        datalist = DataObjectList(data, TestDisk)
+        starting_order = [disk.name for disk in datalist]
+
+        datalist.shuffle()
+        new_order = [disk.name for disk in datalist]
+
+        self.assertNotEqual(starting_order, new_order, 'Data-object list still has same order after shuffling')
+        self.assertEqual(set(starting_order), set(new_order), 'Items disappeared from the data-object list after shuffling')
 
 if __name__ == '__main__':
     import unittest

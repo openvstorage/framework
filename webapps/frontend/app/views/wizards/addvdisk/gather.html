@@ -1,0 +1,81 @@
+<!--
+Copyright 2015 iNuron NV
+
+Licensed under the Open vStorage Modified Apache License (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.openvstorage.org/license
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<div>
+    <form class="form-horizontal">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
+            <label class="col-lg-3 control-label" for="addVdisk" data-i18n="ovs:wizards.add_vdisk.gather.name"></label>
+            <div class="col-lg-7">
+                <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-3 control-label" for="addVdisk" data-i18n="ovs:wizards.add_vdisk.gather.size"></label>
+            <div class="col-lg-2">
+                <input type="text" id="size_entry" class="autofocus form-control" data-bind="value: data.size_entry, valueUpdate: 'afterkeydown'" style="text-align:right;">
+            </div>
+            <div class="col-lg-2">
+                <span data-bind="dropdown: {
+                         items: data.size_units, target: data.size_unit,
+                         text: function(item) {
+                             return $.t('ovs:generic.units.' + item);
+                         }
+                     }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.vpool"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: {
+                                    key: 'guid',
+                                    keyisfunction: true,
+                                    items: data.vPools,
+                                    target: data.vPool,
+                                    text: function(item) {
+                                        if (item !== undefined) {
+                                            return item.name()
+                                        }
+                                    }
+                                }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.initial_storagerouter"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: {
+                                    key: 'guid',
+                                    keyisfunction: true,
+                                    items: data.storageRoutersByVpool,
+                                    target: data.storageRouter,
+                                    text: function(item) {
+                                        if (item !== undefined) {
+                                            return item.name()
+                                        }
+                                    }
+                                }">
+                </span>
+            </div>
+        </div>
+    </form>
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors" style="margin-bottom: -10px;">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>

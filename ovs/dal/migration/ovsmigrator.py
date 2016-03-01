@@ -436,8 +436,8 @@ class OVSMigrator(object):
 
             working_version = 5
 
-        # Version 6
-        # Distributed scrubbing
+        # Version 6 introduced:
+        # - Distributed scrubbing
         if working_version < 6:
             from ovs.dal.hybrids.diskpartition import DiskPartition
             from ovs.dal.lists.storagedriverlist import StorageDriverList
@@ -460,5 +460,18 @@ class OVSMigrator(object):
                         root_client.dir_chmod(partition.path, 0777)
 
             working_version = 6
+
+        # Version 7 introduced:
+        # - vPool status
+        if working_version < 7:
+            from ovs.dal.hybrids import vpool
+            reload(vpool)
+            from ovs.dal.hybrids.vpool import VPool
+            from ovs.dal.lists.vpoollist import VPoolList
+            for _vpool in VPoolList.get_vpools():
+                vpool = VPool(_vpool.guid)
+                if hasattr(vpool, 'status') and vpool.status is None:
+                    vpool.status = VPool.STATUSES.RUNNING
+                    vpool.save()
 
         return working_version

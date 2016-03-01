@@ -32,7 +32,7 @@ limitations under the License.
                         data-bind="click: function() { $root.sync(); },
                                    style: { color: '#428bca' },
                                    tooltip: 'ovs:vpools.detail.sync',
-                                   enable: $root.shared.user.roles().contains('write')">
+                                   enable: $root.shared.user.roles().contains('write') && status() === 'RUNNING' && $root.updatingStorageRouters() === false">
                     <span class="fa" data-i18n="[html]ovs:icons.sync"></span>
                 </button>
             </li>
@@ -49,10 +49,22 @@ limitations under the License.
                     </thead>
                     <tbody>
                         <tr>
-                            <td style="width: 12%;" data-i18n="ovs:generic.storeddata"></td>
-                            <td style="width: 20%;"><span data-bind="text: storedData"></span></td>
-                            <td data-i18n="ovs:generic.writespeed"></td>
-                            <td><span data-bind="text: backendWriteSpeed"></span></td>
+                            <td style="width: 12%;" data-i18n="ovs:generic.status"></td>
+                            <td style="width: 20%;">
+                                <div style="width: 14px; height: 14px;"
+                                     data-bind="tooltip: 'ovs:generic.states.vpool.' + status(),
+                                                status: {
+                                                    colors: {
+                                                        green: status() === 'RUNNING',
+                                                        blue: status() === 'INSTALLING' || status() === 'EXTENDING' || status() === 'SHRINKING' || status() === 'DELETING',
+                                                        red: status() === 'FAILURE'
+                                                    },
+                                                    defaultColor: 'lightgrey'
+                                                }">
+                                </div>
+                            </td>
+                            <td style="width: 12%;" data-i18n="ovs:generic.writespeed"></td>
+                            <td style="width: 29%;"><span data-bind="text: backendWriteSpeed"></span></td>
                             <td style="width: 12%;" data-i18n="ovs:vpools.cache_strategy"></td>
                             <td style="width: 15%;">
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
@@ -61,8 +73,8 @@ limitations under the License.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.cache"></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
+                            <td style="width: 12%;" data-i18n="ovs:generic.storeddata"></td>
+                            <td style="width: 20%;"><span data-bind="text: storedData"></span></td>
                             <td data-i18n="ovs:generic.readspeed"></td>
                             <td><span data-bind="text: backendReadSpeed"></span></td>
                             <td data-i18n="ovs:vpools.dedupe_mode"></td>
@@ -73,10 +85,10 @@ limitations under the License.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
-                            <td style="width: 12%;" data-i18n="ovs:vpools.backendtype"></td>
-                            <td style="width: 29%;">
+                            <td data-i18n="ovs:generic.cache"></td>
+                            <td><span data-bind="text: cacheRatio"></span></td>
+                            <td data-i18n="ovs:vpools.backendtype"></td>
+                            <td>
                                 <span data-bind="lazyloader: { item: backendType, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry" data-bind="translate: 'ovs:generic.backendtypes.' + item().code()"></span>
                                 </span>
@@ -92,10 +104,25 @@ limitations under the License.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: iops"></span></td>
                             <td data-i18n="ovs:vpools.backendlogin"></td>
                             <td><span data-bind="text: backendLogin() ? backendLogin() : '-'"></span></td>
+                            <td data-i18n="ovs:vpools.cluster_size"></td>
+                            <td>
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry">
+                                        <span data-bind="text: item().cluster_size"></span>
+                                        <span data-i18n="ovs:generic.units.kib"></span>
+                                    </span>
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:vpools.backendconnection"></td>
+                            <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
                             <td data-i18n="ovs:vpools.write_buffer"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
@@ -109,8 +136,13 @@ limitations under the License.
                         <tr>
                             <td data-i18n="ovs:generic.writespeed"></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
-                            <td data-i18n="ovs:vpools.backendconnection"></td>
-                            <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
+                            <!-- ko if: backendPreset() === undefined -->
+                                <td colspan="2" >&nbsp;</td>
+                            <!-- /ko -->
+                            <!-- ko if: backendPreset() !== undefined -->
+                                <td data-i18n="ovs:vpools.backendpreset"></td>
+                                <td><span data-bind="text: backendPreset"></span></td>
+                            <!-- /ko -->
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry">
@@ -133,13 +165,7 @@ limitations under the License.
                         <tr>
                             <td data-i18n="ovs:generic.nrofvmachines"></td>
                             <td><span data-bind="text: vMachines().length"></span></td>
-                            <!-- ko if: backendPreset() === undefined -->
-                                <td colspan="2" >&nbsp;</td>
-                            <!-- /ko -->
-                            <!-- ko if: backendPreset() !== undefined -->
-                                <td data-i18n="ovs:vpools.backendpreset"></td>
-                                <td><span data-bind="text: backendPreset"></span></td>
-                            <!-- /ko -->
+                            <td colspan="2">&nbsp;</td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry"
@@ -260,7 +286,7 @@ limitations under the License.
                 <table class="table table-noborder" style="width: 100%;">
                     <tbody>
                         <tr>
-                             <td style="width: 90px; vertical-align: middle; padding: 0 0 20px 0;">
+                            <td style="width: 90px; vertical-align: middle; padding: 0 0 20px 0;">
                                 <button id="btn.vpool.management" type="button" class="btn btn-lg" data-bind="enable: false">
                                     <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.storageroutervpoollink"></span>
                                 </button>
@@ -278,31 +304,36 @@ limitations under the License.
                                         <!-- ko foreach: $root.storageRouters() -->
                                             <tr>
                                                 <td><span data-bind="text: name"></span></td>
-                                                <!-- ko if: !$root.checkedStorageRouterGuids().contains(guid()) -->
+                                                <!-- ko if: $root.srCanDeleteMap() !== undefined && ($root.srCanDeleteMap()[guid()] === undefined || $root.srCanDeleteMap()[guid()] === null) -->
                                                 <td>
                                                     <button type="button"
                                                         class="btn btn-mini btn-default"
                                                         data-bind="click: $root.addStorageRouter,
                                                                    enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
                                                                    attr: { id: 'button_add_' + guid()},
-                                                                   visible: $root.updatingStorageRouters() === false">
+                                                                   visible: $root.srCanDeleteMap() !== undefined && $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
                                                         <span class="fa" data-i18n="[html]ovs:icons.add"></span>
                                                     </button>
                                                 </td>
                                                 <!-- /ko -->
-                                                <!-- ko if: $root.checkedStorageRouterGuids().contains(guid()) -->
+                                                <!-- ko if: $root.srCanDeleteMap() !== undefined && ($root.srCanDeleteMap()[guid()] === true || $root.srCanDeleteMap()[guid()] === false) -->
                                                 <td>
                                                     <button type="button"
                                                             class="btn btn-mini btn-default"
                                                             data-bind="click: $root.removeStorageRouter,
+                                                                       tooltip: ($root.srCanDeleteMap() === undefined || $root.srCanDeleteMap()[guid()] !== false) ? '' : 'ovs:wizards.shrink_vpool.confirm.cannot_remove',
+                                                                       style: { color: ($root.srCanDeleteMap() !== undefined && $root.srCanDeleteMap()[guid()] === false) ? 'lightgrey' : '' },
                                                                        attr: { id: 'button_remove_' + guid()},
-                                                                       visible: $root.updatingStorageRouters() === false ">
-                                                        <span class="fa" data-i18n="[html]ovs:icons.delete"></span>
+                                                                       visible: $root.srCanDeleteMap() !== undefined && $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING',
+                                                                       css: {hand: ($root.srCanDeleteMap() !== undefined && $root.srCanDeleteMap()[guid()] === true)}">
+                                                        <span class="fa" data-i18n="[html]ovs:icons.delete" data-bind="css: {hand: ($root.srCanDeleteMap() !== undefined && $root.srCanDeleteMap()[guid()] === true)}"></span>
+
                                                     </button>
                                                     <span class="fa-stack">
                                                         <i data-bind="click: function() { $root.reconfigurePmachine(guid(), true); },
                                                                       tooltip: (pMachine() !== undefined && pMachine().isVPoolConfigured()[$root.vPool().guid()]) ? '' : 'ovs:wizards.linkhosts.gather.configure',
-                                                                      visible: $root.updatingStorageRouters() === false &&
+                                                                      visible: $root.srCanDeleteMap() !== undefined &&
+                                                                               $root.updatingStorageRouters() === false &&
                                                                                pMachine() !== undefined &&
                                                                                !(pMachine().mgmtCenterGuid() === undefined || pMachine().mgmtCenterGuid() === null)"
                                                            class="hand fa fa-fw fa-stack-1x" data-i18n="[html]ovs:icons.cog">
@@ -310,7 +341,8 @@ limitations under the License.
                                                         <i data-bind="click: function() { $root.reconfigurePmachine(guid(), false); },
                                                                       tooltip: 'ovs:wizards.linkhosts.gather.unconfigure',
                                                                       style: { color: 'red' },
-                                                                      visible: $root.updatingStorageRouters() === false &&
+                                                                      visible: $root.srCanDeleteMap() !== undefined &&
+                                                                               $root.updatingStorageRouters() === false &&
                                                                                pMachine() !== undefined &&
                                                                                !(pMachine().mgmtCenterGuid() === undefined || pMachine().mgmtCenterGuid() === null) &&
                                                                                pMachine().isVPoolConfigured()[$root.vPool().guid()]"

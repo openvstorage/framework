@@ -54,6 +54,7 @@ define([
         self.rdmaEnabled        = ko.observable();
         self.readSpeed          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.size               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.status             = ko.observable();
         self.storageDriverGuids = ko.observableArray([]);
         self.storageRouterGuids = ko.observableArray([]);
         self.storedData         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
@@ -85,6 +86,7 @@ define([
         self.fillData = function(data, options) {
             options = options || {};
             generic.trySet(self.name, data, 'name');
+            generic.trySet(self.status, data, 'status');
             generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.metadata, data, 'metadata');
@@ -231,6 +233,8 @@ define([
                         self.backendType().load()
                             .then(deferred.resolve)
                             .fail(deferred.reject);
+                    } else {
+                        deferred.resolve();
                     }
                 } else {
                     self.backendType(undefined);

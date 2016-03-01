@@ -29,6 +29,8 @@ define(['knockout'], function(ko){
             backends:                ko.observableArray(['alba', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']),
             cacheStrategies:         ko.observableArray(['on_read', 'on_write', 'none']),
             cacheStrategy:           ko.observable(''),
+            clusterSize:             ko.observable(4),
+            clusterSizes:            ko.observableArray([4, 8, 16, 32, 64]),
             dedupeMode:              ko.observable(''),
             dedupeModes:             ko.observableArray(['dedupe', 'non_dedupe']),
             distributedMtpt:         ko.observable(),
@@ -37,7 +39,6 @@ define(['knockout'], function(ko){
             dtlModes:                ko.observableArray([{name: 'no_sync', disabled: false}, {name: 'a_sync', disabled: false}, {name: 'sync', disabled: false}]),
             dtlTransportMode:        ko.observable({name: 'tcp'}),
             dtlTransportModes:       ko.observableArray([{name: 'tcp', disabled: false}, {name: 'rdma', disabled: true}]),
-            extendVpool:             ko.observable(false),
             hasMgmtCenter:           ko.observable(false),
             host:                    ko.observable('').extend({ regex: hostRegex }),
             integratemgmt:           ko.observable(),
@@ -63,14 +64,14 @@ define(['knockout'], function(ko){
             storageDriver:           ko.observable(),
             storageDrivers:          ko.observableArray([]),
             storageIP:               ko.observable().extend({ regex: ipRegex, identifier: 'storageip' }),
-            storageRouter:           ko.observable(),
             storageRouters:          ko.observableArray([]),
             target:                  ko.observable(),
             vPool:                   ko.observable(),
             vPools:                  ko.observableArray([]),
             writeBuffer:             ko.observable(128).extend({numeric: {min: 128, max: 10240}}),
             writeCacheSize:          ko.observable(1).extend({numeric: {min: 1, max: 10240}}),
-            writeCacheAvailableSize: ko.observable()
+            writeCacheAvailableSize: ko.observable(),
+            v260Migration:           ko.observable(false)
         }, resetAlbaBackends = function() {
             wizardData.albaBackends([]);
             wizardData.albaBackend(undefined);
@@ -95,6 +96,14 @@ define(['knockout'], function(ko){
                 wizardData.writeBuffer.min = 256;
             }
             wizardData.writeBuffer(wizardData.writeBuffer());
+        });
+
+        // Computed
+        wizardData.vPoolAdd = ko.computed(function() {
+            return wizardData.vPool() === undefined;
+        });
+        wizardData.editBackend = ko.computed(function() {
+            return wizardData.vPoolAdd() || wizardData.v260Migration();
         });
 
         return wizardData;

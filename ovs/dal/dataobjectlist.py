@@ -15,6 +15,7 @@
 """
 DataObjectList module
 """
+import random
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import Descriptor
 
@@ -45,6 +46,10 @@ class DataObjectList(object):
 
     @property
     def reduced(self):
+        """
+        Reduced property
+        :return: Data-object list
+        """
         if not self._reduced:
             dataobjectlist = DataObjectList(self._query_result, self.type, reduced=True)
             dataobjectlist._guids = self._guids  # Keep sorting
@@ -52,8 +57,9 @@ class DataObjectList(object):
 
     def update(self, query_result):
         """
-        This method merges in a new query result, preservice objects that might already
+        This method merges in a new query result, pre-service objects that might already
         be cached. It also maintains previous sorting, appending new items to the end of the list
+        :param query_result: Query result to merge in
         """
         # Maintaining order is very important here
         old_guids = self._guids[:]
@@ -77,7 +83,7 @@ class DataObjectList(object):
         Yields an instance with a given guid, or a fake class with only a guid property in case
         of a reduced list
         """
-        def load_and_cache(guid):
+        def _load_and_cache(guid):
             """
             Loads and caches the object
             """
@@ -94,22 +100,24 @@ class DataObjectList(object):
             requested_object = DataObjectList.global_object_cache[self._type_name][requested_guid]
             self._objects[requested_guid] = requested_object
         else:
-            load_and_cache(requested_guid)
+            _load_and_cache(requested_guid)
             return self._objects[requested_guid]
         if requested_object.updated_on_datastore():
-            load_and_cache(requested_guid)
+            _load_and_cache(requested_guid)
             return self._objects[requested_guid]
         return requested_object
 
     def index(self, value):
         """
         Returns the index of a given value (hybrid)
+        :param value: Value to search index of
         """
         return self._guids.index(value.guid)
 
     def count(self, value):
         """
         Returns the count for a given value (hybrid)
+        :param value: Value to count occurrences for
         """
         return self._guids.count(value.guid)
 
@@ -191,7 +199,7 @@ class DataObjectList(object):
     def iterloaded(self):
         """
         Allows to iterate only over the objects that are already loaded
-        preventing unnessesary object loading
+        preventing unnecessary object loading
         """
         for guid in self._guids:
             if guid in self._objects:
@@ -273,3 +281,10 @@ class DataObjectList(object):
             raise ValueError('Index must be an integer')
         self._guids.pop(index)
         self._objects = dict(item for item in self._objects.iteritems() if item[0] in self._guids)
+
+    def shuffle(self):
+        """
+        Randomly shuffle the items in the data-object list
+        :return: Shuffled data-object list
+        """
+        random.shuffle(self._guids)

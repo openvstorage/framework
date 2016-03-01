@@ -27,6 +27,8 @@ class VPool(DataObject):
     The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to
     deploy vMachines. a vPool can span multiple Storage Drivers and connects to a single Storage BackendType.
     """
+    STATUSES = DataObject.enumerator('Status', ['DELETING', 'EXTENDING', 'FAILURE', 'INSTALLING', 'RUNNING', 'SHRINKING'])
+
     __properties = [Property('name', str, doc='Name of the vPool'),
                     Property('description', str, mandatory=False, doc='Description of the vPool'),
                     Property('size', int, mandatory=False, doc='Size of the vPool expressed in Bytes. Set to zero if not applicable.'),
@@ -34,18 +36,11 @@ class VPool(DataObject):
                     Property('password', str, mandatory=False, doc='Password for the Storage BackendType.'),
                     Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domain name, Zone, ...) for the Storage BackendType.'),
                     Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.'),
-                    Property('rdma_enabled', bool, default=False, doc='Has the vpool been configured to use RDMA for DTL transport, which is only possible if all storagerouters are RDMA capable')]
+                    Property('rdma_enabled', bool, default=False, doc='Has the vpool been configured to use RDMA for DTL transport, which is only possible if all storagerouters are RDMA capable'),
+                    Property('status', STATUSES.keys(), doc='Status of the vPool')]
     __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
-    __dynamics = [Dynamic('status', str, 10),
-                  Dynamic('statistics', dict, 4, locked=True),
+    __dynamics = [Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('stored_data', int, 60)]
-
-    def _status(self):
-        """
-        Fetches the Status of the vPool.
-        """
-        _ = self
-        return None
 
     def _statistics(self, dynamic):
         """

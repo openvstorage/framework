@@ -5,7 +5,7 @@ notifications:
   email: false
 before_install:
   - sudo echo "deb http://apt.openvstorage.org unstable main" | sudo tee -a /etc/apt/sources.list
-  - sudo rm -f /var/lib/apt/lists/*
+  - sudo rm -rf /var/lib/apt/lists/*
   - sudo apt-get -qq update
   - sudo apt-get install -y --force-yes openvstorage
 before_script:

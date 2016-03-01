@@ -16,16 +16,26 @@
 Generic module for managing configuration in Etcd
 """
 
+import etcd
 import json
 import time
-import etcd
 import random
+import signal
 import string
-import logging
 from ovs.log.logHandler import LogHandler
+try:
+    from requests.packages.urllib3 import disable_warnings
+except ImportError:
+    import requests
+    reload(requests)  # Required for 2.6 > 2.7 upgrade (new requests.packages module)
+    from requests.packages.urllib3 import disable_warnings
+from requests.packages.urllib3.exceptions import InsecurePlatformWarning
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from requests.packages.urllib3.exceptions import SNIMissingWarning
 
-logging.getLogger('urllib3').setLevel(logging.WARNING)
-logging.getLogger('requests').setLevel(logging.WARNING)
+disable_warnings(InsecurePlatformWarning)
+disable_warnings(InsecureRequestWarning)
+disable_warnings(SNIMissingWarning)
 logger = LogHandler.get('extensions', name='etcdconfiguration')
 
 
@@ -199,12 +209,15 @@ class EtcdConfiguration(object):
         :param host_id: ID of the host
         :return: None
         """
+        if EtcdConfiguration.exists('/ovs/framework/hosts/{0}/setupcompleted'.format(host_id)):
+            return
         base_config = {'/storagedriver': {'rsp': '/var/rsp',
                                           'vmware_mode': 'ganesha'},
                        '/ports': {'storagedriver': [[26200, 26299]],
                                   'mds': [[26300, 26399]],
                                   'arakoon': [26400]},
                        '/setupcompleted': False,
+                       '/versions': {'ovs': 4},
                        '/type': 'UNCONFIGURED'}
         for key, value in base_config.iteritems():
             EtcdConfiguration._set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value, raw=False)
@@ -217,6 +230,8 @@ class EtcdConfiguration(object):
         :param logging_target: Configures (overwrites) logging configuration
         """
         cluster_id = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
+        if EtcdConfiguration.exists('/ovs/framework/cluster_id'):
+            return
         base_config = {'/cluster_id': cluster_id,
                        '/external_etcd': external_etcd,
                        '/registered': False,
@@ -229,7 +244,6 @@ class EtcdConfiguration(object):
                                          'queues': {'storagedriver': 'volumerouter'}},
                        '/plugins/installed': {'backends': [],
                                               'generic': []},
-                       '/versions': {'ovs': 4},
                        '/stores': {'persistent': 'pyrakoon',
                                    'volatile': 'memcache'},
                        '/paths': {'cfgdir': '/opt/OpenvStorage/config',
@@ -290,9 +304,15 @@ class EtcdConfiguration(object):
             data = json.dumps(value)
         client.write(key, data)
         try:
+            def _escape(*args, **kwargs):
+                _ = args, kwargs
+                raise RuntimeError()
             from ovs.extensions.storage.persistentfactory import PersistentFactory
             client = PersistentFactory.get_client()
+            signal.signal(signal.SIGALRM, _escape)
+            signal.alarm(0.5)  # Wait only 0.5 seconds. This is a backup and should not slow down the system
             client.set(key, value)
+            signal.alarm(0)
         except:
             pass
 

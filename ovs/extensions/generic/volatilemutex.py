@@ -24,6 +24,13 @@ from ovs.log.logHandler import LogHandler
 logger = LogHandler.get('extensions', 'volatile mutex')
 
 
+class NoLockAvailableException(Exception):
+    """
+    Custom exception thrown when lock could not be acquired in due time
+    """
+    pass
+
+
 class VolatileMutex(object):
     """
     This is a volatile, distributed mutex to provide cross thread, cross process and cross node
@@ -56,6 +63,7 @@ class VolatileMutex(object):
     def acquire(self, wait=None):
         """
         Acquire a lock on the mutex, optionally given a maximum wait timeout
+        :param wait: Time to wait for lock
         """
         if self._has_lock:
             return True
@@ -67,7 +75,7 @@ class VolatileMutex(object):
             passed = time.time() - self._start
             if wait is not None and passed > wait:
                 logger.error('Lock for {0} could not be acquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
-                raise RuntimeError('Could not acquire lock %s' % self.key())
+                raise NoLockAvailableException('Could not acquire lock %s' % self.key())
         passed = time.time() - self._start
         if passed > 0.1:  # More than 100 ms is a long time to wait!
             logger.warning('Waited {0} sec for lock {1}'.format(passed, self.key()))

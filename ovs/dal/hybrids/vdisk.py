@@ -41,7 +41,7 @@ class VDisk(DataObject):
                     Property('volume_id', str, mandatory=False, doc='ID of the vDisk in the Open vStorage Volume Driver.'),
                     Property('parentsnapshot', str, mandatory=False, doc='Points to a parent storage driver parent ID. None if there is no parent Snapshot'),
                     Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder'),
-                    Property('is_vtemplate', bool, default=False, doc='Indicates whether this vDisk is a vTemplate.')]
+                    Property('has_manual_dtl', bool, default=False, doc='Indicates whether the default DTL location has been overruled by customer')]
     __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
                    Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False),
@@ -50,7 +50,8 @@ class VDisk(DataObject):
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('storagedriver_id', str, 60),
-                  Dynamic('storagerouter_guid', str, 15)]
+                  Dynamic('storagerouter_guid', str, 15),
+                  Dynamic('is_vtemplate', bool, 60)]
 
     def __init__(self, *args, **kwargs):
         """
@@ -156,6 +157,12 @@ class VDisk(DataObject):
             return storagedrivers[0].storagerouter_guid
         return None
 
+    def _is_vtemplate(self):
+        """
+        Returns whether the vdisk is a template
+        """
+        return self.info.get('object_type') == 'TEMPLATE'
+
     def reload_client(self):
         """
         Reloads the StorageDriver Client
@@ -214,6 +221,10 @@ class VDisk(DataObject):
     def calculate_delta(key, dynamic, current_stats):
         """
         Calculate statistics deltas
+        :param key: Key to retrieve from volatile factory
+        :param dynamic:
+        :param current_stats: Current statistics to compare with
+        :return: None
         """
         volatile = VolatileFactory.get_client()
         prev_key = '{0}_{1}'.format(key, 'statistics_previous')

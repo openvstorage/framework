@@ -14,32 +14,27 @@
 /*global define */
 define([
     'jquery', 'ovs/generic',
-    '../build', './data', './gather_config', './gather_vpool', './gather_mountpoints', './gather_mgmtcenter', './confirm'
-], function($, generic, build, data, GatherConfig, GatherVPool, GatherMountPoints, IntegrateMgmt, Confirm) {
+    '../build', './data', './gather_config', './gather_vpool', './gather_cache_info', './gather_mgmtcenter', './confirm'
+], function($, generic, build, data, GatherConfig, GatherVPool, GatherCacheInfo, GatherMgmtCenter, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
         build(self);
 
         // Setup
-        data.extendVpool(generic.tryGet(options, 'extendVpool', false));
         self.modal(generic.tryGet(options, 'modal', false));
 
-        if (data.extendVpool() === true) {
-            self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.extendvpool.title')));
-            self.steps([new GatherMountPoints(), new IntegrateMgmt(), new Confirm()]);
-            self.storagedriver_guid = "";
-            data.storageRouter(options.pendingStorageRouters()[0]);
-            data.target(options.pendingStorageRouters()[0]);
+        if (options.vPool !== undefined) {
+            self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.extend_vpool.title')));
+            data.vPool(options.vPool);
+            data.target(options.storageRouter);
         } else {
-            self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addvpool.title')));
-            self.steps([new GatherVPool(), new GatherConfig(), new GatherMountPoints(), new IntegrateMgmt(), new Confirm()]);
-            data.storageRouter([]);
+            self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.add_vpool.title')));
+            data.vPool(undefined);
             data.target(undefined);
         }
+        self.steps([new GatherVPool(), new GatherConfig(), new GatherCacheInfo(), new GatherMgmtCenter(), new Confirm()]);
         data.completed = options.completed;
-        data.vPool(options.vPool);
-        data.storageDriver(options.storagedriver);
         self.step(0);
         self.activateStep();
 
@@ -50,6 +45,7 @@ define([
         data.backend('alba');
         data.backends(['alba', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']);
         data.cacheStrategy('on_read');
+        data.clusterSize(4);
         data.dedupeMode('dedupe');
         data.distributedMtpt(undefined);
         data.dtlEnabled(true);
@@ -74,6 +70,8 @@ define([
         data.scoSize(4);
         data.scrubAvailable(false);
         data.secretkey('');
+        data.sharedSize(undefined);
+        data.storageDriver(undefined);
         data.storageDrivers([]);
         data.storageIP(undefined);
         data.storageRouters([]);

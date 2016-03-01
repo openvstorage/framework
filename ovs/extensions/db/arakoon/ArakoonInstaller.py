@@ -202,6 +202,15 @@ class ArakoonInstaller(object):
         base_dir = base_dir.rstrip('/')
 
         client = SSHClient(ip)
+        if ArakoonInstaller.is_running(cluster_name, client):
+            logger.info('Arakoon service running for cluster {0}'.format(cluster_name))
+            config = ArakoonClusterConfig(cluster_name, plugins)
+            config.load_config()
+            for node in config.nodes:
+                if node.ip == ip:
+                    return {'client_port': node.client_port,
+                            'messaging_port': node.messaging_port}
+
         node_name = System.get_my_machine_id(client)
 
         home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
@@ -392,9 +401,10 @@ class ArakoonInstaller(object):
             if node.crash_log_sinks.startswith('/'):
                 abs_paths.add(os.path.dirname(os.path.abspath(node.crash_log_sinks)))
             abs_paths = list(abs_paths)
-            root_client.dir_create(abs_paths)
-            root_client.dir_chmod(abs_paths, 0755, recursive=True)
-            root_client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
+            if not root_client.dir_exists(abs_paths):
+                root_client.dir_create(abs_paths)
+                root_client.dir_chmod(abs_paths, 0755, recursive=True)
+                root_client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
 
             # Creates services for/on all nodes in the config
             base_name = 'ovs-arakoon'
@@ -413,8 +423,7 @@ class ArakoonInstaller(object):
         :param client: Client on which to start the service
         :param cluster_name: The name of the cluster service to start
         """
-        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
-                ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is False:
+        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.start_service('arakoon-{0}'.format(cluster_name), client=client)
 
     @staticmethod
@@ -424,9 +433,19 @@ class ArakoonInstaller(object):
         :param client: Client on which to stop the service
         :param cluster_name: The name of the cluster service to stop
         """
-        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
-                ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is True:
+        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.stop_service('arakoon-{0}'.format(cluster_name), client=client)
+
+    @staticmethod
+    def is_running(cluster_name, client):
+        """
+        Checks if arakoon service is running
+        :param client: Client on which to stop the service
+        :param cluster_name: The name of the cluster service to stop
+        """
+        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client):
+            return ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client)
+        return False
 
     @staticmethod
     def remove(cluster_name, client):
@@ -489,11 +508,15 @@ class ArakoonInstaller(object):
         :param current_ips: IPs of the previous nodes
         :param cluster_name: Name of the cluster to restart
         """
+
         logger.debug('Restart sequence (add) for {0}'.format(cluster_name))
         logger.debug('Current ips: {0}'.format(', '.join(current_ips)))
         logger.debug('New ip: {0}'.format(new_ip))
 
         client = SSHClient(new_ip)
+        if ArakoonInstaller.is_running(cluster_name, client):
+            logger.info('Arakoon service for {0} is already running'.format(cluster_name))
+            return
         config = ArakoonClusterConfig(cluster_name)
         config.load_config()
 

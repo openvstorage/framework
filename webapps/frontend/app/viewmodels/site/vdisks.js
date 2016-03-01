@@ -13,10 +13,11 @@
 // limitations under the License.
 /*global define, window */
 define([
-    'jquery', 'knockout',
+    'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter'
-], function($, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter) {
+    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter',
+    '../wizards/addvdisk/index'
+], function($, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, AddVDiskWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -51,6 +52,12 @@ define([
         self.vPools = ko.observableArray([]);
 
         // Functions
+        self.addVDisk = function() {
+            dialog.show(new AddVDiskWizard({
+                modal: true
+            }));
+        };
+
         self.loadVDisks = function(page) {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.vDisksHandle[page])) {

@@ -14,57 +14,58 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <div>
-    <form role="form form-horizontal" class="form-horizontal">
-        <p data-i18n="ovs:wizards.addvpool.confirm.basicinfo"></p>
+    <form class="form-horizontal">
+        <p data-i18n="ovs:wizards.add_vpool.confirm.basic_info"></p>
         <ul>
-            <li><b data-i18n="ovs:wizards.addvpool.gathervpool.name"></b> <span data-bind="text: data.name"></span></li>
+            <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.name"></b> <span data-bind="text: data.name"></span></li>
             <li>
-                <b data-i18n="ovs:wizards.addvpool.gathervpool.backendtype"></b> <span data-bind="translate: 'ovs:generic.backendtypes.' + data.backend()"></span>
+                <b data-i18n="ovs:wizards.add_vpool.gather_vpool.backend_type"></b> <span data-bind="translate: 'ovs:generic.backendtypes.' + data.backend()"></span>
                 <ul data-bind="visible: data.backend() !== 'local' && data.backend() !== 'distributed'">
                     <!-- ko if: data.backend() === 'alba' && !data.localHost() -->
-                        <li><b data-i18n="ovs:wizards.addvpool.gathervpool.host"></b> <span data-bind="text: data.host"></span></li>
-                        <li><b data-i18n="ovs:wizards.addvpool.gathervpool.port"></b> <span data-bind="text: data.port"></span></li>
+                        <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.host"></b> <span data-bind="text: data.host"></span></li>
+                        <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.port"></b> <span data-bind="text: data.port"></span></li>
                     <!-- /ko -->
                     <li data-bind="visible: data.backend().match(/^.+_s3$/) !== null || (data.backend() === 'alba' && !data.localHost())">
-                        <b data-i18n="ovs:wizards.addvpool.gathervpool.accesskey"></b> <span data-bind="text: data.accesskey"></span>
+                        <b data-i18n="ovs:wizards.add_vpool.gather_vpool.access_key"></b> <span data-bind="text: data.accesskey"></span>
                     </li>
                     <li data-bind="visible: data.backend() === 'alba'">
-                        <b data-i18n="ovs:wizards.addvpool.gathervpool.albabackend"></b> <span data-bind="text: data.albaBackend() !== undefined ? data.albaBackend().name : ''"></span> -
+                        <b data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_backend"></b> <span data-bind="text: data.albaBackend() !== undefined ? data.albaBackend().name : ''"></span> -
                         <span data-bind="text: data.albaPreset() !== undefined ? data.albaPreset().name : ''"></span>
                     </li>
                 </ul>
             </li>
         </ul>
-        <p data-i18n="ovs:wizards.addvpool.confirm.storagerouterinfo"></p>
+        <p data-i18n="ovs:wizards.add_vpool.confirm.storagerouter_info"></p>
         <ul>
-            <li><b data-i18n="ovs:wizards.addvpool.gathervpool.initialstoragerouter"></b> <span data-bind="text: data.target() !== undefined ? data.target().name() : ''"></span></li>
+            <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.initial_storagerouter"></b> <span data-bind="text: data.target() !== undefined ? data.target().name() : ''"></span></li>
         </ul>
-        <p data-i18n="ovs:wizards.addvpool.confirm.cache_sizing"></p>
+        <p data-i18n="ovs:wizards.add_vpool.confirm.cache_sizing"></p>
         <ul>
             <li data-bind="visible: data.backend() === 'distributed'">
-                <b data-i18n="ovs:wizards.addvpool.gathermountpoints.mountpoint"></b> <span data-bind="text: data.distributedMtpt()"></span>
+                <b data-i18n="ovs:wizards.add_vpool.gather_cache_info.mountpoint"></b> <span data-bind="text: data.distributedMtpt()"></span>
             </li>
-            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.readcache_size"></b> <span data-bind="text: data.readCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span></li>
-            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.writecache_size"></b> <span data-bind="text: data.writeCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span></li>
-            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.ipaddress"></b> <span data-bind="text: data.storageIP"></span></li>
+            <li><b data-i18n="ovs:wizards.add_vpool.gather_cache_info.readcache_size"></b> <span data-bind="text: data.readCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span></li>
+            <li><b data-i18n="ovs:wizards.add_vpool.gather_cache_info.writecache_size"></b> <span data-bind="text: data.writeCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span></li>
+            <li><b data-i18n="ovs:wizards.add_vpool.gather_cache_info.ip_address"></b> <span data-bind="text: data.storageIP"></span></li>
         </ul>
-        <div data-bind="visible: !data.extendVpool()">
-            <p data-i18n="ovs:wizards.addvpool.confirm.configuration"></p>
+        <div>
+            <p data-i18n="ovs:wizards.add_vpool.confirm.configuration"></p>
             <ul>
                 <li><b data-i18n="ovs:vpools.cache_strategy"></b>: <span data-bind="translate: data.cacheStrategy() !== undefined ? 'ovs:storagedrivers.configuration.general.cache_strategies.' + data.cacheStrategy() : ''"></span></li>
                 <li><b data-i18n="ovs:vpools.dedupe_mode"></b>: <span data-bind="translate: data.dedupeMode() !== undefined ? 'ovs:storagedrivers.configuration.general.dedupe_modes.' + data.dedupeMode() : ''"></span></li>
                 <li><b data-i18n="ovs:vpools.sco_size"></b>: <span data-bind="text: data.scoSize() !== undefined ? data.scoSize() : ''"></span> <span data-i18n="ovs:generic.units.mib"></span></li>
+                <li><b data-i18n="ovs:vpools.cluster_size"></b>: <span data-bind="text: data.clusterSize() !== undefined ? data.clusterSize() : ''"></span> <span data-i18n="ovs:generic.units.kib"></span></li>
                 <li><b data-i18n="ovs:vpools.write_buffer"></b>: <span data-bind="text: data.writeBuffer() !== undefined ? data.writeBuffer() : ''"></span> <span data-i18n="ovs:generic.units.mib"></span></li>
                 <li>
                     <b data-bind="translate: 'ovs:vpools.' + (data.dtlEnabled() === true ? 'dtl_mode' : 'dtl')"></b>:
                     <span data-bind="translate: (data.dtlEnabled() === true ? 'ovs:storagedrivers.configuration.general.dtl_modes.' + data.dtlMode().name : 'ovs:vpools.dtl_disabled')"></span>
                 </li>
                 <li data-bind="visible: data.dtlEnabled() === true">
-                    <b data-i18n="ovs:wizards.addvpool.confirm.dtl_transport"></b>
+                    <b data-i18n="ovs:wizards.add_vpool.confirm.dtl_transport"></b>
                     <span data-bind="translate: data.dtlTransportMode() !== undefined ? 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + data.dtlTransportMode().name : ''"></span>
                 </li>
             </ul>
         </div>
-        <p data-i18n="[html]ovs:wizards.addvpool.confirm.extra"></p>
+        <p data-i18n="[html]ovs:wizards.add_vpool.confirm.extra"></p>
     </form>
 </div>

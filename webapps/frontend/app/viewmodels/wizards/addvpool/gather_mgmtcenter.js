@@ -13,27 +13,19 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'knockout',
-    'ovs/shared', 'ovs/api', 'ovs/generic',
-    '../../containers/storagerouter', '../../containers/storagedriver', './data'
-], function ($, ko, shared, api, generic, StorageRouter, StorageDriver, data) {
+    'jquery', 'knockout', 'ovs/api', './data'
+], function ($, ko, api, data) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.shared = shared;
-        self.data   = data;
+        self.data = data;
 
         // Computed
         self.canContinue = ko.computed(function () {
             return { value: self.data.mgmtcenterLoaded(), showErrors: false, reasons: [], fields: [] };
         });
-
-        // Functions
-        self.next = function() {
-            return true;
-        };
 
         // Durandal
         self.activate = function() {

@@ -45,8 +45,8 @@ for filename in os.listdir(path):
 
 celery = Celery('ovs', include=include)
 
-celery.conf.CELERY_RESULT_BACKEND = "cache"
-celery.conf.CELERY_CACHE_BACKEND = 'memcached://{0}/'.format(';'.join(memcache_servers))
+# http://docs.celeryproject.org/en/latest/configuration.html#cache-backend-settings
+celery.conf.CELERY_RESULT_BACKEND = "cache+memcached://{0}/".format(';'.join(memcache_servers))
 celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(EtcdConfiguration.get('/ovs/framework/messagequeue|protocol'),
                                                                 EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
                                                                 EtcdConfiguration.get('/ovs/framework/messagequeue|password'),

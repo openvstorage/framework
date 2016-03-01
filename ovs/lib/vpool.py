@@ -71,15 +71,15 @@ class VPoolController(object):
         :param vpool_guid: Guid of the vPool to synchronize
         """
         vpool = VPool(vpool_guid)
+        if vpool.status != VPool.STATUSES.RUNNING:
+            raise ValueError('Synchronizing with hypervisor is only allowed if your vPool is in {0} status'.format(VPool.STATUSES.RUNNING))
         for storagedriver in vpool.storagedrivers:
             pmachine = storagedriver.storagerouter.pmachine
             hypervisor = Factory.get(pmachine)
             for vm_object in hypervisor.get_vms_by_nfs_mountinfo(storagedriver.storage_ip, storagedriver.mountpoint):
                 search_vpool = None if pmachine.hvtype == 'KVM' else vpool
-                vmachine = VMachineList.get_by_devicename_and_vpool(
-                    devicename=vm_object['backing']['filename'],
-                    vpool=search_vpool
-                )
+                vmachine = VMachineList.get_by_devicename_and_vpool(devicename=vm_object['backing']['filename'],
+                                                                    vpool=search_vpool)
                 VMachineController.update_vmachine_config(vmachine, vm_object, pmachine)
 
     @staticmethod
@@ -115,6 +115,7 @@ class VPoolController(object):
 
         dtl_mode = file_system.get('fs_dtl_mode', StorageDriverClient.VOLDRV_DTL_ASYNC)
         dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_CONTENT_BASED)
+        cluster_size = volume_manager.get('default_cluster_size', 4096) / 1024
         dtl_transport = dtl.get('dtl_transport', StorageDriverClient.VOLDRV_DTL_TRANSPORT_TCP)
         cache_strategy = volume_manager.get('read_cache_default_behaviour', StorageDriverClient.VOLDRV_CACHE_ON_READ)
         sco_multiplier = volume_router.get('vrouter_sco_multiplier', 1024)
@@ -122,7 +123,7 @@ class VPoolController(object):
         tlog_multiplier = volume_manager.get('number_of_scos_in_tlog', 20)
         non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
 
-        sco_size = sco_multiplier * 4 / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
+        sco_size = sco_multiplier * cluster_size / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
         write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor
 
         dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_mode]
@@ -134,6 +135,7 @@ class VPoolController(object):
                 'dtl_mode': dtl_mode,
                 'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
                 'dtl_enabled': dtl_enabled,
+                'cluster_size': cluster_size,
                 'write_buffer': write_buffer,
                 'dtl_transport': StorageDriverClient.REVERSE_DTL_TRANSPORT_MAP[dtl_transport],
                 'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],

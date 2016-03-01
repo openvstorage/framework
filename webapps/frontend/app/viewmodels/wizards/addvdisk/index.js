@@ -11,16 +11,30 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 /*global define */
-define(['knockout'], function(ko){
+define([
+    'jquery', 'ovs/generic',
+    '../build', './data', './gather'
+], function($, generic, build, data, Gather) {
     "use strict";
-    var singleton = function() {
-        return {
-            vPool:                  ko.observable(),
-            pendingStorageRouters:  ko.observableArray([]),
-            removingStorageRouters: ko.observableArray([]),
-            completed:              undefined
-        };
+    return function(options) {
+        var self = this;
+        build(self);
+
+        // Variables
+        self.data = data;
+
+        // Setup
+        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.add_vdisk.title')));
+        self.modal(generic.tryGet(options, 'modal', false));
+
+        self.steps([new Gather()]);
+        self.activateStep();
+
+        // Cleaning data
+        data.name('');
+        data.size_entry(1);
+        data.size_unit('gib');
     };
-    return singleton();
 });

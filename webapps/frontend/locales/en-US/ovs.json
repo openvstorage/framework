@@ -17,22 +17,6 @@
     "releasename": "Fargo",
     "generic": {
         "states": {
-            "storagerouter": {
-                "ok": "OK",
-                "warning": "Warning",
-                "failure": "Failure",
-                "undefined": "Unknown",
-                "unknown": "Unknown"
-            },
-            "dtl": {
-                "ok_standalone": "Healthy (standalone)",
-                "ok_sync": "Healthy (sync)",
-                "catch_up": "Rebuilding",
-                "degraded": "Degraded",
-                "unknown": "Unknown",
-                "undefined": "Unknown",
-                "null": "Unknown"
-            },
             "backend": {
                 "new": "New",
                 "installing": "Installing",
@@ -46,6 +30,30 @@
                 "missing": "Missing",
                 "failure": "Failure",
                 "raw": "Raw disk"
+            },
+            "dtl": {
+                "ok_standalone": "Healthy (standalone)",
+                "ok_sync": "Healthy (sync)",
+                "catch_up": "Rebuilding",
+                "degraded": "Degraded",
+                "unknown": "Unknown",
+                "undefined": "Unknown",
+                "null": "Unknown"
+            },
+            "storagerouter": {
+                "ok": "OK",
+                "warning": "Warning",
+                "failure": "Failure",
+                "undefined": "Unknown",
+                "unknown": "Unknown"
+            },
+            "vpool": {
+                "DELETING": "Deleting",
+                "EXTENDING": "Extending",
+                "FAILURE": "Failure",
+                "INSTALLING": "Installing",
+                "RUNNING": "Running",
+                "SHRINKING": "Shrinking"
             }
         },
         "messages": {
@@ -290,6 +298,7 @@
                     "on_write": "Cache On Write"
                 },
                 "caching": "Caching",
+                "cluster_size": "Cluster size",
                 "dedupe": "Deduplication",
                 "dedupe_help_message": "Deduplication will calculate an MD5 sum for each write resulting in performance loss, but better cache performance",
                 "dedupe_help_title": "Help - Deduplication",
@@ -308,7 +317,7 @@
                     "no_sync": "Disabled",
                     "sync": "Synchronous"
                 },
-                "dtl_target": "Target",
+                "dtl_target": "Target Failure Domain",
                 "dtl_transport": "Transport Mode",
                 "dtl_transport_modes": {
                     "rdma": "RDMA",
@@ -334,6 +343,7 @@
         "backendlogin": "Login",
         "backendtype": "Type",
         "cache_strategy": "Cache Strategy",
+        "cluster_size": "Cluster Size",
         "configuration": "Configurations",
         "dedupe_mode": "Dedupe Mode",
         "dtl": "DTL",
@@ -437,6 +447,7 @@
         }
     },
     "vdisks": {
+        "add": "Add new vDisk",
         "title": "vDisks",
         "details": "Details",
         "performance": "Performance",
@@ -757,91 +768,119 @@
                 "unable_to_determine_roles": "Failed to determine all required roles"
             }
         },
-        "addvpool": {
+        "add_vdisk": {
+            "title": "Add new vDisk",
+            "gather": {
+                "complete":"Adding vDisk complete",
+                "failed":"Adding vDisk failed",
+                "initial_storagerouter": "Storage Router:",
+                "inprogress":"Adding vDisk in progress",
+                "invalid_name": "The vDisk name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
+                "invalid_storagerouter": "No valid storagerouter selected",
+                "invalid_vpool": "No valid vPool selected",
+                "name": "Name:",
+                "size": "Size:",
+                "size_unit": "Unit:",
+                "started":"Adding vDisk",
+                "success":"vDisk added successfully",
+                "vpool": "vPool:"
+            }
+        },
+        "add_vpool": {
             "title": "Add new vPool",
-            "gatherconfig": {
-                "basicinfo": "Specify the configurations for the vPool"
-            },
-            "gathervpool": {
-                "accesskey": "Access key:",
-                "albabackend": "Backend:",
-                "albapreset": "Preset",
-                "basicinfo": "Add basic vPool information",
-                "backendtype": "BackendType:",
-                "choosebackend": "Choose one of the available backends",
-                "clientid": "Client ID",
-                "clientsecret": "Client secret",
-                "duplicatename": "This name already exists",
-                "extendedinfo": "Extended vPool information",
-                "host": "Host (FQDN/IP):",
-                "initialstoragerouter": "Storage Router:",
-                "invalidalbainfo": "The entered connection info and credentials are invalid",
-                "invalidhost": "Invalid host (should be a FQDN or IP address)",
-                "invalidname": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
-                "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
-                "localhost": "Use local Open vStorage backends",
+            "gather_config": {
+                "basic_info": "Specify the configurations for the vPool",
                 "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
                 "missing_role": "Missing required partition role: __what__",
-                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use.",
-                "name": "Name:",
-                "nobackends": "No backends found.",
-                "nocredentials": "No credentials were entered",
-                "port": "Port:",
-                "secretkey": "Secret key:"
+                "missing_storage_ip": "Required Storage IP __what__ could not be found"
             },
-            "gathermountpoints": {
-                "basicinfo": "Enter/select the requested information.",
+            "gather_vpool": {
+                "access_key": "Access key:",
+                "alba_backend": "Backend:",
+                "alba_preset": "Preset:",
+                "backend_type": "BackendType:",
+                "basic_info": "Add basic vPool information",
+                "basic_info_extend": "Basic vPool information",
+                "choose_backend": "Choose one of the available backends",
+                "client_id": "Client ID",
+                "client_secret": "Client secret",
+                "duplicate_name": "This name already exists",
+                "extended_info": "Extended vPool information",
+                "host": "Host (FQDN/IP):",
+                "initial_storagerouter": "Storage Router:",
+                "invalid_alba_info": "The entered connection info and credentials are invalid",
+                "invalid_host": "Invalid host (should be a FQDN or IP address)",
+                "invalid_name": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
+                "invalid_s3_info": "Could not connect to the given host/port, or wrong credentials.",
+                "local_host": "Use local Open vStorage backends",
+                "mtpt_in_use": "The mountpoint /mnt/__what__ for the vPool is already in use.",
+                "name": "Name:",
+                "no_backends": "No backends found.",
+                "no_credentials": "No credentials were entered",
+                "port": "Port:",
+                "secret_key": "Secret key:"
+            },
+            "gather_cache_info": {
+                "basic_info": "Enter/select the requested information.",
                 "information": "Information about the available space for:",
-                "ipaddress": "Storage IP:",
+                "ip_address": "Storage IP:",
                 "mountpoint": "Mountpoint:",
                 "over_allocation": "Over allocation detected",
-                "portinuse": "The ports are already in use.",
                 "readcache_size": "Read Cache:",
                 "shared_available": "Shared between Read and Write Cache:",
                 "writecache_size": "Write Cache:"
             },
-            "integratemgmtcenter": {
-                "integratemgmt": "Automatically configure the vPool on the Hypervisor.",
-                "mgmtcenter": "is managed by Hypervisor Management Center:",
-                "nomgmtcenter": "is not managed by a Hypervisor Management Center. Automatic configuration of the vPool on the Hypervisor will not be possible. Please refer to the documentation for manual instructions.",
-                "loading": "Loading information about available Management Centers."
+            "gather_mgmt_center": {
+                "integrate_mgmt": "Automatically configure the vPool on the Hypervisor.",
+                "loading": "Loading information about available Management Centers.",
+                "mgmt_center": "is managed by Hypervisor Management Center:",
+                "no_mgmt_center": "is not managed by a Hypervisor Management Center. Automatic configuration of the vPool on the Hypervisor will not be possible. Please refer to the documentation for manual instructions."
             },
             "confirm": {
-                "basicinfo": "Validate the basic vPool information.",
+                "basic_info": "Validate the basic vPool information.",
                 "cache_sizing": "Validate whether the required cache sizes and connection information are correct.",
                 "configuration": "Validate the configuration settings.",
                 "creating": "creating the vPool",
-                "dtl_mode": "DTL Mode:",
                 "dtl_transport": "DTL Transport Mode:",
                 "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
-                "inprogress": "Creation of vPool __what__ is started.",
-                "started": "Creation started",
-                "storagerouterinfo": "Validate whether the correct Storage Router was selected.",
+                "in_progress": "Creation of vPool __what__ is started.",
+                "started": "Started creating",
+                "storagerouter_info": "Validate whether the correct Storage Router was selected.",
                 "success": "Creation of vPool __what__ finished."
             }
         },
-        "extendvpool": {
-            "title": "Extend existing vPool"
-        },
-        "storageroutertovpool": {
-            "title": "Change links between vPool and Storage Routers",
+        "extend_vpool": {
+            "title": "Extend vPool",
             "confirm": {
-                "errorvalidating": "Error while validating. Try again.",
-                "validating": "Validating...",
-                "addvalid": "The vPool can be added to this Storage Router.",
-                "removevalid": "The vPool can be removed from this Storage Router.",
-                "noselection": "No Storage Routers were selected.",
-                "mtptnotavailable": "The location __what__ is not available on this Storage Router",
-                "ipnotavailable": "The IP __what__ is not available on this Storage Router",
-                "started": "Adding/removing",
-                "inprogress": "The vPool is being added to or removed from the validated Storage Routers",
-                "working": "adding/removing the vPool",
-                "complete": "Add/remove vPool complete",
-                "success": "The vPool was added/removed to the selected Storage Routers with success",
-                "somefailed": "The vPool was added to or removed from some the selected Storage Routers. Some tasks failed.",
-                "allfailed": "The vPool could not be added to or removed from any of the selected Storage Routers",
-                "inuse": "The vPool is in use at this Storage Router",
-                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
+                "extending": "extending the vPool",
+                "in_progress": "Extending vPool __what__ has started.",
+                "started": "Started extending",
+                "success": "vPool __what__ was successfully extended."
+            },
+            "gather_config": {
+                "basic_info": "Configurations for the vPool",
+                "information": "Extending a vPool does not allow to reconfigure the storagedriver settings"
+            },
+            "gather_vpool": {
+                "basic_info": "Basic vPool information",
+                "information": "Extending a vPool does not allow to reconfigure the name and backend information",
+                "migration": "This vPool was created using an old verion of Open vStorage. Please enter all Backend related information again."
+            }
+        },
+        "shrink_vpool": {
+            "title": "Remove Storage Driver from vPool",
+            "confirm": {
+                "cannot_remove": "The vPool is in use on this Storage Router",
+                "complete": "Remove complete",
+                "failed_multi": "Not all tasks were successful while removing the vPool from the selected Storage Router",
+                "failed_single": "Not all tasks were successful while removing the vPool",
+                "inprogress_multi": "The vPool is being removed from the Storage Router",
+                "inprogress_single": "The vPool is being removed",
+                "remove_multi": "Are you sure you want to remove the vPool from Storage Router __what__?",
+                "remove_single": "Are you sure you want to remove the last Storage Router for this vPool? This will result in the vPool being deleted.",
+                "started": "Removal started",
+                "success_multi": "The vPool was removed from the selected Storage Router with success",
+                "success_single": "The vPool was successfully removed"
             }
         },
         "createft": {

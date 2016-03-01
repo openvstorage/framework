@@ -16,13 +16,16 @@
 Module for working with celery tasks
 """
 
-from rest_framework import status, viewsets
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import link
-from backend.decorators import required_roles, load, log
+from backend.decorators import load
+from backend.decorators import log
+from backend.decorators import required_roles
 from celery.task.control import inspect
 from ovs.celery_run import celery
+from rest_framework import status
+from rest_framework import viewsets
+from rest_framework.decorators import link
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 
 class TaskViewSet(viewsets.ViewSet):
@@ -41,10 +44,10 @@ class TaskViewSet(viewsets.ViewSet):
         Overview of active, scheduled, reserved and revoked tasks
         """
         inspector = inspect()
-        data = {'active'   : inspector.active(),
+        data = {'active': inspector.active(),
                 'scheduled': inspector.scheduled(),
-                'reserved' : inspector.reserved(),
-                'revoked'  : inspector.revoked()}
+                'reserved': inspector.reserved(),
+                'revoked': inspector.revoked()}
         return Response(data, status=status.HTTP_200_OK)
 
     @log()
@@ -53,18 +56,19 @@ class TaskViewSet(viewsets.ViewSet):
     def retrieve(self, pk):
         """
         Load information about a given task
+        :param pk: Primary key
         """
         result = celery.AsyncResult(pk)
         if result.successful():
             result_data = result.result
         else:
             result_data = str(result.result) if result.result is not None else None
-        data = {'id'        : result.id,
-                'status'    : result.status,
+        data = {'id': result.id,
+                'status': result.status,
                 'successful': result.successful(),
-                'failed'    : result.failed(),
-                'ready'     : result.ready(),
-                'result'    : result_data}
+                'failed': result.failed(),
+                'ready': result.ready(),
+                'result': result_data}
         return Response(data, status=status.HTTP_200_OK)
 
     @link()
@@ -74,6 +78,7 @@ class TaskViewSet(viewsets.ViewSet):
     def get(self, pk):
         """
         Gets a given task's result
+        :param pk: Primary key
         """
         result = celery.AsyncResult(pk)
         return Response(result.get(), status=status.HTTP_200_OK)

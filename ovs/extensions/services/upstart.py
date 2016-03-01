@@ -52,15 +52,6 @@ class Upstart(object):
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
-    def prepare_template(base_name, target_name, client):
-        template_name = '/opt/OpenvStorage/config/templates/upstart/{0}.conf'
-        if client.file_exists(template_name.format(base_name)):
-            client.run('cp -f {0} {1}'.format(
-                template_name.format(base_name),
-                template_name.format(target_name)
-            ))
-
-    @staticmethod
     def add_service(name, client, params=None, target_name=None, additional_dependencies=None):
         if params is None:
             params = {}
@@ -105,7 +96,7 @@ class Upstart(object):
                     return status, output
                 return status
             # Normal cases - or if the above code didn't yield an outcome
-            if 'start/running' in output or 'is running' in output:
+            if 'start' in output or 'is running' in output:
                 if return_output is True:
                     return True, output
                 return True
@@ -116,7 +107,7 @@ class Upstart(object):
             if return_output is True:
                 return False, output
             return False
-        except CalledProcessError, ex:
+        except CalledProcessError as ex:
             logger.error('Get {0}.service status failed: {1}'.format(name, ex))
             raise Exception('Retrieving status for service "{0}" failed'.format(name))
 
@@ -139,6 +130,9 @@ class Upstart(object):
 
     @staticmethod
     def start_service(name, client):
+        status, output = Upstart.get_service_status(name, client, True)
+        if status is True:
+            return output
         try:
             name = Upstart._get_name(name, client)
             client.run('service {0} start'.format(name))
@@ -161,6 +155,9 @@ class Upstart(object):
 
     @staticmethod
     def stop_service(name, client):
+        status, output = Upstart.get_service_status(name, client, True)
+        if status is False:
+            return output
         try:
             name = Upstart._get_name(name, client)
             client.run('service {0} stop'.format(name))
