@@ -1324,7 +1324,7 @@ class SetupController(object):
             master_hostname = master_client.run('hostname')
             target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
             target_client.file_write(rabbitmq_cookie_file, contents)
-            target_client.file_attribs(rabbitmq_cookie_file, mode=400)
+            target_client.file_chmod(rabbitmq_cookie_file, mode=400)
             target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
             target_client.run('rabbitmqctl join_cluster rabbit@{0}; sleep 5;'.format(master_hostname))
             target_client.run('rabbitmqctl stop; sleep 5;')

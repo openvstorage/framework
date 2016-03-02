@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+SSHClient class
+Used for remote or local command execution
+"""
+
 import os
 import re
 import grp
@@ -510,7 +515,7 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
 print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             return json.loads(self.run('python -c """{0}"""'.format(command)))
 
-    def file_attribs(self, filename, mode):
+    def file_chmod(self, filename, mode):
         """
         Sets the mode of a remote file
         :param filename: File to chmod
@@ -521,6 +526,34 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             check_output(command, shell=True)
         else:
             self.run(command)
+
+    def file_chown(self, filenames, user, group):
+        """
+        Sets the ownership of a remote file
+        :param filenames: Files to chown
+        :param user: User to set
+        :param group: Group to set
+        :return: None
+        """
+        all_users = [user_info[0] for user_info in pwd.getpwall()]
+        all_groups = [group_info[0] for group_info in grp.getgrall()]
+
+        if user not in all_users:
+            raise ValueError('User "{0}" is unknown on the system'.format(user))
+        if group not in all_groups:
+            raise ValueError('Group "{0}" is unknown on the system'.format(group))
+
+        uid = pwd.getpwnam(user)[2]
+        gid = grp.getgrnam(group)[2]
+        if isinstance(filenames, basestring):
+            filenames = [filenames]
+        for filename in filenames:
+            if self.file_exists(filename=filename) is False:
+                continue
+            if self.is_local is True:
+                os.chown(filename, uid, gid)
+            else:
+                self.run('chown {0}:{1} {2}'.format(user, group, filename))
 
     def file_list(self, directory, abs_path=False, recursive=False):
         """
@@ -554,4 +587,3 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
                     if recursive is False:
                         break
         return all_files
-
