@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-SSHClient class
+SSHClient module
 Used for remote or local command execution
 """
 
