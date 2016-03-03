@@ -677,13 +677,13 @@ class VDiskController(object):
         if non_disposable_sco_factor is None:
             non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
 
-        return {'sco_size': sco_size,
+        return {'sco_size': int(sco_size),
                 'dtl_mode': dtl_mode,
                 'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
-                'write_buffer': tlog_multiplier * sco_size * non_disposable_sco_factor,
+                'write_buffer': int(tlog_multiplier * sco_size * non_disposable_sco_factor),
                 'dtl_target': dtl_target,
                 'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],
-                'readcache_limit': readcache_limit,
+                'readcache_limit': int(readcache_limit),
                 'metadata_cache_size': metadata_cache_size}
 
     @staticmethod
