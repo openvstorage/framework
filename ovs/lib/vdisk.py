@@ -646,6 +646,11 @@ class VDiskController(object):
         tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id)
         readcache_limit = vdisk.storagedriver_client.get_readcache_limit(volume_id)
         non_disposable_sco_factor = vdisk.storagedriver_client.get_sco_cache_max_non_disposable_factor(volume_id)
+        metadata_cache_size = vdisk.storagedriver_client.get_metadata_cache_capacity(volume_id)
+        if not metadata_cache_size:
+            metadata_cache_size = StorageDriverClient.DEFAULT_METADATA_CACHE_SIZE
+        else:
+            metadata_cache_size *= StorageDriverClient.METADATA_CACHE_PAGE_SIZE
 
         dtl_target = None
         if dtl_config is None:
@@ -673,10 +678,11 @@ class VDiskController(object):
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
                 'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
-                'write_buffer': tlog_multiplier * sco_size * non_disposable_sco_factor,
+                'write_buffer': int(tlog_multiplier * sco_size * non_disposable_sco_factor),
                 'dtl_target': dtl_target,
                 'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],
-                'readcache_limit': readcache_limit}
+                'readcache_limit': readcache_limit,
+                'metadata_cache_size': metadata_cache_size}
 
     @staticmethod
     @celery.task(name='ovs.vdisk.set_config_params')
@@ -695,6 +701,9 @@ class VDiskController(object):
 
         if new_config_params.get('dtl_target') is not None:
             required_params.update({'dtl_target': (str, Toolbox.regex_guid)})
+
+        if new_config_params.get('metadata_cache_size') is not None:
+            required_params.update({'metadata_cache_size': (int, {'min': StorageDriverClient.METADATA_CACHE_PAGE_SIZE})})
 
         Toolbox.verify_required_params(required_params, new_config_params)
 
@@ -780,6 +789,8 @@ class VDiskController(object):
                         block_size = vol_info.lba_size * vol_info.cluster_multiplier or 4096
                         limit = new_value * 1024 * 1024 * 1024 / block_size if new_value else None
                         vdisk.storagedriver_client.set_readcache_limit(volume_id, limit)
+                    elif key =='metadata_cache_size':
+                        vdisk.storagedriver_client.set_metadata_cache_capacity(volume_id, new_value / StorageDriverClient.METADATA_CACHE_PAGE_SIZE)
                     else:
                         raise KeyError('Unsupported property provided: "{0}"'.format(key))
                     logger.info('Updated property {0}'.format(key))
