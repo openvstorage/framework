@@ -72,6 +72,9 @@ class StorageDriverClient(object):
     FRAMEWORK_DTL_TRANSPORT_TCP = 'tcp'
     FRAMEWORK_DTL_TRANSPORT_RSOCKET = 'rdma'
 
+    METADATA_CACHE_PAGE_SIZE = 256 * 24
+    DEFAULT_METADATA_CACHE_SIZE = 8192 * METADATA_CACHE_PAGE_SIZE
+
     VDISK_CACHE_MAP = {FRAMEWORK_NO_CACHE: ReadCacheBehaviour.NO_CACHE,
                        FRAMEWORK_CACHE_ON_READ: ReadCacheBehaviour.CACHE_ON_READ,
                        FRAMEWORK_CACHE_ON_WRITE: ReadCacheBehaviour.CACHE_ON_WRITE}

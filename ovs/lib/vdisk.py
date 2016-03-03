@@ -62,8 +62,6 @@ logger = LogHandler.get('lib', name='vdisk')
 storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
 storagerouterclient.Logger.enableLogging()
 
-METADATA_CACHE_PAGE_SIZE = 256 * 24
-DEFAULT_METADATA_CACHE_SIZE = 8192 * METADATA_CACHE_PAGE_SIZE
 
 class VDiskController(object):
     """
@@ -650,9 +648,9 @@ class VDiskController(object):
         non_disposable_sco_factor = vdisk.storagedriver_client.get_sco_cache_max_non_disposable_factor(volume_id)
         metadata_cache_size = vdisk.storagedriver_client.get_metadata_cache_capacity(volume_id)
         if not metadata_cache_size:
-            metadata_cache_size = DEFAULT_METADATA_CACHE_SIZE
+            metadata_cache_size = StorageDriverClient.DEFAULT_METADATA_CACHE_SIZE
         else:
-            metadata_cache_size *= METADATA_CACHE_PAGE_SIZE
+            metadata_cache_size *= StorageDriverClient.METADATA_CACHE_PAGE_SIZE
 
         dtl_target = None
         if dtl_config is None:
@@ -677,13 +675,13 @@ class VDiskController(object):
         if non_disposable_sco_factor is None:
             non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
 
-        return {'sco_size': int(sco_size),
+        return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
                 'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
                 'write_buffer': int(tlog_multiplier * sco_size * non_disposable_sco_factor),
                 'dtl_target': dtl_target,
                 'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],
-                'readcache_limit': int(readcache_limit),
+                'readcache_limit': readcache_limit,
                 'metadata_cache_size': metadata_cache_size}
 
     @staticmethod
@@ -705,7 +703,7 @@ class VDiskController(object):
             required_params.update({'dtl_target': (str, Toolbox.regex_guid)})
 
         if new_config_params.get('metadata_cache_size') is not None:
-            required_params.update({'metadata_cache_size': (int, {'min': METADATA_CACHE_PAGE_SIZE})})
+            required_params.update({'metadata_cache_size': (int, {'min': StorageDriverClient.METADATA_CACHE_PAGE_SIZE})})
 
         Toolbox.verify_required_params(required_params, new_config_params)
 
@@ -792,7 +790,7 @@ class VDiskController(object):
                         limit = new_value * 1024 * 1024 * 1024 / block_size if new_value else None
                         vdisk.storagedriver_client.set_readcache_limit(volume_id, limit)
                     elif key =='metadata_cache_size':
-                        vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), int(new_value / METADATA_CACHE_PAGE_SIZE))
+                        vdisk.storagedriver_client.set_metadata_cache_capacity(volume_id, new_value / StorageDriverClient.METADATA_CACHE_PAGE_SIZE)
                     else:
                         raise KeyError('Unsupported property provided: "{0}"'.format(key))
                     logger.info('Updated property {0}'.format(key))
