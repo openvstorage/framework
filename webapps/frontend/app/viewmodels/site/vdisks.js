@@ -58,15 +58,12 @@ define([
             }));
         };
 
-        self.loadVDisks = function(page) {
+        self.loadVDisks = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.vDisksHandle[page])) {
-                    var options = {
-                        sort: 'vpool_guid,devicename',  // Aka, sorted by vpool, machinename, diskname
-                        page: page,
-                        contents: '_dynamics,_relations,-snapshots'
-                    };
-                    self.vDisksHandle[page] = api.get('vdisks', { queryparams: options })
+                if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
+                    options.sort = 'vpool_guid,devicename';
+                    options.contents = '_dynamics,_relations,-snapshots';
+                    self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,

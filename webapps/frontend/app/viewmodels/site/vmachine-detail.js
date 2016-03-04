@@ -102,16 +102,13 @@ define([
         self.refreshSnapshots = function() {
             // Not un use, for mapping only
         };
-        self.loadVDisks = function(page) {
+        self.loadVDisks = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.vDisksHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        page: page,
-                        contents: '_dynamics,-snapshots',
-                        vmachineguid: self.vMachine().guid()
-                    };
-                    self.vDisksHandle[page] = api.get('vdisks', { queryparams: options })
+                if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = '_dynamics,-snapshots';
+                    options.vmachineguid = self.vMachine().guid();
+                    self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,

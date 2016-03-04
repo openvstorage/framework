@@ -46,16 +46,13 @@ define([
         self.vPools     = ko.observableArray([]);
 
         // Functions
-        self.loadVTemplates = function(page) {
+        self.loadVTemplates = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.vTemplatesHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        page: page,
-                        contents: 'vdisks',
-                        query: JSON.stringify(self.query)
-                    };
-                    self.vTemplatesHandle[page] = api.get('vmachines', { queryparams: options })
+                if (generic.xhrCompleted(self.vTemplatesHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = 'vdisks';
+                    options.query = JSON.stringify(self.query);
+                    self.vTemplatesHandle[options.page] = api.get('vmachines', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,

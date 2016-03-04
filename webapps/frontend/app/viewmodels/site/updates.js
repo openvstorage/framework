@@ -112,15 +112,12 @@ define([
         });
 
         // Functions
-        self.loadStorageRouters = function(page) {
+        self.loadStorageRouters = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.storageRoutersHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        page: page,
-                        'contents': '_relations'
-                    };
-                    self.storageRoutersHandle[page] = api.get('storagerouters', { queryparams: options })
+                if (generic.xhrCompleted(self.storageRoutersHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = '_relations';
+                    self.storageRoutersHandle[options.page] = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,

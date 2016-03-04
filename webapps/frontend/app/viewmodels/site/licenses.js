@@ -42,15 +42,12 @@ define([
                 modal: true
             }));
         };
-        self.loadLicenses = function(page) {
+        self.loadLicenses = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.licensesHandle[page])) {
-                    var options = {
-                        sort: 'component,name,valid_until',
-                        page: page,
-                        contents: '_dynamics'
-                    };
-                    self.licensesHandle[page] = api.get('licenses', { queryparams: options })
+                if (generic.xhrCompleted(self.licensesHandle[options.page])) {
+                    options.sort = 'component,name,valid_until';
+                    options.contents = '_dynamics';
+                    self.licensesHandle[options.page] = api.get('licenses', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,

@@ -128,14 +128,12 @@ define([
             }, client);
             return client;
         };
-        self.loadUsers = function(page) {
+        self.loadUsers = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.usersHandle[page])) {
-                    var options = {
-                        sort: 'username',
-                        contents: '_relations'
-                    };
-                    self.usersHandle[page] = api.get('users', { queryparams: options })
+                if (generic.xhrCompleted(self.usersHandle[options.page])) {
+                    options.sort = 'username';
+                    options.contents = '_relations';
+                    self.usersHandle[options.page] = api.get('users', { queryparams: options })
                         .then(function(data) {
                             deferred.resolve({
                                 data: data,
@@ -172,17 +170,14 @@ define([
                 }
             }).promise();
         };
-        self.loadClients = function(page) {
+        self.loadClients = function(options) {
             return $.Deferred(function(deferred) {
-                if (self.selectedUserGuid() !== undefined && generic.xhrCompleted(self.clientsHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        page: page,
-                        contents: '_relations',
-                        userguid: self.selectedUserGuid(),
-                        type: 'USER'
-                    };
-                    self.clientsHandle[page] = api.get('clients', { queryparams: options })
+                if (self.selectedUserGuid() !== undefined && generic.xhrCompleted(self.clientsHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = '_relations';
+                    options.userguid = self.selectedUserGuid();
+                    options.type = 'USER';
+                    self.clientsHandle[options.page] = api.get('clients', { queryparams: options })
                         .then(function(data) {
                             deferred.resolve({
                                 data: data,

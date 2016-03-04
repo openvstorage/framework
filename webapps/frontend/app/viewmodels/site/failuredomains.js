@@ -45,14 +45,12 @@ define([
         self.buildDomain = function() {
             return new FailureDomain();
         };
-        self.loadDomains = function(page) {
+        self.loadDomains = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.domainsHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        contents: '_relations'
-                    };
-                    self.domainsHandle[page] = api.get('failure_domains', { queryparams: options })
+                if (generic.xhrCompleted(self.domainsHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = '_relations';
+                    self.domainsHandle[options.page] = api.get('failure_domains', { queryparams: options })
                         .then(function(data) {
                             deferred.resolve({
                                 data: data,
