@@ -232,3 +232,18 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         storagerouter = StorageRouter(vdisk.storagerouter_guid)
         return VDiskController.delete.s(diskguid=vdisk.guid).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
+
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VDisk)
+    def schedule_backend_sync(self, vdisk):
+        """
+        Schedule a backend sync on a vdisk
+        :param vdisk: vdisk to schedule a backend sync to
+        :return: TLogName associated with the data sent off to the backend
+        """
+        storagerouter = StorageRouter(vdisk.storagerouter_guid)
+        return VDiskController.schedule_backend_sync.s(vdisk_guid=vdisk.guid).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
+

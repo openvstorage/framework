@@ -1095,3 +1095,17 @@ class VDiskController(object):
 
         logger.debug('Deleting vdisk {0} from model'.format(vdisk.name))
         vdisk.delete()
+
+    @staticmethod
+    @celery.task(name='ovs.vdisk.schedule_backend_sync')
+    def schedule_backend_sync(vdisk_guid):
+        """
+        Schedule a backend sync on a vdisk
+        :param vdisk_guid: Guid of vdisk to schedule a backend sync to
+        :return: TLogName associated with the data sent off to the backend
+        """
+        vdisk = VDisk(vdisk_guid)
+        logger.info('Schedule backend sync for vdisk {0}'.format(vdisk.name))
+        storagedriver_client = StorageDriverClient.load(vdisk.vpool)
+
+        return storagedriver_client.schedule_backend_sync(str(vdisk.volume_id))
