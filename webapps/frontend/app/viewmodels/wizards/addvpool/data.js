@@ -105,7 +105,16 @@ define(['knockout'], function(ko){
         wizardData.editBackend = ko.computed(function() {
             return wizardData.vPoolAdd() || wizardData.v260Migration();
         });
-
+        wizardData.enhancedPresets = ko.computed(function(){
+            if (wizardData.albaBackend() === undefined){
+                wizardData.albaPreset(undefined);
+                return []
+            }
+            if (wizardData.albaBackend().enhancedPresets().indexOf(wizardData.albaPreset()) === -1){
+                wizardData.albaPreset(wizardData.albaBackend().enhancedPresets()[0]);
+            } 
+            return wizardData.albaBackend().enhancedPresets();
+        });
         return wizardData;
     };
     return singleton();
