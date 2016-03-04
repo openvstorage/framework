@@ -106,6 +106,11 @@ class DataObjectAttributeEncoder(json.JSONEncoder):
     Custom JSONEncoder for attributes
     """
     def default(self, obj):
+        """
+        Default return value
+        :param obj: Object to encode
+        :return: String
+        """
         return "{0}: {1}".format(type(obj), obj)
 
 
@@ -148,7 +153,7 @@ class DataObject(object):
         identifier = Descriptor(cls).descriptor['identifier']
         if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
             new_class = Descriptor().load(hybrid_structure[identifier]).get_object()
-            return super(cls, new_class).__new__(new_class, *args, **kwargs)
+            return super(cls, new_class).__new__(new_class, *args)
         return super(DataObject, cls).__new__(cls)
 
     def __init__(self, guid=None, data=None, datastore_wins=False, volatile=False, _hook=None):
@@ -259,9 +264,6 @@ class DataObject(object):
                                       'data': None}
                 self._add_list_property(key, info['list'])
 
-        # Store original data
-        self._original = copy.deepcopy(self._data)
-
         if _hook is not None and hasattr(_hook, '__call__'):
             _hook()
 
@@ -290,6 +292,9 @@ class DataObject(object):
             for prop in self._properties:
                 if prop.name in data:
                     setattr(self, prop.name, data[prop.name])
+
+        # Store original data
+        self._original = copy.deepcopy(self._data)
 
     #######################
     # Helper methods for dynamic getting and setting
@@ -337,7 +342,7 @@ class DataObject(object):
         # pylint: enable=protected-access
         setattr(self.__class__, dynamic.name, property(fget))
 
-    # Helper method spporting property fetching
+    # Helper method supporting property fetching
     def _get_property(self, prop):
         """
         Getter for a simple property
@@ -470,6 +475,9 @@ class DataObject(object):
         of the specified conflict resolve settings.
         It will also invalidate certain caches if required. For example lists pointing towards this
         object
+        :param recursive: Save related sub-objects recursively
+        :param skip: Skip certain relations
+        :param _hook:
         """
         if self.volatile is True:
             raise VolatileObjectException()
@@ -676,7 +684,10 @@ class DataObject(object):
     def delete(self, abandon=None, _hook=None):
         """
         Delete the given object. It also invalidates certain lists
+        :param abandon:
+        :param _hook: Unused
         """
+        _ = _hook
         if self.volatile is True:
             raise VolatileObjectException()
 
@@ -773,7 +784,10 @@ class DataObject(object):
         """
         Invalidates all dynamic property caches. Use with caution, as this action can introduce
         a short performance hit.
+        :param properties: Properties to invalidate
         """
+        if properties is not None and not isinstance(properties, list):
+            properties = [properties]
         for dynamic in self._dynamics:
             if properties is None or dynamic.name in properties:
                 key = '{0}_{1}'.format(self._key, dynamic.name)
@@ -797,14 +811,12 @@ class DataObject(object):
         """
         Exports this object's data for import in another object
         """
-        data = {}
-        for prop in self._properties:
-            data[prop.name] = self._data[prop.name]
-        return data
+        return dict((prop.name, self._data[prop.name]) for prop in self._properties)
 
     def serialize(self, depth=0):
         """
         Serializes the internal data, getting rid of certain metadata like descriptors
+        :param depth: Depth of relations to serialize
         """
         data = {'guid': self.guid}
         for relation in self._relations:
@@ -828,6 +840,10 @@ class DataObject(object):
         Copies all _properties (and optionally _relations) properties over from a given hybrid to
         self. One can pass in a list of properties that should be copied, or a list of properties
         that should not be copied. Exclude > Include
+        :param other_object: Other object to copy properties from into current 1
+        :param include: Properties to include
+        :param exclude: Properties to exclude
+        :param include_relations: Include all relations
         """
         if include is not None and not isinstance(include, list):
             raise TypeError('Argument include should be None or a list of strings')
@@ -838,12 +854,9 @@ class DataObject(object):
 
         all_properties = [prop.name for prop in self._properties]
         all_relations = [relation.name for relation in self._relations]
-        if include:
-            properties_to_copy = include
-        else:
-            properties_to_copy = all_properties
-            if include_relations:
-                properties_to_copy += all_relations
+        properties_to_copy = all_properties if include is None else include
+        if include_relations:
+            properties_to_copy += all_relations
 
         if exclude:
             properties_to_copy = [p for p in properties_to_copy if p not in exclude]
@@ -971,8 +984,13 @@ class DataObject(object):
     def enumerator(name, items):
         """
         Generates an enumerator
+        :param name: Name of enumerator
+        :param items: Enumerator items
         """
         class Enumerator(dict):
+            """
+            Enumerator class
+            """
             def __init__(self, *args, **kwargs):
                 super(Enumerator, self).__init__(*args, **kwargs)
 
