@@ -244,4 +244,6 @@ class VDiskViewSet(viewsets.ViewSet):
         :param vdisk: vdisk to schedule a backend sync to
         :return: TLogName associated with the data sent off to the backend
         """
-        return VDiskController.schedule_backend_sync.delay(vdisk_guid=vdisk.guid)
+        storagerouter = StorageRouter(vdisk.storagerouter_guid)
+        return VDiskController.schedule_backend_sync.s(vdisk_guid=vdisk.guid).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
+
