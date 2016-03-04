@@ -193,6 +193,9 @@ def return_list(object_type, default_sort=None):
             sort = None if sort is None else [s for s in reversed(sort.split(','))]
             page = request.QUERY_PARAMS.get('page')
             page = int(page) if page is not None and page.isdigit() else None
+            page_size = request.QUERY_PARAMS.get('page_size')
+            page_size = int(page_size) if page_size is not None and page_size.isdigit() else None
+            page_size = page_size if page_size in [10, 25, 50, 100] else 10
             contents = request.QUERY_PARAMS.get('contents')
             contents = None if contents is None else contents.split(',')
 
@@ -216,23 +219,23 @@ def return_list(object_type, default_sort=None):
                     data_list.sort(key=lambda e: Toolbox.extract_key(e, field), reverse=desc)
 
             # 5. Paging
-            items_pp = 10
             total_items = len(data_list)
             page_metadata = {'total_items': total_items,
                              'current_page': 1,
                              'max_page': 1,
+                             'page_size': page_size,
                              'start_number': min(1, total_items),
                              'end_number': total_items}
             if page is not None:
-                max_page = int(math.ceil(total_items / (items_pp * 1.0)))
+                max_page = int(math.ceil(total_items / (page_size * 1.0)))
                 if page > max_page:
                     page = max_page
                 if page == 0:
                     start_number = -1
                     end_number = 0
                 else:
-                    start_number = (page - 1) * items_pp  # Index - e.g. 0 for page 1, 10 for page 2
-                    end_number = start_number + items_pp  # Index - e.g. 10 for page 1, 20 for page 2
+                    start_number = (page - 1) * page_size  # Index - e.g. 0 for page 1, 10 for page 2
+                    end_number = start_number + page_size  # Index - e.g. 10 for page 1, 20 for page 2
                 data_list = data_list[start_number: end_number]
                 page_metadata = dict(page_metadata.items() + {'current_page': max(1, page),
                                                               'max_page': max(1, max_page),

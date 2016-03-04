@@ -171,16 +171,13 @@ define([
                 }
             }).promise();
         };
-        self.loadVDisks = function(page) {
+        self.loadVDisks = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.vDisksHandle[page])) {
-                    var options = {
-                        sort: 'devicename',
-                        page: page,
-                        contents: '_dynamics,_relations,-snapshots',
-                        vpoolguid: self.vPool().guid()
-                    };
-                    self.vDisksHandle[page] = api.get('vdisks', { queryparams: options })
+                if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
+                    options.sort = 'devicename';
+                    options.contents = '_dynamics,_relations,-snapshots';
+                    options.vpoolguid = self.vPool().guid();
+                    self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,
@@ -204,16 +201,13 @@ define([
                 }
             }).promise();
         };
-        self.loadVMachines = function(page) {
+        self.loadVMachines = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.vMachinesHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        page: page,
-                        contents: 'vdisks,_dynamics,-snapshots,-hypervisor_status',
-                        vpoolguid: self.vPool().guid()
-                    };
-                    self.vMachinesHandle[page] = api.get('vmachines', { queryparams: options })
+                if (generic.xhrCompleted(self.vMachinesHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = 'vdisks,_dynamics,-snapshots,-hypervisor_status';
+                    options.vpoolguid = self.vPool().guid();
+                    self.vMachinesHandle[options.page] = api.get('vmachines', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,

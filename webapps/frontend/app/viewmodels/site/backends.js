@@ -46,15 +46,12 @@ define([
         self.backendsHandle         = {};
 
         // Functions
-        self.loadBackends = function(page) {
+        self.loadBackends = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.backendsHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        page: page,
-                        contents: '_relations'
-                    };
-                    self.backendsHandle[page] = api.get('backends', { queryparams: options })
+                if (generic.xhrCompleted(self.backendsHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = '_relations';
+                    self.backendsHandle[options.page] = api.get('backends', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,

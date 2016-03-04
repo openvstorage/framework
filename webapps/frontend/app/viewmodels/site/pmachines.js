@@ -90,19 +90,16 @@ define([
         });
 
         // Functions
-        self.loadPMachines = function(page) {
+        self.loadPMachines = function(options) {
             return $.Deferred(function(deferred) {
                 if (self.holdLoading === true) {
                     deferred.resolve();
                     return;
                 }
-                if (generic.xhrCompleted(self.pMachinesHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        contents: 'mgmtcenter',
-                        page: page
-                    };
-                    self.pMachinesHandle[page] = api.get('pmachines', { queryparams: options })
+                if (generic.xhrCompleted(self.pMachinesHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = 'mgmtcenter';
+                    self.pMachinesHandle[options.page] = api.get('pmachines', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,
@@ -190,15 +187,12 @@ define([
                 }
             }).promise();
         };
-        self.loadMgmtCenters = function(page) {
+        self.loadMgmtCenters = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.mgmtCentersHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        contents: 'hosts',
-                        page: page
-                    };
-                    self.mgmtCentersHandle[page] = api.get('mgmtcenters', { queryparams: options })
+                if (generic.xhrCompleted(self.mgmtCentersHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = 'hosts';
+                    self.mgmtCentersHandle[options.page] = api.get('mgmtcenters', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,
