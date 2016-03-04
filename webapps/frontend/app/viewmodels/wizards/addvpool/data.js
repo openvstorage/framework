@@ -110,9 +110,9 @@ define(['knockout'], function(ko){
                 wizardData.albaPreset(undefined);
                 return []
             }
-            if (wizardData.albaBackend().enhancedPresets().indexOf(wizardData.albaPreset()) === -1){
+            if (!wizardData.albaBackend().enhancedPresets().contains(wizardData.albaPreset())){
                 wizardData.albaPreset(wizardData.albaBackend().enhancedPresets()[0]);
-            } 
+            }
             return wizardData.albaBackend().enhancedPresets();
         });
         return wizardData;
