@@ -625,7 +625,8 @@ class StorageRouterController(object):
             raise
 
         filesystem_config = StorageDriverConfiguration.build_filesystem_by_hypervisor(storagerouter.pmachine.hvtype)
-        filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
+        filesystem_config.update({'fs_enable_shm_interface': 1,
+                                  'fs_metadata_backend_arakoon_cluster_nodes': [],
                                   'fs_metadata_backend_mds_nodes': [],
                                   'fs_metadata_backend_type': 'MDS'})
 
