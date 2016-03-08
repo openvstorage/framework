@@ -254,7 +254,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @load(VDisk)
     def is_volume_synced_up_to_tlog(self, vdisk, tlog_name):
         """
-        Verify is volume is synced to backend up to a specific tlog
+        Verify if volume is synced to backend up to a specific tlog
         :param vdisk: vdisk to verify
         :param: TLogName to verify
         :return: bool: status
@@ -269,7 +269,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @load(VDisk)
     def is_volume_synced_up_to_snapshot(self, vdisk, snapshot_id):
         """
-        Verify is volume is synced to backend up to a specific snapshot
+        Verify if volume is synced to backend up to a specific snapshot
         :param vdisk: vdisk to verify
         :param snapshot_id: Snapshot to verify
         :return: bool: status

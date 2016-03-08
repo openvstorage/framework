@@ -1127,7 +1127,7 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.is_volume_synced_up_to_snapshot')
     def is_volume_synced_up_to_snapshot(vdisk_guid, snapshot_id):
         """
-        Verify i a volume is synced up to a specific snapshot
+        Verify if a volume is synced up to a specific snapshot
         :param vdisk_guid: Guid of vdisk to verify
         :return: snapshot_id: snapshot_id to verify
         """
