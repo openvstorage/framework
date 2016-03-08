@@ -1109,3 +1109,29 @@ class VDiskController(object):
         storagedriver_client = StorageDriverClient.load(vdisk.vpool)
 
         return storagedriver_client.schedule_backend_sync(str(vdisk.volume_id))
+
+    @staticmethod
+    @celery.task(name='ovs.vdisk.is_volume_synced_up_to_tlog')
+    def is_volume_synced_up_to_tlog(vdisk_guid, tlog_name):
+        """
+        Verify if a volume is synced up to a specific tlog
+        :param vdisk_guid: Guid of vdisk to verify
+        :param tlog_name: tlog_name to verify
+        """
+        vdisk = VDisk(vdisk_guid)
+        storagedriver_client = StorageDriverClient.load(vdisk.vpool)
+
+        return storagedriver_client.is_volume_synced_up_to_tlog(str(vdisk.volume_id), str(tlog_name))
+
+    @staticmethod
+    @celery.task(name='ovs.vdisk.is_volume_synced_up_to_snapshot')
+    def is_volume_synced_up_to_snapshot(vdisk_guid, snapshot_id):
+        """
+        Verify i a volume is synced up to a specific snapshot
+        :param vdisk_guid: Guid of vdisk to verify
+        :return: snapshot_id: snapshot_id to verify
+        """
+        vdisk = VDisk(vdisk_guid)
+        storagedriver_client = StorageDriverClient.load(vdisk.vpool)
+
+        return storagedriver_client.is_volume_synced_up_to_snapshot(str(vdisk.volume_id), str(snapshot_id))
