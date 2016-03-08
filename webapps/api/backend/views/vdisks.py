@@ -256,8 +256,7 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Verify if volume is synced to backend up to a specific tlog
         :param vdisk: vdisk to verify
-        :param: TLogName to verify
-        :return: bool: status
+        :param tlog_name: TLogName to verify
         """
         storagerouter = StorageRouter(vdisk.storagerouter_guid)
         return VDiskController.is_volume_synced_up_to_tlog.s(vdisk_guid=vdisk.guid, tlog_name=tlog_name).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
@@ -272,7 +271,6 @@ class VDiskViewSet(viewsets.ViewSet):
         Verify if volume is synced to backend up to a specific snapshot
         :param vdisk: vdisk to verify
         :param snapshot_id: Snapshot to verify
-        :return: bool: status
         """
         storagerouter = StorageRouter(vdisk.storagerouter_guid)
         return VDiskController.is_volume_synced_up_to_snapshot.s(vdisk_guid=vdisk.guid, snapshot_id=snapshot_id).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
