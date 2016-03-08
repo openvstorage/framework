@@ -112,18 +112,10 @@ class StorageRouterController(object):
                     if client.dir_exists(storagedriver_partition.path):
                         try:
                             output = client.run('du -d 0 {0}'.format(storagedriver_partition.path))
+                            _used_size, _ = output.split('\t')
+                            _directory_used_size = int(_used_size) * 1024
                         except Exception as ex:
                             logger.error('Failed to get directory usage for {0}. {1}'.format(storagedriver_partition.path, ex))
-                        else:
-                            try:
-                                _used_size, _ = output.split('\t')
-                            except ValueError as ve:
-                                logger.error('Unexpected output for directory {0}. "{1}" . {2}'.format(storagedriver_partition.path, output, ve))
-                            else:
-                                try:
-                                    _directory_used_size = int(_used_size) * 1024
-                                except ValueError as ve:
-                                    logger.error('Could not parse value: {0}. {1}'.format(_used_size, ve))
                     used_space_by_roles += _directory_used_size
 
                 partition_available_space = None
