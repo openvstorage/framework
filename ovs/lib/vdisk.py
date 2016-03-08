@@ -1129,7 +1129,7 @@ class VDiskController(object):
         """
         Verify if a volume is synced up to a specific snapshot
         :param vdisk_guid: Guid of vdisk to verify
-        :return: snapshot_id: snapshot_id to verify
+        :param snapshot_id: snapshot_id to verify
         """
         vdisk = VDisk(vdisk_guid)
         storagedriver_client = StorageDriverClient.load(vdisk.vpool)
