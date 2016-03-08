@@ -354,7 +354,7 @@ class VDiskController(object):
             snapshotid = str(uuid.uuid4())
         metadata = pickle.dumps(metadata)
         disk.storagedriver_client.create_snapshot(str(disk.volume_id),
-                                                  snapshot_id=snapshotid,
+                                                  snapshot_id=str(snapshotid),
                                                   metadata=metadata)
         disk.invalidate_dynamics(['snapshots'])
         return snapshotid
