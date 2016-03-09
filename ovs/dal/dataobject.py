@@ -141,6 +141,8 @@ class DataObject(object):
     _dynamics = []    # Timeout of readonly object properties cache
     _relations = []   # Blueprint for relations
 
+    NAMESPACE = 'ovs_data'
+
     #######################
     # Constructor
     #######################
@@ -185,7 +187,6 @@ class DataObject(object):
 
         # Worker fields/objects
         self._classname = self.__class__.__name__.lower()
-        self._namespace = 'ovs_data'   # Namespace of the object
         self._mutex_listcache = VolatileMutex('listcache_{0}'.format(self._classname))
         self._mutex_reverseindex = VolatileMutex('reverseindex')
 
@@ -210,7 +211,7 @@ class DataObject(object):
                 raise ValueError('The given guid is invalid: {0}'.format(guid))
 
         # Build base keys
-        self._key = '{0}_{1}_{2}'.format(self._namespace, self._classname, self._guid)
+        self._key = '{0}_{1}_{2}'.format(DataObject.NAMESPACE, self._classname, self._guid)
 
         # Worker mutexes
         self._mutex_version = VolatileMutex('ovs_dataversion_{0}_{1}'.format(self._classname, self._guid))

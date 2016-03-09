@@ -107,7 +107,8 @@ class DataList(object):
                 if result is False:
                     return False
             else:
-                if self._evaluate(instance, item) is False:
+                result, instance = self._evaluate(instance, item)
+                if result is False:
                     return False
         return True
 
@@ -126,7 +127,8 @@ class DataList(object):
                 if result is True:
                     return True
             else:
-                if self._evaluate(instance, item) is True:
+                result, instance = self._evaluate(instance, item)
+                if result is True:
                     return True
         return False
 
@@ -136,40 +138,47 @@ class DataList(object):
         It will keep track of which properties are used, making sure the query result
         will get invalidated when such property is updated
         """
-        path = item[0].split('.')
-        value = instance
-        if value is None:
-            return False
-        itemcounter = 0
-        for pitem in path:
-            itemcounter += 1
-            if pitem in (dynamic.name for dynamic in value.__class__._dynamics):
-                self._can_cache = False
-            value = getattr(value, pitem)
-            if value is None and itemcounter != len(path):
-                return False  # Fail the filter
+        found = False
+        if '.' not in item[0] and isinstance(instance, dict):
+            pitem = item[0]
+            if pitem in (prop.name for prop in self._query['object']._properties):
+                value = instance['data'][pitem]
+                found = True
+        if found is False:
+            if isinstance(instance, dict):
+                instance = self._query['object'](instance['guid'])
+            path = item[0].split('.')
+            value = instance
+            itemcounter = 0
+            for pitem in path:
+                itemcounter += 1
+                if pitem in (dynamic.name for dynamic in value.__class__._dynamics):
+                    self._can_cache = False
+                value = getattr(value, pitem)
+                if value is None and itemcounter != len(path):
+                    return False, instance  # Fail the filter
 
         # Apply operators
         ignorecase = len(item) == 4 and item[3] is False
         if item[1] == DataList.operator.NOT_EQUALS:
             if ignorecase is True:
-                return value.lower() != item[2].lower()
-            return value != item[2]
+                return value.lower() != item[2].lower(), instance
+            return value != item[2], instance
         if item[1] == DataList.operator.EQUALS:
             if ignorecase is True:
-                return value.lower() == item[2].lower()
-            return value == item[2]
+                return value.lower() == item[2].lower(), instance
+            return value == item[2], instance
         if item[1] == DataList.operator.GT:
-            return value > item[2]
+            return value > item[2], instance
         if item[1] == DataList.operator.LT:
-            return value < item[2]
+            return value < item[2], instance
         if item[1] == DataList.operator.IN:
             if ignorecase:
                 if isinstance(item[2], list):
-                    return value.lower() in [x.lower() for x in item[2]]
+                    return value.lower() in [x.lower() for x in item[2]], instance
                 else:
-                    return value.lower() in item[2].lower()
-            return value in item[2]
+                    return value.lower() in item[2].lower(), instance
+            return value in item[2], instance
         raise NotImplementedError('The given operator {} is not yet implemented.'.format(item[1]))
 
     def _load(self):
@@ -192,6 +201,8 @@ class DataList(object):
             # The field is any property you would also find on the given object. In case of
             # properties, you can dot as far as you like. This means you can combine AND and OR
             # in any possible combination
+
+            from ovs.dal.dataobject import DataObject
 
             Toolbox.log_cache_hit('datalist', False)
             hybrid_structure = HybridRunner.get_hybrids()
@@ -222,9 +233,8 @@ class DataList(object):
                     mutex.release()
 
             self.from_cache = False
-            namespace = query_object()._namespace
             name = query_object.__name__.lower()
-            guids = DataList.get_pks(namespace, name)
+            guids = DataList.get_pks(DataObject.NAMESPACE, name)
 
             if query_data == DataList.select.COUNT:
                 self.data = 0
@@ -235,7 +245,12 @@ class DataList(object):
             for guid in guids:
                 elements += 1
                 try:
-                    instance = query_object(guid)
+                    key = '{0}_{1}_{2}'.format(DataObject.NAMESPACE, name, guid)
+                    data = self._volatile.get(key)
+                    if data is None:
+                        data = self._persistent.get(key)
+                    instance = {'data': data,
+                                'guid': guid}
                     if query_type == DataList.where_operator.AND:
                         include = self._exec_and(instance, items)
                     elif query_type == DataList.where_operator.OR:
@@ -344,6 +359,8 @@ class DataList(object):
         # Called to load the vMachine.vdisks list (resulting in a possible scan of vDisk objects)
         # * own_guid = this vMachine object's guid
 
+        from ovs.dal.dataobject import DataObject
+
         volatile = VolatileFactory.get_client()
         own_name = own_class.__name__.lower()
         datalist = DataList({}, '{0}_{1}_{2}'.format(own_name, own_guid, remote_key), load=False)
@@ -360,19 +377,17 @@ class DataList(object):
         Toolbox.log_cache_hit('datalist', False)
         mutex = VolatileMutex('reverseindex')
         remote_name = remote_class.__name__.lower()
+        namespace = DataObject.NAMESPACE
         blueprint_object = remote_class()  # vDisk object
         foreign_guids = {}
 
-        remote_namespace = blueprint_object._namespace
         for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
             if relation.foreign_type is None:
                 classname = remote_name
-                foreign_namespace = blueprint_object._namespace
             else:
                 classname = relation.foreign_type.__name__.lower()
-                foreign_namespace = relation.foreign_type()._namespace
             if classname not in foreign_guids:
-                foreign_guids[classname] = DataList.get_pks(foreign_namespace, classname)
+                foreign_guids[classname] = DataList.get_pks(namespace, classname)
             try:
                 mutex.acquire(60)
                 for foreign_guid in foreign_guids[classname]:
@@ -385,7 +400,7 @@ class DataList(object):
                         volatile.set(reverse_key, reverse_index)
             finally:
                 mutex.release()
-        remote_keys = DataList.get_pks(remote_namespace, remote_name)
+        remote_keys = DataList.get_pks(namespace, remote_name)
         for guid in remote_keys:
             try:
                 instance = remote_class(guid)

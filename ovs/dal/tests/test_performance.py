@@ -22,6 +22,7 @@ from unittest import TestCase
 from ovs.dal.hybrids.t_testdisk import TestDisk
 from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.datalist import DataList
+from ovs.dal.dataobject import DataObject
 from ovs.dal.exceptions import ObjectNotFoundException
 
 
@@ -45,7 +46,7 @@ class LotsOfObjects(TestCase):
             LotsOfObjects.amount_of_disks = 5
         load_data = True
         if load_data:
-            print 'start loading data'
+            print '\nstart loading data'
             start = time.time()
             mguids = []
             runtimes = []
@@ -70,7 +71,7 @@ class LotsOfObjects(TestCase):
 
         test_queries = True
         if test_queries:
-            print 'start queries'
+            print '\nstart queries'
             start = time.time()
             runtimes = []
             for i in xrange(0, int(LotsOfObjects.amount_of_machines)):
@@ -84,7 +85,28 @@ class LotsOfObjects(TestCase):
             runtimes.sort()
             print '\ncompleted ({0}s). min: {1} dps, max: {2} dps'.format(round(time.time() - tstart, 2), round(runtimes[1], 2), round(runtimes[-2], 2))
 
-            print 'start full query on disk property'
+            print '\nstart full query on disk property'
+            start = time.time()
+            dlist = DataList({'object': TestDisk,
+                              'data': DataList.select.COUNT,
+                              'query': {'type': DataList.where_operator.AND,
+                                        'items': [('size', DataList.operator.GT, 100),
+                                                  ('size', DataList.operator.LT, (LotsOfObjects.amount_of_disks - 1) * 100)]}})
+            amount = dlist.data
+            self.assertEqual(amount, (LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines, 'Incorrect amount of disks. Found {0} instead of {1}'.format(amount, int((LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines)))
+            seconds_passed = (time.time() - start)
+            print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
+
+            print '\nloading disks'
+            start = time.time()
+            for i in xrange(0, int(LotsOfObjects.amount_of_machines)):
+                machine = TestMachine(mguids[i])
+                _ = [_ for _ in machine.disks]
+            seconds_passed = (time.time() - start)
+            print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
+
+            print '\nstart full query on disk property (using cached objects)'
+            dlist._volatile.delete(dlist._key)
             start = time.time()
             amount = DataList({'object': TestDisk,
                                'data': DataList.select.COUNT,
@@ -97,7 +119,7 @@ class LotsOfObjects(TestCase):
 
         clean_data = True
         if clean_data:
-            print 'cleaning up'
+            print '\ncleaning up'
             start = time.time()
             runtimes = []
             for i in xrange(0, int(LotsOfObjects.amount_of_machines)):
@@ -125,7 +147,7 @@ class LotsOfObjects(TestCase):
         Cleans all disks and machines
         """
         machine = TestMachine()
-        keys = DataList.get_pks(machine._namespace, machine._classname)
+        keys = DataList.get_pks(DataObject.NAMESPACE, machine._classname)
         for guid in keys:
             try:
                 machine = TestMachine(guid)
@@ -135,7 +157,7 @@ class LotsOfObjects(TestCase):
             except (ObjectNotFoundException, ValueError):
                 pass
         disk = TestDisk()
-        keys = DataList.get_pks(disk._namespace, disk._classname)
+        keys = DataList.get_pks(DataObject.NAMESPACE, disk._classname)
         for guid in keys:
             try:
                 disk = TestDisk(guid)
