@@ -509,7 +509,7 @@ class VDiskController(object):
         hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
         disk_path = hypervisor.clean_backing_disk_filename(hypervisor.get_disk_path(None, diskname))
         location = os.path.join(vp_mountpoint, disk_path)
-        VDiskController.create_volume(location, size)
+        VDiskController.create_volume(location, size, storagedriver.storagerouter_guid)
 
         backoff = 1
         timeout = 30  # seconds
@@ -526,25 +526,25 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_volume')
-    def create_volume(location, size):
+    def create_volume(location, size, storagerouter_guid=None):
         """
         Create a volume using filesystem calls
         Calls "truncate" to create sparse raw file
-        TODO: use volumedriver API
-        TODO: model VDisk() and return guid
 
         @param location: location, filename
         @param size: size of volume, GB
+        @param: storagerouter_guid: use ssh client to create file on remote storagerouter
         @return None
         """
         logger.info('Creating volume {0} of {1} GB'.format(location, size))
-        if os.path.exists(location):
+
+        client = SSHClient(StorageRouter(storagerouter_guid)) if storagerouter_guid is not None else SSHClient('127.0.0.1')
+        if client.file_exists(location):
             raise RuntimeError('File already exists at %s' % location)
 
-        output = check_output('truncate -s {0}G "{1}"'.format(size, location), shell=True).strip()
-        output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+        output = client.run('truncate -s {0}G "{1}"'.format(size, location)).strip()
 
-        if not os.path.exists(location):
+        if not client.file_exists(location):
             raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
 
     @staticmethod
