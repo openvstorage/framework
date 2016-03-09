@@ -37,7 +37,6 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException
@@ -538,26 +537,15 @@ class VDiskController(object):
         @return None
         """
         logger.info('Creating volume {0} of {1} GB'.format(location, size))
-        if storagerouter_guid is None:
-            if os.path.exists(location):
-                raise RuntimeError('File already exists at %s' % location)
 
-            output = check_output('truncate -s {0}G "{1}"'.format(size, location), shell=True).strip()
-            output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+        client = SSHClient(StorageRouter(storagerouter_guid)) if storagerouter_guid is not None else SSHClient('127.0.0.1')
+        if client.file_exists(location):
+            raise RuntimeError('File already exists at %s' % location)
 
-            if not os.path.exists(location):
-                raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
-        else:
-            storagerouter = StorageRouter(storagerouter_guid)
-            client = SSHClient(storagerouter.ip)
-            if client.file_exists(location):
-                raise RuntimeError('File already exists at %s' % location)
+        output = client.run('truncate -s {0}G "{1}"'.format(size, location)).strip()
 
-            output = client.run('truncate -s {0}G "{1}"'.format(size, location)).strip()
-            output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
-
-            if not client.file_exists(location):
-                raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
+        if not client.file_exists(location):
+            raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete_volume')
