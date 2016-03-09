@@ -171,10 +171,9 @@ class VDiskViewSet(viewsets.ViewSet):
         storagerouter = StorageRouter(storagerouter_guid)
         for storagedriver in storagerouter.storagedrivers:
             if storagedriver.vpool.guid == vpool_guid:
-                return VDiskController.create_new.s(diskname=devicename,
-                                                    size=size,
-                                                    storagedriver_guid=storagedriver.guid).\
-                    apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
+                return VDiskController.create_new.delay(diskname=devicename,
+                                                        size=size,
+                                                        storagedriver_guid=storagedriver.guid)
         raise NotAcceptable('No storagedriver found for vPool: {0} and storageRouter: {1}'.format(vpool_guid,
                                                                                                   storagerouter_guid))
 

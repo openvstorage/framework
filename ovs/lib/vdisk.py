@@ -37,6 +37,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException
@@ -509,7 +510,8 @@ class VDiskController(object):
         hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
         disk_path = hypervisor.clean_backing_disk_filename(hypervisor.get_disk_path(None, diskname))
         location = os.path.join(vp_mountpoint, disk_path)
-        VDiskController.create_volume(location, size)
+        with Remote(storagedriver.storagerouter.ip, [VDiskController]) as remote:
+            remote.VDiskController.create_volume(location, size)
 
         backoff = 1
         timeout = 30  # seconds
