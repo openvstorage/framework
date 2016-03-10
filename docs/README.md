@@ -1,4 +1,4 @@
-### Framework
+# Framework
 The Framework is responsible for the orchestration (extending a cluster, service management, ...) and task management, the GUI and the API.
 
 The Framework is built in python and makes use of different technologies:
