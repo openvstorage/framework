@@ -64,7 +64,7 @@ class SetupController(object):
     host_ips = set()
 
     @staticmethod
-    def setup_node(ip=None, force_type=None):
+    def setup_node(force_type=None):
         """
         Sets up a node.
         1. Some magic figuring out here:
@@ -73,13 +73,13 @@ class SetupController(object):
         2. Prepare cluster
         3. Depending on (2), setup first/extra node
         4. Depending on (2), promote new extra node
-        :param ip: IP of the node to set up
         :param force_type: Force master or extra node
         """
 
         print Interactive.boxed_message(['Open vStorage Setup'])
         logger.info('Starting Open vStorage Setup')
 
+        ip = None
         target_password = None
         cluster_name = None
         first_node = True
