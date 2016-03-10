@@ -1,19 +1,19 @@
-#### The Data Abstraction Layer (DAL)
+## The Data Abstraction Layer (DAL)
 The Data Abstraction model uses hybrids, a template to build object which consists of persistent data, quickly changing data and relations between these objects.
 
 The link between hybrids and their relations can be found in the [Open vStorage ERD](openvstorage-erd.pdf).
 
-##### Hybrids
+### Hybrids
 
 A hybrid is an object consisting of persistent data, and dynamic data. Persistent data is stored in a persistent key-value store, and is read-write. The dynamic properties is code that's cached for a certain amount of time, and contains logic to load the value from 3rd party libraries.
 
 Hybrids also support lazy loading relations. These are all one-to-many. With a junction table, a many-to-many relation is possible as well.
 
-##### File structure
+### File structure
 
 All hybrids should be located in `/ovs/dal/hybrids`. Each hybrid should have its own module, having its name as lowercase.
 
-##### File contents
+### File contents
 
 **Imports**
 
@@ -63,7 +63,7 @@ The dynamics, referred to from the `__dynamics` dictionary each should have a pr
 
 Always code pep8 compliant. However, by aligning the `__properties`, `__relations` and `__dynamics` fields, things get a better readability, so breaking the line-too-long rule on that part shouldn't be an issue.
 
-## Example ###
+### Example ###
 The Backend hybrid can be found below:
 
 ```
@@ -121,11 +121,11 @@ Dynamic('storagedriver_id', str, 60),
 Dynamic('storagerouter_guid', str, 15)]
 ```
 
-In this situation we can see that the list of the snapshots for this vdisk is refreshed (from the storagedriver) every 60 seconds:
+In this situation we can see that the list of the snapshots for this vDisk is refreshed (from the storagedriver) every 60 seconds:
 ```
 Dynamic('snapshots', list, 60)
 
 This info get stored in Memcached and .
 
 ##### Persistent  - Arakoon
-The [Arakoon](../Arakoon/README.md) key-value database (OVSDB) stores data about the Open vStorage model which doesn't frequently change, typically static properties of the object.
+The [Arakoon](https://openvstorage.gitbooks.io/Arakoon/content) key-value database (OVSDB) stores data about the Open vStorage model which doesn't frequently change, typically static properties of the object.
