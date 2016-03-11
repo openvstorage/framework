@@ -67,15 +67,17 @@ define([
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.createft.gather.noname'));
             }
-            if (self.data.vMachinesNames().contains(self.data.name())) {
-                valid = false;
-                fields.push('name');
-                reasons.push($.t('ovs:wizards.createft.gather.duplicatename', {
-                    name: self.data.name()
-                }));
+            if (self.data.amount() === 1) {
+                if (self.data.vMachinesNames().contains(self.data.name())) {
+                    valid = false;
+                    fields.push('name');
+                    reasons.push($.t('ovs:wizards.createft.gather.duplicatename', {
+                        name: self.data.name()
+                    }));
+                }
             }
-            if (self.data.amount() > 1) {
-                var i = self.data.startnr();
+            else {
+                var name, i = self.data.startnr();
                 for (i = self.data.startnr(); i < (self.data.startnr() + self.data.amount()); i++) {
                     name = self.data.name() + '-' + i;
                     if (self.data.vMachinesNames().contains(name)) {
@@ -177,13 +179,10 @@ define([
                 self.data.selectedPMachines([]);
             }
             generic.xhrAbort(self.loadVMachinesHandle);
-            self.loadVMachinesHandle = api.get('vmachines/')
+            self.loadVMachinesHandle = api.get('vmachines/', { queryparams: {contents: 'name'}})
                 .done(function(data) {
                     $.each(data.data, function(index, item) {
-                        api.get('vmachines/' + item)
-                            .done(function(data) {
-                                self.data.vMachinesNames.push(data.name);
-                            })
+                        self.data.vMachinesNames.push(item.name);
                     });
                 });
             generic.xhrAbort(self.loadPMachinesHandle);
