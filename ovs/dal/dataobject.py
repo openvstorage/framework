@@ -21,7 +21,7 @@ import re
 import json
 import inspect
 from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
-                                MissingMandatoryFieldsException, SaveRaceConditionException, InvalidRelationException,
+                                MissingMandatoryFieldsException, RaceConditionException, InvalidRelationException,
                                 VolatileObjectException)
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
@@ -175,11 +175,11 @@ class DataObject(object):
         # Initialize internal fields
         self._frozen = False
         self._datastore_wins = datastore_wins
-        self._guid = None             # Guid identifier of the object
-        self._original = {}           # Original data copy
-        self._metadata = {}           # Some metadata, mainly used for unit testing
-        self._data = {}               # Internal data storage
-        self._objects = {}            # Internal objects storage
+        self._guid = None    # Guid identifier of the object
+        self._original = {}  # Original data copy
+        self._metadata = {}  # Some metadata, mainly used for unit testing
+        self._data = {}      # Internal data storage
+        self._objects = {}   # Internal objects storage
 
         # Initialize public fields
         self.dirty = False
@@ -187,8 +187,6 @@ class DataObject(object):
 
         # Worker fields/objects
         self._classname = self.__class__.__name__.lower()
-        self._mutex_listcache = VolatileMutex('listcache_{0}'.format(self._classname))
-        self._mutex_reverseindex = VolatileMutex('reverseindex')
 
         # Rebuild _relation types
         hybrid_structure = HybridRunner.get_hybrids()
@@ -488,7 +486,7 @@ class DataObject(object):
         while successful is False:
             tries += 1
             if tries > 5:
-                raise SaveRaceConditionException()
+                raise RaceConditionException()
 
             invalid_fields = []
             for prop in self._properties:
@@ -539,7 +537,7 @@ class DataObject(object):
                     raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(
                         self.__class__.__name__, self._guid
                     ))
-                self._persistent.assertValue(self._key, current_data, transaction=transaction)
+                self._persistent.assert_value(self._key, current_data, transaction=transaction)
                 data = copy.deepcopy(current_data)
 
             changed_fields = []
@@ -627,26 +625,25 @@ class DataObject(object):
                                           'new': reverse_index}
             for key, value in index_map.iteritems():
                 if value['original'] is not None:
-                    self._persistent.assertValue(key, value['original'], transaction=transaction)
+                    self._persistent.assert_value(key, value['original'], transaction=transaction)
                 self._persistent.set(key, value['new'], transaction=transaction)
 
             # Second, invalidate property lists
-            try:
-                self._mutex_listcache.acquire(60)
-                cache_key = '{0}_{1}'.format(DataList.cachelink, self._classname)
-                cache_list = Toolbox.try_get(cache_key, {})
-                change = False
-                for list_key in cache_list.keys():
-                    fields = cache_list[list_key]
-                    if ('__all' in fields and self._new) or list(set(fields) & set(changed_fields)):
-                        change = True
-                        self._volatile.delete(list_key)
-                        del cache_list[list_key]
-                if change is True:
-                    self._volatile.set(cache_key, cache_list)
-                    self._persistent.set(cache_key, cache_list)
-            finally:
-                self._mutex_listcache.release()
+            cache_key = '{0}_{1}'.format(DataList.cachelink, self._classname)
+            if self._persistent.exists(cache_key):
+                cache_list = self._persistent.get(cache_key)
+                self._persistent.assert_value(cache_key, copy.deepcopy(cache_list), transaction=transaction)
+            else:
+                cache_list = {}
+            change = False
+            for list_key in cache_list.keys():
+                fields = cache_list[list_key]
+                if ('__all' in fields and self._new) or list(set(fields) & set(changed_fields)):
+                    change = True
+                    self._volatile.delete(list_key)
+                    del cache_list[list_key]
+            if change is True:
+                self._persistent.set(cache_key, cache_list, transaction=transaction)
 
             if _hook is not None and hasattr(_hook, '__call__'):
                 _hook()
@@ -685,75 +682,84 @@ class DataObject(object):
         if self.volatile is True:
             raise VolatileObjectException()
 
-        transaction = self._persistent.begin_transaction()
+        tries = 0
+        successful = False
+        while successful is False:
+            tries += 1
+            if tries > 5:
+                raise RaceConditionException()
 
-        # Check foreign relations
-        relations = RelationMapper.load_foreign_relations(self.__class__)
-        if relations is not None:
-            for key, info in relations.iteritems():
-                items = getattr(self, key)
-                if info['list'] is True:
-                    if len(items) > 0:
+            transaction = self._persistent.begin_transaction()
+
+            # Check foreign relations
+            relations = RelationMapper.load_foreign_relations(self.__class__)
+            if relations is not None:
+                for key, info in relations.iteritems():
+                    items = getattr(self, key)
+                    if info['list'] is True:
+                        if len(items) > 0:
+                            if abandon is not None and (key in abandon or '_all' in abandon):
+                                for item in items.itersafe():
+                                    setattr(item, info['key'], None)
+                                    try:
+                                        item.save()
+                                    except ObjectNotFoundException:
+                                        pass
+                            else:
+                                multi = 'are {0} items'.format(len(items)) if len(items) > 1 else 'is 1 item'
+                                raise LinkedObjectException('There {0} left in self.{1}'.format(multi, key))
+                    elif items is not None:
+                        # No list (so a 1-to-1 relation), so there should be an object, or None
+                        item = items  # More clear naming
                         if abandon is not None and (key in abandon or '_all' in abandon):
-                            for item in items.itersafe():
-                                setattr(item, info['key'], None)
-                                try:
-                                    item.save()
-                                except ObjectNotFoundException:
-                                    pass
+                            setattr(item, info['key'], None)
+                            try:
+                                item.save()
+                            except ObjectNotFoundException:
+                                pass
                         else:
-                            multi = 'are {0} items'.format(len(items)) if len(items) > 1 else 'is 1 item'
-                            raise LinkedObjectException('There {0} left in self.{1}'.format(multi, key))
-                elif items is not None:
-                    # No list (so a 1-to-1 relation), so there should be an object, or None
-                    item = items  # More clear naming
-                    if abandon is not None and (key in abandon or '_all' in abandon):
-                        setattr(item, info['key'], None)
-                        try:
-                            item.save()
-                        except ObjectNotFoundException:
-                            pass
+                            raise LinkedObjectException('There is still an item linked in self.{0}'.format(key))
+
+            # Delete the object out of the persistent store
+            try:
+                self._persistent.delete(self._key, transaction=transaction)
+            except KeyNotFoundException:
+                pass
+
+            # First, update reverse index
+            index_map = {}
+            for relation in self._relations:
+                key = relation.name
+                original_guid = self._original[key]['guid']
+                if original_guid is not None:
+                    if relation.foreign_type is None:
+                        classname = self.__class__.__name__.lower()
                     else:
-                        raise LinkedObjectException('There is still an item linked in self.{0}'.format(key))
+                        classname = relation.foreign_type.__name__.lower()
+                    reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, original_guid)
+                    if reverse_key not in index_map:
+                        reverse_index = self._persistent.get(reverse_key)
+                        index_map[reverse_key] = {'original': copy.deepcopy(reverse_index),
+                                                  'new': reverse_index}
+                    else:
+                        reverse_index = index_map[reverse_key]['new']
+                    if relation.foreign_key in reverse_index:
+                        entries = reverse_index[relation.foreign_key]
+                        if self.guid in entries:
+                            entries.remove(self.guid)
+                            reverse_index[relation.foreign_key] = entries
+            for key, value in index_map.iteritems():
+                self._persistent.assert_value(key, value['original'], transaction=transaction)
+                self._persistent.set(key, value['new'], transaction=transaction)
+            self._persistent.delete('ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid), transaction=transaction)
 
-        # Delete the object out of the persistent store
-        try:
-            self._persistent.delete(self._key, transaction=transaction)
-        except KeyNotFoundException:
-            pass
-
-        # First, update reverse index
-        index_map = {}
-        for relation in self._relations:
-            key = relation.name
-            original_guid = self._original[key]['guid']
-            if original_guid is not None:
-                if relation.foreign_type is None:
-                    classname = self.__class__.__name__.lower()
-                else:
-                    classname = relation.foreign_type.__name__.lower()
-                reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, original_guid)
-                if reverse_key not in index_map:
-                    reverse_index = self._persistent.get(reverse_key)
-                    index_map[reverse_key] = {'original': copy.deepcopy(reverse_index),
-                                              'new': reverse_index}
-                else:
-                    reverse_index = index_map[reverse_key]['new']
-                if relation.foreign_key in reverse_index:
-                    entries = reverse_index[relation.foreign_key]
-                    if self.guid in entries:
-                        entries.remove(self.guid)
-                        reverse_index[relation.foreign_key] = entries
-        for key, value in index_map.iteritems():
-            self._persistent.assertValue(key, value['original'], transaction=transaction)
-            self._persistent.set(key, value['new'], transaction=transaction)
-        self._persistent.delete('ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid), transaction=transaction)
-
-        # Second, invalidate property lists
-        try:
-            self._mutex_listcache.acquire(60)
+            # Second, invalidate property lists
             cache_key = '{0}_{1}'.format(DataList.cachelink, self._classname)
-            cache_list = Toolbox.try_get(cache_key, {})
+            if self._persistent.exists(cache_key):
+                cache_list = self._persistent.get(cache_key)
+                self._persistent.assert_value(cache_key, copy.deepcopy(cache_list), transaction=transaction)
+            else:
+                cache_list = {}
             change = False
             for list_key in cache_list.keys():
                 fields = cache_list[list_key]
@@ -762,16 +768,14 @@ class DataObject(object):
                     self._volatile.delete(list_key)
                     del cache_list[list_key]
             if change is True:
-                self._volatile.set(cache_key, cache_list)
-                self._persistent.set(cache_key, cache_list)
-        finally:
-            self._mutex_listcache.release()
+                self._persistent.set(cache_key, cache_list, transaction=transaction)
+
+            self._persistent.apply_transaction(transaction)
+            successful = True
 
         # Delete the object and its properties out of the volatile store
         self.invalidate_dynamics()
         self._volatile.delete(self._key)
-
-        self._persistent.apply_transaction(transaction)
 
     # Discard all pending changes
     def discard(self):

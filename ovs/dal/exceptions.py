@@ -52,7 +52,7 @@ class MissingMandatoryFieldsException(Exception):
     pass
 
 
-class SaveRaceConditionException(Exception):
+class RaceConditionException(Exception):
     """
     Raised when an object could not be saved in X attempts
     """

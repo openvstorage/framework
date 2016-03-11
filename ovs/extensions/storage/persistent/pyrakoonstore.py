@@ -96,8 +96,8 @@ class PyrakoonStore(object):
         Sets the value for a key to a given value
         """
         if transaction is not None:
-            return self._sequences[transaction].addSet(key, json.dumps(value))
-        return PyrakoonStore._try(self._identifier, self._client.set, key, json.dumps(value))
+            return self._sequences[transaction].addSet(key, json.dumps(value, sort_keys=True))
+        return PyrakoonStore._try(self._identifier, self._client.set, key, json.dumps(value, sort_keys=True))
 
     @locked()
     def prefix(self, prefix):
@@ -162,14 +162,14 @@ class PyrakoonStore(object):
         return PyrakoonStore._try(self._identifier, self._client.exists, key)
 
     @locked()
-    def assertValue(self, key, value, transaction=None):
+    def assert_value(self, key, value, transaction=None):
         """
         Asserts a key-value pair
         """
         if transaction is not None:
-            return self._sequences[transaction].addAssert(key, json.dumps(value))
+            return self._sequences[transaction].addAssert(key, json.dumps(value, sort_keys=True))
         try:
-            return PyrakoonStore._try(self._identifier, self._client.aSSert, key, json.dumps(value))
+            return PyrakoonStore._try(self._identifier, self._client.aSSert, key, json.dumps(value, sort_keys=True))
         except ArakoonAssertionFailed as assertion:
             raise AssertException(assertion)
 

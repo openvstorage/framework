@@ -35,6 +35,7 @@ class Descriptor(object):
     """
 
     object_cache = {}
+    descriptor_cache = {}
 
     def __init__(self, object_type=None, guid=None, cached=True):
         """
@@ -48,26 +49,28 @@ class Descriptor(object):
             self.initialized = False
         else:
             self.initialized = True
-            self._volatile = VolatileFactory.get_client()
 
             type_name = object_type.__name__
             module_name = object_type.__module__.split('.')[-1]
             fqm_name = 'ovs.dal.hybrids.{0}'.format(module_name)
-            try:
-                module = __import__(fqm_name, level=0, fromlist=[type_name])
-                _ = getattr(module, type_name)
-            except (ImportError, AttributeError):
-                logger.info('Received object type {0} is not a hybrid'.format(object_type))
-                raise TypeError('Invalid type for Descriptor: {0}'.format(object_type))
-            identifier = '{0}_{1}'.format(type_name, hashlib.sha1(fqm_name).hexdigest())
-            key = 'ovs_descriptor_{0}'.format(identifier)
+            if object_type in Descriptor.descriptor_cache:
+                identifier = Descriptor.descriptor_cache[object_type]
+            else:
+                try:
+                    module = __import__(fqm_name, level=0, fromlist=[type_name])
+                    _ = getattr(module, type_name)
+                except (ImportError, AttributeError):
+                    logger.info('Received object type {0} is not a hybrid'.format(object_type))
+                    raise TypeError('Invalid type for Descriptor: {0}'.format(object_type))
+                identifier = '{0}_{1}'.format(type_name, hashlib.sha1(fqm_name).hexdigest())
+                Descriptor.descriptor_cache[identifier] = object_type
 
+            key = 'ovs_descriptor_{0}'.format(identifier)
+            self._volatile = VolatileFactory.get_client()
             self._descriptor = self._volatile.get(key)
             if self._descriptor is None or cached is False:
                 if self._descriptor is None:
-                    logger.debug('Object type {0} was translated to {1}.{2}'.format(
-                        object_type, fqm_name, type_name
-                    ))
+                    logger.debug('Object type {0} was translated to {1}.{2}'.format(object_type, fqm_name, type_name))
                 Toolbox.log_cache_hit('descriptor', False)
                 self._descriptor = {'fqmn': fqm_name,
                                     'type': type_name,

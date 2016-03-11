@@ -124,14 +124,14 @@ class DummyPersistentStore(object):
         _ = self
         pass
 
-    def assertValue(self, key, value, transaction=None):
+    def assert_value(self, key, value, transaction=None):
         """
         Asserts a key-value pair
         """
         if transaction is not None:
-            return self._sequences[transaction].append([self.assertValue, {'key': key, 'value': value}])
+            return self._sequences[transaction].append([self.assert_value, {'key': key, 'value': value}])
         data = self._read()
-        if json.dumps(data[key]) != json.dumps(value):
+        if json.dumps(data[key], sort_keys=True) != json.dumps(value, sort_keys=True):
             raise AssertException(key)
         self._save(data)
 

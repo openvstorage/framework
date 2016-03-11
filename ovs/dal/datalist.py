@@ -218,19 +218,19 @@ class DataList(object):
             invalidations = {query_object.__name__.lower(): ['__all']}
             DataList._build_invalidations(invalidations, query_object, items)
 
+            transaction = self._persistent.begin_transaction()
             for class_name in invalidations:
                 key = '{0}_{1}'.format(DataList.cachelink, class_name)
-                mutex = VolatileMutex('listcache_{0}'.format(class_name))
-                try:
-                    mutex.acquire(60)
-                    cache_list = Toolbox.try_get(key, {})
-                    current_fields = cache_list.get(self._key, [])
-                    current_fields = list(set(current_fields + ['__all'] + invalidations[class_name]))
-                    cache_list[self._key] = current_fields
-                    self._volatile.set(key, cache_list)
-                    self._persistent.set(key, cache_list)
-                finally:
-                    mutex.release()
+                if self._persistent.exists(key):
+                    cache_list = self._persistent.get(key)
+                    self._persistent.assert_value(key, copy.deepcopy(cache_list), transaction=transaction)
+                else:
+                    cache_list = {}
+                current_fields = cache_list.get(self._key, [])
+                current_fields = list(set(current_fields + ['__all'] + invalidations[class_name]))
+                cache_list[self._key] = current_fields
+                self._persistent.set(key, cache_list, transaction=transaction)
+            self._persistent.apply_transaction(transaction)
 
             self.from_cache = False
             name = query_object.__name__.lower()
@@ -272,9 +272,12 @@ class DataList(object):
                 invalidated = False
                 for class_name in invalidations:
                     key = '{0}_{1}'.format(DataList.cachelink, class_name)
-                    cache_list = Toolbox.try_get(key, {})
-                    if self._key not in cache_list:
+                    if not self._persistent.exists(key):
                         invalidated = True
+                    else:
+                        cache_list = self._persistent.get(key)
+                        if self._key not in cache_list:
+                            invalidated = True
                 # If the key under which the list should be saved was already invalidated since the invalidations
                 # were saved, the returned list is most likely outdated. This is OK for this result, but the list
                 # won't get cached
