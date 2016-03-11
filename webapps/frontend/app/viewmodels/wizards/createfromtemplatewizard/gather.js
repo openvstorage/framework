@@ -27,6 +27,7 @@ define([
 
         // Handles
         self.loadPMachinesHandle = undefined;
+        self.loadVMachinesHandle = undefined;
 
         // Computed
         self.namehelp = ko.computed(function() {
@@ -65,6 +66,26 @@ define([
                 valid = false;
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.createft.gather.noname'));
+            }
+            if (self.data.vMachinesNames().contains(self.data.name())) {
+                valid = false;
+                fields.push('name');
+                reasons.push($.t('ovs:wizards.createft.gather.duplicatename', {
+                    name: self.data.name()
+                }));
+            }
+            if (self.data.amount() > 1) {
+                var i = self.data.startnr();
+                for (i = self.data.startnr(); i < (self.data.startnr() + self.data.amount()); i++) {
+                    name = self.data.name() + '-' + i;
+                    if (self.data.vMachinesNames().contains(name)) {
+                        valid = false;
+                        fields.push('name');
+                        reasons.push($.t('ovs:wizards.createft.gather.duplicatename', {
+                            name: name
+                        }));
+                    }
+                }
             }
             if (self.data.selectedPMachines().length === 0) {
                 valid = false;
@@ -155,6 +176,16 @@ define([
                 self.data.vm().load();
                 self.data.selectedPMachines([]);
             }
+            generic.xhrAbort(self.loadVMachinesHandle);
+            self.loadVMachinesHandle = api.get('vmachines/')
+                .done(function(data) {
+                    $.each(data.data, function(index, item) {
+                        api.get('vmachines/' + item)
+                            .done(function(data) {
+                                self.data.vMachinesNames.push(data.name);
+                            })
+                    });
+                });
             generic.xhrAbort(self.loadPMachinesHandle);
             self.loadPMachinesHandle = api.get('vmachines/' + self.data.guid() + '/get_target_pmachines', {
                 queryparams: {
