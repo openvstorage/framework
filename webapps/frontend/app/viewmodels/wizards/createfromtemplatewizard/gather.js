@@ -75,8 +75,7 @@ define([
                         name: self.data.name()
                     }));
                 }
-            }
-            else {
+            } else {
                 var name, i = self.data.startnr();
                 for (i = self.data.startnr(); i < (self.data.startnr() + self.data.amount()); i++) {
                     name = self.data.name() + '-' + i;
