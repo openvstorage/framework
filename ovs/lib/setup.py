@@ -23,17 +23,13 @@ import json
 import time
 import base64
 import urllib2
-from paramiko import AuthenticationException
 from etcd import EtcdConnectionFailed, EtcdKeyNotFound
-from ConfigParser import RawConfigParser
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
-from ovs.extensions.db.etcd.installer import EtcdInstaller
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.db.etcd.installer import EtcdInstaller
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.remote import Remote
-from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.generic.sshclient import UnableToConnectException
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -41,6 +37,7 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.log.logHandler import LogHandler
+from paramiko import AuthenticationException
 
 logger = LogHandler.get('lib', name='setup')
 logger.logger.propagate = False
@@ -53,13 +50,6 @@ class SetupController(object):
 
     # Generic configuration files
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
-
-    # Services
-    model_services = ['memcached', 'arakoon-ovsdb']
-    master_services = model_services + ['rabbitmq-server', 'etcd-config']
-    extra_node_services = ['workers', 'volumerouter-consumer']
-    master_node_services = master_services + extra_node_services + ['scheduled-tasks', 'snmp', 'webapp-api', 'volumerouter-consumer']
-
     discovered_nodes = {}
     host_ips = set()
 
@@ -75,167 +65,113 @@ class SetupController(object):
         4. Depending on (2), promote new extra node
         :param force_type: Force master or extra node
         """
-
         print Interactive.boxed_message(['Open vStorage Setup'])
         logger.info('Starting Open vStorage Setup')
 
-        ip = None
-        target_password = None
-        cluster_name = None
-        first_node = True
-        nodes = []
-        cluster_ip = None
-        hypervisor_type = None
-        hypervisor_name = None
-        hypervisor_password = None
-        hypervisor_ip = None
-        hypervisor_username = 'root'
-        known_passwords = {}
+        Toolbox.verify_required_params(actual_params={'force_type': force_type},
+                                       required_params={'force_type': (str, ['master', 'extra'], False)})
+
         master_ip = None
-        join_cluster = False
-        configure_memcached = True
-        configure_rabbitmq = True
+        cluster_ip = None
+        cluster_name = None
         external_etcd = None  # Example: 'abcdef0123456789=http://1.2.3.4:2380'
+        hypervisor_ip = None
+        hypervisor_name = None
+        hypervisor_type = None
+        master_password = None
+        cluster_password = None
         enable_heartbeats = True
-        ip_client_map = {}
-        setupcompleted, promotecompleted = None, None
+        configure_rabbitmq = True
+        configure_memcached = True
+        hypervisor_password = None
+        hypervisor_username = 'root'
 
         # Support non-interactive setup
-        preconfig = '/tmp/openvstorage_preconfig.cfg'
-        if os.path.exists(preconfig):
-            config = RawConfigParser()
-            config.read(preconfig)
-            ip = config.get('setup', 'target_ip')
-            target_password = config.get('setup', 'target_password')  # @TODO: Replace by using "known_passwords"
-            cluster_ip = config.get('setup', 'cluster_ip')
-            cluster_name = str(config.get('setup', 'cluster_name'))
-            master_ip = config.get('setup', 'master_ip')
-            hypervisor_type = config.get('setup', 'hypervisor_type')
-            hypervisor_name = config.get('setup', 'hypervisor_name')
-            hypervisor_ip = config.get('setup', 'hypervisor_ip')
-            hypervisor_username = config.get('setup', 'hypervisor_username')
-            hypervisor_password = config.get('setup', 'hypervisor_password')
-            join_cluster = config.getboolean('setup', 'join_cluster')
-            configure_memcached = config.getboolean('setup', 'configure_memcached')
-            configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
-            if config.has_option('setup', 'other_nodes'):
-                SetupController.discovered_nodes = json.loads(config.get('setup', 'other_nodes'))
-            if config.has_option('setup', 'passwords'):
-                known_passwords = json.loads(config.get('setup', 'passwords'))
-            if config.has_option('setup', 'external_etcd'):
-                external_etcd = json.loads(config.get('setup', 'external_etcd'))
-            if config.has_option('setup', 'enable_heartbeats'):
-                enable_heartbeats = config.getboolean('setup', 'enable_heartbeats')
-            else:
-                enable_heartbeats = True
+        config = SetupController._validate_and_retrieve_pre_config()
+        if config is not None:
+            # Required fields
+            master_ip = config['master_ip']
+            cluster_name = config['cluster_name']
+            hypervisor_ip = config['hypervisor_ip']
+            hypervisor_name = config['hypervisor_name']
+            hypervisor_type = config['hypervisor_type']
+            master_password = config['master_password']
+
+            # Optional fields
+            cluster_ip = config.get('cluster_ip', master_ip)  # If cluster_ip not provided, we assume 1st node installation
+            external_etcd = config.get('external_etcd')
+            cluster_password = config.get('cluster_password', master_password)  # If cluster_password not provided, we assume identical password to master password
+            enable_heartbeats = config.get('enable_heartbeats', enable_heartbeats)
+            configure_rabbitmq = config.get('configure_rabbitmq', configure_rabbitmq)
+            configure_memcached = config.get('configure_memcached', configure_memcached)
+            hypervisor_password = config.get('hypervisor_password')
+            hypervisor_username = config.get('hypervisor_username', hypervisor_username)
 
         # Support resume setup - store entered parameters so when retrying, we have the values
-        resumeconfig = '/tmp/openvstorage_resumeconfig.cfg'
-        if not os.path.exists(resumeconfig):
-            with open(resumeconfig, 'w') as f:
-                f.write('')
-        r_config = RawConfigParser()
-        r_config.read(resumeconfig)
-        if not r_config.has_section('setup'):
-            r_config.add_section('setup')
-        if not r_config.has_section('ip_client_map'):
-            r_config.add_section('ip_client_map')
-        with open(resumeconfig, 'w') as fp:
-            r_config.write(fp)
+        resume_config = {}
+        resume_config_file = '/opt/OpenvStorage/openvstorage_resumeconfig.json'
+        if os.path.exists(resume_config_file):
+            with open(resume_config_file, 'r') as resume_cfg:
+                resume_config = json.loads(resume_cfg.read())
 
         try:
-            if force_type is not None:
-                force_type = force_type.lower()
-                if force_type not in ['master', 'extra']:
-                    raise ValueError("The force_type parameter should be 'master' or 'extra'.")
-
             # Create connection to target node
             print '\n+++ Setting up connections +++\n'
             logger.info('Setting up connections')
 
-            if ip is None:
-                ip = '127.0.0.1'
-            if target_password is None:
-                node_string = 'this node' if ip == '127.0.0.1' else ip
-                target_node_password = SetupController._ask_validate_password(ip, username='root', node_string=node_string)
-            else:
-                target_node_password = target_password
-            target_client = SSHClient(ip, username='root', password=target_node_password)
-            unique_id = System.get_my_machine_id(target_client)
-            ip_client_map[ip] = target_client
+            root_client = SSHClient(endpoint='127.0.0.1', username='root')
+            ipaddresses = root_client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
+            unique_id = System.get_my_machine_id(root_client)
+
+            ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
+            SetupController.host_ips = set(ipaddresses)
 
             logger.debug('Target client loaded')
 
+            setup_completed = False
+            promote_completed = False
             try:
-                setupcompleted = EtcdConfiguration.get('/ovs/framework/hosts/{0}/setupcompleted'.format(unique_id)) is True
-                promotecompleted = EtcdConfiguration.get('/ovs/framework/hosts/{0}/promotecompleted'.format(unique_id)) is True
-                if setupcompleted and promotecompleted:
+                setup_completed = EtcdConfiguration.get('/ovs/framework/hosts/{0}/setupcompleted'.format(unique_id))
+                promote_completed = EtcdConfiguration.get('/ovs/framework/hosts/{0}/promotecompleted'.format(unique_id))
+                if setup_completed is True and promote_completed is True:
                     raise RuntimeError('This node has already been configured for Open vStorage. Re-running the setup is not supported.')
             except (EtcdConnectionFailed, EtcdKeyNotFound):
                 pass
 
-            if not setupcompleted:
+            ip_client_map = {}
+            if setup_completed is False:
                 print '\n+++ Collecting cluster information +++\n'
                 logger.info('Collecting cluster information')
 
-                ipaddresses = target_client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
-                ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
-                SetupController.host_ips = set(ipaddresses)
-
-                # Check whether running local or remote
-                local_unique_id = System.get_my_machine_id()
-                remote_install = unique_id != local_unique_id
-                logger.debug('{0} installation'.format('Remote' if remote_install else 'Local'))
-                try:
-                    target_client.file_exists('/etc/openvstorage_id')
-                except:
-                    raise RuntimeError("The 'openvstorage' package is not installed on {0}".format(ip))
+                if root_client.file_exists('/etc/openvstorage_id') is False:
+                    raise RuntimeError("The 'openvstorage' package is not installed on this node")
 
                 # Getting cluster information
-                current_cluster_names = []
                 clusters = []
-                avahi_installed = SetupController._avahi_installed(target_client)
+                avahi_installed = SetupController._avahi_installed(root_client)
                 discovery_result = {}
                 if avahi_installed is True:
-                    discovery_result = SetupController._discover_nodes(target_client)
+                    discovery_result = SetupController._discover_nodes(root_client)
                     if discovery_result:
                         clusters = discovery_result.keys()
                         clusters.sort()
-                        current_cluster_names = clusters[:]
-                        logger.debug('Cluster names: {0}'.format(current_cluster_names))
+                        logger.debug('Cluster names: {0}'.format(clusters))
                     else:
                         logger.debug('No clusters found')
                 else:
                     logger.debug('No avahi installed/detected')
 
-                local_cluster_name = None
-                if remote_install is True:
-                    if os.path.exists(SetupController.avahi_filename):
-                        with open(SetupController.avahi_filename, 'r') as avahi_file:
-                            avahi_contents = avahi_file.read()
-                        match_groups = re.search('>ovs_cluster_(?P<cluster>[^_]+)_.+?<', avahi_contents).groupdict()
-                        if 'cluster' in match_groups:
-                            local_cluster_name = match_groups['cluster']
-
-                node_name = target_client.run('hostname')
+                nodes = []
+                node_name = root_client.run('hostname')
+                first_node = True
+                known_passwords = {}
                 logger.debug('Current host: {0}'.format(node_name))
-                if r_config.has_option('setup', 'cluster_name'):
-                    cluster_name = r_config.get('setup', 'cluster_name')
-                if r_config.has_option('setup', 'master_ip'):
-                    master_ip = r_config.get('setup', 'master_ip')
-                if r_config.has_option('setup', 'cluster_ip'):
-                    cluster_ip = r_config.get('setup', 'cluster_ip')
-
-                if r_config.has_option('setup', 'hypervisor_type'):
-                    hypervisor_type = r_config.get('setup', 'hypervisor_type')
-                if r_config.has_option('setup', 'hypervisor_name'):
-                    hypervisor_name = r_config.get('setup', 'hypervisor_name')
-                if r_config.has_option('setup', 'hypervisor_ip'):
-                    hypervisor_ip = r_config.get('setup', 'hypervisor_ip')
-                if r_config.has_option('setup', 'hypervisor_username'):
-                    hypervisor_username = r_config.get('setup', 'hypervisor_username')
-                if r_config.has_option('setup', 'hypervisor_password'):
-                    hypervisor_password = r_config.get('setup', 'hypervisor_password')
+                master_ip = resume_config.get('master_ip', master_ip)
+                cluster_name = resume_config.get('cluster_name', cluster_name)
+                hypervisor_ip = resume_config.get('hypervisor_ip', hypervisor_ip)
+                hypervisor_name = resume_config.get('hypervisor_name', hypervisor_name)
+                hypervisor_type = resume_config.get('hypervisor_type', hypervisor_type)
+                hypervisor_username = resume_config.get('hypervisor_username', hypervisor_username)
 
                 if cluster_name is None:
                     while True:
@@ -245,7 +181,6 @@ class SetupController(object):
                         cluster_options = [new_cluster] + clusters + [join_manually]
                         question = 'Select a cluster to join' if len(clusters) > 0 else 'No clusters found'
                         cluster_name = Interactive.ask_choice(cluster_options, question,
-                                                              default_value=local_cluster_name,
                                                               sort_choices=False)
                         if cluster_name == new_cluster:
                             cluster_name = None
@@ -257,8 +192,8 @@ class SetupController(object):
                             if not re.match(SSHClient.IP_REGEX, node_ip):
                                 print 'Incorrect IP provided'
                                 continue
-                            if node_ip in target_client.local_ips:
-                                print "A local ip address was given, please select '{0}'".format(new_cluster)
+                            if node_ip in root_client.local_ips:
+                                print "A local IP address was given, please select '{0}'".format(new_cluster)
                                 continue
                             logger.debug('Trying to manually join cluster on {0}'.format(node_ip))
 
@@ -284,17 +219,14 @@ class SetupController(object):
                                 logger.debug('No StorageRouters could be loaded, cannot join the cluster')
                                 print 'The cluster on the given master node cannot be joined as no StorageRouters could be loaded'
                                 continue
-                            correct = Interactive.ask_yesno(
-                                message='Following StorageRouters were detected:\n    {0}\nAre they correct?'.format(
-                                    ', '.join(storagerouters.keys()))
-                            )
+                            correct = Interactive.ask_yesno(message='Following StorageRouters were detected:\n    {0}\nAre they correct?'.format(', '.join(storagerouters.keys())))
                             if correct is False:
                                 print 'The cluster on the given master node cannot be joined as not all StorageRouters could be loaded'
                                 continue
 
                             known_passwords[node_ip] = node_password
                             if master_ip is not None and master_ip not in known_passwords:
-                                master_password = SetupController._ask_validate_password(master_ip, username='root')
+                                master_password = SetupController._ask_validate_password(master_ip, username='root', previous=node_password)
                                 known_passwords[master_ip] = master_password
                             for sr_ip, sr_name in storagerouters.iteritems():
                                 SetupController.discovered_nodes[sr_name] = {'ip': sr_ip,
@@ -306,21 +238,18 @@ class SetupController(object):
                         else:
                             logger.debug('Cluster {0} selected'.format(cluster_name))
                             SetupController.discovered_nodes = discovery_result[cluster_name]
-                            nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
-                            if node_name in discovery_result[cluster_name].keys():
-                                continue_install = Interactive.ask_yesno(
-                                    '{0} already exists in cluster {1}. Do you want to continue?'.format(
-                                        node_name, cluster_name
-                                    ), default_value=True
-                                )
+                            nodes = [node_property['ip'] for node_property in SetupController.discovered_nodes.values()]
+                            if node_name in SetupController.discovered_nodes.keys():
+                                continue_install = Interactive.ask_yesno(message='{0} already exists in cluster {1}. Do you want to continue?'.format(node_name, cluster_name),
+                                                                         default_value=True)
                                 if continue_install is False:
                                     raise ValueError('Duplicate node name found.')
-                            master_nodes = [this_node_name for this_node_name, node_properties in discovery_result[cluster_name].iteritems()
+                            master_nodes = [this_node_name for this_node_name, node_properties in SetupController.discovered_nodes.iteritems()
                                             if node_properties.get('type', None) == 'master']
                             if len(master_nodes) == 0:
                                 raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
-                            for _, node_info in discovery_result[cluster_name].iteritems():
-                                if node_info['ip'] != ip:
+                            for host_name, node_info in SetupController.discovered_nodes.iteritems():
+                                if host_name != node_name and node_info.get('type') == 'master':
                                     master_ip = node_info['ip']
                                     break
                             if master_ip is None:
@@ -335,38 +264,57 @@ class SetupController(object):
                     if first_node is True and cluster_name is None:
                         while True:
                             cluster_name = Interactive.ask_string('Please enter the cluster name')
-                            if cluster_name in current_cluster_names:
+                            if cluster_name in clusters:
                                 print 'The new cluster name should be unique.'
                             elif not re.match('^[0-9a-zA-Z]+(\-[0-9a-zA-Z]+)*$', cluster_name):
                                 print "The new cluster name can only contain numbers, letters and dashes."
                             else:
                                 break
 
+                    cluster_ip = Interactive.ask_choice(SetupController.host_ips, 'Select the public IP address of {0}'.format(node_name))
                 else:  # Automated install
+                    # @TODO: Add more validations for provided parameters
                     logger.debug('Automated installation')
-                    if SetupController._avahi_installed(target_client):
+                    first_node = cluster_ip is None or master_ip == cluster_ip
+                    logger.debug('Detected{0}a 1st node installation'.format('' if first_node is True else 'not'))
+                    known_passwords[master_ip] = master_password
+                    known_passwords[cluster_ip] = cluster_password
+                    if avahi_installed is True:
                         if cluster_name in discovery_result:
                             SetupController.discovered_nodes = discovery_result[cluster_name]
+                    elif first_node is False:
+                        try:
+                            from ovs.dal.lists.storagerouterlist import StorageRouterList
+                            with Remote(master_ip, [StorageRouterList],
+                                        username='root',
+                                        password=master_password,
+                                        strict_host_key_checking=False) as remote:
+                                for sr in remote.StorageRouterList.get_storagerouters():
+                                    SetupController.discovered_nodes[sr.name] = {'ip': sr.ip,
+                                                                                 'type': 'unknown',
+                                                                                 'ip_list': [sr.ip]}
+                        except Exception as ex:
+                            logger.error('Error loading storagerouters: {0}'.format(ex))
+                        if len(SetupController.discovered_nodes) == 0:
+                            logger.debug('No StorageRouters could be loaded, cannot join the cluster')
+                            raise RuntimeError('The cluster on the given master node cannot be joined as no StorageRouters could be loaded')
+                    else:
+                        SetupController.discovered_nodes[node_name] = {'ip': master_ip,
+                                                                       'type': 'unknown',
+                                                                       'ip_list': [master_ip]}
                     nodes = [node_property['ip'] for node_property in SetupController.discovered_nodes.values()]
-                    first_node = not join_cluster
                 if not cluster_name and first_node is False and avahi_installed is True:
                     raise RuntimeError('The name of the cluster should be known by now.')
 
-                # Get target cluster ip
-                ipaddresses = target_client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
-                ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
-                if not cluster_ip:
-                    cluster_ip = Interactive.ask_choice(ipaddresses, 'Select the public ip address of {0}'.format(node_name))
-                    ip_client_map.pop(ip)
-                    ip_client_map[cluster_ip] = SSHClient(cluster_ip, username='root', password=target_node_password)
-                known_passwords[cluster_ip] = target_node_password
+                ip_client_map[cluster_ip] = SSHClient(cluster_ip, username='root')
                 if cluster_ip not in nodes:
                     nodes.append(cluster_ip)
                 logger.debug('Cluster ip is selected as {0}'.format(cluster_ip))
 
-                if target_password is not None:
+                if master_password is not None:
                     for node in nodes:
-                        known_passwords[node] = target_password
+                        if node not in known_passwords:
+                            known_passwords[node] = master_password
 
                 hypervisor_info, ip_client_map = SetupController._prepare_node(cluster_ip=cluster_ip,
                                                                                nodes=nodes,
@@ -377,22 +325,18 @@ class SetupController(object):
                                                                                                 'username': hypervisor_username,
                                                                                                 'ip': hypervisor_ip,
                                                                                                 'password': hypervisor_password})
-                r_config.read(resumeconfig)
-                r_config.set('setup', 'cluster_ip', cluster_ip)
-                r_config.set('setup', 'master_ip', master_ip)
-                r_config.set('setup', 'cluster_name', cluster_name)
-                r_config.set('setup', 'unique_id', unique_id)
-                r_config.set('setup', 'configure_memcached', configure_memcached)
-                r_config.set('setup', 'configure_rabbitmq', configure_rabbitmq)
-                r_config.set('setup', 'hypervisor_type', hypervisor_info.get('type', None))
-                r_config.set('setup', 'hypervisor_name', hypervisor_info.get('name', None))
-                r_config.set('setup', 'hypervisor_ip', hypervisor_info.get('ip', None))
-                r_config.set('setup', 'hypervisor_username', hypervisor_info.get('username', None))
-                r_config.set('setup', 'hypervisor_password', hypervisor_info.get('password', None))
-                for ip, client in ip_client_map.items():
-                    r_config.set('ip_client_map', ip, client.password)
-                with open(resumeconfig, 'w') as fp:
-                    r_config.write(fp)
+                resume_config['master_ip'] = master_ip
+                resume_config['unique_id'] = unique_id
+                resume_config['cluster_ip'] = cluster_ip
+                resume_config['cluster_name'] = cluster_name
+                resume_config['hypervisor_ip'] = hypervisor_info['ip']
+                resume_config['hypervisor_type'] = hypervisor_info['type']
+                resume_config['hypervisor_name'] = hypervisor_info['name']
+                resume_config['configure_rabbitmq'] = configure_rabbitmq
+                resume_config['configure_memcached'] = configure_memcached
+                resume_config['hypervisor_username'] = hypervisor_info['username']
+                with open(resume_config_file, 'w') as resume_cfg:
+                    resume_cfg.write(json.dumps(resume_config))
 
                 if first_node is True:
                     try:
@@ -426,26 +370,13 @@ class SetupController(object):
                                                         node='extra')
                         raise
 
-                    if not promotecompleted:
-                        r_config = RawConfigParser()
-                        r_config.read(resumeconfig)
-                        if cluster_ip is None:
-                            cluster_ip = r_config.get('setup', 'cluster_ip')
-                        if master_ip is None:
-                            master_ip = r_config.get('setup', 'master_ip')
-                        if cluster_name is None:
-                            cluster_name = r_config.get('setup', 'cluster_name')
-                        for item in r_config.items('ip_client_map'):
-                            ip, password = item
-                            if ip not in ip_client_map:
-                                ip_client_map[ip] = SSHClient(ip, username='root', password=password)
-                        if unique_id is None:
-                            unique_id = r_config.get('setup', 'unique_id')
-                        if configure_memcached is None:
-                            configure_memcached = r_config.get('setup', 'configure_memcached')
-                        if configure_rabbitmq is None:
-                            configure_rabbitmq = r_config.get('setup', 'configure_rabbitmq')
-
+                    if promote_completed is False:
+                        master_ip = resume_config['master_ip']
+                        unique_id = resume_config['unique_id']
+                        cluster_ip = resume_config['cluster_ip']
+                        cluster_name = resume_config['cluster_name']
+                        configure_rabbitmq = resume_config['configure_rabbitmq']
+                        configure_memcached = resume_config['configure_memcached']
 
                         print 'Analyzing cluster layout'
                         logger.info('Analyzing cluster layout')
@@ -471,6 +402,8 @@ class SetupController(object):
                                                              unconfigure_memcached=configure_memcached,
                                                              unconfigure_rabbitmq=configure_rabbitmq)
                                 raise
+
+            root_client.file_delete(resume_config_file)
 
             print ''
             print Interactive.boxed_message(['Setup complete.',
@@ -533,16 +466,12 @@ class SetupController(object):
             elif cluster_ip and not re.match(Toolbox.regex_ip, cluster_ip):
                 raise RuntimeError('Incorrect IP provided ({0})'.format(cluster_ip))
 
+            config = SetupController._validate_and_retrieve_pre_config()
             master_ip = None
             offline_nodes = []
-            configure_rabbitmq = True
-            configure_memcached = True
-            preconfig = '/tmp/openvstorage_preconfig.cfg'
-            if os.path.exists(preconfig):
-                config = RawConfigParser()
-                config.read(preconfig)
-                configure_memcached = config.getboolean('setup', 'configure_memcached')
-                configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
+            configure_rabbitmq = config.get('configure_rabbitmq', True)
+            configure_memcached = config.get('configure_memcached', True)
+
             if node_action == 'demote' and cluster_ip:
                 from ovs.dal.lists.storagerouterlist import StorageRouterList
                 from ovs.lib.storagedriver import StorageDriverController
@@ -569,8 +498,7 @@ class SetupController(object):
                     raise RuntimeError("If the node is online, please use 'ovs setup demote' executed on the node you wish to demote")
 
             else:
-                target_password = SetupController._ask_validate_password('127.0.0.1', username='root',
-                                                                         node_string='this node')
+                target_password = SetupController._ask_validate_password('127.0.0.1', username='root')
                 target_client = SSHClient('127.0.0.1', username='root', password=target_password)
 
                 unique_id = System.get_my_machine_id(target_client)
@@ -780,14 +708,9 @@ class SetupController(object):
 
                 # 3. Demote if MASTER
                 if storage_router.node_type == 'MASTER':
-                    unconfigure_rabbitmq = True
-                    unconfigure_memcached = True
-                    preconfig = '/tmp/openvstorage_preconfig.cfg'
-                    if os.path.exists(preconfig):
-                        config = RawConfigParser()
-                        config.read(preconfig)
-                        unconfigure_memcached = config.getboolean('setup', 'configure_memcached')
-                        unconfigure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
+                    config = SetupController._validate_and_retrieve_pre_config()
+                    unconfigure_rabbitmq = config.get('configure_rabbitmq', True)
+                    unconfigure_memcached = config.get('configure_memcached', True)
                     SetupController._demote_node(cluster_ip=storage_router.ip,
                                                  master_ip=master_ip,
                                                  cluster_name=None,
@@ -849,18 +772,15 @@ class SetupController(object):
         # Exchange ssh keys
         print 'Exchanging SSH keys and updating hosts files'
         logger.info('Exchanging SSH keys and updating hosts files')
-        passwords = {}
         password = None
         if known_passwords:
             password = known_passwords.values()[0]
         for node in nodes:
             if node in known_passwords:
-                passwords[node] = known_passwords[node]
                 if node not in ip_client_map:
                     ip_client_map[node] = SSHClient(node, username='root', password=known_passwords[node])
                 continue
             password = SetupController._ask_validate_password(node, username='root', previous=password)
-            passwords[node] = password
             if node not in ip_client_map:
                 ip_client_map[node] = SSHClient(node, username='root', password=password)
 
@@ -929,38 +849,50 @@ class SetupController(object):
             if disktypes != '':
                 possible_hypervisor = 'VMWARE'
 
-        if not hypervisor_info.get('type'):
-            hypervisor_info['type'] = Interactive.ask_choice(['VMWARE', 'KVM'],
-                                                             question='Which type of hypervisor is this Storage Router backing?',
-                                                             default_value=possible_hypervisor)
-            logger.debug('Selected hypervisor type {0}'.format(hypervisor_info['type']))
-        default_name = ('esxi{0}' if hypervisor_info['type'] == 'VMWARE' else 'kvm{0}').format(cluster_ip.split('.')[-1])
-        if not hypervisor_info.get('name'):
-            hypervisor_info['name'] = Interactive.ask_string('Enter hypervisor hostname', default_value=default_name)
-        if hypervisor_info['type'] == 'VMWARE':
+        hypervisor_ip = hypervisor_info['ip']
+        hypervisor_name = hypervisor_info['name']
+        hypervisor_type = hypervisor_info['type']
+        hypervisor_username = hypervisor_info['username']
+        hypervisor_password = hypervisor_info['password']
+        if hypervisor_type is None:
+            hypervisor_type = Interactive.ask_choice(choice_options=['VMWARE', 'KVM'],
+                                                     question='Which type of hypervisor is this Storage Router backing?',
+                                                     default_value=possible_hypervisor)
+            logger.debug('Selected hypervisor type {0}'.format(hypervisor_type))
+        default_name = ('esxi{0}' if hypervisor_type == 'VMWARE' else 'kvm{0}').format(cluster_ip.split('.')[-1])
+        if hypervisor_name is None:
+            hypervisor_name = Interactive.ask_string('Enter hypervisor hostname', default_value=default_name)
+        if hypervisor_type == 'VMWARE':
             first_request = True  # If parameters are wrong, we need to re-ask it
             while True:
-                if not hypervisor_info.get('ip') or not first_request:
-                    hypervisor_info['ip'] = Interactive.ask_string('Enter hypervisor ip address',
-                                                                   default_value=hypervisor_info.get('ip'))
-                if not hypervisor_info.get('username') or not first_request:
-                    hypervisor_info['username'] = Interactive.ask_string('Enter hypervisor username',
-                                                                         default_value=hypervisor_info['username'])
-                if not hypervisor_info.get('password') or not first_request:
-                    hypervisor_info['password'] = Interactive.ask_password('Enter hypervisor {0} password'.format(hypervisor_info.get('username')))
+                if hypervisor_ip is None or first_request is False:
+                    hypervisor_ip = Interactive.ask_string(message='Enter hypervisor IP address',
+                                                           default_value=hypervisor_ip)
+                if hypervisor_username is None or first_request is False:
+                    hypervisor_username = Interactive.ask_string(message='Enter hypervisor username',
+                                                                 default_value=hypervisor_username)
+                if hypervisor_password is None or first_request is False:
+                    hypervisor_password = Interactive.ask_password(message='Enter hypervisor {0} password'.format(hypervisor_username))
                 try:
-                    request = urllib2.Request('https://{0}/mob'.format(hypervisor_info['ip']))
-                    auth = base64.encodestring('{0}:{1}'.format(hypervisor_info['username'], hypervisor_info['password'])).replace('\n', '')
+                    request = urllib2.Request('https://{0}/mob'.format(hypervisor_ip))
+                    auth = base64.encodestring('{0}:{1}'.format(hypervisor_username, hypervisor_password)).replace('\n', '')
                     request.add_header("Authorization", "Basic %s" % auth)
                     urllib2.urlopen(request).read()
                     break
                 except Exception as ex:
                     first_request = False
-                    print 'Could not connect to {0}: {1}'.format(hypervisor_info['ip'], ex)
-        elif hypervisor_info['type'] == 'KVM':
+                    print 'Could not connect to {0}: {1}'.format(hypervisor_ip, ex)
+            hypervisor_info['ip'] = hypervisor_ip
+            hypervisor_info['username'] = hypervisor_username
+            hypervisor_info['password'] = hypervisor_password
+        elif hypervisor_type == 'KVM':
             hypervisor_info['ip'] = cluster_ip
             hypervisor_info['password'] = None
             hypervisor_info['username'] = 'root'
+
+        hypervisor_info['name'] = hypervisor_name
+        hypervisor_info['type'] = hypervisor_type
+
         logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
 
         return hypervisor_info, ip_client_map
@@ -1006,7 +938,6 @@ class SetupController(object):
         result = ArakoonInstaller.create_cluster('ovsdb', cluster_ip, EtcdConfiguration.get('/ovs/framework/paths|ovsdb'), locked=False)
         arakoon_ports = [result['client_port'], result['messaging_port']]
 
-        SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
 
         print 'Build configuration files'
@@ -1021,7 +952,7 @@ class SetupController(object):
 
         print 'Starting model services'
         logger.debug('Starting model services')
-        for service in SetupController.model_services:
+        for service in ['memcached', 'arakoon-ovsdb']:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'restart', logger)
@@ -1052,7 +983,7 @@ class SetupController(object):
 
         print 'Starting services'
         logger.info('Starting services for join master')
-        for service in [s for s in SetupController.master_services if s not in ['etcd-config']]:
+        for service in ['memcached', 'arakoon-ovsdb', 'rabbitmq-server']:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'start', logger)
@@ -1118,7 +1049,7 @@ class SetupController(object):
 
         print 'Stopping services'
         logger.debug('Stopping services')
-        for service in SetupController.model_services + ['watcher-framework', 'workers', 'support-agent']:
+        for service in ['memcached', 'arakoon-ovsdb', 'watcher-framework', 'workers', 'support-agent']:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.disable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'stop', logger)
@@ -1138,8 +1069,7 @@ class SetupController(object):
         except Exception as ex:
             SetupController._print_log_error('remove configuration files', ex)
 
-        SetupController._remove_services(target_client, machine_id, 'master')
-        SetupController._unconfigure_logstash(target_client)
+        SetupController._remove_services(target_client, 'master')
 
         if node == 'first':
             print 'Unconfigure Arakoon'
@@ -1200,7 +1130,6 @@ class SetupController(object):
             logger.info('Setting up fleet')
             ServiceManager.setup_fleet()
 
-        SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'extra')
 
         enabled = EtcdConfiguration.get('/ovs/framework/support|enabled')
@@ -1269,7 +1198,6 @@ class SetupController(object):
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
-        SetupController._configure_logstash(target_client)
         if configure_memcached:
             SetupController._configure_memcached(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
@@ -1337,7 +1265,7 @@ class SetupController(object):
 
         print 'Starting services'
         logger.info('Starting services')
-        for service in SetupController.master_services:
+        for service in ['memcached', 'arakoon-ovsdb', 'rabbitmq-server', 'etcd-config']:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'start', logger)
@@ -1461,7 +1389,7 @@ class SetupController(object):
 
             print 'Removing services'
             logger.info('Removing services')
-            services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + ['arakoon-ovsdb', 'etcd-config'])]
+            services = ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'snmp', 'webapp-api']
             if unconfigure_rabbitmq is False:
                 services.remove('rabbitmq-server')
             if unconfigure_memcached is False:
@@ -1595,7 +1523,6 @@ EOF
             Toolbox.change_service_state(client, 'rabbitmq-server', 'stop', logger)
         client.file_delete('/etc/rabbitmq/rabbitmq.config')
 
-
     @staticmethod
     def _check_rabbitmq_and_enable_ha_mode(client):
         if not ServiceManager.has_service('rabbitmq-server', client):
@@ -1638,39 +1565,6 @@ EOF
             return True
 
     @staticmethod
-    def _logstash_installed(client):
-        if client.file_exists('/usr/sbin/logstash') \
-           or client.file_exists('/usr/bin/logstash') \
-           or client.file_exists('/opt/logstash/bin/logstash'):
-            return True
-        return False
-
-    @staticmethod
-    def _configure_logstash(client):
-        if not SetupController._logstash_installed(client):
-            logger.debug("Logstash is not installed, skipping its configuration")
-            return False
-
-        print 'Configuring logstash'
-        logger.info('Configuring logstash')
-        if ServiceManager.has_service('logstash', client) is False:
-            ServiceManager.add_service('logstash', client)
-        Toolbox.change_service_state(client, 'logstash', 'restart', logger)
-
-    @staticmethod
-    def _unconfigure_logstash(client):
-        if not SetupController._logstash_installed(client):
-            logger.debug("Logstash is not installed, skipping its configuration")
-            return False
-
-        print 'Unconfiguring logstash'
-        logger.info('Unconfiguring logstash')
-        Toolbox.change_service_state(client, 'logstash', 'stop', logger)
-        if ServiceManager.has_service('logstash', client) is True:
-            ServiceManager.remove_service('logstash', client)
-
-
-    @staticmethod
     def _configure_avahi(client, cluster_name, node_name, node_type):
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
@@ -1695,14 +1589,14 @@ EOF
     @staticmethod
     def _add_services(client, unique_id, node_type):
         if node_type == 'master':
-            services = SetupController.master_node_services
+            services = ['memcached', 'arakoon-ovsdb', 'rabbitmq-server', 'etcd-config', 'workers', 'scheduled-tasks', 'snmp', 'webapp-api', 'volumerouter-consumer']
             if 'arakoon-ovsdb' in services:
                 services.remove('arakoon-ovsdb')
             if 'etcd-config' in services:
                 services.remove('etcd-config')
             worker_queue = '{0},ovs_masters'.format(unique_id)
         else:
-            services = SetupController.extra_node_services
+            services = ['workers', 'volumerouter-consumer']
             worker_queue = unique_id
 
         print 'Adding services'
@@ -1715,15 +1609,15 @@ EOF
                 ServiceManager.add_service(service, params=params, client=client)
 
     @staticmethod
-    def _remove_services(client, unique_id, node_type):
+    def _remove_services(client, node_type):
         if node_type == 'master':
-            services = SetupController.master_node_services
+            services = ['memcached', 'arakoon-ovsdb', 'rabbitmq-server', 'etcd-config', 'workers', 'scheduled-tasks', 'snmp', 'webapp-api', 'volumerouter-consumer']
             if 'arakoon-ovsdb' in services:
                 services.remove('arakoon-ovsdb')
             if 'etcd-config' in services:
                 services.remove('etcd-config')
         else:
-            services = SetupController.extra_node_services
+            services = ['workers', 'volumerouter-consumer']
 
         print 'Removing services'
         logger.info('Removing services')
@@ -1738,8 +1632,6 @@ EOF
     def _finalize_setup(client, node_name, node_type, hypervisor_info, unique_id):
         cluster_ip = client.ip
         client.dir_create('/opt/OpenvStorage/webapps/frontend/logging')
-        if SetupController._logstash_installed(client):
-            Toolbox.change_service_state(client, 'logstash', 'restart', logger)
         SetupController._replace_param_in_config(client=client,
                                                  config_file='/opt/OpenvStorage/webapps/frontend/logging/config.js',
                                                  old_value='http://"+window.location.hostname+":9200',
@@ -1888,9 +1780,10 @@ EOF
         return functions_found
 
     @staticmethod
-    def _ask_validate_password(ip, username='root', previous=None, node_string=None):
+    def _ask_validate_password(ip, username='root', previous=None):
         """
         Asks a user to enter the password for a given user on a given ip and validates it
+        If previous is provided, we first attempt to login using the previous password, if successful, we don't ask for a password
         """
         while True:
             try:
@@ -1907,10 +1800,8 @@ EOF
                         return previous
                     except:
                         pass
-                password = Interactive.ask_password('Enter the {0} password for {1}'.format(
-                    username,
-                    ip if node_string is None else node_string
-                ))
+                node_string = 'this node' if ip == '127.0.0.1' else ip
+                password = Interactive.ask_password('Enter the {0} password for {1}'.format(username, node_string))
                 if password in ['', None]:
                     continue
                 client = SSHClient(ip, username=username, password=password)
@@ -1940,3 +1831,53 @@ EOF
     def _print_log_error(action, exception):
         print '\n Failed to {0}. \n Error: {1} {2}'.format(action, type(exception), exception)
         logger.warning('Failed to {0}. Error: {1}'.format(action, exception))
+
+    @staticmethod
+    def _validate_and_retrieve_pre_config():
+        """
+        Validate whether the values in the pre-configuration file are valid
+        :return: JSON contents
+        """
+        preconfig = '/opt/OpenvStorage/openvstorage_preconfig.json'
+        if not os.path.exists(preconfig):
+            return
+
+        config = {}
+        with open(preconfig, 'r') as pre_config:
+            try:
+                config = json.loads(pre_config.read())
+            except Exception as ex:
+                raise ValueError('JSON contents could not be retrieved from file {0}.\nErrormessage: {1}'.format(preconfig, ex))
+
+        if 'setup' not in config or not isinstance(config['setup'], dict):
+            raise ValueError('The OpenvStorage pre-configuration file must contain a "setup" key with a dictionary as value')
+
+        errors = []
+        config = config['setup']
+        actual_keys = config.keys()
+        expected_keys = ['cluster_ip', 'cluster_name', 'cluster_password', 'configure_memcached', 'configure_rabbitmq', 'enable_heartbeats', 'external_etcd',
+                         'hypervisor_ip', 'hypervisor_name', 'hypervisor_password', 'hypervisor_type', 'hypervisor_username', 'master_ip', 'master_password']
+        for key in actual_keys:
+            if key not in expected_keys:
+                errors.append('Key {0} is not supported by OpenvStorage to be used in the pre-configuration JSON'.format(key))
+        if len(errors) > 0:
+            raise ValueError('\nErrors found while verifying pre-configuration:\n - {0}\n\nAllowed keys:\n - {1}'.format('\n - '.join(errors), '\n - '.join(expected_keys)))
+
+        Toolbox.verify_required_params(actual_params=config,
+                                       required_params={'cluster_ip': (str, Toolbox.regex_ip, False),
+                                                        'cluster_name': (str, None),
+                                                        'cluster_password': (str, None, False),
+                                                        'configure_memcached': (bool, None, False),
+                                                        'configure_rabbitmq': (bool, None, False),
+                                                        'enable_heartbeats': (bool, None, False),
+                                                        'external_etcd': (str, None, False),
+                                                        'hypervisor_ip': (str, Toolbox.regex_ip),
+                                                        'hypervisor_name': (str, None),
+                                                        'hypervisor_password': (str, None, False),
+                                                        'hypervisor_type': (str, ['VMWARE', 'KVM']),
+                                                        'hypervisor_username': (str, None, False),
+                                                        'master_ip': (str, Toolbox.regex_ip),
+                                                        'master_password': (str, None)})
+        if config['hypervisor_type'] == 'VMWARE' and config.get('hypervisor_password') is None or config.get('hypervisor_username') is None:
+            raise ValueError('Hypervisor credentials are required for VMWARE unattended installation')
+        return config
