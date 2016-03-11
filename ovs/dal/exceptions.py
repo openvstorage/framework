@@ -71,3 +71,10 @@ class VolatileObjectException(Exception):
     Raised when ceratin actions are executed on a volatile object (e.g. save)
     """
     pass
+
+
+class MissingIndexException(Exception):
+    """
+    Raised when an index could not be found/loaded
+    """
+    pass

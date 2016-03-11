@@ -21,7 +21,7 @@ import json
 import copy
 from random import randint
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
-from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException
+from ovs.dal.exceptions import ObjectNotFoundException, MissingIndexException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
@@ -234,7 +234,8 @@ class DataList(object):
 
             self.from_cache = False
             name = query_object.__name__.lower()
-            guids = DataList.get_pks(DataObject.NAMESPACE, name)
+            prefix = '{0}_{1}_'.format(DataObject.NAMESPACE, name)
+            entries = self._persistent.prefix_entries(prefix)
 
             if query_data == DataList.select.COUNT:
                 self.data = 0
@@ -242,13 +243,10 @@ class DataList(object):
                 self.data = []
 
             elements = 0
-            for guid in guids:
+            for key, data in entries:
                 elements += 1
                 try:
-                    key = '{0}_{1}_{2}'.format(DataObject.NAMESPACE, name, guid)
-                    data = self._volatile.get(key)
-                    if data is None:
-                        data = self._persistent.get(key)
+                    guid = key.replace(prefix, '')
                     instance = {'data': data,
                                 'guid': guid}
                     if query_type == DataList.where_operator.AND:
@@ -344,7 +342,7 @@ class DataList(object):
                     raise RuntimeError('Invalid path given: {0}, currently pointing to {1}'.format(path, pitem))
 
     @staticmethod
-    def get_relation_set(remote_class, remote_key, own_class, own_key, own_guid):
+    def get_relation_set(remote_key, own_class, own_key, own_guid):
         """
         This method will get a DataList for a relation.
         On a cache miss, the relation DataList will be rebuild and due to the nature of the full table scan, it will
@@ -352,105 +350,25 @@ class DataList(object):
         """
 
         # Example:
-        # * remote_class = vDisk
         # * remote_key = vmachine
         # * own_class = vMachine
         # * own_key = vdisks
         # Called to load the vMachine.vdisks list (resulting in a possible scan of vDisk objects)
         # * own_guid = this vMachine object's guid
 
-        from ovs.dal.dataobject import DataObject
-
-        volatile = VolatileFactory.get_client()
+        persistent = PersistentFactory.get_client()
         own_name = own_class.__name__.lower()
         datalist = DataList({}, '{0}_{1}_{2}'.format(own_name, own_guid, remote_key), load=False)
         reverse_key = 'ovs_reverseindex_{0}_{1}'.format(own_name, own_guid)
 
         # Check whether the requested information is available in cache
-        reverse_index = volatile.get(reverse_key)
-        if reverse_index is not None and own_key in reverse_index:
-            Toolbox.log_cache_hit('datalist', True)
-            datalist.data = reverse_index[own_key]
-            datalist.from_cache = True
-            return datalist
+        if persistent.exists(reverse_key):
+            reverse_index = persistent.get(reverse_key)
+            if own_key in reverse_index:
+                datalist.data = reverse_index[own_key]
+                datalist.from_cache = True
+                return datalist
 
-        Toolbox.log_cache_hit('datalist', False)
-        mutex = VolatileMutex('reverseindex')
-        remote_name = remote_class.__name__.lower()
-        namespace = DataObject.NAMESPACE
-        blueprint_object = remote_class()  # vDisk object
-        foreign_guids = {}
-
-        for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
-            if relation.foreign_type is None:
-                classname = remote_name
-            else:
-                classname = relation.foreign_type.__name__.lower()
-            if classname not in foreign_guids:
-                foreign_guids[classname] = DataList.get_pks(namespace, classname)
-            try:
-                mutex.acquire(60)
-                for foreign_guid in foreign_guids[classname]:
-                    reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, foreign_guid)
-                    reverse_index = volatile.get(reverse_key)
-                    if reverse_index is None:
-                        reverse_index = {}
-                    if relation.foreign_key not in reverse_index:
-                        reverse_index[relation.foreign_key] = []
-                        volatile.set(reverse_key, reverse_index)
-            finally:
-                mutex.release()
-        remote_keys = DataList.get_pks(namespace, remote_name)
-        for guid in remote_keys:
-            try:
-                instance = remote_class(guid)
-                for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
-                    if relation.foreign_type is None:
-                        classname = remote_name
-                    else:
-                        classname = relation.foreign_type.__name__.lower()
-                    key = getattr(instance, '{0}_guid'.format(relation.name))
-                    if key is not None:
-                        try:
-                            mutex.acquire(60)
-                            reverse_index = volatile.get('ovs_reverseindex_{0}_{1}'.format(classname, key))
-                            if reverse_index is None:
-                                reverse_index = {}
-                            if relation.foreign_key not in reverse_index:
-                                reverse_index[relation.foreign_key] = []
-                            if guid not in reverse_index[relation.foreign_key]:
-                                if instance.updated_on_datastore():
-                                    raise ConcurrencyException()
-                                reverse_index[relation.foreign_key].append(guid)
-                                volatile.set('ovs_reverseindex_{0}_{1}'.format(classname, key), reverse_index)
-                        finally:
-                            mutex.release()
-            except ObjectNotFoundException:
-                pass
-            except ConcurrencyException:
-                pass
-
-        try:
-            mutex.acquire(60)
-            reverse_key = 'ovs_reverseindex_{0}_{1}'.format(own_name, own_guid)
-            reverse_index = volatile.get(reverse_key)
-            if reverse_index is None:
-                reverse_index = {}
-            if own_key not in reverse_index:
-                reverse_index[own_key] = []
-                volatile.set(reverse_key, reverse_index)
-            datalist.data = reverse_index[own_key]
-            datalist.from_cache = False
-        finally:
-            mutex.release()
+        datalist.data = []
+        datalist.from_cache = False
         return datalist
-
-    @staticmethod
-    def get_pks(namespace, name):
-        """
-        This method will load the primary keys for a given namespace and name
-        """
-        persistent = PersistentFactory.get_client()
-        prefix = '{0}_{1}_'.format(namespace, name)
-        for key in persistent.prefix(prefix):
-            yield key.replace(prefix, '')

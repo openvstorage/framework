@@ -637,21 +637,6 @@ class Basic(TestCase):
         self.assertEqual(dictionary['machine']['name'], 'machine',
                          'Serialized object should have correct properties at all depths')
 
-    def test_primarykeys(self):
-        """
-        Validates whether the primary keys are kept in sync
-        """
-        disk = TestDisk()
-        disk.name = 'disk'
-        keys = list(DataList.get_pks(disk._namespace, disk._classname))
-        self.assertEqual(len(keys), 0, 'There should be no primary keys ({0})'.format(len(keys)))
-        disk.save()
-        keys = list(DataList.get_pks(disk._namespace, disk._classname))
-        self.assertEqual(len(keys), 1, 'There should be one primary key ({0})'.format(len(keys)))
-        disk.delete()
-        keys = list(DataList.get_pks(disk._namespace, disk._classname))
-        self.assertEqual(len(keys), 0, 'There should be no primary keys ({0})'.format(len(keys)))
-
     def test_reduceddatalist(self):
         """
         Validates the reduced list
@@ -1096,11 +1081,11 @@ class Basic(TestCase):
         machine_x = TestMachine(machine.guid)
         machine_x.name = 'machine1'
         machine_x.save()
-        self.assertTrue(machine.updated_on_datastore(), 'Machine is updated on datastore')
+        self.assertTrue(machine.updated_on_datastore(), 'Machine should be updated on datastore')
         machine.name = 'machine2'
         machine.save()
         self.assertEqual(machine._data['_version'], 4, 'Version should be 4, is {0}'.format(machine._data['_version']))
-        self.assertFalse(machine.updated_on_datastore(), 'Machine is not updated on datastore')
+        self.assertFalse(machine.updated_on_datastore(), 'Machine should not be updated on datastore')
 
     def test_outdated_listobjects(self):
         """
@@ -1178,16 +1163,14 @@ class Basic(TestCase):
         disk2.name = 'disk2'
         disk2.machine = machine
         disk2.save()
-        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
+        datalist = DataList.get_relation_set('machine', TestEMachine, 'disks', machine.guid)
         self.assertTrue(datalist.from_cache, 'The relation set should be cached')
         self.assertEqual(len(datalist.data), 2, 'There should be two disks')
-        VolatileFactory.store.clean()
-        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
-        self.assertFalse(datalist.from_cache, 'The relation set should be generated')
-        self.assertEqual(len(datalist.data), 2, 'There should be two disks')
-        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
-        self.assertTrue(datalist.from_cache, 'The relation set should be cached')
-        self.assertEqual(len(datalist.data), 2, 'There should be two disks')
+        key = 'ovs_reverseindex_testemachine_{0}'.format(machine.guid)
+        PersistentFactory.store.delete(key)
+        datalist = DataList.get_relation_set('machine', TestEMachine, 'disks', machine.guid)
+        self.assertFalse(datalist.from_cache, 'The reverse index is gone, so the relation is empty')
+        self.assertEqual(len(datalist.data), 0, 'No disks should be found')
 
     def test_instance_checks(self):
         """
@@ -1225,8 +1208,8 @@ class Basic(TestCase):
         self.assertEqual(machine.name, 'one', 'The machine\'s name should still be one')
         self.assertFalse(machine._metadata['cache'], 'The machine should be loaded from persistent store')
         machine = TestMachine(machine.guid)
-        self.assertEqual(machine.name, 'updated', 'The machine\'s name should be updated')
         self.assertFalse(machine._metadata['cache'], 'Race condition should have prevented caching')
+        self.assertEqual(machine.name, 'updated', 'The machine\'s name should be updated')
         machine = TestMachine(machine.guid)
         self.assertTrue(machine._metadata['cache'], 'The machine should be loaded from cache')
 
@@ -1256,7 +1239,7 @@ class Basic(TestCase):
         machine.name = 'machine'
         machine.save()
         key = 'ovs_reverseindex_testemachine_{0}'.format(machine.guid)
-        self.assertIsNotNone(VolatileFactory.store.get(key), 'The reverse index should be created (save on new object)')
+        self.assertIsNotNone(PersistentFactory.store.get(key), 'The reverse index should be created (save on new object)')
         disk1 = TestDisk()
         disk1.name = 'disk1'
         disk1.machine = machine
@@ -1265,14 +1248,6 @@ class Basic(TestCase):
         disk2.name = 'disk2'
         disk2.machine = machine
         disk2.save()
-        amount = len(machine.disks)
-        self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
-        VolatileFactory.store.delete(key)
-        amount = len(machine.disks)
-        self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
-        VolatileFactory.store.delete(key)
-        machine.save()
-        self.assertIsNone(VolatileFactory.store.get(key), 'The reverse index should not be created (save on existing object)')
         amount = len(machine.disks)
         self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
 

@@ -24,6 +24,7 @@ from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobject import DataObject
 from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 
 
 class LotsOfObjects(TestCase):
@@ -35,6 +36,8 @@ class LotsOfObjects(TestCase):
         """
         A test creating, linking and querying a lot of objects
         """
+        self.persistent = PersistentFactory.get_client()
+
         print ''
         print 'cleaning up'
         self._clean_all()
@@ -97,7 +100,7 @@ class LotsOfObjects(TestCase):
             seconds_passed = (time.time() - start)
             print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
 
-            print '\nloading disks'
+            print '\nloading disks (all)'
             start = time.time()
             for i in xrange(0, int(LotsOfObjects.amount_of_machines)):
                 machine = TestMachine(mguids[i])
@@ -147,9 +150,13 @@ class LotsOfObjects(TestCase):
         Cleans all disks and machines
         """
         machine = TestMachine()
-        keys = DataList.get_pks(DataObject.NAMESPACE, machine._classname)
-        for guid in keys:
+        prefix = '{0}_{1}_'.format(DataObject.NAMESPACE, machine._classname)
+        for key in self.persistent.prefix('ovs_reverseindex_{0}'.format(machine._classname)):
+            self.persistent.delete(key)
+        keys = self.persistent.prefix(prefix)
+        for key in keys:
             try:
+                guid = key.replace(prefix, '')
                 machine = TestMachine(guid)
                 for disk in machine.disks:
                     disk.delete()
@@ -157,9 +164,13 @@ class LotsOfObjects(TestCase):
             except (ObjectNotFoundException, ValueError):
                 pass
         disk = TestDisk()
-        keys = DataList.get_pks(DataObject.NAMESPACE, disk._classname)
-        for guid in keys:
+        prefix = '{0}_{1}_'.format(DataObject.NAMESPACE, disk._classname)
+        for key in self.persistent.prefix('ovs_reverseindex_{0}'.format(disk._classname)):
+            self.persistent.delete(key)
+        keys = self.persistent.prefix(prefix)
+        for key in keys:
             try:
+                guid = key.replace(prefix, '')
                 disk = TestDisk(guid)
                 disk.delete()
             except (ObjectNotFoundException, ValueError):

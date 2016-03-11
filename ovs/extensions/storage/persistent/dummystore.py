@@ -17,7 +17,8 @@ Dummy persistent module
 """
 import os
 import json
-from ovs.extensions.storage.exceptions import KeyNotFoundException
+import uuid
+from ovs.extensions.storage.exceptions import KeyNotFoundException, AssertException
 
 
 class DummyPersistentStore(object):
@@ -27,6 +28,9 @@ class DummyPersistentStore(object):
     _path = '/run/dummypersistent.json'
     _keep_in_memory_only = False
     _data = {}
+
+    def __init__(self):
+        self._sequences = {}
 
     @staticmethod
     def clean():
@@ -73,18 +77,29 @@ class DummyPersistentStore(object):
         data = self._read()
         return [k for k in data.keys() if k.startswith(key)]
 
-    def set(self, key, value):
+    def prefix_entries(self, key):
+        """
+        Returns all key-values starting with the given prefix
+        """
+        data = self._read()
+        return [(k, v) for k, v in data.iteritems() if k.startswith(key)]
+
+    def set(self, key, value, transaction=None):
         """
         Sets the value for a key to a given value
         """
+        if transaction is not None:
+            return self._sequences[transaction].append([self.set, {'key': key, 'value': value}])
         data = self._read()
         data[key] = value
         self._save(data)
 
-    def delete(self, key):
+    def delete(self, key, transaction=None):
         """
         Deletes a given key from the store
         """
+        if transaction is not None:
+            return self._sequences[transaction].append([self.delete, {'key': key}])
         data = self._read()
         if key in data:
             del data[key]
@@ -108,6 +123,32 @@ class DummyPersistentStore(object):
         """
         _ = self
         pass
+
+    def assertValue(self, key, value, transaction=None):
+        """
+        Asserts a key-value pair
+        """
+        if transaction is not None:
+            return self._sequences[transaction].append([self.assertValue, {'key': key, 'value': value}])
+        data = self._read()
+        if json.dumps(data[key]) != json.dumps(value):
+            raise AssertException(key)
+        self._save(data)
+
+    def begin_transaction(self):
+        """
+        Creates a transaction (wrapper around Arakoon sequences)
+        """
+        key = str(uuid.uuid4())
+        self._sequences[key] = []
+        return key
+
+    def apply_transaction(self, transaction):
+        """
+        Applies a transaction
+        """
+        for item in self._sequences[transaction]:
+            item[0](**item[1])
 
     def _save(self, data):
         """
