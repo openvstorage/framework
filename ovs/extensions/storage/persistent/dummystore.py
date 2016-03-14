@@ -66,9 +66,20 @@ class DummyPersistentStore(object):
         """
         data = self._read()
         if key in data:
-            return self._read()[key]
+            return data[key]
         else:
             raise KeyNotFoundException(key)
+
+    def get_multi(self, keys):
+        """
+        Retreives values for all given keys
+        """
+        data = self._read()
+        for key in keys:
+            if key in data:
+                yield data[key]
+            else:
+                raise KeyNotFoundException(key)
 
     def prefix(self, key):
         """
@@ -131,6 +142,8 @@ class DummyPersistentStore(object):
         if transaction is not None:
             return self._sequences[transaction].append([self.assert_value, {'key': key, 'value': value}])
         data = self._read()
+        if key not in data:
+            raise AssertException(key)
         if json.dumps(data[key], sort_keys=True) != json.dumps(value, sort_keys=True):
             raise AssertException(key)
         self._save(data)

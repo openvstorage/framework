@@ -204,7 +204,6 @@ class DataList(object):
 
             from ovs.dal.dataobject import DataObject
 
-            Toolbox.log_cache_hit('datalist', False)
             hybrid_structure = HybridRunner.get_hybrids()
 
             items = self._query['query']['items']
@@ -284,7 +283,6 @@ class DataList(object):
                 if invalidated is False:
                     self._volatile.set(self._key, self.data, 300 + randint(0, 300))  # Cache between 5 and 10 minutes
         else:
-            Toolbox.log_cache_hit('datalist', True)
             self.from_cache = True
         return self
 

@@ -53,8 +53,8 @@ class Descriptor(object):
             type_name = object_type.__name__
             module_name = object_type.__module__.split('.')[-1]
             fqm_name = 'ovs.dal.hybrids.{0}'.format(module_name)
-            if object_type in Descriptor.descriptor_cache:
-                identifier = Descriptor.descriptor_cache[object_type]
+            if object_type in Descriptor.descriptor_cache and cached is True:
+                self._descriptor = Descriptor.descriptor_cache[object_type]
             else:
                 try:
                     module = __import__(fqm_name, level=0, fromlist=[type_name])
@@ -63,22 +63,11 @@ class Descriptor(object):
                     logger.info('Received object type {0} is not a hybrid'.format(object_type))
                     raise TypeError('Invalid type for Descriptor: {0}'.format(object_type))
                 identifier = '{0}_{1}'.format(type_name, hashlib.sha1(fqm_name).hexdigest())
-                Descriptor.descriptor_cache[identifier] = object_type
-
-            key = 'ovs_descriptor_{0}'.format(identifier)
-            self._volatile = VolatileFactory.get_client()
-            self._descriptor = self._volatile.get(key)
-            if self._descriptor is None or cached is False:
-                if self._descriptor is None:
-                    logger.debug('Object type {0} was translated to {1}.{2}'.format(object_type, fqm_name, type_name))
-                Toolbox.log_cache_hit('descriptor', False)
                 self._descriptor = {'fqmn': fqm_name,
                                     'type': type_name,
                                     'identifier': identifier,
                                     'version': 3}
-                self._volatile.set(key, self._descriptor)
-            else:
-                Toolbox.log_cache_hit('descriptor', True)
+                Descriptor.descriptor_cache[identifier] = self._descriptor
             self._descriptor['guid'] = guid
 
     def load(self, descriptor):
@@ -149,73 +138,77 @@ class HybridRunner(object):
     of dynamic code reflection
     """
 
+    cache = {}
+
     @staticmethod
     def get_hybrids():
         """
         Yields all hybrid classes
         """
         key = 'ovs_hybrid_structure'
+        if key in HybridRunner.cache:
+            return HybridRunner.cache[key]
         volatile = VolatileFactory.get_client()
         hybrid_structure = volatile.get(key)
-        if hybrid_structure is None:
-            Toolbox.log_cache_hit('hybrid_structure', False)
-            base_hybrids = []
-            inherit_table = {}
-            translation_table = {}
-            path = os.path.join(os.path.dirname(__file__), 'hybrids')
-            for filename in os.listdir(path):
-                if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
-                    name = filename.replace('.py', '')
-                    module = imp.load_source(name, os.path.join(path, filename))
-                    for member in inspect.getmembers(module):
-                        if inspect.isclass(member[1]) \
-                                and member[1].__module__ == name:
-                            current_class = member[1]
-                            try:
-                                current_descriptor = Descriptor(current_class).descriptor
-                            except TypeError:
-                                continue
-                            current_identifier = current_descriptor['identifier']
-                            if current_identifier not in translation_table:
-                                translation_table[current_identifier] = current_descriptor
-                            if 'DataObject' in current_class.__base__.__name__:
-                                if current_identifier not in base_hybrids:
-                                    base_hybrids.append(current_identifier)
-                                else:
-                                    raise RuntimeError('Duplicate base hybrid found: {0}'.format(current_identifier))
-                            elif 'DataObject' not in current_class.__name__:
-                                structure = []
-                                this_class = None
-                                for this_class in current_class.__mro__:
-                                    if 'DataObject' in this_class.__name__:
-                                        break
-                                    try:
-                                        structure.append(Descriptor(this_class).descriptor['identifier'])
-                                    except TypeError:
-                                        break  # This means we reached one of the built-in classes.
+        if hybrid_structure is not None:
+            HybridRunner.cache[key] = hybrid_structure
+            return hybrid_structure
+        base_hybrids = []
+        inherit_table = {}
+        translation_table = {}
+        path = os.path.join(os.path.dirname(__file__), 'hybrids')
+        for filename in os.listdir(path):
+            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+                name = filename.replace('.py', '')
+                module = imp.load_source(name, os.path.join(path, filename))
+                for member in inspect.getmembers(module):
+                    if inspect.isclass(member[1]) \
+                            and member[1].__module__ == name:
+                        current_class = member[1]
+                        try:
+                            current_descriptor = Descriptor(current_class).descriptor
+                        except TypeError:
+                            continue
+                        current_identifier = current_descriptor['identifier']
+                        if current_identifier not in translation_table:
+                            translation_table[current_identifier] = current_descriptor
+                        if 'DataObject' in current_class.__base__.__name__:
+                            if current_identifier not in base_hybrids:
+                                base_hybrids.append(current_identifier)
+                            else:
+                                raise RuntimeError('Duplicate base hybrid found: {0}'.format(current_identifier))
+                        elif 'DataObject' not in current_class.__name__:
+                            structure = []
+                            this_class = None
+                            for this_class in current_class.__mro__:
                                 if 'DataObject' in this_class.__name__:
-                                    for index in reversed(range(1, len(structure))):
-                                        if structure[index] in inherit_table:
-                                            raise RuntimeError('Duplicate hybrid inheritance: {0}({1})'.format(structure[index - 1], structure[index]))
-                                        inherit_table[structure[index]] = structure[index - 1]
-            items_replaced = True
-            hybrids = {hybrid: None for hybrid in base_hybrids[:]}
-            while items_replaced is True:
-                items_replaced = False
-                for hybrid, replacement in inherit_table.iteritems():
-                    if hybrid in hybrids.keys() and hybrids[hybrid] is None:
-                        hybrids[hybrid] = replacement
-                        items_replaced = True
-                    if hybrid in hybrids.values():
-                        for item in hybrids.keys():
-                            if hybrids[item] == hybrid:
-                                hybrids[item] = replacement
-                        items_replaced = True
-            hybrid_structure = {hybrid: translation_table[replacement] if replacement is not None else translation_table[hybrid]
-                                for hybrid, replacement in hybrids.iteritems()}
-            volatile.set(key, hybrid_structure)
-        else:
-            Toolbox.log_cache_hit('hybrid_structure', True)
+                                    break
+                                try:
+                                    structure.append(Descriptor(this_class).descriptor['identifier'])
+                                except TypeError:
+                                    break  # This means we reached one of the built-in classes.
+                            if 'DataObject' in this_class.__name__:
+                                for index in reversed(range(1, len(structure))):
+                                    if structure[index] in inherit_table:
+                                        raise RuntimeError('Duplicate hybrid inheritance: {0}({1})'.format(structure[index - 1], structure[index]))
+                                    inherit_table[structure[index]] = structure[index - 1]
+        items_replaced = True
+        hybrids = {hybrid: None for hybrid in base_hybrids[:]}
+        while items_replaced is True:
+            items_replaced = False
+            for hybrid, replacement in inherit_table.iteritems():
+                if hybrid in hybrids.keys() and hybrids[hybrid] is None:
+                    hybrids[hybrid] = replacement
+                    items_replaced = True
+                if hybrid in hybrids.values():
+                    for item in hybrids.keys():
+                        if hybrids[item] == hybrid:
+                            hybrids[item] = replacement
+                    items_replaced = True
+        hybrid_structure = {hybrid: translation_table[replacement] if replacement is not None else translation_table[hybrid]
+                            for hybrid, replacement in hybrids.iteritems()}
+        HybridRunner.cache[key] = hybrid_structure
+        volatile.set(key, hybrid_structure)
         return hybrid_structure
 
 
@@ -223,24 +216,6 @@ class Toolbox(object):
     """
     Generic class for various methods
     """
-
-    @staticmethod
-    def try_get(key, fallback):
-        """
-        Returns a value linked to a certain key from the volatile store.
-        If not found in the volatile store, it will try fetch it from the persistent
-        store. If not found, it returns the fallback
-        """
-        volatile = VolatileFactory.get_client()
-        data = volatile.get(key)
-        if data is None:
-            try:
-                persistent = PersistentFactory.get_client()
-                data = persistent.get(key)
-            except:
-                data = fallback
-            volatile.set(key, data)
-        return data
 
     @staticmethod
     def check_type(value, required_type):
@@ -275,20 +250,6 @@ class Toolbox(object):
             allowed_types = [required_type.__name__]
 
         return correct, allowed_types, given_type
-
-    @staticmethod
-    def log_cache_hit(cache_type, hit):
-        """
-        Registers a cache hit or miss with a specific type
-        """
-        volatile = VolatileFactory.get_client()
-        key = 'ovs_stats_cache_{0}_{1}'.format(cache_type, 'hit' if hit else 'miss')
-        try:
-            successfull = volatile.incr(key)
-            if not successfull:
-                volatile.set(key, 1)
-        except:
-            pass
 
 
 class Migration(object):

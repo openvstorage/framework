@@ -151,8 +151,6 @@ class LotsOfObjects(TestCase):
         """
         machine = TestMachine()
         prefix = '{0}_{1}_'.format(DataObject.NAMESPACE, machine._classname)
-        for key in self.persistent.prefix('ovs_reverseindex_{0}'.format(machine._classname)):
-            self.persistent.delete(key)
         keys = self.persistent.prefix(prefix)
         for key in keys:
             try:
@@ -163,10 +161,10 @@ class LotsOfObjects(TestCase):
                 machine.delete()
             except (ObjectNotFoundException, ValueError):
                 pass
+        for key in self.persistent.prefix('ovs_reverseindex_{0}'.format(machine._classname)):
+            self.persistent.delete(key)
         disk = TestDisk()
         prefix = '{0}_{1}_'.format(DataObject.NAMESPACE, disk._classname)
-        for key in self.persistent.prefix('ovs_reverseindex_{0}'.format(disk._classname)):
-            self.persistent.delete(key)
         keys = self.persistent.prefix(prefix)
         for key in keys:
             try:
@@ -175,6 +173,8 @@ class LotsOfObjects(TestCase):
                 disk.delete()
             except (ObjectNotFoundException, ValueError):
                 pass
+        for key in self.persistent.prefix('ovs_reverseindex_{0}'.format(disk._classname)):
+            self.persistent.delete(key)
 
 if __name__ == '__main__':
     import unittest

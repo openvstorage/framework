@@ -91,6 +91,19 @@ class PyrakoonStore(object):
             raise KeyNotFoundException(field)
 
     @locked()
+    def get_multi(self, keys):
+        """
+        Get multiple keys at once
+        """
+        try:
+            for item in PyrakoonStore._try(self._identifier, self._client.multiGet, keys):
+                yield ujson.loads(item)
+        except ValueError:
+            raise KeyNotFoundException('Could not parse JSON stored')
+        except ArakoonNotFound as field:
+            raise KeyNotFoundException(field)
+
+    @locked()
     def set(self, key, value, transaction=None):
         """
         Sets the value for a key to a given value

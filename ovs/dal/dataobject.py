@@ -17,7 +17,6 @@ DataObject module
 """
 import uuid
 import copy
-import re
 import json
 import inspect
 from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
@@ -202,11 +201,7 @@ class DataObject(object):
             self._guid = str(uuid.uuid4())
             self._new = True
         else:
-            guid = str(guid).lower()
-            if re.match('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', guid) is not None:
-                self._guid = str(guid)
-            else:
-                raise ValueError('The given guid is invalid: {0}'.format(guid))
+            self._guid = str(guid).lower()
 
         # Build base keys
         self._key = '{0}_{1}_{2}'.format(DataObject.NAMESPACE, self._classname, self._guid)
@@ -223,7 +218,6 @@ class DataObject(object):
         else:
             self._data = self._volatile.get(self._key)
             if self._data is None:
-                Toolbox.log_cache_hit('object_load', False)
                 self._metadata['cache'] = False
                 try:
                     self._data = self._persistent.get(self._key)
@@ -232,7 +226,6 @@ class DataObject(object):
                         self.__class__.__name__, self._guid
                     ))
             else:
-                Toolbox.log_cache_hit('object_load', True)
                 self._metadata['cache'] = True
 
         # Set default values on new fields
@@ -483,6 +476,7 @@ class DataObject(object):
 
         tries = 0
         successful = False
+        optimistic = True
         while successful is False:
             tries += 1
             if tries > 5:
@@ -519,17 +513,27 @@ class DataObject(object):
                                 if item is not None:
                                     item.save(recursive=True, skip=info['key'])
 
+            validation_keys = []
             for relation in self._relations:
                 if self._data[relation.name]['guid'] is not None:
                     if relation.foreign_type is None:
                         cls = self.__class__
                     else:
                         cls = relation.foreign_type
-                    _ = cls(self._data[relation.name]['guid'])
+                    validation_keys.append('{0}_{1}_{2}'.format(DataObject.NAMESPACE, cls.__name__.lower(), self._data[relation.name]['guid']))
+            try:
+                [_ for _ in self._persistent.get_multi(validation_keys)]
+            except KeyNotFoundException:
+                raise ObjectNotFoundException('One of the relations specified in {0} with guid \'{1}\' was not found'.format(
+                    self.__class__.__name__, self._guid
+                ))
 
             transaction = self._persistent.begin_transaction()
             if self._new is True:
                 data = {'_version': 0}
+            elif optimistic is True:
+                self._persistent.assert_value(self._key, self._original, transaction=transaction)
+                data = copy.deepcopy(self._original)
             else:
                 try:
                     current_data = self._persistent.get(self._key)
@@ -630,10 +634,10 @@ class DataObject(object):
 
             # Second, invalidate property lists
             cache_key = '{0}_{1}'.format(DataList.cachelink, self._classname)
-            if self._persistent.exists(cache_key):
+            try:
                 cache_list = self._persistent.get(cache_key)
                 self._persistent.assert_value(cache_key, copy.deepcopy(cache_list), transaction=transaction)
-            else:
+            except KeyNotFoundException:
                 cache_list = {}
             change = False
             for list_key in cache_list.keys():
@@ -660,6 +664,7 @@ class DataObject(object):
                     self.__class__.__name__, self._guid
                 ))
             except AssertException:
+                optimistic = False
                 pass
 
         self.invalidate_dynamics()
@@ -672,13 +677,11 @@ class DataObject(object):
     # Other CRUDs
     #######################
 
-    def delete(self, abandon=None, _hook=None):
+    def delete(self, abandon=None):
         """
         Delete the given object. It also invalidates certain lists
-        :param abandon:
-        :param _hook: Unused
+        :param abandon: Indicates whether(which) linked objects can be unlinked. Use with caution
         """
-        _ = _hook
         if self.volatile is True:
             raise VolatileObjectException()
 
