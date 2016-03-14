@@ -9,5 +9,5 @@
 * [Framework Concepts](docs/concepts.md)
     * [Master and Extra Nodes](docs/masterextra.md)
     * [The watchers](docs/watchers.md)
-    * [The scrubber](docs/watchers.md)
+    * [The scrubber](docs/scrubber.md)
 * [Logs](docs/log.md)
