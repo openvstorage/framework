@@ -18,7 +18,7 @@ Arakoon store module, using pyrakoon
 
 import os
 import time
-import json
+import ujson
 import uuid
 import random
 from StringIO import StringIO
@@ -75,7 +75,7 @@ class PyrakoonStore(object):
         self._client = ArakoonClient(self._config)
         self._identifier = int(round(random.random() * 10000000))
         self._lock = Lock()
-        self._batch_size = 30
+        self._batch_size = 500
         self._sequences = {}
 
     @locked()
@@ -84,7 +84,7 @@ class PyrakoonStore(object):
         Retrieves a certain value for a given key
         """
         try:
-            return json.loads(PyrakoonStore._try(self._identifier, self._client.get, key))
+            return ujson.loads(PyrakoonStore._try(self._identifier, self._client.get, key))
         except ValueError:
             raise KeyNotFoundException('Could not parse JSON stored for {0}'.format(key))
         except ArakoonNotFound as field:
@@ -96,8 +96,8 @@ class PyrakoonStore(object):
         Sets the value for a key to a given value
         """
         if transaction is not None:
-            return self._sequences[transaction].addSet(key, json.dumps(value, sort_keys=True))
-        return PyrakoonStore._try(self._identifier, self._client.set, key, json.dumps(value, sort_keys=True))
+            return self._sequences[transaction].addSet(key, ujson.dumps(value, sort_keys=True))
+        return PyrakoonStore._try(self._identifier, self._client.set, key, ujson.dumps(value, sort_keys=True))
 
     @locked()
     def prefix(self, prefix):
@@ -133,7 +133,7 @@ class PyrakoonStore(object):
                                        endKeyIncluded=False,
                                        maxElements=self._batch_size)
             for item in batch:
-                yield [item[0], json.loads(item[1])]
+                yield [item[0], ujson.loads(item[1])]
 
     @locked()
     def delete(self, key, transaction=None):
@@ -167,9 +167,9 @@ class PyrakoonStore(object):
         Asserts a key-value pair
         """
         if transaction is not None:
-            return self._sequences[transaction].addAssert(key, json.dumps(value, sort_keys=True))
+            return self._sequences[transaction].addAssert(key, ujson.dumps(value, sort_keys=True))
         try:
-            return PyrakoonStore._try(self._identifier, self._client.aSSert, key, json.dumps(value, sort_keys=True))
+            return PyrakoonStore._try(self._identifier, self._client.aSSert, key, ujson.dumps(value, sort_keys=True))
         except ArakoonAssertionFailed as assertion:
             raise AssertException(assertion)
 
