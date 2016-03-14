@@ -105,10 +105,10 @@ class Backend(DataObject):
 
 ```
 
-##### The databases
+### The databases
 The hybrids are constructed using multiple databases: a volatile and a non-volatile DB.
 
-###### Volatile - Memcached
+#### Volatile - Memcached
 Complete hybrids containing both the static information and the quickly changing dynamic information are stored in [Memcached](http://memcached.org/). This is a fast, distributed in-memory object caching system which increases the communication from the slower persistent DB (Arakoon) to the front-end/
 
 An example for a vDisk:
@@ -127,5 +127,5 @@ Dynamic('snapshots', list, 60)
 
 This info get stored in Memcached and .
 
-##### Persistent  - Arakoon
+#### Persistent  - Arakoon
 The [Arakoon](https://openvstorage.gitbooks.io/Arakoon/content) key-value database (OVSDB) stores data about the Open vStorage model which doesn't frequently change, typically static properties of the object.

@@ -1,6 +1,9 @@
 # Open vStorage Framework Introduction
-The Framework is responsible for the orchestration (extending a cluster, service management, ...) and task management, the GUI and the API.
+This book documents the Open vStorage Framework. The Framework is the comfort layer offering the user an intuitive web based graphical user interface to configure and manage an Open vStorage cluster. It offers functionality for easy integration with OpenStack Cinder and VMware vSphere, it provides an easy to use API to interact with the distributed Open vStorage system, runs scheduled maintenance tasks, etc...
 
-The Framework is built in python and makes use of different technologies:
-* [Django](https://www.djangoproject.com/): a python webframework
-* [RabbitMQ](https://www.rabbitmq.com/): a distributed message bus
+The Open vStorage Documentation is divided into following sections:
+* [Framework Components](docs/components.md)
+* [Conifguration Management](docs/etcd.md)
+* [Framework Concepts](docs/concepts.md)
+* [Logs](docs/log.md)
+* [Troubleshooting](docs/troubleshooting.md)
