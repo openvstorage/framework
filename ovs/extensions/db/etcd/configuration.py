@@ -97,12 +97,6 @@ class EtcdConfiguration(object):
     base_config = {'cluster_id': None,
                    'external_etcd': None,
                    'registered': False,
-                   'messagequeue': {'endpoints': [],
-                                    'protocol': 'amqp',
-                                    'user': 'ovs',
-                                    'port': 5672,
-                                    'password': '0penv5tor4ge',
-                                    'queues': {'storagedriver': 'volumerouter'}},
                    'plugins/installed': {'backends': [],
                                          'generic': []},
                    'stores': {'persistent': 'pyrakoon',
@@ -261,10 +255,29 @@ class EtcdConfiguration(object):
         if EtcdConfiguration.exists('/ovs/framework/cluster_id'):
             return
 
+        messagequeue_cfg = {'endpoints': [],
+                            'metadata': {'internal': True},
+                            'protocol': 'amqp',
+                            'user': 'ovs',
+                            'password': '0penv5tor4ge',
+                            'queues': {'storagedriver': 'volumerouter'}}
+
         base_cfg = copy.deepcopy(EtcdConfiguration.base_config)
-        base_cfg['cluster_id'] = cluster_id
-        base_cfg['external_etcd'] = external_etcd
-        base_cfg['memcache'] = {'endpoints': []}
+        base_cfg.update({'cluster_id': cluster_id,
+                         'external_etcd': external_etcd,
+                         'messagequeue': {'protocol': 'amqp',
+                                          'queues': {'storagedriver': 'volumerouter'}}})
+
+        if EtcdConfiguration.exists('/ovs/framework/memcache') is False:
+            base_cfg['memcache'] = {'endpoints': [],
+                                    'metadata': {'internal': True}}
+        if EtcdConfiguration.exists('/ovs/framework/messagequeue') is False:
+            base_cfg['messagequeue'] = messagequeue_cfg
+        else:
+            messagequeue_info = EtcdConfiguration.get('/ovs/framework/messagequeue')
+            for key, value in messagequeue_cfg.iteritems():
+                if key not in messagequeue_info:
+                    base_cfg['messagequeue'][key] = value
         for key, value in base_cfg.iteritems():
             EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
 
