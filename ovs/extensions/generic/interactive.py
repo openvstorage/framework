@@ -17,6 +17,7 @@ Interactive extension
 Used to interactively ask for an integer, choice, password, ...
 """
 
+import re
 import getpass
 
 
@@ -92,18 +93,31 @@ class Interactive(object):
         return choice_options[result - 1]
 
     @staticmethod
-    def ask_string(message='', default_value=None):
+    def ask_string(message='', default_value=None, regex_info=None):
         """
         Asks the user a question
         :param message: Message to show when asking the string
         :param default_value: Default value
+        :param regex_info: Dictionary with regex and message when regex does not match
         :return: String
         """
+        if regex_info is None:
+            regex_info = {}
+
+        if not isinstance(regex_info, dict):
+            raise ValueError('Regex info should be a dictionary with "regex" as key and the actual regex as value')
+
+        regex = regex_info.get('regex')
+        error_message = regex_info.get('message')
         default_string = ': ' if default_value is None else ' [{0}]: '.format(default_value)
-        result = raw_input(str(message) + default_string).rstrip()
-        if not result and default_value is not None:
-            return default_value
-        return result
+        while True:
+            result = raw_input(str(message) + default_string).rstrip()
+            if result == '' and default_value is not None:
+                result = default_value
+            if regex is not None and not re.match(regex, result):
+                print error_message if error_message else 'Provided string does not match regex {0}'.format(regex)
+                continue
+            return result
 
     @staticmethod
     def ask_yesno(message='', default_value=None):

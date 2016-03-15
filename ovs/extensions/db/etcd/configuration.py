@@ -16,6 +16,7 @@
 Generic module for managing configuration in Etcd
 """
 
+import copy
 import etcd
 import json
 import time
@@ -93,6 +94,30 @@ class EtcdConfiguration(object):
         > print EtcdConfiguration.get('/bar')
         < {u'a': {u'b': u'test'}}
     """
+    base_config = {'cluster_id': None,
+                   'external_etcd': None,
+                   'registered': False,
+                   'messagequeue': {'endpoints': [],
+                                    'protocol': 'amqp',
+                                    'user': 'ovs',
+                                    'port': 5672,
+                                    'password': '0penv5tor4ge',
+                                    'queues': {'storagedriver': 'volumerouter'}},
+                   'plugins/installed': {'backends': [],
+                                         'generic': []},
+                   'stores': {'persistent': 'pyrakoon',
+                              'volatile': 'memcache'},
+                   'paths': {'cfgdir': '/opt/OpenvStorage/config',
+                             'basedir': '/opt/OpenvStorage',
+                             'ovsdb': '/opt/OpenvStorage/db'},
+                   'support': {'enablesupport': False,
+                               'enabled': True,
+                               'interval': 60},
+                   'storagedriver': {'mds_safety': 2,
+                                     'mds_tlogs': 100,
+                                     'mds_maxload': 75},
+                   'webapps': {'html_endpoint': '/',
+                               'oauth2': {'mode': 'local'}}}
 
     def __init__(self):
         """
@@ -214,15 +239,15 @@ class EtcdConfiguration(object):
         """
         if EtcdConfiguration.exists('/ovs/framework/hosts/{0}/setupcompleted'.format(host_id)):
             return
-        base_config = {'/storagedriver': {'rsp': '/var/rsp',
-                                          'vmware_mode': 'ganesha'},
-                       '/ports': {'storagedriver': [[26200, 26299]],
-                                  'mds': [[26300, 26399]],
-                                  'arakoon': [26400]},
-                       '/setupcompleted': False,
-                       '/versions': {'ovs': 4},
-                       '/type': 'UNCONFIGURED'}
-        for key, value in base_config.iteritems():
+        host_config = {'storagedriver': {'rsp': '/var/rsp',
+                                         'vmware_mode': 'ganesha'},
+                       'ports': {'storagedriver': [[26200, 26299]],
+                                 'mds': [[26300, 26399]],
+                                 'arakoon': [26400]},
+                       'setupcompleted': False,
+                       'versions': {'ovs': 4},
+                       'type': 'UNCONFIGURED'}
+        for key, value in host_config.iteritems():
             EtcdConfiguration._set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value, raw=False)
 
     @staticmethod
@@ -235,33 +260,27 @@ class EtcdConfiguration(object):
         cluster_id = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
         if EtcdConfiguration.exists('/ovs/framework/cluster_id'):
             return
-        base_config = {'/cluster_id': cluster_id,
-                       '/external_etcd': external_etcd,
-                       '/registered': False,
-                       '/memcache': {'endpoints': []},
-                       '/messagequeue': {'endpoints': [],
-                                         'protocol': 'amqp',
-                                         'user': 'ovs',
-                                         'port': 5672,
-                                         'password': '0penv5tor4ge',
-                                         'queues': {'storagedriver': 'volumerouter'}},
-                       '/plugins/installed': {'backends': [],
-                                              'generic': []},
-                       '/stores': {'persistent': 'pyrakoon',
-                                   'volatile': 'memcache'},
-                       '/paths': {'cfgdir': '/opt/OpenvStorage/config',
-                                  'basedir': '/opt/OpenvStorage',
-                                  'ovsdb': '/opt/OpenvStorage/db'},
-                       '/support': {'enablesupport': False,
-                                    'enabled': True,
-                                    'interval': 60},
-                       '/storagedriver': {'mds_safety': 2,
-                                          'mds_tlogs': 100,
-                                          'mds_maxload': 75},
-                       '/webapps': {'html_endpoint': '/',
-                                    'oauth2': {'mode': 'local'}}}
-        for key, value in base_config.iteritems():
+
+        base_cfg = copy.deepcopy(EtcdConfiguration.base_config)
+        base_cfg['cluster_id'] = cluster_id
+        base_cfg['external_etcd'] = external_etcd
+        base_cfg['memcache'] = {'endpoints': []}
+        for key, value in base_cfg.iteritems():
             EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
+
+    @staticmethod
+    def validate_etcd():
+        """
+        Validate whether the (external) Etcd cluster can be used
+        :return: None
+        """
+        try:
+            if EtcdConfiguration.dir_exists('/ovs/framework'):
+                for item in EtcdConfiguration.list('/ovs/framework'):
+                    if item in EtcdConfiguration.base_config:
+                        raise etcd.EtcdKeyError('OVS specific keys already found in the external Etcd cluster. To set up a new OVS cluster, please clean up the Etcd cluster')
+        except etcd.EtcdConnectionFailed:
+            raise
 
     @staticmethod
     @log_slow_calls
@@ -277,7 +296,7 @@ class EtcdConfiguration(object):
     def _list(key):
         client = EtcdConfiguration._get_client()
         for child in client.get(key).children:
-            if child.key != key:
+            if child.key is not None and child.key != key:
                 yield child.key.replace('{0}/'.format(key), '')
 
     @staticmethod

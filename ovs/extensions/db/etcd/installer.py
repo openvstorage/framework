@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+ETCD Installer module
+"""
+
 import re
+import etcd
 import time
 from subprocess import CalledProcessError
 from ovs.extensions.generic.sshclient import SSHClient
@@ -28,8 +33,8 @@ class EtcdInstaller(object):
     class to dynamically install/(re)configure etcd cluster
     """
     DB_DIR = '/opt/OpenvStorage/db'
-    DATA_DIR = '{0}/etcd/{1}/data'
-    WAL_DIR = '{0}/etcd/{1}/wal'
+    DATA_DIR = '{0}/etcd/{{0}}/data'.format(DB_DIR)
+    WAL_DIR = '{0}/etcd/{{0}}/wal'.format(DB_DIR)
     SERVER_URL = 'http://{0}:2380'
     CLIENT_URL = 'http://{0}:2379'
     MEMBER_REGEX = re.compile(ur'^(?P<id>[^:]+): name=(?P<name>[^ ]+) peerURLs=(?P<peer>[^ ]+) clientURLs=(?P<client>[^ ]+)$')
@@ -51,14 +56,13 @@ class EtcdInstaller(object):
 
         client = SSHClient(ip, username='root')
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
-        if ServiceManager.has_service(target_name, client) and \
-            ServiceManager.get_service_status(target_name, client) is True:
+        if ServiceManager.has_service(target_name, client) and ServiceManager.get_service_status(target_name, client) is True:
             logger.info('Service {0} already configured and running'.format(target_name))
             return
 
         node_name = System.get_my_machine_id(client)
-        data_dir = EtcdInstaller.DATA_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
-        wal_dir = EtcdInstaller.WAL_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
+        data_dir = EtcdInstaller.DATA_DIR.format(cluster_name)
+        wal_dir = EtcdInstaller.WAL_DIR.format(cluster_name)
         abs_paths = [data_dir, wal_dir]
         client.dir_delete(abs_paths)
         client.dir_create(abs_paths)
@@ -87,9 +91,9 @@ class EtcdInstaller(object):
     def extend_cluster(master_ip, new_ip, cluster_name):
         """
         Extends a cluster to a given new node
-        :param cluster_name: Name of the cluster to be extended
-        :param new_ip: IP address of the node to be added
         :param master_ip: IP of one of the already existing nodes
+        :param new_ip: IP address of the node to be added
+        :param cluster_name: Name of the cluster to be extended
         """
         logger.debug('Extending cluster "{0}" from {1} to {2}'.format(cluster_name, master_ip, new_ip))
 
@@ -112,8 +116,8 @@ class EtcdInstaller(object):
         node_name = System.get_my_machine_id(client)
         current_cluster.append('{0}={1}'.format(node_name, EtcdInstaller.SERVER_URL.format(new_ip)))
 
-        data_dir = EtcdInstaller.DATA_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
-        wal_dir = EtcdInstaller.WAL_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
+        data_dir = EtcdInstaller.DATA_DIR.format(cluster_name)
+        wal_dir = EtcdInstaller.WAL_DIR.format(cluster_name)
         abs_paths = [data_dir, wal_dir]
         client.dir_delete(abs_paths)
         client.dir_create(abs_paths)
@@ -166,13 +170,19 @@ class EtcdInstaller(object):
         if node_id is not None:
             current_client.run('etcdctl member remove {0}'.format(node_id))
         if ip_to_remove not in offline_node_ips:
-            EtcdInstaller.deploy_to_slave(remaining_node_ip, ip_to_remove, cluster_name, force=True)
+            EtcdInstaller.deploy_to_slave(remaining_node_ip, ip_to_remove, cluster_name)
         EtcdInstaller.wait_for_cluster(cluster_name, current_client)
 
         logger.debug('Shrinking cluster "{0}" from {1} completed'.format(cluster_name, ip_to_remove))
 
     @staticmethod
     def has_cluster(ip, cluster_name):
+        """
+        Verify if IP has an ETCD cluster with 'cluster_name' running
+        :param ip: IP on which to check for the ETCD cluster
+        :param cluster_name: Name of the ETCD cluster
+        :return: True or False
+        """
         logger.debug('Checking whether {0} has cluster "{1}" running'.format(ip, cluster_name))
         client = SSHClient(ip, username='root')
         try:
@@ -181,13 +191,12 @@ class EtcdInstaller(object):
             return False
 
     @staticmethod
-    def deploy_to_slave(master_ip, slave_ip, cluster_name, force=False):
+    def deploy_to_slave(master_ip, slave_ip, cluster_name):
         """
         Deploys the configuration file to a slave
         :param cluster_name: Name of the cluster of which to deploy the configuration file
         :param slave_ip: IP of the slave to deploy to
         :param master_ip: IP of the node to deploy from
-        :param force: force deployment, even if a process is running with that name
         """
         logger.debug('  Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, master_ip, slave_ip))
         master_client = SSHClient(master_ip, username='root')
@@ -214,17 +223,31 @@ class EtcdInstaller(object):
         logger.debug('Setting up proxy "{0}" from {1} to {2} completed'.format(cluster_name, external, slave_ip))
 
     @staticmethod
+    def remove_proxy(cluster_name, ip):
+        """
+        Remove a proxy
+        :param cluster_name: Name of cluster
+        :param ip: IP of the node on which to remove the proxy
+        :return: None
+        """
+        root_client = SSHClient(ip, username='root')
+        EtcdInstaller.stop(cluster_name=cluster_name, client=root_client)
+        EtcdInstaller.remove(cluster_name=cluster_name, client=root_client)
+        data_dir = EtcdInstaller.DATA_DIR.format(cluster_name)
+        wal_dir = EtcdInstaller.WAL_DIR.format(cluster_name)
+        root_client.dir_delete([wal_dir, data_dir])
+
+    @staticmethod
     def _setup_proxy(initial_cluster, slave_client, cluster_name, force=False):
         base_name = 'ovs-etcd-proxy'
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
-        if force is False and ServiceManager.has_service(target_name, slave_client) and \
-            ServiceManager.get_service_status(target_name, slave_client) is True:
+        if force is False and ServiceManager.has_service(target_name, slave_client) and ServiceManager.get_service_status(target_name, slave_client) is True:
             logger.info('Service {0} already configured and running'.format(target_name))
             return
         EtcdInstaller.stop(cluster_name, slave_client)
 
-        data_dir = EtcdInstaller.DATA_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
-        wal_dir = EtcdInstaller.WAL_DIR.format(EtcdInstaller.DB_DIR, cluster_name)
+        data_dir = EtcdInstaller.DATA_DIR.format(cluster_name)
+        wal_dir = EtcdInstaller.WAL_DIR.format(cluster_name)
         abs_paths = [data_dir, wal_dir]
         slave_client.dir_delete(abs_paths)
         slave_client.dir_create(data_dir)
@@ -285,7 +308,7 @@ class EtcdInstaller(object):
             time.sleep(5 - tries)
             healthy = EtcdInstaller._is_healty(cluster_name, client)
         if healthy is False:
-            raise RuntimeError('Etcd cluster "{0}" could not be started correctly'.format(cluster_name))
+            raise etcd.EtcdConnectionFailed('Etcd cluster "{0}" could not be started correctly'.format(cluster_name))
         logger.debug('Cluster "{0}" running'.format(cluster_name))
 
     @staticmethod
