@@ -67,7 +67,7 @@ class TaskViewSet(viewsets.ViewSet):
                 'status': result.status,
                 'successful': result.successful(),
                 'failed': result.failed(),
-                'ready': result.ready(),
+                'ready': result.status in ('FAILURE', 'SUCCESS'),
                 'result': result_data}
         return Response(data, status=status.HTTP_200_OK)
 
