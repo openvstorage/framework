@@ -274,13 +274,10 @@ class EtcdConfiguration(object):
         Validate whether the (external) Etcd cluster can be used
         :return: None
         """
-        try:
-            if EtcdConfiguration.dir_exists('/ovs/framework'):
-                for item in EtcdConfiguration.list('/ovs/framework'):
-                    if item in EtcdConfiguration.base_config:
-                        raise etcd.EtcdKeyError('OVS specific keys already found in the external Etcd cluster. To set up a new OVS cluster, please clean up the Etcd cluster')
-        except etcd.EtcdConnectionFailed:
-            raise
+        if EtcdConfiguration.dir_exists('/ovs/framework'):
+            for item in EtcdConfiguration.list('/ovs/framework'):
+                if item in EtcdConfiguration.base_config:
+                    raise etcd.EtcdKeyError('OVS specific keys already found in the external Etcd cluster. To set up a new OVS cluster, please clean up the Etcd cluster')
 
     @staticmethod
     @log_slow_calls

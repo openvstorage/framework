@@ -161,13 +161,8 @@ class SetupController(object):
                 hypervisor_username = resume_config.get('hypervisor_username', hypervisor_username)
 
                 new_cluster = 'Create a new cluster'
+                discovery_result = SetupController._discover_nodes(root_client) if avahi_installed is True else {}
                 if cluster_name is None:  # Non-automated install
-                    discovery_result = {}
-                    if avahi_installed is True:
-                        discovery_result = SetupController._discover_nodes(root_client)
-                        if discovery_result:
-                            logger.debug('Cluster names: {0}'.format(discovery_result.keys()))
-
                     logger.debug('Cluster selection')
                     join_manually = 'Join {0} cluster'.format('a' if len(discovery_result) == 0 else 'a different')
                     cluster_options = [new_cluster] + discovery_result.keys() + [join_manually]
@@ -190,21 +185,21 @@ class SetupController(object):
                                                                         'type': 'master'}}
 
                         if Interactive.ask_yesno(message='Use an external Etcd cluster?', default_value=False) is True:
-                            etcd_name = Interactive.ask_string(message='Provide the name of the external Etcd cluster',
-                                                               regex_info={'regex': '^[a-zA-z][a-zA-Z0-9_-]{,30}[a-zA-Z0-9]$'})
-                            etcd_ip = Interactive.ask_string(message='Provide the IP of the external Etcd cluster server',
+                            etcd_name = Interactive.ask_string(message='Provide the name of the external Etcd cluster (See "name" in "etcdctl member list" output)')
+                            etcd_ip = Interactive.ask_string(message='Provide an IP of the external Etcd cluster server (See "peerURLs" when executing "etcdctl member list")',
                                                              regex_info={'regex': SSHClient.IP_REGEX,
                                                                          'message': 'Incorrect Etcd IP provided'})
-                            etcd_port = Interactive.ask_integer(question='Provide the port for the external Etcd cluster server', min_value=1025, max_value=65535, default_value=2380)
+                            etcd_port = Interactive.ask_integer(question='Provide the port for the external Etcd cluster server (See "peerURLs" in "etcdctl member list" output)',
+                                                                min_value=1025, max_value=65535, default_value=2380)
                             external_etcd = '{0}=http://{1}:{2}'.format(etcd_name, etcd_ip, etcd_port)
 
                     elif cluster_name == join_manually:  # Join an existing cluster manually
                         first_node = False
                         cluster_name = None
+                        cluster_ip = Interactive.ask_choice(SetupController.host_ips, 'Select the public IP address of {0}'.format(node_name))
                         master_ip = Interactive.ask_string(message='Please enter the IP of one of the cluster\'s master nodes',
                                                            regex_info={'regex': SSHClient.IP_REGEX,
                                                                        'message': 'Incorrect IP provided'})
-                        cluster_ip = Interactive.ask_choice(SetupController.host_ips, 'Select the public IP address of {0}'.format(node_name))
                         if master_ip in root_client.local_ips:
                             raise ValueError("A local IP address was given, please select '{0}' or provide another IP address".format(new_cluster))
 
@@ -212,7 +207,7 @@ class SetupController(object):
 
                         master_password = SetupController._ask_validate_password(master_ip, username='root')
                         SetupController.discovered_nodes = SetupController._retrieve_storagerouters(ip=master_ip, password=master_password)
-                        master_ips = [sr_info['ip'] for sr_info in SetupController.discovered_nodes.iterkeys() if sr_info['type'] == 'master']
+                        master_ips = [sr_info['ip'] for sr_info in SetupController.discovered_nodes.itervalues() if sr_info['type'] == 'master']
                         if master_ip not in master_ips:
                             raise ValueError('Incorrect master IP provided, please choose from: {0}'.format(', '.join(master_ips)))
 
@@ -221,20 +216,21 @@ class SetupController(object):
                             current_sr_message.append('{0:<15} - {1}'.format(SetupController.discovered_nodes[sr_name]['ip'], sr_name))
                         if Interactive.ask_yesno(message='Following StorageRouters were detected:\n  -  {0}\nIs this correct?'.format('\n  -  '.join(current_sr_message)),
                                                  default_value=True) is False:
-                            print 'The cluster on the given master node cannot be joined as not all StorageRouters could be loaded'
-                            sys.exit(0)
+                            raise Exception('The cluster on the given master node cannot be joined as not all StorageRouters could be loaded')
 
                     else:  # Join an existing cluster automatically
                         logger.debug('Cluster {0} selected'.format(cluster_name))
                         first_node = False
-                        SetupController.discovered_nodes = discovery_result.get(cluster_name, {})
-                        cluster_ip = Interactive.ask_choice(SetupController.host_ips, 'Select the public IP address of {0}'.format(node_name))
-                        for host_name, node_info in SetupController.discovered_nodes.iteritems():
+                        for host_name, node_info in discovery_result.get(cluster_name, {}).iteritems():
                             if host_name != node_name and node_info.get('type') == 'master':
                                 master_ip = node_info['ip']
                                 break
                         if master_ip is None:
                             raise RuntimeError('Could not find appropriate master')
+
+                        master_password = SetupController._ask_validate_password(master_ip, username='root')
+                        cluster_ip = Interactive.ask_choice(SetupController.host_ips, 'Select the public IP address of {0}'.format(node_name))
+                        SetupController.discovered_nodes = SetupController._retrieve_storagerouters(ip=master_ip, password=master_password)
 
                 else:  # Automated install
                     # @TODO: Add more validations for provided parameters
@@ -243,7 +239,6 @@ class SetupController(object):
                     first_node = master_ip == cluster_ip
                     logger.info('Detected{0}a 1st node installation'.format('' if first_node is True else 'not'))
 
-                    discovery_result = SetupController._discover_nodes(root_client)
                     if avahi_installed is True and cluster_name in discovery_result:
                         SetupController.discovered_nodes = discovery_result[cluster_name]
                     elif avahi_installed is False and first_node is False:
@@ -259,7 +254,7 @@ class SetupController(object):
                 if cluster_ip is None or master_ip is None:  # Master IP and cluster IP must be known by now, cluster_ip == master_ip for 1st node
                     raise ValueError('Something must have gone wrong retrieving IP information')
 
-                if cluster_name is None:
+                if avahi_installed is True and cluster_name is None:
                     raise RuntimeError('The name of the cluster should be known by now.')
 
                 if node_name not in SetupController.discovered_nodes:
@@ -764,12 +759,12 @@ class SetupController(object):
                 System.update_hosts_file(node_hostname, ip, node_client)
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
-            cmd = 'cp {1} {1}.tmp; ssh-keyscan -t rsa {0} {2} 2> /dev/null >> {1}.tmp; cat {1}.tmp | sort -u - > {1}'
-            node_client.run(cmd.format(' '.join(SetupController.host_ips), known_hosts_filename.format(root_ssh_folder),
-                                       ' '.join(all_hostnames)))
-            cmd = 'su - ovs -c "cp {1} {1}.tmp; ssh-keyscan -t rsa {0} {2} 2> /dev/null  >> {1}.tmp; cat {1}.tmp | sort -u - > {1}"'
-            node_client.run(cmd.format(' '.join(SetupController.host_ips), known_hosts_filename.format(ovs_ssh_folder),
-                                       ' '.join(all_hostnames)))
+            cmd = 'cp {{0}} {{0}}.tmp; ssh-keyscan -t rsa {0} {1} 2> /dev/null >> {{0}}.tmp; cat {{0}}.tmp | sort -u - > {{0}}'.format(' '.join(all_ips), ' '.join(all_hostnames))
+            root_command = cmd.format(known_hosts_filename.format(root_ssh_folder))
+            ovs_command = cmd.format(known_hosts_filename.format(ovs_ssh_folder))
+            ovs_command = 'su - ovs -c "{0}"'.format(ovs_command)
+            node_client.run(root_command)
+            node_client.run(ovs_command)
 
         print 'Collecting hypervisor information'
         logger.info('Collecting hypervisor information')
