@@ -31,6 +31,9 @@ define([
         self.steps([new Gather()]);
         self.activateStep();
 
+        // Cleaning data
+        self.data.vMachinesNames([]);
+        
         // Functions
         self.compositionComplete = function() {
             var i, fields = ['amount', 'startnr'], element;
