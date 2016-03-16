@@ -1,35 +1,27 @@
-# Open vStorage
+# Open vStorage Framework
 
-Open vStorage is an open-source, scale-out, reliable, high performance, software based storage platform which offers a block & file interface on top of ethernet drives (Seagate Kinetic), object storage or a pool of traditional SATA drives.
+[![Build Status](https://travis-ci.org/openvstorage/framework.svg?branch=master)](https://travis-ci.org/openvstorage/framework)
 
-[![Build Status](https://travis-ci.org/openvstorage/openvstorage.svg?branch=master)](https://travis-ci.org/openvstorage/openvstorage)
-
-The Open vStorage Framework takes care of the communication between the different hosts in the Open vStorage cluster and the storage backends. The Framework allows to manage Open vStorage through an intuitive GUI and a complete REST API. It integrates with OpenStack (Cinder) and VMware vSphere.
+The Framework is a set of components and tools which brings the user an interface (GUI / API) to manage the Open vStorage platform.
+The main framework pieces are written in python and javascript. It makes use of other open source projects like etcd for distributed
+configuration management and Celery as distributed task queue.
+The intuitive GUI allows easy setup and management of an Open vStorage Backend and link that to a distributed vPool.
+Having the ability to interface with hypervisors like KVM and VMware the framework turns the platform into a VM-Centric Storage platform.
 
 The Open vStorage Framework is licensed under the [Modified Apache License](http://www.openvstorage.org/license).
 
-The Open vStorage Framework is built using python (Django, Celery) and javascript.
-
 ## Get started
 
-On our community website you can find [more information](https://www.openvstorage.org) and [how to get started with an installation](https://openvstorage.gitbooks.io/openvstorage/content/Installation/index.html).
+Check our gitbook on [how to get started with an installation](https://openvstorage.gitbooks.io/openvstorage/content/Installation/index.html).
 
 ## Releases
-You can find an overview of the release history on our [Releases page](https://github.com/openvstorage/openvstorage/wiki/releases).
-
-## Support
-* For community support, please visit our [community support forum](https://groups.google.com/forum/#!forum/open-vstorage)
-* For commercial support, please [contact Open vStorage](https://www.openvstorage.com/en/#footer)
+You can find an overview of the release history on our [Releases page](https://github.com/openvstorage/framework/wiki/releases).
 
 ## Contribution & Packaging
 
-We welcome contributions.
-Packaging your own changes for testing can be done using the [packager module](https://github.com/openvstorage/framework-tools/blob/master/packaging/packager.py)
+We welcome contributions, general contribution info/guidelines can be found [here](https://github.com/openvstorage/home/blob/master/CONTRIBUTING.md).
+From a Framework perspective packaging your own changes for testing can be done using the [packager module](https://github.com/openvstorage/framework-tools/blob/master/packaging/packager.py)
 
-## File a bug
-Open vStorage is quality checked to the highest level. Unfortunately we might have overlooked some tiny topics here or there. The Open vStorage Project maintains a [public issue tracker](https://github.com/openvstorage/openvstorage/issues) where you can report bugs and request features. This issue tracker is not a customer support forum but an error, flaw, failure, or fault in the Open vStorage software.
+## File a bug/enhancement
+Open vStorage is quality checked to the highest level. Unfortunately we might have overlooked some tiny topics here or there. The Open vStorage Project maintains a [public issue tracker](https://github.com/openvstorage/framework/issues) where you can report bugs and request enhancements. This issue tracker is not a customer support forum but an error, flaw, failure, or fault in the Open vStorage software.
 
-## Nightly tests
-
-A view on the different sets of Nightly test runs can be found [here](http://testrail.openvstorage.com/index.php?/runs/overview/10).
-Email address ovs-guest@openvstorage.com with password 0vsgu3st should allow you to login and view the results

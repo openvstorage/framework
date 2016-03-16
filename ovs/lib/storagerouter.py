@@ -108,22 +108,14 @@ class StorageRouterController(object):
                 used_space_by_roles = 0
                 for storagedriver_partition in disk_partition.storagedrivers:
                     claimed_space += storagedriver_partition.size if storagedriver_partition.size is not None else 0
-                    _directory_used_size = 0
-                    try:
-                        output = client.run('du -Pl {0}'.format(storagedriver_partition.path))
-                    except Exception as ex:
-                        logger.error('Failed to get directory usage for {0}. {1}'.format(storagedriver_partition.path, ex))
-                    else:
+                    directory_used_size = 0
+                    if client.dir_exists(storagedriver_partition.path):
                         try:
-                            _used_size, _ = output.split('\t')
-                        except ValueError as ve:
-                            logger.error('Unexpected output for directory {0}. "{1}" . {2}'.format(storagedriver_partition.path, output, ve))
-                        else:
-                            try:
-                                _directory_used_size = int(_used_size) * 1024
-                            except ValueError as ve:
-                                logger.error('Could not parse value: {0}. {1}'.format(_used_size, ve))
-                    used_space_by_roles += _directory_used_size
+                            used_size, _ = client.run('du -B 1M -d 0 {0}'.format(storagedriver_partition.path)).split('\t')
+                            directory_used_size = int(used_size)
+                        except Exception as ex:
+                            logger.error('Failed to get directory usage for {0}. {1}'.format(storagedriver_partition.path, ex))
+                    used_space_by_roles += directory_used_size
 
                 partition_available_space = None
                 if disk_partition.mountpoint is not None:
@@ -625,7 +617,8 @@ class StorageRouterController(object):
             raise
 
         filesystem_config = StorageDriverConfiguration.build_filesystem_by_hypervisor(storagerouter.pmachine.hvtype)
-        filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
+        filesystem_config.update({'fs_enable_shm_interface': 1,
+                                  'fs_metadata_backend_arakoon_cluster_nodes': [],
                                   'fs_metadata_backend_mds_nodes': [],
                                   'fs_metadata_backend_type': 'MDS'})
 
