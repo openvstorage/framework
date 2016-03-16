@@ -19,6 +19,7 @@ import uuid
 import copy
 import json
 import inspect
+from functools import total_ordering
 from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
                                 MissingMandatoryFieldsException, RaceConditionException, InvalidRelationException,
                                 VolatileObjectException)
@@ -112,6 +113,7 @@ class DataObjectAttributeEncoder(json.JSONEncoder):
         return "{0}: {1}".format(type(obj), obj)
 
 
+@total_ordering
 class DataObject(object):
     """
     This base class contains all logic to support our multiple backends and the caching
@@ -962,17 +964,13 @@ class DataObject(object):
         """
         Checks whether two objects are the same.
         """
-        if not Descriptor.isinstance(other, self.__class__):
-            return False
         return self.__hash__() == other.__hash__()
 
-    def __ne__(self, other):
+    def __lt__(self, other):
         """
-        Checks whether to objects are not the same.
+        Checks whether this object is "less than" the other object
         """
-        if not Descriptor.isinstance(other, self.__class__):
-            return True
-        return not self.__eq__(other)
+        return self.__hash__() < other.__hash__()
 
     def _benchmark(self, iterations=100):
         import time

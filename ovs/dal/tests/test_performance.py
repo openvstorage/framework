@@ -24,6 +24,7 @@ from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobject import DataObject
 from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.dal.helpers import Toolbox
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 
 
@@ -114,6 +115,23 @@ class LotsOfObjects(TestCase):
                                                   ('size', DataList.operator.LT, (LotsOfObjects.amount_of_disks - 1) * 100)]})
             amount = len(dlist)
             self.assertEqual(amount, (LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines, 'Incorrect amount of disks. Found {0} instead of {1}'.format(amount, int((LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines)))
+            seconds_passed = (time.time() - start)
+            print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
+
+            print '\nstart property sort'
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': []})
+            start = time.time()
+            dlist.sort(key=lambda a: Toolbox.extract_key(a, 'size'))
+            seconds_passed = (time.time() - start)
+            print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
+
+            print '\nstart dynamic sort'
+            dlist._volatile.delete(dlist._key)
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': []})
+            start = time.time()
+            dlist.sort(key=lambda a: Toolbox.extract_key(a, 'predictable'))
             seconds_passed = (time.time() - start)
             print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
 

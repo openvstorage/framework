@@ -17,6 +17,7 @@ Module containing certain helper classes providing various logic
 """
 
 import os
+import re
 import imp
 import copy
 import inspect
@@ -250,6 +251,40 @@ class Toolbox(object):
             allowed_types = [required_type.__name__]
 
         return correct, allowed_types, given_type
+
+    @staticmethod
+    def extract_key(obj, field):
+        """
+        Extracts a sortable tuple from the object using the given keys
+        :param obj: The object where the key should be extracted from
+        :param field: Field which has to be translated to a key
+        """
+        regex = re.compile(r'(\d+)')
+        value = obj
+        for subkey in field.split('.'):
+            if '[' in subkey:
+                # We're using a dict
+                attribute = subkey.split('[')[0]
+                dictkey = subkey.split('[')[1][:-1]
+                value = getattr(value, attribute)[dictkey]
+            else:
+                # Normal property
+                value = getattr(value, subkey)
+            if value is None:
+                break
+        value = '' if value is None else str(value)
+        key = regex.split(value)
+        while True:
+            try:
+                key.remove('')
+            except ValueError:
+                break
+        for index in xrange(len(key)):
+            try:
+                key[index] = float(key[index])
+            except ValueError:
+                pass
+        return tuple(key)
 
 
 class Migration(object):

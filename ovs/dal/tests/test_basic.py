@@ -30,7 +30,7 @@ from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.hybrids.t_testdisk import TestDisk
 from ovs.dal.hybrids.t_testemachine import TestEMachine
 from ovs.dal.datalist import DataList
-from ovs.dal.helpers import Descriptor
+from ovs.dal.helpers import Descriptor, Toolbox
 from ovs.extensions.generic.volatilemutex import VolatileMutex, NoLockAvailableException
 
 
@@ -420,26 +420,51 @@ class Basic(TestCase):
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
-        disk1 = TestDisk()
-        disk1.name = 'disk1'
-        disk1.machine = machine
-        disk1.save()
-        disk2 = TestDisk()
-        disk2.name = 'disk2'
-        disk2.machine = machine
-        disk2.save()
-        disk3 = TestDisk()
-        disk3.name = 'disk3'
-        disk3.machine = machine
-        disk3.save()
-        self.assertEqual(machine.disks.count(disk1), 1, 'Disk should be available only once')
-        self.assertGreaterEqual(machine.disks.index(disk1), 0, 'We should retreive an index')
+        sizes = [7, 2, 0, 4, 6, 1, 5, 0, 3, 8]
+        guids = []
+        disks = []
+        disk = None
+        for i in xrange(0, 10):
+            disk = TestDisk()
+            disk.name = 'disk_{0}'.format(i)
+            disk.size = sizes[i]
+            disk.machine = machine
+            disk.save()
+            disks.append(disk)
+            guids.append(disk.guid)
+        self.assertEqual(machine.disks.count(disk), 1, 'Disk should be available only once')
+        self.assertGreaterEqual(machine.disks.index(disk), 0, 'We should retreive an index')
         machine.disks.sort()
-        guid = machine.disks[0].guid
+        guids.sort()
+        self.assertEqual(machine.disks[0].guid, guids[0], 'Reverse and sort should work')
         machine.disks.reverse()
-        self.assertEqual(machine.disks[-1].guid, guid, 'Reverse and sort should work')
+        self.assertEqual(machine.disks[-1].guid, guids[0], 'Reverse and sort should work')
         machine.disks.sort()
-        self.assertEqual(machine.disks[0].guid, guid, 'And the guid should be first again')
+        self.assertEqual(machine.disks[0].guid, guids[0], 'And the guid should be first again')
+        disks = DataList(TestDisk, {'type': DataList.where_operator.AND, 'items': []})
+        disks.sort(key=lambda a: a.size)
+        self.assertEqual(disks[0].size, 0, 'Disks should be sorted on size')
+        self.assertEqual(disks[4].size, 3, 'Disks should be sorted on size')
+        disks.sort(key=lambda a: a.name)
+        filtered = disks[1:4]
+        self.assertEqual(filtered[0].name, 'disk_1', 'Disks should be properly sliced')
+        self.assertEqual(filtered[2].name, 'disk_3', 'Disks should be properly sliced')
+        fields = [('name', True), ('size', False)]
+        for field in fields:
+            disks.sort(key=lambda a: Toolbox.extract_key(a, field[0]), reverse=field[1])
+        self.assertEqual(disks[0].size, 0, 'Disk should be properly sorted')
+        self.assertEqual(disks[1].size, 0, 'Disk should be properly sorted')
+        self.assertEqual(disks[0].name, 'disk_7', 'Disk should be properly sorted')
+        self.assertEqual(disks[1].name, 'disk_2', 'Disk should be properly sorted')
+        fields = [('name', False), ('predictable', False)]
+        for field in fields:
+            disks.sort(key=lambda a: Toolbox.extract_key(a, field[0]), reverse=field[1])
+        self.assertEqual(disks[0].predictable, 0, 'Disk should be properly sorted')
+        self.assertEqual(disks[1].predictable, 0, 'Disk should be properly sorted')
+        self.assertEqual(disks[2].predictable, 1, 'Disk should be properly sorted')
+        self.assertEqual(disks[0].name, 'disk_2', 'Disk should be properly sorted')
+        self.assertEqual(disks[1].name, 'disk_7', 'Disk should be properly sorted')
+        self.assertEqual(disks[2].name, 'disk_5', 'Disk should be properly sorted')
 
     def test_listcache(self):
         """
@@ -739,34 +764,6 @@ class Basic(TestCase):
         disk.save()
         disk.delete()
         self.assertRaises(ObjectNotFoundException, disk.save, 'Cannot resave a deleted object')
-
-    def test_datalist_advanced(self):
-        """
-        Validates the DataList advanced functions (indexer, sort)
-        """
-        sizes = [7, 2, 0, 4, 6, 1, 5, 9, 3, 8]
-        guids = []
-        for i in xrange(0, 10):
-            disk = TestDisk()
-            disk.name = 'disk_{0}'.format(i)
-            disk.size = sizes[i]
-            disk.save()
-            guids.append(disk.guid)
-        disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': []})
-        disks.sort()
-        guids.sort()
-        self.assertEqual(disks[0].guid, guids[0], 'Disks should be sorted on guid')
-        self.assertEqual(disks[4].guid, guids[4], 'Disks should be sorted on guid')
-        disks.sort(cmp=lambda a, b: a.size - b.size)
-        self.assertEqual(disks[0].size, 0, 'Disks should be sorted on size')
-        self.assertEqual(disks[4].size, 4, 'Disks should be sorted on size')
-        disks.sort(key=lambda a: a.name)
-        self.assertEqual(disks[0].name, 'disk_0', 'Disks should be sorted on name')
-        self.assertEqual(disks[4].name, 'disk_4', 'Disks should be sorted on name')
-        filtered = disks[1:4]
-        self.assertEqual(filtered[0].name, 'disk_1', 'Disks should be properly sliced')
-        self.assertEqual(filtered[2].name, 'disk_3', 'Disks should be properly sliced')
 
     def test_itemchange_during_list_build(self):
         """

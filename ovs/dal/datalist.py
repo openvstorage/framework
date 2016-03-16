@@ -86,6 +86,7 @@ class DataList(object):
         self._objects = {}
         self._guids = None
         self._executed = False
+        self._shallow_sort = True
 
         self.from_cache = None
 
@@ -457,7 +458,7 @@ class DataList(object):
             self._execute_query()
         return self._guids.count(value.guid)
 
-    def sort(self, **kwargs):
+    def sort(self, key=None, reverse=False):
         """
         Sorts the list with a given set of parameters.
         However, the sorting will be applied to the guids only
@@ -465,14 +466,21 @@ class DataList(object):
         if self._executed is False:
             self._execute_query()
 
-        if len(kwargs) == 0:
-            self._guids.sort()
-        else:
-            # @TODO: This sorting should try to offload to _data as much as possible!
-            self.load()
-            objects = [self._objects[guid] for guid in self._guids]
-            objects.sort(**kwargs)
-            self._guids = [obj.guid for obj in objects]
+        if key is None:
+            return self._guids.sort(reverse=reverse)
+
+        def extract_key(guid):
+            if self._shallow_sort is True:
+                try:
+                    type_dict = {'guid': guid}
+                    type_dict.update(self._data[guid]['data'])
+                    return key(type(self._object_type.__name__, (), type_dict))
+                except AttributeError:
+                    self._shallow_sort = False
+            return key(self._get_object(guid))
+
+        self._shallow_sort = True
+        self._guids.sort(key=extract_key, reverse=reverse)
 
     def reverse(self):
         """
