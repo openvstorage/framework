@@ -16,7 +16,6 @@
 BrandingList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobject import DataObjectList
 from ovs.dal.hybrids.branding import Branding
 
 
@@ -30,8 +29,5 @@ class BrandingList(object):
         """
         Returns a list of all brandings
         """
-        brandings = DataList({'object': Branding,
-                              'data': DataList.select.GUIDS,
-                              'query': {'type': DataList.where_operator.AND,
-                                        'items': []}}).data
-        return DataObjectList(brandings, Branding)
+        return DataList(Branding, {'type': DataList.where_operator.AND,
+                                   'items': []})

@@ -428,7 +428,6 @@ class Decorators(TestCase):
         """
         from backend.decorators import return_list
         from ovs.dal.datalist import DataList
-        from ovs.dal.dataobjectlist import DataObjectList
 
         @return_list(User)
         def the_function_1(*args, **kwargs):
@@ -450,12 +449,9 @@ class Decorators(TestCase):
 
         # Username/password combinations: [('bb', 'aa'), ('aa', 'cc'), ('bb', 'dd'), ('aa', 'bb')]
         output_values = {}
-        users = DataList({'object': User,
-                          'data': DataList.select.GUIDS,
-                          'query': {'type': DataList.where_operator.OR,
-                                    'items': [('username', DataList.operator.EQUALS, 'aa'),
-                                              ('username', DataList.operator.EQUALS, 'bb')]}}).data
-        data_list_users = DataObjectList(users, User)
+        data_list_users = DataList(User, {'type': DataList.where_operator.OR,
+                                          'items': [('username', DataList.operator.EQUALS, 'aa'),
+                                                    ('username', DataList.operator.EQUALS, 'bb')]})
         self.assertEqual(len(data_list_users), 4)
         guid_table = {}
         for user in data_list_users:
@@ -508,7 +504,7 @@ class Decorators(TestCase):
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
             self.assertEqual(len(response.data['data']), len(data_list_users))
             if function.__name__ == 'the_function_1':
-                self.assertIsInstance(response.data['data']['instance'], DataObjectList)
+                self.assertIsInstance(response.data['data']['instance'], DataList)
                 self.assertIsInstance(response.data['data']['instance'][0], User)
                 self.assertIn(response.data['data']['instance'][0].username, ['aa', 'bb'])
             else:

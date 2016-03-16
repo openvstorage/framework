@@ -16,7 +16,6 @@
 MgmtCenterList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.mgmtcenter import MgmtCenter
 
 
@@ -30,21 +29,16 @@ class MgmtCenterList(object):
         """
         Returns a list of MgmtCenters
         """
-        mgmtcenters = DataList({'object': MgmtCenter,
-                                'data': DataList.select.GUIDS,
-                                'query': {'type': DataList.where_operator.AND,
-                                          'items': []}}).data
-        return DataObjectList(mgmtcenters, MgmtCenter)
+        return DataList(MgmtCenter, {'type': DataList.where_operator.AND,
+                                     'items': []})
 
     @staticmethod
     def get_by_ip(ip):
         """
         Gets a mgmtCenter based on a given ip address
         """
-        mgmtcenters = DataList({'object': MgmtCenter,
-                                'data': DataList.select.GUIDS,
-                                'query': {'type': DataList.where_operator.AND,
-                                          'items': [('ip', DataList.operator.EQUALS, ip)]}}).data
-        if mgmtcenters:
-            return DataObjectList(mgmtcenters, MgmtCenter)[0]
+        mgmtcenters = DataList(MgmtCenter, {'type': DataList.where_operator.AND,
+                                            'items': [('ip', DataList.operator.EQUALS, ip)]})
+        if len(mgmtcenters):
+            return mgmtcenters[0]
         return None

@@ -16,7 +16,6 @@
 DiskPartitionList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.diskpartition import DiskPartition
 
 
@@ -30,8 +29,5 @@ class DiskPartitionList(object):
         """
         Returns a list of all Partitions
         """
-        partitions = DataList({'object': DiskPartition,
-                               'data': DataList.select.GUIDS,
-                               'query': {'type': DataList.where_operator.AND,
-                                         'items': []}}).data
-        return DataObjectList(partitions, DiskPartition)
+        return DataList(DiskPartition, {'type': DataList.where_operator.AND,
+                                        'items': []})

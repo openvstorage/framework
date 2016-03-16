@@ -16,7 +16,6 @@
 PMachineList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 
@@ -31,23 +30,18 @@ class PMachineList(object):
         """
         Returns a list of all PMachines
         """
-        pmachines = DataList({'object': PMachine,
-                              'data': DataList.select.GUIDS,
-                              'query': {'type': DataList.where_operator.AND,
-                                        'items': []}}).data
-        return DataObjectList(pmachines, PMachine)
+        return DataList(PMachine, {'type': DataList.where_operator.AND,
+                                   'items': []})
 
     @staticmethod
     def get_by_ip(ip):
         """
         Gets a pmachine based on a given ip address
         """
-        pmachines = DataList({'object': PMachine,
-                              'data': DataList.select.GUIDS,
-                              'query': {'type': DataList.where_operator.AND,
-                                        'items': [('ip', DataList.operator.EQUALS, ip)]}}).data
-        if pmachines:
-            return DataObjectList(pmachines, PMachine)[0]
+        pmachines = DataList(PMachine, {'type': DataList.where_operator.AND,
+                                        'items': [('ip', DataList.operator.EQUALS, ip)]})
+        if len(pmachines):
+            return pmachines[0]
         return None
 
     @staticmethod

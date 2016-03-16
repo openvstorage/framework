@@ -18,7 +18,6 @@ VDisk module
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.failuredomain import FailureDomain
@@ -146,15 +145,10 @@ class VDisk(DataObject):
         if not self.storagedriver_id:
             return None
         from ovs.dal.hybrids.storagedriver import StorageDriver
-        storagedrivers = DataObjectList(
-            DataList({'object': StorageDriver,
-                      'data': DataList.select.GUIDS,
-                      'query': {'type': DataList.where_operator.AND,
-                                'items': [('storagedriver_id', DataList.operator.EQUALS, self.storagedriver_id)]}}).data,
-            StorageDriver
-        )
-        if len(storagedrivers) == 1:
-            return storagedrivers[0].storagerouter_guid
+        sds = DataList(StorageDriver, {'type': DataList.where_operator.AND,
+                                       'items': [('storagedriver_id', DataList.operator.EQUALS, self.storagedriver_id)]})
+        if len(sds) == 1:
+            return sds[0].storagerouter_guid
         return None
 
     def _is_vtemplate(self):

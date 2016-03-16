@@ -16,9 +16,7 @@
 RoleList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobject import DataObjectList
 from ovs.dal.hybrids.role import Role
-from ovs.dal.helpers import Descriptor
 
 
 class RoleList(object):
@@ -31,23 +29,18 @@ class RoleList(object):
         """
         Returns a list of all Roles
         """
-        roles = DataList({'object': Role,
-                          'data': DataList.select.GUIDS,
-                          'query': {'type': DataList.where_operator.AND,
-                                    'items': []}}).data
-        return DataObjectList(roles, Role)
+        return DataList(Role, {'type': DataList.where_operator.AND,
+                               'items': []})
 
     @staticmethod
     def get_role_by_code(code):
         """
         Returns a single Role for the given code. Returns None if no Role was found
         """
-        roles = DataList({'object': Role,
-                          'data': DataList.select.GUIDS,
-                          'query': {'type': DataList.where_operator.AND,
-                                    'items': [('code', DataList.operator.EQUALS, code)]}}).data  # noqa
+        roles = DataList(Role, {'type': DataList.where_operator.AND,
+                                'items': [('code', DataList.operator.EQUALS, code)]})
         if len(roles) == 1:
-            return Descriptor(Role, roles[0]).get_object(True)
+            return roles[0]
         return None
 
     @staticmethod
@@ -55,8 +48,5 @@ class RoleList(object):
         """
         Returns a list of Roles for a list of codes
         """
-        roles = DataList({'object': Role,
-                          'data': DataList.select.GUIDS,
-                          'query': {'type': DataList.where_operator.AND,
-                                    'items': [('code', DataList.operator.IN, codes)]}}).data  # noqa
-        return DataObjectList(roles, Role)
+        return DataList(Role, {'type': DataList.where_operator.AND,
+                               'items': [('code', DataList.operator.IN, codes)]})

@@ -28,7 +28,6 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.disk import DiskController
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagerouter import StorageRouterController
@@ -57,10 +56,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
             return StorageRouterList.get_storagerouters()
         else:
             query = json.loads(query)
-            query_result = DataList({'object': StorageRouter,
-                                     'data': DataList.select.GUIDS,
-                                     'query': query}).data
-            return DataObjectList(query_result, StorageRouter)
+            return DataList(StorageRouter, query)
 
     @log()
     @required_roles(['read'])

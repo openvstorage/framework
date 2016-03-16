@@ -16,7 +16,6 @@
 BearerTokenList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobject import DataObjectList
 from ovs.dal.hybrids.bearertoken import BearerToken
 
 
@@ -30,19 +29,13 @@ class BearerTokenList(object):
         """
         Returns a single BearerToken for the given token. Returns None if no BearerToken was found
         """
-        tokens = DataList({'object': BearerToken,
-                           'data': DataList.select.GUIDS,
-                           'query': {'type': DataList.where_operator.AND,
-                                     'items': [('access_token', DataList.operator.EQUALS, access_token)]}}).data
-        return DataObjectList(tokens, BearerToken)
+        return DataList(BearerToken, {'type': DataList.where_operator.AND,
+                                      'items': [('access_token', DataList.operator.EQUALS, access_token)]})
 
     @staticmethod
     def get_by_refresh_token(refresh_token):
         """
         Returns a single BearerToken for the given token. Returns None if no BearerToken was found
         """
-        tokens = DataList({'object': BearerToken,
-                           'data': DataList.select.GUIDS,
-                           'query': {'type': DataList.where_operator.AND,
-                                     'items': [('refresh_token', DataList.operator.EQUALS, refresh_token)]}}).data
-        return DataObjectList(tokens, BearerToken)
+        return DataList(BearerToken, {'type': DataList.where_operator.AND,
+                                      'items': [('refresh_token', DataList.operator.EQUALS, refresh_token)]})

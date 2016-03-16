@@ -27,7 +27,6 @@ from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.vmachine import VMachineController
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.decorators import required_roles, load, return_list, return_object, return_task, log
@@ -60,10 +59,7 @@ class VMachineViewSet(viewsets.ViewSet):
                         vmachines.append(vdisk.vmachine)
         elif query is not None:
             query = json.loads(query)
-            query_result = DataList({'object': VMachine,
-                                     'data': DataList.select.GUIDS,
-                                     'query': query}).data
-            vmachines = DataObjectList(query_result, VMachine)
+            vmachines = DataList(VMachine, query)
         else:
             vmachines = VMachineList.get_vmachines()
         return vmachines

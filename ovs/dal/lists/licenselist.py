@@ -16,9 +16,7 @@
 LicenseList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobject import DataObjectList
 from ovs.dal.hybrids.license import License
-from ovs.dal.helpers import Descriptor
 
 
 class LicenseList(object):
@@ -31,16 +29,12 @@ class LicenseList(object):
         """
         Returns a single License for the given name. Returns None if no license was found
         """
-        # pylint: disable=line-too-long
-        licenses = DataList({'object': License,
-                             'data': DataList.select.GUIDS,
-                             'query': {'type': DataList.where_operator.AND,
-                                       'items': [('component', DataList.operator.EQUALS, component)]}}).data  # noqa
-        # pylint: enable=line-too-long
+        licenses = DataList(License, {'type': DataList.where_operator.AND,
+                                      'items': [('component', DataList.operator.EQUALS, component)]})
         if return_as_list is True:
-            return DataObjectList(licenses, License)
+            return licenses
         if len(licenses) == 1:
-            return Descriptor(License, licenses[0]).get_object(True)
+            return licenses[0]
         return None
 
     @staticmethod
@@ -48,8 +42,5 @@ class LicenseList(object):
         """
         Returns a list of all Licenses
         """
-        licenses = DataList({'object': License,
-                             'data': DataList.select.GUIDS,
-                             'query': {'type': DataList.where_operator.AND,
-                                       'items': []}}).data
-        return DataObjectList(licenses, License)
+        return DataList(License, {'type': DataList.where_operator.AND,
+                                  'items': []})

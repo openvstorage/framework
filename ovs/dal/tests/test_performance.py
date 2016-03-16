@@ -90,12 +90,10 @@ class LotsOfObjects(TestCase):
 
             print '\nstart full query on disk property'
             start = time.time()
-            dlist = DataList({'object': TestDisk,
-                              'data': DataList.select.COUNT,
-                              'query': {'type': DataList.where_operator.AND,
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                         'items': [('size', DataList.operator.GT, 100),
-                                                  ('size', DataList.operator.LT, (LotsOfObjects.amount_of_disks - 1) * 100)]}})
-            amount = dlist.data
+                                                  ('size', DataList.operator.LT, (LotsOfObjects.amount_of_disks - 1) * 100)]})
+            amount = len(dlist)
             self.assertEqual(amount, (LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines, 'Incorrect amount of disks. Found {0} instead of {1}'.format(amount, int((LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines)))
             seconds_passed = (time.time() - start)
             print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
@@ -111,11 +109,10 @@ class LotsOfObjects(TestCase):
             print '\nstart full query on disk property (using cached objects)'
             dlist._volatile.delete(dlist._key)
             start = time.time()
-            amount = DataList({'object': TestDisk,
-                               'data': DataList.select.COUNT,
-                               'query': {'type': DataList.where_operator.AND,
-                                         'items': [('size', DataList.operator.GT, 100),
-                                                   ('size', DataList.operator.LT, (LotsOfObjects.amount_of_disks - 1) * 100)]}}).data
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('size', DataList.operator.GT, 100),
+                                                  ('size', DataList.operator.LT, (LotsOfObjects.amount_of_disks - 1) * 100)]})
+            amount = len(dlist)
             self.assertEqual(amount, (LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines, 'Incorrect amount of disks. Found {0} instead of {1}'.format(amount, int((LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines)))
             seconds_passed = (time.time() - start)
             print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))

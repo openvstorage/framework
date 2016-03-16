@@ -24,7 +24,6 @@ from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, L
                                 VolatileObjectException)
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.datalist import DataList
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.storage.exceptions import KeyNotFoundException, AssertException
@@ -131,9 +130,9 @@ class DataObject(object):
     """
     __metaclass__ = MetaClass
 
-    #######################
-    # Attributes
-    #######################
+    ##############
+    # Attributes #
+    ##############
 
     # Properties that needs to be overwritten by implementation
     _properties = []  # Blueprint data of the object type
@@ -142,9 +141,9 @@ class DataObject(object):
 
     NAMESPACE = 'ovs_data'
 
-    #######################
-    # Constructor
-    #######################
+    ###############
+    # Constructor #
+    ###############
 
     def __new__(cls, *args, **kwargs):
         """
@@ -216,17 +215,21 @@ class DataObject(object):
         if self._new:
             self._data = {}
         else:
-            self._data = self._volatile.get(self._key)
-            if self._data is None:
-                self._metadata['cache'] = False
-                try:
-                    self._data = self._persistent.get(self._key)
-                except KeyNotFoundException:
-                    raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(
-                        self.__class__.__name__, self._guid
-                    ))
+            if data is not None:
+                self._data = copy.deepcopy(data)
+                self._metadata['cache'] = None
             else:
-                self._metadata['cache'] = True
+                self._data = self._volatile.get(self._key)
+                if self._data is None:
+                    self._metadata['cache'] = False
+                    try:
+                        self._data = self._persistent.get(self._key)
+                    except KeyNotFoundException:
+                        raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(
+                            self.__class__.__name__, self._guid
+                        ))
+                else:
+                    self._metadata['cache'] = True
 
         # Set default values on new fields
         for prop in self._properties:
@@ -288,9 +291,9 @@ class DataObject(object):
         # Store original data
         self._original = copy.deepcopy(self._data)
 
-    #######################
-    # Helper methods for dynamic getting and setting
-    #######################
+    ##################################################
+    # Helper methods for dynamic getting and setting #
+    ##################################################
 
     def _add_property(self, prop):
         """
@@ -369,11 +372,11 @@ class DataObject(object):
         info = self._objects[attribute]['info']
         remote_class = Descriptor().load(info['class']).get_object()
         remote_key = info['key']
-        datalist = DataList.get_relation_set(remote_key, self.__class__, attribute, self.guid)
+        datalist = DataList.get_relation_set(remote_class, remote_key, self.__class__, attribute, self.guid)
         if self._objects[attribute]['data'] is None:
-            self._objects[attribute]['data'] = DataObjectList(datalist.data, remote_class)
+            self._objects[attribute]['data'] = datalist
         else:
-            self._objects[attribute]['data'].update(datalist.data)
+            self._objects[attribute]['data'].update(datalist)
         if info['list'] is True:
             return self._objects[attribute]['data']
         else:
@@ -386,12 +389,12 @@ class DataObject(object):
         """
         Getter for guid list property
         """
-        dataobjectlist = getattr(self, attribute)
-        if dataobjectlist is None:
+        list_or_item = getattr(self, attribute)
+        if list_or_item is None:
             return None
-        if hasattr(dataobjectlist, '_guids'):
-            return dataobjectlist._guids
-        return dataobjectlist.guid
+        if hasattr(list_or_item, '_guids'):
+            return list_or_item._guids
+        return list_or_item.guid
 
     def _get_dynamic_property(self, dynamic):
         """
@@ -457,9 +460,9 @@ class DataObject(object):
         else:
             raise RuntimeError('Property {0} does not exist on this object.'.format(key))
 
-    #######################
-    # Saving data to persistent store and invalidating volatile store
-    #######################
+    ###############
+    # Saving data #
+    ###############
 
     def save(self, recursive=False, skip=None, _hook=None):
         """
@@ -633,7 +636,7 @@ class DataObject(object):
                 self._persistent.set(key, value['new'], transaction=transaction)
 
             # Second, invalidate property lists
-            cache_key = '{0}_{1}'.format(DataList.cachelink, self._classname)
+            cache_key = '{0}_{1}'.format(DataList.CACHELINK, self._classname)
             try:
                 cache_list = self._persistent.get(cache_key)
                 self._persistent.assert_value(cache_key, copy.deepcopy(cache_list), transaction=transaction)
@@ -673,9 +676,9 @@ class DataObject(object):
         self.dirty = False
         self._new = False
 
-    #######################
-    # Other CRUDs
-    #######################
+    ###############
+    # Other CRUDs #
+    ###############
 
     def delete(self, abandon=None):
         """
@@ -757,7 +760,7 @@ class DataObject(object):
             self._persistent.delete('ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid), transaction=transaction)
 
             # Second, invalidate property lists
-            cache_key = '{0}_{1}'.format(DataList.cachelink, self._classname)
+            cache_key = '{0}_{1}'.format(DataList.CACHELINK, self._classname)
             if self._persistent.exists(cache_key):
                 cache_list = self._persistent.get(cache_key)
                 self._persistent.assert_value(cache_key, copy.deepcopy(cache_list), transaction=transaction)
@@ -773,7 +776,11 @@ class DataObject(object):
             if change is True:
                 self._persistent.set(cache_key, cache_list, transaction=transaction)
 
-            self._persistent.apply_transaction(transaction)
+            try:
+                self._persistent.apply_transaction(transaction)
+            except KeyNotFoundException as ex:
+                if ex.message != self._key:
+                    raise
             successful = True
 
         # Delete the object and its properties out of the volatile store
@@ -893,9 +900,9 @@ class DataObject(object):
             backend_version = cached_object['_version']
         return this_version != backend_version
 
-    #######################
-    # Properties
-    #######################
+    ##############
+    # Properties #
+    ##############
 
     @property
     def guid(self):
@@ -904,9 +911,9 @@ class DataObject(object):
         """
         return self._guid
 
-    #######################
-    # Helper methods
-    #######################
+    ##################
+    # Helper methods #
+    ##################
 
     def _backend_property(self, function, dynamic):
         """
