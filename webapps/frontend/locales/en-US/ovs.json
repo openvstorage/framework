@@ -906,7 +906,8 @@
                 "success": "Creating from __what__ successfully",
                 "somefailed": "Create from __what__ finished. However, some of the machines could not be created.",
                 "allfailed": "All create actions from __what__ failed.",
-                "complete": "Create completed"
+                "complete": "Create completed",
+                "duplicatename": "The name __name__ is already in use"
             }
         },
         "rollback": {
