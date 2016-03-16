@@ -1775,7 +1775,7 @@ EOF
                                                         'hypervisor_username': (str, None, False),
                                                         'master_ip': (str, Toolbox.regex_ip),
                                                         'master_password': (str, None)})
-        if config['hypervisor_type'] == 'VMWARE' and config.get('hypervisor_password') is None or config.get('hypervisor_username') is None:
+        if config['hypervisor_type'] == 'VMWARE' and (config.get('hypervisor_password') is None or config.get('hypervisor_username') is None):
             raise ValueError('Hypervisor credentials are required for VMWARE unattended installation')
         return config
 

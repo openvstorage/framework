@@ -35,8 +35,10 @@ class EtcdInstaller(object):
     DB_DIR = '/opt/OpenvStorage/db'
     DATA_DIR = '{0}/etcd/{{0}}/data'.format(DB_DIR)
     WAL_DIR = '{0}/etcd/{{0}}/wal'.format(DB_DIR)
-    SERVER_URL = 'http://{0}:2380'
-    CLIENT_URL = 'http://{0}:2379'
+    DEFAULT_SERVER_PORT = 2380
+    DEFAULT_CLIENT_PORT = 2379
+    SERVER_URL = 'http://{0}:{1}'
+    CLIENT_URL = 'http://{0}:{1}'
     MEMBER_REGEX = re.compile(ur'^(?P<id>[^:]+): name=(?P<name>[^ ]+) peerURLs=(?P<peer>[^ ]+) clientURLs=(?P<client>[^ ]+)$')
 
     def __init__(self):
@@ -46,7 +48,7 @@ class EtcdInstaller(object):
         raise RuntimeError('EtcdInstaller is a complete static helper class')
 
     @staticmethod
-    def create_cluster(cluster_name, ip):
+    def create_cluster(cluster_name, ip, server_port=DEFAULT_SERVER_PORT, client_port=DEFAULT_CLIENT_PORT):
         """
         Creates a cluster
         :param ip: IP address of the first node of the new cluster
@@ -75,12 +77,12 @@ class EtcdInstaller(object):
                                            'NODE_ID': node_name,
                                            'DATA_DIR': data_dir,
                                            'WAL_DIR': wal_dir,
-                                           'SERVER_URL': EtcdInstaller.SERVER_URL.format(ip),
-                                           'CLIENT_URL': EtcdInstaller.CLIENT_URL.format(ip),
-                                           'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1'),
-                                           'INITIAL_CLUSTER': '{0}={1}'.format(node_name, EtcdInstaller.SERVER_URL.format(ip)),
+                                           'SERVER_URL': EtcdInstaller.SERVER_URL.format(ip, server_port),
+                                           'CLIENT_URL': EtcdInstaller.CLIENT_URL.format(ip, client_port),
+                                           'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1', client_port),
+                                           'INITIAL_CLUSTER': '{0}={1}'.format(node_name, EtcdInstaller.SERVER_URL.format(ip, server_port)),
                                            'INITIAL_STATE': 'new',
-                                           'INITIAL_PEERS': '-initial-advertise-peer-urls {0}'.format(EtcdInstaller.SERVER_URL.format(ip))},
+                                           'INITIAL_PEERS': '-initial-advertise-peer-urls {0}'.format(EtcdInstaller.SERVER_URL.format(ip, server_port))},
                                    target_name=target_name)
         EtcdInstaller.start(cluster_name, client)
         EtcdInstaller.wait_for_cluster(cluster_name, client)
@@ -88,7 +90,7 @@ class EtcdInstaller(object):
         logger.debug('Creating cluster "{0}" on {1} completed'.format(cluster_name, ip))
 
     @staticmethod
-    def extend_cluster(master_ip, new_ip, cluster_name):
+    def extend_cluster(master_ip, new_ip, cluster_name, server_port=DEFAULT_SERVER_PORT, client_port=DEFAULT_CLIENT_PORT):
         """
         Extends a cluster to a given new node
         :param master_ip: IP of one of the already existing nodes
@@ -103,7 +105,7 @@ class EtcdInstaller(object):
 
         cluster_members = client.run('etcdctl member list').splitlines()
         for cluster_member in cluster_members:
-            if EtcdInstaller.SERVER_URL.format(new_ip) in cluster_member:
+            if EtcdInstaller.SERVER_URL.format(new_ip, server_port) in cluster_member:
                 logger.info('Node {0} already member of etcd cluster'.format(new_ip))
                 return
 
@@ -114,7 +116,7 @@ class EtcdInstaller(object):
 
         client = SSHClient(new_ip, username='root')
         node_name = System.get_my_machine_id(client)
-        current_cluster.append('{0}={1}'.format(node_name, EtcdInstaller.SERVER_URL.format(new_ip)))
+        current_cluster.append('{0}={1}'.format(node_name, EtcdInstaller.SERVER_URL.format(new_ip, server_port)))
 
         data_dir = EtcdInstaller.DATA_DIR.format(cluster_name)
         wal_dir = EtcdInstaller.WAL_DIR.format(cluster_name)
@@ -132,23 +134,23 @@ class EtcdInstaller(object):
                                            'NODE_ID': node_name,
                                            'DATA_DIR': data_dir,
                                            'WAL_DIR': wal_dir,
-                                           'SERVER_URL': EtcdInstaller.SERVER_URL.format(new_ip),
-                                           'CLIENT_URL': EtcdInstaller.CLIENT_URL.format(new_ip),
-                                           'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1'),
+                                           'SERVER_URL': EtcdInstaller.SERVER_URL.format(new_ip, server_port),
+                                           'CLIENT_URL': EtcdInstaller.CLIENT_URL.format(new_ip, client_port),
+                                           'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1', client_port),
                                            'INITIAL_CLUSTER': ','.join(current_cluster),
                                            'INITIAL_STATE': 'existing',
                                            'INITIAL_PEERS': ''},
                                    target_name=target_name)
 
         master_client = SSHClient(master_ip, username='root')
-        master_client.run('etcdctl member add {0} {1}'.format(node_name, EtcdInstaller.SERVER_URL.format(new_ip)))
+        master_client.run('etcdctl member add {0} {1}'.format(node_name, EtcdInstaller.SERVER_URL.format(new_ip, server_port)))
         EtcdInstaller.start(cluster_name, client)
         EtcdInstaller.wait_for_cluster(cluster_name, client)
 
         logger.debug('Extending cluster "{0}" from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
 
     @staticmethod
-    def shrink_cluster(remaining_node_ip, ip_to_remove, cluster_name, offline_node_ips=None):
+    def shrink_cluster(remaining_node_ip, ip_to_remove, cluster_name, offline_node_ips=None, client_port=DEFAULT_CLIENT_PORT):
         """
         Removes a node from a cluster, the old node will become a slave
         :param cluster_name: The name of the cluster to shrink
@@ -165,7 +167,7 @@ class EtcdInstaller(object):
         node_id = None
         for item in current_client.run('etcdctl member list').splitlines():
             info = re.search(EtcdInstaller.MEMBER_REGEX, item).groupdict()
-            if EtcdInstaller.CLIENT_URL.format(ip_to_remove) == info['client']:
+            if EtcdInstaller.CLIENT_URL.format(ip_to_remove, client_port) == info['client']:
                 node_id = info['id']
         if node_id is not None:
             current_client.run('etcdctl member remove {0}'.format(node_id))
@@ -238,7 +240,7 @@ class EtcdInstaller(object):
         root_client.dir_delete([wal_dir, data_dir])
 
     @staticmethod
-    def _setup_proxy(initial_cluster, slave_client, cluster_name, force=False):
+    def _setup_proxy(initial_cluster, slave_client, cluster_name, force=False, client_port=DEFAULT_CLIENT_PORT):
         base_name = 'ovs-etcd-proxy'
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
         if force is False and ServiceManager.has_service(target_name, slave_client) and ServiceManager.get_service_status(target_name, slave_client) is True:
@@ -257,7 +259,7 @@ class EtcdInstaller(object):
         ServiceManager.add_service(base_name, slave_client,
                                    params={'CLUSTER': cluster_name,
                                            'DATA_DIR': data_dir,
-                                           'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1'),
+                                           'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1', client_port),
                                            'INITIAL_CLUSTER': initial_cluster},
                                    target_name=target_name)
         EtcdInstaller.start(cluster_name, slave_client)

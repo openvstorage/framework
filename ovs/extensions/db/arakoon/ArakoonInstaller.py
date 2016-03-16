@@ -19,6 +19,7 @@ ArakoonInstaller class
 """
 
 import os
+import pwd
 import time
 from ConfigParser import RawConfigParser
 from ovs.extensions.generic.remote import Remote
@@ -177,14 +178,36 @@ class ArakoonInstaller(object):
     ARAKOON_TLOG_DIR = '{0}/arakoon/{1}/tlogs'
     ARAKOON_CATCHUP_COMMAND = 'arakoon --node {0} -config {1} -catchup-only'
     ETCD_CONFIG_ROOT = '/ovs/arakoon'
-    ETCD_CONFIG_KEY = '/ovs/arakoon/{0}/config'
-    ETCD_CONFIG_PATH = 'etcd://127.0.0.1:2379/ovs/arakoon/{0}/config'
+    ETCD_CONFIG_KEY = ETCD_CONFIG_ROOT + '/{0}/config'
+    ETCD_CONFIG_PATH = 'etcd://127.0.0.1:2379' + ETCD_CONFIG_KEY
+    DEFAULT_SSHCLIENT_USER = 'ovs'
+    DEFAULT_ARAKOON_PORT_START_PORT = 26400
 
     def __init__(self):
         """
         ArakoonInstaller should not be instantiated
         """
         raise RuntimeError('ArakoonInstaller is a complete static helper class')
+
+    @staticmethod
+    def get_etcd_config_path():
+        return ArakoonInstaller.ETCD_CONFIG_PATH
+
+    @staticmethod
+    def set_etcd_config_path(path):
+        ArakoonInstaller.ETCD_CONFIG_PATH = path
+
+    @staticmethod
+    def get_default_sshclient_user():
+        return ArakoonInstaller.DEFAULT_SSHCLIENT_USER
+
+    @staticmethod
+    def set_default_sshclient_user(username):
+        try:
+            pwd.getpwnam(username)
+        except KeyError:
+            print('Username {0} does not exist!'.format(username))
+        ArakoonInstaller.DEFAULT_SSHCLIENT_USER = username
 
     @staticmethod
     def clean_leftover_arakoon_data(ip, directories):
@@ -256,7 +279,7 @@ class ArakoonInstaller(object):
         logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
         base_dir = base_dir.rstrip('/')
 
-        client = SSHClient(ip)
+        client = SSHClient(ip, username=ArakoonInstaller.DEFAULT_SSHCLIENT_USER)
         if ArakoonInstaller.is_running(cluster_name, client):
             logger.info('Arakoon service running for cluster {0}'.format(cluster_name))
             config = ArakoonClusterConfig(cluster_name, plugins)
@@ -333,7 +356,7 @@ class ArakoonInstaller(object):
         config = ArakoonClusterConfig(cluster_name)
         config.load_config()
 
-        client = SSHClient(new_ip)
+        client = SSHClient(new_ip, username=ArakoonInstaller.DEFAULT_SSHCLIENT_USER)
         node_name = System.get_my_machine_id(client)
 
         home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
@@ -414,7 +437,11 @@ class ArakoonInstaller(object):
                             exclude_ports.append(node.messaging_port)
                 except:
                     logger.error('  Could not load port information of cluster {0}'.format(cluster_name))
-        ports = System.get_free_ports(EtcdConfiguration.get('/ovs/framework/hosts/{0}/ports|arakoon'.format(node_name)), exclude_ports, 2, client)
+        key = '/ovs/framework/hosts/{0}/ports|arakoon'.format(node_name)
+        if EtcdConfiguration.exists(key):
+            ports = System.get_free_ports(EtcdConfiguration.get(), exclude_ports, 2, client)
+        else:
+            ports = System.get_free_ports([ArakoonInstaller.DEFAULT_ARAKOON_PORT_START_PORT], exclude_ports, 2, client)
         logger.debug('  Loaded free ports {0} based on existing clusters {1}'.format(ports, clusters))
         return ports
 
@@ -569,7 +596,7 @@ class ArakoonInstaller(object):
         logger.debug('Current ips: {0}'.format(', '.join(current_ips)))
         logger.debug('New ip: {0}'.format(new_ip))
 
-        client = SSHClient(new_ip)
+        client = SSHClient(new_ip, username=ArakoonInstaller.DEFAULT_SSHCLIENT_USER)
         if ArakoonInstaller.is_running(cluster_name, client):
             logger.info('Arakoon service for {0} is already running'.format(cluster_name))
             return
