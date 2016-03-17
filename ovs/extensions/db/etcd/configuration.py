@@ -216,6 +216,24 @@ class EtcdConfiguration(object):
         return EtcdConfiguration._dir_exists(key)
 
     @staticmethod
+    def create_dir(key):
+        """
+        Creates a directory, including subdirs
+        :param key: full directory path to be created
+        :return: None
+        """
+        EtcdConfiguration._create_dir(key)
+
+    @staticmethod
+    def delete_dir(key):
+        """
+        Deletes a directory
+        :param key: full directory path to be deleted
+        :return: None
+        """
+        EtcdConfiguration._delete_dir(key)
+
+    @staticmethod
     def list(key):
         """
         List all keys in tree
@@ -303,6 +321,20 @@ class EtcdConfiguration(object):
 
     @staticmethod
     @log_slow_calls
+    def _create_dir(key):
+        if not EtcdConfiguration._dir_exists(key):
+            client = EtcdConfiguration._get_client()
+            client.write(key, '', dir=True)
+
+    @staticmethod
+    @log_slow_calls
+    def _delete_dir(key):
+        if EtcdConfiguration._dir_exists(key):
+            client = EtcdConfiguration._get_client()
+            client.delete(key, dir=True)
+
+    @staticmethod
+    @log_slow_calls
     def _list(key):
         client = EtcdConfiguration._get_client()
         for child in client.get(key).children:
@@ -348,3 +380,4 @@ class EtcdConfiguration(object):
     @staticmethod
     def _get_client():
         return etcd.Client(port=2379, use_proxies=True)
+
