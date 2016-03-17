@@ -528,6 +528,10 @@ class DataList(object):
             raise TypeError('Both operands should be of type DataList')
         if Descriptor(self._object_type) != Descriptor(other._object_type):
             raise TypeError('Both operands should contain the same data')
+        if self._executed is False and self._guids is None:
+            self._execute_query()
+        if other._executed is False and other._guids is None:
+            other._execute_query()
         new_datalist = DataList(self._object_type, {})
         guids = self._guids[:]
         for guid in other._guids:
@@ -546,17 +550,7 @@ class DataList(object):
             return self
         if isinstance(other, list) and other == []:
             return self
-        if not isinstance(other, DataList):
-            raise TypeError('Both operands should be of type DataList')
-        if Descriptor(self._object_type) != Descriptor(other._object_type):
-            raise TypeError('Both operands should contain the same data')
-        new_datalist = DataList(self._object_type, {})
-        guids = self._guids[:]
-        for guid in other._guids:
-            if guid not in guids:
-                guids.append(guid)
-        new_datalist._guids = guids
-        return new_datalist
+        return self.__add__(other)
 
     def iterloaded(self):
         """

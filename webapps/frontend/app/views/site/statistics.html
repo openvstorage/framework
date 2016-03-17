@@ -16,69 +16,6 @@ limitations under the License.
 <section>
     <h2 data-i18n="ovs:statistics.title"></h2>
     <p data-i18n="ovs:statistics.introduction"></p>
-    <h3 data-i18n="ovs:statistics.dal.title"></h3>
-    <ul>
-        <li>
-            <span data-i18n="ovs:statistics.dal.objectload"></span>
-            <ul>
-                <li>
-                    <span data-i18n="ovs:statistics.dal.hitsratio"></span>
-                    <span data-bind="text: memcached.ovsOLhit"></span>
-                    <span data-i18n="ovs:generic.of"></span>
-                    <span data-bind="text: memcached.ovsOLtot"></span>: <b><span data-bind="text: memcached.ovsOLrat"></span>%</b>
-                </li>
-                <li>
-                    <span data-i18n="ovs:statistics.dal.loadspeed"></span>
-                    <span data-bind="lazyloader: { item: memcached.ovsOLspeed }"></span>
-                </li>
-            </ul>
-        </li>
-        <li>
-            <span data-i18n="ovs:statistics.dal.relations"></span>
-            <ul>
-                <li>
-                    <span data-i18n="ovs:statistics.dal.hitsratio"></span>
-                    <span data-bind="text: memcached.ovsRLhit"></span>
-                    <span data-i18n="ovs:generic.of"></span>
-                    <span data-bind="text: memcached.ovsRLtot"></span>: <b><span data-bind="text: memcached.ovsRLrat"></span>%</b>
-                </li>
-                <li>
-                    <span data-i18n="ovs:statistics.dal.loadspeed"></span>
-                    <span data-bind="lazyloader: { item: memcached.ovsRLspeed }"></span>
-                </li>
-            </ul>
-        </li>
-        <li>
-            <span data-i18n="ovs:statistics.dal.datalist"></span>
-            <ul>
-                <li>
-                    <span data-i18n="ovs:statistics.dal.hitsratio"></span>
-                    <span data-bind="text: memcached.ovsDLhit"></span>
-                    <span data-i18n="ovs:generic.of"></span>
-                    <span data-bind="text: memcached.ovsDLtot"></span>: <b><span data-bind="text: memcached.ovsDLrat"></span>%</b>
-                </li>
-                <li>
-                    <span data-i18n="ovs:statistics.dal.loadspeed"></span>
-                    <span data-bind="lazyloader: { item: memcached.ovsDLspeed }"></span>
-                </li>
-            </ul>
-        </li>
-        <li>
-            <span data-i18n="ovs:statistics.dal.descriptor"></span>
-            <ul>
-                <li>
-                    <span data-i18n="ovs:statistics.dal.hitsratio"></span>
-                    <span data-bind="text: memcached.ovsDRhit"></span>
-                    <span data-i18n="ovs:generic.of"></span>
-                    <span data-bind="text: memcached.ovsDRtot"></span>: <b><span data-bind="text: memcached.ovsDRrat"></span>%</b>
-                </li>
-                <li>
-                    <span data-i18n="ovs:statistics.dal.loadspeed"></span>
-                    <span data-bind="lazyloader: { item: memcached.ovsDRspeed }"></span>
-                </li>
-            </ul>
-        </li>
-    </ul>
     <h3 data-i18n="ovs:statistics.memcache.title"></h3>
     <div style="width: 100%; overflow: auto;">
         <div data-bind="style: { width: (memcached.nodes().length * 470) + 'px' }">
@@ -87,6 +24,10 @@ limitations under the License.
                     <h4><span data-bind="text: node"></span></h4>
                     <!-- ko if: online() -->
                         <ul>
+                            <li>
+                                <span data-i18n="ovs:statistics.memcache.hitspeed"></span>
+                                <span data-bind="text: cmdGetps"></span>
+                            </li>
                             <li>
                                 <span data-i18n="ovs:statistics.memcache.memoryusage"></span>
                                 <span data-bind="text: bytes"></span>

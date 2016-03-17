@@ -1291,6 +1291,34 @@ class Basic(TestCase):
         self.assertNotEqual(starting_order, new_order, 'Data-object list still has same order after shuffling')
         self.assertEqual(set(starting_order), set(new_order), 'Items disappeared from the data-object list after shuffling')
 
+    def test_volatile_objects(self):
+        """
+        Validates whether volatile objects behave as expected
+        """
+        disk = TestDisk(data={'name': 'test'}, volatile=True)
+        self.assertEqual(disk.name, 'test', 'Name should be set correctly')
+        self.assertRaises(VolatileObjectException, disk.save, 'A volatile object cannot be saved')
+        self.assertRaises(VolatileObjectException, disk.delete, 'A volatile object cannot be deleted')
+
+    def test_datalist_add(self):
+        """
+        Validates whether one can add DataLists
+        """
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.save()
+        datalist1 = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('name', DataList.operator.EQUALS, 'disk1')]})
+        datalist2 = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('name', DataList.operator.EQUALS, 'disk2')]})
+        datalist3 = datalist1 + datalist2
+        self.assertEqual(len(datalist1), 1, 'First query should contain one item')
+        self.assertEqual(len(datalist2), 1, 'Second query should contain one item')
+        self.assertEqual(len(datalist3), 2, 'Sum should contain both items')
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)
