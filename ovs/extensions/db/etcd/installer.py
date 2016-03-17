@@ -53,6 +53,8 @@ class EtcdInstaller(object):
         Creates a cluster
         :param ip: IP address of the first node of the new cluster
         :param cluster_name: Name of the cluster
+        :param server_port: Port to be used by server
+        :param client_port: Port to be used by client
         """
         logger.debug('Creating cluster "{0}" on {1}'.format(cluster_name, ip))
 
@@ -96,6 +98,8 @@ class EtcdInstaller(object):
         :param master_ip: IP of one of the already existing nodes
         :param new_ip: IP address of the node to be added
         :param cluster_name: Name of the cluster to be extended
+        :param server_port: Port to be used by server
+        :param client_port: Port to be used by client
         """
         logger.debug('Extending cluster "{0}" from {1} to {2}'.format(cluster_name, master_ip, new_ip))
 
@@ -157,6 +161,7 @@ class EtcdInstaller(object):
         :param ip_to_remove: The ip of the node that should be removed from the cluster
         :param remaining_node_ip: The ip of a remaining node in the cluster
         :param offline_node_ips: IPs of offline nodes
+        :param client_port: Port to be used by client
         """
         logger.debug('Shrinking cluster "{0}" from {1}'.format(cluster_name, ip_to_remove))
 

@@ -16,9 +16,7 @@
 StorageDriver module
 """
 
-import os
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
-from ConfigParser import RawConfigParser
 from celery.schedules import crontab
 from ovs.celery_run import celery
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
@@ -203,6 +201,7 @@ class StorageDriverController(object):
         if create_cluster is True and len(current_services) == 0 and len(available_storagerouters) > 0:
             storagerouter, partition = available_storagerouters.items()[0]
             result = ArakoonInstaller.create_cluster(cluster_name=cluster_name,
+                                                     cluster_type='SD',
                                                      ip=storagerouter.ip,
                                                      base_dir=partition.folder)
             current_services.append(add_service(storagerouter, result))

@@ -380,4 +380,3 @@ class EtcdConfiguration(object):
     @staticmethod
     def _get_client():
         return etcd.Client(port=2379, use_proxies=True)
-
