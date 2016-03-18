@@ -102,11 +102,11 @@ class DataList(object):
         :param items: The query items
         :param where_operator: The WHERE operator
         """
+        if where_operator not in [DataList.where_operator.AND, DataList.where_operator.OR]:
+            raise NotImplementedError('Invalid where operator specified')
         return_value = where_operator == DataList.where_operator.OR
         for item in items:
             if isinstance(item, dict):
-                if item['type'] not in [DataList.where_operator.AND, DataList.where_operator.OR]:
-                    raise NotImplementedError('Invalid where operator specified')
                 result, instance = self._filter(instance, item['items'], item['type'])
                 if result == return_value:
                     return return_value, instance
@@ -209,8 +209,6 @@ class DataList(object):
 
             query_type = self._query['type']
             query_items = self._query['items']
-            if query_type not in [DataList.where_operator.AND, DataList.where_operator.OR]:
-                raise NotImplementedError('Invalid where operator specified')
 
             invalidations = {object_type_name: ['__all']}
             DataList._build_invalidations(invalidations, self._object_type, query_items)
