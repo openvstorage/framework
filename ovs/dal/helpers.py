@@ -234,7 +234,7 @@ class Toolbox(object):
         elif required_type is float:
             correct = isinstance(value, float) or isinstance(value, int)
             allowed_types = ['float', 'int']
-        elif required_type is int:
+        elif required_type is int or required_type is long:
             correct = isinstance(value, int) or isinstance(value, long)
             allowed_types = ['int', 'long']
         elif isinstance(required_type, list):
