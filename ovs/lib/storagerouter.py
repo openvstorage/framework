@@ -125,7 +125,7 @@ class StorageRouterController(object):
                         _partition, _size, _used, _available, _percent, _mountpoint = output.split()
                         partition_available_space = int(_available) * 1024
                     except Exception as ex:
-                        logger.error('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
+                        logger.warning('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
 
                 shared = False
                 for role in disk_partition.roles:
