@@ -114,27 +114,17 @@ class StorageRouterController(object):
                             used_size, _ = client.run('du -B 1M -d 0 {0}'.format(storagedriver_partition.path)).split('\t')
                             directory_used_size = int(used_size)
                         except Exception as ex:
-                            logger.error('Failed to get directory usage for {0}. {1}'.format(storagedriver_partition.path, ex))
+                            logger.warning('Failed to get directory usage for {0}. {1}'.format(storagedriver_partition.path, ex))
                     used_space_by_roles += directory_used_size
 
                 partition_available_space = None
                 if disk_partition.mountpoint is not None:
-                    disk_partition_device = '/dev/{0}{1}'.format(disk.name, disk_partition.id)
+                    disk_partition_device = os.readlink(disk_partition.path).replace('../..', '/dev')
                     try:
-                        output = client.run("df -Pl | grep {0}".format(disk_partition_device))
+                        available = client.run("df -B 1M --output=avail {0}".format(disk_partition_device)).splitlines()[-1]
+                        partition_available_space = int(available)
                     except Exception as ex:
-                        logger.error('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
-                    else:
-                        if output != '':
-                            try:
-                                _partition, _size, _used, _available, _percent, _mountpoint = output.split()
-                            except ValueError as ve:
-                                logger.error('Unexpected output {0}. {1}'.format(output, ve))
-                            else:
-                                try:
-                                    partition_available_space = int(_available) * 1024
-                                except ValueError as ve:
-                                    logger.error('Could not parse value: {0}. {1}'.format(_available, ve))
+                        logger.warning('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
 
                 shared = False
                 for role in disk_partition.roles:
