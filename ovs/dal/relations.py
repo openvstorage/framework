@@ -25,6 +25,8 @@ class RelationMapper(object):
     of the hybrid objects.
     """
 
+    cache = {}
+
     @staticmethod
     def load_foreign_relations(object_type):
         """
@@ -32,29 +34,31 @@ class RelationMapper(object):
         The resulting mapping will be stored in volatile storage so it can be fetched faster
         """
         relation_key = 'ovs_relations_{0}'.format(object_type.__name__.lower())
+        if relation_key in RelationMapper.cache:
+            return RelationMapper.cache[relation_key]
         volatile = VolatileFactory.get_client()
         relation_info = volatile.get(relation_key)
-        if relation_info is None:
-            Toolbox.log_cache_hit('relations', False)
-            relation_info = {}
-            hybrid_structure = HybridRunner.get_hybrids()
-            for class_descriptor in hybrid_structure.values():  # Extended objects
-                cls = Descriptor().load(class_descriptor).get_object()
-                for relation in cls._relations:
-                    if relation.foreign_type is None:
-                        remote_class = cls
+        if relation_info is not None:
+            RelationMapper.cache[relation_key] = relation_info
+            return relation_info
+        relation_info = {}
+        hybrid_structure = HybridRunner.get_hybrids()
+        for class_descriptor in hybrid_structure.values():  # Extended objects
+            cls = Descriptor().load(class_descriptor).get_object()
+            for relation in cls._relations:
+                if relation.foreign_type is None:
+                    remote_class = cls
+                else:
+                    identifier = Descriptor(relation.foreign_type).descriptor['identifier']
+                    if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
+                        remote_class = Descriptor().load(hybrid_structure[identifier]).get_object()
                     else:
-                        identifier = Descriptor(relation.foreign_type).descriptor['identifier']
-                        if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
-                            remote_class = Descriptor().load(hybrid_structure[identifier]).get_object()
-                        else:
-                            remote_class = relation.foreign_type
-                    itemname = remote_class.__name__
-                    if itemname == object_type.__name__:
-                        relation_info[relation.foreign_key] = {'class': Descriptor(cls).descriptor,
-                                                               'key': relation.name,
-                                                               'list': not relation.onetoone}
-            volatile.set(relation_key, relation_info)
-        else:
-            Toolbox.log_cache_hit('relations', True)
+                        remote_class = relation.foreign_type
+                itemname = remote_class.__name__
+                if itemname == object_type.__name__:
+                    relation_info[relation.foreign_key] = {'class': Descriptor(cls).descriptor,
+                                                           'key': relation.name,
+                                                           'list': not relation.onetoone}
+        RelationMapper.cache[relation_key] = relation_info
+        volatile.set(relation_key, relation_info)
         return relation_info

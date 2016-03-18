@@ -392,21 +392,13 @@
         "introduction": "This page contains various system statistics.",
         "memcache": {
             "title": "Memcache",
+            "hitspeed": "Requests per second:",
             "memoryusage": "Memory usage:",
             "keysincache": "Keys in cache:",
             "cachehits": "Cache hits:",
             "cachetraffic": "Cache traffic",
             "uptime": "Uptime",
             "rawinfo": "Raw memcached information"
-        },
-        "dal": {
-            "title": "Open vStorage DAL",
-            "relations": "Relation structure loads",
-            "descriptor": "Descriptor loads",
-            "datalist": "Datalist queries",
-            "objectload": "Objects loads",
-            "hitsratio": "Hits and hitratio:",
-            "loadspeed": "Loads per second:"
         }
     },
     "vmachines": {
@@ -488,20 +480,10 @@
                 "helptitle": "Help - Cache Hit Ratio",
                 "title": "Cache Hit Ratio"
             },
-            "vmachines": {
-                "helpcontent": "This panels lists the top vMachines according to IOPS and Stored Data. Use the drop-down list to select the property to filter on. Click the number next to the vMachines title to go directly to the list of vMachines.",
-                "helptitle": "Help - vMachines",
-                "title": "vMachines"
-            },
             "statistics": {
                 "helpcontent": "This panels lists the average on IOPS, Read and Write Speed and Cache Hits over 5 seconds summarized for all vDisks in the Cluster. The values are updated automatically every 5 seconds.",
                 "helptitle": "Help - vDisk Statistics",
                 "title": "vDisk Statistics"
-            },
-            "vpools": {
-                "helpcontent": "This panels lists the top vPools according to Stored Data and Bandwidth. Use the drop-down list to select the property to filter on.",
-                "helptitle": "Help - vPools",
-                "title": "vPools"
             }
         }
     },

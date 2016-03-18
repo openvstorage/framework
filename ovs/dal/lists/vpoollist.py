@@ -16,7 +16,6 @@
 VPoolList
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.vpool import VPool
 
 
@@ -30,24 +29,19 @@ class VPoolList(object):
         """
         Returns a list of all VPools
         """
-        vpools = DataList({'object': VPool,
-                           'data': DataList.select.GUIDS,
-                           'query': {'type': DataList.where_operator.AND,
-                                     'items': []}}).data
-        return DataObjectList(vpools, VPool)
+        return DataList(VPool, {'type': DataList.where_operator.AND,
+                                'items': []})
 
     @staticmethod
     def get_vpool_by_name(vpool_name):
         """
         Returns all VPools which have a given name
         """
-        vpools = DataList({'object': VPool,
-                           'data': DataList.select.GUIDS,
-                           'query': {'type': DataList.where_operator.AND,
-                                     'items': [('name', DataList.operator.EQUALS, vpool_name)]}}).data
+        vpools = DataList(VPool, {'type': DataList.where_operator.AND,
+                                  'items': [('name', DataList.operator.EQUALS, vpool_name)]})
         if len(vpools) == 0:
             return None
         if len(vpools) == 1:
-            return DataObjectList(vpools, VPool)[0]
+            return vpools[0]
         else:
             raise RuntimeError('Only one vPool with name {0} should exist.'.format(vpool_name))

@@ -18,7 +18,6 @@ VMachine module
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
@@ -139,12 +138,11 @@ class VMachine(DataObject):
         storagerouter_guids = set()
         from ovs.dal.hybrids.storagedriver import StorageDriver
         storagedriver_ids = [vdisk.storagedriver_id for vdisk in self.vdisks if vdisk.storagedriver_id is not None]
-        storagedrivers = DataList({'object': StorageDriver,
-                                   'data': DataList.select.GUIDS,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': [('storagedriver_id', DataList.operator.IN, storagedriver_ids)]}}).data
-        for storagedriver in DataObjectList(storagedrivers, StorageDriver):
-            storagerouter_guids.add(storagedriver.storagerouter_guid)
+        sds = DataList(StorageDriver,
+                       {'type': DataList.where_operator.AND,
+                        'items': [('storagedriver_id', DataList.operator.IN, storagedriver_ids)]})
+        for sd in sds:
+            storagerouter_guids.add(sd.storagerouter_guid)
         return list(storagerouter_guids)
 
     def _vpools_guids(self):
