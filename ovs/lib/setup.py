@@ -148,6 +148,9 @@ class SetupController(object):
 
                 new_cluster = 'Create a new cluster'
                 discovery_result = SetupController._discover_nodes(root_client) if avahi_installed is True else {}
+                if cluster_name is not None and master_ip == cluster_ip and external_etcd is None and config is None:  # Failed setup with connectivity issues to the external Etcd
+                    external_etcd = SetupController._retrieve_external_etcd_info()
+
                 if cluster_name is None:  # Non-automated install
                     logger.debug('Cluster selection')
                     join_manually = 'Join {0} cluster'.format('a' if len(discovery_result) == 0 else 'a different')
@@ -169,16 +172,7 @@ class SetupController(object):
                         cluster_ip = master_ip
                         SetupController.nodes = {node_name: {'ip': master_ip,
                                                              'type': 'master'}}
-
-                        if Interactive.ask_yesno(message='Use an external Etcd cluster?', default_value=False) is True:
-                            SetupController._log(messages='Provide the connection information to 1 of the external Etcd servers (Can be requested by executing "etcdctl member list")')
-                            etcd_name = Interactive.ask_string(message='Provide the name of a cluster member')
-                            etcd_ip = Interactive.ask_string(message='Provide the peer IP address of that member',
-                                                             regex_info={'regex': SSHClient.IP_REGEX,
-                                                                         'message': 'Incorrect Etcd IP provided'})
-                            etcd_port = Interactive.ask_integer(question='Provide the port for the given IP address of that member',
-                                                                min_value=1025, max_value=65535, default_value=2380)
-                            external_etcd = '{0}=http://{1}:{2}'.format(etcd_name, etcd_ip, etcd_port)
+                        external_etcd = SetupController._retrieve_external_etcd_info()
 
                     elif cluster_name == join_manually:  # Join an existing cluster manually
                         first_node = False
@@ -305,9 +299,10 @@ class SetupController(object):
 
                     if promote_completed is False:
                         SetupController._log(messages='Analyzing cluster layout')
-                        config = ArakoonClusterConfig('ovsdb')
+                        framework_cluster_name = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type='FWK', in_use=True)[0].cluster_id
+                        config = ArakoonClusterConfig(framework_cluster_name)
                         config.load_config()
-                        logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), 'ovsdb'))
+                        logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), framework_cluster_name))
                         if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
                             configure_rabbitmq = SetupController._is_internally_managed(service='rabbitmq')
                             configure_memcached = SetupController._is_internally_managed(service='memcached')
@@ -774,12 +769,18 @@ class SetupController(object):
         else:
             try:
                 EtcdInstaller.use_external(external_etcd, cluster_ip, 'config')
-                EtcdConfiguration.validate_etcd()
             except (EtcdConnectionFailed, EtcdException, EtcdKeyError):
+                SetupController._log(messages='Failed to set up Etcd proxy')
                 resume_config_file = '/opt/OpenvStorage/config/openvstorage_resumeconfig.json'
                 if target_client.file_exists(resume_config_file):
-                    target_client.file_delete(resume_config_file)  # Etcd incorrectly configured, need input again on next 'ovs setup' attempts
+                    with open(resume_config_file, 'r') as resume_cfg:
+                        resume_config = json.loads(resume_cfg.read())
+                        if 'external_etcd' in resume_config:
+                            resume_config.pop('external_etcd')
+                    with open(resume_config_file, 'w') as resume_cfg:
+                        resume_cfg.write(json.dumps(resume_config))
                 raise
+            EtcdConfiguration.validate_etcd()
 
         EtcdConfiguration.initialize(external_etcd=external_etcd)
         EtcdConfiguration.initialize_host(machine_id)
@@ -789,23 +790,25 @@ class SetupController(object):
             ServiceManager.setup_fleet()
 
         arakoon_ports = []
-        arakoon_metadata = ArakoonInstaller.get_clusters_by_type(cluster_type='FWK', in_use=False)
-        arakoon_metadata = arakoon_metadata[0] if len(arakoon_metadata) > 0 else None
-        internal = arakoon_metadata is None or arakoon_metadata.internal is True
-        if internal is True:
-            arakoon_cluster_name = 'ovsdb' if arakoon_metadata is None else arakoon_metadata.cluster_id
-            SetupController._log(messages='Setting up Arakoon')
-            result = ArakoonInstaller.create_cluster(cluster_name=arakoon_cluster_name,
-                                                     cluster_type='FWK',
-                                                     ip=cluster_ip,
-                                                     base_dir=EtcdConfiguration.get('/ovs/framework/paths|ovsdb'),
-                                                     locked=False)
-            arakoon_ports = [result['client_port'], result['messaging_port']]
+        cluster_in_use_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type='FWK', in_use=True)
+        if cluster_in_use_metadata:
+            internal = cluster_in_use_metadata[0].internal
         else:
-            if arakoon_metadata is None:
-                raise RuntimeError('Failed to find an externally managed unused Arakoon cluster of type "FWK"')
-            # @TODO: Add external arakoon cluster sanity / validation
-            arakoon_metadata.claim_cluster()
+            cluster_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type='FWK', in_use=False)
+            if not cluster_metadata or cluster_metadata[0].internal is True:
+                internal = True
+                arakoon_cluster_name = 'ovsdb' if not cluster_metadata else cluster_metadata[0].cluster_id
+                SetupController._log(messages='Setting up Arakoon cluster {0}'.format(arakoon_cluster_name))
+                result = ArakoonInstaller.create_cluster(cluster_name=arakoon_cluster_name,
+                                                         cluster_type='FWK',
+                                                         ip=cluster_ip,
+                                                         base_dir=EtcdConfiguration.get('/ovs/framework/paths|ovsdb'),
+                                                         locked=False)
+                arakoon_ports = [result['client_port'], result['messaging_port']]
+            else:
+                internal = False
+            cluster_metadata[0].in_use = True
+            cluster_metadata[0].write()
 
         SetupController._add_services(target_client, unique_id, 'master')
         SetupController._log(messages='Build configuration files')
@@ -899,11 +902,17 @@ class SetupController(object):
         cluster_ip = target_client.ip
         machine_id = System.get_my_machine_id(target_client)
         etcd_running = ServiceManager.has_service(name='etcd-config', client=target_client) and ServiceManager.get_service_status(name='etcd-config', client=target_client) is True
+        if etcd_running is True:
+            try:
+                EtcdInstaller.wait_for_cluster(cluster_name='config', client=target_client)
+            except EtcdConnectionFailed:
+                etcd_running = False
         unconfigure_rabbitmq = False
         unconfigure_memcached = False
 
-        etcd_required_info = {'/ovs/framework/paths|ovsdb': '',
-                              '/ovs/framework/external_etcd': '',
+        etcd_required_info = {'/ovs/framework/memcache': None,
+                              '/ovs/framework/paths|ovsdb': '',
+                              '/ovs/framework/external_etcd': None,
                               '/ovs/framework/memcache|endpoints': [],
                               '/ovs/framework/messagequeue|endpoints': []}
 
@@ -912,13 +921,7 @@ class SetupController(object):
             for key in etcd_required_info:
                 try:
                     etcd_required_info[key] = EtcdConfiguration.get(key=key)
-                except EtcdKeyNotFound:
-                    pass
-
-            for key in EtcdConfiguration.base_config.keys() + ['install_time', 'plugins', 'hosts/{0}'.format(machine_id)]:
-                try:
-                    EtcdConfiguration.delete(key='/ovs/framework/{0}'.format(key))
-                except EtcdKeyNotFound:
+                except (EtcdKeyNotFound, KeyError):
                     pass
             unconfigure_rabbitmq = SetupController._is_internally_managed(service='rabbitmq')
             unconfigure_memcached = SetupController._is_internally_managed(service='memcached')
@@ -966,15 +969,15 @@ class SetupController(object):
 
         if first_node is True:
             SetupController._log(messages='Unconfigure Arakoon')
-            cluster_name = 'ovsdb'
             if etcd_running is True:
-                clusters = ArakoonInstaller.get_clusters_by_type(cluster_type='FWK', in_use=True)
+                clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type='FWK', in_use=True)
                 if len(clusters) > 0 and clusters[0].internal is True:
+                    cluster_name = clusters[0].cluster_id
                     try:
                         ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
                     except Exception as ex:
                         SetupController._log(messages=['\nFailed to delete cluster', ex], loglevel='error')
-                    base_dir = EtcdConfiguration.get('/ovs/framework/paths|ovsdb')
+                    base_dir = etcd_required_info['/ovs/framework/paths|ovsdb']
                     directory_info = {ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name): True,
                                       ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name): False,
                                       ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name): False}
@@ -987,7 +990,7 @@ class SetupController(object):
 
         SetupController._log(messages='Unconfigure Etcd')
         if etcd_running is True:
-            external_etcd = EtcdConfiguration.get('/ovs/framework/external_etcd')
+            external_etcd = etcd_required_info['/ovs/framework/external_etcd']
             if external_etcd is None:
                 SetupController._log(messages='Removing Etcd cluster')
                 try:
@@ -996,25 +999,38 @@ class SetupController(object):
                 except Exception as ex:
                     SetupController._log(messages=['\nFailed to unconfigure Etcd', ex], loglevel='error')
 
-            SetupController._log(messages='Removing Etcd proxy')
-            EtcdInstaller.remove_proxy('config', cluster_ip)
-
             SetupController._log(messages='Cleaning up model')
-            storagerouter = System.get_my_storagerouter()
-            pmachine = storagerouter.pmachine
-            if pmachine is not None:  # Pmachine will be None if storagerouter not yet modeled
+            memcache_configured = etcd_required_info['/ovs/framework/memcache']
+            pmachine = None
+            storagerouter = None
+            if memcache_configured is not None:
                 try:
-                    for service in storagerouter.services:
-                        service.delete()
-                    storagerouter.delete()
-                    if len(pmachine.storagerouters) == 0:
-                        pmachine.delete()
-                except Exception as ex:
-                    SetupController._log(messages='Cleaning up model failed with error: {0}'.format(ex), loglevel='error')
+                    storagerouter = System.get_my_storagerouter()
+                    pmachine = storagerouter.pmachine
+                except EtcdKeyNotFound:
+                    pass
 
-            if first_node is True:
-                for service in ServiceTypeList.get_by_name('Arakoon').services:  # Externally managed Arakoon services not linked to the storagerouter
-                    service.delete()
+                if pmachine is not None:  # Pmachine will be None if storagerouter not yet modeled
+                    try:
+                        for service in storagerouter.services:
+                            service.delete()
+                        storagerouter.delete()
+                        if len(pmachine.storagerouters) == 0:
+                            pmachine.delete()
+                    except Exception as ex:
+                        SetupController._log(messages='Cleaning up model failed with error: {0}'.format(ex), loglevel='error')
+
+                if first_node is True:
+                    for service in ServiceTypeList.get_by_name('Arakoon').services:  # Externally managed Arakoon services not linked to the storagerouter
+                        service.delete()
+
+            for key in EtcdConfiguration.base_config.keys() + ['install_time', 'plugins', 'hosts/{0}'.format(machine_id)]:
+                try:
+                    EtcdConfiguration.delete(key='/ovs/framework/{0}'.format(key))
+                except (EtcdKeyNotFound, KeyError):
+                    pass
+        SetupController._log(messages='Removing Etcd proxy')
+        EtcdInstaller.remove_proxy('config', cluster_ip)
 
     @staticmethod
     def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map, hypervisor_info):
@@ -1091,7 +1107,8 @@ class SetupController(object):
         storagerouter.save()
 
         # Find other (arakoon) master nodes
-        config = ArakoonClusterConfig('ovsdb')
+        framework_cluster_name = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type='FWK', in_use=True)[0].cluster_id
+        config = ArakoonClusterConfig(framework_cluster_name)
         config.load_config()
         master_nodes = [node.ip for node in config.nodes]
         if cluster_ip in master_nodes:
@@ -1104,7 +1121,7 @@ class SetupController(object):
         SetupController._add_services(target_client, unique_id, 'master')
 
         arakoon_ports = []
-        arakoon_metadata = ArakoonInstaller.get_clusters_by_type(cluster_type='FWK', in_use=True)
+        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type='FWK', in_use=True)
         if len(arakoon_metadata) == 0:
             raise ValueError('Could not find an Arakoon cluster for framework')
 
@@ -1138,7 +1155,7 @@ class SetupController(object):
 
         if arakoon_metadata.internal is True:
             SetupController._log(messages='Restarting master node services')
-            ArakoonInstaller.restart_cluster_add('ovsdb', master_nodes, cluster_ip)
+            ArakoonInstaller.restart_cluster_add(framework_cluster_name, master_nodes, cluster_ip)
             PersistentFactory.store = None
             VolatileFactory.store = None
 
@@ -1212,7 +1229,8 @@ class SetupController(object):
                 raise RuntimeError('Not all memcache nodes can be reached which is required for demoting a node.')
 
         # Find other (arakoon) master nodes
-        config = ArakoonClusterConfig('ovsdb')
+        framework_cluster_name = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type='FWK', in_use=True)[0].cluster_id
+        config = ArakoonClusterConfig(framework_cluster_name)
         config.load_config()
         master_nodes = [node.ip for node in config.nodes]
         if cluster_ip in master_nodes:
@@ -1225,13 +1243,13 @@ class SetupController(object):
         storagerouter.save()
 
         offline_node_ips = [node.ip for node in offline_nodes]
-        arakoon_metadata = ArakoonInstaller.get_clusters_by_type(cluster_type='FWK', in_use=True)
+        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type='FWK', in_use=True)
         if len(arakoon_metadata) == 0:
             raise ValueError('Could not find an Arakoon cluster for framework')
 
         arakoon_metadata = arakoon_metadata[0]
         if arakoon_metadata.internal is True:
-            SetupController._log(messages='Leaving Arakoon ovsdb cluster')
+            SetupController._log(messages='Leaving Arakoon {0} cluster'.format(framework_cluster_name))
             ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip, cluster_name=arakoon_metadata.cluster_id, offline_nodes=offline_node_ips)
 
         try:
@@ -1265,7 +1283,7 @@ class SetupController(object):
             if cluster_ip in remaining_nodes:
                 remaining_nodes.remove(cluster_ip)
 
-            ArakoonInstaller.restart_cluster_remove('ovsdb', remaining_nodes)
+            ArakoonInstaller.restart_cluster_remove(framework_cluster_name, remaining_nodes)
             PersistentFactory.store = None
             VolatileFactory.store = None
 
@@ -1815,6 +1833,24 @@ EOF
         return internal
 
     @staticmethod
+    def _retrieve_external_etcd_info():
+        """
+        Retrieve external Etcd information interactively
+        :return: External Etcd or None
+        """
+        external_etcd = None
+        if Interactive.ask_yesno(message='Use an external Etcd cluster?', default_value=False) is True:
+            SetupController._log(messages='Provide the connection information to 1 of the external Etcd servers (Can be requested by executing "etcdctl member list")')
+            etcd_name = Interactive.ask_string(message='Provide the name of a cluster member')
+            etcd_ip = Interactive.ask_string(message='Provide the peer IP address of that member',
+                                             regex_info={'regex': SSHClient.IP_REGEX,
+                                                         'message': 'Incorrect Etcd IP provided'})
+            etcd_port = Interactive.ask_integer(question='Provide the port for the given IP address of that member',
+                                                min_value=1025, max_value=65535, default_value=2380)
+            external_etcd = '{0}=http://{1}:{2}'.format(etcd_name, etcd_ip, etcd_port)
+        return external_etcd
+
+    @staticmethod
     def _log(messages, title=False, boxed=False, loglevel='info'):
         """
         Print a message on stdout and log to file
@@ -1832,6 +1868,8 @@ EOF
             for message in messages:
                 if title is True:
                     message = '\n+++ {0} +++\n'.format(message)
+                if loglevel == 'error':
+                    message = 'ERROR: {0}'.format(message)
                 print message
 
         for message in messages:

@@ -212,15 +212,14 @@ class ArakoonClusterMetadata(object):
                     raise ValueError('Unsupported arakoon cluster type {0} found\nPlease choose from {1}'.format(value, ', '.join(ArakoonInstaller.ARAKOON_CLUSTER_TYPES)))
                 self.type = value
 
-    def claim_cluster(self):
+    def write(self):
         """
-        Sets the 'in_use' flag to True in the metadata of the arakoon cluster
+        Write the metadata to Etcd
+        :return: None
         """
-        self.load_metadata()
         if self.type is None or self.type == '':
-            raise ValueError('Cannot claim a cluster if the type has not been set')
+            raise ValueError('Cluster type must be defined before being able to store the cluster metadata information')
 
-        self.in_use = True
         etcd_key = ArakoonClusterMetadata.ETCD_METADATA_KEY.format(self.cluster_id)
         EtcdConfiguration.set(key=etcd_key, value={'type': self.type,
                                                    'in_use': self.in_use,
@@ -324,7 +323,8 @@ class ArakoonInstaller(object):
         logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
         base_dir = base_dir.rstrip('/')
 
-        EtcdConfiguration.create_dir('/ovs/framework/stores')
+        EtcdConfiguration.set('/ovs/framework/stores', {'persistent': 'pyrakoon',
+                                                        'volatile': 'memcache'})
         EtcdConfiguration.create_dir('/ovs/arakoon')
 
         client = SSHClient(ip, username=ArakoonInstaller.SSHCLIENT_USER)
@@ -366,7 +366,7 @@ class ArakoonInstaller(object):
             metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
             metadata.type = cluster_type.upper()
             metadata.internal = internal
-            metadata.claim_cluster()
+            metadata.write()
         finally:
             if port_mutex is not None:
                 port_mutex.release()
@@ -474,7 +474,7 @@ class ArakoonInstaller(object):
         ArakoonInstaller._deploy(config)
 
     @staticmethod
-    def get_clusters_by_type(cluster_type, in_use):
+    def get_arakoon_metadata_by_cluster_type(cluster_type, in_use):
         """
         Retrieve cluster information for an unused cluster based on its type
         :param cluster_type: Type of arakoon cluster (FWK, SD, ABM, NSM)
