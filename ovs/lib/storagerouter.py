@@ -121,9 +121,8 @@ class StorageRouterController(object):
                 if disk_partition.mountpoint is not None:
                     disk_partition_device = os.readlink(disk_partition.path).replace('../..', '/dev')
                     try:
-                        output = client.run("df -Pl | grep {0}".format(disk_partition_device))
-                        _partition, _size, _used, _available, _percent, _mountpoint = output.split()
-                        partition_available_space = int(_available) * 1024
+                        available = client.run("df -B 1M --output=avail {0}".format(disk_partition_device)).splitlines()[-1]
+                        partition_available_space = int(available)
                     except Exception as ex:
                         logger.warning('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
 
