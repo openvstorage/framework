@@ -39,7 +39,7 @@ class VMachineList(object):
         """
         vmachines = DataList(VMachine, {'type': DataList.where_operator.AND,
                                         'items': [('name', DataList.operator.EQUALS, vmname)]})
-        if vmachines:
+        if len(vmachines) > 0:
             return vmachines
         return None
 
@@ -52,7 +52,7 @@ class VMachineList(object):
         vms = DataList(VMachine, {'type': DataList.where_operator.AND,
                                   'items': [('devicename', DataList.operator.EQUALS, devicename),
                                             ('vpool_guid', DataList.operator.EQUALS, vpool_guid)]})
-        if vms:
+        if len(vms) > 0:
             if len(vms) != 1:
                 raise RuntimeError('Invalid amount of vMachines found: {0}'.format(len(vms)))
             return vms[0]

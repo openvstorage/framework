@@ -197,8 +197,7 @@ class DataList(object):
             entries = list(self._persistent.get_multi(['{0}{1}'.format(prefix, guid) for guid in self._guids]))
             self._data = {}
             self._objects = {}
-            for index in xrange(len(self._guids)):
-                guid = self._guids[index]
+            for index, guid in enumerate(self._guids):
                 self._data[guid] = {'data': entries[index],
                                     'guid': guid}
             self._executed = True

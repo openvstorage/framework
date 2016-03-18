@@ -39,7 +39,7 @@ class VDiskList(object):
         """
         vdisks = DataList(VDisk, {'type': DataList.where_operator.AND,
                                   'items': [('volume_id', DataList.operator.EQUALS, volume_id)]})
-        if vdisks:
+        if len(vdisks) > 0:
             return vdisks[0]
         return None
 
@@ -50,7 +50,7 @@ class VDiskList(object):
         """
         vdisks = DataList(VDisk, {'type': DataList.where_operator.AND,
                                   'items': [('name', DataList.operator.EQUALS, vdiskname)]})
-        if vdisks:
+        if len(vdisks) > 0:
             return vdisks
         return None
 
@@ -62,7 +62,7 @@ class VDiskList(object):
         vds = DataList(VDisk, {'type': DataList.where_operator.AND,
                                'items': [('devicename', DataList.operator.EQUALS, devicename),
                                          ('vpool_guid', DataList.operator.EQUALS, vpool.guid)]})
-        if vds:
+        if len(vds) > 0:
             if len(vds) != 1:
                 raise RuntimeError('Invalid amount of vDisks found: {0}'.format(len(vds)))
             return vds[0]

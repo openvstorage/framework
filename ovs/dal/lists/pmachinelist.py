@@ -40,7 +40,7 @@ class PMachineList(object):
         """
         pmachines = DataList(PMachine, {'type': DataList.where_operator.AND,
                                         'items': [('ip', DataList.operator.EQUALS, ip)]})
-        if len(pmachines):
+        if len(pmachines) > 0:
             return pmachines[0]
         return None
 

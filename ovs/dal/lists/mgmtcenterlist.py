@@ -39,6 +39,6 @@ class MgmtCenterList(object):
         """
         mgmtcenters = DataList(MgmtCenter, {'type': DataList.where_operator.AND,
                                             'items': [('ip', DataList.operator.EQUALS, ip)]})
-        if len(mgmtcenters):
+        if len(mgmtcenters) > 0:
             return mgmtcenters[0]
         return None

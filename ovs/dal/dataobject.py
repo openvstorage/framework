@@ -202,7 +202,7 @@ class DataObject(object):
             self._guid = str(uuid.uuid4())
             self._new = True
         else:
-            self._guid = str(guid).lower()
+            self._guid = str(guid)
 
         # Build base keys
         self._key = '{0}_{1}_{2}'.format(DataObject.NAMESPACE, self._classname, self._guid)
@@ -682,7 +682,7 @@ class DataObject(object):
     # Other CRUDs #
     ###############
 
-    def delete(self, abandon=None):
+    def delete(self, abandon=None, _hook=None):
         """
         Delete the given object. It also invalidates certain lists
         :param abandon: Indicates whether(which) linked objects can be unlinked. Use with caution
@@ -763,10 +763,10 @@ class DataObject(object):
 
             # Second, invalidate property lists
             cache_key = '{0}_{1}'.format(DataList.CACHELINK, self._classname)
-            if self._persistent.exists(cache_key):
+            try:
                 cache_list = self._persistent.get(cache_key)
                 self._persistent.assert_value(cache_key, copy.deepcopy(cache_list), transaction=transaction)
-            else:
+            except KeyNotFoundException:
                 cache_list = {}
             change = False
             for list_key in cache_list.keys():
@@ -778,12 +778,17 @@ class DataObject(object):
             if change is True:
                 self._persistent.set(cache_key, cache_list, transaction=transaction)
 
+            if _hook is not None and hasattr(_hook, '__call__'):
+                _hook()
+
             try:
                 self._persistent.apply_transaction(transaction)
+                successful = True
             except KeyNotFoundException as ex:
                 if ex.message != self._key:
                     raise
-            successful = True
+            except AssertException:
+                pass
 
         # Delete the object and its properties out of the volatile store
         self.invalidate_dynamics()
