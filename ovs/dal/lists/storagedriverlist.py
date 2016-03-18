@@ -39,7 +39,7 @@ class StorageDriverList(object):
         """
         storagedrivers = DataList(StorageDriver, {'type': DataList.where_operator.AND,
                                                   'items': [('storagedriver_id', DataList.operator.EQUALS, storagedriver_id)]})
-        if len(storagedrivers) > 1:
+        if len(storagedrivers) > 0:
             return storagedrivers[0]
         return None
 
