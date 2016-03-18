@@ -787,6 +787,7 @@ class DataObject(object):
             except KeyNotFoundException as ex:
                 if ex.message != self._key:
                     raise
+                successful = True
             except AssertException:
                 pass
 

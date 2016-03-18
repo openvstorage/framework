@@ -1319,6 +1319,22 @@ class Basic(TestCase):
         self.assertEqual(len(datalist2), 1, 'Second query should contain one item')
         self.assertEqual(len(datalist3), 2, 'Sum should contain both items')
 
+    def test_delete_retries(self):
+        """
+        Validates whether a delete will retry on an assert error
+        """
+        def _change_list():
+            if Basic._executed is False:
+                PersistentFactory.store.set('ovs_listcache_testdisk', {})
+                Basic._executed = True
+
+        PersistentFactory.store.set('ovs_listcache_testdisk', {'foo': 'bar'})
+        Basic._executed = False
+        disk = TestDisk()
+        disk.name = 'disk'
+        disk.save()
+        disk.delete(_hook=_change_list)
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)
