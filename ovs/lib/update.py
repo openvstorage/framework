@@ -183,7 +183,8 @@ class UpdateController(object):
             UpdateController._log_message('Started model migration', client_ip=this_client.ip)
             try:
                 from ovs.dal.helpers import Migration
-                Migration.migrate()
+                with Remote(ssh_clients[0].ip, [Migration]) as remote:
+                    remote.Migration.migrate()
                 UpdateController._log_message('Finished model migration', client_ip=this_client.ip)
             except Exception as ex:
                 UpdateController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
