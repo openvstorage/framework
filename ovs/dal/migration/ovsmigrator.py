@@ -474,4 +474,72 @@ class OVSMigrator(object):
                     vpool.status = VPool.STATUSES.RUNNING
                     vpool.save()
 
+            working_version = 7
+
+        # Version 8 introduced:
+        # - Reverse indexes are stored in persistent store
+        if working_version < 8:
+            from ovs.dal.helpers import HybridRunner, Descriptor
+            from ovs.dal.relations import RelationMapper
+            from ovs.dal.datalist import DataList
+            from ovs.extensions.storage.persistentfactory import PersistentFactory
+            from ovs.extensions.storage.volatilefactory import VolatileFactory
+            persistent = PersistentFactory.get_client()
+            transaction = persistent.begin_transaction()
+            for prefix in persistent.prefix('ovs_reverseindex_'):
+                persistent.delete(prefix, transaction=transaction)
+            index_map = {}
+            hybrid_structure = HybridRunner.get_hybrids()
+            for class_descriptor in hybrid_structure.values():
+                cls = Descriptor().load(class_descriptor).get_object()
+                clsname = cls.__name__.lower()
+                all_objects = DataList(cls, {'type': DataList.where_operator.AND,
+                                             'items': []})
+                for item in all_objects:
+                    guid = item.guid
+                    for relation in item._relations:
+                        if relation.foreign_type is None:
+                            rcls = cls.__class__
+                            rclsname = rcls.__name__.lower()
+                        else:
+                            rcls = relation.foreign_type
+                            rclsname = rcls.__name__.lower()
+                        key = relation.name
+                        rguid = item._data[key]['guid']
+                        if rguid is not None:
+                            reverse_key = 'ovs_reverseindex_{0}_{1}'.format(rclsname, rguid)
+                            if reverse_key not in index_map:
+                                reverse_index = {}
+                                relations = RelationMapper.load_foreign_relations(rcls)
+                                if relations is not None:
+                                    for key, _ in relations.iteritems():
+                                        if key not in reverse_index:
+                                            reverse_index[key] = []
+                                index_map[reverse_key] = reverse_index
+                            else:
+                                reverse_index = index_map[reverse_key]
+                            entries = reverse_index[relation.foreign_key]
+                            if guid not in entries:
+                                entries.append(guid)
+                                reverse_index[relation.foreign_key] = entries
+                    reverse_key = 'ovs_reverseindex_{0}_{1}'.format(clsname, guid)
+                    if reverse_key not in index_map:
+                        reverse_index = {}
+                        index_map[reverse_key] = reverse_index
+                        relations = RelationMapper.load_foreign_relations(cls)
+                        if relations is not None:
+                            for key, _ in relations.iteritems():
+                                if key not in reverse_index:
+                                    reverse_index[key] = []
+                    for key, value in index_map.iteritems():
+                        persistent.set(key, value, transaction=transaction)
+            persistent.apply_transaction(transaction)
+            volatile = VolatileFactory.get_client()
+            try:
+                volatile._client.flush_all()
+            except:
+                pass
+
+            working_version = 8
+
         return working_version
