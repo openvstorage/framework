@@ -111,8 +111,8 @@ class StorageRouterController(object):
                     directory_used_size = 0
                     if client.dir_exists(storagedriver_partition.path):
                         try:
-                            used_size, _ = client.run('du -B 1M -d 0 {0}'.format(storagedriver_partition.path)).split('\t')
-                            directory_used_size = int(used_size)
+                            used_size, _ = client.run('du -B 1K -d 0 {0}'.format(storagedriver_partition.path)).split('\t')
+                            directory_used_size = int(used_size) * 1024
                         except Exception as ex:
                             logger.warning('Failed to get directory usage for {0}. {1}'.format(storagedriver_partition.path, ex))
                     used_space_by_roles += directory_used_size
@@ -121,8 +121,8 @@ class StorageRouterController(object):
                 if disk_partition.mountpoint is not None:
                     disk_partition_device = os.readlink(disk_partition.path).replace('../..', '/dev')
                     try:
-                        available = client.run("df -B 1M --output=avail {0}".format(disk_partition_device)).splitlines()[-1]
-                        partition_available_space = int(available)
+                        available = client.run("df -B 1K --output=avail {0}".format(disk_partition_device)).splitlines()[-1]
+                        partition_available_space = int(available) * 1024
                     except Exception as ex:
                         logger.warning('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
 
