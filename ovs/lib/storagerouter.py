@@ -859,15 +859,19 @@ class StorageRouterController(object):
 
         storagedriver_config.clean()  # Clean out obsolete values
         if vpool.backend_type.code == 'alba':
-            storagedriver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
-                                                                      alba_connection_port=alba_proxy.service.ports[0],
-                                                                      alba_connection_preset=vpool.metadata['preset'],
-                                                                      alba_connection_timeout=15,
-                                                                      backend_type='ALBA')
+            backend_connection_manager = {'alba_connection_host': '127.0.0.1',
+                                          'alba_connection_port': alba_proxy.service.ports[0],
+                                          'alba_connection_preset': vpool.metadata['preset'],
+                                          'alba_connection_timeout': 15,
+                                          'backend_type': 'ALBA'}
         elif vpool.backend_type.code in ['local', 'distributed']:
-            storagedriver_config.configure_backend_connection_manager(**local_backend_data)
+            backend_connection_manager = local_backend_data
         else:
-            storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
+            backend_connection_manager = vpool.metadata
+        backend_connection_manager.update({'backend_interface_retries_on_error': 5,
+                                           'backend_interface_retry_interval_secs': 1,
+                                           'backend_interface_retry_backoff_multiplier': 2.0})
+        storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
         storagedriver_config.configure_content_addressed_cache(clustercache_mount_points=readcaches,
                                                                read_cache_serialization_path=rsppath)
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
