@@ -16,7 +16,6 @@
 VDiskList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.vdisk import VDisk
 
 
@@ -30,25 +29,18 @@ class VDiskList(object):
         """
         Returns a list of all VDisks
         """
-        vdisks = DataList({'object': VDisk,
-                           'data': DataList.select.GUIDS,
-                           'query': {'type': DataList.where_operator.AND,
-                                     'items': []}}).data
-        return DataObjectList(vdisks, VDisk)
+        return DataList(VDisk, {'type': DataList.where_operator.AND,
+                                'items': []})
 
     @staticmethod
     def get_vdisk_by_volume_id(volume_id):
         """
         Returns a list of all VDisks based on a given volume id
         """
-        # pylint: disable=line-too-long
-        vdisks = DataList({'object': VDisk,
-                           'data': DataList.select.GUIDS,
-                           'query': {'type': DataList.where_operator.AND,
-                                     'items': [('volume_id', DataList.operator.EQUALS, volume_id)]}}).data
-        # pylint: enable=line-too-long
-        if vdisks:
-            return DataObjectList(vdisks, VDisk)[0]
+        vdisks = DataList(VDisk, {'type': DataList.where_operator.AND,
+                                  'items': [('volume_id', DataList.operator.EQUALS, volume_id)]})
+        if len(vdisks) > 0:
+            return vdisks[0]
         return None
 
     @staticmethod
@@ -56,14 +48,10 @@ class VDiskList(object):
         """
         Returns all VDisks which have a given name
         """
-        # pylint: disable=line-too-long
-        vdisks = DataList({'object': VDisk,
-                           'data': DataList.select.GUIDS,
-                           'query': {'type': DataList.where_operator.AND,
-                                     'items': [('name', DataList.operator.EQUALS, vdiskname)]}}).data
-        # pylint: enable=line-too-long
-        if vdisks:
-            return DataObjectList(vdisks, VDisk)
+        vdisks = DataList(VDisk, {'type': DataList.where_operator.AND,
+                                  'items': [('name', DataList.operator.EQUALS, vdiskname)]})
+        if len(vdisks) > 0:
+            return vdisks
         return None
 
     @staticmethod
@@ -71,17 +59,13 @@ class VDiskList(object):
         """
         Returns a list of all VDisks based on a given device name and vpool
         """
-        # pylint: disable=line-too-long
-        vds = DataList({'object': VDisk,
-                        'data': DataList.select.GUIDS,
-                        'query': {'type': DataList.where_operator.AND,
-                                  'items': [('devicename', DataList.operator.EQUALS, devicename),
-                                            ('vpool_guid', DataList.operator.EQUALS, vpool.guid)]}}).data  # noqa
-        # pylint: enable=line-too-long
-        if vds:
+        vds = DataList(VDisk, {'type': DataList.where_operator.AND,
+                               'items': [('devicename', DataList.operator.EQUALS, devicename),
+                                         ('vpool_guid', DataList.operator.EQUALS, vpool.guid)]})
+        if len(vds) > 0:
             if len(vds) != 1:
                 raise RuntimeError('Invalid amount of vDisks found: {0}'.format(len(vds)))
-            return DataObjectList(vds, VDisk)[0]
+            return vds[0]
         return None
 
     @staticmethod
@@ -89,24 +73,13 @@ class VDiskList(object):
         """
         Gets all vDisks without a vMachine
         """
-        # pylint: disable=line-too-long
-        vdisks = DataList({'object': VDisk,
-                           'data': DataList.select.GUIDS,
-                           'query': {'type': DataList.where_operator.AND,
-                                     'items': [('vmachine_guid', DataList.operator.EQUALS, None)]}}).data
-        # pylint: enable=line-too-long
-        return DataObjectList(vdisks, VDisk)
+        return DataList(VDisk, {'type': DataList.where_operator.AND,
+                                'items': [('vmachine_guid', DataList.operator.EQUALS, None)]})
 
     @staticmethod
     def get_by_parentsnapshot(snapshotid):
         """
         Gets all vDisks whose parentsnapshot is snapshotid
         """
-        # pylint: disable=line-too-long
-        vdisks = DataList({'object': VDisk,
-                           'data': DataList.select.GUIDS,
-                           'query': {'type': DataList.where_operator.AND,
-                                     'items': [('parentsnapshot', DataList.operator.EQUALS, snapshotid)]}}).data
-
-        # pylint: enable=line-too-long
-        return DataObjectList(vdisks, VDisk)
+        return DataList(VDisk, {'type': DataList.where_operator.AND,
+                                'items': [('parentsnapshot', DataList.operator.EQUALS, snapshotid)]})

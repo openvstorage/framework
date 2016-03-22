@@ -435,9 +435,8 @@ class VDiskController(object):
         disk_path = hypervisor.get_disk_path(machinename, devicename)
 
         description = '{0} {1}'.format(machinename, devicename)
-        properties_to_clone = [
-            'description', 'size', 'type', 'retentionpolicyid',
-            'snapshotpolicyid', 'vmachine', 'vpool']
+        properties_to_clone = ['description', 'size', 'type', 'retentionpolicyid',
+                               'snapshotpolicyid', 'vmachine', 'vpool']
 
         vdisk = VDisk(diskguid)
         if vdisk.vmachine and not vdisk.vmachine.is_vtemplate:

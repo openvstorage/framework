@@ -19,7 +19,7 @@ Contains various helping classes
 import re
 
 
-class Toolbox:
+class Toolbox(object):
     """
     This class contains generic methods
     """
@@ -52,44 +52,6 @@ class Toolbox:
             if required_role not in user_roles:
                 return False
         return True
-
-    @staticmethod
-    def extract_key(obj, key):
-        """
-        Extracts a sortable tuple from the object using the given keys
-        """
-        def clean_list(l):
-            """
-            Cleans a given tuple, removing empty elements, and convert to an integer where possible
-            """
-            while True:
-                try:
-                    l.remove('')
-                except ValueError:
-                    break
-            for i in xrange(len(l)):
-                try:
-                    l[i] = int(l[i])
-                except ValueError:
-                    pass
-            return l
-
-        regex = re.compile(r'(\d+)')
-        value = obj
-        for subkey in key.split('.'):
-            if '[' in subkey:
-                # We're using a dict
-                attribute = subkey.split('[')[0]
-                dictkey = subkey.split('[')[1][:-1]
-                value = getattr(value, attribute)[dictkey]
-            else:
-                # Normal property
-                value = getattr(value, subkey)
-            if value is None:
-                break
-        value = '' if value is None else str(value)
-        sorting_key = tuple(clean_list(regex.split(value)))
-        return sorting_key
 
     @staticmethod
     def compare(version_1, version_2):

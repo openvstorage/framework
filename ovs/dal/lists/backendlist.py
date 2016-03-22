@@ -16,7 +16,6 @@
 BackendList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobject import DataObjectList
 from ovs.dal.hybrids.backend import Backend
 
 
@@ -30,20 +29,15 @@ class BackendList(object):
         """
         Returns a list of all Backends
         """
-        backends = DataList({'object': Backend,
-                             'data': DataList.select.GUIDS,
-                             'query': {'type': DataList.where_operator.AND,
-                                       'items': []}}).data
-        return DataObjectList(backends, Backend)
+        return DataList(Backend, {'type': DataList.where_operator.AND,
+                                  'items': []})
 
     @staticmethod
     def get_by_name(name):
-        backends = DataList({'object': Backend,
-                             'data': DataList.select.GUIDS,
-                             'query': {'type': DataList.where_operator.AND,
-                                       'items': [('name', DataList.operator.EQUALS, name)]}}).data
-        if backends:
-            if len(backends) != 1:
-                raise RuntimeError('Invalid amount of Backends found: {0}'.format(len(backends)))
-            return DataObjectList(backends, Backend)[0]
-        return None
+        backends = DataList(Backend, {'type': DataList.where_operator.AND,
+                                      'items': [('name', DataList.operator.EQUALS, name)]})
+        if len(backends) > 1:
+            raise RuntimeError('Invalid amount of Backends found: {0}'.format(len(backends)))
+        if len(backends) == 0:
+            return None
+        return backends[0]

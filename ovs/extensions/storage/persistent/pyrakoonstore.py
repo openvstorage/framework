@@ -18,15 +18,16 @@ Arakoon store module, using pyrakoon
 
 import os
 import time
-import json
+import ujson
+import uuid
 import random
 from StringIO import StringIO
 from threading import Lock, current_thread
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
-from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNotFound, ArakoonSockNotReadable, ArakoonSockReadNoBytes, ArakoonSockSendError
-from ovs.extensions.storage.exceptions import KeyNotFoundException
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNotFound, ArakoonSockNotReadable, ArakoonSockReadNoBytes, ArakoonSockSendError, ArakoonAssertionFailed
+from ovs.extensions.storage.exceptions import KeyNotFoundException, AssertException
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('extensions', name='arakoon_store')
@@ -74,7 +75,8 @@ class PyrakoonStore(object):
         self._client = ArakoonClient(self._config)
         self._identifier = int(round(random.random() * 10000000))
         self._lock = Lock()
-        self._batch_size = 100
+        self._batch_size = 500
+        self._sequences = {}
 
     @locked()
     def get(self, key):
@@ -82,18 +84,33 @@ class PyrakoonStore(object):
         Retrieves a certain value for a given key
         """
         try:
-            return json.loads(PyrakoonStore._try(self._identifier, self._client.get, key))
+            return ujson.loads(PyrakoonStore._try(self._identifier, self._client.get, key))
         except ValueError:
             raise KeyNotFoundException('Could not parse JSON stored for {0}'.format(key))
         except ArakoonNotFound as field:
             raise KeyNotFoundException(field)
 
     @locked()
-    def set(self, key, value):
+    def get_multi(self, keys):
+        """
+        Get multiple keys at once
+        """
+        try:
+            for item in PyrakoonStore._try(self._identifier, self._client.multiGet, keys):
+                yield ujson.loads(item)
+        except ValueError:
+            raise KeyNotFoundException('Could not parse JSON stored')
+        except ArakoonNotFound as field:
+            raise KeyNotFoundException(field)
+
+    @locked()
+    def set(self, key, value, transaction=None):
         """
         Sets the value for a key to a given value
         """
-        return PyrakoonStore._try(self._identifier, self._client.set, key, json.dumps(value))
+        if transaction is not None:
+            return self._sequences[transaction].addSet(key, ujson.dumps(value, sort_keys=True))
+        return PyrakoonStore._try(self._identifier, self._client.set, key, ujson.dumps(value, sort_keys=True))
 
     @locked()
     def prefix(self, prefix):
@@ -114,10 +131,30 @@ class PyrakoonStore(object):
                 yield item
 
     @locked()
-    def delete(self, key):
+    def prefix_entries(self, prefix):
+        """
+        Lists all keys starting with the given prefix
+        """
+        next_prefix = PyrakoonStore._next_key(prefix)
+        batch = None
+        while batch is None or len(batch) > 0:
+            batch = PyrakoonStore._try(self._identifier,
+                                       self._client.range_entries,
+                                       beginKey=prefix if batch is None else batch[-1][0],
+                                       beginKeyIncluded=batch is None,
+                                       endKey=next_prefix,
+                                       endKeyIncluded=False,
+                                       maxElements=self._batch_size)
+            for item in batch:
+                yield [item[0], ujson.loads(item[1])]
+
+    @locked()
+    def delete(self, key, transaction=None):
         """
         Deletes a given key from the store
         """
+        if transaction is not None:
+            return self._sequences[transaction].addDelete(key)
         try:
             return PyrakoonStore._try(self._identifier, self._client.delete, key)
         except ArakoonNotFound as field:
@@ -136,6 +173,37 @@ class PyrakoonStore(object):
         Check if key exists
         """
         return PyrakoonStore._try(self._identifier, self._client.exists, key)
+
+    @locked()
+    def assert_value(self, key, value, transaction=None):
+        """
+        Asserts a key-value pair
+        """
+        if transaction is not None:
+            return self._sequences[transaction].addAssert(key, ujson.dumps(value, sort_keys=True))
+        try:
+            return PyrakoonStore._try(self._identifier, self._client.aSSert, key, ujson.dumps(value, sort_keys=True))
+        except ArakoonAssertionFailed as assertion:
+            raise AssertException(assertion)
+
+    def begin_transaction(self):
+        """
+        Creates a transaction (wrapper around Arakoon sequences)
+        """
+        key = str(uuid.uuid4())
+        self._sequences[key] = self._client.makeSequence()
+        return key
+
+    def apply_transaction(self, transaction):
+        """
+        Applies a transaction
+        """
+        try:
+            return PyrakoonStore._try(self._identifier, self._client.sequence, self._sequences[transaction])
+        except ArakoonAssertionFailed as assertion:
+            raise AssertException(assertion)
+        except ArakoonNotFound as field:
+            raise KeyNotFoundException(field)
 
     @staticmethod
     def _try(identifier, method, *args, **kwargs):

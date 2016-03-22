@@ -16,7 +16,6 @@
 GroupList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobject import DataObjectList
 from ovs.dal.hybrids.group import Group
 
 
@@ -30,8 +29,5 @@ class GroupList(object):
         """
         Returns a list of all Groups
         """
-        groups = DataList({'object': Group,
-                           'data': DataList.select.GUIDS,
-                           'query': {'type': DataList.where_operator.AND,
-                                     'items': []}}).data
-        return DataObjectList(groups, Group)
+        return DataList(Group, {'type': DataList.where_operator.AND,
+                                'items': []})

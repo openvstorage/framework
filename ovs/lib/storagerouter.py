@@ -111,30 +111,20 @@ class StorageRouterController(object):
                     directory_used_size = 0
                     if client.dir_exists(storagedriver_partition.path):
                         try:
-                            used_size, _ = client.run('du -B 1M -d 0 {0}'.format(storagedriver_partition.path)).split('\t')
+                            used_size, _ = client.run('du -B 1 -d 0 {0}'.format(storagedriver_partition.path)).split('\t')
                             directory_used_size = int(used_size)
                         except Exception as ex:
-                            logger.error('Failed to get directory usage for {0}. {1}'.format(storagedriver_partition.path, ex))
+                            logger.warning('Failed to get directory usage for {0}. {1}'.format(storagedriver_partition.path, ex))
                     used_space_by_roles += directory_used_size
 
                 partition_available_space = None
                 if disk_partition.mountpoint is not None:
-                    disk_partition_device = '/dev/{0}{1}'.format(disk.name, disk_partition.id)
+                    disk_partition_device = os.readlink(disk_partition.path).replace('../..', '/dev')
                     try:
-                        output = client.run("df -Pl | grep {0}".format(disk_partition_device))
+                        available = client.run("df -B 1 --output=avail {0}".format(disk_partition_device)).splitlines()[-1]
+                        partition_available_space = int(available)
                     except Exception as ex:
-                        logger.error('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
-                    else:
-                        if output != '':
-                            try:
-                                _partition, _size, _used, _available, _percent, _mountpoint = output.split()
-                            except ValueError as ve:
-                                logger.error('Unexpected output {0}. {1}'.format(output, ve))
-                            else:
-                                try:
-                                    partition_available_space = int(_available) * 1024
-                                except ValueError as ve:
-                                    logger.error('Could not parse value: {0}. {1}'.format(_available, ve))
+                        logger.warning('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
 
                 shared = False
                 for role in disk_partition.roles:
@@ -869,15 +859,19 @@ class StorageRouterController(object):
 
         storagedriver_config.clean()  # Clean out obsolete values
         if vpool.backend_type.code == 'alba':
-            storagedriver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
-                                                                      alba_connection_port=alba_proxy.service.ports[0],
-                                                                      alba_connection_preset=vpool.metadata['preset'],
-                                                                      alba_connection_timeout=15,
-                                                                      backend_type='ALBA')
+            backend_connection_manager = {'alba_connection_host': '127.0.0.1',
+                                          'alba_connection_port': alba_proxy.service.ports[0],
+                                          'alba_connection_preset': vpool.metadata['preset'],
+                                          'alba_connection_timeout': 15,
+                                          'backend_type': 'ALBA'}
         elif vpool.backend_type.code in ['local', 'distributed']:
-            storagedriver_config.configure_backend_connection_manager(**local_backend_data)
+            backend_connection_manager = local_backend_data
         else:
-            storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
+            backend_connection_manager = vpool.metadata
+        backend_connection_manager.update({'backend_interface_retries_on_error': 5,
+                                           'backend_interface_retry_interval_secs': 1,
+                                           'backend_interface_retry_backoff_multiplier': 2.0})
+        storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
         storagedriver_config.configure_content_addressed_cache(clustercache_mount_points=readcaches,
                                                                read_cache_serialization_path=rsppath)
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,

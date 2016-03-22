@@ -23,6 +23,7 @@ import inspect
 import time
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.helpers import Toolbox as DalToolbox
 from rest_framework.response import Response
 from toolbox import Toolbox
 from rest_framework.exceptions import PermissionDenied, NotAuthenticated, NotAcceptable, Throttled
@@ -216,7 +217,7 @@ def return_list(object_type, default_sort=None):
                 for sort_item in sort:
                     desc = sort_item[0] == '-'
                     field = sort_item[1 if desc else 0:]
-                    data_list.sort(key=lambda e: Toolbox.extract_key(e, field), reverse=desc)
+                    data_list.sort(key=lambda e: DalToolbox.extract_key(e, field), reverse=desc)
 
             # 5. Paging
             total_items = len(data_list)

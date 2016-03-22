@@ -68,19 +68,6 @@ class MemcacheViewSet(viewsets.ViewSet):
         host.close_socket()
         return stats
 
-    @staticmethod
-    def _dal_stats(client):
-        """
-        Creates a dict with DAL statistics
-        """
-        stats = {}
-        keys = ['datalist', 'object_load', 'descriptor', 'relations']
-        for key in keys:
-            for hittype in ['hit', 'miss']:
-                cachekey = 'ovs_stats_cache_%s_%s' % (key, hittype)
-                stats['%s_%s' % (key, hittype)] = client.get(cachekey, default=0)
-        return stats
-
     @log()
     @required_roles(['read'])
     @load()
@@ -91,8 +78,7 @@ class MemcacheViewSet(viewsets.ViewSet):
         nodes = MemcacheViewSet._get_memcache_nodes()
         client = VolatileFactory.get_client('memcache')
         online_nodes = ['%s:%s' % (node.ip, node.port) for node in client._client.servers if node.deaduntil == 0]
-        stats = {'dal': MemcacheViewSet._dal_stats(client),
-                 'nodes': [],
+        stats = {'nodes': [],
                  'offline': []}
         for node in nodes:
             if node in online_nodes:
@@ -113,8 +99,7 @@ class MemcacheViewSet(viewsets.ViewSet):
         nodes = MemcacheViewSet._get_memcache_nodes()
         client = VolatileFactory.get_client('memcache')
         online_nodes = ['%s:%s' % (node.ip, node.port) for node in client._client.servers if node.deaduntil == 0]
-        stats = {'dal': MemcacheViewSet._dal_stats(client),
-                 'nodes': [],
+        stats = {'nodes': [],
                  'offline': []}
         for node in nodes:
             if node in online_nodes:

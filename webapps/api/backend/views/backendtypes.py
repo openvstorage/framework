@@ -22,7 +22,6 @@ from rest_framework.permissions import IsAuthenticated
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from backend.decorators import return_object, return_list, load, required_roles, log
 
 
@@ -44,10 +43,7 @@ class BackendTypeViewSet(viewsets.ViewSet):
         """
         if query is not None:
             query = json.loads(query)
-            query_result = DataList({'object': BackendType,
-                                     'data': DataList.select.GUIDS,
-                                     'query': query}).data
-            return DataObjectList(query_result, BackendType)
+            return DataList(BackendType, query)
         return BackendTypeList.get_backend_types()
 
     @log()

@@ -16,7 +16,6 @@
 DiskList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.disk import Disk
 
 
@@ -30,8 +29,5 @@ class DiskList(object):
         """
         Returns a list of all Disks
         """
-        disks = DataList({'object': Disk,
-                          'data': DataList.select.GUIDS,
-                          'query': {'type': DataList.where_operator.AND,
-                                    'items': []}}).data
-        return DataObjectList(disks, Disk)
+        return DataList(Disk, {'type': DataList.where_operator.AND,
+                               'items': []})
