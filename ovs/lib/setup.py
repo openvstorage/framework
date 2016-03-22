@@ -867,7 +867,7 @@ class SetupController(object):
 
         SetupController._run_hooks('firstnode', cluster_ip)
 
-        if enable_heartbeats is not True:
+        if enable_heartbeats is None:
             SetupController._log(messages='Heartbeat', title=True)
             print Interactive.boxed_message(['Open vStorage has the option to send regular heartbeats with metadata to a centralized server.' +
                                              'The metadata contains anonymous data like Open vStorage\'s version and status of the Open vStorage services. These heartbeats are optional and can be turned on/off at any time via the GUI.'],

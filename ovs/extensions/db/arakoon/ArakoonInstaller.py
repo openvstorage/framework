@@ -87,7 +87,7 @@ class ArakoonClusterConfig(object):
         Initializes an empty Cluster Config
         """
         self.cluster_id = cluster_id
-        self._extra_globals = {'__tainted_tlog_entries_per_file': 5000}
+        self._extra_globals = {'tlog_max_entries': 5000}
         self.nodes = []
         self._plugins = []
         if isinstance(plugins, list):
