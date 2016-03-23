@@ -32,7 +32,6 @@ class PersistentFactory(object):
         Returns a persistent storage client
         :param client_type: Type of store client
         """
-
         if not hasattr(PersistentFactory, 'store') or PersistentFactory.store is None:
             if client_type is None:
                 client_type = EtcdConfiguration.get('/ovs/framework/stores|persistent')
@@ -45,10 +44,6 @@ class PersistentFactory(object):
                     if metadata['type'].upper() == 'FWK':
                         framework_cluster_name = cluster
                         break
-
-        if not hasattr(PersistentFactory, 'store') or PersistentFactory.store is None:
-            if client_type is None:
-                client_type = EtcdConfiguration.get('/ovs/framework/stores|persistent')
 
             PersistentFactory.store = None
             if client_type in ['pyrakoon', 'arakoon']:
