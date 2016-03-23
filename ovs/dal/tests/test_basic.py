@@ -26,9 +26,12 @@ from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.hybrids.t_testdisk import TestDisk
 from ovs.dal.hybrids.t_testemachine import TestEMachine
+from ovs.dal.hybrids.t_testmachine import TestMachine
+from ovs.dal.hybrids.t_teststoragedriver import TestStorageDriver
+from ovs.dal.hybrids.t_teststoragerouter import TestStorageRouter
+from ovs.dal.hybrids.t_testvpool import TestVPool
 from ovs.dal.datalist import DataList
 from ovs.dal.helpers import Descriptor, Toolbox
 from ovs.extensions.generic.volatilemutex import VolatileMutex, NoLockAvailableException
@@ -1334,6 +1337,37 @@ class Basic(TestCase):
         disk.name = 'disk'
         disk.save()
         disk.delete(_hook=_change_list)
+
+    def test_object_comparison_on_different_level(self):
+        """
+        Verify 2 objects are the same, but when approached from a different level
+        """
+        sr = TestStorageRouter()
+        sr.name = 'storage_router1'
+        sr.save()
+        vpool = TestVPool()
+        vpool.name = 'vpool1'
+        vpool.save()
+        sd = TestStorageDriver()
+        sd.name = 'storage_driver1'
+        sd.vpool = vpool
+        sd.storagerouter = sr
+        sd.save()
+
+        # http://jira.openvstorage.com/browse/OVS-4413
+        # In [6]: vpool.storagedrivers[0].storagerouter == srs[0]
+        # Out[6]: True
+        #
+        # In [7]: vpool.storagedrivers[0].storagerouter != srs[0]
+        # Out[7]: True
+
+        error_message = 'DAL object comparison failure'
+        assert (sr == sr) is True, error_message
+        assert (sr != sr) is False, error_message
+        assert (sd.storagerouter == sr) is True, error_message
+        assert (sd.storagerouter != sr) is False, error_message
+        assert (vpool.storagedrivers[0].storagerouter == sr) is True, error_message
+        assert (vpool.storagedrivers[0].storagerouter != sr) is False, error_message
 
 if __name__ == '__main__':
     import unittest
