@@ -21,6 +21,7 @@ ArakoonInstaller class
 import os
 import time
 from ConfigParser import RawConfigParser
+from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import CalledProcessError
 from ovs.extensions.generic.sshclient import SSHClient
@@ -208,8 +209,8 @@ class ArakoonClusterMetadata(object):
                     raise ValueError('"internal" should be of type "bool"')
                 self.internal = value
             else:
-                if value not in ArakoonInstaller.ARAKOON_CLUSTER_TYPES:
-                    raise ValueError('Unsupported arakoon cluster type {0} found\nPlease choose from {1}'.format(value, ', '.join(ArakoonInstaller.ARAKOON_CLUSTER_TYPES)))
+                if value not in ServiceType.ARAKOON_CLUSTER_TYPES:
+                    raise ValueError('Unsupported arakoon cluster type {0} found\nPlease choose from {1}'.format(value, ', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
                 self.type = value
 
     def write(self):
@@ -240,7 +241,6 @@ class ArakoonInstaller(object):
     ETCD_CONFIG_PATH = 'etcd://127.0.0.1:2379' + ETCD_CONFIG_KEY
     SSHCLIENT_USER = 'ovs'
     ARAKOON_START_PORT = 26400
-    ARAKOON_CLUSTER_TYPES = ['ABM', 'FWK', 'NSM', 'SD']
 
     def __init__(self):
         """
@@ -312,13 +312,13 @@ class ArakoonInstaller(object):
         :param cluster_name: Name of the cluster
         :param ip: IP address of the first node of the new cluster
         :param base_dir: Base directory that should contain the data and tlogs
-        :param cluster_type: Type of the cluster (ABM, FWK, NSM, SD)
+        :param cluster_type: Type of the cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
         :param plugins: Plugins that should be added to the configuration file
         :param locked: Indicates whether the create should run in a locked context (e.g. to prevent port conflicts)
         :param internal: Is cluster internally managed by OVS
         """
-        if cluster_type not in ArakoonInstaller.ARAKOON_CLUSTER_TYPES:
-            raise ValueError('Cluster type {0} is not supported. Please choose from {1}'.format(cluster_type, ', '.join(ArakoonInstaller.ARAKOON_CLUSTER_TYPES)))
+        if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
+            raise ValueError('Cluster type {0} is not supported. Please choose from {1}'.format(cluster_type, ', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
 
         logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
         base_dir = base_dir.rstrip('/')
@@ -477,14 +477,14 @@ class ArakoonInstaller(object):
     def get_arakoon_metadata_by_cluster_type(cluster_type, in_use):
         """
         Retrieve cluster information for an unused cluster based on its type
-        :param cluster_type: Type of arakoon cluster (FWK, SD, ABM, NSM)
+        :param cluster_type: Type of arakoon cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
         :param in_use: Return clusters which are already in use or not
         :return: List of ArakoonClusterMetadata objects
         """
         clusters = []
         cluster_type = cluster_type.upper()
-        if cluster_type not in ArakoonInstaller.ARAKOON_CLUSTER_TYPES:
-            raise ValueError('Unsupported arakoon cluster type provided. Please choose from {0}'.format(', '.join(ArakoonInstaller.ARAKOON_CLUSTER_TYPES)))
+        if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
+            raise ValueError('Unsupported arakoon cluster type provided. Please choose from {0}'.format(', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
         if not EtcdConfiguration.exists('/ovs/arakoon', raw=True):
             return clusters
 
