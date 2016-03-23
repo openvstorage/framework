@@ -240,7 +240,6 @@ class SSHClient(object):
             else:
                 return '\n'.join(line.rstrip() for line in stdout).strip()
 
-    @connected()
     def dir_create(self, directories):
         """
         Ensures a directory exists on the remote end
@@ -256,7 +255,6 @@ class SSHClient(object):
             else:
                 self.run('mkdir -p "{0}"; echo true'.format(directory))
 
-    @connected()
     def dir_delete(self, directories, follow_symlinks=False):
         """
         Remove a directory (or multiple directories) from the remote filesystem recursively
@@ -284,7 +282,6 @@ class SSHClient(object):
                     if self.dir_exists(directory):
                         self.run('rm -rf {0}'.format(directory))
 
-    @connected()
     def dir_exists(self, directory):
         """
         Checks if a directory exists on a remote host
@@ -297,7 +294,6 @@ class SSHClient(object):
 print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
             return json.loads(self.run('python -c """{0}"""'.format(command)))
 
-    @connected()
     def dir_chmod(self, directories, mode, recursive=False):
         """
         Chmod a or multiple directories
@@ -323,7 +319,6 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
                 recursive_str = '-R' if recursive is True else ''
                 self.run('chmod {0} {1} {2}'.format(recursive_str, oct(mode), directory))
 
-    @connected()
     def dir_chown(self, directories, user, group, recursive=False):
         """
         Chown a or multiple directories
@@ -357,7 +352,6 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
                 recursive_str = '-R' if recursive is True else ''
                 self.run('chown {0} {1}:{2} {3}'.format(recursive_str, user, group, directory))
 
-    @connected()
     def dir_list(self, directory):
         """
         List contents of a directory on a remote host
@@ -370,7 +364,6 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
 print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
             return json.loads(self.run('python -c """{0}"""'.format(command)))
 
-    @connected()
     def symlink(self, links):
         """
         Create symlink
@@ -384,7 +377,6 @@ print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
             for link_name, source in links.iteritems():
                 self.run('ln -s {0} {1}'.format(self.shell_safe(source), self.shell_safe(link_name)))
 
-    @connected()
     def file_create(self, filenames):
         """
         Create a or multiple files
@@ -408,7 +400,6 @@ print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
                 self.dir_create(directory)
                 self.run('touch {0}'.format(filename))
 
-    @connected()
     def file_delete(self, filenames):
         """
         Remove a file (or multiple files) from the remote filesystem
@@ -435,7 +426,6 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
                     if self.file_exists(filename):
                         self.run('rm -f "{0}"'.format(filename))
 
-    @connected()
     def file_unlink(self, path):
         """
         Unlink a file
@@ -449,7 +439,6 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
         else:
             self.run("unlink {0}".format(path))
 
-    @connected()
     def file_read_link(self, path):
         """
         Read the symlink of the specified path
@@ -468,7 +457,6 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
             except:
                 pass
 
-    @connected()
     def file_read(self, filename):
         """
         Load a file from the remote end
@@ -516,7 +504,6 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
             sftp = self.client.open_sftp()
             sftp.put(local_filename, remote_filename)
 
-    @connected()
     def file_exists(self, filename):
         """
         Checks if a file exists on a remote host
@@ -529,7 +516,6 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
 print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             return json.loads(self.run('python -c """{0}"""'.format(command)))
 
-    @connected()
     def file_chmod(self, filename, mode):
         """
         Sets the mode of a remote file
@@ -542,7 +528,6 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
         else:
             self.run(command)
 
-    @connected()
     def file_chown(self, filenames, user, group):
         """
         Sets the ownership of a remote file
@@ -571,7 +556,6 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             else:
                 self.run('chown {0}:{1} {2}'.format(user, group, filename))
 
-    @connected()
     def file_list(self, directory, abs_path=False, recursive=False):
         """
         List all files in directory
