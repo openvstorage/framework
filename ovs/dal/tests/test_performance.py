@@ -49,10 +49,10 @@ class LotsOfObjects(TestCase):
         if getattr(LotsOfObjects, 'amount_of_disks', None) is None:
             LotsOfObjects.amount_of_disks = 5
         load_data = True
+        mguids = []
         if load_data:
             print '\nstart loading data'
             start = time.time()
-            mguids = []
             runtimes = []
             for i in xrange(0, int(LotsOfObjects.amount_of_machines)):
                 mstart = time.time()
@@ -81,7 +81,7 @@ class LotsOfObjects(TestCase):
             for i in xrange(0, int(LotsOfObjects.amount_of_machines)):
                 mstart = time.time()
                 machine = TestMachine(mguids[i])
-                self.assertEqual(len(machine.disks), LotsOfObjects.amount_of_disks, 'Not all disks were retreived ({0})'.format(len(machine.disks)))
+                self.assertEqual(len(machine.disks), LotsOfObjects.amount_of_disks, 'Not all disks were retrieved ({0})'.format(len(machine.disks)))
                 avgitemspersec = ((i + 1) * LotsOfObjects.amount_of_disks) / (time.time() - start)
                 itemspersec = LotsOfObjects.amount_of_disks / (time.time() - mstart)
                 runtimes.append(itemspersec)
