@@ -906,12 +906,11 @@ class SetupController(object):
 
         cluster_ip = target_client.ip
         machine_id = System.get_my_machine_id(target_client)
-        etcd_running = ServiceManager.has_service(name='etcd-config', client=target_client) and ServiceManager.get_service_status(name='etcd-config', client=target_client) is True
-        if etcd_running is True:
-            try:
-                EtcdInstaller.wait_for_cluster(cluster_name='config', client=target_client)
-            except EtcdConnectionFailed:
-                etcd_running = False
+        try:
+            EtcdInstaller.wait_for_cluster(cluster_name='a_name_that_does_not_matter_at_all', client=target_client)
+            etcd_running = True
+        except EtcdConnectionFailed:
+            etcd_running = False
         unconfigure_rabbitmq = False
         unconfigure_memcached = False
 
@@ -1012,8 +1011,8 @@ class SetupController(object):
                 try:
                     storagerouter = System.get_my_storagerouter()
                     pmachine = storagerouter.pmachine
-                except EtcdKeyNotFound:
-                    pass
+                except Exception as ex:
+                    SetupController._log(messages='Retrieving storagerouter and pmachine information failed with error: {0}'.format(ex), loglevel='error')
 
                 if pmachine is not None:  # Pmachine will be None if storagerouter not yet modeled
                     try:
@@ -1026,8 +1025,11 @@ class SetupController(object):
                         SetupController._log(messages='Cleaning up model failed with error: {0}'.format(ex), loglevel='error')
 
                 if first_node is True:
-                    for service in ServiceTypeList.get_by_name('Arakoon').services:  # Externally managed Arakoon services not linked to the storagerouter
-                        service.delete()
+                    try:
+                        for service in ServiceTypeList.get_by_name('Arakoon').services:  # Externally managed Arakoon services not linked to the storagerouter
+                            service.delete()
+                    except Exception as ex:
+                        SetupController._log(messages='Cleaning up services failed with error: {0}'.format(ex), loglevel='error')
 
             for key in EtcdConfiguration.base_config.keys() + ['install_time', 'plugins', 'hosts/{0}'.format(machine_id)]:
                 try:
@@ -1749,7 +1751,7 @@ EOF
             try:
                 config = json.loads(pre_config.read())
             except Exception as ex:
-                raise ValueError('JSON contents could not be retrieved from file {0}.\nErrormessage: {1}'.format(preconfig, ex))
+                raise ValueError('JSON contents could not be retrieved from file {0}.\nError message: {1}'.format(preconfig, ex))
 
         if 'setup' not in config or not isinstance(config['setup'], dict):
             raise ValueError('The OpenvStorage pre-configuration file must contain a "setup" key with a dictionary as value')
@@ -1844,13 +1846,12 @@ EOF
         external_etcd = None
         if Interactive.ask_yesno(message='Use an external Etcd cluster?', default_value=False) is True:
             SetupController._log(messages='Provide the connection information to 1 of the external Etcd servers (Can be requested by executing "etcdctl member list")')
-            etcd_name = Interactive.ask_string(message='Provide the name of a cluster member')
             etcd_ip = Interactive.ask_string(message='Provide the peer IP address of that member',
                                              regex_info={'regex': SSHClient.IP_REGEX,
                                                          'message': 'Incorrect Etcd IP provided'})
             etcd_port = Interactive.ask_integer(question='Provide the port for the given IP address of that member',
                                                 min_value=1025, max_value=65535, default_value=2380)
-            external_etcd = '{0}=http://{1}:{2}'.format(etcd_name, etcd_ip, etcd_port)
+            external_etcd = 'config=http://{0}:{1}'.format(etcd_ip, etcd_port)
         return external_etcd
 
     @staticmethod

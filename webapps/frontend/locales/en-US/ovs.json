@@ -316,7 +316,8 @@
                 "dtl_modes": {
                     "a_sync": "Asynchronous",
                     "no_sync": "Disabled",
-                    "sync": "Synchronous"
+                    "sync": "Synchronous",
+                    "undefined": "Unknown"
                 },
                 "dtl_target": "Target Failure Domain",
                 "dtl_transport": "Transport Mode",

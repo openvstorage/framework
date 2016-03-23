@@ -99,8 +99,6 @@ class EtcdConfiguration(object):
                    'registered': False,
                    'plugins/installed': {'backends': [],
                                          'generic': []},
-                   'stores': {'persistent': 'pyrakoon',
-                              'volatile': 'memcache'},
                    'paths': {'cfgdir': '/opt/OpenvStorage/config',
                              'basedir': '/opt/OpenvStorage',
                              'ovsdb': '/opt/OpenvStorage/db'},
@@ -283,6 +281,8 @@ class EtcdConfiguration(object):
         base_cfg = copy.deepcopy(EtcdConfiguration.base_config)
         base_cfg.update({'cluster_id': cluster_id,
                          'external_etcd': external_etcd,
+                         'stores': {'persistent': 'pyrakoon',
+                                    'volatile': 'memcache'},
                          'messagequeue': {'protocol': 'amqp',
                                           'queues': {'storagedriver': 'volumerouter'}}})
 

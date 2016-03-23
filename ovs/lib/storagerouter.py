@@ -29,6 +29,7 @@ from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service as DalService
+from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
@@ -40,7 +41,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.api.client import OVSClient
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.remote import Remote
@@ -75,7 +76,6 @@ class StorageRouterController(object):
     """
     Contains all BLL related to StorageRouter
     """
-    ARAKOON_CLUSTER_ID_VOLDRV = 'voldrv'
     SUPPORT_AGENT = 'support-agent'
     PARTITION_DEFAULT_USAGES = {DiskPartition.ROLES.DB: (40, 20),  # 1st number is exact size in GiB, 2nd number is percentage (highest of the 2 will be taken)
                                 DiskPartition.ROLES.SCRUB: (0, 0)}
@@ -546,7 +546,19 @@ class StorageRouterController(object):
         if arakoon_service_found is False:
             StorageDriverController.manual_voldrv_arakoon_checkup()
 
+        # Verify SD arakoon cluster is available and 'in_use'
         root_client = ip_client_map[storagerouter.ip]['root']
+        clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=True)
+        if len(clusters) != 1:
+            for service in ServiceTypeList.get_by_name('Arakoon').services:
+                if service.name == 'arakoon-voldrv':
+                    service.delete()
+            vpool.delete()
+            clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=False)
+            if clusters[0].internal is True:
+                ArakoonInstaller.delete_cluster(cluster_name=clusters[0].cluster_id, ip=root_client.ip)
+            raise ValueError('Expected exactly 1 "{0}" arakoon cluster'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
+
         watcher_volumedriver_service = 'watcher-volumedriver'
         if not ServiceManager.has_service(watcher_volumedriver_service, client=root_client):
             ServiceManager.add_service(watcher_volumedriver_service, client=root_client)
@@ -577,8 +589,8 @@ class StorageRouterController(object):
         model_ports_in_use += ports
 
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
-
-        config = ArakoonClusterConfig(StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV)
+        arakoon_cluster_name = str(clusters[0].cluster_id)
+        config = ArakoonClusterConfig(arakoon_cluster_name)
         config.load_config()
         arakoon_nodes = []
         arakoon_node_configs = []
@@ -597,7 +609,7 @@ class StorageRouterController(object):
             node_configs.append(ClusterNodeConfig(vrouter_id, str(grid_ip), ports[0], ports[1], ports[2]))
 
         try:
-            vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV, arakoon_node_configs)
+            vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
             vrouter_clusterregistry.set_node_configs(node_configs)
         except:
             vpool.status = VPool.STATUSES.FAILURE
@@ -894,10 +906,10 @@ class StorageRouterController(object):
                                                      vrouter_backend_sync_timeout_ms=5000,
                                                      vrouter_migrate_timeout_ms=5000)
         storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
-        storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV,
+        storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=arakoon_cluster_name,
                                                        vregistry_arakoon_cluster_nodes=arakoon_nodes)
         storagedriver_config.configure_distributed_lock_store(dls_type='Arakoon',
-                                                              dls_arakoon_cluster_id=StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV,
+                                                              dls_arakoon_cluster_id=arakoon_cluster_name,
                                                               dls_arakoon_cluster_nodes=arakoon_nodes)
         storagedriver_config.configure_file_driver(fd_cache_path=sdp_fd.path,
                                                    fd_extent_cache_capacity='1024',
@@ -1103,11 +1115,9 @@ class StorageRouterController(object):
         if client is None:
             raise RuntimeError('Could not found any responsive node in the cluster')
 
-        if storage_drivers_left is True:
-            vpool.status = VPool.STATUSES.SHRINKING
-        else:
-            vpool.status = VPool.STATUSES.DELETING
-        vpool.save()
+        clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=True)
+        if len(clusters) != 1:
+            raise ValueError('Expected exactly 1 "{0}" arakoon cluster'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
 
         vpool_guids = set()
         pmachine_guids = set()
@@ -1120,6 +1130,13 @@ class StorageRouterController(object):
             raise RuntimeError('There are still vMachines served from the given Storage Driver')
         if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storage_driver.storagedriver_id) and storage_router_online is True:
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
+
+        # Start removal
+        if storage_drivers_left is True:
+            vpool.status = VPool.STATUSES.SHRINKING
+        else:
+            vpool.status = VPool.STATUSES.DELETING
+        vpool.save()
 
         # Unconfigure management center
         vdisks = []
@@ -1182,7 +1199,8 @@ class StorageRouterController(object):
                     except Exception as ex:
                         logger.error('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed with error: {3}'.format(storage_driver.guid, vdisk.guid, vdisk.name, ex))
 
-        config = ArakoonClusterConfig(StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV)
+        arakoon_cluster_name = str(clusters[0].cluster_id)
+        config = ArakoonClusterConfig(arakoon_cluster_name)
         config.load_config()
         arakoon_node_configs = []
         offline_node_ips = [sr.ip for sr in storage_routers_offline]
@@ -1191,7 +1209,7 @@ class StorageRouterController(object):
                 continue
             arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
         logger.info('Remove Storage Driver - Guid {0} - Arakoon node configs - \n{1}'.format(storage_driver.guid, '\n'.join([str(config) for config in arakoon_node_configs])))
-        vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), StorageRouterController.ARAKOON_CLUSTER_ID_VOLDRV, arakoon_node_configs)
+        vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
 
         # Disable and stop DTL, voldrv and albaproxy services
         if storage_router_online is True:

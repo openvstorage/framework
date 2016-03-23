@@ -17,8 +17,10 @@ import sys
 import time
 import uuid
 import logging
-from ovs.log.logHandler import LogHandler
+from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('extensions', name='watcher')
 
@@ -104,7 +106,10 @@ def services_running(target):
             while tries < max_tries:
                 try:
                     from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
-                    client = PyrakoonStore('voldrv')
+                    clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=True)
+                    if len(clusters) != 1:
+                        raise ValueError('Expected exactly 1 "{0}" arakoon cluster'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
+                    client = PyrakoonStore(cluster=clusters[0].cluster_id)
                     client.set(key, value)
                     if client.get(key) == value:
                         client.delete(key)
