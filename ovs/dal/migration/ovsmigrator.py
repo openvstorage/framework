@@ -485,9 +485,8 @@ class OVSMigrator(object):
             from ovs.extensions.storage.persistentfactory import PersistentFactory
             from ovs.extensions.storage.volatilefactory import VolatileFactory
             persistent = PersistentFactory.get_client()
-            transaction = persistent.begin_transaction()
             for prefix in persistent.prefix('ovs_reverseindex_'):
-                persistent.delete(prefix, transaction=transaction)
+                persistent.delete(prefix)
             index_map = {}
             hybrid_structure = HybridRunner.get_hybrids()
             for class_descriptor in hybrid_structure.values():
@@ -499,7 +498,7 @@ class OVSMigrator(object):
                     guid = item.guid
                     for relation in item._relations:
                         if relation.foreign_type is None:
-                            rcls = cls.__class__
+                            rcls = cls
                             rclsname = rcls.__name__.lower()
                         else:
                             rcls = relation.foreign_type
@@ -531,9 +530,8 @@ class OVSMigrator(object):
                             for key, _ in relations.iteritems():
                                 if key not in reverse_index:
                                     reverse_index[key] = []
-                    for key, value in index_map.iteritems():
-                        persistent.set(key, value, transaction=transaction)
-            persistent.apply_transaction(transaction)
+            for key, value in index_map.iteritems():
+                persistent.set(key, value)
             volatile = VolatileFactory.get_client()
             try:
                 volatile._client.flush_all()

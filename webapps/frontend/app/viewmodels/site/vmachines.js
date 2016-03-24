@@ -104,7 +104,7 @@ define([
         self.activate = function() {
             self.refresher.init(function() {
                 if (generic.xhrCompleted(self.vPoolsHandle)) {
-                    self.vPoolsHandle = api.get('vpools', { queryparams: { contents: 'statistics,stored_data' }})
+                    self.vPoolsHandle = api.get('vpools', { queryparams: { contents: '' }})
                         .done(function(data) {
                             var guids = [], vpdata = {};
                             $.each(data.data, function(index, item) {

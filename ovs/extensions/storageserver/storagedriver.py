@@ -148,8 +148,7 @@ class StorageDriverClient(object):
         Loads and returns the client
         :param vpool: vPool for which the StorageRouterClient needs to be loaded
         """
-
-        key = '{0}_{1}'.format(vpool.guid, '_'.join(guid for guid in vpool.storagedrivers_guids))
+        key = vpool.identifier
         if key not in client_vpool_cache:
             cluster_contacts = []
             for storagedriver in vpool.storagedrivers[:3]:
