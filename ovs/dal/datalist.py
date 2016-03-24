@@ -22,7 +22,7 @@ import random
 import hashlib
 from random import randint
 from ovs.dal.helpers import Descriptor, HybridRunner
-from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.dal.exceptions import ObjectNotFoundException, RaceConditionException
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -210,21 +210,29 @@ class DataList(object):
             query_type = self._query['type']
             query_items = self._query['items']
 
-            invalidations = {object_type_name: ['__all']}
-            DataList._build_invalidations(invalidations, self._object_type, query_items)
-            transaction = self._persistent.begin_transaction()
-            for class_name in invalidations:
-                key = '{0}_{1}'.format(DataList.CACHELINK, class_name)
-                try:
-                    cache_list = self._persistent.get(key)
-                    self._persistent.assert_value(key, copy.deepcopy(cache_list), transaction=transaction)
-                except KeyNotFoundException:
-                    cache_list = {}
-                current_fields = cache_list.get(self._key, [])
-                current_fields = list(set(current_fields + ['__all'] + invalidations[class_name]))
-                cache_list[self._key] = current_fields
-                self._persistent.set(key, cache_list, transaction=transaction)
-            self._persistent.apply_transaction(transaction)
+            successful = False
+            tries = 0
+            while successful is False:
+                tries += 1
+                if tries > 5:
+                    raise RaceConditionException()
+
+                invalidations = {object_type_name: ['__all']}
+                DataList._build_invalidations(invalidations, self._object_type, query_items)
+                transaction = self._persistent.begin_transaction()
+                for class_name in invalidations:
+                    key = '{0}_{1}'.format(DataList.CACHELINK, class_name)
+                    try:
+                        cache_list = self._persistent.get(key)
+                        self._persistent.assert_value(key, copy.deepcopy(cache_list), transaction=transaction)
+                    except KeyNotFoundException:
+                        cache_list = {}
+                    current_fields = cache_list.get(self._key, [])
+                    current_fields = list(set(current_fields + ['__all'] + invalidations[class_name]))
+                    cache_list[self._key] = current_fields
+                    self._persistent.set(key, cache_list, transaction=transaction)
+                self._persistent.apply_transaction(transaction)
+                successful = True
 
             self._guids = []
             self._data = {}
