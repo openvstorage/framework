@@ -969,8 +969,6 @@ class DataObject(object):
         """
         Checks whether two objects are the same.
         """
-        if not Descriptor.isinstance(other, self.__class__):
-            return False
         return self.__hash__() == other.__hash__()
 
     def __ne__(self, other):
