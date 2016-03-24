@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Watcher module for framework and volumedriver
+"""
+
 import sys
 import time
 import uuid
@@ -109,7 +113,7 @@ def services_running(target):
                     clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=True)
                     if len(clusters) != 1:
                         raise ValueError('Expected exactly 1 "{0}" arakoon cluster'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
-                    client = PyrakoonStore(cluster=clusters[0].cluster_id)
+                    client = PyrakoonStore(cluster=str(clusters[0].cluster_id))
                     client.set(key, value)
                     if client.get(key) == value:
                         client.delete(key)

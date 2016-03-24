@@ -18,19 +18,17 @@ ArakoonClusterConfig class
 ArakoonInstaller class
 """
 
-import json
 import os
 import time
 from ConfigParser import RawConfigParser
 from ovs.dal.hybrids.servicetype import ServiceType
-from ovs.extensions.generic.remote import Remote
-from ovs.extensions.generic.sshclient import CalledProcessError
-from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.sshclient import CalledProcessError, SSHClient
+from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
-from StringIO import StringIO
 from ovs.log.logHandler import LogHandler
+from StringIO import StringIO
 
 logger = LogHandler.get('extensions', name='arakoon_installer')
 logger.logger.propagate = False
@@ -179,10 +177,10 @@ class ArakoonClusterMetadata(object):
         """
         Initializes an empty Cluster Config
         """
-        self.type = None
         self.in_use = False
         self.internal = True
         self.cluster_id = cluster_id
+        self.cluster_type = None
 
     def load_metadata(self):
         """
@@ -212,18 +210,18 @@ class ArakoonClusterMetadata(object):
             else:
                 if value not in ServiceType.ARAKOON_CLUSTER_TYPES:
                     raise ValueError('Unsupported arakoon cluster type {0} found\nPlease choose from {1}'.format(value, ', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
-                self.type = value
+                self.cluster_type = value
 
     def write(self):
         """
         Write the metadata to Etcd
         :return: None
         """
-        if self.type is None or self.type == '':
+        if self.cluster_type is None or self.cluster_type == '':
             raise ValueError('Cluster type must be defined before being able to store the cluster metadata information')
 
         etcd_key = ArakoonClusterMetadata.ETCD_METADATA_KEY.format(self.cluster_id)
-        EtcdConfiguration.set(key=etcd_key, value={'type': self.type,
+        EtcdConfiguration.set(key=etcd_key, value={'type': self.cluster_type,
                                                    'in_use': self.in_use,
                                                    'internal': self.internal})
 
@@ -242,8 +240,6 @@ class ArakoonInstaller(object):
     ETCD_CONFIG_PATH = 'etcd://127.0.0.1:2379' + ETCD_CONFIG_KEY
     SSHCLIENT_USER = 'ovs'
     ARAKOON_START_PORT = 26400
-    ARAKOON_CLUSTER_TYPES = ['ABM', 'FWK', 'NSM', 'SD']
-    metadata_key = '/ovs/arakoon/{0}/metadata'
 
     def __init__(self):
         """
@@ -367,7 +363,7 @@ class ArakoonInstaller(object):
             ArakoonInstaller._deploy(config)
 
             metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
-            metadata.type = cluster_type.upper()
+            metadata.cluster_type = cluster_type.upper()
             metadata.internal = internal
             metadata.write()
         finally:
@@ -494,7 +490,7 @@ class ArakoonInstaller(object):
         for cluster_name in EtcdConfiguration.list('/ovs/arakoon'):
             arakoon_metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
             arakoon_metadata.load_metadata()
-            if arakoon_metadata.type == cluster_type and arakoon_metadata.in_use is in_use:
+            if arakoon_metadata.cluster_type == cluster_type and arakoon_metadata.in_use is in_use:
                 clusters.append(arakoon_metadata)
                 if in_use is False:
                     break  # We only need 1 unused cluster (at a time)
@@ -726,9 +722,9 @@ class ArakoonInstaller(object):
     @staticmethod
     def is_internal(cluster_type):
         """
-        Checks if an arakoon cluster is internally managed, if no cluster are found, internally managed is assumed
-        Any cluster found that is externally managed or no result found -> return False
-        :param cluster_type: type of cluster to claim: ['FWK','SD','ABM','NSM']
+        Checks if an arakoon cluster is internally managed, if no clusters are found, internally managed is assumed
+        Any cluster found that is externally managed for this cluster_type -> return False
+        :param cluster_type: Type of cluster to claim: ['FWK','SD','ABM','NSM']
         :return: True|False
         """
 
@@ -736,50 +732,35 @@ class ArakoonInstaller(object):
                                                                                 in_use=True)
         metadata_not_in_use = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=cluster_type,
                                                                                     in_use=False)
-        metadata_in_use.extend(metadata_not_in_use)
-        if metadata_in_use:
-            result = True
-            for metadata in metadata_in_use:
-                if cluster_type in metadata:
-                    result = result and metadata['internal']
-            return result
-
-        return False
+        for metadata in metadata_in_use + metadata_not_in_use:
+            if metadata.cluster_type == cluster_type and metadata.internal is False:
+                return False
+        return True
 
     @staticmethod
-    def claim_cluster(cluster_type, cluster_name=''):
+    def claim_cluster(cluster_type, cluster_name=None):
         """
-        Claim an external cluster and mark it in use
-        :param cluster_type: type of cluster to claim: ['FWK','SD','ABM','NSM']
-        :param cluster_name:
-        :return:
+        Claim a cluster and mark it in use
+        :param cluster_type: Type of cluster to claim: ['FWK','SD','ABM','NSM']
+        :param cluster_name: Name of the cluster to claim
+        :return: Cluster name
         """
 
-        if ArakoonInstaller.is_internal(cluster_type):
-            key = ArakoonInstaller.metadata_key.format(cluster_name)
-            if cluster_name == '':
-                raise RuntimeError('Cluster name required when marking internal cluster')
-            if not EtcdConfiguration.exists(key):
-                raise RuntimeError('No cluster metadata found for {0}'.format(cluster_name))
-            values = json.loads(EtcdConfiguration.get(key, raw=True))
-            if values['in_use'] == True:
-                raise RuntimeError('Cluster with name {0} is already in_use!'.format(cluster_name))
-            else:
-                values['in_use'] = True
-                EtcdConfiguration.set(key, values)
-        else:
-            # look for a cluster with specific name else choose one
-            available_clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type, in_use=False)
-            if not available_clusters:
-                raise RuntimeError('No available external clusters found for type: {0}'.format(cluster_type))
-            for cluster in available_clusters:
-                if cluster_name:
-                    if cluster['cluster_id'] == cluster_name:
-                        break
-            cluster_name = cluster['cluster_id']
-            key = ArakoonInstaller.metadata_key.format(cluster_name)
-            values = json.loads(EtcdConfiguration.get(key, raw=True))
-            values['in_use'] = True
-            EtcdConfiguration.set(key, values)
+        internal = ArakoonInstaller.is_internal(cluster_type=cluster_type)
+        if internal is True and cluster_name is None:
+            raise RuntimeError('Cluster name required when marking internal cluster')
 
-        return cluster_name
+        available_cluster = None
+        for cluster in ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=cluster_type, in_use=False):
+            if cluster_name is None:
+                available_cluster = cluster
+                break
+            elif cluster.cluster_id == cluster_name:
+                available_cluster = cluster
+                break
+
+        if available_cluster is None:
+            raise RuntimeError('No available internal clusters found for type: {0}'.format(cluster_type))
+
+        available_cluster.in_use = True
+        available_cluster.write()

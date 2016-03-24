@@ -790,15 +790,17 @@ class SetupController(object):
             SetupController._log(messages='Setting up Fleet')
             ServiceManager.setup_fleet()
 
+        clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=True)
+        if len(clusters) > 0:
+            raise ValueError('Found a cluster of type "{0}" which has already been claimed'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
+
+        internal = ArakoonInstaller.is_internal(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK)
         arakoon_ports = []
-        cluster_in_use_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=True)
-        if cluster_in_use_metadata:
-            internal = cluster_in_use_metadata[0].internal
-        else:
+        arakoon_cluster_name = None
+        if internal is True:
             clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=False)
-            if len(clusters) == 0 or clusters[0].internal is True:
-                internal = True
-                arakoon_cluster_name = 'ovsdb' if len(clusters) == 0 else str(clusters[0].cluster_id)
+            if len(clusters) == 0:
+                arakoon_cluster_name = 'ovsdb'
                 SetupController._log(messages='Setting up Arakoon cluster {0}'.format(arakoon_cluster_name))
                 result = ArakoonInstaller.create_cluster(cluster_name=arakoon_cluster_name,
                                                          cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
@@ -806,14 +808,12 @@ class SetupController(object):
                                                          base_dir=EtcdConfiguration.get('/ovs/framework/paths|ovsdb'),
                                                          locked=False)
                 arakoon_ports = [result['client_port'], result['messaging_port']]
+                clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=False)
                 if len(clusters) == 0:
-                    clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=False)
-                    if len(clusters) == 0:
-                        raise ValueError('Expected exactly 1 "{0}" arakoon cluster not being in use'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
+                    raise ValueError('Expected exactly 1 "{0}" arakoon cluster not being in use'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
             else:
-                internal = False
-            clusters[0].in_use = True
-            clusters[0].write()
+                arakoon_cluster_name = str(clusters[0].cluster_id)
+        ArakoonInstaller.claim_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, cluster_name=arakoon_cluster_name)
 
         SetupController._add_services(target_client, unique_id, 'master')
         SetupController._log(messages='Build configuration files')
@@ -872,12 +872,6 @@ class SetupController(object):
 
         SetupController._run_hooks('firstnode', cluster_ip)
 
-        if enable_heartbeats is None:
-            SetupController._log(messages='Heartbeat', title=True)
-            print Interactive.boxed_message(['Open vStorage has the option to send regular heartbeats with metadata to a centralized server.' +
-                                             'The metadata contains anonymous data like Open vStorage\'s version and status of the Open vStorage services. These heartbeats are optional and can be turned on/off at any time via the GUI.'],
-                                            character=None)
-            enable_heartbeats = Interactive.ask_yesno('Do you want to enable Heartbeats?', default_value=True)
         if enable_heartbeats is False:
             EtcdConfiguration.set('/ovs/framework/support|enabled', False)
         else:
@@ -971,26 +965,25 @@ class SetupController(object):
 
         SetupController._remove_services(target_client, 'master')
 
-        if first_node is True:
+        if first_node is True and etcd_running is True:
             SetupController._log(messages='Unconfigure Arakoon')
-            if etcd_running is True:
-                clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=True)
-                if len(clusters) > 0 and clusters[0].internal is True:
-                    cluster_name = str(clusters[0].cluster_id)
-                    try:
-                        ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
-                    except Exception as ex:
-                        SetupController._log(messages=['\nFailed to delete cluster', ex], loglevel='error')
-                    base_dir = etcd_required_info['/ovs/framework/paths|ovsdb']
-                    directory_info = {ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name): True,
-                                      ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name): False,
-                                      ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name): False}
+            clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=True)
+            if len(clusters) > 0 and clusters[0].internal is True:
+                cluster_name = str(clusters[0].cluster_id)
+                try:
+                    ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
+                except Exception as ex:
+                    SetupController._log(messages=['\nFailed to delete cluster', ex], loglevel='error')
+                base_dir = etcd_required_info['/ovs/framework/paths|ovsdb']
+                directory_info = {ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name): True,
+                                  ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name): False,
+                                  ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name): False}
 
-                    try:
-                        ArakoonInstaller.clean_leftover_arakoon_data(ip=cluster_ip,
-                                                                     directories=directory_info)
-                    except Exception as ex:
-                        SetupController._log(messages=['Failed to clean Arakoon data', ex])
+                try:
+                    ArakoonInstaller.clean_leftover_arakoon_data(ip=cluster_ip,
+                                                                 directories=directory_info)
+                except Exception as ex:
+                    SetupController._log(messages=['Failed to clean Arakoon data', ex])
 
         SetupController._log(messages='Unconfigure Etcd')
         if etcd_running is True:

@@ -544,7 +544,7 @@ class StorageRouterController(object):
         # CREATE SERVICES #
         ###################
         if arakoon_service_found is False:
-            StorageDriverController.manual_voldrv_arakoon_checkup()
+            StorageDriverController.scheduled_voldrv_arakoon_checkup()
 
         # Verify SD arakoon cluster is available and 'in_use'
         root_client = ip_client_map[storagerouter.ip]['root']
@@ -555,7 +555,7 @@ class StorageRouterController(object):
                     service.delete()
             vpool.delete()
             clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=False)
-            if clusters[0].internal is True:
+            if len(clusters) > 0 and clusters[0].internal is True:
                 ArakoonInstaller.delete_cluster(cluster_name=clusters[0].cluster_id, ip=root_client.ip)
             raise ValueError('Expected exactly 1 "{0}" arakoon cluster'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
 

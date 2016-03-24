@@ -156,19 +156,11 @@ class StorageDriverController(object):
         """
         Makes sure the volumedriver arakoon is on all available master nodes
         """
-        StorageDriverController._voldrv_arakoon_checkup(False)
-
-    @staticmethod
-    @celery.task(name='ovs.storagedriver.manual_voldrv_arakoon_checkup')
-    def manual_voldrv_arakoon_checkup():
-        """
-        Creates a new Arakoon Cluster if required and extends cluster if possible on all available master nodes
-        """
-        StorageDriverController._voldrv_arakoon_checkup(True)
+        StorageDriverController._voldrv_arakoon_checkup()
 
     @staticmethod
     @ensure_single(task_name='ovs.storagedriver.voldrv_arakoon_checkup')
-    def _voldrv_arakoon_checkup(create_cluster):
+    def _voldrv_arakoon_checkup():
         def add_service(service_storagerouter, arakoon_ports):
             """
             Add a service to the storage router
@@ -184,22 +176,12 @@ class StorageDriverController(object):
             new_service.save()
             return new_service
 
-        internal = True
-        cluster_name = 'voldrv'
-        clusters_in_use = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=True)
-        if len(clusters_in_use) > 1:
-            raise RuntimeError('More than 1 "{0}" arakoon cluster found'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
-        elif len(clusters_in_use) == 1:
-            internal = clusters_in_use[0].internal
-            cluster_name = str(clusters_in_use[0].cluster_id)
-        else:
-            clusters_available = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=False)
-            if len(clusters_available) > 0:
-                arakoon_metadata = clusters_available[0]
-                internal = arakoon_metadata.internal
-                cluster_name = str(arakoon_metadata.cluster_id)
-                arakoon_metadata.in_use = True
-                arakoon_metadata.write()
+        claimed_clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=True)
+        if len(claimed_clusters) > 1:
+            raise ValueError('Found multiple clusters of type "{0}" which have already been claimed'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
+
+        internal = ArakoonInstaller.is_internal(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD)
+        create_cluster = internal is True and len(claimed_clusters) == 0
 
         service_name = 'arakoon-voldrv'
         service_type = ServiceTypeList.get_by_name('Arakoon')
@@ -220,20 +202,20 @@ class StorageDriverController(object):
             all_sr_ips.append(storagerouter.ip)
         if create_cluster is True and len(current_services) == 0 and len(available_storagerouters) > 0:
             storagerouter, partition = available_storagerouters.items()[0]
-            if internal is True:
-                result = ArakoonInstaller.create_cluster(cluster_name=cluster_name,
-                                                         cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
-                                                         ip=storagerouter.ip,
-                                                         base_dir=partition.folder)
-                current_services.append(add_service(storagerouter, [result['client_port'], result['messaging_port']]))
-                ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
-                current_ips.append(storagerouter.ip)
-                clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=False)
-                clusters[0].in_use = True
-                clusters[0].write()
-            else:
-                add_service(service_storagerouter=None, arakoon_ports=[])
+            available_clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=False)
+            cluster_name = 'voldrv' if len(available_clusters) == 0 else str(available_clusters[0].cluster_id)
+            result = ArakoonInstaller.create_cluster(cluster_name=cluster_name,
+                                                     cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD,
+                                                     ip=storagerouter.ip,
+                                                     base_dir=partition.folder)
+            current_services.append(add_service(storagerouter, [result['client_port'], result['messaging_port']]))
+            ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
+            current_ips.append(storagerouter.ip)
+            ArakoonInstaller.claim_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, cluster_name=cluster_name)
             StorageDriverController._configure_arakoon_to_volumedriver(cluster_name=cluster_name)
+        elif internal is False and len(claimed_clusters) == 0:
+            add_service(None, [])
+            ArakoonInstaller.claim_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD)
 
         if 0 < len(current_services) < len(available_storagerouters) and internal is True:
             for storagerouter, partition in available_storagerouters.iteritems():
