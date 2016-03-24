@@ -26,9 +26,12 @@ from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.hybrids.t_testdisk import TestDisk
 from ovs.dal.hybrids.t_testemachine import TestEMachine
+from ovs.dal.hybrids.t_testmachine import TestMachine
+from ovs.dal.hybrids.t_teststoragedriver import TestStorageDriver
+from ovs.dal.hybrids.t_teststoragerouter import TestStorageRouter
+from ovs.dal.hybrids.t_testvpool import TestVPool
 from ovs.dal.datalist import DataList
 from ovs.dal.helpers import Descriptor, Toolbox
 from ovs.extensions.generic.volatilemutex import VolatileMutex, NoLockAvailableException
@@ -36,7 +39,7 @@ from ovs.extensions.generic.volatilemutex import VolatileMutex, NoLockAvailableE
 
 class Basic(TestCase):
     """
-    The basic unittestsuite will test all basic functionality of the DAL framework
+    The basic unit-testsuite will test all basic functionality of the DAL framework
     It will also try accessing all dynamic properties of all hybrids making sure
     that code actually works. This however means that all loaded 3rd party libs
     need to be mocked
@@ -92,7 +95,7 @@ class Basic(TestCase):
         # An object should always have a guid
         guid = disk.guid
         self.assertIsNotNone(guid, 'Guid should not be None')
-        # After deleting, the object should not be retreivable
+        # After deleting, the object should not be retrievable
         disk.delete()
         self.assertRaises(Exception, TestDisk, guid, None)
 
@@ -123,12 +126,12 @@ class Basic(TestCase):
         """
         Validates whether initial data is loaded on object creation
         """
-        disk = TestDisk(data={'name': 'diskx'})
+        disk = TestDisk(data={'name': 'disk_x'})
         disk.save()
-        self.assertEqual(disk.name, 'diskx', 'Disk name should be preloaded')
-        disk = TestDisk(data={'name': 'disky', 'foo': 'bar'})
+        self.assertEqual(disk.name, 'disk_x', 'Disk name should be preloaded')
+        disk = TestDisk(data={'name': 'disk_y', 'foo': 'bar'})
         disk.save()
-        self.assertEqual(disk.name, 'disky', 'Disk name should be preloaded, without raising for invalid preload data')
+        self.assertEqual(disk.name, 'disk_y', 'Disk name should be preloaded, without raising for invalid pre-load data')
 
     def test_datapersistent(self):
         """
@@ -138,7 +141,7 @@ class Basic(TestCase):
         guid = disk.guid
         disk.name = 'test'
         disk.save()
-        # Retreiving an object should return the data as when it was saved
+        # Retrieving an object should return the data as when it was saved
         disk2 = TestDisk(guid)
         self.assertEqual(disk.name, disk2.name, 'Data should be persistent')
 
@@ -152,7 +155,7 @@ class Basic(TestCase):
 
     def test_datastorewins(self):
         """
-        Validates the "datastore_wins" behavior in the usecase where it wins
+        Validates the "datastore_wins" behavior in the use-case where it wins
         """
         disk = TestDisk()
         disk.name = 'initial'
@@ -167,7 +170,7 @@ class Basic(TestCase):
 
     def test_datastoreloses(self):
         """
-        Validates the "datastore_wins" behavior in the usecase where it loses
+        Validates the "datastore_wins" behavior in the use-case where it loses
         """
         disk = TestDisk()
         disk.name = 'initial'
@@ -200,7 +203,7 @@ class Basic(TestCase):
 
     def test_datastoreraises(self):
         """
-        Validates the "datastore_wins" behavior in the usecase where it's supposed to raise
+        Validates the "datastore_wins" behavior in the use-case where it's supposed to raise
         """
         disk = TestDisk()
         disk.name = 'initial'
@@ -237,14 +240,14 @@ class Basic(TestCase):
         disk.save()
         # Right after a save, the cache is invalidated
         disk2 = TestDisk(disk.guid)
-        self.assertFalse(disk2._metadata['cache'], 'Object should be retreived from persistent backend')
-        # Subsequent calls will retreive the object from cache
+        self.assertFalse(disk2._metadata['cache'], 'Object should be retrieved from persistent backend')
+        # Subsequent calls will retrieve the object from cache
         disk3 = TestDisk(disk.guid)
-        self.assertTrue(disk3._metadata['cache'], 'Object should be retreived from cache')
-        # After the object expiry passed, it will be retreived from backend again
+        self.assertTrue(disk3._metadata['cache'], 'Object should be retrieved from cache')
+        # After the object expiry passed, it will be retrieved from backend again
         DummyVolatileStore().delete(disk._key)  # We clear the entry
         disk4 = TestDisk(disk.guid)
-        self.assertFalse(disk4._metadata['cache'], 'Object should be retreived from persistent backend')
+        self.assertFalse(disk4._metadata['cache'], 'Object should be retrieved from persistent backend')
 
     def test_queries(self):
         """
@@ -362,11 +365,11 @@ class Basic(TestCase):
         machine.save(recursive=True)
         disk = TestDisk(machine.disks[0].guid)
         self.assertEqual(disk.size, 1, 'lists should be saved recursively')
-        disk.machine.name = 'mtest'
+        disk.machine.name = 'm_test'
         disk.save(recursive=True)
         machine2 = TestMachine(machine.guid)
         self.assertEqual(machine2.disks[1].size, 2, 'lists should be saved recursively')
-        self.assertEqual(machine2.name, 'mtest', 'properties should be saved recursively')
+        self.assertEqual(machine2.name, 'm_test', 'properties should be saved recursively')
 
     def test_descriptors(self):
         """
@@ -415,7 +418,7 @@ class Basic(TestCase):
 
     def test_datalistactions(self):
         """
-        Validates all actions that can be executed agains DataLists
+        Validates all actions that can be executed against DataLists
         """
         machine = TestMachine()
         machine.name = 'machine'
@@ -433,7 +436,7 @@ class Basic(TestCase):
             disks.append(disk)
             guids.append(disk.guid)
         self.assertEqual(machine.disks.count(disk), 1, 'Disk should be available only once')
-        self.assertGreaterEqual(machine.disks.index(disk), 0, 'We should retreive an index')
+        self.assertGreaterEqual(machine.disks.index(disk), 0, 'We should retrieve an index')
         machine.disks.sort()
         guids.sort()
         self.assertEqual(machine.disks[0].guid, guids[0], 'Reverse and sort should work')
@@ -528,7 +531,7 @@ class Basic(TestCase):
 
     def test_nofilterquery(self):
         """
-        Validates whether empty queries return the full resultset
+        Validates whether empty queries return the full result set
         """
         disk1 = TestDisk()
         disk1.name = 'disk 1'
@@ -580,11 +583,11 @@ class Basic(TestCase):
         Validates the correct behavior when the volatile cache is cleared
         """
         disk = TestDisk()
-        disk.name = 'somedisk'
+        disk.name = 'some_disk'
         disk.save()
         VolatileFactory.store.delete(disk._key)
         disk2 = TestDisk(disk.guid)
-        self.assertEqual(disk2.name, 'somedisk', 'Disk should be fetched from persistent store')
+        self.assertEqual(disk2.name, 'some_disk', 'Disk should be fetched from persistent store')
 
     def test_serialization(self):
         """
@@ -627,7 +630,7 @@ class Basic(TestCase):
 
     def test_typesafety(self):
         """
-        Validates typesafety checking on object properties
+        Validates type safety checking on object properties
         """
         disk = TestDisk()
         disk.name = 'test'
@@ -679,7 +682,7 @@ class Basic(TestCase):
         Validates whether the copy function works correct
         """
         machine = TestMachine()
-        machine.name = 'testmachine1'
+        machine.name = 'test_machine1'
         machine.save()
         disk1 = TestDisk()
         disk1.name = 'test1'
@@ -697,7 +700,7 @@ class Basic(TestCase):
         self.assertEqual(disk2.machine, None, 'Relations should not be copied')
         disk3 = TestDisk()
         disk3.copy(disk1, include_relations=True)
-        self.assertEqual(disk3.machine.name, 'testmachine1', 'Relations should be copied')
+        self.assertEqual(disk3.machine.name, 'test_machine1', 'Relations should be copied')
         disk4 = TestDisk()
         disk4.copy(disk1, include=['name'])
         self.assertEqual(disk4.name, 'test1', 'Name should be copied')
@@ -713,7 +716,7 @@ class Basic(TestCase):
         """
         Validates whether a query that queried dynamic properties is never cached
         """
-        def get_disks():
+        def _get_disks():
             return DataList(TestDisk, {'type': DataList.where_operator.AND,
                                        'items': [('used_size', DataList.operator.NOT_EQUALS, -1)]})
         disk1 = TestDisk()
@@ -724,10 +727,10 @@ class Basic(TestCase):
         disk2.name = 'disk 2'
         disk2.size = 100
         disk2.save()
-        query_result = get_disks()
+        query_result = _get_disks()
         self.assertEqual(len(query_result), 2, 'There should be 2 disks ({0})'.format(len(query_result)))
         self.assertFalse(query_result.from_cache, 'Disk should not be loaded from cache')
-        query_result = get_disks()
+        query_result = _get_disks()
         query_result._execute_query()
         self.assertFalse(query_result.from_cache, 'Disk should not be loaded from cache')
 
@@ -763,14 +766,14 @@ class Basic(TestCase):
         disk.name = 'disk'
         disk.save()
         disk.delete()
-        self.assertRaises(ObjectNotFoundException, disk.save, 'Cannot resave a deleted object')
+        self.assertRaises(ObjectNotFoundException, disk.save, 'Cannot re-save a deleted object')
 
     def test_itemchange_during_list_build(self):
         """
         Validates whether changing, creating or deleting objects while running a depending list will cause the list to
         be invalidated
         """
-        def inject_new(datalist_object):
+        def _inject_new(datalist_object):
             """
             Creates a new object
             """
@@ -779,14 +782,14 @@ class Basic(TestCase):
             disk_x.name = 'test'
             disk_x.save()
 
-        def inject_delete(datalist_object):
+        def _inject_delete(datalist_object):
             """
             Deletes an object
             """
             _ = datalist_object
             disk_1.delete()
 
-        def inject_update(datalist_object):
+        def _inject_update(datalist_object):
             """
             Updates an object
             """
@@ -802,7 +805,7 @@ class Basic(TestCase):
         disk_2.name = 'test'
         disk_2.save()
         # Validates new object creation
-        DataList.test_hooks['post_query'] = inject_new
+        DataList.test_hooks['post_query'] = _inject_new
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.EQUALS, 'test')]})
         self.assertEqual(len(disks), 2, 'Two disks should be found ({0})'.format(len(disks)))
@@ -813,7 +816,7 @@ class Basic(TestCase):
         # Clear the list cache for the next test
         VolatileFactory.store.delete('ovs_list_420e307cdc7b792aab024842cd278bccdf0af39e0af83e74bf64b998c8f7a400')
         # Validates object change
-        DataList.test_hooks['post_query'] = inject_update
+        DataList.test_hooks['post_query'] = _inject_update
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.EQUALS, 'test')]})
         self.assertEqual(len(disks), 3, 'Three disks should be found ({0})'.format(len(disks)))
@@ -824,7 +827,7 @@ class Basic(TestCase):
         # Clear the list cache for the next test
         VolatileFactory.store.delete('ovs_list_420e307cdc7b792aab024842cd278bccdf0af39e0af83e74bf64b998c8f7a400')
         # Validates object deletion
-        DataList.test_hooks['post_query'] = inject_delete
+        DataList.test_hooks['post_query'] = _inject_delete
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('name', DataList.operator.EQUALS, 'test')]})
         self.assertEqual(len(disks), 2, 'Two disks should be found ({0})'.format(len(disks)))
@@ -903,12 +906,12 @@ class Basic(TestCase):
         Validates whether an inherited object has all properties
         """
         machine = TestEMachine()
-        machine.name = 'emachine'
+        machine.name = 'e_machine'
         machine.extended = 'ext'
         machine.save()
 
         machine2 = TestEMachine(machine.guid)
-        self.assertEqual(machine2.name, 'emachine', 'The name of the extended machine should be correct')
+        self.assertEqual(machine2.name, 'e_machine', 'The name of the extended machine should be correct')
         self.assertEqual(machine2.extended, 'ext', 'The extended property of the extended machine should be correct')
 
     def test_extended_filter(self):
@@ -956,7 +959,7 @@ class Basic(TestCase):
 
     def test_versioning(self):
         """
-        Validates whether the versioning system works
+        Validates whether the version system works
         """
         machine = TestMachine()
         machine.name = 'machine0'
@@ -1036,7 +1039,7 @@ class Basic(TestCase):
 
     def test_relation_set_build(self):
         """
-        Validates whether relationsets are (re)build correctly
+        Validates whether relation sets are (re)build correctly
         """
         machine = TestMachine()
         machine.name = 'machine'
@@ -1077,22 +1080,22 @@ class Basic(TestCase):
 
     def test_cache_and_save_racecondition(self):
         """
-        Validates whether concurrent save/loads won't result in outdates sturctures being cached
+        Validates whether concurrent save/loads won't result in outdated structures being cached
         """
         guid = None
 
-        def update():
+        def _update():
             local_machine = TestMachine(guid)
             local_machine.name = 'updated'
             local_machine.save()
 
         machine = TestMachine()
-        self.assertIsNone(machine._metadata['cache'], 'A new object shouldn\'t imply caching')
+        self.assertIsNone(machine._metadata['cache'], "A new object shouldn't imply caching")
         machine.name = 'one'
         machine.save()
         guid = machine.guid
 
-        machine = TestMachine(machine.guid, _hook=update)
+        machine = TestMachine(machine.guid, _hook=_update)
         self.assertEqual(machine.name, 'one', 'The machine\'s name should still be one')
         self.assertFalse(machine._metadata['cache'], 'The machine should be loaded from persistent store')
         machine = TestMachine(machine.guid)
@@ -1107,7 +1110,7 @@ class Basic(TestCase):
         """
         guid = None
 
-        def delete():
+        def _delete():
             local_machine = TestMachine(guid)
             local_machine.delete()
 
@@ -1117,7 +1120,7 @@ class Basic(TestCase):
         guid = machine.guid
 
         with self.assertRaises(ObjectNotFoundException):
-            _ = TestMachine(guid, _hook=delete)
+            _ = TestMachine(guid, _hook=_delete)
 
     def test_object_save_reverseindex_build(self):
         """
@@ -1141,7 +1144,7 @@ class Basic(TestCase):
 
     def test_save_nonexisting_relation(self):
         """
-        Validates the behavior when saving ab object having nonexisting relations
+        Validates the behavior when saving ab object having non-existing relations
         """
         machine = TestMachine()
         machine.name = 'machine'
@@ -1251,7 +1254,7 @@ class Basic(TestCase):
         """
         Validates whether an error during save doesn't leave the system in an inconsistent state
         """
-        def raise_error():
+        def _raise_error():
             raise RuntimeError()
         machine = TestMachine()
         machine.name = 'machine'
@@ -1264,7 +1267,7 @@ class Basic(TestCase):
         disk2.name = 'disk2'
         disk2.machine = machine
         try:
-            disk2.save(_hook=raise_error)
+            disk2.save(_hook=_raise_error)
         except RuntimeError:
             pass
         self.assertEqual(len(machine.disks), 1, 'There should be one disk')
@@ -1334,6 +1337,37 @@ class Basic(TestCase):
         disk.name = 'disk'
         disk.save()
         disk.delete(_hook=_change_list)
+
+    def test_object_comparison_on_different_level(self):
+        """
+        Verify 2 objects are the same, but when approached from a different level
+        """
+        sr = TestStorageRouter()
+        sr.name = 'storage_router1'
+        sr.save()
+        vpool = TestVPool()
+        vpool.name = 'vpool1'
+        vpool.save()
+        sd = TestStorageDriver()
+        sd.name = 'storage_driver1'
+        sd.vpool = vpool
+        sd.storagerouter = sr
+        sd.save()
+
+        # http://jira.openvstorage.com/browse/OVS-4413
+        # In [6]: vpool.storagedrivers[0].storagerouter == srs[0]
+        # Out[6]: True
+        #
+        # In [7]: vpool.storagedrivers[0].storagerouter != srs[0]
+        # Out[7]: True
+
+        error_message = 'DAL object comparison failure'
+        assert (sr == sr) is True, error_message
+        assert (sr != sr) is False, error_message
+        assert (sd.storagerouter == sr) is True, error_message
+        assert (sd.storagerouter != sr) is False, error_message
+        assert (vpool.storagedrivers[0].storagerouter == sr) is True, error_message
+        assert (vpool.storagedrivers[0].storagerouter != sr) is False, error_message
 
 if __name__ == '__main__':
     import unittest

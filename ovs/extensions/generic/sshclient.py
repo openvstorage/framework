@@ -142,6 +142,7 @@ class SSHClient(object):
                 client.is_connected = types.MethodType(is_connected, client)
                 SSHClient.client_cache[key] = client
             self.client = SSHClient.client_cache[key]
+        self._connect()
 
     def __del__(self):
         """
