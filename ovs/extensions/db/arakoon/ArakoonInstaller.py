@@ -18,6 +18,7 @@ ArakoonClusterConfig class
 ArakoonInstaller class
 """
 
+import json
 import os
 import time
 from ConfigParser import RawConfigParser
@@ -241,6 +242,8 @@ class ArakoonInstaller(object):
     ETCD_CONFIG_PATH = 'etcd://127.0.0.1:2379' + ETCD_CONFIG_KEY
     SSHCLIENT_USER = 'ovs'
     ARAKOON_START_PORT = 26400
+    ARAKOON_CLUSTER_TYPES = ['ABM', 'FWK', 'NSM', 'SD']
+    metadata_key = '/ovs/arakoon/{0}/metadata'
 
     def __init__(self):
         """
@@ -719,3 +722,64 @@ class ArakoonInstaller(object):
             if len(remaining_ips) > 2:  # A two node cluster needs all nodes running
                 ArakoonInstaller.wait_for_cluster(cluster_name, client)
         logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))
+
+    @staticmethod
+    def is_internal(cluster_type):
+        """
+        Checks if an arakoon cluster is internally managed, if no cluster are found, internally managed is assumed
+        Any cluster found that is externally managed or no result found -> return False
+        :param cluster_type: type of cluster to claim: ['FWK','SD','ABM','NSM']
+        :return: True|False
+        """
+
+        metadata_in_use = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=cluster_type,
+                                                                                in_use=True)
+        metadata_not_in_use = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=cluster_type,
+                                                                                    in_use=False)
+        metadata_in_use.extend(metadata_not_in_use)
+        if metadata_in_use:
+            result = True
+            for metadata in metadata_in_use:
+                if cluster_type in metadata:
+                    result = result and metadata['internal']
+            return result
+
+        return False
+
+    @staticmethod
+    def claim_cluster(cluster_type, cluster_name=''):
+        """
+        Claim an external cluster and mark it in use
+        :param cluster_type: type of cluster to claim: ['FWK','SD','ABM','NSM']
+        :param cluster_name:
+        :return:
+        """
+
+        if ArakoonInstaller.is_internal(cluster_type):
+            key = ArakoonInstaller.metadata_key.format(cluster_name)
+            if cluster_name == '':
+                raise RuntimeError('Cluster name required when marking internal cluster')
+            if not EtcdConfiguration.exists(key):
+                raise RuntimeError('No cluster metadata found for {0}'.format(cluster_name))
+            values = json.loads(EtcdConfiguration.get(key, raw=True))
+            if values['in_use'] == True:
+                raise RuntimeError('Cluster with name {0} is already in_use!'.format(cluster_name))
+            else:
+                values['in_use'] = True
+                EtcdConfiguration.set(key, values)
+        else:
+            # look for a cluster with specific name else choose one
+            available_clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type, in_use=False)
+            if not available_clusters:
+                raise RuntimeError('No available external clusters found for type: {0}'.format(cluster_type))
+            for cluster in available_clusters:
+                if cluster_name:
+                    if cluster['cluster_id'] == cluster_name:
+                        break
+            cluster_name = cluster['cluster_id']
+            key = ArakoonInstaller.metadata_key.format(cluster_name)
+            values = json.loads(EtcdConfiguration.get(key, raw=True))
+            values['in_use'] = True
+            EtcdConfiguration.set(key, values)
+
+        return cluster_name

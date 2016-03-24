@@ -358,7 +358,7 @@ class ScheduledTaskController(object):
         logger.info('Starting arakoon collapse')
         arakoon_clusters = {}
         for service in ServiceList.get_services():
-            if service.type.name in ('Arakoon', 'NamespaceManager', 'AlbaManager'):
+            if service.type.name in ('Arakoon', 'NamespaceManager', 'AlbaManager') and service.storagerouter is not None:
                 arakoon_clusters[service.name.replace('arakoon-', '')] = service.storagerouter
 
         for cluster, storagerouter in arakoon_clusters.iteritems():

@@ -227,7 +227,7 @@ class MDSServices(TestCase):
         """
         vdisks = {}
         storagedriver_id = None
-        if mds_service is not None:
+        if mds_service is not None and mds_service.service.storagerouter_guid is not None:
             for sd in mds_service.vpool.storagedrivers:
                 if sd.storagerouter_guid == mds_service.service.storagerouter_guid:
                     storagedriver_id = sd.storagedriver_id
@@ -240,7 +240,7 @@ class MDSServices(TestCase):
             disk.size = 0
             disk.save()
             disk.reload_client()
-            if mds_service is not None:
+            if mds_service is not None and mds_service.service.storagerouter_guid is not None:
                 junction = MDSServiceVDisk()
                 junction.vdisk = disk
                 junction.mds_service = mds_service
@@ -282,7 +282,8 @@ class MDSServices(TestCase):
                 _load = 'infinite'
             else:
                 _load = round(_load, 2)
-            reality_loads.append([_mds_service.service.storagerouter.ip, _mds_service.service.ports[0], masters, slaves, capacity, _load])
+            if _mds_service.service.storagerouter_guid is not None:
+                reality_loads.append([_mds_service.service.storagerouter.ip, _mds_service.service.ports[0], masters, slaves, capacity, _load])
         if display is True:
             for l in reality_loads:
                 print l

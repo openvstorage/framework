@@ -177,6 +177,9 @@ class MetadataServerClient(object):
         :param service: Service for which the MDSClient needs to be loaded
         """
 
+        if service.storagerouter is None:
+            return None
+
         key = service.guid
         if key not in mdsclient_service_cache:
             try:

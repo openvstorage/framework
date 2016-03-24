@@ -27,6 +27,7 @@ class Service(DataObject):
     """
     __properties = [Property('name', str, doc='Name of the Service.'),
                     Property('ports', list, doc='Port(s) of the Service.')]
-    __relations = [Relation('storagerouter', StorageRouter, 'services', doc='The StorageRouter running the Service.'),
+    __relations = [Relation('storagerouter', StorageRouter, 'services', mandatory=False,
+                            doc='The StorageRouter running the Service.'),
                    Relation('type', ServiceType, 'services', doc='The type of the Service.')]
     __dynamics = []
