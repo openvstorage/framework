@@ -202,3 +202,32 @@ class VMware(object):
         return self.sdk.file_exists(storagedriver.storage_ip,
                                     storagedriver.mountpoint,
                                     self.clean_vmachine_filename(devicename))
+
+    def create_volume(self, vpool_mountpoint, storage_ip, diskname, size):
+        """
+        Create new volume
+        @param vpool_mountpoint: mountpoint of the vpool
+        @param diskname: name of the disk
+        @param size: size in GB
+        @return: location of volume
+        """
+        return self.sdk.create_disk(storage_ip, vpool_mountpoint, diskname, size)
+
+    def delete_volume(self, vpool_mountpoint, storage_ip, diskname):
+        """
+        Delete volume
+        @param vpool_mountpoint: mountpoint of the vpool
+        @param diskname: name of the disk
+        @return: None
+        """
+        return self.sdk.delete_disk(storage_ip, vpool_mountpoint, diskname)
+
+    def extend_volume(self, vpool_mountpoint, storage_ip, diskname, size):
+        """
+        Extend volume - this is a truncate command
+        @param vpool_mountpoint: mountpoint of the vpool
+        @param diskname: name of the disk
+        @param size: size in GB
+        @return: None
+        """
+        return self.sdk.extend_disk(storage_ip, vpool_mountpoint, diskname, size)

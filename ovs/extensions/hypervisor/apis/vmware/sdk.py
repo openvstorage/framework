@@ -903,11 +903,34 @@ class Sdk(object):
                     return vm, mapping[datastore.name][filename]
         raise RuntimeError('Could not locate given file on the given datastore')
 
+    @authenticated
+    def create_disk(self, ip, mountpoint, diskname, size, host=None):
+        if host is None:
+            host = self._esxHost
+        esxhost = self._validate_host(host)
+        datastore = self.get_datastore(ip, mountpoint, host=esxhost)
+        if not datastore:
+            raise RuntimeError('Could not find datastore')
+        disk = {}
+        Sdk._create_disk(self._client.factory, -101, disk, 0, datastore)
+
+    @authenticated
+    def delete_disk(self, ip, mountpoint, diskname):
+        # TODO
+        # Sdk._delete_disk
+        pass
+
+    @authenticated
+    def extend_disk(self, ip, mountpoint, diskname, size):
+        # TODO
+        # Sdk._extend_disk
+        pass
+
     def file_exists(self, ip, mountpoint, filename):
         try:
             self.get_nfs_datastore_object(ip, mountpoint, filename)
             return True
-        except Exception, ex:
+        except Exception as ex:
             logger.debug('File does not exist: {0}'.format(ex))
             return False
 
