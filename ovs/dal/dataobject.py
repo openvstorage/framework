@@ -134,8 +134,6 @@ class DataObject(object):
     # Attributes #
     ##############
 
-    dynamic_cache = {}
-
     # Properties that needs to be overwritten by implementation
     _properties = []  # Blueprint data of the object type
     _dynamics = []    # Timeout of readonly object properties cache
