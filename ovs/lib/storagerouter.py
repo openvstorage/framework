@@ -371,7 +371,7 @@ class StorageRouterController(object):
                 backend_name = backend_info['name']
                 if preset_name not in [preset['name'] for preset in backend_info['presets']]:
                     raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_guid))
-                task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(backend_guid))
+                task_id = ovs_client.get('/alba/backends/{0}/get_arakoon_config'.format(backend_guid))
                 successful, vpool_metadata = ovs_client.wait_for_task(task_id, timeout=300)
                 if successful is False:
                     raise RuntimeError('Could not load metadata from remote environment {0}'.format(connection_host))
@@ -1623,8 +1623,10 @@ class StorageRouterController(object):
         """
         this_sr = StorageRouterList.get_by_ip(client.ip)
         srs = StorageRouterList.get_storagerouters()
-        ovsdb_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == 'Arakoon' and ser.name == 'arakoon-ovsdb']
-        downtime = [('ovs', 'ovsdb', None)] if len(ovsdb_cluster) < 3 and this_sr.guid in ovsdb_cluster else []
+        downtime = []
+        if ArakoonInstaller.is_internal(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK) is True:
+            ovsdb_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == 'Arakoon' and ser.name == 'arakoon-ovsdb']
+            downtime = [('ovs', 'ovsdb', None)] if len(ovsdb_cluster) < 3 and this_sr.guid in ovsdb_cluster else []
 
         ovs_info = PackageManager.verify_update_required(packages=['openvstorage-core', 'openvstorage-webapps', 'openvstorage-cinder-plugin'],
                                                          services=['watcher-framework', 'memcached'],
@@ -1670,15 +1672,18 @@ class StorageRouterController(object):
             if running_vms is True:
                 break
 
+        srs = StorageRouterList.get_storagerouters()
         this_sr = StorageRouterList.get_by_ip(client.ip)
+        downtime = []
+        if ArakoonInstaller.is_internal(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD) is True:
+            voldrv_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == 'Arakoon' and ser.name == 'arakoon-voldrv']
+            downtime = [('ovs', 'voldrv', None)] if len(voldrv_cluster) < 3 and this_sr.guid in voldrv_cluster else []
+
         alba_proxies = []
         alba_downtime = []
-        voldrv_cluster = []
-        for sr in StorageRouterList.get_storagerouters():
+        for sr in srs:
             for service in sr.services:
-                if service.type.name == 'Arakoon' and service.name == 'arakoon-voldrv':
-                    voldrv_cluster.append(service.storagerouter_guid)
-                elif service.type.name == 'AlbaProxy' and service.storagerouter_guid == this_sr.guid:
+                if service.type.name == 'AlbaProxy' and service.storagerouter_guid == this_sr.guid:
                     alba_proxies.append(service.alba_proxy)
                     alba_downtime.append(('ovs', 'proxy', service.alba_proxy.storagedriver.vpool.name))
 
@@ -1715,7 +1720,7 @@ class StorageRouterController(object):
                                   'version': arakoon_info['version'],
                                   'services': arakoon_info['services'],
                                   'packages': arakoon_info['packages'],
-                                  'downtime': [('ovs', 'voldrv', None)] if len(voldrv_cluster) < 3 and this_sr.guid in voldrv_cluster else [],
+                                  'downtime': downtime,
                                   'namespace': 'ovs',
                                   'prerequisites': []}]}
 

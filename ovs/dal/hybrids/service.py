@@ -16,7 +16,7 @@
 Service module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Property, Relation
+from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.servicetype import ServiceType
 
@@ -30,4 +30,10 @@ class Service(DataObject):
     __relations = [Relation('storagerouter', StorageRouter, 'services', mandatory=False,
                             doc='The StorageRouter running the Service.'),
                    Relation('type', ServiceType, 'services', doc='The type of the Service.')]
-    __dynamics = []
+    __dynamics = [Dynamic('is_internal', bool, 3600)]
+
+    def _is_internal(self):
+        """
+        Returns whether a service is internally managed by OVS or externally managed by customer
+        """
+        return self.storagerouter is not None
