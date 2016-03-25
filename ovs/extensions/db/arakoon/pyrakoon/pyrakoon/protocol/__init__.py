@@ -26,10 +26,8 @@ try:
 except ImportError:
     import StringIO
 
-import sys
-sys.path.append('/opt/OpenvStorage/ovs/extensions/db/arakoon/pyrakoon')
-import pyrakoon.consistency
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import utils
+import ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency
 
 # Result codes
 RESULT_SUCCESS = 0x0000

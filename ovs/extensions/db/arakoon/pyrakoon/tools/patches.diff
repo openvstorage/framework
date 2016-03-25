@@ -24,20 +24,18 @@
      '''NurseryConfig type'''
 --- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/protocol/__init__.py
 +++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/protocol/__init__.py
-@@ -26,8 +26,10 @@
+@@ -26,8 +26,8 @@
  except ImportError:
      import StringIO
 
 -from pyrakoon import utils
 -import pyrakoon.consistency
-+import sys
-+sys.path.append('/opt/OpenvStorage/ovs/extensions/db/arakoon/pyrakoon')
-+import pyrakoon.consistency
 +from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import utils
++import ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency
 
  # Result codes
  RESULT_SUCCESS = 0x0000
-@@ -301,7 +301,7 @@
+@@ -302,7 +302,7 @@
      '''Step type'''
 
      def check(self, value):
@@ -46,7 +44,7 @@
 
          if not isinstance(value, sequence.Step):
              raise TypeError
-@@ -708,7 +708,7 @@
+@@ -766,7 +766,7 @@
          :see: :func:`pyrakoon.utils.process_blocking`
          '''
 
@@ -55,7 +53,7 @@
 
          code_receiver = UINT32.receive()
          request = code_receiver.next() #pylint: disable=E1101
-@@ -1034,7 +1034,7 @@
+@@ -1092,7 +1092,7 @@
      ''')
 
      def __init__(self, steps, sync):
@@ -149,7 +147,7 @@
 
  def validate_types(specs, args):
      '''Validate method call argument types
-@@ -87,7 +87,7 @@
+@@ -88,7 +88,7 @@
              self = kwargs['self']
 
              if not self.connected:
@@ -173,7 +171,7 @@
 
  class ClientMixin: #pylint: disable=W0232,R0904,old-style-class
      '''Mixin providing client actions for standard cluster functionality
-@@ -234,7 +234,7 @@
+@@ -238,7 +238,7 @@
              for part in message.serialize():
                  self._socket.sendall(part)
 
@@ -195,7 +193,7 @@
      '''"optimize_db" message'''
 --- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/compat.py
 +++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/compat.py
-@@ -20,14 +20,14 @@
+@@ -21,14 +21,14 @@
  import random
  import select
  import socket
@@ -207,12 +205,12 @@
  import ssl
 
 -from pyrakoon import client, consistency, errors, protocol, sequence, utils
-+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, errors, protocol, sequence, utils
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, consistency, errors, protocol, sequence, utils
 +from ovs.log.logHandler import LogHandler
 
  __docformat__ = 'epytext'
 
-@@ -48,22 +48,7 @@
+@@ -52,22 +52,7 @@
  # E1121: Too many positional arguments for function call
  # R0904: Too many public methods
 
@@ -234,8 +232,8 @@
 -del _add_handler
 +LOGGER = LogHandler.get('arakoon', 'pyrakoon', propagate=False)
 
-
- def _validate_signature_helper(fun, *args):
+ class Consistency:
+     pass
 --- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/tx.py
 +++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/tx.py
 @@ -26,7 +26,7 @@
@@ -246,4 +244,3 @@
 +from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, errors, protocol, utils
 
  #pylint: disable=R0904,C0103,R0901
-

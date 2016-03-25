@@ -16,6 +16,7 @@
 
 '''Compatibility layer for the original Arakoon Python client'''
 
+import os
 import time
 import random
 import select
@@ -24,7 +25,6 @@ import functools
 import threading
 import inspect
 import operator
-import os
 import ssl
 
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, consistency, errors, protocol, sequence, utils
@@ -839,6 +839,7 @@ def _convert_exception(exc):
     elif isinstance(exc, errors.ReadOnly):
         exc_ = ArakoonException(exc.message)
         exc_.inner = exc
+        return exc_
     else:
         return exc
 
@@ -898,7 +899,7 @@ ARA_CFG_CONN_TIMEOUT = 60
 ARA_CFG_CONN_BACKOFF = 5
 ARA_CFG_NO_MASTER_RETRY = 60
 
-class ArakoonClientConfig:
+class ArakoonClientConfig :
 
     def __init__ (self, clusterId, nodes,
                   tls = False, tls_ca_cert = None, tls_cert = None):
