@@ -44,6 +44,52 @@
 
          if not isinstance(value, sequence.Step):
              raise TypeError
+@@ -650,18 +650,18 @@
+     #pylint: disable=R0912
+
+     def check(self, value):
+-        if value is not pyrakoon.consistency.CONSISTENT \
+-            and value is not pyrakoon.consistency.INCONSISTENT \
++        if value is not ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.CONSISTENT \
++            and value is not ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.INCONSISTENT \
+             and value is not None \
+-            and not isinstance(value, pyrakoon.consistency.AtLeast):
++            and not isinstance(value, ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.AtLeast):
+             raise ValueError('Invalid `consistency` value')
+
+     def serialize(self, value):
+-        if value is pyrakoon.consistency.CONSISTENT or value is None:
++        if value is ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.CONSISTENT or value is None:
+             yield '\0'
+-        elif value is pyrakoon.consistency.INCONSISTENT:
++        elif value is ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.INCONSISTENT:
+             yield '\1'
+-        elif isinstance(value, pyrakoon.consistency.AtLeast):
++        elif isinstance(value, ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.AtLeast):
+             yield '\2'
+             for data in INT64.serialize(value.i):
+                 yield data
+@@ -680,9 +680,9 @@
+             raise TypeError
+
+         if request.value == 0:
+-            yield Result(pyrakoon.consistency.CONSISTENT)
++            yield Result(ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.CONSISTENT)
+         elif request.value == 1:
+-            yield Result(pyrakoon.consistency.INCONSISTENT)
++            yield Result(ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.INCONSISTENT)
+         elif request.value == 2:
+             i_receiver = INT64.receive()
+             request = i_receiver.next()
+@@ -694,7 +694,7 @@
+             if not isinstance(request, Result):
+                 raise TypeError
+
+-            yield Result(pyrakoon.consistency.AtLeast(request.value))
++            yield Result(ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.AtLeast(request.value))
+         else:
+             raise ValueError('Unknown consistency tag \'%d\'' % request.value)
+
 @@ -766,7 +766,7 @@
          :see: :func:`pyrakoon.utils.process_blocking`
          '''
