@@ -211,7 +211,8 @@ class VMware(object):
         @param size: size in GB
         @return: location of volume
         """
-        return self.sdk.create_disk(storage_ip, vpool_mountpoint, diskname, size)
+        disk_path = self.get_disk_path(None, diskname)
+        return self.sdk.create_disk(storage_ip, vpool_mountpoint, diskname, size, disk_path)
 
     def delete_volume(self, vpool_mountpoint, storage_ip, diskname):
         """

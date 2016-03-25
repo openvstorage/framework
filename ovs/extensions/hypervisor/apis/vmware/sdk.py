@@ -903,24 +903,31 @@ class Sdk(object):
                     return vm, mapping[datastore.name][filename]
         raise RuntimeError('Could not locate given file on the given datastore')
 
-    @authenticated
-    def create_disk(self, ip, mountpoint, diskname, size, host=None):
+    @authenticated()
+    def create_disk(self, ip, mountpoint, diskname, size, disk_path, host=None, wait=True):
         if host is None:
             host = self._esxHost
         esxhost = self._validate_host(host)
         datastore = self.get_datastore(ip, mountpoint, host=esxhost)
         if not datastore:
             raise RuntimeError('Could not find datastore')
-        disk = {}
-        Sdk._create_disk(self._client.factory, -101, disk, 0, datastore)
+        disk = {'name': diskname,
+                'backingdevice': disk_path}
 
-    @authenticated
+        config = Sdk._create_disk(self._client.factory, -101, disk, 0, datastore)
+        task = self._client.service.CreateVirtualDisk_Task(disk_path, None, config)
+
+        if wait:
+            self.wait_for_task(task)
+        return task
+
+    @authenticated()
     def delete_disk(self, ip, mountpoint, diskname):
         # TODO
         # Sdk._delete_disk
         pass
 
-    @authenticated
+    @authenticated()
     def extend_disk(self, ip, mountpoint, diskname, size):
         # TODO
         # Sdk._extend_disk
