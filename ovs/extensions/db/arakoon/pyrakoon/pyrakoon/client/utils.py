@@ -46,9 +46,10 @@ def validate_types(specs, args):
 def call(message_type):
     '''Expose a :class:`~pyrakoon.protocol.Message` as a method on a client
 
-    :note: If the client method has an `allow_dirty` option (i.e.
-        :data:`pyrakoon.protocol.ALLOW_DIRTY_ARG` is present in the :attr:`ARGS`
-        field of `message_type`), this is automatically moved to the back.
+    :note: If the client method has a `consistency` option (i.e.
+        :data:`pyrakoon.protocol.CONSISTENCY_ARG` is present in the :attr:`ARGS`
+        field of `message_type`), an `allow_dirty`  argument is added 
+        automatically, and both are moved to the back.
 
     :param message_type: Type of the message this method should call
     :type message_type: :class:`type`
@@ -61,13 +62,13 @@ def call(message_type):
     def wrapper(fun):
         '''Decorator helper'''
 
-        has_allow_dirty = False
+        has_consistency = False
 
         # Calculate argspec of final method
         argspec = ['self']
         for arg in message_type.ARGS:
-            if arg is protocol.ALLOW_DIRTY_ARG:
-                has_allow_dirty = True
+            if arg is protocol.CONSISTENCY_ARG:
+                has_consistency = True
                 continue
 
             if len(arg) == 2:
@@ -77,8 +78,8 @@ def call(message_type):
             else:
                 raise ValueError
 
-        if has_allow_dirty:
-            name, _, default = protocol.ALLOW_DIRTY_ARG
+        if has_consistency:
+            name, _, default = protocol.CONSISTENCY_ARG
             argspec.append((name, default))
 
         @utils.update_argspec(*argspec) #pylint: disable=W0142
