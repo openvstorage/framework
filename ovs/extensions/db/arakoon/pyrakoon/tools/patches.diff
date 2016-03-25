@@ -24,16 +24,20 @@
      '''NurseryConfig type'''
 --- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/protocol/__init__.py
 +++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/protocol/__init__.py
-@@ -26,7 +26,7 @@
+@@ -26,8 +26,10 @@
  except ImportError:
      import StringIO
 
 -from pyrakoon import utils
+-import pyrakoon.consistency
++import sys
++sys.path.append('/opt/OpenvStorage/ovs/extensions/db/arakoon/pyrakoon')
++import pyrakoon.consistency
 +from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import utils
 
  # Result codes
  RESULT_SUCCESS = 0x0000
-@@ -300,7 +300,7 @@
+@@ -301,7 +301,7 @@
      '''Step type'''
 
      def check(self, value):
@@ -191,15 +195,18 @@
      '''"optimize_db" message'''
 --- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/compat.py
 +++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/compat.py
-@@ -20,11 +20,11 @@
+@@ -20,14 +20,14 @@
  import random
  import select
  import socket
 -import logging
  import functools
  import threading
+ import inspect
+ import operator
+ import ssl
 
--from pyrakoon import client, errors, protocol, sequence, utils
+-from pyrakoon import client, consistency, errors, protocol, sequence, utils
 +from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, errors, protocol, sequence, utils
 +from ovs.log.logHandler import LogHandler
 
