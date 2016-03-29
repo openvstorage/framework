@@ -146,8 +146,8 @@ class VDiskController(object):
     def extend(diskguid, size):
         """
         Extend a vdisk through API
-        @param diskguid: GUID of the vdisk to delete
-        @param size: New size
+        @param diskguid: GUID of the vdisk to extend
+        @param size: New size (GB)
         """
         vdisk = VDisk(diskguid)
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
