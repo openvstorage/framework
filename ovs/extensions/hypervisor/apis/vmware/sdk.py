@@ -904,42 +904,87 @@ class Sdk(object):
         raise RuntimeError('Could not locate given file on the given datastore')
 
     @authenticated()
-    def create_disk(self, ip, mountpoint, diskname, size, disk_path, host=None, wait=True):
+    def create_disk(self, ip, mountpoint, disk_path, size, host=None, wait=True):
         if host is None:
             host = self._esxHost
         esxhost = self._validate_host(host)
         datastore = self.get_datastore(ip, mountpoint, host=esxhost)
         if not datastore:
             raise RuntimeError('Could not find datastore')
-        disk = {'name': diskname,
-                'backingdevice': disk_path}
+        if self.file_exists(ip, mountpoint, disk_path):
+            raise RuntimeError('Disk {0} already exists'.format(disk_path))
 
-        config = Sdk._create_disk(self._client.factory, -101, disk, 0, datastore)
-        task = self._client.service.CreateVirtualDisk_Task(disk_path, None, config)
+        disk_url = '[{0}] {1}'.format(datastore.name, disk_path)
+        config = self._client.factory.create('ns0:FileBackedVirtualDiskSpec')
+        config.adapterType = "busLogic"
+        config.diskType =  "preallocated"
+        config.capacityKb =  size * 1024 * 1024
+
+        task = self._client.service.CreateVirtualDisk_Task(self._serviceContent.virtualDiskManager, disk_url, None, config)
 
         if wait:
             self.wait_for_task(task)
-        return task
+        return disk_path.lstrip('/')
 
     @authenticated()
-    def delete_disk(self, ip, mountpoint, diskname):
-        # TODO
-        # Sdk._delete_disk
-        pass
+    def delete_disk(self, ip, mountpoint, disk_path, host=None, wait=True):
+        if host is None:
+            host = self._esxHost
+        esxhost = self._validate_host(host)
+        datastore = self.get_datastore(ip, mountpoint, host=esxhost)
+        if not datastore:
+            raise RuntimeError('Could not find datastore')
+        if not self.file_exists(ip, mountpoint, disk_path):
+            logger.error('Disk {0} already deleted'.format(disk_path))
+            return
+        disk_url = '[{0}] {1}'.format(datastore.name, disk_path)
+
+        task = self._client.service.DeleteVirtualDisk_Task(self._serviceContent.virtualDiskManager, disk_url, None)
+        if wait:
+            self.wait_for_task(task)
+
+    def _get_files_on_datastore(self, ip, mountpoint, host=None):
+        if host is None:
+            host = self._esxHost
+        esxhost = self._validate_host(host)
+        datastore = self.get_datastore(ip, mountpoint, host=esxhost)
+        if not datastore:
+            raise RuntimeError('Could not find datastore')
+        hdbss = self._client.factory.create('ns0:HostDatastoreBrowserSearchSpec')
+        hdbss.matchPattern = "*.*"
+        task = self._client.service.SearchDatastore_Task(datastore.browser, '[{0}]'.format(datastore.name), hdbss)
+        result = self.get_task_info(task)
+        if result.info.state == 'success':
+            return [file.path for file in result.info.result.file]
+        logger.warning(result.info.error.localizedMessage)
+        return []
 
     @authenticated()
-    def extend_disk(self, ip, mountpoint, diskname, size):
-        # TODO
-        # Sdk._extend_disk
-        pass
+    def extend_disk(self, ip, mountpoint, disk_path, size, host=None, wait=True):
+        if host is None:
+            host = self._esxHost
+        esxhost = self._validate_host(host)
+        datastore = self.get_datastore(ip, mountpoint, host=esxhost)
+        if not datastore:
+            raise RuntimeError('Could not find datastore')
+        if not self.file_exists(ip, mountpoint, disk_path):
+            raise RuntimeError('Disk {0} must be created first'.format(disk_path))
+        disk_url = '[{0}] {1}'.format(datastore.name, disk_path)
+        capacityKb = size * 1024 * 1024
+
+        task = self._client.service.ExtendVirtualDisk_Task(self._serviceContent.virtualDiskManager, disk_url, None, capacityKb)
+
+        if wait:
+            self.wait_for_task(task)
 
     def file_exists(self, ip, mountpoint, filename):
         try:
             self.get_nfs_datastore_object(ip, mountpoint, filename)
             return True
         except Exception as ex:
-            logger.debug('File does not exist: {0}'.format(ex))
-            return False
+            logger.debug('Exception in get_nfs_datastore_object: {0}'.format(ex))
+            files_on_datastore = self._get_files_on_datastore(ip, mountpoint)
+            return filename.lstrip('/') in files_on_datastore
 
     def _get_vm_datastore_mapping(self, vm):
         """

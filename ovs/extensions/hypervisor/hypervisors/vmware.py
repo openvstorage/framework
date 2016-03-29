@@ -212,7 +212,7 @@ class VMware(object):
         @return: location of volume
         """
         disk_path = self.get_disk_path(None, diskname)
-        return self.sdk.create_disk(storage_ip, vpool_mountpoint, diskname, size, disk_path)
+        return self.sdk.create_disk(storage_ip, vpool_mountpoint, disk_path, size)
 
     def delete_volume(self, vpool_mountpoint, storage_ip, diskname):
         """
@@ -221,14 +221,16 @@ class VMware(object):
         @param diskname: name of the disk
         @return: None
         """
-        return self.sdk.delete_disk(storage_ip, vpool_mountpoint, diskname)
+        disk_path = self.get_disk_path(None, diskname)
+        return self.sdk.delete_disk(storage_ip, vpool_mountpoint, disk_path)
 
     def extend_volume(self, vpool_mountpoint, storage_ip, diskname, size):
         """
-        Extend volume - this is a truncate command
+        Extend volume
         @param vpool_mountpoint: mountpoint of the vpool
         @param diskname: name of the disk
         @param size: size in GB
         @return: None
         """
-        return self.sdk.extend_disk(storage_ip, vpool_mountpoint, diskname, size)
+        disk_path = self.get_disk_path(None, diskname)
+        return self.sdk.extend_disk(storage_ip, vpool_mountpoint, disk_path, size)
