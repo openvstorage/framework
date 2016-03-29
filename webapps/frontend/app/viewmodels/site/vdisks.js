@@ -61,7 +61,7 @@ define([
         self.loadVDisks = function(options) {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
-                    options.sort = 'vpool_guid,devicename';
+                    options.sort = 'devicename';
                     options.contents = '_dynamics,_relations,-snapshots';
                     self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
@@ -113,7 +113,7 @@ define([
         self.activate = function() {
             self.refresher.init(function() {
                 if (generic.xhrCompleted(self.vPoolsHandle)) {
-                    self.vPoolsHandle = api.get('vpools', { queryparams: { contents: 'statistics,stored_data' }})
+                    self.vPoolsHandle = api.get('vpools', { queryparams: { contents: '' }})
                         .done(function(data) {
                             var guids = [], vpdata = {};
                             $.each(data.data, function(index, item) {

@@ -133,6 +133,7 @@ class Hybrid(TestCase):
             missing_metadata = []
             for found_prop in properties:
                 found = found_prop in [prop.name for prop in cls._properties] \
+                    or found_prop in (cls._fixed_properties if hasattr(cls, '_fixed_properties') else []) \
                     or found_prop in [relation.name for relation in cls._relations] \
                     or found_prop in ['{0}_guid'.format(relation.name) for relation in cls._relations] \
                     or found_prop in [dynamic.name for dynamic in cls._dynamics] \
