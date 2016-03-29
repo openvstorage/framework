@@ -39,7 +39,8 @@ class VPool(DataObject):
                     Property('rdma_enabled', bool, default=False, doc='Has the vpool been configured to use RDMA for DTL transport, which is only possible if all storagerouters are RDMA capable'),
                     Property('status', STATUSES.keys(), doc='Status of the vPool')]
     __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
-    __dynamics = [Dynamic('statistics', dict, 4, locked=True),
+    __dynamics = [Dynamic('statistics', dict, 4),
+                  Dynamic('identifier', str, 120),
                   Dynamic('stored_data', int, 60)]
 
     def _statistics(self, dynamic):
@@ -63,3 +64,9 @@ class VPool(DataObject):
         Aggregates the Stored Data of each vDisk served by the vPool.
         """
         return sum([disk.info['stored'] for disk in self.vdisks])
+
+    def _identifier(self):
+        """
+        An identifier of this vPool in its current configuration state
+        """
+        return '{0}_{1}'.format(self.guid, '_'.join(self.storagedrivers_guids))

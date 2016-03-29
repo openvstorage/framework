@@ -19,7 +19,6 @@ import uuid
 import copy
 import json
 import inspect
-from functools import total_ordering
 from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
                                 MissingMandatoryFieldsException, RaceConditionException, InvalidRelationException,
                                 VolatileObjectException)
@@ -113,7 +112,6 @@ class DataObjectAttributeEncoder(json.JSONEncoder):
         return "{0}: {1}".format(type(obj), obj)
 
 
-@total_ordering
 class DataObject(object):
     """
     This base class contains all logic to support our multiple backends and the caching
@@ -827,8 +825,7 @@ class DataObject(object):
         Invalidates cached objects so they are reloaded when used.
         """
         for relation in self._relations:
-            if relation.name in self._objects:
-                del self._objects[relation.name]
+            self._objects.pop(relation.name, None)
 
     def export(self):
         """
@@ -970,8 +967,6 @@ class DataObject(object):
         """
         Checks whether two objects are the same.
         """
-        if not Descriptor.isinstance(other, self.__class__):
-            return False
         return self.__hash__() == other.__hash__()
 
     def __ne__(self, other):
@@ -979,12 +974,6 @@ class DataObject(object):
         Checks whether two objects are not the same.
         """
         return not self.__eq__(other)
-
-    def __lt__(self, other):
-        """
-        Checks whether this object is "less than" the other object
-        """
-        return self.__hash__() < other.__hash__()
 
     def _benchmark(self, iterations=100):
         import time
@@ -995,7 +984,12 @@ class DataObject(object):
             istart = time.time()
             for dynamic in self._dynamics:
                 start = time.time()
-                getattr(self, '_{0}'.format(dynamic.name))()
+                function = getattr(self, '_{0}'.format(dynamic.name))
+                function_info = inspect.getargspec(function)
+                if 'dynamic' in function_info.args:
+                    function(dynamic=dynamic)
+                else:
+                    function()
                 duration = time.time() - start
                 if dynamic.name not in stats:
                     stats[dynamic.name] = []
@@ -1003,9 +997,9 @@ class DataObject(object):
             totals.append(time.time() - istart)
         print "Object: {0}('{1}')".format(self.__class__.__name__, self._guid)
         for dyn in stats:
-            print '- {0}: avg {1:.2f}s (min: {2:.2f}s, max: {3:.2f}s)'.format(dyn, sum(stats[dyn]) / float(len(stats[dyn])), min(stats[dyn]), max(stats[dyn]))
-        print 'Took {0:.2f}s for {1} iterations'.format(time.time() - begin, iterations)
-        print 'Avg: {0:.2f}s, min: {1:.2f}s, max: {2:.2f}s'.format(sum(totals) / float(len(totals)), min(totals), max(totals))
+            print '- {0}: avg {1:.3f}s (min: {2:.3f}s, max: {3:.3f}s)'.format(dyn, sum(stats[dyn]) / float(len(stats[dyn])), min(stats[dyn]), max(stats[dyn]))
+        print 'Took {0:.3f}s for {1} iterations'.format(time.time() - begin, iterations)
+        print 'Avg: {0:.3f}s, min: {1:.3f}s, max: {2:.3f}s'.format(sum(totals) / float(len(totals)), min(totals), max(totals))
 
     @staticmethod
     def enumerator(name, items):
