@@ -105,7 +105,7 @@ class DummyPersistentStore(object):
         data[key] = value
         self._save(data)
 
-    def delete(self, key, transaction=None):
+    def delete(self, key, must_exist=True, transaction=None):
         """
         Deletes a given key from the store
         """
@@ -115,7 +115,7 @@ class DummyPersistentStore(object):
         if key in data:
             del data[key]
             self._save(data)
-        else:
+        elif must_exist is True:
             raise KeyNotFoundException(key)
 
     def exists(self, key):
@@ -146,7 +146,16 @@ class DummyPersistentStore(object):
             raise AssertException(key)
         if json.dumps(data[key], sort_keys=True) != json.dumps(value, sort_keys=True):
             raise AssertException(key)
-        self._save(data)
+
+    def assert_exists(self, key, transaction=None):
+        """
+        Asserts whether a given key exists
+        """
+        if transaction is not None:
+            return self._sequences[transaction].append([self.assert_exists, {'key': key}])
+        data = self._read()
+        if key not in data:
+            raise AssertException(key)
 
     def begin_transaction(self):
         """
