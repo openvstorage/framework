@@ -39,6 +39,7 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
+from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.hypervisor.factory import Factory
@@ -540,69 +541,72 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.create_volume')
     def create_volume(location, size, storagerouter_guid=None):
         """
-        Create a volume using filesystem calls
-        Calls "truncate" to create sparse raw file
-        !! This method only works on kvm, this method is hardcoded in the cinder driver
+        Create a volume
+        !! This method is for compatibility with the cinder driver
         !! Other callers should use VDiskController.create_new
 
-        @param location: location, filename
-        @param size: size of volume, GB
-        @param: storagerouter_guid: use ssh client to create file on remote storagerouter
-        @return None
+        :param location: location, filename
+        :param size: size of volume, GB
+        :param: storagerouter_guid: create file on remote storagerouter
         """
         logger.info('Creating volume {0} of {1} GB'.format(location, size))
 
-        client = SSHClient(StorageRouter(storagerouter_guid)) if storagerouter_guid is not None else SSHClient('127.0.0.1')
-        if client.file_exists(location):
-            raise RuntimeError('File already exists at %s' % location)
+        if storagerouter_guid is not None:
+            storagerouter = StorageRouter(storagerouter_guid)
+        else:
+            storagerouter = System.get_my_storagerouter()
+        for storagedriver in storagerouter.storagedrivers:
+            if location.startswith(storagedriver.mountpoint):
+                diskname = location.split('/')[-1].split('.')[0]
+                storagedriver_guid = storagedriver.guid
+                return VDiskController.create_new(diskname, size, storagedriver_guid)
 
-        output = client.run('truncate -s {0}G "{1}"'.format(size, location)).strip()
-
-        if not client.file_exists(location):
-            raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
+        raise RuntimeError('Cannot create volume {0}. No storagedriver found for this location.'.format(location))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete_volume')
     def delete_volume(location):
         """
-        Create a volume using filesystem calls
-        Calls "rm" to delete raw file
-        !! This method only works on kvm, this method is hardcoded in the cinder driver
+        Delete a volume
+
+        !! This method is for compatibility with the cinder driver
         !! Other callers should use VDiskController.delete
 
-        @param location: location, filename
-        @return None
+        :param location: location, filename
         """
-        if not os.path.exists(location):
-            logger.error('File already deleted at %s' % location)
-            return
-        output = check_output('rm "{0}"'.format(location), shell=True).strip()
-        output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
-        logger.info(output)
-        if os.path.exists(location):
-            raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
-        if output == '':
-            return True
-        raise RuntimeError(output)
+        storagerouter = System.get_my_storagerouter()
+        for storagedriver in storagerouter.storagedrivers:
+            if location.startswith(storagedriver.mountpoint):
+                devicename = location.split('/')[-1]
+                disk = VDiskList.get_by_devicename_and_vpool(devicename, storagedriver.vpool)
+                if disk is None:
+                    raise RuntimeError('Disk {0} already deleted'.format(location))
+                return VDiskController.delete(disk.guid)
+
+        raise RuntimeError('Cannot delete volume {0}. No storagedriver found for this location.'.format(location))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.extend_volume')
     def extend_volume(location, size):
         """
-        Extend a volume using filesystem calls
-        Calls "truncate" to create sparse raw file
-        !! This method only works on kvm, this method is hardcoded in the cinder driver
+        Extend a volume
+
+        !! This method is for compatibility with the cinder driver
         !! Other callers should use VDiskController.extend
 
-        @param location: location, filename
-        @param size: size of volume, GB
-        @return None
+        :param location: location, filename
+        :param size: size of volume, GB
         """
-        if not os.path.exists(location):
-            raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
-        output = check_output('truncate -s {0}G "{1}"'.format(size, location), shell=True).strip()
-        output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
-        logger.info(output)
+        storagerouter = System.get_my_storagerouter()
+        for storagedriver in storagerouter.storagedrivers:
+            if location.startswith(storagedriver.mountpoint):
+                devicename = location.split('/')[-1]
+                disk = VDiskList.get_by_devicename_and_vpool(devicename, storagedriver.vpool)
+                if disk is None:
+                    raise RuntimeError('Disk {0} does not exist'.format(location))
+                return VDiskController.extend(disk.guid, size)
+
+        raise RuntimeError('Cannot extend volume {0}. No storagedriver found for this location.'.format(location))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.update_vdisk_name')
