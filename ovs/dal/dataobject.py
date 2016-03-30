@@ -607,7 +607,6 @@ class DataObject(object):
 
             # Second, invalidate property lists
             cache_key = '{0}_{1}|'.format(DataList.CACHELINK, self._classname)
-            fields = changed_fields[:]
             list_keys = set()
             cache_keys = {}
             for key in list(self._persistent.prefix(cache_key)):
@@ -615,7 +614,7 @@ class DataObject(object):
                 if list_key not in cache_keys:
                     cache_keys[list_key] = [False, []]
                 cache_keys[list_key][1].append(key)
-                if field in fields or self._new is True:
+                if field in changed_fields or self._new is True:
                     list_keys.add(list_key)
                     cache_keys[list_key][0] = True
             for list_key in list_keys:

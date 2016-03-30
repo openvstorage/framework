@@ -213,9 +213,9 @@ class DataList(object):
             invalidations = {object_type_name: ['__all']}
             DataList._build_invalidations(invalidations, self._object_type, query_items)
             transaction = self._persistent.begin_transaction()
-            for class_name in invalidations:
+            for class_name, fields in invalidations.iteritems():
                 key = '{0}_{1}|{{0}}|{{1}}'.format(DataList.CACHELINK, class_name)
-                for field in invalidations[class_name]:
+                for field in fields:
                     self._persistent.set(key.format(self._key, field), 0, transaction=transaction)
             self._persistent.apply_transaction(transaction)
 
@@ -243,7 +243,7 @@ class DataList(object):
                 self._volatile.set(self._key, self._guids, 300 + randint(0, 300))  # Cache between 5 and 10 minutes
                 # Check whether the cache was invalidated and should be removed again
                 for class_name in invalidations:
-                    key = '{0}_{1}|{{0}}'.format(DataList.CACHELINK, class_name)
+                    key = '{0}_{1}|{{0}}|'.format(DataList.CACHELINK, class_name)
                     if len(list(self._persistent.prefix(key.format(self._key)))) == 0:
                         self._volatile.delete(self._key)
                         break
