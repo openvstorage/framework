@@ -580,7 +580,8 @@ class VDiskController(object):
                 devicename = location.split('/')[-1]
                 disk = VDiskList.get_by_devicename_and_vpool(devicename, storagedriver.vpool)
                 if disk is None:
-                    raise RuntimeError('Disk {0} already deleted'.format(location))
+                    logger.info('Disk {0} already deleted'.format(location))
+                    return
                 return VDiskController.delete(disk.guid)
 
         raise RuntimeError('Cannot delete volume {0}. No storagedriver found for this location.'.format(location))
