@@ -905,8 +905,6 @@ class Sdk(object):
 
     @authenticated()
     def create_disk(self, ip, mountpoint, disk_path, size, host=None, wait=True):
-        if host is None:
-            host = self._esxHost
         esxhost = self._validate_host(host)
         datastore = self.get_datastore(ip, mountpoint, host=esxhost)
         if not datastore:
@@ -928,14 +926,12 @@ class Sdk(object):
 
     @authenticated()
     def delete_disk(self, ip, mountpoint, disk_path, host=None, wait=True):
-        if host is None:
-            host = self._esxHost
         esxhost = self._validate_host(host)
         datastore = self.get_datastore(ip, mountpoint, host=esxhost)
         if not datastore:
             raise RuntimeError('Could not find datastore')
         if not self.file_exists(ip, mountpoint, disk_path):
-            logger.error('Disk {0} already deleted'.format(disk_path))
+            logger.warning('Disk {0} already deleted'.format(disk_path))
             return
         disk_url = '[{0}] {1}'.format(datastore.name, disk_path)
 
@@ -944,8 +940,6 @@ class Sdk(object):
             self.wait_for_task(task)
 
     def _get_files_on_datastore(self, ip, mountpoint, host=None):
-        if host is None:
-            host = self._esxHost
         esxhost = self._validate_host(host)
         datastore = self.get_datastore(ip, mountpoint, host=esxhost)
         if not datastore:

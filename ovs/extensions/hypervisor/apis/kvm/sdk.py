@@ -82,7 +82,7 @@ class Sdk(object):
         self.host = host
         self.login = login
         self._conn = None
-        self.ssh_client = None
+        self.ssh_client = SSHClient(self.host, username='root')
         logger.debug('Init complete')
 
     def _connect(self, attempt=0):
@@ -390,15 +390,11 @@ class Sdk(object):
     def create_volume(self, location, size):
         """
         Create volume using truncate
-        @param location: Location on filesystem
-        @param size: size in GB
         """
-        if self.ssh_client is None:
-            self.ssh_client = SSHClient(self.host, username='root')
         if self.ssh_client.file_exists(location):
             raise RuntimeError('File already exists at %s' % location)
         command = 'truncate -s {0}G "{1}"'.format(size, location)
-        output = self.ssh_client.run(command).strip()
+        output = self.ssh_client.run(command)
         if not self.ssh_client.file_exists(location):
             raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
         logger.info('Command {0}. Output {1}'.format(command, output))
@@ -406,15 +402,12 @@ class Sdk(object):
     def delete_volume(self, location):
         """
         Remove volume using rm
-        @param location: Location on filesystem
         """
-        if self.ssh_client is None:
-            self.ssh_client = SSHClient(self.host, username='root')
         if not self.ssh_client.file_exists(location):
             logger.error('File already deleted at %s' % location)
             return
         command = 'rm "{0}"'.format(location)
-        output = self.ssh_client.run(command).strip()
+        output = self.ssh_client.run(command)
         logger.info('Command {0}. Output {1}'.format(command, output))
         if self.ssh_client.file_exists(location):
             raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
@@ -425,15 +418,11 @@ class Sdk(object):
     def extend_volume(self, location, size):
         """
         Resize volume using truncate
-        @param location: Location on filesystem
-        @param size: Size in GB
         """
-        if self.ssh_client is None:
-            self.ssh_client = SSHClient(self.host, username='root')
         if not self.ssh_client.file_exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
         command = 'truncate -s {0}G "{1}"'.format(size, location)
-        output = self.ssh_client.run(command).strip()
+        output = self.ssh_client.run(command)
         logger.info('Command {0}. Output {1}'.format(command, output))
 
     @authenticated
