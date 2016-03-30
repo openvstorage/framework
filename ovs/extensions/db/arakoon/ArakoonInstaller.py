@@ -235,6 +235,9 @@ class ArakoonInstaller(object):
     ARAKOON_HOME_DIR = '{0}/arakoon/{1}/db'
     ARAKOON_TLOG_DIR = '{0}/arakoon/{1}/tlogs'
     ARAKOON_CATCHUP_COMMAND = 'arakoon --node {0} -config {1} -catchup-only'
+    ABM_PLUGIN = 'albamgr_plugin'
+    NSM_PLUGIN = 'nsm_host_plugin'
+    ARAKOON_PLUGIN_DIR = '/usr/lib/alba'
     ETCD_CONFIG_ROOT = '/ovs/arakoon'
     ETCD_CONFIG_KEY = ETCD_CONFIG_ROOT + '/{0}/config'
     ETCD_CONFIG_PATH = 'etcd://127.0.0.1:2379' + ETCD_CONFIG_KEY
@@ -305,19 +308,24 @@ class ArakoonInstaller(object):
             root_client.file_delete(info['files'])
 
     @staticmethod
-    def create_cluster(cluster_name, ip, base_dir, cluster_type, plugins=None, locked=True, internal=True):
+    def create_cluster(cluster_name, cluster_type, ip, base_dir, locked=True, internal=True):
         """
-        Creates a cluster
+        Always creates a cluster but marks it's usage according to the internal flag
         :param cluster_name: Name of the cluster
+        :param cluster_type: Type of the cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
         :param ip: IP address of the first node of the new cluster
         :param base_dir: Base directory that should contain the data and tlogs
-        :param cluster_type: Type of the cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
-        :param plugins: Plugins that should be added to the configuration file
         :param locked: Indicates whether the create should run in a locked context (e.g. to prevent port conflicts)
         :param internal: Is cluster internally managed by OVS
         """
         if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
             raise ValueError('Cluster type {0} is not supported. Please choose from {1}'.format(cluster_type, ', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
+
+        plugins = []
+        if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.NSM:
+            plugins = [ArakoonInstaller.NSM_PLUGIN]
+        if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.ABM:
+            plugins = [ArakoonInstaller.ABM_PLUGIN]
 
         logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
         base_dir = base_dir.rstrip('/')
@@ -362,6 +370,12 @@ class ArakoonInstaller(object):
                                                   tlog_dir=tlog_dir))
             ArakoonInstaller._deploy(config)
 
+            data_dir = '' if base_dir == '/' else base_dir
+            for plugin in plugins:
+                cmd = 'ln -s {0}/{1}.cmxs {2}/arakoon/{3}/db'.format(ArakoonInstaller.ARAKOON_PLUGIN_DIR, plugin,
+                                                                     data_dir, cluster_name)
+                client.run(cmd)
+
             metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
             metadata.cluster_type = cluster_type.upper()
             metadata.internal = internal
@@ -373,6 +387,34 @@ class ArakoonInstaller(object):
         logger.debug('Creating cluster {0} on {1} completed'.format(cluster_name, ip))
         return {'client_port': ports[0],
                 'messaging_port': ports[1]}
+
+    @staticmethod
+    def claim_cluster(cluster_name, cluster_type):
+        """
+        Claim a cluster and mark it in use
+        :param cluster_name: Name of the cluster to claim
+        :param cluster_type: Type of cluster to claim: ['FWK','SD','ABM','NSM']
+        :return: Cluster name
+        """
+
+        internal = ArakoonInstaller.is_internal(cluster_type=cluster_type)
+        # if internal is True and cluster_name is None:
+        #     raise RuntimeError('Cluster name required when marking internal cluster')
+
+        available_cluster = None
+        for cluster in ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=cluster_type, in_use=False):
+            if cluster.cluster_id == cluster_name:
+                available_cluster = cluster
+                break
+
+        if available_cluster is None:
+            raise RuntimeError('No available internal clusters found for type: {0}'.format(cluster_type))
+
+        if available_cluster.in_use is True:
+            raise RuntimeError('Cluster is already marked as in use: {0}'.format(cluster_name))
+
+        available_cluster.in_use = True
+        available_cluster.write()
 
     @staticmethod
     def delete_cluster(cluster_name, ip):
@@ -736,31 +778,3 @@ class ArakoonInstaller(object):
             if metadata.cluster_type == cluster_type and metadata.internal is False:
                 return False
         return True
-
-    @staticmethod
-    def claim_cluster(cluster_type, cluster_name=None):
-        """
-        Claim a cluster and mark it in use
-        :param cluster_type: Type of cluster to claim: ['FWK','SD','ABM','NSM']
-        :param cluster_name: Name of the cluster to claim
-        :return: Cluster name
-        """
-
-        internal = ArakoonInstaller.is_internal(cluster_type=cluster_type)
-        if internal is True and cluster_name is None:
-            raise RuntimeError('Cluster name required when marking internal cluster')
-
-        available_cluster = None
-        for cluster in ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=cluster_type, in_use=False):
-            if cluster_name is None:
-                available_cluster = cluster
-                break
-            elif cluster.cluster_id == cluster_name:
-                available_cluster = cluster
-                break
-
-        if available_cluster is None:
-            raise RuntimeError('No available internal clusters found for type: {0}'.format(cluster_type))
-
-        available_cluster.in_use = True
-        available_cluster.write()

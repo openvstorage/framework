@@ -196,7 +196,7 @@ class SetupController(object):
                         current_sr_message = []
                         for sr_name in sorted(SetupController.nodes):
                             current_sr_message.append('{0:<15} - {1}'.format(SetupController.nodes[sr_name]['ip'], sr_name))
-                        if Interactive.ask_yesno(message='Following StorageRouters were detected:\n  -  {0}\nIs this correct?'.format('\n  -  '.join(current_sr_message)),
+                        if Interactive.ask_yesno(message='Following StorageRouters were detected: \n  -  {0}\nIs this correct?'.format('\n  -  '.join(current_sr_message)),
                                                  default_value=True) is False:
                             raise Exception('The cluster on the given master node cannot be joined as not all StorageRouters could be loaded')
 
@@ -219,7 +219,7 @@ class SetupController(object):
                     logger.debug('Automated installation')
                     cluster_ip = master_ip if cluster_ip is None else cluster_ip
                     first_node = master_ip == cluster_ip
-                    logger.info('Detected{0}a 1st node installation'.format('' if first_node is True else 'not'))
+                    logger.info('Detected {0} a 1st node installation'.format('' if first_node is True else 'not'))
 
                     if avahi_installed is True and cluster_name in discovery_result:
                         SetupController.nodes = discovery_result[cluster_name]
@@ -1816,7 +1816,7 @@ EOF
             return True
 
         if not EtcdConfiguration.exists(key='{0}|metadata'.format(etcd_key)):
-            raise ValueError('Not all required keys for {0} are present in the Etcd cluster'.format(service))
+            raise ValueError('Not all required keys ({0}) for {2} are present in the Etcd cluster'.format(etcd_key, service))
         metadata = EtcdConfiguration.get('{0}|metadata'.format(etcd_key))
         if 'internal' not in metadata:
             raise ValueError('Internal flag not present in metadata for {0}.\nPlease provide a key: {1} and value "metadata": {"internal": True/False}'.format(service, etcd_key))

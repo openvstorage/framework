@@ -211,11 +211,11 @@ class StorageDriverController(object):
             current_services.append(add_service(storagerouter, [result['client_port'], result['messaging_port']]))
             ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, storagerouter.ip)
             current_ips.append(storagerouter.ip)
-            ArakoonInstaller.claim_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, cluster_name=cluster_name)
+            ArakoonInstaller.claim_cluster(cluster_name=cluster_name, cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD)
             StorageDriverController._configure_arakoon_to_volumedriver(cluster_name=cluster_name)
         elif internal is False and len(claimed_clusters) == 0:
             add_service(None, [])
-            ArakoonInstaller.claim_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD)
+            ArakoonInstaller.claim_cluster(cluster_name='ovsdb', cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD)
 
         if 0 < len(current_services) < len(available_storagerouters) and internal is True:
             for storagerouter, partition in available_storagerouters.iteritems():
