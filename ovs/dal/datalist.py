@@ -212,30 +212,12 @@ class DataList(object):
 
             invalidations = {object_type_name: ['__all']}
             DataList._build_invalidations(invalidations, self._object_type, query_items)
-            successful = False
-            tries = 0
-            while successful is False:
-                tries += 1
-                if tries > 5:
-                    raise RaceConditionException()
-
-                try:
-                    transaction = self._persistent.begin_transaction()
-                    for class_name in invalidations:
-                        key = '{0}_{1}'.format(DataList.CACHELINK, class_name)
-                        try:
-                            cache_list = self._persistent.get(key)
-                            self._persistent.assert_value(key, copy.deepcopy(cache_list), transaction=transaction)
-                        except KeyNotFoundException:
-                            cache_list = {}
-                        current_fields = cache_list.get(self._key, [])
-                        current_fields = list(set(current_fields + ['__all'] + invalidations[class_name]))
-                        cache_list[self._key] = current_fields
-                        self._persistent.set(key, cache_list, transaction=transaction)
-                    self._persistent.apply_transaction(transaction)
-                    successful = True
-                except AssertException:
-                    pass
+            transaction = self._persistent.begin_transaction()
+            for class_name, fields in invalidations.iteritems():
+                key = '{0}_{1}|{{0}}|{{1}}'.format(DataList.CACHELINK, class_name)
+                for field in fields:
+                    self._persistent.set(key.format(self._key, field), 0, transaction=transaction)
+            self._persistent.apply_transaction(transaction)
 
             self._guids = []
             self._data = {}
@@ -258,21 +240,13 @@ class DataList(object):
                 DataList.test_hooks['post_query'](self)
 
             if self._key is not None and elements > 0 and self._can_cache:
-                invalidated = False
+                self._volatile.set(self._key, self._guids, 300 + randint(0, 300))  # Cache between 5 and 10 minutes
+                # Check whether the cache was invalidated and should be removed again
                 for class_name in invalidations:
-                    key = '{0}_{1}'.format(DataList.CACHELINK, class_name)
-                    try:
-                        cache_list = self._persistent.get(key)
-                        if self._key not in cache_list:
-                            invalidated = True
-                    except KeyNotFoundException:
-                        invalidated = True
-
-                # If the key under which the list should be saved was already invalidated since the invalidations
-                # were saved, the returned list is most likely outdated. This is OK for this result, but the list
-                # won't get cached
-                if invalidated is False:
-                    self._volatile.set(self._key, self._guids, 300 + randint(0, 300))  # Cache between 5 and 10 minutes
+                    key = '{0}_{1}|{{0}}|'.format(DataList.CACHELINK, class_name)
+                    if len(list(self._persistent.prefix(key.format(self._key)))) == 0:
+                        self._volatile.delete(self._key)
+                        break
             self._executed = True
         else:
             self.from_cache = True
@@ -371,18 +345,8 @@ class DataList(object):
         own_name = own_class.__name__.lower()
         datalist = DataList(remote_class, {}, '{0}_{1}_{2}'.format(own_name, own_guid, remote_key))
 
-        reverse_key = 'ovs_reverseindex_{0}_{1}'.format(own_name, own_guid)
-
-        # Check whether the requested information is available in cache
-        try:
-            reverse_index = persistent.get(reverse_key)
-            if own_key in reverse_index:
-                datalist._guids = reverse_index[own_key]
-                return datalist
-        except KeyNotFoundException:
-            pass
-
-        datalist._guids = []
+        reverse_key = 'ovs_reverseindex_{0}_{1}|{2}|'.format(own_name, own_guid, own_key)
+        datalist._guids = [guid.replace(reverse_key, '') for guid in persistent.prefix(reverse_key)]
         return datalist
 
     ######################

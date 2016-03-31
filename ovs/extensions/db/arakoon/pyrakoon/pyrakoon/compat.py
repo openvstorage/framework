@@ -290,6 +290,9 @@ class ArakoonClient(object):
         def convert_assert_exists(step):
             return sequence.AssertExists(step._key)
 
+        def convert_replace(step):
+            return sequence.Replace(step._key, step._wanted)
+
         def convert_sequence(sequence_):
             steps = []
 
@@ -304,6 +307,8 @@ class ArakoonClient(object):
                     steps.append(convert_assert_exists(step))
                 elif isinstance(step, Sequence):
                     steps.append(convert_sequence(step))
+                elif isinstance(step, Replace):
+                    steps.append(convert_replace(step))
                 else:
                     raise TypeError
 
@@ -867,6 +872,11 @@ class AssertExists(Update):
     def __init__(self, key):
         self._key = key
 
+class Replace(Update):
+    def __init__(self, key, wanted):
+        self._key = key
+        self._wanted = wanted
+
 class Sequence(Update):
     def __init__(self):
         self._updates = []
@@ -891,6 +901,11 @@ class Sequence(Update):
     @_validate_signature('string')
     def addAssertExists(self, key):
         self._updates.append(AssertExists(key))
+
+    @utils.update_argspec('self', 'key', 'wanted')
+    @_validate_signature('string', 'string_option')
+    def addReplace(self, key, wanted):
+        self._updates.append(Replace(key, wanted))
 
 # ArakoonClientConfig
 # This is copied from the ArakoonProtocol module

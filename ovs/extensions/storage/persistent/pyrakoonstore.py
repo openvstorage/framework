@@ -149,14 +149,20 @@ class PyrakoonStore(object):
                 yield [item[0], ujson.loads(item[1])]
 
     @locked()
-    def delete(self, key, transaction=None):
+    def delete(self, key, must_exist=True, transaction=None):
         """
         Deletes a given key from the store
         """
         if transaction is not None:
-            return self._sequences[transaction].addDelete(key)
+            if must_exist is True:
+                return self._sequences[transaction].addDelete(key)
+            else:
+                return self._sequences[transaction].addReplace(key, None)
         try:
-            return PyrakoonStore._try(self._identifier, self._client.delete, key)
+            if must_exist is True:
+                return PyrakoonStore._try(self._identifier, self._client.delete, key)
+            else:
+                return PyrakoonStore._try(self._identifier, self._client.replace, key, None)
         except ArakoonNotFound as field:
             raise KeyNotFoundException(field)
 
@@ -183,6 +189,18 @@ class PyrakoonStore(object):
             return self._sequences[transaction].addAssert(key, ujson.dumps(value, sort_keys=True))
         try:
             return PyrakoonStore._try(self._identifier, self._client.aSSert, key, ujson.dumps(value, sort_keys=True))
+        except ArakoonAssertionFailed as assertion:
+            raise AssertException(assertion)
+
+    @locked()
+    def assert_exists(self, key, transaction=None):
+        """
+        Asserts that a given key exists
+        """
+        if transaction is not None:
+            return self._sequences[transaction].addAssertExists(key)
+        try:
+            return PyrakoonStore._try(self._identifier, self._client.aSSert_exists, key)
         except ArakoonAssertionFailed as assertion:
             raise AssertException(assertion)
 
@@ -222,8 +240,8 @@ class PyrakoonStore(object):
             if duration > 0.5:
                 logger.warning('Arakoon call {0} took {1}s'.format(method.__name__, round(duration, 2)))
             return return_value
-        except ArakoonNotFound:
-            # No extra logging for ArakoonNotFound
+        except (ArakoonNotFound, ArakoonAssertionFailed):
+            # No extra logging for some errors
             raise
         except Exception:
             logger.error('Error during {0}. Process {1}, thread {2}, clientid {3}'.format(
