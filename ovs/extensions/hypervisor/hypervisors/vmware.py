@@ -206,10 +206,9 @@ class VMware(object):
     def create_volume(self, vpool_mountpoint, storage_ip, diskname, size):
         """
         Create new volume
-        @param vpool_mountpoint: mountpoint of the vpool
-        @param diskname: name of the disk
-        @param size: size in GB
-        @return: location of volume
+        :param vpool_mountpoint: mountpoint of the vpool
+        :param diskname: name of the disk
+        :param size: size in GB
         """
         disk_path = self.get_disk_path(None, diskname)
         return self.sdk.create_disk(storage_ip, vpool_mountpoint, disk_path, size)
@@ -217,9 +216,8 @@ class VMware(object):
     def delete_volume(self, vpool_mountpoint, storage_ip, diskname):
         """
         Delete volume
-        @param vpool_mountpoint: mountpoint of the vpool
-        @param diskname: name of the disk
-        @return: None
+        :param vpool_mountpoint: mountpoint of the vpool
+        :param diskname: name of the disk
         """
         disk_path = self.get_disk_path(None, diskname)
         return self.sdk.delete_disk(storage_ip, vpool_mountpoint, disk_path)
@@ -227,10 +225,9 @@ class VMware(object):
     def extend_volume(self, vpool_mountpoint, storage_ip, diskname, size):
         """
         Extend volume
-        @param vpool_mountpoint: mountpoint of the vpool
-        @param diskname: name of the disk
-        @param size: size in GB
-        @return: None
+        :param vpool_mountpoint: mountpoint of the vpool
+        :param diskname: name of the disk
+        :param size: size in GB
         """
         disk_path = self.get_disk_path(None, diskname)
         return self.sdk.extend_disk(storage_ip, vpool_mountpoint, disk_path, size)

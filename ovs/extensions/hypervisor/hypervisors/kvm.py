@@ -194,10 +194,9 @@ class KVM(object):
     def create_volume(self, vpool_mountpoint, storage_ip, diskname, size):
         """
         Create new volume - this is a truncate command
-        @param vpool_mountpoint: mountpoint of the vpool
-        @param diskname: name of the disk
-        @param size: size in GB
-        @return: location of volume
+        :param vpool_mountpoint: mountpoint of the vpool
+        :param diskname: name of the disk
+        :param size: size in GB
         """
         _ = storage_ip
         disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
@@ -208,9 +207,8 @@ class KVM(object):
     def delete_volume(self, vpool_mountpoint, storage_ip, diskname):
         """
         Delete volume - this is a rm command
-        @param vpool_mountpoint: mountpoint of the vpool
-        @param diskname: name of the disk
-        @return: None
+        :param vpool_mountpoint: mountpoint of the vpool
+        :param diskname: name of the disk
         """
         _ = storage_ip
         disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
@@ -220,10 +218,9 @@ class KVM(object):
     def extend_volume(self, vpool_mountpoint, storage_ip, diskname, size):
         """
         Extend volume - this is a truncate command
-        @param vpool_mountpoint: mountpoint of the vpool
-        @param diskname: name of the disk
-        @param size: size in GB
-        @return: None
+        :param vpool_mountpoint: mountpoint of the vpool
+        :param diskname: name of the disk
+        :param size: size in GB
         """
         _ = storage_ip
         disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))

@@ -133,7 +133,7 @@ class VDiskController(object):
     def delete(diskguid):
         """
         Delete a vdisk through API
-        @param diskguid: GUID of the vdisk to delete
+        :param diskguid: GUID of the vdisk to delete
         """
         vdisk = VDisk(diskguid)
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
@@ -147,8 +147,8 @@ class VDiskController(object):
     def extend(diskguid, size):
         """
         Extend a vdisk through API
-        @param diskguid: GUID of the vdisk to extend
-        @param size: New size (GB)
+        :param diskguid: GUID of the vdisk to extend
+        :param size: New size (GB)
         """
         vdisk = VDisk(diskguid)
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
@@ -547,7 +547,7 @@ class VDiskController(object):
 
         :param location: location, filename
         :param size: size of volume, GB
-        :param: storagerouter_guid: create file on remote storagerouter
+        :param storagerouter_guid: create file on remote storagerouter
         """
         logger.info('Creating volume {0} of {1} GB'.format(location, size))
 
@@ -556,10 +556,9 @@ class VDiskController(object):
         else:
             storagerouter = System.get_my_storagerouter()
         for storagedriver in storagerouter.storagedrivers:
-            if location.startswith(storagedriver.mountpoint):
+            if location.startswith('{0}/'.format(storagedriver.mountpoint)):
                 diskname = location.split('/')[-1].split('.')[0]
-                storagedriver_guid = storagedriver.guid
-                return VDiskController.create_new(diskname, size, storagedriver_guid)
+                return VDiskController.create_new(diskname, size, storagedriver.guid)
 
         raise RuntimeError('Cannot create volume {0}. No storagedriver found for this location.'.format(location))
 
@@ -576,7 +575,7 @@ class VDiskController(object):
         """
         storagerouter = System.get_my_storagerouter()
         for storagedriver in storagerouter.storagedrivers:
-            if location.startswith(storagedriver.mountpoint):
+            if location.startswith('{0}/'.format(storagedriver.mountpoint)):
                 devicename = location.split('/')[-1]
                 disk = VDiskList.get_by_devicename_and_vpool(devicename, storagedriver.vpool)
                 if disk is None:
@@ -600,7 +599,7 @@ class VDiskController(object):
         """
         storagerouter = System.get_my_storagerouter()
         for storagedriver in storagerouter.storagedrivers:
-            if location.startswith(storagedriver.mountpoint):
+            if location.startswith('{0}/'.format(storagedriver.mountpoint)):
                 devicename = location.split('/')[-1]
                 disk = VDiskList.get_by_devicename_and_vpool(devicename, storagedriver.vpool)
                 if disk is None:

@@ -905,6 +905,15 @@ class Sdk(object):
 
     @authenticated()
     def create_disk(self, ip, mountpoint, disk_path, size, host=None, wait=True):
+        """
+        Create disk
+        :param ip: ip
+        :param mountpoint: mountpoint
+        :param disk_path: disk path
+        :param size: size
+        :param host: host (optional)
+        :param wait: wait for task
+        """
         esxhost = self._validate_host(host)
         datastore = self.get_datastore(ip, mountpoint, host=esxhost)
         if not datastore:
@@ -926,6 +935,14 @@ class Sdk(object):
 
     @authenticated()
     def delete_disk(self, ip, mountpoint, disk_path, host=None, wait=True):
+        """
+        Delete disk
+        :param ip: ip
+        :param mountpoint: mountpoint
+        :param disk_path: disk path
+        :param host: host (optional)
+        :param wait: wait for task
+        """
         esxhost = self._validate_host(host)
         datastore = self.get_datastore(ip, mountpoint, host=esxhost)
         if not datastore:
@@ -938,6 +955,8 @@ class Sdk(object):
         task = self._client.service.DeleteVirtualDisk_Task(self._serviceContent.virtualDiskManager, disk_url, None)
         if wait:
             self.wait_for_task(task)
+        if self.file_exists(ip, mountpoint, disk_path):
+            raise RuntimeError('Disk {0} cannot be deleted'.format(disk_path))
 
     def _get_files_on_datastore(self, ip, mountpoint, host=None):
         esxhost = self._validate_host(host)
@@ -955,8 +974,15 @@ class Sdk(object):
 
     @authenticated()
     def extend_disk(self, ip, mountpoint, disk_path, size, host=None, wait=True):
-        if host is None:
-            host = self._esxHost
+        """
+        Create disk
+        :param ip: ip
+        :param mountpoint: mountpoint
+        :param disk_path: disk path
+        :param size: size
+        :param host: host (optional)
+        :param wait: wait for task
+        """
         esxhost = self._validate_host(host)
         datastore = self.get_datastore(ip, mountpoint, host=esxhost)
         if not datastore:
@@ -972,6 +998,12 @@ class Sdk(object):
             self.wait_for_task(task)
 
     def file_exists(self, ip, mountpoint, filename):
+        """
+        Check if file exists
+        :param ip: ip
+        :param mountpoint: mountpoint
+        :param disk_path: filename
+        """
         try:
             self.get_nfs_datastore_object(ip, mountpoint, filename)
             return True
