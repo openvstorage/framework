@@ -57,9 +57,7 @@ class MetadataView(View):
                 'identification': {},
                 'storagerouter_ips': [sr.ip for sr in StorageRouterList.get_storagerouters()],
                 'versions': list(settings.VERSION),
-                'plugins': {},
-                'registration': {'registered': False,
-                                 'remaining': None}}
+                'plugins': {}}
         try:
             # Gather plugin metadata
             plugins = {}
@@ -79,15 +77,6 @@ class MetadataView(View):
 
             # Fill identification
             data['identification'] = {'cluster_id': EtcdConfiguration.get('/ovs/framework/cluster_id')}
-
-            # Registration data
-            registered = EtcdConfiguration.get('/ovs/framework/registered')
-            data['registration']['registered'] = registered
-            if registered is False:
-                cluster_install_time = EtcdConfiguration.get('/ovs/framework/install_time')
-                if cluster_install_time is not None:
-                    timeout_days = 30 * 24 * 60 * 60
-                    data['registration']['remaining'] = (timeout_days - time.time() + cluster_install_time) / 24 / 60 / 60
 
             # Get authentication metadata
             authentication_metadata = {'ip': System.get_my_storagerouter().ip}
