@@ -74,6 +74,10 @@ class VDiskController(object):
         """
         List all known volumes on a specific vpool or on all
         :param vpool_guid: Guid of the vPool to list the volumes for
+        :type vpool_guid: str
+
+        :return: Volumes known by the vPool
+        :rtype: list
         """
         if vpool_guid is not None:
             vpool = VPool(vpool_guid)
@@ -94,7 +98,12 @@ class VDiskController(object):
         Delete a disk
         Triggered by volumedriver messages on the queue
         :param volumename: volume ID of the disk
+        :type volumename: str
+
         :param storagedriver_id: ID of the storagedriver serving the volume to delete
+        :type storagedriver_id: str
+
+        :return: None
         """
         disk = VDiskList.get_vdisk_by_volume_id(volumename)
         if disk is not None:
@@ -132,7 +141,10 @@ class VDiskController(object):
     def delete(diskguid):
         """
         Delete a vdisk through API
-        @param diskguid: GUID of the vdisk to delete
+        :param diskguid: Guid of the vdisk to delete
+        :type diskguid: str
+
+        :return: None
         """
         vdisk = VDisk(diskguid)
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
@@ -150,9 +162,18 @@ class VDiskController(object):
         Triggered by volumedriver messages on the queue
 
         :param volumename: volume ID of the disk
+        :type volumename: str
+
         :param volumesize: size of the volume
+        :type volumesize: int
+
         :param volumepath: path on hypervisor to the volume
+        :type volumepath: str
+
         :param storagedriver_id: ID of the storagedriver serving the volume to resize
+        :type storagedriver_id: str
+
+        :return: None
         """
         pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
@@ -187,9 +208,18 @@ class VDiskController(object):
         Triggered by volumedriver messages
 
         :param volumename: volume ID of the disk
+        :type volumename: str
+
         :param volume_old_path: old path on hypervisor to the volume
+        :type volume_old_path: str
+
         :param volume_new_path: new path on hypervisor to the volume
+        :type volume_new_path: str
+
         :param storagedriver_id: ID of the storagedriver serving the volume to rename
+        :type storagedriver_id: str
+
+        :return: None
         """
         pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         hypervisor = Factory.get(pmachine)
@@ -211,13 +241,13 @@ class VDiskController(object):
         Triggered when volume has changed owner (Clean migration or stolen due to other reason)
         Triggered by volumedriver messages
 
-        :param volume_id:    Volume ID of the disk
-        :type volume_id:     unicode
+        :param volume_id: Volume ID of the disk
+        :type volume_id: unicode
 
         :param new_owner_id: ID of the storage driver the volume migrated to
-        :type new_owner_id:  unicode
+        :type new_owner_id: unicode
 
-        :returns:            None
+        :return: None
         """
         sd = StorageDriverList.get_by_storagedriver_id(storagedriver_id=new_owner_id)
         vdisk = VDiskList.get_vdisk_by_volume_id(volume_id=volume_id)
@@ -234,12 +264,28 @@ class VDiskController(object):
         """
         Clone a disk
         :param diskguid: Guid of the disk to clone
+        :type diskguid: str
+
         :param snapshotid: ID of the snapshot to clone from
+        :type snapshotid: str
+
         :param devicename: Name of the device to use in clone's description
+        :type devicename: str
+
         :param pmachineguid: Guid of the physical machine
+        :type pmachineguid: str
+
         :param machinename: Name of the machine the disk is attached to
+        :type machinename: str
+
         :param machineguid: Guid of the machine
+        :type machineguid: str
+
         :param detached: Boolean indicating the disk is attached to a machine or not
+        :type detached: bool
+
+        ;return: Information about the cloned volume
+        :rtype: dict
         """
         # 1. Validations
         name_regex = "^[0-9a-zA-Z][-_a-zA-Z0-9]{1,48}[a-zA-Z0-9]$"
@@ -302,7 +348,7 @@ class VDiskController(object):
 
         # 4. Configure Storage Driver
         try:
-            mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
+            mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)[0]
             if mds_service is None:
                 raise RuntimeError('Could not find a MDS service')
 
@@ -342,9 +388,17 @@ class VDiskController(object):
         """
         Create a disk snapshot
 
-        :param diskguid: guid of the disk
-        :param metadata: dict of metadata
+        :param diskguid: Guid of the disk
+        :type diskguid: str
+
+        :param metadata: Dictionary of metadata
+        :type metadata: dict
+
         :param snapshotid: ID of the snapshot
+        :type snapshotid: str
+
+        :return: ID of the newly created snapshot
+        :rtype: str
         """
         if not isinstance(metadata, dict):
             raise ValueError('Expected metadata as dict, got {0} instead'.format(type(metadata)))
@@ -365,8 +419,13 @@ class VDiskController(object):
         """
         Delete a disk snapshot
 
-        @param diskguid: guid of the disk
-        @param snapshotid: ID of the snapshot
+        :param diskguid: Guid of the disk
+        :type diskguid: str
+
+        :param snapshotid: ID of the snapshot
+        :type snapshotid: str
+
+        :return: None
 
         @todo: Check if new volumedriver storagedriver upon deletion
         of a snapshot has built-in protection to block it from being deleted
@@ -388,7 +447,10 @@ class VDiskController(object):
         """
         Set a disk as template
 
-        @param diskguid: guid of the disk
+        :param diskguid: Guid of the disk
+        :type diskguid: str
+
+        :return: None
         """
         disk = VDisk(diskguid)
         if disk.is_vtemplate is True:
@@ -402,7 +464,13 @@ class VDiskController(object):
         """
         Rolls back a disk based on a given disk snapshot timestamp
         :param diskguid: Guid of the disk to rollback
+        :type diskguid: str
+
         :param timestamp: Timestamp of the snapshot to rollback from
+        :type timestamp: str
+
+        :return: True
+        :rtype: bool
         """
         disk = VDisk(diskguid)
         snapshots = [snap for snap in disk.snapshots if snap['timestamp'] == timestamp]
@@ -420,11 +488,22 @@ class VDiskController(object):
         Create a disk from a template
 
         :param diskguid: Guid of the disk
+        :type diskguid: str
+
         :param machinename: Name of the machine
+        :type machinename: str
+
         :param devicename: Device file name for the disk (eg: my_disk-flat.vmdk)
+        :type devicename: str
+
         :param pmachineguid: Guid of pmachine to create new vdisk on
+        :type pmachineguid: str
+
         :param machineguid: Guid of the machine to assign disk to
-        :return diskguid: Guid of new disk
+        :type machineguid: str
+
+        :return diskguid: Information about the new volume
+        :rtype: dict
         """
         pmachine = PMachine(pmachineguid)
         hypervisor = Factory.get(pmachine)
@@ -464,7 +543,7 @@ class VDiskController(object):
         new_vdisk.vmachine = new_vdisk_vmachine if machineguid else vdisk.vmachine
         new_vdisk.save()
 
-        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, new_vdisk.vpool)
+        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, new_vdisk.vpool)[0]
         if mds_service is None:
             raise RuntimeError('Could not find a MDS service')
 
@@ -489,7 +568,8 @@ class VDiskController(object):
                 logger.exception('Exception during exception handling of "create_clone_from_template" : {0}'.format(str(ex2)))
             raise ex
 
-        return {'diskguid': new_vdisk.guid, 'name': new_vdisk.name,
+        return {'diskguid': new_vdisk.guid,
+                'name': new_vdisk.name,
                 'backingdevice': disk_path}
 
     @staticmethod
@@ -497,10 +577,17 @@ class VDiskController(object):
     def create_new(diskname, size, storagedriver_guid):
         """
         Create a new vdisk/volume using filesystem calls
-        :param diskname: name of the disk
+        :param diskname: Name of the disk
+        :type diskname: str
+
         :param size: size of the disk (GB)
+        :type size: int
+
         :param storagedriver_guid: guid of the Storagedriver
-        :return: guid of the new disk
+        :type storagedriver_guid: str
+
+        :return: Guid of the new disk
+        :rtype: str
         """
         logger.info('Creating new empty disk {0} of {1} GB'.format(diskname, size))
         storagedriver = StorageDriver(storagedriver_guid)
@@ -530,10 +617,16 @@ class VDiskController(object):
         Create a volume using filesystem calls
         Calls "truncate" to create sparse raw file
 
-        @param location: location, filename
-        @param size: size of volume, GB
-        @param: storagerouter_guid: use ssh client to create file on remote storagerouter
-        @return None
+        :param location: Location, filename
+        :type location: str
+
+        :param size: Size of volume, GB
+        :type size: int
+
+        :param storagerouter_guid: Use ssh client to create file on remote storagerouter
+        :type storagerouter_guid: str
+
+        :return: None
         """
         logger.info('Creating volume {0} of {1} GB'.format(location, size))
 
@@ -553,8 +646,10 @@ class VDiskController(object):
         Create a volume using filesystem calls
         Calls "rm" to delete raw file
 
-        @param location: location, filename
-        @return None
+        :param location: Location, filename
+        :type location: str
+
+        :return: None
         """
         if not os.path.exists(location):
             logger.error('File already deleted at %s' % location)
@@ -577,9 +672,13 @@ class VDiskController(object):
         TODO: use volumedriver API
         TODO: model VDisk() and return guid
 
-        @param location: location, filename
-        @param size: size of volume, GB
-        @return None
+        :param location: Location, filename
+        :type location: str
+
+        :param size: Size of volume, GB
+        :type size: int
+
+        :return: None
         """
         if not os.path.exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
@@ -593,8 +692,15 @@ class VDiskController(object):
         """
         Update a vDisk name using Management Center: set new name
         :param volume_id: ID of the volume to update its name
+        :type volume_id: str
+
         :param old_name: Old name of the volume
+        :type old_name: str
+
         :param new_name: New name of the volume
+        :type new_name: str
+
+        :return: None
         """
         vdisk = None
         for mgmt_center in MgmtCenterList.get_mgmtcenters():
@@ -629,6 +735,10 @@ class VDiskController(object):
         """
         Retrieve the configuration parameters for the given disk from the storagedriver.
         :param vdisk_guid: Guid of the virtual disk to retrieve the configuration for
+        :type vdisk_guid: str
+
+        :return: Storage driver configuration information for the vDisk
+        :rtype: dict
         """
         vdisk = VDisk(vdisk_guid)
         vpool = VPool(vdisk.vpool_guid)
@@ -689,7 +799,12 @@ class VDiskController(object):
         """
         Sets configuration parameters for a given vdisk.
         :param vdisk_guid: Guid of the virtual disk to set the configuration parameters for
+        :type vdisk_guid: str
+
         :param new_config_params: New configuration parameters
+        :type new_config_params: dict
+
+        :return: None
         """
         required_params = {'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
                            'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
@@ -788,7 +903,7 @@ class VDiskController(object):
                         block_size = vol_info.lba_size * vol_info.cluster_multiplier or 4096
                         limit = new_value * 1024 * 1024 * 1024 / block_size if new_value else None
                         vdisk.storagedriver_client.set_readcache_limit(volume_id, limit)
-                    elif key =='metadata_cache_size':
+                    elif key == 'metadata_cache_size':
                         vdisk.storagedriver_client.set_metadata_cache_capacity(volume_id, new_value / StorageDriverClient.METADATA_CACHE_PAGE_SIZE)
                     else:
                         raise KeyError('Unsupported property provided: "{0}"'.format(key))
@@ -805,9 +920,16 @@ class VDiskController(object):
         Update disk info using management center (if available)
         If no management center, try with hypervisor
         If no info retrieved, use devicename
-        @param disk: vDisk hybrid (vdisk to be updated)
-        @param pmachine: pmachine hybrid (pmachine running the storagedriver)
-        @param storagedriver: storagedriver hybrid (storagedriver serving the vdisk)
+        :param disk: vDisk hybrid (vdisk to be updated)
+        :type disk: VDisk
+
+        :param pmachine: Pmachine hybrid (pmachine running the storagedriver)
+        :type pmachine: PMachine
+
+        :param storagedriver: Storagedriver hybrid (storagedriver serving the vdisk)
+        :type storagedriver: StorageDriver
+
+        :return: None
         """
         disk_name = None
         if pmachine.mgmtcenter is not None:
@@ -849,16 +971,16 @@ class VDiskController(object):
     def dtl_checkup(vpool_guid=None, vdisk_guid=None, storagerouters_to_exclude=None):
         """
         Check DTL for all volumes
-        :param vpool_guid:                vPool to check the DTL configuration of all its disks
-        :type vpool_guid:                 String
+        :param vpool_guid: vPool to check the DTL configuration of all its disks
+        :type vpool_guid: str
 
-        :param vdisk_guid:                Virtual Disk to check its DTL configuration
-        :type vdisk_guid:                 String
+        :param vdisk_guid: Virtual Disk to check its DTL configuration
+        :type vdisk_guid: str
 
         :param storagerouters_to_exclude: Storage Router Guids to exclude from possible targets
-        :type storagerouters_to_exclude:  List
+        :type storagerouters_to_exclude: list
 
-        :return:                          None
+        :return: None
         """
         if vpool_guid is not None and vdisk_guid is not None:
             raise ValueError('vpool and vdisk are mutually exclusive')
@@ -1056,9 +1178,17 @@ class VDiskController(object):
         """
         Triggered by volumedriver when DTL state changes
         :param volume_name: ID of the volume
+        :type volume_name: str
+
         :param old_state: Previous DTL status
+        :type old_state: int
+
         :param new_state: New DTL status
+        :type new_state: int
+
         :param storagedriver_id: ID of the storagedriver hosting the volume
+        :type storagedriver_id: str
+
         :return: None
         """
         if new_state == VolumeDriverEvents_pb2.Degraded and old_state != VolumeDriverEvents_pb2.Standalone:
@@ -1077,7 +1207,9 @@ class VDiskController(object):
         Cleanup bad vdisk:
         - in case create_from_template failed
         - remove mds_services so the vdisk can be properly cleaned up
-        :param vdiskguid: guid of vdisk
+        :param vdiskguid: Guid of vdisk
+        :type vdiskguid: str
+
         :return: None
         """
         vdisk = VDisk(vdiskguid)
@@ -1101,7 +1233,10 @@ class VDiskController(object):
         """
         Schedule a backend sync on a vdisk
         :param vdisk_guid: Guid of vdisk to schedule a backend sync to
+        :type vdisk_guid: str
+
         :return: TLogName associated with the data sent off to the backend
+        :rtype: str
         """
         vdisk = VDisk(vdisk_guid)
         logger.info('Schedule backend sync for vdisk {0}'.format(vdisk.name))
@@ -1115,7 +1250,13 @@ class VDiskController(object):
         """
         Verify if a volume is synced up to a specific tlog
         :param vdisk_guid: Guid of vdisk to verify
-        :param tlog_name: tlog_name to verify
+        :type vdisk_guid: str
+
+        :param tlog_name: Tlog_name to verify
+        :type tlog_name: str
+
+        :return: True or False
+        :rtype: bool
         """
         vdisk = VDisk(vdisk_guid)
         storagedriver_client = StorageDriverClient.load(vdisk.vpool)
@@ -1128,7 +1269,13 @@ class VDiskController(object):
         """
         Verify if a volume is synced up to a specific snapshot
         :param vdisk_guid: Guid of vdisk to verify
-        :param snapshot_id: snapshot_id to verify
+        :type vdisk_guid: str
+
+        :param snapshot_id: Snapshot_id to verify
+        :type snapshot_id: str
+
+        :return: True or False
+        :rtype: bool
         """
         vdisk = VDisk(vdisk_guid)
         storagedriver_client = StorageDriverClient.load(vdisk.vpool)

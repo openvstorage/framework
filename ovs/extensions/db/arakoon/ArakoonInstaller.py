@@ -225,6 +225,20 @@ class ArakoonClusterMetadata(object):
                                                    'in_use': self.in_use,
                                                    'internal': self.internal})
 
+    def claim(self):
+        """
+        Claim a cluster and mark it in use
+        """
+        self.in_use = True
+        self.write()
+
+    def unclaim(self):
+        """
+        Un-claim a cluster and mark it as no longer in use
+        """
+        self.in_use = False
+        self.write()
+
 
 class ArakoonInstaller(object):
     """
@@ -235,9 +249,6 @@ class ArakoonInstaller(object):
     ARAKOON_HOME_DIR = '{0}/arakoon/{1}/db'
     ARAKOON_TLOG_DIR = '{0}/arakoon/{1}/tlogs'
     ARAKOON_CATCHUP_COMMAND = 'arakoon --node {0} -config {1} -catchup-only'
-    ABM_PLUGIN = 'albamgr_plugin'
-    NSM_PLUGIN = 'nsm_host_plugin'
-    ARAKOON_PLUGIN_DIR = '/usr/lib/alba'
     ETCD_CONFIG_ROOT = '/ovs/arakoon'
     ETCD_CONFIG_KEY = ETCD_CONFIG_ROOT + '/{0}/config'
     ETCD_CONFIG_PATH = 'etcd://127.0.0.1:2379' + ETCD_CONFIG_KEY
@@ -261,7 +272,7 @@ class ArakoonInstaller(object):
         :type ip: str
 
         :param directories: Directories to archive or delete
-        :type directories: dictionary
+        :type directories: dict
 
         :return: None
         """
@@ -308,24 +319,35 @@ class ArakoonInstaller(object):
             root_client.file_delete(info['files'])
 
     @staticmethod
-    def create_cluster(cluster_name, cluster_type, ip, base_dir, locked=True, internal=True):
+    def create_cluster(cluster_name, cluster_type, ip, base_dir, plugins=None, locked=True, internal=True):
         """
         Always creates a cluster but marks it's usage according to the internal flag
         :param cluster_name: Name of the cluster
+        :type cluster_name: str
+
         :param cluster_type: Type of the cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
+        :type cluster_type: str
+
         :param ip: IP address of the first node of the new cluster
+        :type ip: str
+
         :param base_dir: Base directory that should contain the data and tlogs
+        :type base_dir: str
+
+        :param plugins: Plugins that should be added to the configuration file
+        :type plugins: list
+
         :param locked: Indicates whether the create should run in a locked context (e.g. to prevent port conflicts)
+        :type locked: bool
+
         :param internal: Is cluster internally managed by OVS
+        :type internal: bool
+
+        :return: Ports used by arakoon cluster
+        :rtype: dict
         """
         if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
             raise ValueError('Cluster type {0} is not supported. Please choose from {1}'.format(cluster_type, ', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
-
-        plugins = []
-        if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.NSM:
-            plugins = [ArakoonInstaller.NSM_PLUGIN]
-        if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.ABM:
-            plugins = [ArakoonInstaller.ABM_PLUGIN]
 
         logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
         base_dir = base_dir.rstrip('/')
@@ -370,16 +392,10 @@ class ArakoonInstaller(object):
                                                   tlog_dir=tlog_dir))
             ArakoonInstaller._deploy(config)
 
-            data_dir = '' if base_dir == '/' else base_dir
-            for plugin in plugins:
-                cmd = 'ln -s {0}/{1}.cmxs {2}/arakoon/{3}/db'.format(ArakoonInstaller.ARAKOON_PLUGIN_DIR, plugin,
-                                                                     data_dir, cluster_name)
-                client.run(cmd)
-
             metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
-            metadata.cluster_type = cluster_type.upper()
             metadata.internal = internal
-            metadata.write()
+            metadata.cluster_type = cluster_type.upper()
+            metadata.claim()
         finally:
             if port_mutex is not None:
                 port_mutex.release()
@@ -389,39 +405,16 @@ class ArakoonInstaller(object):
                 'messaging_port': ports[1]}
 
     @staticmethod
-    def claim_cluster(cluster_name, cluster_type):
-        """
-        Claim a cluster and mark it in use
-        :param cluster_name: Name of the cluster to claim
-        :param cluster_type: Type of cluster to claim: ['FWK','SD','ABM','NSM']
-        :return: Cluster name
-        """
-
-        internal = ArakoonInstaller.is_internal(cluster_type=cluster_type)
-        # if internal is True and cluster_name is None:
-        #     raise RuntimeError('Cluster name required when marking internal cluster')
-
-        available_cluster = None
-        for cluster in ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=cluster_type, in_use=False):
-            if cluster.cluster_id == cluster_name:
-                available_cluster = cluster
-                break
-
-        if available_cluster is None:
-            raise RuntimeError('No available internal clusters found for type: {0}'.format(cluster_type))
-
-        if available_cluster.in_use is True:
-            raise RuntimeError('Cluster is already marked as in use: {0}'.format(cluster_name))
-
-        available_cluster.in_use = True
-        available_cluster.write()
-
-    @staticmethod
     def delete_cluster(cluster_name, ip):
         """
         Deletes a complete cluster
-        :param ip: IP address of the last node of a cluster
         :param cluster_name: Name of the cluster to remove
+        :type cluster_name: str
+
+        :param ip: IP address of the last node of a cluster
+        :type ip: str
+
+        :return: None
         """
         logger.debug('Deleting cluster {0} on {1}'.format(cluster_name, ip))
         config = ArakoonClusterConfig(cluster_name)
@@ -437,10 +430,20 @@ class ArakoonInstaller(object):
     def extend_cluster(master_ip, new_ip, cluster_name, base_dir):
         """
         Extends a cluster to a given new node
-        :param base_dir: Base directory that will hold the db and tlogs
-        :param cluster_name: Name of the cluster to be extended
-        :param new_ip: IP address of the node to be added
         :param master_ip: IP of one of the already existing nodes
+        :type master_ip: str
+
+        :param new_ip: IP address of the node to be added
+        :type new_ip: str
+
+        :param cluster_name: Name of the cluster to be extended
+        :type cluster_name: str
+
+        :param base_dir: Base directory that will hold the db and tlogs
+        :type base_dir: str
+
+        :return: Ports used by arakoon cluster
+        :rtype: dict
         """
         logger.debug('Extending cluster {0} from {1} to {2}'.format(cluster_name, master_ip, new_ip))
         base_dir = base_dir.rstrip('/')
@@ -483,9 +486,16 @@ class ArakoonInstaller(object):
     def shrink_cluster(deleted_node_ip, cluster_name, offline_nodes=None):
         """
         Removes a node from a cluster, the old node will become a slave
-        :param cluster_name: The name of the cluster to shrink
         :param deleted_node_ip: The ip of the node that should be deleted
+        :type deleted_node_ip: str
+
+        :param cluster_name: The name of the cluster to shrink
+        :type cluster_name: str
+
         :param offline_nodes: Storage Routers which are offline
+        :type offline_nodes: list
+
+        :return: None
         """
         logger.debug('Shrinking cluster {0} from {1}'.format(cluster_name, deleted_node_ip))
         config = ArakoonClusterConfig(cluster_name)
@@ -507,7 +517,12 @@ class ArakoonInstaller(object):
         """
         (Re)deploys a given cluster
         :param cluster_name: Name of the cluster to (re)deploy
+        :type cluster_name: str
+
         :param node_ip: IP address of one of the cluster's nodes
+        :type node_ip: str
+
+        :return: None
         """
         logger.debug('(Re)deploying cluster {0} from {1}'.format(cluster_name, node_ip))
         config = ArakoonClusterConfig(cluster_name)
@@ -517,10 +532,15 @@ class ArakoonInstaller(object):
     @staticmethod
     def get_arakoon_metadata_by_cluster_type(cluster_type, in_use):
         """
-        Retrieve cluster information for an unused cluster based on its type
+        Retrieve arakoon cluster information based on its type
         :param cluster_type: Type of arakoon cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
+        :type cluster_type: str
+
         :param in_use: Return clusters which are already in use or not
+        :type in_use: bool
+
         :return: List of ArakoonClusterMetadata objects
+        :rtype: list
         """
         clusters = []
         cluster_type = cluster_type.upper()
@@ -537,6 +557,26 @@ class ArakoonInstaller(object):
                 if in_use is False:
                     break  # We only need 1 unused cluster (at a time)
         return clusters
+
+    @staticmethod
+    def get_arakoon_metadata_by_cluster_name(cluster_name):
+        """
+        Retrieve arakoon cluster information based on its name
+        :param cluster_name: Name of the arakoon cluster
+        :type cluster_name: str
+
+        :return: Arakoon cluster metadata information
+        :rtype: ArakoonClusterMetadata
+        """
+        if not EtcdConfiguration.exists('/ovs/arakoon', raw=True):
+            raise ValueError('Etcd key "/ovs/arakoon" not found')
+
+        for cluster in EtcdConfiguration.list('/ovs/arakoon'):
+            if cluster == cluster_name:
+                arakoon_metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
+                arakoon_metadata.load_metadata()
+                return arakoon_metadata
+        raise ValueError('No arakoon cluster found with name "{0}"'.format(cluster_name))
 
     @staticmethod
     def _get_free_ports(client):
@@ -621,8 +661,13 @@ class ArakoonInstaller(object):
     def start(cluster_name, client):
         """
         Starts an arakoon cluster
-        :param client: Client on which to start the service
         :param cluster_name: The name of the cluster service to start
+        :type cluster_name: str
+
+        :param client: Client on which to start the service
+        :type client: SSHClient
+
+        :return: None
         """
         if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.start_service('arakoon-{0}'.format(cluster_name), client=client)
@@ -631,8 +676,13 @@ class ArakoonInstaller(object):
     def stop(cluster_name, client):
         """
         Stops an arakoon service
-        :param client: Client on which to stop the service
         :param cluster_name: The name of the cluster service to stop
+        :type cluster_name: str
+
+        :param client: Client on which to stop the service
+        :type client: SSHClient
+
+        :return: None
         """
         if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.stop_service('arakoon-{0}'.format(cluster_name), client=client)
@@ -641,8 +691,13 @@ class ArakoonInstaller(object):
     def is_running(cluster_name, client):
         """
         Checks if arakoon service is running
-        :param client: Client on which to stop the service
-        :param cluster_name: The name of the cluster service to stop
+        :param cluster_name: The name of the cluster service to check
+        :type cluster_name: str
+
+        :param client: Client on which to check the service
+        :type client: SSHClient
+
+        :return: None
         """
         if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client):
             return ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client)
@@ -652,8 +707,13 @@ class ArakoonInstaller(object):
     def remove(cluster_name, client):
         """
         Removes an arakoon service
-        :param client: Client on which to remove the service
         :param cluster_name: The name of the cluster service to remove
+        :type cluster_name: str
+
+        :param client: Client on which to remove the service
+        :type client: SSHClient
+
+        :return: None
         """
         if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.remove_service('arakoon-{0}'.format(cluster_name), client=client)
@@ -662,8 +722,14 @@ class ArakoonInstaller(object):
     def wait_for_cluster(cluster_name, sshclient):
         """
         Waits for an Arakoon cluster to be available (by sending a nop)
-        :param sshclient: Client on which to wait for the cluster
         :param cluster_name: Name of the cluster to wait on
+        :type cluster_name: str
+
+        :param sshclient: Client on which to wait for the cluster
+        :type sshclient: SSHClient
+
+        :return: True
+        :rtype: Boolean
         """
         logger.debug('Waiting for cluster {0}'.format(cluster_name))
         from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -677,8 +743,13 @@ class ArakoonInstaller(object):
     def restart_cluster(cluster_name, master_ip):
         """
         Execute a restart sequence (Executed after arakoon and/or alba package upgrade)
-        :param master_ip: IP of one of the cluster nodes
         :param cluster_name: Name of the cluster to restart
+        :type cluster_name: str
+
+        :param master_ip: IP of one of the cluster nodes
+        :type master_ip: str
+
+        :return: None
         """
         logger.debug('Restart sequence for {0} via {1}'.format(cluster_name, master_ip))
 
@@ -705,11 +776,17 @@ class ArakoonInstaller(object):
     def restart_cluster_add(cluster_name, current_ips, new_ip):
         """
         Execute a (re)start sequence after adding a new node to a cluster.
-        :param new_ip: IP of the newly added node
-        :param current_ips: IPs of the previous nodes
         :param cluster_name: Name of the cluster to restart
-        """
+        :type cluster_name: str
 
+        :param current_ips: IPs of the previous nodes
+        :type current_ips: list
+
+        :param new_ip: IP of the newly added node
+        :type new_ip: str
+
+        :return: None
+        """
         logger.debug('Restart sequence (add) for {0}'.format(cluster_name))
         logger.debug('Current ips: {0}'.format(', '.join(current_ips)))
         logger.debug('New ip: {0}'.format(new_ip))
@@ -747,8 +824,13 @@ class ArakoonInstaller(object):
     def restart_cluster_remove(cluster_name, remaining_ips):
         """
         Execute a restart sequence after removing a node from a cluster
-        :param remaining_ips: IPs of the remaining nodes after shrink
         :param cluster_name: Name of the cluster to restart
+        :type cluster_name: str
+
+        :param remaining_ips: IPs of the remaining nodes after shrink
+        :type remaining_ips: list
+
+        :return: None
         """
         logger.debug('Restart sequence (remove) for {0}'.format(cluster_name))
         logger.debug('Remaining ips: {0}'.format(', '.join(remaining_ips)))
@@ -760,21 +842,3 @@ class ArakoonInstaller(object):
             if len(remaining_ips) > 2:  # A two node cluster needs all nodes running
                 ArakoonInstaller.wait_for_cluster(cluster_name, client)
         logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))
-
-    @staticmethod
-    def is_internal(cluster_type):
-        """
-        Checks if an arakoon cluster is internally managed, if no clusters are found, internally managed is assumed
-        Any cluster found that is externally managed for this cluster_type -> return False
-        :param cluster_type: Type of cluster to claim: ['FWK','SD','ABM','NSM']
-        :return: True|False
-        """
-
-        metadata_in_use = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=cluster_type,
-                                                                                in_use=True)
-        metadata_not_in_use = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=cluster_type,
-                                                                                    in_use=False)
-        for metadata in metadata_in_use + metadata_not_in_use:
-            if metadata.cluster_type == cluster_type and metadata.internal is False:
-                return False
-        return True

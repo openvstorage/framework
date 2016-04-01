@@ -15,6 +15,7 @@
 """
 MDSServiceList module
 """
+from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 
@@ -30,7 +31,7 @@ class MDSServiceList(object):
         Returns a list of MDSServices based on the StorageDriver (via StorageRouter > Service and Vpool)
         * This list uses object relations instead of queries for better performance
         """
-        mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
+        mdsservice_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.MD_SERVER)
         storagedriver = StorageDriver(storagedriver_guid)
         for service in storagedriver.storagerouter.services:
             if service.type_guid == mdsservice_type.guid and service.mds_service.vpool_guid == storagedriver.vpool_guid:

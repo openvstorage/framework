@@ -64,7 +64,11 @@ class SetupController(object):
         2. Prepare cluster
         3. Depending on (2), setup first/extra node
         4. Depending on (2), promote new extra node
+
         :param force_type: Force master or extra node
+        :type force_type: str
+
+        :return: None
         """
         SetupController._log(messages='Open vStorage Setup', boxed=True)
         Toolbox.verify_required_params(actual_params={'force_type': force_type},
@@ -196,7 +200,7 @@ class SetupController(object):
                         current_sr_message = []
                         for sr_name in sorted(SetupController.nodes):
                             current_sr_message.append('{0:<15} - {1}'.format(SetupController.nodes[sr_name]['ip'], sr_name))
-                        if Interactive.ask_yesno(message='Following StorageRouters were detected: \n  -  {0}\nIs this correct?'.format('\n  -  '.join(current_sr_message)),
+                        if Interactive.ask_yesno(message='Following StorageRouters were detected:\n  -  {0}\nIs this correct?'.format('\n  -  '.join(current_sr_message)),
                                                  default_value=True) is False:
                             raise Exception('The cluster on the given master node cannot be joined as not all StorageRouters could be loaded')
 
@@ -219,7 +223,7 @@ class SetupController(object):
                     logger.debug('Automated installation')
                     cluster_ip = master_ip if cluster_ip is None else cluster_ip
                     first_node = master_ip == cluster_ip
-                    logger.info('Detected {0} a 1st node installation'.format('' if first_node is True else 'not'))
+                    logger.info('Detected{0} a 1st node installation'.format('' if first_node is True else ' not'))
 
                     if avahi_installed is True and cluster_name in discovery_result:
                         SetupController.nodes = discovery_result[cluster_name]
@@ -356,7 +360,12 @@ class SetupController(object):
         """
         Promotes or demotes the local node
         :param node_action: Demote or promote
+        :type node_action: str
+
         :param cluster_ip: IP of node to promote or demote
+        :type cluster_ip: str
+
+        :return: None
         """
 
         if node_action not in ('promote', 'demote'):
@@ -474,6 +483,7 @@ class SetupController(object):
         Remove the nodes with specified IPs from the cluster
         :param node_ips: IPs of nodes to remove
         :type node_ips: str
+
         :return: None
         """
         from ovs.lib.storagedriver import StorageDriverController
@@ -794,26 +804,21 @@ class SetupController(object):
         if len(clusters) > 0:
             raise ValueError('Found a cluster of type "{0}" which has already been claimed'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
 
-        internal = ArakoonInstaller.is_internal(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK)
+        clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=False)
         arakoon_ports = []
-        arakoon_cluster_name = None
-        if internal is True:
-            clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=False)
-            if len(clusters) == 0:
-                arakoon_cluster_name = 'ovsdb'
-                SetupController._log(messages='Setting up Arakoon cluster {0}'.format(arakoon_cluster_name))
-                result = ArakoonInstaller.create_cluster(cluster_name=arakoon_cluster_name,
-                                                         cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
-                                                         ip=cluster_ip,
-                                                         base_dir=EtcdConfiguration.get('/ovs/framework/paths|ovsdb'),
-                                                         locked=False)
-                arakoon_ports = [result['client_port'], result['messaging_port']]
-                clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=False)
-                if len(clusters) == 0:
-                    raise ValueError('Expected exactly 1 "{0}" arakoon cluster not being in use'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
-            else:
-                arakoon_cluster_name = str(clusters[0].cluster_id)
-        ArakoonInstaller.claim_cluster(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, cluster_name=arakoon_cluster_name)
+        if len(clusters) == 0:  # No externally managed cluster found, we create 1 ourselves
+            SetupController._log(messages='Setting up Arakoon cluster ovsdb')
+            internal = True
+            result = ArakoonInstaller.create_cluster(cluster_name='ovsdb',
+                                                     cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
+                                                     ip=cluster_ip,
+                                                     base_dir=EtcdConfiguration.get('/ovs/framework/paths|ovsdb'),
+                                                     locked=False)
+            arakoon_ports = [result['client_port'], result['messaging_port']]
+        else:
+            SetupController._log(messages='Arakoon cluster of type {0} with name {1} found, marking it as being used'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK, clusters[0].cluster_id))
+            internal = False
+            clusters[0].claim()
 
         SetupController._add_services(target_client, unique_id, 'master')
         SetupController._log(messages='Build configuration files')
@@ -847,7 +852,7 @@ class SetupController(object):
             from ovs.dal.hybrids.service import Service
             service = Service()
             service.name = 'arakoon-ovsdb'
-            service.type = ServiceTypeList.get_by_name('Arakoon')
+            service.type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON)
             service.ports = arakoon_ports
             service.storagerouter = storagerouter if internal is True else None
             service.save()
@@ -1019,7 +1024,7 @@ class SetupController(object):
 
                 if first_node is True:
                     try:
-                        for service in ServiceTypeList.get_by_name('Arakoon').services:  # Externally managed Arakoon services not linked to the storagerouter
+                        for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:  # Externally managed Arakoon services not linked to the storagerouter
                             service.delete()
                     except Exception as ex:
                         SetupController._log(messages='Cleaning up services failed with error: {0}'.format(ex), loglevel='error')
@@ -1161,7 +1166,7 @@ class SetupController(object):
             if 'arakoon-ovsdb' not in [s.name for s in ServiceList.get_services()]:
                 service = Service()
                 service.name = 'arakoon-ovsdb'
-                service.type = ServiceTypeList.get_by_name('Arakoon')
+                service.type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON)
                 service.ports = arakoon_ports
                 service.storagerouter = storagerouter
                 service.save()
@@ -1783,9 +1788,6 @@ EOF
     def _retrieve_storagerouters(ip, password):
         """
         Retrieve the storagerouters from model
-        :param ip: IP to login
-        :param password: Password to use for log in
-        :return: Storage Router information
         """
         storagerouters = {}
         try:
@@ -1816,7 +1818,7 @@ EOF
             return True
 
         if not EtcdConfiguration.exists(key='{0}|metadata'.format(etcd_key)):
-            raise ValueError('Not all required keys ({0}) for {2} are present in the Etcd cluster'.format(etcd_key, service))
+            raise ValueError('Not all required keys ({0}) for {1} are present in the Etcd cluster'.format(etcd_key, service))
         metadata = EtcdConfiguration.get('{0}|metadata'.format(etcd_key))
         if 'internal' not in metadata:
             raise ValueError('Internal flag not present in metadata for {0}.\nPlease provide a key: {1} and value "metadata": {"internal": True/False}'.format(service, etcd_key))

@@ -25,6 +25,7 @@ from datetime import datetime
 from datetime import timedelta
 from ovs.celery_run import celery
 from ovs.dal.hybrids.diskpartition import DiskPartition
+from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vdisklist import VDiskList
@@ -96,8 +97,10 @@ class ScheduledTaskController(object):
         > 1m | delete
 
         :param timestamp: Timestamp to determine whether snapshots should be kept or not, if none provided, current time will be used
-        """
+        :type timestamp: float
 
+        :return: None
+        """
         logger.info('Delete snapshots started')
 
         day = timedelta(1)
@@ -287,14 +290,7 @@ class ScheduledTaskController(object):
     @staticmethod
     @celery.task(name='ovs.scheduled.execute_scrub_work')
     def _execute_scrub_work(scrub_location, vdisk_guids):
-        def verify_mds_config(current_vdisk):
-            """
-            Retrieve the metadata backend configuration for vDisk
-            :param current_vdisk: vDisk to retrieve configuration for
-            :type current_vdisk:  vDisk
-
-            :return:              MDS configuration for vDisk
-            """
+        def _verify_mds_config(current_vdisk):
             current_vdisk.invalidate_dynamics(['info'])
             vdisk_configs = current_vdisk.info['metadata_backend_config']
             if len(vdisk_configs) == 0:
@@ -318,13 +314,13 @@ class ScheduledTaskController(object):
                 storagedriver = storagedrivers[vdisk.storagedriver_id]
 
                 # Load the vDisk's MDS configuration
-                configs = verify_mds_config(current_vdisk=vdisk)
+                configs = _verify_mds_config(current_vdisk=vdisk)
 
                 # Check MDS master is local. Trigger MDS handover if necessary
                 if configs[0].get('ip') != storagedriver.storagerouter.ip:
                     logger.debug('Execute Scrub - Virtual disk {0} - {1} - MDS master is not local, trigger handover'.format(vdisk.guid, vdisk.name))
                     MDSServiceController.ensure_safety(vdisk)
-                    configs = verify_mds_config(current_vdisk=vdisk)
+                    configs = _verify_mds_config(current_vdisk=vdisk)
                     if configs[0].get('ip') != storagedriver.storagerouter.ip:
                         skipped += 1
                         logger.info('Execute Scrub - Virtual disk {0} - {1} - Skipping because master MDS still not local'.format(vdisk.guid, vdisk.name))
@@ -359,7 +355,9 @@ class ScheduledTaskController(object):
         logger.info('Starting arakoon collapse')
         arakoon_clusters = {}
         for service in ServiceList.get_services():
-            if service.type.name in ('Arakoon', 'NamespaceManager', 'AlbaManager') and service.storagerouter is not None:
+            if service.type.name in (ServiceType.SERVICE_TYPES.ARAKOON,
+                                     ServiceType.SERVICE_TYPES.NS_MGR,
+                                     ServiceType.SERVICE_TYPES.ALBA_MGR) and service.storagerouter is not None:
                 arakoon_clusters[service.name.replace('arakoon-', '')] = service.storagerouter
 
         for cluster, storagerouter in arakoon_clusters.iteritems():
