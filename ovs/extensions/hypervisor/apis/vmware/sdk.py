@@ -907,10 +907,10 @@ class Sdk(object):
     def create_disk(self, ip, mountpoint, disk_path, size, host=None, wait=True):
         """
         Create disk
-        :param ip: ip
+        :param ip: storage ip
         :param mountpoint: mountpoint
         :param disk_path: disk path
-        :param size: size
+        :param size: size (GB)
         :param host: host (optional)
         :param wait: wait for task
         """
@@ -937,7 +937,7 @@ class Sdk(object):
     def delete_disk(self, ip, mountpoint, disk_path, host=None, wait=True):
         """
         Delete disk
-        :param ip: ip
+        :param ip: storage ip
         :param mountpoint: mountpoint
         :param disk_path: disk path
         :param host: host (optional)
@@ -976,10 +976,10 @@ class Sdk(object):
     def extend_disk(self, ip, mountpoint, disk_path, size, host=None, wait=True):
         """
         Create disk
-        :param ip: ip
+        :param ip: storage ip
         :param mountpoint: mountpoint
         :param disk_path: disk path
-        :param size: size
+        :param size: size (GB)
         :param host: host (optional)
         :param wait: wait for task
         """

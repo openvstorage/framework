@@ -390,8 +390,8 @@ class Sdk(object):
     def create_volume(self, location, size):
         """
         Create volume using truncate
-        :param location: location
-        :param size: size
+        :param location: location (mountpoint + file name)
+        :param size: size (GB)
         """
         if self.ssh_client.file_exists(location):
             raise RuntimeError('File already exists at %s' % location)
@@ -404,7 +404,7 @@ class Sdk(object):
     def delete_volume(self, location):
         """
         Remove volume using rm
-        :param location: location
+        :param location: location (mountpoint + file name)
         """
         if not self.ssh_client.file_exists(location):
             logger.error('File already deleted at %s' % location)
@@ -418,8 +418,8 @@ class Sdk(object):
     def extend_volume(self, location, size):
         """
         Resize volume using truncate
-        :param location: location
-        :param size: size
+        :param location: location (mountpoint + file name)
+        :param size: new size
         """
         if not self.ssh_client.file_exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
