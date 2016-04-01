@@ -24,7 +24,7 @@ define([
         // Variables
         self.widgets        = [];
         self.shared         = shared;
-        self.guard          = { authenticated: true, registered: true };
+        self.guard          = { authenticated: true };
         self.generic        = generic;
         self.licensesHandle = {};
         self.licenseHeaders = [

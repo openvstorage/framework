@@ -237,7 +237,6 @@ class EtcdConfiguration(object):
             return
         base_config = {'/cluster_id': cluster_id,
                        '/external_etcd': external_etcd,
-                       '/registered': False,
                        '/memcache': {'endpoints': []},
                        '/messagequeue': {'endpoints': [],
                                          'protocol': 'amqp',

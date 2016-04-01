@@ -64,9 +64,6 @@ define([
             }
             return generic.formatBytes(total);
         });
-        self.unregistered = ko.computed(function() {
-            return shared.registration().registered === false && shared.registration().remaining > 0;
-        });
 
         // Functions
         self._fetchData = function(observable, property) {

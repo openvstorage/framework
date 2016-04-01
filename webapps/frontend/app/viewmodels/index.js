@@ -50,13 +50,6 @@ define([
                     return instruction.params[0] + '/login';
                 }
             }
-            if (instance.guard.registered === true && shared.registration().registered === false) {
-                if (shared.registration().remaining <= 0) {
-                    return instruction.params[0] + '/register';
-                } else {
-                    window.localStorage.setItem('referrer', instruction.params[0] + '/register');
-                }
-            }
         }
         window.localStorage.removeItem('state');
         return true;
