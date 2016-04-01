@@ -57,7 +57,7 @@ class MetadataView(View):
                 'identification': {},
                 'storagerouter_ips': [sr.ip for sr in StorageRouterList.get_storagerouters()],
                 'versions': list(settings.VERSION),
-                'plugins': {},}
+                'plugins': {}}
         try:
             # Gather plugin metadata
             plugins = {}
