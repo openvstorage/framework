@@ -410,7 +410,7 @@ class UpdateController(object):
         # If we can reach Etcd with a valid config, and there's still an old config file present, delete it
         from ovs.extensions.db.etcd.configuration import EtcdConfiguration
         path = '/opt/OpenvStorage/config/ovs.json'
-        if client.file_exists(path):
+        if EtcdConfiguration.exists('/ovs/framework/cluster_id') and client.file_exists(path):
             client.file_delete(path)
         # Migrate volumedriver & albaproxy configuration files
         import uuid
