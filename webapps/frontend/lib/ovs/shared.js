@@ -19,10 +19,6 @@ define(['knockout'], function(ko){
             messaging      : undefined,
             tasks          : undefined,
             authentication : undefined,
-            registration   : ko.observable({
-                registered: false,
-                remaining: null
-            }),
             defaultLanguage: 'en-US',
             language       : 'en-US',
             mode           : ko.observable('full'),

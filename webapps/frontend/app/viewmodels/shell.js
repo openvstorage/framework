@@ -163,7 +163,6 @@ define([
                             if (metadata.authenticated) {
                                 metadataHandlers.push(self.shared.authentication.dispatch(true));
                             }
-                            self.shared.registration(metadata.registration);
                             $.when.apply($, metadataHandlers).always(metadataCheckDeferred.resolve);
                         })
                         .fail(metadataCheckDeferred.resolve);

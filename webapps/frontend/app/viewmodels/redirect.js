@@ -17,9 +17,6 @@ define(['ovs/shared'], function(shared) {
     return {
         canActivate: function() {
             var redirect = '#full';
-            if (shared.registration().registered === false && shared.registration().remaining > 0) {
-                redirect += '/register';
-            }
             return {
                 redirect: redirect
             };
