@@ -174,26 +174,6 @@ class LicenseController(object):
         client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
 
     @staticmethod
-    @celery.task(name='ovs.license.register')
-    def register(name, email, company, phone, newsletter):
-        """
-        Registers the environment
-        """
-        SupportAgent().run()  # Execute a single heartbeat run
-        client = OVSClient('monitoring.openvstorage.com', 443, credentials=None, verify=True, version=1)
-        task_id = client.post('/support/register/',
-                              data={'cluster_id': EtcdConfiguration.get('/ovs/framework/cluster_id'),
-                                    'name': name,
-                                    'email': email,
-                                    'company': company,
-                                    'phone': phone,
-                                    'newsletter': newsletter,
-                                    'register_only': True})
-        if task_id:
-            client.wait_for_task(task_id, timeout=120)
-        EtcdConfiguration.set('/ovs/framework/registered', True)
-
-    @staticmethod
     def _encode(data):
         return base64.b64encode(zlib.compress(json.dumps(data)))
 
