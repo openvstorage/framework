@@ -473,6 +473,10 @@ class SetupController(object):
                                 raise
 
             print ''
+            print Interactive.boxed_message(['Open vStorage securely sends a minimal set of error, usage and health information.',
+                                             'This information is used to keep the quality and performance of the code at the highest possible levels.',
+                                             'Please refer to the documentation for more information.'])
+            print ''
             print Interactive.boxed_message(['Setup complete.',
                                              'Point your browser to https://{0} to use Open vStorage'.format(cluster_ip)])
             logger.info('Setup complete')
