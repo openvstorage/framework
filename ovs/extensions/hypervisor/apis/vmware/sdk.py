@@ -990,9 +990,9 @@ class Sdk(object):
         if not self.file_exists(ip, mountpoint, disk_path):
             raise RuntimeError('Disk {0} must be created first'.format(disk_path))
         disk_url = '[{0}] {1}'.format(datastore.name, disk_path)
-        capacityKb = size * 1024 * 1024
+        capacity_kb = size * 1024 * 1024
 
-        task = self._client.service.ExtendVirtualDisk_Task(self._serviceContent.virtualDiskManager, disk_url, None, capacityKb)
+        task = self._client.service.ExtendVirtualDisk_Task(self._serviceContent.virtualDiskManager, disk_url, None, capacity_kb)
 
         if wait:
             self.wait_for_task(task)
@@ -1002,7 +1002,7 @@ class Sdk(object):
         Check if file exists
         :param ip: ip
         :param mountpoint: mountpoint
-        :param disk_path: filename
+        :param filename: filename
         """
         try:
             self.get_nfs_datastore_object(ip, mountpoint, filename)

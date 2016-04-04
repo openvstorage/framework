@@ -207,6 +207,7 @@ class VMware(object):
         """
         Create new volume
         :param vpool_mountpoint: mountpoint of the vpool
+        :param storage_ip: IP of the storagerouter
         :param diskname: name of the disk
         :param size: size in GB
         """
@@ -217,6 +218,7 @@ class VMware(object):
         """
         Delete volume
         :param vpool_mountpoint: mountpoint of the vpool
+        :param storage_ip: IP of the storagerouter
         :param diskname: name of the disk
         """
         disk_path = self.get_disk_path(None, diskname)
@@ -226,6 +228,7 @@ class VMware(object):
         """
         Extend volume
         :param vpool_mountpoint: mountpoint of the vpool
+        :param storage_ip: IP of the storagerouter
         :param diskname: name of the disk
         :param size: size in GB
         """

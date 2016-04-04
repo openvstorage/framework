@@ -386,7 +386,6 @@ class Sdk(object):
         source_vm = self.get_vm_object(vmid)
         return self.create_vm_from_template(name, source_vm, disks, mountpoint)
 
-
     def create_volume(self, location, size):
         """
         Create volume using truncate

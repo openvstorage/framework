@@ -195,6 +195,7 @@ class KVM(object):
         """
         Create new volume - this is a truncate command
         :param vpool_mountpoint: mountpoint of the vpool
+        :param storage_ip: IP of the storagerouter
         :param diskname: name of the disk
         :param size: size in GB
         """
@@ -208,6 +209,7 @@ class KVM(object):
         """
         Delete volume - this is a rm command
         :param vpool_mountpoint: mountpoint of the vpool
+        :param storage_ip: IP of the storagerouter
         :param diskname: name of the disk
         """
         _ = storage_ip
@@ -219,6 +221,7 @@ class KVM(object):
         """
         Extend volume - this is a truncate command
         :param vpool_mountpoint: mountpoint of the vpool
+        :param storage_ip: IP of the storagerouter
         :param diskname: name of the disk
         :param size: size in GB
         """
