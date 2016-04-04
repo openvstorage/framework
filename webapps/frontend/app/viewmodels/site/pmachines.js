@@ -26,7 +26,7 @@ define([
         // Variables
         self.shared            = shared;
         self.holdLoading       = false;
-        self.guard             = { authenticated: true, registered: true };
+        self.guard             = { authenticated: true };
         self.refresher         = new Refresher();
         self.widgets           = [];
         self.mgmtCenterHeaders = [

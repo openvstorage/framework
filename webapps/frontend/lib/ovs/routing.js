@@ -38,7 +38,6 @@ define(['jquery'], function($) {
         { route: 'statistics',           moduleId: 'statistics',           title: $.t('ovs:statistics.title'),            titlecode: 'ovs:statistics.title',            nav: true,  main: false },
         { route: 'support',              moduleId: 'support',              title: $.t('ovs:support.title'),               titlecode: 'ovs:support.title',               nav: true,  main: false },
         { route: 'licenses',             moduleId: 'licenses',             title: $.t('ovs:licenses.title'),              titlecode: 'ovs:licenses.title',              nav: false, main: false },
-        { route: 'register',             moduleId: 'register',             title: $.t('ovs:register.title'),              titlecode: 'ovs:register.title',              nav: true,  main: false },
         { route: 'updates',              moduleId: 'updates',              title: $.t('ovs:updates.title'),               titlecode: 'ovs:updates.title',               nav: true,  main: false }
     ];
     extraRoutes = [];
