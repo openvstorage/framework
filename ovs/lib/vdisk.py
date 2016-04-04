@@ -39,6 +39,7 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
+from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.hypervisor.factory import Factory
@@ -132,14 +133,29 @@ class VDiskController(object):
     def delete(diskguid):
         """
         Delete a vdisk through API
-        @param diskguid: GUID of the vdisk to delete
+        :param diskguid: GUID of the vdisk to delete
         """
         vdisk = VDisk(diskguid)
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-        location = os.path.join(storagedriver.mountpoint, vdisk.devicename)
-        logger.info('Deleting disk {0} on location {1}'.format(vdisk.name, location))
-        VDiskController.delete_volume(location=location)
-        logger.info('Deleted disk {0}'.format(location))
+        hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
+        logger.info('Deleting disk {0}'.format(vdisk.name))
+        hypervisor.delete_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.name)
+        logger.info('Deleted disk {0}'.format(vdisk.name))
+
+    @staticmethod
+    @celery.task(name='ovs.vdisk.extend')
+    def extend(diskguid, size):
+        """
+        Extend a vdisk through API
+        :param diskguid: GUID of the vdisk to extend
+        :param size: New size (GB)
+        """
+        vdisk = VDisk(diskguid)
+        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+        hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
+        logger.info('Extending disk {0}'.format(vdisk.name))
+        hypervisor.extend_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.name, size)
+        logger.info('Extended disk {0}'.format(vdisk.name))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.resize_from_voldrv')
@@ -496,7 +512,7 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.create_new')
     def create_new(diskname, size, storagedriver_guid):
         """
-        Create a new vdisk/volume using filesystem calls
+        Create a new vdisk/volume using hypervisor calls
         :param diskname: name of the disk
         :param size: size of the disk (GB)
         :param storagedriver_guid: guid of the Storagedriver
@@ -504,11 +520,9 @@ class VDiskController(object):
         """
         logger.info('Creating new empty disk {0} of {1} GB'.format(diskname, size))
         storagedriver = StorageDriver(storagedriver_guid)
-        vp_mountpoint = storagedriver.mountpoint
         hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
-        disk_path = hypervisor.clean_backing_disk_filename(hypervisor.get_disk_path(None, diskname))
-        location = os.path.join(vp_mountpoint, disk_path)
-        VDiskController.create_volume(location, size, storagedriver.storagerouter_guid)
+        disk_path = hypervisor.create_volume(storagedriver.mountpoint, storagedriver.storage_ip, diskname, size)
+        logger.info('Created volume. Location {0}'.format(disk_path))
 
         backoff = 1
         timeout = 30  # seconds
@@ -527,65 +541,72 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.create_volume')
     def create_volume(location, size, storagerouter_guid=None):
         """
-        Create a volume using filesystem calls
-        Calls "truncate" to create sparse raw file
+        Create a volume
+        !! This method is for compatibility with the cinder driver
+        !! Other callers should use VDiskController.create_new
 
-        @param location: location, filename
-        @param size: size of volume, GB
-        @param: storagerouter_guid: use ssh client to create file on remote storagerouter
-        @return None
+        :param location: location, filename
+        :param size: size of volume, GB
+        :param storagerouter_guid: create file on remote storagerouter
         """
         logger.info('Creating volume {0} of {1} GB'.format(location, size))
 
-        client = SSHClient(StorageRouter(storagerouter_guid)) if storagerouter_guid is not None else SSHClient('127.0.0.1')
-        if client.file_exists(location):
-            raise RuntimeError('File already exists at %s' % location)
+        if storagerouter_guid is not None:
+            storagerouter = StorageRouter(storagerouter_guid)
+        else:
+            storagerouter = System.get_my_storagerouter()
+        for storagedriver in storagerouter.storagedrivers:
+            if location.startswith('{0}/'.format(storagedriver.mountpoint)):
+                diskname = location.split('/')[-1].split('.')[0]
+                return VDiskController.create_new(diskname, size, storagedriver.guid)
 
-        output = client.run('truncate -s {0}G "{1}"'.format(size, location)).strip()
-
-        if not client.file_exists(location):
-            raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
+        raise RuntimeError('Cannot create volume {0}. No storagedriver found for this location.'.format(location))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete_volume')
     def delete_volume(location):
         """
-        Create a volume using filesystem calls
-        Calls "rm" to delete raw file
+        Delete a volume
 
-        @param location: location, filename
-        @return None
+        !! This method is for compatibility with the cinder driver
+        !! Other callers should use VDiskController.delete
+
+        :param location: location, filename
         """
-        if not os.path.exists(location):
-            logger.error('File already deleted at %s' % location)
-            return
-        output = check_output('rm "{0}"'.format(location), shell=True).strip()
-        output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
-        logger.info(output)
-        if os.path.exists(location):
-            raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
-        if output == '':
-            return True
-        raise RuntimeError(output)
+        storagerouter = System.get_my_storagerouter()
+        for storagedriver in storagerouter.storagedrivers:
+            if location.startswith('{0}/'.format(storagedriver.mountpoint)):
+                devicename = location.split('/')[-1]
+                disk = VDiskList.get_by_devicename_and_vpool(devicename, storagedriver.vpool)
+                if disk is None:
+                    logger.info('Disk {0} already deleted'.format(location))
+                    return
+                return VDiskController.delete(disk.guid)
+
+        raise RuntimeError('Cannot delete volume {0}. No storagedriver found for this location.'.format(location))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.extend_volume')
     def extend_volume(location, size):
         """
-        Extend a volume using filesystem calls
-        Calls "truncate" to create sparse raw file
-        TODO: use volumedriver API
-        TODO: model VDisk() and return guid
+        Extend a volume
 
-        @param location: location, filename
-        @param size: size of volume, GB
-        @return None
+        !! This method is for compatibility with the cinder driver
+        !! Other callers should use VDiskController.extend
+
+        :param location: location, filename
+        :param size: size of volume, GB
         """
-        if not os.path.exists(location):
-            raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
-        output = check_output('truncate -s {0}G "{1}"'.format(size, location), shell=True).strip()
-        output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
-        logger.info(output)
+        storagerouter = System.get_my_storagerouter()
+        for storagedriver in storagerouter.storagedrivers:
+            if location.startswith('{0}/'.format(storagedriver.mountpoint)):
+                devicename = location.split('/')[-1]
+                disk = VDiskList.get_by_devicename_and_vpool(devicename, storagedriver.vpool)
+                if disk is None:
+                    raise RuntimeError('Disk {0} does not exist'.format(location))
+                return VDiskController.extend(disk.guid, size)
+
+        raise RuntimeError('Cannot extend volume {0}. No storagedriver found for this location.'.format(location))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.update_vdisk_name')
@@ -788,7 +809,7 @@ class VDiskController(object):
                         block_size = vol_info.lba_size * vol_info.cluster_multiplier or 4096
                         limit = new_value * 1024 * 1024 * 1024 / block_size if new_value else None
                         vdisk.storagedriver_client.set_readcache_limit(volume_id, limit)
-                    elif key =='metadata_cache_size':
+                    elif key == 'metadata_cache_size':
                         vdisk.storagedriver_client.set_metadata_cache_capacity(volume_id, new_value / StorageDriverClient.METADATA_CACHE_PAGE_SIZE)
                     else:
                         raise KeyError('Unsupported property provided: "{0}"'.format(key))
@@ -1086,11 +1107,8 @@ class VDiskController(object):
             mdss.delete()
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
         if storagedriver is not None and vdisk.devicename is not None:
-            logger.debug('Removing volume from filesystem')
-            volumepath = vdisk.devicename
-            mountpoint = storagedriver.mountpoint
-            devicepath = '{0}/{1}'.format(mountpoint, volumepath)
-            VDiskController.delete_volume(devicepath)
+            logger.debug('Removing volume from hypervisor')
+            VDiskController.delete(vdisk.guid)
 
         logger.debug('Deleting vdisk {0} from model'.format(vdisk.name))
         vdisk.delete()

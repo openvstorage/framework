@@ -16,6 +16,7 @@
 Module for the KVM hypervisor client
 """
 
+import os
 from ovs.extensions.hypervisor.apis.kvm.sdk import Sdk
 
 
@@ -189,3 +190,42 @@ class KVM(object):
         _ = storagedriver
         matches = self.sdk.find_devicename(devicename)
         return matches is not None
+
+    def create_volume(self, vpool_mountpoint, storage_ip, diskname, size):
+        """
+        Create new volume - this is a truncate command
+        :param vpool_mountpoint: mountpoint of the vpool
+        :param storage_ip: IP of the storagerouter
+        :param diskname: name of the disk
+        :param size: size in GB
+        """
+        _ = storage_ip
+        disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
+        location = os.path.join(vpool_mountpoint, disk_path)
+        self.sdk.create_volume(location, size)
+        return disk_path
+
+    def delete_volume(self, vpool_mountpoint, storage_ip, diskname):
+        """
+        Delete volume - this is a rm command
+        :param vpool_mountpoint: mountpoint of the vpool
+        :param storage_ip: IP of the storagerouter
+        :param diskname: name of the disk
+        """
+        _ = storage_ip
+        disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
+        location = os.path.join(vpool_mountpoint, disk_path)
+        self.sdk.delete_volume(location)
+
+    def extend_volume(self, vpool_mountpoint, storage_ip, diskname, size):
+        """
+        Extend volume - this is a truncate command
+        :param vpool_mountpoint: mountpoint of the vpool
+        :param storage_ip: IP of the storagerouter
+        :param diskname: name of the disk
+        :param size: size in GB
+        """
+        _ = storage_ip
+        disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
+        location = os.path.join(vpool_mountpoint, disk_path)
+        self.sdk.extend_volume(location, size)
