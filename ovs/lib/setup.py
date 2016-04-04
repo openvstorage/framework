@@ -815,10 +815,14 @@ class SetupController(object):
                                                      base_dir=EtcdConfiguration.get('/ovs/framework/paths|ovsdb'),
                                                      locked=False)
             arakoon_ports = [result['client_port'], result['messaging_port']]
+            clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=False)
         else:
             SetupController._log(messages='Arakoon cluster of type {0} with name {1} found, marking it as being used'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK, clusters[0].cluster_id))
             internal = False
-            clusters[0].claim()
+
+        if len(clusters) == 0:
+            raise ValueError('No arakoon cluster found of type {0}'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
+        clusters[0].claim()
 
         SetupController._add_services(target_client, unique_id, 'master')
         SetupController._log(messages='Build configuration files')

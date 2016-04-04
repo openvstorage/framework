@@ -395,7 +395,7 @@ class ArakoonInstaller(object):
             metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
             metadata.internal = internal
             metadata.cluster_type = cluster_type.upper()
-            metadata.claim()
+            metadata.write()
         finally:
             if port_mutex is not None:
                 port_mutex.release()
