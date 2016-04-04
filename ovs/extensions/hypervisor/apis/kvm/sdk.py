@@ -310,6 +310,10 @@ class Sdk(object):
         return self._conn.listAllDomains()
 
     def shutdown(self, vmid):
+        """
+        Shutdown vm
+        :param vmid: ID of vm
+        """
         vm_object = self.get_vm_object(vmid)
         vm_object.shutdown()
         return self.get_power_state(vmid)
@@ -356,6 +360,10 @@ class Sdk(object):
         return True
 
     def power_on(self, vmid):
+        """
+        Power on vm
+        :param vmid: ID of vm
+        """
         vm_object = self.get_vm_object(vmid)
         vm_object.create()
         return self.get_power_state(vmid)
@@ -373,6 +381,10 @@ class Sdk(object):
         return matches if matches else None
 
     def is_datastore_available(self, mountpoint):
+        """
+        Check if datastore is available
+        :param mountpoint: Mountpoint of the NFS datastore
+        """
         if self.ssh_client is None:
             self.ssh_client = SSHClient(self.host, username='root')
         return self.ssh_client.run("[ -d {0} ] && echo 'yes' || echo 'no'".format(mountpoint)) == 'yes'

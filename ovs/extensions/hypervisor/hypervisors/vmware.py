@@ -55,10 +55,11 @@ class VMware(object):
         """
         Clone a vmachine
 
-        @param vmid: hypervisor id of the virtual machine
-        @param name: name of the virtual machine
-        @param disks: list of disk information
-        @param wait: wait for action to complete
+        :param vmid: hypervisor id of the virtual machine
+        :param name: name of the virtual machine
+        :param disks: list of disk information
+        :param mountpoint: None
+        :param wait: wait for action to complete
         """
         _ = mountpoint
         task = self.sdk.clone_vm(vmid, name, disks, wait)
@@ -72,8 +73,12 @@ class VMware(object):
         """
         Remove the vmachine from the hypervisor
 
-        @param vmid: hypervisor id of the virtual machine
-        @param wait: wait for action to complete
+        :param vmid: hypervisor id of the virtual machine
+        :param storagedriver_mountpoint: mountpoint
+        :param storagedriver_storage_ip: IP of the storagedriver
+        :param devicename: device name
+        :param disks_info: None
+        :param wait: wait for action to complete
         """
         if disks_info is None:
             disks_info = []
@@ -108,10 +113,10 @@ class VMware(object):
 
     def is_datastore_available(self, ip, mountpoint):
         """
-        @param ip : hypervisor ip to query for datastore presence
-        @param mountpoint: nfs mountpoint on hypervisor
-        @rtype: boolean
-        @return: True | False
+        :param ip : hypervisor ip to query for datastore presence
+        :param mountpoint: nfs mountpoint on hypervisor
+        :rtype: boolean
+        :return: True | False
         """
         return self.sdk.is_datastore_available(ip, mountpoint)
 
@@ -121,7 +126,9 @@ class VMware(object):
         This lets the machine exist on the hypervisor but configures
         all disks as "Independent Non-persistent"
 
-        @param vmid: hypervisor id of the virtual machine
+        :param vmid: hypervisor id of the virtual machine
+        :param disks: list of disks to configure
+        :param wait: wait for task
         """
         return self.sdk.set_disk_mode(vmid, disks, 'independent_nonpersistent', wait)
 

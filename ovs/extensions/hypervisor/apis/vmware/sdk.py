@@ -37,7 +37,7 @@ class NotAuthenticatedException(BaseException):
 def authenticated(force=False):
     """
     Decorator to make that a login is executed in case the current session isn't valid anymore
-    @param force: Force a (re)login, as some methods also work when not logged in
+    :param force: Force a (re)login, as some methods also work when not logged in
     """
     def wrapper(function):
         def new_function(self, *args, **kwargs):
@@ -630,10 +630,10 @@ class Sdk(object):
         """
         Clone a existing VM configuration
 
-        @param vmid: unique id of the vm
-        @param name: name of the clone vm
-        @param disks: list of disks to use in vm configuration
-        @param wait: wait for task to complete or not (True/False)
+        :param vmid: unique id of the vm
+        :param name: name of the clone vm
+        :param disks: list of disks to use in vm configuration
+        :param wait: wait for task to complete or not (True/False)
         """
 
         esxhost = self._validate_host(None)
@@ -703,8 +703,8 @@ class Sdk(object):
     @authenticated()
     def get_datastore(self, ip, mountpoint, host=None):
         """
-        @param ip : hypervisor ip to query for datastore presence
-        @param mountpoint: nfs mountpoint on hypervisor
+        :param ip : hypervisor ip to query for datastore presence
+        :param mountpoint: nfs mountpoint on hypervisor
         @rtype: sdk datastore object
         @return: object when found else None
         """
@@ -727,8 +727,8 @@ class Sdk(object):
     @authenticated()
     def is_datastore_available(self, ip, mountpoint):
         """
-        @param ip : hypervisor ip to query for datastore presence
-        @param mountpoint: nfs mountpoint on hypervisor
+        :param ip : hypervisor ip to query for datastore presence
+        :param mountpoint: nfs mountpoint on hypervisor
         @rtype: boolean
         @return: True | False
         """
@@ -739,6 +739,11 @@ class Sdk(object):
             return False
 
     def make_agnostic_config(self, vm_object, host=None):
+        """
+        Create a generic config object
+        :param vm_object: extension specific object
+        :param host: esx host 
+        """
         regex = '\[([^\]]+)\]\s(.+)'
         match = re.search(regex, vm_object.config.files.vmPathName)
         if host is None:
@@ -925,7 +930,7 @@ class Sdk(object):
         config = self._client.factory.create('ns0:FileBackedVirtualDiskSpec')
         config.adapterType = "busLogic"
         config.diskType =  "preallocated"
-        config.capacityKb =  size * 1024 * 1024
+        config.capacityKb = size * 1024 * 1024
 
         task = self._client.service.CreateVirtualDisk_Task(self._serviceContent.virtualDiskManager, disk_url, None, config)
 
