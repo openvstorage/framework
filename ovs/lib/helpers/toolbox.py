@@ -197,3 +197,18 @@ class Toolbox(object):
         else:
             logger.debug('  {0:<15} - Service {1} {2}'.format(client.ip, name, action))
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
+
+    @staticmethod
+    def wait_for_service(client, name):
+        ServiceManager.enable_service(name, client=client)
+        tries = 10
+        while tries > 0:
+            status = ServiceManager.get_service_status(name, client)
+            if status is True:
+                break
+            print('... waiting for workers')
+            tries -= 1
+            time.sleep(10 - tries)
+        status, output = ServiceManager.get_service_status(name, client, True)
+        if status is False:
+            raise RuntimeError('Service {0} is not running: {1}'.format(name, output))
