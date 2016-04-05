@@ -1270,7 +1270,13 @@ class StorageRouterController(object):
                     with Remote(client.ip, [LocalStorageRouterClient], username='root') as remote:
                         path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id)
                         storagedriver_client = remote.LocalStorageRouterClient(path)
-                        storagedriver_client.destroy_filesystem()
+                        try:
+                            storagedriver_client.destroy_filesystem()
+                        except RuntimeError as rte:
+                            # If backend has already been deleted, we cannot delete the filesystem anymore --> storage leak!!!
+                            # @TODO: Find better way for catching this error
+                            if 'MasterLookupResult.Error' not in rte.message:
+                                raise
 
                     # noinspection PyArgumentList
                     vrouter_clusterregistry.erase_node_configs()
