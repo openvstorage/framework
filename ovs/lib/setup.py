@@ -1068,9 +1068,9 @@ class SetupController(object):
         ServiceManager.enable_service('watcher-framework', client=target_client)
         Toolbox.change_service_state(target_client, 'watcher-framework', 'start', logger)
 
-        logger.debug('Restarting workers')
-        ServiceManager.enable_service('workers', client=target_client)
-        Toolbox.change_service_state(target_client, 'workers', 'restart', logger)
+        logger.debug('Check ovs-workers')
+        # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
+        Toolbox.wait_for_service(target_client, 'workers')
 
         SetupController._run_hooks('firstnode', cluster_ip)
 
@@ -1225,6 +1225,10 @@ class SetupController(object):
         print 'Starting services'
         ServiceManager.enable_service('watcher-framework', client=target_client)
         Toolbox.change_service_state(target_client, 'watcher-framework', 'start', logger)
+
+        logger.debug('Check ovs-workers')
+        # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
+        Toolbox.wait_for_service(target_client, 'workers')
 
         logger.debug('Restarting workers')
         for node_client in ip_client_map.itervalues():
