@@ -204,13 +204,13 @@ class Toolbox(object):
         Wait for service to enter status
         :param client: SSHClient to run commands
         :param name: name of service
-        :params status: True - running/False - not running
+        :param status: True - running/False - not running
         """
         ServiceManager.enable_service(name, client=client)
         tries = 10
         while tries > 0:
             service_status = ServiceManager.get_service_status(name, client)
-            if service_status == status :
+            if service_status == status:
                 break
             print('... waiting for service')
             tries -= 1
