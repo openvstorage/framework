@@ -1167,7 +1167,7 @@ class SetupController(object):
             PersistentFactory.store = None
             VolatileFactory.store = None
 
-            if 'arakoon-ovsdb' not in [s.name for s in ServiceList.get_services()]:
+            if 'arakoon-ovsdb' not in [s.name for s in ServiceList.get_services() if s.is_internal is False or s.storagerouter.ip == cluster_ip]:
                 service = Service()
                 service.name = 'arakoon-ovsdb'
                 service.type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON)
