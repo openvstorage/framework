@@ -296,7 +296,7 @@ class EtcdConfiguration(object):
                 if key not in messagequeue_info:
                     base_cfg['messagequeue'][key] = value
         for key, value in base_cfg.iteritems():
-             EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
+            EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
 
     @staticmethod
     def validate_etcd():
