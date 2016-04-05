@@ -216,5 +216,5 @@ class Toolbox(object):
             tries -= 1
             time.sleep(10 - tries)
         service_status, output = ServiceManager.get_service_status(name, client, True)
-        if service_status is False:
-            raise RuntimeError('Service {0} is not running: {1}'.format(name, output))
+        if service_status != status:
+            raise RuntimeError('Service {0} does not have expected status: {1}'.format(name, output))
