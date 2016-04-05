@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -331,11 +331,20 @@ class SetupController(object):
                                 raise
 
             root_client.file_delete(resume_config_file)
+            if enable_heartbeats is True:
+                SetupController._log(messages='')
+                SetupController._log(messages=['Open vStorage securely sends a minimal set of error, usage and health',
+                                               'information. This information is used to keep the quality and performance',
+                                               'of the code at the highest possible levels.',
+                                               'Please refer to the documentation for more information.'],
+                                     boxed=True)
+
             is_master = [node for node in SetupController.nodes.itervalues() if node['type'] == 'master' and node['ip'] == cluster_ip]
             SetupController._log(messages='')
             SetupController._log(messages=['Setup complete.',
                                            'Point your browser to https://{0} to use Open vStorage'.format(cluster_ip if len(is_master) > 0 else master_ip)],
                                  boxed=True)
+            logger.info('Setup complete')
 
             try:
                 # Try to trigger setups from possibly installed other packages

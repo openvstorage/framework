@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,10 +47,11 @@ class VDisk(DataObject):
                    Relation('secondary_failure_domain', FailureDomain, 'secondary_vdisks', mandatory=False)]
     __dynamics = [Dynamic('snapshots', list, 60),
                   Dynamic('info', dict, 60),
-                  Dynamic('statistics', dict, 4, locked=True),
+                  Dynamic('statistics', dict, 4),
                   Dynamic('storagedriver_id', str, 60),
                   Dynamic('storagerouter_guid', str, 15),
                   Dynamic('is_vtemplate', bool, 60)]
+    _fixed_properties = ['storagedriver_client']
 
     def __init__(self, *args, **kwargs):
         """
@@ -58,9 +59,14 @@ class VDisk(DataObject):
         """
         DataObject.__init__(self, *args, **kwargs)
         self._frozen = False
-        self.storagedriver_client = None
+        self._storagedriver_client = None
         self._frozen = True
-        self.reload_client()
+
+    @property
+    def storagedriver_client(self):
+        if self._storagedriver_client is None:
+            self.reload_client()
+        return self._storagedriver_client
 
     def _snapshots(self):
         """
@@ -161,9 +167,9 @@ class VDisk(DataObject):
         """
         Reloads the StorageDriver Client
         """
-        if self.vpool:
+        if self.vpool_guid:
             self._frozen = False
-            self.storagedriver_client = StorageDriverClient.load(self.vpool)
+            self._storagedriver_client = StorageDriverClient.load(self.vpool)
             self._frozen = True
 
     def fetch_statistics(self):
@@ -174,13 +180,11 @@ class VDisk(DataObject):
         if self.volume_id and self.vpool:
             try:
                 vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id))
-                vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id))
             except:
                 vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
-                vdiskinfo = StorageDriverClient.EMPTY_INFO()
         else:
             vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
-            vdiskinfo = StorageDriverClient.EMPTY_INFO()
+        vdiskinfo = self.info
         # Load volumedriver data in dictionary
         vdiskstatsdict = {}
         try:
@@ -197,7 +201,7 @@ class VDisk(DataObject):
                         'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses']:
                 vdiskstatsdict[key] = getattr(vdiskstats, key)
             # Do some more manual calculations
-            block_size = vdiskinfo.lba_size * vdiskinfo.cluster_multiplier
+            block_size = vdiskinfo['lba_size'] * vdiskinfo['cluster_multiplier']
             if block_size == 0:
                 block_size = 4096
             vdiskstatsdict['4k_read_operations'] = vdiskstatsdict['data_read'] / block_size

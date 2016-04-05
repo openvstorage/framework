@@ -1,12 +1,12 @@
 {
     "license": [
-        "Copyright 2014 iNuron NV",
+        "Copyright 2016 iNuron NV",
         "",
-        "Licensed under the Open vStorage Modified Apache License (the \"License\");",
+        "Licensed under the Apache License, Version 2.0 (the \"License\");",
         "you may not use this file except in compliance with the License.",
         "You may obtain a copy of the License at",
         "",
-        "    http://www.openvstorage.org/license",
+        "    http://www.apache.org/licenses/LICENSE-2.0",
         "",
         "Unless required by applicable law or agreed to in writing, software",
         "distributed under the License is distributed on an \"AS IS\" BASIS,",
@@ -641,35 +641,11 @@
         "title": "Licenses",
         "add": "Add license"
     },
-    "register": {
-        "title": "Register",
-        "registered": "Your installation of Open vStorage is registered.",
-        "basicinfo1": "To use Open vStorage longer than 30 days, register below. There are",
-        "basicinfo2": "days left in the evaluation period.",
-        "basicinfo3": "To use Open vStorage longer than 30 days, register below. You are",
-        "basicinfo4": "days over your evaluation period and registration is now mandatory.",
-        "company": "Company",
-        "companyhelp": "Company name, if applicable",
-        "name": "Name",
-        "namehelp": "Mandatory field",
-        "email": "Email",
-        "emailhelp": "Mandatory field",
-        "phone": "Phone",
-        "newsletter": "Newsletter",
-        "newsletterhelp": "I want to receive the Open vStorage newsletter.",
-        "agreement": "Agreement",
-        "agreementhelp": "I hereby accept the <a href=\"https://www.openvstorage.org/license\" target=\"_blank\">Modified Apache License</a> of Open vStorage.",
-        "register": "Register",
-        "success": "Successful",
-        "successmsg": "Registration completed.",
-        "registering": "processing the registration"
-    },
     "support": {
         "information": "Support information",
         "description": "Open vStorage has the option to send regular heartbeats with metadata to a centralized server. The heartbeat data can be inspected at the bottom of this page. Additionally, you can enable remote access which enables the Open vStorage support team to access your environment upon your request through a secured tunnel.",
         "identification": "Identification parameters",
         "title": "Support",
-        "registered": "Your copy of Open vStorage is registered.",
         "clusterid": "Cluster ID:",
         "nodeid": "Node ID",
         "nodes": "StorageRouters:",
@@ -1030,9 +1006,7 @@
         "cachereads": "Reads served from the Cache:",
         "datawritten": "Data written to the Backend:",
         "dataread": "Data read from the Backend:",
-        "bandwidthsaved": "Bandwidth Saved:",
-        "unregistered1": "Unregistered version,",
-        "unregistered2": "days remaining."
+        "bandwidthsaved": "Bandwidth Saved:"
     },
     "events": {
         "vmachine_deleted": "vMachine deleted",

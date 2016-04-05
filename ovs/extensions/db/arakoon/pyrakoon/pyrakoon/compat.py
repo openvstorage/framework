@@ -16,14 +16,18 @@
 
 '''Compatibility layer for the original Arakoon Python client'''
 
+import os
 import time
 import random
 import select
 import socket
 import functools
 import threading
+import inspect
+import operator
+import ssl
 
-from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, errors, protocol, sequence, utils
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, consistency, errors, protocol, sequence, utils
 from ovs.log.logHandler import LogHandler
 
 __docformat__ = 'epytext'
@@ -50,6 +54,25 @@ __docformat__ = 'epytext'
 
 LOGGER = LogHandler.get('arakoon', 'pyrakoon', propagate=False)
 
+class Consistency:
+    pass
+
+class Consistent(Consistency):
+    def __str__(self):
+        return 'Consistent'
+
+class NoGuarantee(Consistency):
+    def __str__(self):
+        return 'NoGuarantee'
+
+class AtLeast(Consistency):
+    def __init__(self,i):
+        self.i = i
+
+    def __str__(self):
+        return 'AtLeast(%i)' % self.i
+
+
 
 def _validate_signature_helper(fun, *args):
     param_native_type_mapping = {
@@ -59,26 +82,31 @@ def _validate_signature_helper(fun, *args):
     }
 
     def validate(arg, arg_type):
+        r = False
         if arg_type in param_native_type_mapping:
-            return isinstance(arg, param_native_type_mapping[arg_type])
+            r =  isinstance(arg, param_native_type_mapping[arg_type])
         elif arg_type == 'string_option':
-            return isinstance(arg, str) or arg is None
+            r =  isinstance(arg, str) or arg is None
         elif arg_type == 'string_list':
-            return all(isinstance(value, str) for value in arg)
+            r =  all(isinstance(value, str) for value in arg)
         elif arg_type == 'sequence':
-            return isinstance(arg, Sequence)
+            r =  isinstance(arg, Sequence)
+        elif arg_type == 'consistency_option':
+            r = isinstance(arg, Consistency) or arg is None
+        elif arg_type == 'consistency':
+            r =  isinstance(arg, Consistency)
         else:
             raise RuntimeError('Invalid argument type supplied: %s' % arg_type)
+        return r
 
     @functools.wraps(fun)
     def wrapped(**kwargs):
         new_args = [None] * (len(args) + 1)
-        missing_args = fun.func_code.co_varnames
+        missing_args = inspect.getargs(fun.func_code).args
 
-        for missing_arg in missing_args:
+        for (idx, missing_arg) in enumerate(missing_args):
             if missing_arg in kwargs:
-                pos = fun.func_code.co_varnames.index(missing_arg)
-                new_args[pos] = kwargs[missing_arg]
+                new_args[idx] = kwargs[missing_arg]
                 del kwargs[missing_arg]
 
         if kwargs:
@@ -126,6 +154,9 @@ def _convert_exceptions(fun):
     return wrapped
 
 
+
+    
+
 class ArakoonClient(object):
     def __init__(self, config):
         """
@@ -144,9 +175,25 @@ class ArakoonClient(object):
 
         # Keep a reference, for compatibility reasons
         self._config = config
+        self._consistency = Consistent()
 
     def _initialize(self, config):
         raise NotImplementedError
+
+    def _determine_consistency(self, consistency_):
+        c = self._consistency
+        if consistency_:
+            c = consistency_
+
+        if isinstance(c, Consistent):
+            c = consistency.CONSISTENT
+        elif isinstance(c,NoGuarantee):
+            c = consistency.INCONSISTENT
+        elif isinstance(c,AtLeast):
+            c = consistency.AtLeast(c.i)
+        else:
+            raise ValueError('consistency')
+        return c
 
     @utils.update_argspec('self', 'clientId', ('clusterId', 'arakoon'))
     @_convert_exceptions
@@ -167,22 +214,22 @@ class ArakoonClient(object):
 
         return self._client.hello(clientId, clusterId)
 
-    @utils.update_argspec('self', 'key')
+    @utils.update_argspec('self', 'key', ('consistency', None))
     @_convert_exceptions
-    @_validate_signature('string')
-    def exists(self, key):
+    @_validate_signature('string', 'consistency_option')
+    def exists(self, key, consistency = None):
         """
         @type key : string
         @param key : key
         @return : True if there is a value for that key, False otherwise
         """
 
-        return self._client.exists(key)
+        return self._client.exists(key, consistency = consistency)
 
-    @utils.update_argspec('self', 'key')
+    @utils.update_argspec('self', 'key', ('consistency', None))
     @_convert_exceptions
-    @_validate_signature('string')
-    def get(self, key):
+    @_validate_signature('string', 'consistency_option')
+    def get(self, key, consistency = None):
         """
         Retrieve a single value from the store.
 
@@ -195,7 +242,9 @@ class ArakoonClient(object):
         @return: The value associated with the given key
         """
 
-        return self._client.get(key)
+        consistency_ = self._determine_consistency(consistency)
+        return self._client.get(key,consistency = consistency_)
+    
 
     @utils.update_argspec('self', 'key', 'value')
     @_convert_exceptions
@@ -241,6 +290,9 @@ class ArakoonClient(object):
         def convert_assert_exists(step):
             return sequence.AssertExists(step._key)
 
+        def convert_replace(step):
+            return sequence.Replace(step._key, step._wanted)
+
         def convert_sequence(sequence_):
             steps = []
 
@@ -255,6 +307,8 @@ class ArakoonClient(object):
                     steps.append(convert_assert_exists(step))
                 elif isinstance(step, Sequence):
                     steps.append(convert_sequence(step))
+                elif isinstance(step, Replace):
+                    steps.append(convert_replace(step))
                 else:
                     raise TypeError
 
@@ -311,9 +365,12 @@ class ArakoonClient(object):
         @rtype: list of strings
         @return: Returns a list containing all matching keys
         """
-
-        result = self._client.range(beginKey, beginKeyIncluded, endKey,
-            endKeyIncluded, maxElements)
+        consistency_ = self._determine_consistency(self._consistency)
+        result = self._client.range(beginKey, beginKeyIncluded,
+                                    endKey, endKeyIncluded,
+                                    maxElements,
+                                    consistency = consistency_)
+        
 
         return result
 
@@ -345,9 +402,11 @@ class ArakoonClient(object):
         @rtype: list of strings
         @return: Returns a list containing all matching key-value pairs
         """
-
-        result = self._client.range_entries(beginKey, beginKeyIncluded, endKey,
-            endKeyIncluded, maxElements)
+        consistency_ = self._determine_consistency(self._consistency)
+        result = self._client.range_entries(beginKey, beginKeyIncluded,
+                                            endKey, endKeyIncluded,
+                                            maxElements,
+                                            consistency = consistency_)
 
         return result
 
@@ -369,8 +428,8 @@ class ArakoonClient(object):
         @rtype: list of strings
         @return: Returns a list of keys matching the provided prefix
         """
-
-        result = self._client.prefix(keyPrefix, maxElements)
+        consistency_ = self._determine_consistency(self._consistency)
+        result = self._client.prefix(keyPrefix, maxElements, consistency = consistency_)
 
         return result
 
@@ -415,8 +474,8 @@ class ArakoonClient(object):
         @rtype: string list
         @return: the values associated with the respective keys
         """
-
-        return self._client.multi_get(keys)
+        consistency_ = self._determine_consistency(self._consistency)
+        return self._client.multi_get(keys, consistency = consistency_)
 
     @utils.update_argspec('self', 'keys')
     @_convert_exceptions
@@ -429,8 +488,8 @@ class ArakoonClient(object):
         @rtype: string option list
         @return: the values associated with the respective keys (None if no value corresponds)
         """
-
-        return self._client.multi_get_option(keys)
+        consistency_ = self._determine_consistency(self._consistency)
+        return self._client.multi_get_option(keys, consistency = consistency_)
 
     @utils.update_argspec('self')
     @_convert_exceptions
@@ -440,8 +499,9 @@ class ArakoonClient(object):
         """
 
         try:
-            return self._client.expect_progress_possible()
-        except ArakoonNoMaster:
+            message = protocol.ExpectProgressPossible()
+            return self._client._process(message, retry = False)
+        except ArakoonException:
             return False
 
     @utils.update_argspec('self')
@@ -519,9 +579,10 @@ class ArakoonClient(object):
         @param maxElements: maximum number of key-value pairs to return. Negative means 'all'. Defaults to -1
         @rtype : list of (string,string)
         """
-
+        consistency_ = self._determine_consistency(self._consistency)
         result = self._client.rev_range_entries(beginKey, beginKeyIncluded,
-            endKey, endKeyIncluded, maxElements)
+                                                endKey, endKeyIncluded,
+                                                maxElements, consistency = consistency_)
 
         return result
 
@@ -548,11 +609,10 @@ class ArakoonClient(object):
         @rtype : (int,int,int,string)
         @return : (major, minor, patch, info)
         """
-
-        if nodeId:
-            raise ValueError('nodeId is not supported')
-
-        return self._client.version()
+        message = protocol.Version()
+        r = self._client._process(message, node_id = nodeId)
+        return r
+        
 
     @utils.update_argspec('self')
     @_convert_exceptions
@@ -566,7 +626,9 @@ class ArakoonClient(object):
     @utils.update_argspec('self', 'nodeId')
     @_convert_exceptions
     def getCurrentState(self, nodeId):
-        return self._client.get_current_state() # TODO: not to master, but to node
+        message = protocol.GetCurrentState()
+        r = self._client._process(message, node_id = nodeId)
+        return r
 
     @utils.update_argspec('self', 'key', 'wanted')
     @_convert_exceptions
@@ -591,13 +653,54 @@ class ArakoonClient(object):
 
         return self._client.delete_prefix(prefix)
 
+    @utils.update_argspec('self')
+    @_convert_exceptions
+    def get_txid(self):
+        _res = self._client.get_tx_id()
+        res = None
+        if _res is consistency.CONSISTENT:
+            res = Consistent()
+        elif _res is consistency.INCONSISTENT:
+            res = NoGuarantee()
+        elif isinstance(_res, consistency.AtLeast):
+            res = AtLeast(_res.i)
+        else:
+            raise ValueError('Unknown result: %r' % res)
+        return res
 
+    @utils.update_argspec('self','c')
+    @_convert_exceptions
+    @_validate_signature('consistency')
+    def setConsistency(self, c):
+        """
+        Allows fine grained consistency constraints on subsequent reads
+        @type c: `Consistency`
+        """
+        self._consistency = c
+
+    @utils.update_argspec('self')
+    @_convert_exceptions
+    def allowDirtyReads(self):
+        """
+        Allow the client to read values from a slave or a node in limbo
+        """
+        self._consistency = NoGuarantee()
+
+    def disallowDirtyReads(self):
+        """
+        Force the client to read from the master
+        """
+        self._consistency = Consistent()
+    
     def makeSequence(self):
         return Sequence()
 
     def dropConnections(self):
         return self._client.drop_connections()
 
+    _masterId = property(
+        lambda self:self._client.master_id,
+        lambda self, v: setattr(self._client, 'master_id', v))
 
 # Exception types
 # This is mostly a copy from the ArakoonExceptions module, with some cosmetic
@@ -648,19 +751,30 @@ class ArakoonNoMasterResult(ArakoonException):
 class ArakoonNodeNotMaster(ArakoonException):
     _msg = 'Cannot perform operation on non-master node'
 
+class ArakoonNodeNoLongerMaster(ArakoonException):
+    _msg = '''
+    Operation might or might not have been performed on node which is no longer master
+    '''.strip()
+
+class ArakoonGoingDown(ArakoonException):
+    _msg = 'Server is going down'
+
+class ArakoonSocketException(ArakoonException):
+    pass
+
 class ArakoonSockReadNoBytes(ArakoonException):
     _msg = 'Could not read a single byte from the socket. Aborting.'
 
-class ArakoonSockNotReadable(ArakoonException):
+class ArakoonSockNotReadable(ArakoonSocketException):
     _msg = 'Socket is not readable. Aborting.'
 
-class ArakoonSockRecvError(ArakoonException):
+class ArakoonSockRecvError(ArakoonSocketException):
     _msg = 'Error while receiving data from socket'
 
-class ArakoonSockRecvClosed(ArakoonException):
+class ArakoonSockRecvClosed(ArakoonSocketException):
     _msg = 'Cannot receive on a not-connected socket'
 
-class ArakoonSockSendError(ArakoonException):
+class ArakoonSockSendError(ArakoonSocketException):
     _msg = 'Error while sending data on socket'
 
 class ArakoonInvalidArguments(ArakoonException, TypeError):
@@ -719,6 +833,18 @@ def _convert_exception(exc):
         exc_ = ArakoonException(exc.message)
         exc_.inner = exc
         return exc_
+    elif isinstance(exc, errors.NoLongerMaster):
+        exc_ = ArakoonNodeNoLongerMaster(exc.message)
+        exc_.inner = exc
+        return exc_
+    elif isinstance(exc, errors.GoingDown):
+        exc_ = ArakoonGoingDown(exc.message)
+        exc_.inner = exc
+        return exc_
+    elif isinstance(exc, errors.ReadOnly):
+        exc_ = ArakoonException(exc.message)
+        exc_.inner = exc
+        return exc_
     else:
         return exc
 
@@ -746,6 +872,11 @@ class AssertExists(Update):
     def __init__(self, key):
         self._key = key
 
+class Replace(Update):
+    def __init__(self, key, wanted):
+        self._key = key
+        self._wanted = wanted
+
 class Sequence(Update):
     def __init__(self):
         self._updates = []
@@ -771,6 +902,11 @@ class Sequence(Update):
     def addAssertExists(self, key):
         self._updates.append(AssertExists(key))
 
+    @utils.update_argspec('self', 'key', 'wanted')
+    @_validate_signature('string', 'string_option')
+    def addReplace(self, key, wanted):
+        self._updates.append(Replace(key, wanted))
+
 # ArakoonClientConfig
 # This is copied from the ArakoonProtocol module
 ARA_CFG_TRY_CNT = 1
@@ -780,7 +916,8 @@ ARA_CFG_NO_MASTER_RETRY = 60
 
 class ArakoonClientConfig :
 
-    def __init__ (self, clusterId, nodes):
+    def __init__ (self, clusterId, nodes,
+                  tls = False, tls_ca_cert = None, tls_cert = None):
         """
         Constructor of an ArakoonClientConfig object
 
@@ -788,23 +925,64 @@ class ArakoonClientConfig :
         This is a dictionary containing info on the arakoon server nodes. It contains:
 
           - nodeids as keys
-          - (ips, tcp port) tuples as value
+          - ([ip], port) as values
         e.g. ::
-            cfg = ArakoonClientConfig ( {
-                    "myFirstNode" : ( ["127.0.0.1"], 4000 ),
-                    "mySecondNode" : (["127.0.0.1", "192.168.0.1"], 5000 ) ,
-                    "myThirdNode"  : (["127.0.0.1"], 6000 ) } )
-        Defaults to a single node running on localhost:4000
+            cfg = ArakoonClientConfig ( 'ricky', 
+                { "myFirstNode" : ( ["127.0.0.1"], 4000 ),
+                  "mySecondNode" : (["127.0.0.1", "192.168.0.1"], 5000 ) ,
+                  "myThirdNode"  : (["127.0.0.1"], 6000 ) 
+                })
+
+        Note: This client only supports TLSv1 when connecting to nodes,
+        due to Python 2.x. 
 
         @type clusterId: string
         @param clusterId: name of the cluster
         @type nodes: dict
         @param nodes: A dictionary containing the locations for the server nodes
-
+        @param tls: Use a TLS connection
+            If `tls_ca_cert` is given, this *must* be `True`, otherwise
+            a `ValueError` will be raised
+        @type tls: 'bool'
+        @param tls_cert: Path of client certificate & key files
+            These should be passed as a tuple. When provided, `tls_ca_cert` 
+            *must* be provided as well, otherwise a `ValueError` will be raised.
+        @type tls_cert: '(str, str)'
         """
         self._clusterId = clusterId
+
+        sanitize = lambda s: \
+                   s if not isinstance(s,str) \
+                   else [a.strip() for a in s.split(',')]
+        nodes = dict(
+            (node_id, (sanitize(addr), port))
+            for (node_id, (addr, port)) in nodes.iteritems())
+        
         self._nodes = nodes
 
+        if tls_ca_cert and not tls:
+            raise ValueError('tls_ca_cert passed, but tls is False')
+        if tls_cert and not tls_ca_cert:
+            raise ValueError('tls_cert passed, but tls_ca_cert not given')
+
+        if tls_ca_cert is not None and not os.path.isfile(tls_ca_cert):
+            raise ValueError('Invalid TLS CA cert path: %s' % tls_ca_cert)
+
+        if tls_cert:
+            cert, key = tls_cert
+            if not os.path.isfile(cert):
+                raise ValueError('Invalid TLS cert path: %s' % cert)
+            if not os.path.isfile(key):
+                raise ValueError('Invalid TLS key path: %s' % key)
+
+        self._tls = tls
+        self._tls_ca_cert = tls_ca_cert
+        self._tls_cert = tls_cert
+
+    tls = property(operator.attrgetter('_tls'))
+    tls_ca_cert = property(operator.attrgetter('_tls_ca_cert'))
+    tls_cert = property(operator.attrgetter('_tls_cert'))
+    
     @staticmethod
     def getNoMasterRetryPeriod() :
         """
@@ -817,6 +995,9 @@ class ArakoonClientConfig :
         """
         return ARA_CFG_NO_MASTER_RETRY
 
+    def getNodeLocations(self, nodeId):
+        return self._nodes[nodeId]
+    
     def getNodeLocation(self, nodeId):
         """
         Retrieve location of the server node with give node identifier
@@ -830,7 +1011,7 @@ class ArakoonClientConfig :
         @rtype: pair(string,int)
         @return: Returns a pair with the nodes hostname or ip and the tcp port, e.g. ("127.0.0.1", 4000)
         """
-        ips, port = self._nodes[nodeId]
+        ips, port = self.getNodeLocations(nodeId)
         return (ips[0], port)
 
 
@@ -899,7 +1080,8 @@ class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
     def connected(self):
         return True
 
-    def _process(self, message):
+    def _process(self, message, node_id = None, retry = True):
+        
         bytes_ = ''.join(message.serialize())
 
         self._lock.acquire()
@@ -908,32 +1090,33 @@ class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
             start = time.time()
             tryCount = 0.0
             backoffPeriod = 0.2
-            callSucceeded = False
             retryPeriod = ArakoonClientConfig.getNoMasterRetryPeriod()
             deadline = start + retryPeriod
-
-            while not callSucceeded and time.time() < deadline:
+            while True:
                 try:
                     # Send on wire
-                    connection = self._send_to_master(bytes_)
+                    if node_id is None:
+                        connection = self._send_to_master(bytes_)
+                    else:
+                        connection = self._send_message(node_id, bytes_)
                     return utils.read_blocking(message.receive(),
                         connection.read)
                 except (errors.NotMaster,
                         ArakoonNoMaster,
+                        ArakoonNotConnected,
                         ArakoonSockReadNoBytes):
                     self.master_id = None
                     self.drop_connections()
-
+                    
                     sleepPeriod = backoffPeriod * tryCount
-                    if time.time() + sleepPeriod > deadline:
-                        raise
-
-                    tryCount += 1.0
-                    LOGGER.warning(
-                        'Master not found, retrying in %0.2f seconds' % \
+                    if retry and time.time() + sleepPeriod <= deadline:
+                        tryCount += 1.0
+                        LOGGER.warning(
+                            'Master not found, retrying in %0.2f seconds' % \
                             sleepPeriod)
-
-                    time.sleep(sleepPeriod)
+                        time.sleep(sleepPeriod)
+                    else:
+                        raise
 
         finally:
             self._lock.release()
@@ -956,9 +1139,9 @@ class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
 
                 result = connection
                 break
-            except Exception:
-                LOGGER.exception('Message exchange with node %s failed',
-                    node_id)
+            except Exception as e:
+                LOGGER.exception('%s : Message exchange with node %s failed',
+                                 e, node_id)
                 try:
                     self._connections.pop(node_id).close()
                 finally:
@@ -1004,14 +1187,14 @@ class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
                                 LOGGER.warning(
                                     'Node "%s" thinks the master is "%s", but actually it isn\'t',
                                     node, tmp_master)
-                    except Exception:
+                    except Exception as e:
                         LOGGER.exception(
-                            'Unable to validate master on node %s', tmp_master)
+                            '%s: Unable to validate master on node %s', e, tmp_master)
                         self.master_id = None
 
-                except Exception:
+                except Exception as e:
                     LOGGER.exception(
-                        'Unable to query node "%s" to look up master', node)
+                        '%s: Unable to query node "%s" to look up master',e, node)
 
         if not self.master_id:
             LOGGER.error('Unable to determine master node')
@@ -1044,6 +1227,8 @@ class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
             node_location = self._config.getNodeLocation(node_id)
             connection = _ClientConnection(node_location,
                                            self._config.getClusterId(),
+                                           self._config.tls, self._config.tls_ca_cert,
+                                           self._config.tls_cert,
                                            self._timeout)
             connection.connect()
 
@@ -1053,11 +1238,16 @@ class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
 
 
 class _ClientConnection(object):
-    def __init__(self, address, cluster_id, timeout=0):
+    def __init__(self, address, cluster_id,
+                 tls, tls_ca_cert, tls_cert,
+                 timeout = 0):
         self._address = address
         self._connected = False
         self._socket = None
         self._cluster_id = cluster_id
+        self._tls = tls
+        self._tls_ca_cert = tls_ca_cert
+        self._tls_cert = tls_cert
         if (isinstance(timeout, (int, float)) and timeout > 0) or timeout is None:
             self._timeout = timeout
         else:
@@ -1070,7 +1260,6 @@ class _ClientConnection(object):
 
         try:
             self._socket = socket.create_connection(self._address, self._timeout)
-            self._socket.setblocking(False)
 
             after_idle_sec = 20
             interval_sec = 20
@@ -1079,13 +1268,32 @@ class _ClientConnection(object):
             self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, after_idle_sec)
             self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, interval_sec)
             self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, max_fails)
+            
+            if self._tls:
+                kwargs = {
+                    'ssl_version': ssl.PROTOCOL_TLSv1,
+                    'cert_reqs': ssl.CERT_OPTIONAL,
+                    'do_handshake_on_onnect' : True
+                }
+                
+                if self._tls_ca_cert:
+                    kwargs['cert_reqs'] = ssl.CERT_REQUIRED
+                    kwargs['ca_certs'] = self._tls_ca_cert
 
+                if self._tls_cert:
+                    cert, key = self._tls_cert
+                    kwargs['keyfile'] = key
+                    kwargs['certfile'] = cert
+
+                self._socket = ssl.wap_socket(self._socket, **kwargs)
+            
+            
             data = protocol.build_prologue(self._cluster_id)
             self._socket.sendall(data)
 
             self._connected = True
-        except Exception:
-            LOGGER.exception('Unable to connect to %s', self._address)
+        except Exception as e:
+            LOGGER.exception('%s: Unable to connect to %s', e, self._address)
 
     def send(self, data):
         if not self._connected:
@@ -1096,8 +1304,8 @@ class _ClientConnection(object):
 
         try:
             self._socket.sendall(data)
-        except Exception:
-            LOGGER.exception('Error while sending data to %s', self._address)
+        except Exception as e:
+            LOGGER.exception('%s:Error while sending data to %s', e, self._address)
             self.close()
             raise ArakoonSockSendError
 
@@ -1105,9 +1313,10 @@ class _ClientConnection(object):
         if self._connected and self._socket:
             try:
                 self._socket.close()
-            except Exception:
-                LOGGER.exception('Error while closing socket to %s',
-                    self._address)
+            except Exception as e:
+                LOGGER.exception('%s: Error while closing socket to %s',
+                                 e,
+                                 self._address)
             finally:
                 self._connected = False
 
@@ -1118,14 +1327,21 @@ class _ClientConnection(object):
         bytes_remaining = count
         result = []
 
+        if isinstance(self._socket, ssl.SSLSocket):
+            pending = self._socket.pending()
+            if pending > 0:
+                tmp = self._socket.recv(min(bytes_remaining, pending))
+                result.append(tmp)
+                bytes_remaining = bytes_remaining - len(tmp)
+    
         while bytes_remaining > 0:
             reads, _, _ = select.select([self._socket], [], [], self._timeout)
 
             if self._socket in reads:
                 try:
                     data = self._socket.recv(bytes_remaining)
-                except Exception:
-                    LOGGER.exception('Error while reading socket')
+                except Exception as e:
+                    LOGGER.exception('%s: Error while reading socket', e)
                     self._connected = False
 
                     raise ArakoonSockRecvError
@@ -1133,8 +1349,8 @@ class _ClientConnection(object):
                 if len(data) == 0:
                     try:
                         self.close()
-                    except Exception:
-                        LOGGER.exception('Error while closing socket')
+                    except Exception as e:
+                        LOGGER.exception('%s: Error while closing socket', e)
 
                     self._connected = False
 
@@ -1146,11 +1362,36 @@ class _ClientConnection(object):
             else:
                 try:
                     self.close()
-                except Exception:
-                    LOGGER.exception('Error while closing socket')
+                except Exception as e:
+                    LOGGER.exception('%s: Error while closing socket', e)
                 finally:
                     self._connnected = False
 
                 raise ArakoonSockNotReadable
 
         return ''.join(result)
+
+from protocol import admin
+class ArakoonAdmin(ArakoonClient):
+
+    @utils.update_argspec('self', 'node_id', 'n')
+    @_convert_exceptions
+    @_validate_signature('string', 'int')
+    def collapse(self, node_id, n):
+
+        """
+        Tell the targeted node to collapse tlogs into a head database
+        Will return the server node identifier and the version of arakoon it is running
+
+        @type node_id  : string
+        @type n : int
+        @param node_id : id of targeted node
+        """
+        message = admin.CollapseTlogs(n)
+        x = self._client._timeout
+        try:
+            self._client._timeout = None # Don't timeout on this call
+            self._client._process(message, node_id = node_id)
+        finally:
+            self._client._timeout = x
+

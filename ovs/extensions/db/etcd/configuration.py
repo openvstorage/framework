@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -96,7 +96,6 @@ class EtcdConfiguration(object):
     """
     base_config = {'cluster_id': None,
                    'external_etcd': None,
-                   'registered': False,
                    'plugins/installed': {'backends': [],
                                          'generic': []},
                    'paths': {'cfgdir': '/opt/OpenvStorage/config',
@@ -297,7 +296,7 @@ class EtcdConfiguration(object):
                 if key not in messagequeue_info:
                     base_cfg['messagequeue'][key] = value
         for key, value in base_cfg.iteritems():
-            EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
+             EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
 
     @staticmethod
     def validate_etcd():

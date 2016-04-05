@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -172,26 +172,6 @@ class LicenseController(object):
             license_contents.append(lic.hash)
         client = SSHClient(ip)
         client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
-
-    @staticmethod
-    @celery.task(name='ovs.license.register')
-    def register(name, email, company, phone, newsletter):
-        """
-        Registers the environment
-        """
-        SupportAgent().run()  # Execute a single heartbeat run
-        client = OVSClient('monitoring.openvstorage.com', 443, credentials=None, verify=True, version=1)
-        task_id = client.post('/support/register/',
-                              data={'cluster_id': EtcdConfiguration.get('/ovs/framework/cluster_id'),
-                                    'name': name,
-                                    'email': email,
-                                    'company': company,
-                                    'phone': phone,
-                                    'newsletter': newsletter,
-                                    'register_only': True})
-        if task_id:
-            client.wait_for_task(task_id, timeout=120)
-        EtcdConfiguration.set('/ovs/framework/registered', True)
 
     @staticmethod
     def _encode(data):

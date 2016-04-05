@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,7 +37,7 @@ class NotAuthenticatedException(BaseException):
 def authenticated(force=False):
     """
     Decorator to make that a login is executed in case the current session isn't valid anymore
-    @param force: Force a (re)login, as some methods also work when not logged in
+    :param force: Force a (re)login, as some methods also work when not logged in
     """
     def wrapper(function):
         def new_function(self, *args, **kwargs):
@@ -630,10 +630,10 @@ class Sdk(object):
         """
         Clone a existing VM configuration
 
-        @param vmid: unique id of the vm
-        @param name: name of the clone vm
-        @param disks: list of disks to use in vm configuration
-        @param wait: wait for task to complete or not (True/False)
+        :param vmid: unique id of the vm
+        :param name: name of the clone vm
+        :param disks: list of disks to use in vm configuration
+        :param wait: wait for task to complete or not (True/False)
         """
 
         esxhost = self._validate_host(None)
@@ -703,8 +703,8 @@ class Sdk(object):
     @authenticated()
     def get_datastore(self, ip, mountpoint, host=None):
         """
-        @param ip : hypervisor ip to query for datastore presence
-        @param mountpoint: nfs mountpoint on hypervisor
+        :param ip : hypervisor ip to query for datastore presence
+        :param mountpoint: nfs mountpoint on hypervisor
         @rtype: sdk datastore object
         @return: object when found else None
         """
@@ -727,8 +727,8 @@ class Sdk(object):
     @authenticated()
     def is_datastore_available(self, ip, mountpoint):
         """
-        @param ip : hypervisor ip to query for datastore presence
-        @param mountpoint: nfs mountpoint on hypervisor
+        :param ip : hypervisor ip to query for datastore presence
+        :param mountpoint: nfs mountpoint on hypervisor
         @rtype: boolean
         @return: True | False
         """
@@ -739,6 +739,11 @@ class Sdk(object):
             return False
 
     def make_agnostic_config(self, vm_object, host=None):
+        """
+        Create a generic config object
+        :param vm_object: extension specific object
+        :param host: esx host 
+        """
         regex = '\[([^\]]+)\]\s(.+)'
         match = re.search(regex, vm_object.config.files.vmPathName)
         if host is None:
@@ -903,13 +908,114 @@ class Sdk(object):
                     return vm, mapping[datastore.name][filename]
         raise RuntimeError('Could not locate given file on the given datastore')
 
+    @authenticated()
+    def create_disk(self, ip, mountpoint, disk_path, size, host=None, wait=True):
+        """
+        Create disk
+        :param ip: storage ip
+        :param mountpoint: mountpoint
+        :param disk_path: disk path
+        :param size: size (GB)
+        :param host: host (optional)
+        :param wait: wait for task
+        """
+        esxhost = self._validate_host(host)
+        datastore = self.get_datastore(ip, mountpoint, host=esxhost)
+        if not datastore:
+            raise RuntimeError('Could not find datastore')
+        if self.file_exists(ip, mountpoint, disk_path):
+            raise RuntimeError('Disk {0} already exists'.format(disk_path))
+
+        disk_url = '[{0}] {1}'.format(datastore.name, disk_path)
+        config = self._client.factory.create('ns0:FileBackedVirtualDiskSpec')
+        config.adapterType = "busLogic"
+        config.diskType =  "preallocated"
+        config.capacityKb = size * 1024 * 1024
+
+        task = self._client.service.CreateVirtualDisk_Task(self._serviceContent.virtualDiskManager, disk_url, None, config)
+
+        if wait:
+            self.wait_for_task(task)
+        return disk_path.lstrip('/')
+
+    @authenticated()
+    def delete_disk(self, ip, mountpoint, disk_path, host=None, wait=True):
+        """
+        Delete disk
+        :param ip: storage ip
+        :param mountpoint: mountpoint
+        :param disk_path: disk path
+        :param host: host (optional)
+        :param wait: wait for task
+        """
+        esxhost = self._validate_host(host)
+        datastore = self.get_datastore(ip, mountpoint, host=esxhost)
+        if not datastore:
+            raise RuntimeError('Could not find datastore')
+        if not self.file_exists(ip, mountpoint, disk_path):
+            logger.warning('Disk {0} already deleted'.format(disk_path))
+            return
+        disk_url = '[{0}] {1}'.format(datastore.name, disk_path)
+
+        task = self._client.service.DeleteVirtualDisk_Task(self._serviceContent.virtualDiskManager, disk_url, None)
+        if wait:
+            self.wait_for_task(task)
+        if self.file_exists(ip, mountpoint, disk_path):
+            raise RuntimeError('Disk {0} cannot be deleted'.format(disk_path))
+
+    def _get_files_on_datastore(self, ip, mountpoint, host=None):
+        esxhost = self._validate_host(host)
+        datastore = self.get_datastore(ip, mountpoint, host=esxhost)
+        if not datastore:
+            raise RuntimeError('Could not find datastore')
+        hdbss = self._client.factory.create('ns0:HostDatastoreBrowserSearchSpec')
+        hdbss.matchPattern = "*.*"
+        task = self._client.service.SearchDatastore_Task(datastore.browser, '[{0}]'.format(datastore.name), hdbss)
+        result = self.get_task_info(task)
+        if result.info.state == 'success':
+            return [file.path for file in result.info.result.file]
+        logger.warning(result.info.error.localizedMessage)
+        return []
+
+    @authenticated()
+    def extend_disk(self, ip, mountpoint, disk_path, size, host=None, wait=True):
+        """
+        Create disk
+        :param ip: storage ip
+        :param mountpoint: mountpoint
+        :param disk_path: disk path
+        :param size: size (GB)
+        :param host: host (optional)
+        :param wait: wait for task
+        """
+        esxhost = self._validate_host(host)
+        datastore = self.get_datastore(ip, mountpoint, host=esxhost)
+        if not datastore:
+            raise RuntimeError('Could not find datastore')
+        if not self.file_exists(ip, mountpoint, disk_path):
+            raise RuntimeError('Disk {0} must be created first'.format(disk_path))
+        disk_url = '[{0}] {1}'.format(datastore.name, disk_path)
+        capacity_kb = size * 1024 * 1024
+
+        task = self._client.service.ExtendVirtualDisk_Task(self._serviceContent.virtualDiskManager, disk_url, None, capacity_kb)
+
+        if wait:
+            self.wait_for_task(task)
+
     def file_exists(self, ip, mountpoint, filename):
+        """
+        Check if file exists
+        :param ip: ip
+        :param mountpoint: mountpoint
+        :param filename: filename
+        """
         try:
             self.get_nfs_datastore_object(ip, mountpoint, filename)
             return True
-        except Exception, ex:
-            logger.debug('File does not exist: {0}'.format(ex))
-            return False
+        except Exception as ex:
+            logger.debug('Exception in get_nfs_datastore_object: {0}'.format(ex))
+            files_on_datastore = self._get_files_on_datastore(ip, mountpoint)
+            return filename.lstrip('/') in files_on_datastore
 
     def _get_vm_datastore_mapping(self, vm):
         """

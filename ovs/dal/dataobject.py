@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,9 +17,10 @@ DataObject module
 """
 import uuid
 import copy
+import time
 import json
 import inspect
-from functools import total_ordering
+from random import randint
 from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
                                 MissingMandatoryFieldsException, RaceConditionException, InvalidRelationException,
                                 VolatileObjectException)
@@ -113,7 +114,6 @@ class DataObjectAttributeEncoder(json.JSONEncoder):
         return "{0}: {1}".format(type(obj), obj)
 
 
-@total_ordering
 class DataObject(object):
     """
     This base class contains all logic to support our multiple backends and the caching
@@ -482,9 +482,11 @@ class DataObject(object):
         tries = 0
         successful = False
         optimistic = True
+        last_assert = None
         while successful is False:
             tries += 1
             if tries > 5:
+                logger.error('Raising RaceConditionException. Last AssertException: {0}'.format(last_assert))
                 raise RaceConditionException()
 
             invalid_fields = []
@@ -585,7 +587,7 @@ class DataObject(object):
             self._data = copy.deepcopy(data)
 
             # First, update reverse index
-            index_map = {}
+            base_reverse_key = 'ovs_reverseindex_{0}_{1}|{2}|{3}'
             for relation in self._relations:
                 key = relation.name
                 original_guid = self._original[key]['guid']
@@ -596,63 +598,30 @@ class DataObject(object):
                     else:
                         classname = relation.foreign_type.__name__.lower()
                     if original_guid is not None:
-                        reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, original_guid)
-                        if reverse_key not in index_map:
-                            reverse_index = self._persistent.get(reverse_key)
-                            index_map[reverse_key] = {'original': copy.deepcopy(reverse_index),
-                                                      'new': reverse_index}
-                        else:
-                            reverse_index = index_map[reverse_key]['new']
-                        if relation.foreign_key in reverse_index:
-                            entries = reverse_index[relation.foreign_key]
-                            if self.guid in entries:
-                                entries.remove(self.guid)
-                                reverse_index[relation.foreign_key] = entries
+                        reverse_key = base_reverse_key.format(classname, original_guid, relation.foreign_key, self.guid)
+                        self._persistent.delete(reverse_key, transaction=transaction)
                     if new_guid is not None:
-                        reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, new_guid)
-                        if reverse_key not in index_map:
-                            reverse_index = self._persistent.get(reverse_key)
-                            index_map[reverse_key] = {'original': copy.deepcopy(reverse_index),
-                                                      'new': reverse_index}
-                        else:
-                            reverse_index = index_map[reverse_key]['new']
-                        if relation.foreign_key in reverse_index:
-                            entries = reverse_index[relation.foreign_key]
-                            if self.guid not in entries:
-                                entries.append(self.guid)
-                                reverse_index[relation.foreign_key] = entries
-                        else:
-                            reverse_index[relation.foreign_key] = [self.guid]
-            if self._new is True:
-                reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid)
-                reverse_index = {}
-                relations = RelationMapper.load_foreign_relations(self.__class__)
-                if relations is not None:
-                    for key, _ in relations.iteritems():
-                        reverse_index[key] = []
-                index_map[reverse_key] = {'original': None,
-                                          'new': reverse_index}
-            for key, value in index_map.iteritems():
-                if value['original'] is not None:
-                    self._persistent.assert_value(key, value['original'], transaction=transaction)
-                self._persistent.set(key, value['new'], transaction=transaction)
+                        reverse_key = base_reverse_key.format(classname, new_guid, relation.foreign_key, self.guid)
+                        self._persistent.assert_exists('{0}_{1}_{2}'.format(DataObject.NAMESPACE, classname, new_guid))
+                        self._persistent.set(reverse_key, 0, transaction=transaction)
 
             # Second, invalidate property lists
-            cache_key = '{0}_{1}'.format(DataList.CACHELINK, self._classname)
-            try:
-                cache_list = self._persistent.get(cache_key)
-                self._persistent.assert_value(cache_key, copy.deepcopy(cache_list), transaction=transaction)
-            except KeyNotFoundException:
-                cache_list = {}
-            change = False
-            for list_key in cache_list.keys():
-                fields = cache_list[list_key]
-                if ('__all' in fields and self._new) or list(set(fields) & set(changed_fields)):
-                    change = True
-                    self._volatile.delete(list_key)
-                    del cache_list[list_key]
-            if change is True:
-                self._persistent.set(cache_key, cache_list, transaction=transaction)
+            cache_key = '{0}_{1}|'.format(DataList.CACHELINK, self._classname)
+            list_keys = set()
+            cache_keys = {}
+            for key in list(self._persistent.prefix(cache_key)):
+                list_key, field = key.replace(cache_key, '').split('|')
+                if list_key not in cache_keys:
+                    cache_keys[list_key] = [False, []]
+                cache_keys[list_key][1].append(key)
+                if field in changed_fields or self._new is True:
+                    list_keys.add(list_key)
+                    cache_keys[list_key][0] = True
+            for list_key in list_keys:
+                self._volatile.delete(list_key)
+                if cache_keys[list_key][0] is True:
+                    for key in cache_keys[list_key][1]:
+                        self._persistent.delete(key, must_exist=False, transaction=transaction)
 
             if _hook is not None and hasattr(_hook, '__call__'):
                 _hook()
@@ -668,9 +637,10 @@ class DataObject(object):
                 raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(
                     self.__class__.__name__, self._guid
                 ))
-            except AssertException:
+            except AssertException as ex:
+                last_assert = ex
                 optimistic = False
-                pass
+                time.sleep(randint(0, 25) / 100.0)
 
         self.invalidate_dynamics()
         self._original = copy.deepcopy(self._data)
@@ -692,9 +662,11 @@ class DataObject(object):
 
         tries = 0
         successful = False
+        last_assert = None
         while successful is False:
             tries += 1
             if tries > 5:
+                logger.error('Raising RaceConditionException. Last AssertException: {0}'.format(last_assert))
                 raise RaceConditionException()
 
             transaction = self._persistent.begin_transaction()
@@ -735,7 +707,7 @@ class DataObject(object):
                 pass
 
             # First, update reverse index
-            index_map = {}
+            base_reverse_key = 'ovs_reverseindex_{0}_{1}|{2}|{3}'
             for relation in self._relations:
                 key = relation.name
                 original_guid = self._original[key]['guid']
@@ -744,39 +716,18 @@ class DataObject(object):
                         classname = self.__class__.__name__.lower()
                     else:
                         classname = relation.foreign_type.__name__.lower()
-                    reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, original_guid)
-                    if reverse_key not in index_map:
-                        reverse_index = self._persistent.get(reverse_key)
-                        index_map[reverse_key] = {'original': copy.deepcopy(reverse_index),
-                                                  'new': reverse_index}
-                    else:
-                        reverse_index = index_map[reverse_key]['new']
-                    if relation.foreign_key in reverse_index:
-                        entries = reverse_index[relation.foreign_key]
-                        if self.guid in entries:
-                            entries.remove(self.guid)
-                            reverse_index[relation.foreign_key] = entries
-            for key, value in index_map.iteritems():
-                self._persistent.assert_value(key, value['original'], transaction=transaction)
-                self._persistent.set(key, value['new'], transaction=transaction)
-            self._persistent.delete('ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid), transaction=transaction)
+                    reverse_key = base_reverse_key.format(classname, original_guid, relation.foreign_key, self.guid)
+                    self._persistent.delete(reverse_key, transaction=transaction)
 
             # Second, invalidate property lists
-            cache_key = '{0}_{1}'.format(DataList.CACHELINK, self._classname)
-            try:
-                cache_list = self._persistent.get(cache_key)
-                self._persistent.assert_value(cache_key, copy.deepcopy(cache_list), transaction=transaction)
-            except KeyNotFoundException:
-                cache_list = {}
-            change = False
-            for list_key in cache_list.keys():
-                fields = cache_list[list_key]
-                if '__all' in fields:
-                    change = True
+            list_keys = []
+            cache_key = '{0}_{1}|'.format(DataList.CACHELINK, self._classname)
+            for key in list(self._persistent.prefix(cache_key)):
+                list_key, _ = key.replace(cache_key, '').split('|')
+                if list_key not in list_keys:
+                    list_keys.append(list_key)
                     self._volatile.delete(list_key)
-                    del cache_list[list_key]
-            if change is True:
-                self._persistent.set(cache_key, cache_list, transaction=transaction)
+                self._persistent.delete(key, must_exist=False, transaction=transaction)
 
             if _hook is not None and hasattr(_hook, '__call__'):
                 _hook()
@@ -788,8 +739,8 @@ class DataObject(object):
                 if ex.message != self._key:
                     raise
                 successful = True
-            except AssertException:
-                pass
+            except AssertException as ex:
+                last_assert = ex
 
         # Delete the object and its properties out of the volatile store
         self.invalidate_dynamics()
@@ -827,8 +778,7 @@ class DataObject(object):
         Invalidates cached objects so they are reloaded when used.
         """
         for relation in self._relations:
-            if relation.name in self._objects:
-                del self._objects[relation.name]
+            self._objects.pop(relation.name, None)
 
     def export(self):
         """
@@ -970,8 +920,6 @@ class DataObject(object):
         """
         Checks whether two objects are the same.
         """
-        if not Descriptor.isinstance(other, self.__class__):
-            return False
         return self.__hash__() == other.__hash__()
 
     def __ne__(self, other):
@@ -979,12 +927,6 @@ class DataObject(object):
         Checks whether two objects are not the same.
         """
         return not self.__eq__(other)
-
-    def __lt__(self, other):
-        """
-        Checks whether this object is "less than" the other object
-        """
-        return self.__hash__() < other.__hash__()
 
     def _benchmark(self, iterations=100):
         import time
@@ -995,7 +937,12 @@ class DataObject(object):
             istart = time.time()
             for dynamic in self._dynamics:
                 start = time.time()
-                getattr(self, '_{0}'.format(dynamic.name))()
+                function = getattr(self, '_{0}'.format(dynamic.name))
+                function_info = inspect.getargspec(function)
+                if 'dynamic' in function_info.args:
+                    function(dynamic=dynamic)
+                else:
+                    function()
                 duration = time.time() - start
                 if dynamic.name not in stats:
                     stats[dynamic.name] = []
@@ -1003,9 +950,9 @@ class DataObject(object):
             totals.append(time.time() - istart)
         print "Object: {0}('{1}')".format(self.__class__.__name__, self._guid)
         for dyn in stats:
-            print '- {0}: avg {1:.2f}s (min: {2:.2f}s, max: {3:.2f}s)'.format(dyn, sum(stats[dyn]) / float(len(stats[dyn])), min(stats[dyn]), max(stats[dyn]))
-        print 'Took {0:.2f}s for {1} iterations'.format(time.time() - begin, iterations)
-        print 'Avg: {0:.2f}s, min: {1:.2f}s, max: {2:.2f}s'.format(sum(totals) / float(len(totals)), min(totals), max(totals))
+            print '- {0}: avg {1:.3f}s (min: {2:.3f}s, max: {3:.3f}s)'.format(dyn, sum(stats[dyn]) / float(len(stats[dyn])), min(stats[dyn]), max(stats[dyn]))
+        print 'Took {0:.3f}s for {1} iterations'.format(time.time() - begin, iterations)
+        print 'Avg: {0:.3f}s, min: {1:.3f}s, max: {2:.3f}s'.format(sum(totals) / float(len(totals)), min(totals), max(totals))
 
     @staticmethod
     def enumerator(name, items):
