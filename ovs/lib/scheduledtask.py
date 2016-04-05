@@ -353,14 +353,15 @@ class ScheduledTaskController(object):
         :return: None
         """
         logger.info('Starting arakoon collapse')
-        arakoon_clusters = {}
+        arakoon_clusters = []
         for service in ServiceList.get_services():
-            if service.type.name in (ServiceType.SERVICE_TYPES.ARAKOON,
+            if service.is_internal is True and \
+               service.type.name in (ServiceType.SERVICE_TYPES.ARAKOON,
                                      ServiceType.SERVICE_TYPES.NS_MGR,
-                                     ServiceType.SERVICE_TYPES.ALBA_MGR) and service.storagerouter is not None:
-                arakoon_clusters[service.name.replace('arakoon-', '')] = service.storagerouter
+                                     ServiceType.SERVICE_TYPES.ALBA_MGR):
+                arakoon_clusters.append(service.name.replace('arakoon-', ''))
 
-        for cluster, storagerouter in arakoon_clusters.iteritems():
+        for cluster in arakoon_clusters:
             logger.info('  Collapsing cluster {0}'.format(cluster))
             contents = EtcdConfiguration.get(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(cluster), raw=True)
             parser = RawConfigParser()
