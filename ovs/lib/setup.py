@@ -1228,7 +1228,8 @@ class SetupController(object):
 
         logger.debug('Check ovs-workers')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
-        Toolbox.wait_for_service(target_client, 'workers')
+        ServiceManager.enable_service('workers', client=target_client)
+        Toolbox.wait_for_service(target_client, 'workers', True, logger)
 
         logger.debug('Restarting workers')
         for node_client in ip_client_map.itervalues():

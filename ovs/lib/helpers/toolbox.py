@@ -199,20 +199,20 @@ class Toolbox(object):
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
 
     @staticmethod
-    def wait_for_service(client, name, status=True):
+    def wait_for_service(client, name, status, logger):
         """
         Wait for service to enter status
         :param client: SSHClient to run commands
         :param name: name of service
         :param status: True - running/False - not running
+        :param logger: Logging object
         """
-        ServiceManager.enable_service(name, client=client)
         tries = 10
         while tries > 0:
             service_status = ServiceManager.get_service_status(name, client)
             if service_status == status:
                 break
-            print('... waiting for service')
+            logger.debug('... waiting for service {0}'.format(name))
             tries -= 1
             time.sleep(10 - tries)
         service_status, output = ServiceManager.get_service_status(name, client, True)
