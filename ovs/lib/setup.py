@@ -1070,7 +1070,7 @@ class SetupController(object):
 
         logger.debug('Check ovs-workers')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
-        Toolbox.wait_for_service(target_client, 'workers')
+        Toolbox.wait_for_service(target_client, 'workers', True, logger)
 
         SetupController._run_hooks('firstnode', cluster_ip)
 
