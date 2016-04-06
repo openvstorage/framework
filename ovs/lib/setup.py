@@ -446,7 +446,6 @@ class SetupController(object):
                         if configure_rabbitmq is None:
                             configure_rabbitmq = r_config.get('setup', 'configure_rabbitmq')
 
-
                         print 'Analyzing cluster layout'
                         logger.info('Analyzing cluster layout')
                         config = ArakoonClusterConfig('ovsdb')
@@ -1070,6 +1069,7 @@ class SetupController(object):
 
         logger.debug('Check ovs-workers')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
+        ServiceManager.enable_service('workers', client=target_client)
         Toolbox.wait_for_service(target_client, 'workers', True, logger)
 
         SetupController._run_hooks('firstnode', cluster_ip)
@@ -1144,7 +1144,7 @@ class SetupController(object):
         except Exception as ex:
             SetupController._print_log_error('remove configuration files', ex)
 
-        SetupController._remove_services(target_client, machine_id, 'master')
+        SetupController._remove_services(target_client, 'master')
         SetupController._unconfigure_logstash(target_client)
 
         if node == 'first':
@@ -1606,7 +1606,6 @@ EOF
             Toolbox.change_service_state(client, 'rabbitmq-server', 'stop', logger)
         client.file_delete('/etc/rabbitmq/rabbitmq.config')
 
-
     @staticmethod
     def _check_rabbitmq_and_enable_ha_mode(client):
         if not ServiceManager.has_service('rabbitmq-server', client):
@@ -1680,7 +1679,6 @@ EOF
         if ServiceManager.has_service('logstash', client) is True:
             ServiceManager.remove_service('logstash', client)
 
-
     @staticmethod
     def _configure_avahi(client, cluster_name, node_name, node_type):
         print '\n+++ Announcing service +++\n'
@@ -1726,7 +1724,7 @@ EOF
                 ServiceManager.add_service(service, params=params, client=client)
 
     @staticmethod
-    def _remove_services(client, unique_id, node_type):
+    def _remove_services(client, node_type):
         if node_type == 'master':
             services = SetupController.master_node_services
             if 'arakoon-ovsdb' in services:
