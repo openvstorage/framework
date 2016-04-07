@@ -259,7 +259,7 @@ class SetupController(object):
                     raise RuntimeError('The name of the cluster should be known by now.')
 
                 node_password = master_password
-                for node_name, node_info in SetupController.nodes.iteritems():
+                for node_info in SetupController.nodes.itervalues():
                     ip = node_info['ip']
                     previous_pass = passwords.get(ip, node_password)
                     node_password = SetupController._ask_validate_password(ip, username='root', previous=previous_pass)
