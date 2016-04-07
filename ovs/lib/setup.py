@@ -192,7 +192,7 @@ class SetupController(object):
                     if 'cluster' in match_groups:
                         local_cluster_name = match_groups['cluster']
 
-            node_name = target_client.run('hostname')
+            node_name = target_client.run('hostname -s')
             logger.debug('Current host: {0}'.format(node_name))
             if cluster_name is None:
                 while True:
@@ -1010,7 +1010,7 @@ class SetupController(object):
             ServiceManager.enable_service(service, client=target_client)
             Toolbox.change_service_state(target_client, service, 'start', logger)
 
-        node_name = target_client.run('hostname')
+        node_name = target_client.run('hostname -s')
         SetupController._finalize_setup(target_client, node_name, 'EXTRA', hypervisor_info, unique_id)
 
         print 'Updating configuration files'
@@ -1053,7 +1053,7 @@ class SetupController(object):
                 raise RuntimeError('Not all memcache nodes can be reached which is required for promoting a node.')
 
         target_client = ip_client_map[cluster_ip]
-        node_name = target_client.run('hostname')
+        node_name = target_client.run('hostname -s')
 
         storagerouter = StorageRouterList.get_by_machine_id(unique_id)
         storagerouter.node_type = 'MASTER'
@@ -1117,7 +1117,7 @@ class SetupController(object):
             logger.debug('Copying Rabbit MQ cookie')
             rabbitmq_cookie_file = '/var/lib/rabbitmq/.erlang.cookie'
             contents = master_client.file_read(rabbitmq_cookie_file)
-            master_hostname = master_client.run('hostname')
+            master_hostname = master_client.run('hostname -s')
             target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
             target_client.file_write(rabbitmq_cookie_file, contents)
             target_client.file_attribs(rabbitmq_cookie_file, mode=400)
@@ -1269,7 +1269,7 @@ class SetupController(object):
 
         if storagerouter not in offline_nodes:
             target_client = ip_client_map[cluster_ip]
-            node_name = target_client.run('hostname')
+            node_name = target_client.run('hostname -s')
             if SetupController._avahi_installed(target_client) is True:
                 SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
             target_client.config_set('ovs.core.nodetype', 'EXTRA')
