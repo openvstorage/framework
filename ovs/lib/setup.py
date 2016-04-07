@@ -258,10 +258,6 @@ class SetupController(object):
                 if avahi_installed is True and cluster_name is None:
                     raise RuntimeError('The name of the cluster should be known by now.')
 
-                if node_name not in SetupController.nodes:
-                    SetupController.nodes[node_name] = {'ip': cluster_ip,
-                                                        'type': 'unknown'}
-
                 node_password = master_password
                 for node_name, node_info in SetupController.nodes.iteritems():
                     ip = node_info['ip']
@@ -269,6 +265,11 @@ class SetupController(object):
                     node_password = SetupController._ask_validate_password(ip, username='root', previous=previous_pass)
                     node_client = SSHClient(endpoint=ip, username='root', password=node_password)
                     node_info['client'] = node_client
+
+                if node_name not in SetupController.nodes:
+                    SetupController.nodes[node_name] = {'ip': cluster_ip,
+                                                        'type': 'unknown',
+                                                        'client': SSHClient(endpoint=cluster_ip, username='root')}
 
                 hypervisor_info = SetupController._prepare_node(cluster_ip=cluster_ip,
                                                                 hypervisor_info={'type': hypervisor_type,
