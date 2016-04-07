@@ -192,7 +192,7 @@ class SetupController(object):
                     if 'cluster' in match_groups:
                         local_cluster_name = match_groups['cluster']
 
-            node_name = target_client.run('hostname')
+            node_name = target_client.run('hostname -s')
             logger.debug('Current host: {0}'.format(node_name))
             if cluster_name is None:
                 while True:
@@ -772,13 +772,19 @@ class SetupController(object):
                 authorized_keys += '{0}\n'.format(root_pub_key)
             if ovs_pub_key not in authorized_keys:
                 authorized_keys += '{0}\n'.format(ovs_pub_key)
-            node_hostname = node_client.run('hostname')
-            all_hostnames.add(node_hostname)
-            mapping[node] = node_hostname
+
+            node_fqdn = node_client.run('hostname -f')
+            mapping[node] = [node_fqdn]
+            all_hostnames.add(node_fqdn)
+
+            node_hostname = node_client.run('hostname -s')
+            if node_fqdn != node_hostname:
+                all_hostnames.add(node_hostname)
+                mapping[node].append(node_hostname)
 
         for node, node_client in ip_client_map.iteritems():
-            for hostname_node, hostname in mapping.iteritems():
-                System.update_hosts_file(hostname, hostname_node, node_client)
+            for host_ip, hostnames in mapping.iteritems():
+                System.update_hosts_file(hostnames, host_ip, node_client)
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
             cmd = 'cp {1} {1}.tmp; ssh-keyscan -t rsa {0} {2} 2> /dev/null >> {1}.tmp; cat {1}.tmp | sort -u - > {1}'
@@ -1004,7 +1010,7 @@ class SetupController(object):
             ServiceManager.enable_service(service, client=target_client)
             Toolbox.change_service_state(target_client, service, 'start', logger)
 
-        node_name = target_client.run('hostname')
+        node_name = target_client.run('hostname -s')
         SetupController._finalize_setup(target_client, node_name, 'EXTRA', hypervisor_info, unique_id)
 
         print 'Updating configuration files'
@@ -1047,7 +1053,7 @@ class SetupController(object):
                 raise RuntimeError('Not all memcache nodes can be reached which is required for promoting a node.')
 
         target_client = ip_client_map[cluster_ip]
-        node_name = target_client.run('hostname')
+        node_name = target_client.run('hostname -s')
 
         storagerouter = StorageRouterList.get_by_machine_id(unique_id)
         storagerouter.node_type = 'MASTER'
@@ -1111,7 +1117,7 @@ class SetupController(object):
             logger.debug('Copying Rabbit MQ cookie')
             rabbitmq_cookie_file = '/var/lib/rabbitmq/.erlang.cookie'
             contents = master_client.file_read(rabbitmq_cookie_file)
-            master_hostname = master_client.run('hostname')
+            master_hostname = master_client.run('hostname -s')
             target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
             target_client.file_write(rabbitmq_cookie_file, contents)
             target_client.file_attribs(rabbitmq_cookie_file, mode=400)
@@ -1263,7 +1269,7 @@ class SetupController(object):
 
         if storagerouter not in offline_nodes:
             target_client = ip_client_map[cluster_ip]
-            node_name = target_client.run('hostname')
+            node_name = target_client.run('hostname -s')
             if SetupController._avahi_installed(target_client) is True:
                 SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
             target_client.config_set('ovs.core.nodetype', 'EXTRA')
