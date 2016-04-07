@@ -777,7 +777,7 @@ class SetupController(object):
             mapping[node] = [node_fqdn]
             all_hostnames.add(node_fqdn)
 
-            node_hostname = node_client.run('hostname')
+            node_hostname = node_client.run('hostname -s')
             if node_fqdn != node_hostname:
                 all_hostnames.add(node_hostname)
                 mapping[node].append(node_hostname)
