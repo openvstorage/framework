@@ -29,7 +29,9 @@ logger = LogHandler.get('arakoon', name='tlogchcker')
 
 
 class CheckArakoonError(Exception):
-
+    """
+    Exception raised when Arakoon check fails
+    """
     def __init__(self, message):
         self.message = message
 
@@ -82,8 +84,7 @@ class CheckArakoonTlogMark(object):
         self._marklength = 26  # Including the newline
         self._dumpcount = 0
         self._finalmessage = 'Node {0} Good Status'
-        self._stoplockfile = os.path.join(
-            os.sep, 'opt', 'OpenvStorage', '.startupfaillock')
+        self._stoplockfile = '/opt/OpenvStorage/.startupfaillock'
 
     @staticmethod
     def _speak(message):
@@ -136,7 +137,7 @@ class CheckArakoonTlogMark(object):
         CheckArakoonTlogMark._speak('Waiting for possible startup and then checking status')
         self._wait(duration=10)
         arakoonstatus = CheckArakoonTlogMark._checkarakoonstatus(localnode, cluster)
-        for loop in range(loops):
+        for _ in range(loops):
             duration -= self._waitduration
             if arakoonstatus:
                 return arakoonstatus
@@ -269,7 +270,7 @@ class CheckArakoonTlogMark(object):
 
         dbdir = self._localnodesfiles[localnode]['dbdir']
         tlogdir = self._localnodesfiles[localnode]['tlogdir']
-        nodedb = os.path.join(dbdir, '{0}.db'.format(localnode))
+        nodedb = ('{0}/{1}.db'.format(dbdir, localnode))
         budir = '/tmp/arakoonbu_{0}-{1}'.format(localnode, time.time())
         os.makedirs(budir)
         dbfiles = [f for f in os.listdir(dbdir) if os.path.isfile(f)]
@@ -282,7 +283,7 @@ class CheckArakoonTlogMark(object):
             CheckArakoonTlogMark._speak('Db files do not exist on {0}'.format(dbdir))
 
         if headdb:
-            headdb = os.path.join(tlogdir, 'head.db')
+            headdb = '/'.join([tlogdir, 'head.db'])
             if os.path.exists(headdb):
                 CheckArakoonTlogMark._speak(
                     'head.db Exists, Moving to replace {0}.db'.format(localnode))
@@ -456,8 +457,8 @@ class CheckArakoonTlogMark(object):
                     'Localnode {1}, Tlogdir: {0}'.format(tlogdir, localnode))
                 # there can be many .tlog files for each localnode
                 # but only the last one is relevant for checking
-                tlogfilelist = [os.path.join(tlogdir, f)
-                                for f in os.listdir(tlogdir) if os.path.isfile(os.path.join(tlogdir, f)) and f.endswith('.tlog')]
+                tlogfilelist = ['/'.join([tlogdir, f])
+                                for f in os.listdir(tlogdir) if os.path.isfile('/'.join([tlogdir, f])) and f.endswith('.tlog')]
                 if not tlogfilelist:
                     failmessage = 'Tlogs are missing - now attempting failover'
                     CheckArakoonTlogMark._speak(failmessage)

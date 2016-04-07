@@ -437,14 +437,21 @@ class StorageDriverConfiguration(object):
             self.configuration[section][item] = value
 
 
-class GaneshaConfiguration:
-
+class GaneshaConfiguration(object):
+    """
+    Ganesha Configuration
+    """
     def __init__(self):
         config_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
-        self._config_corefile = os.path.join(config_dir, 'templates', 'ganesha-core.conf')
-        self._config_exportfile = os.path.join(config_dir, 'templates', 'ganesha-export.conf')
+        self._config_corefile = '/'.join([config_dir, 'templates', 'ganesha-core.conf'])
+        self._config_exportfile = '/'.join([config_dir, 'templates', 'ganesha-export.conf'])
 
     def generate_config(self, target_file, params):
+        """
+        Generate configuration
+        :param target_file: Configuration file
+        :param params: Parameters
+        """
         with open(self._config_corefile, 'r') as core_config_file:
             config = core_config_file.read()
         with open(self._config_exportfile, 'r') as export_section_file:

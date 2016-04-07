@@ -30,7 +30,7 @@ UI_NAME = 'api'
 APP_NAME = 'api'
 BASE_WWW_DIR = os.path.dirname(__file__)
 
-BASE_FOLDER = os.path.join('/opt/OpenvStorage/webapps', APP_NAME)
+BASE_FOLDER = '/opt/OpenvStorage/webapps/{0}'.format(APP_NAME)
 VERSION = (1, 2)  # This tuple should contain all supported API versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
 
 BASE_LOG_DIR = '/var/log/ovs'

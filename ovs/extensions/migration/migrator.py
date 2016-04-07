@@ -20,6 +20,9 @@ from ovs.extensions.generic.system import System
 
 
 class Migrator(object):
+    """
+    Migrator class
+    """
     def __init__(self):
         pass
 
@@ -42,11 +45,11 @@ class Migrator(object):
                 with open(filename) as config_file:
                     data = json.load(config_file).get('core', {}).get('versions', {})
         migrators = []
-        path = os.path.join(os.path.dirname(__file__), 'migration')
+        path = '/'.join([os.path.dirname(__file__), 'migration'])
         for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
+                module = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(module):
                     if inspect.isclass(member[1]) and member[1].__module__ == name and 'object' in [base.__name__ for base in member[1].__bases__]:
                         migrators.append((member[1].identifier, member[1].migrate))

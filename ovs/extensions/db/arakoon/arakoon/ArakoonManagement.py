@@ -120,6 +120,9 @@ class ArakoonClusterEx(ArakoonCluster):
         return clientconfig
 
     def getClient(self):
+        """
+        Return a client
+        """
         config = self.getClientConfig()
         client = ArakoonClient(ArakoonClientConfig(self._clusterName, config))
         return client

@@ -274,9 +274,9 @@ class SSHClient(object):
                     if os.path.exists(directory):
                         for dirpath, dirnames, filenames in os.walk(directory, topdown=False, followlinks=follow_symlinks):
                             for filename in filenames:
-                                os.remove(os.path.join(dirpath, filename))
+                                os.remove('/'.join([dirpath, filename]))
                             for sub_directory in dirnames:
-                                os.rmdir(os.path.join(dirpath, sub_directory))
+                                os.rmdir('/'.join([dirpath, sub_directory]))
                         os.rmdir(directory)
                 else:
                     if self.dir_exists(directory):
@@ -314,7 +314,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
                 if recursive is True:
                     for root, dirs, _ in os.walk(directory):
                         for sub_dir in dirs:
-                            os.chmod(os.path.join(root, sub_dir), mode)
+                            os.chmod('/'.join([root, sub_dir]), mode)
             else:
                 recursive_str = '-R' if recursive is True else ''
                 self.run('chmod {0} {1} {2}'.format(recursive_str, oct(mode), directory))
@@ -347,7 +347,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
                 if recursive is True:
                     for root, dirs, _ in os.walk(directory):
                         for sub_dir in dirs:
-                            os.chown(os.path.join(root, sub_dir), uid, gid)
+                            os.chown('/'.join([root, sub_dir]), uid, gid)
             else:
                 recursive_str = '-R' if recursive is True else ''
                 self.run('chown {0} {1}:{2} {3}'.format(recursive_str, user, group, directory))
@@ -572,7 +572,7 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             for root, dirs, files in os.walk(directory):
                 for file_name in files:
                     if abs_path is True:
-                        all_files.append(os.path.join(root, file_name))
+                        all_files.append('/'.join([root, file_name]))
                     else:
                         all_files.append(file_name)
                 if recursive is False:
@@ -582,7 +582,7 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
                 for root, dirs, files in remote.os.walk(directory):
                     for file_name in files:
                         if abs_path is True:
-                            all_files.append(os.path.join(root, file_name))
+                            all_files.append('/'.join([root, file_name]))
                         else:
                             all_files.append(file_name)
                     if recursive is False:

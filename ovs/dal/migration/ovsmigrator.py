@@ -418,14 +418,14 @@ class OVSMigrator(object):
                     with Remote(client.ip, [os], username='root') as remote:
                         for root, dirs, files in remote.os.walk('/sys/class/infiniband'):
                             for directory in dirs:
-                                ports_dir = remote.os.path.join(root, directory, 'ports')
+                                ports_dir = '/'.join([root, directory, 'ports'])
                                 if not remote.os.path.exists(ports_dir):
                                     continue
                                 for sub_root, sub_dirs, _ in remote.os.walk(ports_dir):
                                     if sub_root != ports_dir:
                                         continue
                                     for sub_directory in sub_dirs:
-                                        state_file = remote.os.path.join(sub_root, sub_directory, 'state')
+                                        state_file = '/'.join([sub_root, sub_directory, 'state'])
                                         if remote.os.path.exists(state_file):
                                             if 'ACTIVE' in client.run('cat {0}'.format(state_file)):
                                                 rdma_capable = True

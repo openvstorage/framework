@@ -1420,7 +1420,7 @@ class ArakoonCluster:
             log_dirs = set([log_dir])
 
             files_in_dir = lambda dir_: itertools.ifilter(os.path.isfile,
-                (os.path.join(dir_, name) for name in os.listdir(dir_)))
+                ('/'.join([dir_, name]) for name in os.listdir(dir_)))
             files_in_dirs = lambda dirs: itertools.chain(*(files_in_dir(dir_)
                 for dir_ in dirs))
             matching_files = lambda *exts: lambda files: \

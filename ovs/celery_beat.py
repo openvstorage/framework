@@ -67,11 +67,11 @@ class DistributedScheduler(Scheduler):
     @staticmethod
     def _discover_schedule():
         schedule = {}
-        path = os.path.join(os.path.dirname(__file__), 'lib')
+        path = '/'.join([os.path.dirname(__file__), 'lib'])
         for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py') and filename != '__init__.py':
+            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
+                module = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(module):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name \
