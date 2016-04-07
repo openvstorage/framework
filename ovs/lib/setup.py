@@ -913,9 +913,9 @@ class SetupController(object):
                 all_hostnames.add(node_hostname)
                 mapping[node].append(node_hostname)
 
-            for node, node_client in ip_client_map.iteritems():
-                for host_ip, hostnames in mapping.iteritems():
-                    System.update_hosts_file(hostnames, host_ip, node_client)
+        for node, node_client in ip_client_map.iteritems():
+            for host_ip, hostnames in mapping.iteritems():
+                System.update_hosts_file(hostnames, host_ip, node_client)
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
             cmd = 'cp {1} {1}.tmp; ssh-keyscan -t rsa {0} {2} 2> /dev/null >> {1}.tmp; cat {1}.tmp | sort -u - > {1}'
