@@ -773,7 +773,7 @@ class SetupController(object):
             if ovs_pub_key not in authorized_keys:
                 authorized_keys += '{0}\n'.format(ovs_pub_key)
 
-            node_fqdn = node_client.run('hostname -f')
+            node_fqdn = node_client.run('hostname -f || hostname -s')
             mapping[node] = [node_fqdn]
             all_hostnames.add(node_fqdn)
 
