@@ -186,7 +186,6 @@ class VDiskController(object):
             disk.volume_id = volumename
             disk.size = volumesize
             disk.vpool = storagedriver.vpool
-            disk.size = disk.info['volume_size']
             disk.metadata = {'lba_size': disk.info['lba_size'],
                              'cluster_multiplier': disk.info['cluster_multiplier']}
             disk.save()

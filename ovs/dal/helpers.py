@@ -344,7 +344,9 @@ class timer(object):
         """
         Creates a timer
         :param name: The name of the timer, will be printed
-        :param ms: Indicates whether it should be printed in seconds or miliseconds
+        :type name: basestring
+        :param ms: Indicates whether it should be printed in seconds or milliseconds
+        :type ms: bool
         """
         self.name = name
         self.ms = ms
