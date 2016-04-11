@@ -140,7 +140,7 @@ class SetupController(object):
                 if root_client.file_exists('/etc/openvstorage_id') is False:
                     raise RuntimeError("The 'openvstorage' package is not installed on this node")
 
-                node_name = root_client.run('hostname')
+                node_name = root_client.run('hostname -s')
                 avahi_installed = SetupController._avahi_installed(root_client)
 
                 logger.debug('Current host: {0}'.format(node_name))
@@ -265,6 +265,10 @@ class SetupController(object):
                     node_password = SetupController._ask_validate_password(ip, username='root', previous=previous_pass)
                     node_client = SSHClient(endpoint=ip, username='root', password=node_password)
                     node_info['client'] = node_client
+
+                    node_fqdn = node_client.run('hostname -f || hostname -s')
+                    node_host = node_client.run('hostname -s')
+                    node_info['host_names'] = list({node_fqdn, node_host})
 
                 if node_name not in SetupController.nodes:
                     SetupController.nodes[node_name] = {'ip': cluster_ip,
@@ -697,7 +701,7 @@ class SetupController(object):
             node_client = node_details['client']
             all_ips.add(node_ip)
             all_hostnames.add(host_name)
-            mapping[node_ip] = host_name
+            mapping[node_ip] = node_details['host_names']
 
             if node_ip == cluster_ip:
                 target_client = node_client
@@ -718,10 +722,10 @@ class SetupController(object):
             if ovs_pub_key not in authorized_keys:
                 authorized_keys += '{0}\n'.format(ovs_pub_key)
 
-         for node_details in SetupController.nodes.itervalues():
+        for node_details in SetupController.nodes.itervalues():
             node_client = node_details['client']
-            for ip, node_hostname in mapping.iteritems():
-                System.update_hosts_file(node_hostname, ip, node_client)
+            for ip, node_hostnames in mapping.iteritems():
+                System.update_hosts_file(node_hostnames, ip, node_client)
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
             cmd = 'cp {{0}} {{0}}.tmp; ssh-keyscan -t rsa {0} {1} 2> /dev/null >> {{0}}.tmp; cat {{0}}.tmp | sort -u - > {{0}}'.format(' '.join(all_ips), ' '.join(all_hostnames))
@@ -1110,7 +1114,7 @@ class SetupController(object):
         ServiceManager.enable_service('workers', client=target_client)
         Toolbox.wait_for_service(target_client, 'workers', True, logger)
 
-        logger.debug('Restarting workers')
+        SetupController._log(messages='Restarting workers', loglevel='debug')
         for node_client in ip_client_map.itervalues():
             ServiceManager.enable_service('workers', client=node_client)
             Toolbox.change_service_state(node_client, 'workers', 'restart', logger)
