@@ -40,7 +40,8 @@ class VDisk(DataObject):
                     Property('volume_id', str, mandatory=False, doc='ID of the vDisk in the Open vStorage Volume Driver.'),
                     Property('parentsnapshot', str, mandatory=False, doc='Points to a parent storage driver parent ID. None if there is no parent Snapshot'),
                     Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder'),
-                    Property('has_manual_dtl', bool, default=False, doc='Indicates whether the default DTL location has been overruled by customer')]
+                    Property('has_manual_dtl', bool, default=False, doc='Indicates whether the default DTL location has been overruled by customer'),
+                    Property('metadata', dict, default=dict(), doc='Contains fixed metadata about the volume (e.g. lba_size, ...)')]
     __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
                    Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False),
@@ -184,7 +185,6 @@ class VDisk(DataObject):
                 vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
         else:
             vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
-        vdiskinfo = self.info
         # Load volumedriver data in dictionary
         vdiskstatsdict = {}
         try:
@@ -201,7 +201,7 @@ class VDisk(DataObject):
                         'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses']:
                 vdiskstatsdict[key] = getattr(vdiskstats, key)
             # Do some more manual calculations
-            block_size = vdiskinfo['lba_size'] * vdiskinfo['cluster_multiplier']
+            block_size = self.metadata.get('lba_size', 0) * self.metadata.get('cluster_multiplier', 0)
             if block_size == 0:
                 block_size = 4096
             vdiskstatsdict['4k_read_operations'] = vdiskstatsdict['data_read'] / block_size

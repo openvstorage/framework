@@ -44,6 +44,14 @@ class VDiskList(object):
         return None
 
     @staticmethod
+    def get_in_volume_ids(volume_ids):
+        """
+        Returns all vDisks which volume_id is in the given list
+        """
+        return DataList(VDisk, {'type': DataList.where_operator.AND,
+                                'items': [('volume_id', DataList.operator.IN, volume_ids)]})
+
+    @staticmethod
     def get_vdisk_by_name(vdiskname):
         """
         Returns all VDisks which have a given name
