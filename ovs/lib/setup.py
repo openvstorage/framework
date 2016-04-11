@@ -718,7 +718,7 @@ class SetupController(object):
             if ovs_pub_key not in authorized_keys:
                 authorized_keys += '{0}\n'.format(ovs_pub_key)
 
-        for node_details in SetupController.nodes.itervalues():
+         for node_details in SetupController.nodes.itervalues():
             node_client = node_details['client']
             for ip, node_hostname in mapping.iteritems():
                 System.update_hosts_file(node_hostname, ip, node_client)
@@ -902,9 +902,10 @@ class SetupController(object):
         ServiceManager.enable_service('watcher-framework', client=target_client)
         Toolbox.change_service_state(target_client, 'watcher-framework', 'start', logger)
 
-        SetupController._log(messages='Restarting workers', loglevel='debug')
+        SetupController._log(messages='Check ovs-workers', loglevel='debug')
+        # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
         ServiceManager.enable_service('workers', client=target_client)
-        Toolbox.change_service_state(target_client, 'workers', 'restart', logger)
+        Toolbox.wait_for_service(target_client, 'workers', True, logger)
 
         SetupController._run_hooks('firstnode', cluster_ip)
 
@@ -1095,7 +1096,7 @@ class SetupController(object):
                 ServiceManager.enable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'start', logger)
 
-        node_name = target_client.run('hostname')
+        node_name = target_client.run('hostname -s')
         SetupController._finalize_setup(target_client, node_name, 'EXTRA', hypervisor_info, unique_id)
 
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/ip'.format(machine_id), cluster_ip)
@@ -1104,7 +1105,12 @@ class SetupController(object):
         ServiceManager.enable_service('watcher-framework', client=target_client)
         Toolbox.change_service_state(target_client, 'watcher-framework', 'start', logger)
 
-        SetupController._log(messages='Restarting workers')
+        SetupController._log(messages='Check ovs-workers')
+        # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
+        ServiceManager.enable_service('workers', client=target_client)
+        Toolbox.wait_for_service(target_client, 'workers', True, logger)
+
+        logger.debug('Restarting workers')
         for node_client in ip_client_map.itervalues():
             ServiceManager.enable_service('workers', client=node_client)
             Toolbox.change_service_state(node_client, 'workers', 'restart', logger)
@@ -1135,7 +1141,7 @@ class SetupController(object):
 
         target_client = ip_client_map[cluster_ip]
         machine_id = System.get_my_machine_id(target_client)
-        node_name = target_client.run('hostname')
+        node_name = target_client.run('hostname -s')
         master_client = ip_client_map[master_ip]
 
         storagerouter = StorageRouterList.get_by_machine_id(unique_id)
@@ -1209,7 +1215,7 @@ class SetupController(object):
 
             SetupController._log(messages='Copying Rabbit MQ cookie', loglevel='debug')
             contents = master_client.file_read(rabbitmq_cookie_file)
-            master_hostname = master_client.run('hostname')
+            master_hostname = master_client.run('hostname -s')
             target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
             target_client.file_write(rabbitmq_cookie_file, contents)
             target_client.file_chmod(rabbitmq_cookie_file, mode=400)
@@ -1383,7 +1389,7 @@ class SetupController(object):
 
         if storagerouter not in offline_nodes:
             target_client = ip_client_map[cluster_ip]
-            node_name = target_client.run('hostname')
+            node_name = target_client.run('hostname -s')
             if SetupController._avahi_installed(target_client) is True:
                 SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(storagerouter.machine_id), 'EXTRA')

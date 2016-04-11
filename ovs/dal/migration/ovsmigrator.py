@@ -477,9 +477,10 @@ class OVSMigrator(object):
 
             working_version = 7
 
-        # Version 9 introduced:
+        # Version 10 introduced:
         # - Reverse indexes are stored in persistent store
-        if working_version < 9:
+        # - Store more non-changing metadata on disk iso using a dynamic property
+        if working_version < 10:
             from ovs.dal.helpers import HybridRunner, Descriptor
             from ovs.dal.datalist import DataList
             from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -515,7 +516,15 @@ class OVSMigrator(object):
                 volatile._client.flush_all()
             except:
                 pass
+            from ovs.dal.lists.vdisklist import VDiskList
+            for vdisk in VDiskList.get_vdisks():
+                try:
+                    vdisk.metadata = {'lba_size': vdisk.info['lba_size'],
+                                      'cluster_multiplier': vdisk.info['cluster_multiplier']}
+                    vdisk.save()
+                except:
+                    pass
 
-            working_version = 9
+            working_version = 10
 
         return working_version

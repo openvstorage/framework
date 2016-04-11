@@ -15,13 +15,16 @@
 """
 StorageDriver module
 """
+
+import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.log.logHandler import LogHandler
 
-import time
+logger = LogHandler.get('dal', name='hybrid')
 
 
 class StorageDriver(DataObject):
@@ -51,23 +54,20 @@ class StorageDriver(DataObject):
         _ = self
         return None
 
-    def _statistics(self):
+    def _statistics(self, dynamic):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of the vDisks connected to the Storage Driver.
         """
-        client = StorageDriverClient()
-        vdiskstatsdict = {}
-        for key in client.STAT_KEYS:
-            vdiskstatsdict[key] = 0
-            vdiskstatsdict['{0}_ps'.format(key)] = 0
-        if self.vpool is not None:
-            for disk in self.vpool.vdisks:
-                if disk.storagedriver_id == self.storagedriver_id:
-                    for key, value in disk.statistics.iteritems():
-                        if key != 'timestamp':
-                            vdiskstatsdict[key] += value
-        vdiskstatsdict['timestamp'] = time.time()
-        return vdiskstatsdict
+        from ovs.dal.hybrids.vdisk import VDisk
+        statistics = {}
+        for key in StorageDriverClient.STAT_KEYS:
+            statistics[key] = 0
+            statistics['{0}_ps'.format(key)] = 0
+        for key, value in self.fetch_statistics().iteritems():
+            statistics[key] += value
+        statistics['timestamp'] = time.time()
+        VDisk.calculate_delta(self._key, dynamic, statistics)
+        return statistics
 
     def _stored_data(self):
         """
@@ -76,3 +76,49 @@ class StorageDriver(DataObject):
         if self.vpool is not None:
             return sum([disk.info['stored'] for disk in self.vpool.vdisks])
         return 0
+
+    def fetch_statistics(self):
+        """
+        Loads statistics from this vDisk - returns unprocessed data
+        """
+        # Load data from volumedriver
+        if self.storagedriver_id and self.vpool:
+            try:
+                sdstats = self.vpool.storagedriver_client.statistics_node(str(self.storagedriver_id))
+            except Exception as ex:
+                logger.error('Error loading statistics_node from {0}: {1}'.format(self.storagedriver_id, ex))
+                sdstats = StorageDriverClient.EMPTY_STATISTICS()
+        else:
+            sdstats = StorageDriverClient.EMPTY_STATISTICS()
+        # Load volumedriver data in dictionary
+        sdstatsdict = {}
+        try:
+            pc = sdstats.performance_counters
+            sdstatsdict['backend_data_read'] = pc.backend_read_request_size.sum()
+            sdstatsdict['backend_data_written'] = pc.backend_write_request_size.sum()
+            sdstatsdict['backend_read_operations'] = pc.backend_read_request_size.events()
+            sdstatsdict['backend_write_operations'] = pc.backend_write_request_size.events()
+            sdstatsdict['data_read'] = pc.read_request_size.sum()
+            sdstatsdict['data_written'] = pc.write_request_size.sum()
+            sdstatsdict['read_operations'] = pc.read_request_size.events()
+            sdstatsdict['write_operations'] = pc.write_request_size.events()
+            for key in ['cluster_cache_hits', 'cluster_cache_misses', 'metadata_store_hits',
+                        'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses']:
+                sdstatsdict[key] = getattr(sdstats, key)
+            # Do some more manual calculations
+            block_size = 0
+            if len(self.vpool.vdisks) > 0:
+                vdisk = self.vpool.vdisks[0]
+                block_size = vdisk.metadata.get('lba_size', 0) * vdisk.metadata.get('cluster_multiplier', 0)
+            if block_size == 0:
+                block_size = 4096
+            sdstatsdict['4k_read_operations'] = sdstatsdict['data_read'] / block_size
+            sdstatsdict['4k_write_operations'] = sdstatsdict['data_written'] / block_size
+            # Pre-calculate sums
+            for key, items in StorageDriverClient.STAT_SUMS.iteritems():
+                sdstatsdict[key] = 0
+                for item in items:
+                    sdstatsdict[key] += sdstatsdict[item]
+        except:
+            pass
+        return sdstatsdict

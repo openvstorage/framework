@@ -15,14 +15,13 @@
 """
 StorageRouter module
 """
-import os
+
 import time
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.failuredomain import FailureDomain
 from ovs.dal.hybrids.pmachine import PMachine
-from subprocess import check_output
 
 
 class StorageRouter(DataObject):
@@ -58,10 +57,8 @@ class StorageRouter(DataObject):
             statistics[key] = 0
             statistics['{0}_ps'.format(key)] = 0
         for storagedriver in self.storagedrivers:
-            for vdisk in storagedriver.vpool.vdisks:
-                if vdisk.storagedriver_id == storagedriver.storagedriver_id:
-                    for key, value in vdisk.fetch_statistics().iteritems():
-                        statistics[key] += value
+            for key, value in storagedriver.fetch_statistics().iteritems():
+                statistics[key] += value
         statistics['timestamp'] = time.time()
         VDisk.calculate_delta(self._key, dynamic, statistics)
         return statistics
@@ -70,11 +67,12 @@ class StorageRouter(DataObject):
         """
         Aggregates the Stored Data of each vDisk of the vMachine.
         """
+        from ovs.dal.lists.vdisklist import VDiskList
         data = 0
         for storagedriver in self.storagedrivers:
-            for vdisk in storagedriver.vpool.vdisks:
-                if vdisk.storagedriver_id == storagedriver.storagedriver_id:
-                    data += vdisk.info['stored']
+            storagedriver_client = storagedriver.vpool.storagedriver_client
+            for vdisk in VDiskList.get_in_volume_ids(storagedriver_client.list_volumes(str(storagedriver.storagedriver_id))):
+                data += vdisk.info['stored']
         return data
 
     def _vmachines_guids(self):
@@ -82,23 +80,24 @@ class StorageRouter(DataObject):
         Gets the vMachine guids served by this StorageRouter.
         Definition of "served by": vMachine whose disks are served by a given StorageRouter
         """
+        from ovs.dal.lists.vdisklist import VDiskList
         vmachine_guids = set()
         for storagedriver in self.storagedrivers:
-            for vdisk in storagedriver.vpool.vdisks:
-                if vdisk.storagedriver_id == storagedriver.storagedriver_id:
-                    if vdisk.vmachine_guid is not None:
-                        vmachine_guids.add(vdisk.vmachine_guid)
+            storagedriver_client = storagedriver.vpool.storagedriver_client
+            for vdisk in VDiskList.get_in_volume_ids(storagedriver_client.list_volumes(str(storagedriver.storagedriver_id))):
+                if vdisk.vmachine_guid is not None:
+                    vmachine_guids.add(vdisk.vmachine_guid)
         return list(vmachine_guids)
 
     def _vdisks_guids(self):
         """
         Gets the vDisk guids served by this StorageRouter.
         """
+        from ovs.dal.lists.vdisklist import VDiskList
         vdisk_guids = []
         for storagedriver in self.storagedrivers:
-            for vdisk in storagedriver.vpool.vdisks:
-                if vdisk.storagedriver_id == storagedriver.storagedriver_id:
-                    vdisk_guids.append(vdisk.guid)
+            storagedriver_client = storagedriver.vpool.storagedriver_client
+            vdisk_guids += VDiskList.get_in_volume_ids(storagedriver_client.list_volumes(str(storagedriver.storagedriver_id))).guids
         return vdisk_guids
 
     def _vpools_guids(self):
