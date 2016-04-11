@@ -92,7 +92,6 @@ class SetupController(object):
             if config is not None:
                 # Required fields
                 master_ip = config['master_ip']
-                hypervisor_ip = config['hypervisor_ip']
                 hypervisor_name = config['hypervisor_name']
                 hypervisor_type = config['hypervisor_type']
                 master_password = config['master_password']
@@ -102,6 +101,7 @@ class SetupController(object):
                 node_type = config.get('node_type')
                 cluster_ip = config.get('cluster_ip', master_ip)  # If cluster_ip not provided, we assume 1st node installation
                 external_etcd = config.get('external_etcd')
+                hypervisor_ip = config.get('hypervisor_ip')
                 enable_heartbeats = config.get('enable_heartbeats', enable_heartbeats)
                 hypervisor_password = config.get('hypervisor_password')
                 hypervisor_username = config.get('hypervisor_username', hypervisor_username)
