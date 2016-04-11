@@ -15,6 +15,8 @@
 """
 VDisk module
 """
+import time
+import pickle
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.datalist import DataList
@@ -23,8 +25,9 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.failuredomain import FailureDomain
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-import pickle
-import time
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('dal', name='hybrid')
 
 
 class VDisk(DataObject):
@@ -181,7 +184,8 @@ class VDisk(DataObject):
         if self.volume_id and self.vpool:
             try:
                 vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id))
-            except:
+            except Exception as ex:
+                logger.error('Error loading statistics_volume from {0}: {1}'.format(self.volume_id, ex))
                 vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
         else:
             vdiskstats = StorageDriverClient.EMPTY_STATISTICS()

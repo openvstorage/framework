@@ -51,17 +51,14 @@ class StorageRouter(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
         """
-        from ovs.dal.lists.vdisklist import VDiskList
         from ovs.dal.hybrids.vdisk import VDisk
         statistics = {}
         for key in StorageDriverClient.STAT_KEYS:
             statistics[key] = 0
             statistics['{0}_ps'.format(key)] = 0
         for storagedriver in self.storagedrivers:
-            storagedriver_client = storagedriver.vpool.storagedriver_client
-            for vdisk in VDiskList.get_in_volume_ids(storagedriver_client.list_volumes(str(storagedriver.storagedriver_id))):
-                for key, value in vdisk.fetch_statistics().iteritems():
-                    statistics[key] += value
+            for key, value in storagedriver.fetch_statistics().iteritems():
+                statistics[key] += value
         statistics['timestamp'] = time.time()
         VDisk.calculate_delta(self._key, dynamic, statistics)
         return statistics
