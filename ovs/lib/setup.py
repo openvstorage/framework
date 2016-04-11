@@ -271,9 +271,13 @@ class SetupController(object):
                     node_info['host_names'] = list({node_fqdn, node_host})
 
                 if node_name not in SetupController.nodes:
+                    local_client = SSHClient(endpoint=cluster_ip, username='root')
+                    node_fqdn = local_client.run('hostname -f || hostname -s')
+                    node_host = local_client.run('hostname -s')
                     SetupController.nodes[node_name] = {'ip': cluster_ip,
                                                         'type': 'unknown',
-                                                        'client': SSHClient(endpoint=cluster_ip, username='root')}
+                                                        'client': local_client,
+                                                        'host_names': list({node_fqdn, node_host})}
 
                 hypervisor_info = SetupController._prepare_node(cluster_ip=cluster_ip,
                                                                 hypervisor_info={'type': hypervisor_type,
