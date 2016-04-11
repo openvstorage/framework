@@ -90,6 +90,15 @@ class DataList(object):
 
         self.from_cache = None
 
+    @property
+    def guids(self):
+        """
+        Gets the resulting guids
+        """
+        if self._executed is False and self._guids is None:
+            self._execute_query()
+        return self._guids
+
     #######################
     # Query functionality #
     #######################
