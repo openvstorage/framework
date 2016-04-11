@@ -42,6 +42,22 @@ class VPool(DataObject):
     __dynamics = [Dynamic('statistics', dict, 4),
                   Dynamic('identifier', str, 120),
                   Dynamic('stored_data', int, 60)]
+    _fixed_properties = ['storagedriver_client']
+
+    def __init__(self, *args, **kwargs):
+        """
+        Initializes a vPool, setting up its additional helpers
+        """
+        DataObject.__init__(self, *args, **kwargs)
+        self._frozen = False
+        self._storagedriver_client = None
+        self._frozen = True
+
+    @property
+    def storagedriver_client(self):
+        if self._storagedriver_client is None:
+            self.reload_client()
+        return self._storagedriver_client
 
     def _statistics(self, dynamic):
         """
@@ -70,3 +86,11 @@ class VPool(DataObject):
         An identifier of this vPool in its current configuration state
         """
         return '{0}_{1}'.format(self.guid, '_'.join(self.storagedrivers_guids))
+
+    def reload_client(self):
+        """
+        Reloads the StorageDriver Client
+        """
+        self._frozen = False
+        self._storagedriver_client = StorageDriverClient.load(self)
+        self._frozen = True

@@ -707,6 +707,8 @@ class VMachineController(object):
                                 vdisk.devicename = disk['filename']
                                 vdisk.volume_id = vdisk.storagedriver_client.get_volume_id(str(disk['backingfilename']))
                                 vdisk.size = vdisk.info['volume_size']
+                                vdisk.metadata = {'lba_size': vdisk.info['lba_size'],
+                                                  'cluster_multiplier': vdisk.info['cluster_multiplier']}
                                 # Create the disk in a locked context, but don't execute long running-task in same context
                                 vdisk.save()
                                 ensure_safety = True

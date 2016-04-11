@@ -20,6 +20,7 @@ import os
 import re
 import imp
 import copy
+import time
 import inspect
 import hashlib
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -332,3 +333,31 @@ class Migration(object):
             data[identifier] = new_version
 
         persistent.set(key, data)
+
+
+class timer(object):
+    """
+    Can be used for timing pieces of code
+    """
+
+    def __init__(self, name, ms=False):
+        """
+        Creates a timer
+        :param name: The name of the timer, will be printed
+        :type name: basestring
+        :param ms: Indicates whether it should be printed in seconds or milliseconds
+        :type ms: bool
+        """
+        self.name = name
+        self.ms = ms
+        self.start = None
+
+    def __enter__(self):
+        self.start = time.time()
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        _ = args, kwargs
+        print '{0}: {1:.3f}{2}'.format(self.name,
+                                       (time.time() - self.start) / (1000 if self.ms is True else 1),
+                                       'ms' if self.ms is True else 's')

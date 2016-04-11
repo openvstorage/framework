@@ -55,17 +55,16 @@ class StorageDriver(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of the vDisks connected to the Storage Driver.
         """
-        client = StorageDriverClient()
+        from ovs.dal.lists.vdisklist import VDiskList
         vdiskstatsdict = {}
-        for key in client.STAT_KEYS:
+        for key in StorageDriverClient.STAT_KEYS:
             vdiskstatsdict[key] = 0
             vdiskstatsdict['{0}_ps'.format(key)] = 0
         if self.vpool is not None:
-            for disk in self.vpool.vdisks:
-                if disk.storagedriver_id == self.storagedriver_id:
-                    for key, value in disk.statistics.iteritems():
-                        if key != 'timestamp':
-                            vdiskstatsdict[key] += value
+            for vdisk in VDiskList.get_in_volume_ids(self.vpool.storagedriver_client.list_volumes(str(self.storagedriver_id))):
+                for key, value in vdisk.statistics.iteritems():
+                    if key != 'timestamp':
+                        vdiskstatsdict[key] += value
         vdiskstatsdict['timestamp'] = time.time()
         return vdiskstatsdict
 
