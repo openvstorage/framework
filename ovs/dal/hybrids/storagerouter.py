@@ -67,13 +67,7 @@ class StorageRouter(DataObject):
         """
         Aggregates the Stored Data of each vDisk of the vMachine.
         """
-        from ovs.dal.lists.vdisklist import VDiskList
-        data = 0
-        for storagedriver in self.storagedrivers:
-            storagedriver_client = storagedriver.vpool.storagedriver_client
-            for vdisk in VDiskList.get_in_volume_ids(storagedriver_client.list_volumes(str(storagedriver.storagedriver_id))):
-                data += vdisk.info['stored']
-        return data
+        return self.statistics['stored']
 
     def _vmachines_guids(self):
         """

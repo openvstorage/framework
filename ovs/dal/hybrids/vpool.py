@@ -79,7 +79,7 @@ class VPool(DataObject):
         """
         Aggregates the Stored Data of each vDisk served by the vPool.
         """
-        return sum([disk.info['stored'] for disk in self.vdisks])
+        return self.statistics['stored']
 
     def _identifier(self):
         """
