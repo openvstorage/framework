@@ -68,8 +68,8 @@ class VPool(DataObject):
         for key in StorageDriverClient.STAT_KEYS:
             statistics[key] = 0
             statistics['{0}_ps'.format(key)] = 0
-        for vdisk in self.vdisks:
-            for key, value in vdisk.fetch_statistics().iteritems():
+        for storagedriver in self.storagedrivers:
+            for key, value in storagedriver.fetch_statistics().iteritems():
                 statistics[key] += value
         statistics['timestamp'] = time.time()
         VDisk.calculate_delta(self._key, dynamic, statistics)
