@@ -270,7 +270,7 @@ class CheckArakoonTlogMark(object):
 
         dbdir = self._localnodesfiles[localnode]['dbdir']
         tlogdir = self._localnodesfiles[localnode]['tlogdir']
-        nodedb = ('{0}/{1}.db'.format(dbdir, localnode))
+        nodedb = '{0}/{1}.db'.format(dbdir, localnode)
         budir = '/tmp/arakoonbu_{0}-{1}'.format(localnode, time.time())
         os.makedirs(budir)
         dbfiles = [f for f in os.listdir(dbdir) if os.path.isfile(f)]
