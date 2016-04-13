@@ -256,10 +256,19 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Adds a vPool to a given Storage Router
         """
-        if version > 2:
-            return StorageRouterController.add_vpool.delay(call_parameters)
-        call_parameters['storagerouter_ip'] = storagerouter.ip
-        return StorageRouterController.add_vpool.s(call_parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
+        if version <= 2:
+            call_parameters['storagerouter_ip'] = storagerouter.ip
+            call_parameters['fragment_cache_on_read'] = True
+            call_parameters['fragment_cache_on_write'] = False
+            call_parameters['backend_connection_info'] = {'host': call_parameters.pop('connection_host'),
+                                                          'port': call_parameters.pop('connection_port'),
+                                                          'username': call_parameters.pop('connection_username'),
+                                                          'password': call_parameters.pop('connection_password')}
+            if 'connection_backend' in call_parameters:
+                connection_backend = call_parameters.pop('connection_backend')
+                call_parameters['backend_connection_info']['backend'] = {'backend': connection_backend.pop('backend') if 'backend' in connection_backend else None,
+                                                                         'metadata': connection_backend.pop('metadata') if 'metadata' in connection_backend else None}
+        return StorageRouterController.add_vpool.delay(call_parameters)
 
     @link()
     @log()
