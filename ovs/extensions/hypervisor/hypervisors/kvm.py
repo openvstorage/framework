@@ -201,7 +201,7 @@ class KVM(object):
         """
         _ = storage_ip
         disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
-        location = os.path.join(vpool_mountpoint, disk_path)
+        location = '/'.join([vpool_mountpoint, disk_path])
         self.sdk.create_volume(location, size)
         return disk_path
 
@@ -214,7 +214,7 @@ class KVM(object):
         """
         _ = storage_ip
         disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
-        location = os.path.join(vpool_mountpoint, disk_path)
+        location = '/'.join([vpool_mountpoint, disk_path])
         self.sdk.delete_volume(location)
 
     def extend_volume(self, vpool_mountpoint, storage_ip, diskname, size):
@@ -227,5 +227,5 @@ class KVM(object):
         """
         _ = storage_ip
         disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
-        location = os.path.join(vpool_mountpoint, disk_path)
+        location = '/'.join([vpool_mountpoint, disk_path])
         self.sdk.extend_volume(location, size)

@@ -252,13 +252,13 @@ class ArakoonEnvironmentMixin: #pylint: disable=C1001
         self._arakoon_environment_base = base
         LOGGER.info('Running in %s', base)
 
-        home_dir = os.path.join(base, 'home')
+        home_dir = '/'.join([base, 'home'])
         os.mkdir(home_dir)
 
-        log_dir = os.path.join(base, 'log')
+        log_dir = '/'.join([base, 'log'])
         os.mkdir(log_dir)
 
-        config_path = os.path.join(base, 'config.ini')
+        config_path = '/'.join([base, 'config.ini'])
         config = config_template % {
             'CLIENT_PORT': DEFAULT_CLIENT_PORT,
             'MESSAGING_PORT': DEFAULT_MESSAGING_PORT,

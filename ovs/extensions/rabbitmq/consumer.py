@@ -115,11 +115,11 @@ if __name__ == '__main__':
         if run_event_consumer():
             # Load mapping
             mapping = {}
-            path = os.path.join(os.path.dirname(__file__), 'mappings')
+            path = '/'.join([os.path.dirname(__file__), 'mappings'])
             for filename in os.listdir(path):
-                if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+                if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                     name = filename.replace('.py', '')
-                    module = imp.load_source(name, os.path.join(path, filename))
+                    module = imp.load_source(name, '/'.join([path, filename]))
                     for member in inspect.getmembers(module):
                         if inspect.isclass(member[1]) \
                                 and member[1].__module__ == name \
