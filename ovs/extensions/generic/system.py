@@ -114,6 +114,7 @@ class System(object):
         :param selected_range: e.g. '2000-2010' or '50000-6000, 8000-8999' ; note single port extends to [port -> 65535]
         :param exclude: excluded list
         :param nr: nr of free ports requested
+        :param client: SSHClient to node
         :return: sorted incrementing list of nr of free ports
         """
 
@@ -152,6 +153,17 @@ class System(object):
 
     @staticmethod
     def read_config(filename, client=None):
+        """
+        Read a configuration file
+        :param filename: File to read
+        :type filename: str
+
+        :param client: SSHClient to node
+        :type client: SSHClient
+
+        :return: Content of configuration file
+        :rtype: RawConfigParser
+        """
         if client is None:
             cp = RawConfigParser()
             with open(filename, 'r') as config_file:
@@ -166,6 +178,19 @@ class System(object):
 
     @staticmethod
     def write_config(config, filename, client=None):
+        """
+        Write a configuration file
+        :param config: Contents to write
+        :type config: RawConfigParser
+
+        :param filename: File to write
+        :type filename: str
+
+        :param client: SSHClient to node
+        :type client: SSHClient
+
+        :return: None
+        """
         if client is None:
             with open(filename, 'w') as config_file:
                 config.write(config_file)

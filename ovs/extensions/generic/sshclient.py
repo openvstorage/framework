@@ -450,11 +450,12 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
             if os.path.islink(path):
                 return os.path.realpath(path)
         else:
+            command = """import os, json
+if os.path.islink('{0}'):
+    print json.dumps(os.path.realpath('{0}'))""".format(path)
             try:
-                real_path = self.run('readlink {0}'.format(path), suppress_logging=True)
-                if real_path:
-                    return "/".join(path.split('/')[:-1] + [real_path])
-            except:
+                return json.loads(self.run('python -c """{0}"""'.format(command)))
+            except ValueError:
                 pass
 
     def file_read(self, filename):
@@ -588,3 +589,23 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
                     if recursive is False:
                         break
         return all_files
+
+    def is_mounted(self, path):
+        """
+        Verify whether a mountpoint is mounted
+        :param path: Path to check
+        :type path: str
+
+        :return: True if mountpoint is mounted
+        :rtype: bool
+        """
+        path = self.shell_safe(path.rstrip('/'))
+        if self.is_local is True:
+            return os.path.ismount(path)
+
+        command = """import os, json
+print json.dumps(os.path.ismount('{0}'))""".format(path)
+        try:
+            return json.loads(self.run('python -c """{0}"""'.format(command)))
+        except ValueError:
+            return False

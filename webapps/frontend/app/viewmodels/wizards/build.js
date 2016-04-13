@@ -93,7 +93,18 @@ define([
                 }).promise()
                     .done(function() {
                         parent.step(parent.step() + 1);
-                        parent.activateStep();
+                        var step = parent.steps()[parent.step()];
+                        if (step.hasOwnProperty('shouldSkip') && step.shouldSkip && step.shouldSkip.call) {
+                            step.shouldSkip()
+                                .done(function(skip) {
+                                    if (skip === true && parent.step() < parent.stepsLength()) {
+                                        parent.step(parent.step() + 1);
+                                    }
+                                    parent.activateStep();
+                                });
+                        } else {
+                            parent.activateStep();
+                        }
                     })
                     .always(function() {
                         parent.loadingNext(false);
@@ -106,7 +117,18 @@ define([
         parent.previous = function() {
             if (parent.step() > 0) {
                 parent.step(parent.step() - 1);
-                parent.activateStep();
+                var step = parent.steps()[parent.step()];
+                if (step.hasOwnProperty('shouldSkip') && step.shouldSkip && step.shouldSkip.call) {
+                    step.shouldSkip()
+                        .done(function(skip) {
+                            if (skip === true && parent.step() > 0) {
+                                parent.step(parent.step() - 1);
+                            }
+                            parent.activateStep();
+                        });
+                } else {
+                    parent.activateStep();
+                }
             }
         };
         parent.close = function(success) {

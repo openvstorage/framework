@@ -252,12 +252,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def add_vpool(self, storagerouter, call_parameters):
+    def add_vpool(self, call_parameters):
         """
         Adds a vPool to a given Storage Router
         """
-        call_parameters['storagerouter_ip'] = storagerouter.ip
-        return StorageRouterController.add_vpool.s(call_parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
+        return StorageRouterController.add_vpool.delay(call_parameters)
 
     @link()
     @log()
