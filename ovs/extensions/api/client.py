@@ -33,6 +33,8 @@ class OVSClient(object):
         """
         if credentials is not None and len(credentials) != 2:
             raise RuntimeError('Credentials should be None (no authentication) or a tuple containing client_id and client_secret (authenticated)')
+        self.ip = ip
+        self.port = port
         self.client_id = credentials[0] if credentials is not None else None
         self.client_secret = credentials[1] if credentials is not None else None
         self._url = 'https://{0}:{1}/api'.format(ip, port)

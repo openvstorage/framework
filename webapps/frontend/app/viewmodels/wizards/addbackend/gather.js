@@ -27,7 +27,7 @@ define([
         self.data   = data;
         self.shared = shared;
 
-        //Handles
+        // Handles
         self.loadBackendsHandle       = undefined;
         self.loadBackendTypesHandle   = undefined;
         self.loadStorageRoutersHandle = undefined;

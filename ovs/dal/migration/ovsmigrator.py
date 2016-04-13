@@ -526,4 +526,19 @@ class OVSMigrator(object):
 
             working_version = 10
 
+        # Version 11 introduced:
+        # - ALBA accelerated ALBA, meaning different vpool.metadata information
+        if working_version < 11:
+            from ovs.dal.lists.vpoollist import VPoolList
+
+            for vpool in VPoolList.get_vpools():
+                vpool.metadata = {'backend': vpool.metadata}
+                if 'metadata' in vpool.metadata['backend']:
+                    vpool.metadata['backend']['arakoon_config'] = vpool.metadata['backend'].pop('metadata')
+                if 'backend_info' in vpool.metadata['backend']:
+                    vpool.metadata['backend']['backend_info']['fragment_cache_on_read'] = True
+                    vpool.metadata['backend']['backend_info']['fragment_cache_on_write'] = False
+                vpool.save()
+            working_version = 11
+
         return working_version

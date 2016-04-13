@@ -89,7 +89,7 @@ limitations under the License.
             </div>
             <div class="form-group">
                 <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_backend"></label>
-                <div class="col-lg-7">
+                <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('backend') }">
                     <!-- ko if: data.albaBackends() === undefined || data.albaBackends().length === 0 -->
                         <i data-i18n="[html]ovs:wizards.add_vpool.gather_vpool.no_backends"
                            style="display: inline-block; margin-top: 7px;"></i>
@@ -118,7 +118,7 @@ limitations under the License.
                     </button>
                 </div>
             </div>
-            <div class="form-group" data-bind="if: data.albaBackend() !== undefined">
+            <div class="form-group" data-bind="visible: data.albaBackend() !== undefined">
                 <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset"></label>
                 <div class="col-lg-7">
                     <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaPreset() === undefined)"></span>
