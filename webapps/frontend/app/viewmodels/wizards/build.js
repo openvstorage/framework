@@ -97,7 +97,7 @@ define([
                         if (step.hasOwnProperty('shouldSkip') && step.shouldSkip && step.shouldSkip.call) {
                             step.shouldSkip()
                                 .done(function(skip) {
-                                    if (skip === true && parent.step() < parent.stepsLength()) {
+                                    if (skip === true && parent.step() < parent.stepsLength() - 1) {
                                         parent.step(parent.step() + 1);
                                     }
                                     parent.activateStep();

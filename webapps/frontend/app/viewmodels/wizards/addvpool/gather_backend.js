@@ -24,7 +24,7 @@ define([
         // Variables
         self.data = data;
 
-        //Handles
+        // Handles
         self.fetchAlbaVPoolHandle = undefined;
 
         // Observables

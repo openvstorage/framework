@@ -25,7 +25,7 @@ define([
         self.data   = data;
         self.shared = shared;
 
-        //Handles
+        // Handles
         self.checkS3Handle            = undefined;
         self.checkMtptHandle          = undefined;
         self.fetchAlbaVPoolHandle     = undefined;
