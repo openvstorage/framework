@@ -115,7 +115,7 @@ class VMachine(DataObject):
         """
         Aggregates the Stored Data of each vDisk of the vMachine.
         """
-        return sum([vdisk.info['stored'] for vdisk in self.vdisks])
+        return self.statistics['stored']
 
     def _dtl_mode(self):
         """
