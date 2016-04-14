@@ -35,7 +35,7 @@ class Toolbox(object):
 
     regex_ip = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
     regex_guid = re.compile('^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$')
-    regex_vpool = re.compile('^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$')
+    regex_vpool = re.compile('^[0-9a-z][\-a-z0-9]{1,20}[a-z0-9]$')
     regex_preset = re.compile('^[0-9a-zA-Z][a-zA-Z0-9]{1,18}[a-zA-Z0-9]$')
     regex_mountpoint = re.compile('^(/[a-zA-Z0-9\-_\.]+)+/?$')
     compiled_regex_type = type(re.compile('some_regex'))
@@ -50,9 +50,9 @@ class Toolbox(object):
         functions = []
         path = '{0}/../'.format(os.path.dirname(__file__))
         for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py') and filename != '__init__.py':
+            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
+                module = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(module):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name \

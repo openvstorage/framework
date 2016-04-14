@@ -419,14 +419,14 @@ class OVSMigrator(object):
                     with Remote(client.ip, [os], username='root') as remote:
                         for root, dirs, files in remote.os.walk('/sys/class/infiniband'):
                             for directory in dirs:
-                                ports_dir = remote.os.path.join(root, directory, 'ports')
+                                ports_dir = '/'.join([root, directory, 'ports'])
                                 if not remote.os.path.exists(ports_dir):
                                     continue
                                 for sub_root, sub_dirs, _ in remote.os.walk(ports_dir):
                                     if sub_root != ports_dir:
                                         continue
                                     for sub_directory in sub_dirs:
-                                        state_file = remote.os.path.join(sub_root, sub_directory, 'state')
+                                        state_file = '/'.join([sub_root, sub_directory, 'state'])
                                         if remote.os.path.exists(state_file):
                                             if 'ACTIVE' in client.run('cat {0}'.format(state_file)):
                                                 rdma_capable = True
@@ -526,5 +526,20 @@ class OVSMigrator(object):
                     pass
 
             working_version = 10
+
+        # Version 11 introduced:
+        # - ALBA accelerated ALBA, meaning different vpool.metadata information
+        if working_version < 11:
+            from ovs.dal.lists.vpoollist import VPoolList
+
+            for vpool in VPoolList.get_vpools():
+                vpool.metadata = {'backend': vpool.metadata}
+                if 'metadata' in vpool.metadata['backend']:
+                    vpool.metadata['backend']['arakoon_config'] = vpool.metadata['backend'].pop('metadata')
+                if 'backend_info' in vpool.metadata['backend']:
+                    vpool.metadata['backend']['backend_info']['fragment_cache_on_read'] = True
+                    vpool.metadata['backend']['backend_info']['fragment_cache_on_write'] = False
+                vpool.save()
+            working_version = 11
 
         return working_version

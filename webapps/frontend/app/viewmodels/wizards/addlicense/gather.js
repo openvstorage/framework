@@ -82,8 +82,5 @@ define([
                     });
             }).promise();
         };
-        self.next = function() {
-            return true;
-        };
     };
 });

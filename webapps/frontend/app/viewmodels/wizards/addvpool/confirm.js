@@ -37,16 +37,23 @@ define([
                     call_parameters: {
                         vpool_name: self.data.name(),
                         type: self.data.backend(),
-                        connection_host: self.data.host(),
-                        connection_port: self.data.port(),
-                        connection_username: self.data.accesskey(),
-                        connection_password: self.data.secretkey(),
-                        connection_backend: {'backend': (self.data.backend() === 'alba' && self.data.albaBackend() !== undefined ? self.data.albaBackend().guid() : undefined),
-                                             'metadata': (self.data.backend() === 'alba' && self.data.albaPreset() !== undefined ? self.data.albaPreset().name : undefined)},
+                        backend_connection_info: {
+                            host: self.data.host(),
+                            port: self.data.port(),
+                            username: self.data.accesskey(),
+                            password: self.data.secretkey(),
+                            backend: {
+                                'backend': (self.data.backend() === 'alba' && self.data.albaBackend() !== undefined ? self.data.albaBackend().guid() : undefined),
+                                'metadata': (self.data.backend() === 'alba' && self.data.albaPreset() !== undefined ? self.data.albaPreset().name : undefined)
+                            }
+                        },
                         storage_ip: self.data.storageIP(),
+                        storagerouter_ip: self.data.target().ipAddress(),
                         integratemgmt: self.data.integratemgmt(),
                         readcache_size: self.data.readCacheSize(),
                         writecache_size: self.data.writeCacheSize(),
+                        fragment_cache_on_read: self.data.fragmentCacheOnRead(),
+                        fragment_cache_on_write: self.data.fragmentCacheOnWrite(),
                         config_params: {
                             'dtl_mode': self.data.dtlMode().name,
                             'sco_size': self.data.scoSize(),
@@ -61,6 +68,18 @@ define([
 
                 if (self.data.backend() === 'distributed') {
                     post_data.call_parameters.distributed_mountpoint = self.data.distributedMtpt();
+                }
+                if (self.data.useAA() === true) {
+                    post_data.call_parameters.backend_connection_info_aa = {
+                        host: self.data.aaHost(),
+                        port: self.data.aaPort(),
+                        username: self.data.aaAccesskey(),
+                        password: self.data.aaSecretkey(),
+                        backend: {
+                            'backend': (self.data.backend() === 'alba' && self.data.albaAABackend() !== undefined ? self.data.albaAABackend().guid() : undefined),
+                            'metadata': (self.data.backend() === 'alba' && self.data.albaAAPreset() !== undefined ? self.data.albaAAPreset().name : undefined)
+                        }
+                    }
                 }
                 if (data.vPoolAdd() === true) {
                     generic.alertInfo($.t('ovs:wizards.add_vpool.confirm.started'), $.t('ovs:wizards.add_vpool.confirm.in_progress', { what: self.data.name() }));

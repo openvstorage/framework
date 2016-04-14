@@ -14,8 +14,8 @@
 /*global define */
 define([
     'jquery', 'ovs/generic',
-    '../build', './data', './gather_config', './gather_vpool', './gather_cache_info', './gather_mgmtcenter', './confirm'
-], function($, generic, build, data, GatherConfig, GatherVPool, GatherCacheInfo, GatherMgmtCenter, Confirm) {
+    '../build', './data', './gather_config', './gather_vpool', './gather_cache_info', './gather_mgmtcenter', './gather_backend', './confirm'
+], function($, generic, build, data, GatherConfig, GatherVPool, GatherCacheInfo, GatherMgmtCenter, GatherBackend, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
@@ -33,15 +33,23 @@ define([
             data.vPool(undefined);
             data.target(undefined);
         }
-        self.steps([new GatherVPool(), new GatherConfig(), new GatherCacheInfo(), new GatherMgmtCenter(), new Confirm()]);
+        self.steps([new GatherVPool(), new GatherBackend(), new GatherConfig(), new GatherCacheInfo(), new GatherMgmtCenter(), new Confirm()]);
         data.completed = options.completed;
         self.step(0);
         self.activateStep();
 
         // Cleaning data
+        data.aaAccesskey('');
+        data.aaHost('');
+        data.aaLocalHost(true);
+        data.aaPort(80);
+        data.aaSecretkey('');
         data.accesskey('');
+        data.albaAABackend(undefined);
+        data.albaAAPreset(undefined);
         data.albaBackend(undefined);
         data.albaBackends([]);
+        data.albaPreset(undefined);
         data.backend('alba');
         data.backends(['alba', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']);
         data.cacheStrategy('on_read');
@@ -51,6 +59,8 @@ define([
         data.dtlEnabled(true);
         data.dtlMode({name: 'a_sync', disabled: false});
         data.dtlTransportMode({name: 'tcp'});
+        data.fragmentCacheOnRead(true);
+        data.fragmentCacheOnWrite(false);
         data.hasMgmtCenter(false);
         data.host('');
         data.integratemgmt(false);
@@ -75,6 +85,7 @@ define([
         data.storageDrivers([]);
         data.storageIP(undefined);
         data.storageRouters([]);
+        data.useAA(false);
         data.writeBuffer(undefined);
         data.writeCacheSize(undefined);
     };

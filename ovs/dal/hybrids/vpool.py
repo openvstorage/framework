@@ -35,7 +35,7 @@ class VPool(DataObject):
                     Property('login', str, mandatory=False, doc='Login/Username for the Storage BackendType.'),
                     Property('password', str, mandatory=False, doc='Password for the Storage BackendType.'),
                     Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domain name, Zone, ...) for the Storage BackendType.'),
-                    Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.'),
+                    Property('metadata', dict, mandatory=False, doc='Metadata for the backends, as used by the Storage Drivers.'),
                     Property('rdma_enabled', bool, default=False, doc='Has the vpool been configured to use RDMA for DTL transport, which is only possible if all storagerouters are RDMA capable'),
                     Property('status', STATUSES.keys(), doc='Status of the vPool')]
     __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
@@ -55,6 +55,10 @@ class VPool(DataObject):
 
     @property
     def storagedriver_client(self):
+        """
+        Client used for communication between Storage Driver and framework
+        :return: StorageDriverClient
+        """
         if self._storagedriver_client is None:
             self.reload_client()
         return self._storagedriver_client
@@ -79,7 +83,7 @@ class VPool(DataObject):
         """
         Aggregates the Stored Data of each vDisk served by the vPool.
         """
-        return sum([disk.info['stored'] for disk in self.vdisks])
+        return self.statistics['stored']
 
     def _identifier(self):
         """

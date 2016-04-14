@@ -805,7 +805,7 @@ class Sdk(object):
                 self.wait_for_task(task)
 
         if storagedriver_mountpoint and devicename:
-            vmx_path = os.path.join(storagedriver_mountpoint, devicename)
+            vmx_path = '/'.join([storagedriver_mountpoint, devicename])
             if os.path.exists(vmx_path):
                 dir_name = os.path.dirname(vmx_path)
                 logger.debug('Removing leftover files in {0}'.format(dir_name))
@@ -929,7 +929,7 @@ class Sdk(object):
         disk_url = '[{0}] {1}'.format(datastore.name, disk_path)
         config = self._client.factory.create('ns0:FileBackedVirtualDiskSpec')
         config.adapterType = "busLogic"
-        config.diskType =  "preallocated"
+        config.diskType = "preallocated"
         config.capacityKb = size * 1024 * 1024
 
         task = self._client.service.CreateVirtualDisk_Task(self._serviceContent.virtualDiskManager, disk_url, None, config)

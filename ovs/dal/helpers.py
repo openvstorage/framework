@@ -158,11 +158,11 @@ class HybridRunner(object):
         base_hybrids = []
         inherit_table = {}
         translation_table = {}
-        path = os.path.join(os.path.dirname(__file__), 'hybrids')
+        path = '/'.join([os.path.dirname(__file__), 'hybrids'])
         for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
+                module = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(module):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name:
@@ -317,11 +317,11 @@ class Migration(object):
             data = {}
 
         migrators = []
-        path = os.path.join(os.path.dirname(__file__), 'migration')
+        path = '/'.join([os.path.dirname(__file__), 'migration'])
         for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
+                module = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(module):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name \
