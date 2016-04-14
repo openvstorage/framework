@@ -1645,7 +1645,7 @@ EOF
 
     @staticmethod
     def _avahi_installed(client):
-        installed = client.run('which avahi-daemon')
+        installed = client.run('which avahi-daemon || :')
         if installed == '':
             logger.debug('Avahi not installed')
             return False
