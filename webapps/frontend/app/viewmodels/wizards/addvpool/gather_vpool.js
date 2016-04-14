@@ -25,13 +25,11 @@ define([
         self.data   = data;
         self.shared = shared;
 
-        //Handles
+        // Handles
         self.checkS3Handle            = undefined;
         self.checkMtptHandle          = undefined;
         self.fetchAlbaVPoolHandle     = undefined;
-        self.loadStorageDriversHandle = undefined;
         self.loadStorageRoutersHandle = undefined;
-        self.loadStorageDriversHandle = {};
 
         // Observables
         self.preValidateResult  = ko.observable({ valid: true, reasons: [], fields: [] });
@@ -254,6 +252,7 @@ define([
                     .fail(function() {
                         self.data.albaBackends([]);
                         self.data.albaBackend(undefined);
+                        self.data.albaPreset(undefined);
                         self.albaBackendLoading(false);
                         self.invalidAlbaInfo(true);
                         albaDeferred.reject();
@@ -330,31 +329,55 @@ define([
                 self.data.dtlTransportMode({name: currentConfig.dtl_transport});
                 var metadata = self.data.vPool().metadata();
                 if (self.data.vPool().backendType().code() === 'alba') {
-                    if (metadata.hasOwnProperty('connection')) {
+                    if (metadata.hasOwnProperty('backend_aa') && metadata.backend_aa.hasOwnProperty('connection')) {
+                        self.data.aaLocalHost(metadata.backend_aa.connection.local);
+                        if (metadata.backend_aa.connection.local) {
+                            self.data.aaAccesskey('');
+                            self.data.aaSecretkey('');
+                            self.data.aaHost('');
+                            self.data.aaPort(80);
+                        } else {
+                            self.data.aaAccesskey(metadata.backend_aa.connection.client_id);
+                            self.data.aaSecretkey(metadata.backend_aa.connection.client_secret);
+                            self.data.aaHost(metadata.backend_aa.connection.host);
+                            self.data.aaPort(metadata.backend_aa.connection.port);
+                        }
+                    }
+                    if (metadata.hasOwnProperty('backend') && metadata.backend.hasOwnProperty('connection')) {
                         // Created in or after 2.7.0
                         self.data.v260Migration(false);
-                        self.data.localHost(metadata.connection.local);
-                        if (metadata.connection.local) {
+                        self.data.localHost(metadata.backend.connection.local);
+                        self.data.fragmentCacheOnRead(metadata.backend.backend_info.fragment_cache_on_read);
+                        self.data.fragmentCacheOnWrite(metadata.backend.backend_info.fragment_cache_on_write);
+                        if (metadata.backend.connection.local) {
                             self.data.accesskey('');
                             self.data.secretkey('');
                             self.data.host('');
-                            self.data.port('');
+                            self.data.port(80);
                         } else {
-                            self.data.accesskey(metadata.connection.client_id);
-                            self.data.secretkey(metadata.connection.client_secret);
-                            self.data.host(metadata.connection.host);
-                            self.data.port(metadata.connection.port);
+                            self.data.accesskey(metadata.backend.connection.client_id);
+                            self.data.secretkey(metadata.backend.connection.client_secret);
+                            self.data.host(metadata.backend.connection.host);
+                            self.data.port(metadata.backend.connection.port);
                         }
                         self.loadAlbaBackends()
                             .done(function () {
                                 $.each(self.data.albaBackends(), function (_, albaBackend) {
-                                    if (albaBackend.guid() === metadata.backend_guid) {
+                                    if (albaBackend.guid() === metadata.backend.backend_guid) {
                                         self.data.albaBackend(albaBackend);
                                         $.each(albaBackend.enhancedPresets(), function (_, preset) {
-                                            if (preset.name === self.data.vPool().backendPreset()) {
+                                            if (preset.name === metadata.backend.preset) {
                                                 self.data.albaPreset(preset);
                                             }
                                         });
+                                    } else if (albaBackend.guid() === metadata.backend_aa.backend_guid) {
+                                        self.data.albaAABackend(albaBackend);
+                                        self.data.useAA(true);
+                                        $.each(albaBackend.enhancedPresets(), function(_, preset) {
+                                            if (preset.name === metadata.backend_aa.preset) {
+                                                self.data.albaAAPreset(preset);
+                                            }
+                                        })
                                     }
                                 });
                             });

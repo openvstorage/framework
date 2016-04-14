@@ -32,6 +32,7 @@ define([
         self.storageRouterHandle = undefined;
 
         // Observables
+        self.aaBackendPreset    = ko.observable();
         self.backendConnection  = ko.observable();
         self.backendPreset      = ko.observable();
         self.backendLogin       = ko.observable();
@@ -91,9 +92,14 @@ define([
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.metadata, data, 'metadata');
             generic.trySet(self.backendConnection, data, 'connection');
-            if (data.hasOwnProperty('metadata') && data.metadata.hasOwnProperty('preset')) {
-                self.backendPreset(data.metadata.preset);
+
+            if (self.metadata.hasOwnProperty('backend') && self.metadata.backend.hasOwnProperty('preset')) {
+                self.backendPreset(self.metadata.backend.preset);
             }
+            if (self.metadata.hasOwnProperty('backend_aa') && self.metadata.backend_aa.hasOwnProperty('preset')) {
+                self.aaBackendPreset(self.metadata.backend_aa.preset);
+            }
+
             generic.trySet(self.backendLogin, data, 'login');
             generic.trySet(self.rdmaEnabled, data, 'rdma_enabled');
             if (data.hasOwnProperty('backend_type_guid')) {

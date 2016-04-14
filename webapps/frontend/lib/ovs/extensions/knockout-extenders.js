@@ -79,12 +79,22 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
         return computed;
     };
     ko.extenders.format = function(target, formatter) {
-        var computed;
-        computed = ko.computed({
+        var computed = ko.computed({
             read: function() {
                 return formatter(target());
             },
             write: target
+        }).extend({ notify: 'always' });
+        computed(target());
+        computed.raw = target;
+        return computed;
+    };
+    ko.extenders.removeWhiteSpaces = function(target) {
+        var computed = ko.computed({
+            read: target,
+            write: function(newValue) {
+                target(newValue.replace(/ /g, ''))
+            }
         }).extend({ notify: 'always' });
         computed(target());
         computed.raw = target;
