@@ -57,7 +57,11 @@ class OpenStackManagement(object):
         try:
             from cinder import version
             version_string = version.version_string()
-            if version_string.startswith('2015.2') or version_string.startswith('7.0'):
+            if version_string.startswith('9.0'):
+                self._stack_version = 'newton'
+            elif version_string.startswith('8.0'):
+                self._stack_version = 'mitaka'
+            elif version_string.startswith('2015.2') or version_string.startswith('7.0'):
                 self._stack_version = 'liberty'
             elif version_string.startswith('2015.1'):
                 self._stack_version = 'kilo'
@@ -98,12 +102,21 @@ class OpenStackManagement(object):
         # 3. Check patches
         nova_base_path = self._get_base_path('nova')
         cinder_base_path = self._get_base_path('cinder')
+        if self._stack_version in ('liberty', 'mitaka', 'newton'):
+            if self._is_devstack is True:
+                nova_volume_file = '{0}/virt/libvirt/volume/volume.py'.format(nova_base_path)
+            else:
+                nova_volume_file = '{0}/nova/virt/libvirt/volume/volume.py'.format(self._driver_location)
+        else:
+            if self._is_devstack is True:
+                nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
+            else:
+                nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(self._driver_location)
+
         if self._is_devstack is True:
-            nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
             nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
             cinder_brick_initiator_file = '{0}/brick/initiator/connector.py'.format(cinder_base_path)
         else:
-            nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(self._driver_location)
             nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(self._driver_location)
             cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(self._driver_location)
 
@@ -113,9 +126,13 @@ class OpenStackManagement(object):
                 logger.info('File "{0}" is not configured properly'.format(nova_volume_file))
                 return False
 
+        if self._stack_version in ('liberty', 'mitaka'):
+            check_line = 'file=nova.virt.libvirt.volume.volume.LibvirtFileVolumeDriver'
+        else:
+            check_line = 'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver'
         with open(nova_driver_file, 'r') as nova_driv_file:
             file_contents = nova_driv_file.readlines()
-            if not [line for line in file_contents if 'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver' in line]:
+            if not [line for line in file_contents if check_line in line]:
                 logger.info('File "{0}" is not configured properly'.format(nova_driver_file))
                 return False
 
@@ -225,6 +242,7 @@ class OpenStackManagement(object):
             volume_type.set_keys(metadata={'volume_backend_name': vpool.name})
 
         # 3. Restart processes
+        self.client = SSHClient(ip, username='root')
         self._restart_processes()
         logger.debug('configure_vpool {0} completed'.format(vpool.name))
 
@@ -308,22 +326,26 @@ class OpenStackManagement(object):
 
         # 3. Apply patches
         logger.info('  Applying patches')
-        if self._stack_version == 'liberty':
+        if self._stack_version in ('liberty', 'mitaka', 'newton'):
+            try:
+                import os_brick
+                cinder_brick_initiator_file = "{0}/initiator/connector.py".format(os.path.dirname(os_brick.__file__))
+            except ImportError:
+                cinder_brick_initiator_file = ''
             if self._is_devstack is True:
                 nova_volume_file = '{0}/virt/libvirt/volume/volume.py'.format(nova_base_path)
             else:
                 nova_volume_file = '{0}/nova/virt/libvirt/volume/volume.py'.format(self._driver_location)
         else:
+            cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(self._driver_location)
             if self._is_devstack is True:
                 nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
             else:
                 nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(self._driver_location)
         if self._is_devstack is True:
             nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
-            cinder_brick_initiator_file = '{0}/brick/initiator/connector.py'.format(cinder_base_path)
         else:
             nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(self._driver_location)
-            cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(self._driver_location)
 
         logger.info('    Patching file {0}'.format(nova_volume_file))
         with open(nova_volume_file, 'r') as nova_vol_file:
@@ -348,12 +370,18 @@ class OpenStackManagement(object):
         logger.info('    Patching file {0}'.format(nova_driver_file))
         with open(nova_driver_file, 'r') as nova_driv_file:
             file_contents = nova_driv_file.readlines()
-        if not [line for line in file_contents if 'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver' in line]:
+        if self._stack_version in ('liberty', 'mitaka'):
+            check_line = 'local=nova.virt.libvirt.volume.volume.LibvirtVolumeDriver'
+            new_line = 'file=nova.virt.libvirt.volume.volume.LibvirtFileVolumeDriver'
+        else:
+            check_line = 'local=nova.virt.libvirt.volume.LibvirtVolumeDriver'
+            new_line = 'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver'
+        if not [line for line in file_contents if new_line in line]:
             for line in file_contents:
-                if 'local=nova.virt.libvirt.volume.LibvirtVolumeDriver' in line:
+                if check_line in line:
                     stripped_line = line.rstrip()
                     whitespaces = len(stripped_line) - len(stripped_line.lstrip())
-                    new_line = "{0}'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver',\n".format(' ' * whitespaces)
+                    new_line = "{0}'{1}',\n".format(' ' * whitespaces, new_line)
                     fc = file_contents[:file_contents.index(line)] + [new_line] + file_contents[file_contents.index(line):]
                     self.client.file_write(nova_driver_file, "".join(fc))
                     break
