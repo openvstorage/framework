@@ -227,7 +227,7 @@ class MDSServices(TestCase):
         """
         vdisks = {}
         storagedriver_id = None
-        if mds_service is not None and mds_service.service.storagerouter_guid is not None:
+        if mds_service is not None:
             for sd in mds_service.vpool.storagedrivers:
                 if sd.storagerouter_guid == mds_service.service.storagerouter_guid:
                     storagedriver_id = sd.storagedriver_id

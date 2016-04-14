@@ -36,19 +36,10 @@ class PersistentFactory(object):
             if client_type is None:
                 client_type = EtcdConfiguration.get('/ovs/framework/stores|persistent')
 
-            framework_cluster_name = 'ovsdb'
-            for cluster in EtcdConfiguration.list('/ovs/arakoon'):
-                metadata_key = '/ovs/arakoon/{0}/metadata'.format(cluster)
-                if EtcdConfiguration.exists(metadata_key):
-                    metadata = EtcdConfiguration.get(metadata_key)
-                    if metadata['type'].upper() == 'FWK':
-                        framework_cluster_name = cluster
-                        break
-
             PersistentFactory.store = None
             if client_type in ['pyrakoon', 'arakoon']:
                 from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
-                PersistentFactory.store = PyrakoonStore(framework_cluster_name)
+                PersistentFactory.store = PyrakoonStore(str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|ovsdb')))
             if client_type == 'default':
                 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
                 PersistentFactory.store = DummyPersistentStore()

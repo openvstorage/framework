@@ -26,6 +26,7 @@ from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import CalledProcessError, SSHClient
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.services.service import ServiceManager
 from ovs.log.logHandler import LogHandler
 from StringIO import StringIO
@@ -253,7 +254,6 @@ class ArakoonInstaller(object):
     ETCD_CONFIG_KEY = ETCD_CONFIG_ROOT + '/{0}/config'
     ETCD_CONFIG_PATH = 'etcd://127.0.0.1:2379' + ETCD_CONFIG_KEY
     SSHCLIENT_USER = 'ovs'
-    ARAKOON_START_PORT = 26400
 
     def __init__(self):
         """
@@ -319,7 +319,7 @@ class ArakoonInstaller(object):
             root_client.file_delete(info['files'])
 
     @staticmethod
-    def create_cluster(cluster_name, cluster_type, ip, base_dir, plugins=None, locked=True, internal=True):
+    def create_cluster(cluster_name, cluster_type, ip, base_dir, plugins=None, locked=True, internal=True, claim=False):
         """
         Always creates a cluster but marks it's usage according to the internal flag
         :param cluster_name: Name of the cluster
@@ -343,6 +343,9 @@ class ArakoonInstaller(object):
         :param internal: Is cluster internally managed by OVS
         :type internal: bool
 
+        :param claim: Claim the cluster right away
+        :type claim: bool
+
         :return: Ports used by arakoon cluster
         :rtype: dict
         """
@@ -351,10 +354,6 @@ class ArakoonInstaller(object):
 
         logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
         base_dir = base_dir.rstrip('/')
-
-        EtcdConfiguration.set('/ovs/framework/stores', {'persistent': 'pyrakoon',
-                                                        'volatile': 'memcache'})
-        EtcdConfiguration.create_dir('/ovs/arakoon')
 
         client = SSHClient(ip, username=ArakoonInstaller.SSHCLIENT_USER)
         if ArakoonInstaller.is_running(cluster_name, client):
@@ -396,12 +395,15 @@ class ArakoonInstaller(object):
             metadata.internal = internal
             metadata.cluster_type = cluster_type.upper()
             metadata.write()
+            if claim is True:
+                metadata.claim()
         finally:
             if port_mutex is not None:
                 port_mutex.release()
 
         logger.debug('Creating cluster {0} on {1} completed'.format(cluster_name, ip))
-        return {'client_port': ports[0],
+        return {'metadata': metadata,
+                'client_port': ports[0],
                 'messaging_port': ports[1]}
 
     @staticmethod
@@ -530,33 +532,28 @@ class ArakoonInstaller(object):
         ArakoonInstaller._deploy(config)
 
     @staticmethod
-    def get_arakoon_metadata_by_cluster_type(cluster_type, in_use):
+    def get_unused_arakoon_metadata_and_claim(cluster_type):
         """
         Retrieve arakoon cluster information based on its type
         :param cluster_type: Type of arakoon cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
         :type cluster_type: str
 
-        :param in_use: Return clusters which are already in use or not
-        :type in_use: bool
-
         :return: List of ArakoonClusterMetadata objects
-        :rtype: list
+        :rtype: ArakoonClusterMetadata
         """
-        clusters = []
         cluster_type = cluster_type.upper()
         if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
             raise ValueError('Unsupported arakoon cluster type provided. Please choose from {0}'.format(', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
-        if not EtcdConfiguration.exists('/ovs/arakoon', raw=True):
-            return clusters
+        if not EtcdConfiguration.dir_exists('/ovs/arakoon'):
+            return None
 
-        for cluster_name in EtcdConfiguration.list('/ovs/arakoon'):
-            arakoon_metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
-            arakoon_metadata.load_metadata()
-            if arakoon_metadata.cluster_type == cluster_type and arakoon_metadata.in_use is in_use:
-                clusters.append(arakoon_metadata)
-                if in_use is False:
-                    break  # We only need 1 unused cluster (at a time)
-        return clusters
+        with VolatileMutex('claim_arakoon_metadata', wait=10):
+            for cluster_name in EtcdConfiguration.list('/ovs/arakoon'):
+                metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
+                metadata.load_metadata()
+                if metadata.cluster_type == cluster_type and metadata.in_use is False and metadata.internal is False:
+                    metadata.claim()
+                    return metadata
 
     @staticmethod
     def get_arakoon_metadata_by_cluster_name(cluster_name):
@@ -595,11 +592,8 @@ class ArakoonInstaller(object):
                             exclude_ports.append(node.messaging_port)
                 except:
                     logger.error('  Could not load port information of cluster {0}'.format(cluster_name))
-        key = '/ovs/framework/hosts/{0}/ports|arakoon'.format(node_name)
-        if EtcdConfiguration.exists(key):
-            ports = System.get_free_ports(EtcdConfiguration.get(key), exclude_ports, 2, client)
-        else:
-            ports = System.get_free_ports([ArakoonInstaller.ARAKOON_START_PORT], exclude_ports, 2, client)
+
+        ports = System.get_free_ports(EtcdConfiguration.get('/ovs/framework/hosts/{0}/ports|arakoon'.format(node_name)), exclude_ports, 2, client)
         logger.debug('  Loaded free ports {0} based on existing clusters {1}'.format(ports, clusters))
         return ports
 

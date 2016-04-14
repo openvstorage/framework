@@ -45,6 +45,7 @@ from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
 
 logger = LogHandler.get('lib', name='mds')
 storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+# noinspection PyArgumentList
 storagerouterclient.Logger.enableLogging()
 
 
@@ -591,6 +592,7 @@ class MDSServiceController(object):
         for service in new_services:
             client = MetadataServerClient.load(service)
             client.create_namespace(str(vdisk.volume_id))
+            # noinspection PyArgumentList
             configs.append(MDSNodeConfig(address=str(service.storagerouter.ip),
                                          port=service.ports[0]))
         vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
@@ -611,11 +613,10 @@ class MDSServiceController(object):
         :return: Preferred MDS service (least loaded), current load on that MDS service
         :rtype: tuple
         """
-
-        mds_service = None
+        mds_service = (None, float('inf'))
         for current_mds_service in vpool.mds_services:
             if current_mds_service.service.storagerouter_guid == storagerouter.guid:
-                load = MDSServiceController.get_mds_load(current_mds_service)
+                load = MDSServiceController.get_mds_load(current_mds_service)[0]
                 if mds_service is None or load < mds_service[1]:
                     mds_service = (current_mds_service, load)
         return mds_service
@@ -628,7 +629,7 @@ class MDSServiceController(object):
         :type mds_service: MDSService
 
         :return: Load of the MDS service
-        :rtype: float
+        :rtype: tuple
         """
         service_capacity = float(mds_service.capacity)
         if service_capacity < 0:
@@ -669,6 +670,8 @@ class MDSServiceController(object):
                 except UnableToConnectException:
                     continue
             mds_service, load = MDSServiceController.get_preferred_mds(storagerouter, vpool)
+            if mds_service is None:
+                raise RuntimeError('Could not find an MDS service')
             mds_per_storagerouter[storagerouter] = {'host': storagerouter.ip, 'port': mds_service.service.ports[0]}
             if load not in mds_per_load:
                 mds_per_load[load] = []

@@ -21,8 +21,6 @@ import sys
 import time
 import uuid
 import logging
-from ovs.dal.hybrids.servicetype import ServiceType
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.log.logHandler import LogHandler
 
@@ -109,11 +107,10 @@ def services_running(target):
             tries = 0
             while tries < max_tries:
                 try:
+                    from ovs.extensions.db.etcd.configuration import EtcdConfiguration
                     from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
-                    clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=True)
-                    if len(clusters) != 1:
-                        raise ValueError('Expected exactly 1 "{0}" arakoon cluster'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
-                    client = PyrakoonStore(cluster=str(clusters[0].cluster_id))
+                    cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
+                    client = PyrakoonStore(cluster=str(cluster_name))
                     client.set(key, value)
                     if client.get(key) == value:
                         client.delete(key)

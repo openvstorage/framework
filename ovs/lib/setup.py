@@ -77,7 +77,7 @@ class SetupController(object):
         passwords = {}
         master_ip = None
         cluster_ip = None
-        external_etcd = None  # Example: 'abcdef0123456789=http://1.2.3.4:2380'
+        external_etcd = None  # Example: 'etcd0123456789=http://1.2.3.4:2380'
         hypervisor_ip = None
         hypervisor_name = None
         hypervisor_type = None
@@ -331,7 +331,7 @@ class SetupController(object):
 
                     if promote_completed is False:
                         SetupController._log(messages='Analyzing cluster layout')
-                        framework_cluster_name = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=True)[0].cluster_id
+                        framework_cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|ovsdb'))
                         config = ArakoonClusterConfig(framework_cluster_name)
                         config.load_config()
                         logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), framework_cluster_name))
@@ -835,30 +835,24 @@ class SetupController(object):
             SetupController._log(messages='Setting up Fleet')
             ServiceManager.setup_fleet()
 
-        clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=True)
-        if len(clusters) > 0:
-            raise ValueError('Found a cluster of type "{0}" which has already been claimed'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
-
-        clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=False)
+        metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK)
         arakoon_ports = []
-        if len(clusters) == 0:  # No externally managed cluster found, we create 1 ourselves
+        if metadata is None:  # No externally managed cluster found, we create 1 ourselves
             SetupController._log(messages='Setting up Arakoon cluster ovsdb')
             internal = True
             result = ArakoonInstaller.create_cluster(cluster_name='ovsdb',
                                                      cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
                                                      ip=cluster_ip,
                                                      base_dir=EtcdConfiguration.get('/ovs/framework/paths|ovsdb'),
-                                                     locked=False)
+                                                     locked=False,
+                                                     claim=True)
             arakoon_ports = [result['client_port'], result['messaging_port']]
-            clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=False)
+            metadata = result['metadata']
         else:
-            SetupController._log(messages='Arakoon cluster of type {0} with name {1} found, marking it as being used'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK, clusters[0].cluster_id))
+            SetupController._log(messages='Arakoon cluster of type {0} with name {1} found, marking it as being used'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK, metadata.cluster_id))
             internal = False
 
-        if len(clusters) == 0:
-            raise ValueError('No arakoon cluster found of type {0}'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
-        clusters[0].claim()
-
+        EtcdConfiguration.set('/ovs/framework/arakoon_clusters|ovsdb', metadata.cluster_id)
         SetupController._add_services(target_client, unique_id, 'master')
         SetupController._log(messages='Build configuration files')
 
@@ -957,6 +951,7 @@ class SetupController(object):
                               '/ovs/framework/paths|ovsdb': '',
                               '/ovs/framework/external_etcd': None,
                               '/ovs/framework/memcache|endpoints': [],
+                              '/ovs/framework/arakoon_clusters|ovsdb': None,
                               '/ovs/framework/messagequeue|endpoints': []}
 
         SetupController._log(messages='Etcd is{0} running'.format('' if etcd_running is True else ' NOT'))
@@ -1012,9 +1007,12 @@ class SetupController(object):
 
         if first_node is True and etcd_running is True:
             SetupController._log(messages='Unconfigure Arakoon')
-            clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=True)
-            if len(clusters) > 0 and clusters[0].internal is True:
-                cluster_name = str(clusters[0].cluster_id)
+            cluster_name = etcd_required_info['/ovs/framework/arakoon_clusters|ovsdb']
+            try:
+                metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+            except ValueError:
+                metadata = None
+            if metadata is not None and metadata.internal is True:
                 try:
                     ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
                 except Exception as ex:
@@ -1157,12 +1155,9 @@ class SetupController(object):
         storagerouter.save()
 
         # Find other (arakoon) master nodes
-        clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=True)
-        if len(clusters) != 1:
-            raise ValueError('Expected exactly 1 "{0}" arakoon cluster'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
-
-        arakoon_metadata = clusters[0]
-        config = ArakoonClusterConfig(arakoon_metadata.cluster_id)
+        arakoon_cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|ovsdb'))
+        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=arakoon_cluster_name)
+        config = ArakoonClusterConfig(arakoon_cluster_name)
         config.load_config()
         master_nodes = [node.ip for node in config.nodes]
         if cluster_ip in master_nodes:
@@ -1179,7 +1174,7 @@ class SetupController(object):
             SetupController._log(messages='Joining Arakoon cluster')
             result = ArakoonInstaller.extend_cluster(master_ip=master_ip,
                                                      new_ip=cluster_ip,
-                                                     cluster_name=arakoon_metadata.cluster_id,
+                                                     cluster_name=arakoon_cluster_name,
                                                      base_dir=EtcdConfiguration.get('/ovs/framework/paths|ovsdb'))
             arakoon_ports = [result['client_port'], result['messaging_port']]
 
@@ -1204,7 +1199,7 @@ class SetupController(object):
 
         if arakoon_metadata.internal is True:
             SetupController._log(messages='Restarting master node services')
-            ArakoonInstaller.restart_cluster_add(arakoon_metadata.cluster_id, master_nodes, cluster_ip)
+            ArakoonInstaller.restart_cluster_add(arakoon_cluster_name, master_nodes, cluster_ip)
             PersistentFactory.store = None
             VolatileFactory.store = None
 
@@ -1278,12 +1273,9 @@ class SetupController(object):
                 raise RuntimeError('Not all memcache nodes can be reached which is required for demoting a node.')
 
         # Find other (arakoon) master nodes
-        clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=True)
-        if len(clusters) != 1:
-            raise ValueError('Expected exactly 1 "{0}" arakoon cluster'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
-
-        arakoon_metadata = clusters[0]
-        config = ArakoonClusterConfig(arakoon_metadata.cluster_id)
+        arakoon_cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|ovsdb'))
+        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=arakoon_cluster_name)
+        config = ArakoonClusterConfig(arakoon_cluster_name)
         config.load_config()
         master_nodes = [node.ip for node in config.nodes]
         if cluster_ip in master_nodes:
@@ -1297,8 +1289,8 @@ class SetupController(object):
 
         offline_node_ips = [node.ip for node in offline_nodes]
         if arakoon_metadata.internal is True:
-            SetupController._log(messages='Leaving Arakoon {0} cluster'.format(arakoon_metadata.cluster_id))
-            ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip, cluster_name=arakoon_metadata.cluster_id, offline_nodes=offline_node_ips)
+            SetupController._log(messages='Leaving Arakoon {0} cluster'.format(arakoon_cluster_name))
+            ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip, cluster_name=arakoon_cluster_name, offline_nodes=offline_node_ips)
 
         try:
             external_etcd = EtcdConfiguration.get('/ovs/framework/external_etcd')
@@ -1331,7 +1323,7 @@ class SetupController(object):
             if cluster_ip in remaining_nodes:
                 remaining_nodes.remove(cluster_ip)
 
-            ArakoonInstaller.restart_cluster_remove(arakoon_metadata.cluster_id, remaining_nodes)
+            ArakoonInstaller.restart_cluster_remove(arakoon_cluster_name, remaining_nodes)
             PersistentFactory.store = None
             VolatileFactory.store = None
 

@@ -51,7 +51,6 @@ from ovs.lib.helpers.decorators import log
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.logHandler import LogHandler
-from subprocess import check_output
 from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter import VolumeDriverEvents_pb2
 from volumedriver.storagerouter.storagerouterclient import DTLConfig
@@ -61,6 +60,7 @@ from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
 
 logger = LogHandler.get('lib', name='vdisk')
 storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+# noinspection PyArgumentList
 storagerouterclient.Logger.enableLogging()
 
 
@@ -376,6 +376,7 @@ class VDiskController(object):
                 raise RuntimeError('Could not find a MDS service')
 
             logger.info('Clone snapshot {0} of disk {1} to location {2}'.format(snapshotid, vdisk.name, location))
+            # noinspection PyArgumentList
             backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                                                      port=mds_service.service.ports[0])])
             volume_id = vdisk.storagedriver_client.create_clone(target_path=location,
@@ -573,6 +574,7 @@ class VDiskController(object):
         logger.info('Create disk from template {0} to new disk {1} to location {2}'.format(vdisk.name, new_vdisk.name, disk_path))
 
         try:
+            # noinspection PyArgumentList
             backend_config = MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                            port=mds_service.service.ports[0])
             volume_id = vdisk.storagedriver_client.create_clone_from_template(target_path=disk_path,

@@ -546,17 +546,6 @@ class StorageRouterController(object):
 
         # Verify SD arakoon cluster is available and 'in_use'
         root_client = ip_client_map[storagerouter.ip]['root']
-        clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=True)
-        if len(clusters) != 1:
-            for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:
-                if service.name == 'arakoon-voldrv':
-                    service.delete()
-            vpool.delete()
-            clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=False)
-            if len(clusters) > 0 and clusters[0].internal is True:
-                ArakoonInstaller.delete_cluster(cluster_name=clusters[0].cluster_id, ip=root_client.ip)
-            raise ValueError('Expected exactly 1 "{0}" arakoon cluster'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
-
         watcher_volumedriver_service = 'watcher-volumedriver'
         if not ServiceManager.has_service(watcher_volumedriver_service, client=root_client):
             ServiceManager.add_service(watcher_volumedriver_service, client=root_client)
@@ -581,7 +570,7 @@ class StorageRouterController(object):
         model_ports_in_use += ports
 
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
-        arakoon_cluster_name = str(clusters[0].cluster_id)
+        arakoon_cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
         config = ArakoonClusterConfig(arakoon_cluster_name)
         config.load_config()
         arakoon_nodes = []
@@ -1126,10 +1115,6 @@ class StorageRouterController(object):
         if client is None:
             raise RuntimeError('Could not found any responsive node in the cluster')
 
-        clusters = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=True)
-        if len(clusters) != 1:
-            raise ValueError('Expected exactly 1 "{0}" arakoon cluster'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
-
         vpool_guids = set()
         pmachine_guids = set()
         for virtual_machine in VMachineList.get_customer_vmachines():
@@ -1210,7 +1195,7 @@ class StorageRouterController(object):
                     except Exception as ex:
                         logger.error('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed with error: {3}'.format(storage_driver.guid, vdisk.guid, vdisk.name, ex))
 
-        arakoon_cluster_name = str(clusters[0].cluster_id)
+        arakoon_cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
         config = ArakoonClusterConfig(arakoon_cluster_name)
         config.load_config()
         arakoon_node_configs = []
@@ -1680,11 +1665,12 @@ class StorageRouterController(object):
         this_sr = StorageRouterList.get_by_ip(client.ip)
         srs = StorageRouterList.get_storagerouters()
         downtime = []
-        metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, in_use=True)
-        if len(metadata) != 1:
-            raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found {1}'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK, len(metadata)))
+        fwk_cluster_name = EtcdConfiguration.get('/ovs/framework/arakoon_clusters|ovsdb')
+        metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=fwk_cluster_name)
+        if metadata is None:
+            raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found None'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
 
-        if metadata[0].internal is True:
+        if metadata.internal is True:
             ovsdb_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == ServiceType.SERVICE_TYPES.ARAKOON and ser.name == 'arakoon-ovsdb']
             downtime = [('ovs', 'ovsdb', None)] if len(ovsdb_cluster) < 3 and this_sr.guid in ovsdb_cluster else []
 
@@ -1738,11 +1724,12 @@ class StorageRouterController(object):
         srs = StorageRouterList.get_storagerouters()
         this_sr = StorageRouterList.get_by_ip(client.ip)
         downtime = []
-        metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_type(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.SD, in_use=True)
-        if len(metadata) != 1:
-            raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found {1}'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD, len(metadata)))
+        sd_cluster_name = EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv')
+        metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=sd_cluster_name)
+        if metadata is None:
+            raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found None'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
 
-        if metadata[0].internal is True:
+        if metadata.internal is True:
             voldrv_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == ServiceType.SERVICE_TYPES.ARAKOON and ser.name == 'arakoon-voldrv']
             downtime = [('ovs', 'voldrv', None)] if len(voldrv_cluster) < 3 and this_sr.guid in voldrv_cluster else []
 

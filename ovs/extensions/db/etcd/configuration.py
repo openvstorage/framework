@@ -240,19 +240,31 @@ class EtcdConfiguration(object):
         return EtcdConfiguration._list(key)
 
     @staticmethod
-    def initialize_host(host_id):
+    def initialize_host(host_id, port_info=None):
         """
         Initialize keys when setting up a host
         :param host_id: ID of the host
+        :type host_id: str
+
+        :param port_info: Information about ports to be used
+        :type port_info: dict
+
         :return: None
         """
         if EtcdConfiguration.exists('/ovs/framework/hosts/{0}/setupcompleted'.format(host_id)):
             return
+        if port_info is None:
+            port_info = {}
+
+        mds_port_range = port_info.get('mds', [26300, 26399])
+        arakoon_start_port = port_info.get('arakoon', 26400)
+        storagedriver_port_range = port_info.get('storagedriver', [26200, 26299])
+
         host_config = {'storagedriver': {'rsp': '/var/rsp',
                                          'vmware_mode': 'ganesha'},
-                       'ports': {'storagedriver': [[26200, 26299]],
-                                 'mds': [[26300, 26399]],
-                                 'arakoon': [26400]},
+                       'ports': {'storagedriver': [storagedriver_port_range],
+                                 'mds': [mds_port_range],
+                                 'arakoon': [arakoon_start_port]},
                        'setupcompleted': False,
                        'versions': {'ovs': 4},
                        'type': 'UNCONFIGURED'}
@@ -280,6 +292,7 @@ class EtcdConfiguration(object):
         base_cfg = copy.deepcopy(EtcdConfiguration.base_config)
         base_cfg.update({'cluster_id': cluster_id,
                          'external_etcd': external_etcd,
+                         'arakoon_clusters': {},
                          'stores': {'persistent': 'pyrakoon',
                                     'volatile': 'memcache'},
                          'messagequeue': {'protocol': 'amqp',
