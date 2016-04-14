@@ -170,10 +170,10 @@ class OVSClient(object):
         """
         start = time.time()
         task_metadata = {'ready': False}
-        while task_metadata['ready'] is False:
+        while task_metadata['status'] not in ('FAILURE', 'SUCCESS'):
             if timeout is not None and timeout < (time.time() - start):
                 raise RuntimeError('Waiting for task {0} has timed out.'.format(task_id))
             task_metadata = self.get('/tasks/{0}/'.format(task_id))
-            if task_metadata['ready'] is False:
+            if task_metadata['status'] not in ('FAILURE', 'SUCCESS'):
                 time.sleep(1)
         return task_metadata['successful'], task_metadata['result']
