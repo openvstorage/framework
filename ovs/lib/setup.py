@@ -98,7 +98,7 @@ class SetupController(object):
 
                 # Optional fields
                 passwords = config.get('passwords', {})
-                node_type = config.get('node_type')
+                node_type = config.get('node_type', node_type)
                 cluster_ip = config.get('cluster_ip', master_ip)  # If cluster_ip not provided, we assume 1st node installation
                 external_etcd = config.get('external_etcd')
                 hypervisor_ip = config.get('hypervisor_ip')
@@ -826,7 +826,6 @@ class SetupController(object):
                     with open(resume_config_file, 'w') as resume_cfg:
                         resume_cfg.write(json.dumps(resume_config))
                 raise
-            EtcdConfiguration.validate_etcd()
 
         EtcdConfiguration.initialize(external_etcd=external_etcd)
         EtcdConfiguration.initialize_host(machine_id)
@@ -835,7 +834,7 @@ class SetupController(object):
             SetupController._log(messages='Setting up Fleet')
             ServiceManager.setup_fleet()
 
-        metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK)
+        metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, locked=False)
         arakoon_ports = []
         if metadata is None:  # No externally managed cluster found, we create 1 ourselves
             SetupController._log(messages='Setting up Arakoon cluster ovsdb')
@@ -849,7 +848,7 @@ class SetupController(object):
             arakoon_ports = [result['client_port'], result['messaging_port']]
             metadata = result['metadata']
         else:
-            SetupController._log(messages='Arakoon cluster of type {0} with name {1} found, marking it as being used'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK, metadata.cluster_id))
+            SetupController._log(messages='Externally managed Arakoon cluster of type {0} found with name {1}'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK, metadata.cluster_id))
             internal = False
 
         EtcdConfiguration.set('/ovs/framework/arakoon_clusters|ovsdb', metadata.cluster_id)

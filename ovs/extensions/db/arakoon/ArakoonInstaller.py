@@ -532,11 +532,14 @@ class ArakoonInstaller(object):
         ArakoonInstaller._deploy(config)
 
     @staticmethod
-    def get_unused_arakoon_metadata_and_claim(cluster_type):
+    def get_unused_arakoon_metadata_and_claim(cluster_type, locked=True):
         """
         Retrieve arakoon cluster information based on its type
         :param cluster_type: Type of arakoon cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
         :type cluster_type: str
+
+        :param locked: Execute this in a locked context
+        :type locked: bool
 
         :return: List of ArakoonClusterMetadata objects
         :rtype: ArakoonClusterMetadata
@@ -547,13 +550,22 @@ class ArakoonInstaller(object):
         if not EtcdConfiguration.dir_exists('/ovs/arakoon'):
             return None
 
-        with VolatileMutex('claim_arakoon_metadata', wait=10):
-            for cluster_name in EtcdConfiguration.list('/ovs/arakoon'):
-                metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
-                metadata.load_metadata()
-                if metadata.cluster_type == cluster_type and metadata.in_use is False and metadata.internal is False:
-                    metadata.claim()
-                    return metadata
+        mutex = None
+        if locked is True:
+            mutex = VolatileMutex('claim_arakoon_metadata', wait=10)
+            mutex.acquire()
+
+        metadata = None
+        for cluster_name in EtcdConfiguration.list('/ovs/arakoon'):
+            metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
+            metadata.load_metadata()
+            if metadata.cluster_type == cluster_type and metadata.in_use is False and metadata.internal is False:
+                metadata.claim()
+                break
+
+        if locked is True:
+            mutex.release()
+        return metadata
 
     @staticmethod
     def get_arakoon_metadata_by_cluster_name(cluster_name):
