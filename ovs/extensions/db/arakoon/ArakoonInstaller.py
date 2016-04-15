@@ -550,22 +550,20 @@ class ArakoonInstaller(object):
         if not EtcdConfiguration.dir_exists('/ovs/arakoon'):
             return None
 
-        mutex = None
-        if locked is True:
-            mutex = VolatileMutex('claim_arakoon_metadata', wait=10)
-            mutex.acquire()
+        mutex = VolatileMutex('claim_arakoon_metadata', wait=10)
+        try:
+            if locked is True:
+                mutex.acquire()
 
-        metadata = None
-        for cluster_name in EtcdConfiguration.list('/ovs/arakoon'):
-            metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
-            metadata.load_metadata()
-            if metadata.cluster_type == cluster_type and metadata.in_use is False and metadata.internal is False:
-                metadata.claim()
-                break
-
-        if locked is True:
-            mutex.release()
-        return metadata
+            for cluster_name in EtcdConfiguration.list('/ovs/arakoon'):
+                metadata = ArakoonClusterMetadata(cluster_id=cluster_name)
+                metadata.load_metadata()
+                if metadata.cluster_type == cluster_type and metadata.in_use is False and metadata.internal is False:
+                    metadata.claim()
+                    return metadata
+        finally:
+            if locked is True:
+                mutex.release()
 
     @staticmethod
     def get_arakoon_metadata_by_cluster_name(cluster_name):
