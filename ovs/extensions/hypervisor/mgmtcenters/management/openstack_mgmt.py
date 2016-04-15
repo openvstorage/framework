@@ -357,18 +357,18 @@ class OpenStackManagement(object):
 
         file_contents = self.client.file_read(nova_volume_file)
         if 'class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):' not in file_contents:
-            file_contents += '\n\n'
-            file_contents += '''class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):\n
-    def __init__(self, connection):\n
-        super(LibvirtFileVolumeDriver,\n
-              self).__init__(connection, is_block_dev=False)\n
+            file_contents += '''
+class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):
+    def __init__(self, connection):
+        super(LibvirtFileVolumeDriver,
+              self).__init__(connection, is_block_dev=False)
 
-    def get_config(self, connection_info, disk_info):\n
-        conf = super(LibvirtFileVolumeDriver,\n
-                     self).get_config(connection_info, disk_info)\n
-        conf.source_type = 'file'\n
-        conf.source_path = connection_info['data']['device_path']\n
-        return conf\n
+    def get_config(self, connection_info, disk_info):
+        conf = super(LibvirtFileVolumeDriver,
+                     self).get_config(connection_info, disk_info)
+        conf.source_type = 'file'
+        conf.source_path = connection_info['data']['device_path']
+        return conf
 '''
             self.client.file_write(nova_volume_file, file_contents)
 
