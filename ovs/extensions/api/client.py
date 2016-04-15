@@ -179,4 +179,5 @@ class OVSClient(object):
             finished = task_metadata['status'] in ('FAILURE', 'SUCCESS')
             if finished is False:
                 time.sleep(1)
-            return task_metadata['successful'], task_metadata['result']
+            else:
+                return task_metadata['successful'], task_metadata['result']
