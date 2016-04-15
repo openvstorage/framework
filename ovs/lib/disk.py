@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -147,7 +147,7 @@ class DiskController(object):
                             partitions_info = DiskTools.get_partitions_info(match.groups()[0])
                             if device_path in partitions_info:
                                 partition_info = partitions_info[device_path]
-                                offset = int(partition_info['offset'])
+                                offset = int(partition_info['start'])
                                 size = int(partition_info['size'])
                             else:
                                 logger.warning('Could not retrieve partition info for disk/partition {0}'.format(device_path))

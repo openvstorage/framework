@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -132,7 +132,7 @@ class StorageDriverClient(object):
     STAT_KEYS = ['backend_data_read', 'backend_data_written', 'backend_read_operations', 'backend_write_operations',
                  'cluster_cache_hits', 'cluster_cache_misses', 'data_read', 'data_written', 'metadata_store_hits',
                  'metadata_store_misses', 'read_operations', 'sco_cache_hits', 'sco_cache_misses', 'write_operations',
-                 '4k_read_operations', '4k_write_operations']
+                 '4k_read_operations', '4k_write_operations', 'stored']
     STAT_KEYS.extend(STAT_SUMS.keys())
 
     def __init__(self):
@@ -437,14 +437,21 @@ class StorageDriverConfiguration(object):
             self.configuration[section][item] = value
 
 
-class GaneshaConfiguration:
-
+class GaneshaConfiguration(object):
+    """
+    Ganesha Configuration
+    """
     def __init__(self):
         config_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
-        self._config_corefile = os.path.join(config_dir, 'templates', 'ganesha-core.conf')
-        self._config_exportfile = os.path.join(config_dir, 'templates', 'ganesha-export.conf')
+        self._config_corefile = '/'.join([config_dir, 'templates', 'ganesha-core.conf'])
+        self._config_exportfile = '/'.join([config_dir, 'templates', 'ganesha-export.conf'])
 
     def generate_config(self, target_file, params):
+        """
+        Generate configuration
+        :param target_file: Configuration file
+        :param params: Parameters
+        """
         with open(self._config_corefile, 'r') as core_config_file:
             config = core_config_file.read()
         with open(self._config_exportfile, 'r') as export_section_file:

@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -67,7 +67,7 @@ def get_repo_dir():
     """
 
     rel_dir = os.path.dirname(__file__)
-    repo_rel_dir = os.path.join(rel_dir, '..', '..')
+    repo_rel_dir = '/'.join([rel_dir, '..', '..'])
     return os.path.abspath(repo_rel_dir)
 
 
@@ -188,7 +188,7 @@ def get_python_files(target_dir):
 
     for (root, _, file_names) in os.walk(target_dir):
         for python_file_name in fnmatch.filter(file_names, '*.py'):
-            python_file = os.path.join(root, python_file_name)
+            python_file = '/'.join([root, python_file_name])
             python_files.append(python_file)
 
     return python_files
@@ -290,7 +290,7 @@ def get_report(target_dir, changes_only=False):
             or is_file_ignored(file_name):
             continue
 
-        target_file = os.path.join(root, file_name)
+        target_file = '/'.join([root, file_name])
         errors = get_common_errors(target_file)
 
         if file_name.endswith('.py'):
@@ -354,12 +354,12 @@ def install_mercurial_hook():
 
     repo_dir = get_repo_dir()
 
-    config_file = os.path.join(repo_dir, '.hg', 'hgrc')
+    config_file = '/'.join([repo_dir, '.hg', 'hgrc'])
     config_parser = RawConfigParser()
     config_parser.read(config_file)
 
-    precommit_abs_file = os.path.join(repo_dir, 'scripts',
-            'codestyleprecommit.py')
+    precommit_abs_file = '/'.join([repo_dir, 'scripts',
+            'codestyleprecommit.py'])
 
     section = 'hooks'
     key = 'pretxncommit.precommit'

@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -217,7 +217,7 @@ class SetupController(object):
                         if 'cluster' in match_groups:
                             local_cluster_name = match_groups['cluster']
 
-                node_name = target_client.run('hostname')
+                node_name = target_client.run('hostname -s')
                 logger.debug('Current host: {0}'.format(node_name))
                 if r_config.has_option('setup', 'cluster_name'):
                     cluster_name = r_config.get('setup', 'cluster_name')
@@ -446,7 +446,6 @@ class SetupController(object):
                         if configure_rabbitmq is None:
                             configure_rabbitmq = r_config.get('setup', 'configure_rabbitmq')
 
-
                         print 'Analyzing cluster layout'
                         logger.info('Analyzing cluster layout')
                         config = ArakoonClusterConfig('ovsdb')
@@ -472,6 +471,12 @@ class SetupController(object):
                                                              unconfigure_rabbitmq=configure_rabbitmq)
                                 raise
 
+            if enable_heartbeats is True:
+                print ''
+                print Interactive.boxed_message(['Open vStorage securely sends a minimal set of error, usage and health',
+                                                 'information. This information is used to keep the quality and performance',
+                                                 'of the code at the highest possible levels.',
+                                                 'Please refer to the documentation for more information.'])
             print ''
             print Interactive.boxed_message(['Setup complete.',
                                              'Point your browser to https://{0} to use Open vStorage'.format(cluster_ip)])
@@ -898,13 +903,19 @@ class SetupController(object):
                 authorized_keys += '{0}\n'.format(root_pub_key)
             if ovs_pub_key not in authorized_keys:
                 authorized_keys += '{0}\n'.format(ovs_pub_key)
-            node_hostname = node_client.run('hostname')
-            all_hostnames.add(node_hostname)
-            mapping[node] = node_hostname
+
+            node_fqdn = node_client.run('hostname -f || hostname -s')
+            mapping[node] = [node_fqdn]
+            all_hostnames.add(node_fqdn)
+
+            node_hostname = node_client.run('hostname -s')
+            if node_fqdn != node_hostname:
+                all_hostnames.add(node_hostname)
+                mapping[node].append(node_hostname)
 
         for node, node_client in ip_client_map.iteritems():
-            for hostname_node, hostname in mapping.iteritems():
-                System.update_hosts_file(hostname, hostname_node, node_client)
+            for host_ip, hostnames in mapping.iteritems():
+                System.update_hosts_file(hostnames, host_ip, node_client)
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
             cmd = 'cp {1} {1}.tmp; ssh-keyscan -t rsa {0} {2} 2> /dev/null >> {1}.tmp; cat {1}.tmp | sort -u - > {1}'
@@ -1062,9 +1073,10 @@ class SetupController(object):
         ServiceManager.enable_service('watcher-framework', client=target_client)
         Toolbox.change_service_state(target_client, 'watcher-framework', 'start', logger)
 
-        logger.debug('Restarting workers')
+        logger.debug('Check ovs-workers')
+        # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
         ServiceManager.enable_service('workers', client=target_client)
-        Toolbox.change_service_state(target_client, 'workers', 'restart', logger)
+        Toolbox.wait_for_service(target_client, 'workers', True, logger)
 
         SetupController._run_hooks('firstnode', cluster_ip)
 
@@ -1138,7 +1150,7 @@ class SetupController(object):
         except Exception as ex:
             SetupController._print_log_error('remove configuration files', ex)
 
-        SetupController._remove_services(target_client, machine_id, 'master')
+        SetupController._remove_services(target_client, 'master')
         SetupController._unconfigure_logstash(target_client)
 
         if node == 'first':
@@ -1211,7 +1223,7 @@ class SetupController(object):
                 ServiceManager.enable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'start', logger)
 
-        node_name = target_client.run('hostname')
+        node_name = target_client.run('hostname -s')
         SetupController._finalize_setup(target_client, node_name, 'EXTRA', hypervisor_info, unique_id)
 
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/ip'.format(machine_id), cluster_ip)
@@ -1219,6 +1231,11 @@ class SetupController(object):
         print 'Starting services'
         ServiceManager.enable_service('watcher-framework', client=target_client)
         Toolbox.change_service_state(target_client, 'watcher-framework', 'start', logger)
+
+        logger.debug('Check ovs-workers')
+        # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
+        ServiceManager.enable_service('workers', client=target_client)
+        Toolbox.wait_for_service(target_client, 'workers', True, logger)
 
         logger.debug('Restarting workers')
         for node_client in ip_client_map.itervalues():
@@ -1253,7 +1270,7 @@ class SetupController(object):
 
         target_client = ip_client_map[cluster_ip]
         machine_id = System.get_my_machine_id(target_client)
-        node_name = target_client.run('hostname')
+        node_name = target_client.run('hostname -s')
         master_client = ip_client_map[master_ip]
 
         storagerouter = StorageRouterList.get_by_machine_id(unique_id)
@@ -1321,7 +1338,7 @@ class SetupController(object):
 
             logger.debug('Copying Rabbit MQ cookie')
             contents = master_client.file_read(rabbitmq_cookie_file)
-            master_hostname = master_client.run('hostname')
+            master_hostname = master_client.run('hostname -s')
             target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
             target_client.file_write(rabbitmq_cookie_file, contents)
             target_client.file_chmod(rabbitmq_cookie_file, mode=400)
@@ -1497,7 +1514,7 @@ class SetupController(object):
 
         if storagerouter not in offline_nodes:
             target_client = ip_client_map[cluster_ip]
-            node_name = target_client.run('hostname')
+            node_name = target_client.run('hostname -s')
             if SetupController._avahi_installed(target_client) is True:
                 SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(storagerouter.machine_id), 'EXTRA')
@@ -1595,7 +1612,6 @@ EOF
             Toolbox.change_service_state(client, 'rabbitmq-server', 'stop', logger)
         client.file_delete('/etc/rabbitmq/rabbitmq.config')
 
-
     @staticmethod
     def _check_rabbitmq_and_enable_ha_mode(client):
         if not ServiceManager.has_service('rabbitmq-server', client):
@@ -1629,7 +1645,7 @@ EOF
 
     @staticmethod
     def _avahi_installed(client):
-        installed = client.run('which avahi-daemon')
+        installed = client.run('which avahi-daemon || :')
         if installed == '':
             logger.debug('Avahi not installed')
             return False
@@ -1668,7 +1684,6 @@ EOF
         Toolbox.change_service_state(client, 'logstash', 'stop', logger)
         if ServiceManager.has_service('logstash', client) is True:
             ServiceManager.remove_service('logstash', client)
-
 
     @staticmethod
     def _configure_avahi(client, cluster_name, node_name, node_type):
@@ -1715,7 +1730,7 @@ EOF
                 ServiceManager.add_service(service, params=params, client=client)
 
     @staticmethod
-    def _remove_services(client, unique_id, node_type):
+    def _remove_services(client, node_type):
         if node_type == 'master':
             services = SetupController.master_node_services
             if 'arakoon-ovsdb' in services:

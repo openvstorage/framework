@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,7 +35,7 @@ class Toolbox(object):
 
     regex_ip = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
     regex_guid = re.compile('^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$')
-    regex_vpool = re.compile('^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$')
+    regex_vpool = re.compile('^[0-9a-z][\-a-z0-9]{1,20}[a-z0-9]$')
     regex_preset = re.compile('^[0-9a-zA-Z][a-zA-Z0-9]{1,18}[a-zA-Z0-9]$')
     regex_mountpoint = re.compile('^(/[a-zA-Z0-9\-_\.]+)+/?$')
     compiled_regex_type = type(re.compile('some_regex'))
@@ -50,9 +50,9 @@ class Toolbox(object):
         functions = []
         path = '{0}/../'.format(os.path.dirname(__file__))
         for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py') and filename != '__init__.py':
+            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
+                module = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(module):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name \
@@ -197,3 +197,24 @@ class Toolbox(object):
         else:
             logger.debug('  {0:<15} - Service {1} {2}'.format(client.ip, name, action))
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
+
+    @staticmethod
+    def wait_for_service(client, name, status, logger):
+        """
+        Wait for service to enter status
+        :param client: SSHClient to run commands
+        :param name: name of service
+        :param status: True - running/False - not running
+        :param logger: Logging object
+        """
+        tries = 10
+        while tries > 0:
+            service_status = ServiceManager.get_service_status(name, client)
+            if service_status == status:
+                break
+            logger.debug('... waiting for service {0}'.format(name))
+            tries -= 1
+            time.sleep(10 - tries)
+        service_status, output = ServiceManager.get_service_status(name, client, True)
+        if service_status != status:
+            raise RuntimeError('Service {0} does not have expected status: {1}'.format(name, output))

@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,6 +33,8 @@ class OVSClient(object):
         """
         if credentials is not None and len(credentials) != 2:
             raise RuntimeError('Credentials should be None (no authentication) or a tuple containing client_id and client_secret (authenticated)')
+        self.ip = ip
+        self.port = port
         self.client_id = credentials[0] if credentials is not None else None
         self.client_secret = credentials[1] if credentials is not None else None
         self._url = 'https://{0}:{1}/api'.format(ip, port)

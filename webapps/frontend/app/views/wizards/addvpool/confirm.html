@@ -1,11 +1,11 @@
 <!--
-Copyright 2014 iNuron NV
+Copyright 2016 iNuron NV
 
-Licensed under the Open vStorage Modified Apache License (the "License");
+Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.openvstorage.org/license
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,19 +18,54 @@ limitations under the License.
         <p data-i18n="ovs:wizards.add_vpool.confirm.basic_info"></p>
         <ul>
             <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.name"></b> <span data-bind="text: data.name"></span></li>
-            <li>
-                <b data-i18n="ovs:wizards.add_vpool.gather_vpool.backend_type"></b> <span data-bind="translate: 'ovs:generic.backendtypes.' + data.backend()"></span>
-                <ul data-bind="visible: data.backend() !== 'local' && data.backend() !== 'distributed'">
-                    <!-- ko if: data.backend() === 'alba' && !data.localHost() -->
-                        <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.host"></b> <span data-bind="text: data.host"></span></li>
-                        <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.port"></b> <span data-bind="text: data.port"></span></li>
-                    <!-- /ko -->
+            <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.backend_type"></b> <span data-bind="translate: 'ovs:generic.backendtypes.' + data.backend()"></span></li>
+            <li data-bind="visible: data.backend() !== 'local' && data.backend() !== 'distributed'">
+                <b data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_backend"></b>
+                <span data-bind="text: data.albaBackend() !== undefined ? data.albaBackend().name : ''"></span>
+                <ul>
+                    <li data-bind="visible: data.backend() === 'alba'">
+                        <b data-i18n="ovs:wizards.add_vpool.confirm.fragment_cache_read"></b>
+                        <span data-bind="translate: 'ovs:wizards.add_vpool.confirm.fragment_cache_info.' + data.fragmentCacheOnRead()"></span>
+                    </li>
+                    <li data-bind="visible: data.backend() === 'alba'">
+                        <b data-i18n="ovs:wizards.add_vpool.confirm.fragment_cache_write"></b>
+                        <span data-bind="translate: 'ovs:wizards.add_vpool.confirm.fragment_cache_info.' + data.fragmentCacheOnWrite()"></span>
+                    </li>
+                    <li data-bind="visible: data.backend() === 'alba' && !data.localHost()">
+                        <b data-i18n="ovs:wizards.add_vpool.gather_vpool.host"></b>
+                        <span data-bind="text: data.host"></span>
+                    </li>
+                    <li data-bind="visible: data.backend() === 'alba' && !data.localHost()">
+                        <b data-i18n="ovs:wizards.add_vpool.gather_vpool.port"></b>
+                        <span data-bind="text: data.port"></span>
+                    </li>
                     <li data-bind="visible: data.backend().match(/^.+_s3$/) !== null || (data.backend() === 'alba' && !data.localHost())">
                         <b data-i18n="ovs:wizards.add_vpool.gather_vpool.access_key"></b> <span data-bind="text: data.accesskey"></span>
                     </li>
                     <li data-bind="visible: data.backend() === 'alba'">
-                        <b data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_backend"></b> <span data-bind="text: data.albaBackend() !== undefined ? data.albaBackend().name : ''"></span> -
+                        <b data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset"></b>
                         <span data-bind="text: data.albaPreset() !== undefined ? data.albaPreset().name : ''"></span>
+                    </li>
+                </ul>
+            </li>
+            <li data-bind="visible: data.useAA()">
+                <b data-i18n="ovs:wizards.add_vpool.confirm.accelerated_backend"></b>
+                <span data-bind="text: data.albaAABackend() !== undefined ? data.albaAABackend().name : ''"></span>
+                <ul>
+                    <li data-bind="visible: data.aaLocalHost() === false">
+                        <b data-i18n="ovs:wizards.add_vpool.gather_vpool.host"></b>
+                        <span data-bind="text: data.aaHost"></span>
+                    </li>
+                    <li data-bind="visible: !data.aaLocalHost()">
+                        <b data-i18n="ovs:wizards.add_vpool.gather_vpool.port"></b>
+                        <span data-bind="text: data.aaPort"></span>
+                    </li>
+                    <li data-bind="visible: !data.aaLocalHost()">
+                        <b data-i18n="ovs:wizards.add_vpool.gather_vpool.access_key"></b> <span data-bind="text: data.aaAccesskey"></span>
+                    </li>
+                    <li>
+                        <b data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset"></b>
+                        <span data-bind="text: data.albaAAPreset() !== undefined ? data.albaAAPreset().name : ''"></span>
                     </li>
                 </ul>
             </li>

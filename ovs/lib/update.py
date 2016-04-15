@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -410,7 +410,7 @@ class UpdateController(object):
         # If we can reach Etcd with a valid config, and there's still an old config file present, delete it
         from ovs.extensions.db.etcd.configuration import EtcdConfiguration
         path = '/opt/OpenvStorage/config/ovs.json'
-        if EtcdConfiguration.exists('/ovs/framework/registered') and client.file_exists(path):
+        if EtcdConfiguration.exists('/ovs/framework/cluster_id') and client.file_exists(path):
             client.file_delete(path)
         # Migrate volumedriver & albaproxy configuration files
         import uuid

@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -418,14 +418,14 @@ class OVSMigrator(object):
                     with Remote(client.ip, [os], username='root') as remote:
                         for root, dirs, files in remote.os.walk('/sys/class/infiniband'):
                             for directory in dirs:
-                                ports_dir = remote.os.path.join(root, directory, 'ports')
+                                ports_dir = '/'.join([root, directory, 'ports'])
                                 if not remote.os.path.exists(ports_dir):
                                     continue
                                 for sub_root, sub_dirs, _ in remote.os.walk(ports_dir):
                                     if sub_root != ports_dir:
                                         continue
                                     for sub_directory in sub_dirs:
-                                        state_file = remote.os.path.join(sub_root, sub_directory, 'state')
+                                        state_file = '/'.join([sub_root, sub_directory, 'state'])
                                         if remote.os.path.exists(state_file):
                                             if 'ACTIVE' in client.run('cat {0}'.format(state_file)):
                                                 rdma_capable = True
@@ -476,22 +476,24 @@ class OVSMigrator(object):
 
             working_version = 7
 
-        # Version 8 introduced:
+        # Version 10 introduced:
         # - Reverse indexes are stored in persistent store
-        if working_version < 8:
+        # - Store more non-changing metadata on disk iso using a dynamic property
+        if working_version < 10:
             from ovs.dal.helpers import HybridRunner, Descriptor
-            from ovs.dal.relations import RelationMapper
             from ovs.dal.datalist import DataList
             from ovs.extensions.storage.persistentfactory import PersistentFactory
             from ovs.extensions.storage.volatilefactory import VolatileFactory
             persistent = PersistentFactory.get_client()
-            for prefix in persistent.prefix('ovs_reverseindex_'):
-                persistent.delete(prefix)
-            index_map = {}
+            for prefix in ['ovs_listcache', 'ovs_reverseindex']:
+                for key in persistent.prefix(prefix):
+                    persistent.delete(key)
+            for key in persistent.prefix('ovs_data_'):
+                persistent.set(key, persistent.get(key))
+            base_reverse_key = 'ovs_reverseindex_{0}_{1}|{2}|{3}'
             hybrid_structure = HybridRunner.get_hybrids()
             for class_descriptor in hybrid_structure.values():
                 cls = Descriptor().load(class_descriptor).get_object()
-                clsname = cls.__name__.lower()
                 all_objects = DataList(cls, {'type': DataList.where_operator.AND,
                                              'items': []})
                 for item in all_objects:
@@ -506,38 +508,37 @@ class OVSMigrator(object):
                         key = relation.name
                         rguid = item._data[key]['guid']
                         if rguid is not None:
-                            reverse_key = 'ovs_reverseindex_{0}_{1}'.format(rclsname, rguid)
-                            if reverse_key not in index_map:
-                                reverse_index = {}
-                                relations = RelationMapper.load_foreign_relations(rcls)
-                                if relations is not None:
-                                    for key, _ in relations.iteritems():
-                                        if key not in reverse_index:
-                                            reverse_index[key] = []
-                                index_map[reverse_key] = reverse_index
-                            else:
-                                reverse_index = index_map[reverse_key]
-                            entries = reverse_index[relation.foreign_key]
-                            if guid not in entries:
-                                entries.append(guid)
-                                reverse_index[relation.foreign_key] = entries
-                    reverse_key = 'ovs_reverseindex_{0}_{1}'.format(clsname, guid)
-                    if reverse_key not in index_map:
-                        reverse_index = {}
-                        index_map[reverse_key] = reverse_index
-                        relations = RelationMapper.load_foreign_relations(cls)
-                        if relations is not None:
-                            for key, _ in relations.iteritems():
-                                if key not in reverse_index:
-                                    reverse_index[key] = []
-            for key, value in index_map.iteritems():
-                persistent.set(key, value)
+                            reverse_key = base_reverse_key.format(rclsname, rguid, relation.foreign_key, guid)
+                            persistent.set(reverse_key, 0)
             volatile = VolatileFactory.get_client()
             try:
                 volatile._client.flush_all()
             except:
                 pass
+            from ovs.dal.lists.vdisklist import VDiskList
+            for vdisk in VDiskList.get_vdisks():
+                try:
+                    vdisk.metadata = {'lba_size': vdisk.info['lba_size'],
+                                      'cluster_multiplier': vdisk.info['cluster_multiplier']}
+                    vdisk.save()
+                except:
+                    pass
 
-            working_version = 8
+            working_version = 10
+
+        # Version 11 introduced:
+        # - ALBA accelerated ALBA, meaning different vpool.metadata information
+        if working_version < 11:
+            from ovs.dal.lists.vpoollist import VPoolList
+
+            for vpool in VPoolList.get_vpools():
+                vpool.metadata = {'backend': vpool.metadata}
+                if 'metadata' in vpool.metadata['backend']:
+                    vpool.metadata['backend']['arakoon_config'] = vpool.metadata['backend'].pop('metadata')
+                if 'backend_info' in vpool.metadata['backend']:
+                    vpool.metadata['backend']['backend_info']['fragment_cache_on_read'] = True
+                    vpool.metadata['backend']['backend_info']['fragment_cache_on_write'] = False
+                vpool.save()
+            working_version = 11
 
         return working_version

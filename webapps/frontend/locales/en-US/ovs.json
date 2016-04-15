@@ -1,12 +1,12 @@
 {
     "license": [
-        "Copyright 2014 iNuron NV",
+        "Copyright 2016 iNuron NV",
         "",
-        "Licensed under the Open vStorage Modified Apache License (the \"License\");",
+        "Licensed under the Apache License, Version 2.0 (the \"License\");",
         "you may not use this file except in compliance with the License.",
         "You may obtain a copy of the License at",
         "",
-        "    http://www.openvstorage.org/license",
+        "    http://www.apache.org/licenses/LICENSE-2.0",
         "",
         "Unless required by applicable law or agreed to in writing, software",
         "distributed under the License is distributed on an \"AS IS\" BASIS,",
@@ -640,35 +640,11 @@
         "title": "Licenses",
         "add": "Add license"
     },
-    "register": {
-        "title": "Register",
-        "registered": "Your installation of Open vStorage is registered.",
-        "basicinfo1": "To use Open vStorage longer than 30 days, register below. There are",
-        "basicinfo2": "days left in the evaluation period.",
-        "basicinfo3": "To use Open vStorage longer than 30 days, register below. You are",
-        "basicinfo4": "days over your evaluation period and registration is now mandatory.",
-        "company": "Company",
-        "companyhelp": "Company name, if applicable",
-        "name": "Name",
-        "namehelp": "Mandatory field",
-        "email": "Email",
-        "emailhelp": "Mandatory field",
-        "phone": "Phone",
-        "newsletter": "Newsletter",
-        "newsletterhelp": "I want to receive the Open vStorage newsletter.",
-        "agreement": "Agreement",
-        "agreementhelp": "I hereby accept the <a href=\"https://www.openvstorage.org/license\" target=\"_blank\">Modified Apache License</a> of Open vStorage.",
-        "register": "Register",
-        "success": "Successful",
-        "successmsg": "Registration completed.",
-        "registering": "processing the registration"
-    },
     "support": {
         "information": "Support information",
         "description": "Open vStorage has the option to send regular heartbeats with metadata to a centralized server. The heartbeat data can be inspected at the bottom of this page. Additionally, you can enable remote access which enables the Open vStorage support team to access your environment upon your request through a secured tunnel.",
         "identification": "Identification parameters",
         "title": "Support",
-        "registered": "Your copy of Open vStorage is registered.",
         "clusterid": "Cluster ID:",
         "nodeid": "Node ID",
         "nodes": "StorageRouters:",
@@ -771,6 +747,26 @@
         },
         "add_vpool": {
             "title": "Add new vPool",
+            "gather_backend": {
+                "accelerated_info": "Accelerated backend information",
+                "alba_backend": "Backend:",
+                "alba_preset": "Preset:",
+                "basic_info": "Additional backend information",
+                "choose_backend": "Choose one of the available backends",
+                "client_id": "Client ID:",
+                "client_secret": "Client Secret:",
+                "fragment_cache": "Fragment Cache:",
+                "fragment_cache_on_read": "On Read",
+                "fragment_cache_on_write": "On Write",
+                "host": "Host (FQDN/IP):",
+                "invalid_alba_info": "The entered connection info and credentials are invalid",
+                "invalid_host": "Invalid host (should be a FQDN or IP address)",
+                "local_host": "Use local Open vStorage backend",
+                "no_backends": "No backends found",
+                "no_credentials": "No credentials were entered",
+                "port": "Port:",
+                "use_accelerated_alba": "Use accelerated backend"
+            },
             "gather_config": {
                 "basic_info": "Specify the configurations for the vPool",
                 "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
@@ -781,12 +777,11 @@
                 "access_key": "Access key:",
                 "alba_backend": "Backend:",
                 "alba_preset": "Preset:",
-                "backend_type": "BackendType:",
+                "backend_type": "Backend Type:",
                 "basic_info": "Add basic vPool information",
-                "basic_info_extend": "Basic vPool information",
                 "choose_backend": "Choose one of the available backends",
-                "client_id": "Client ID",
-                "client_secret": "Client secret",
+                "client_id": "Client ID:",
+                "client_secret": "Client Secret:",
                 "duplicate_name": "This name already exists",
                 "extended_info": "Extended vPool information",
                 "host": "Host (FQDN/IP):",
@@ -795,10 +790,10 @@
                 "invalid_host": "Invalid host (should be a FQDN or IP address)",
                 "invalid_name": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
                 "invalid_s3_info": "Could not connect to the given host/port, or wrong credentials.",
-                "local_host": "Use local Open vStorage backends",
+                "local_host": "Use local Open vStorage backend",
                 "mtpt_in_use": "The mountpoint /mnt/__what__ for the vPool is already in use.",
                 "name": "Name:",
-                "no_backends": "No backends found.",
+                "no_backends": "No backends found",
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
                 "secret_key": "Secret key:"
@@ -820,12 +815,19 @@
                 "no_mgmt_center": "is not managed by a Hypervisor Management Center. Automatic configuration of the vPool on the Hypervisor will not be possible. Please refer to the documentation for manual instructions."
             },
             "confirm": {
+                "accelerated_backend": "Accelerated Backend:",
                 "basic_info": "Validate the basic vPool information.",
                 "cache_sizing": "Validate whether the required cache sizes and connection information are correct.",
                 "configuration": "Validate the configuration settings.",
                 "creating": "creating the vPool",
                 "dtl_transport": "DTL Transport Mode:",
                 "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
+                "fragment_cache_info": {
+                    "true": "Active",
+                    "false": "Inactive"
+                },
+                "fragment_cache_read": "Fragment cache on read:",
+                "fragment_cache_write": "Fragment cache on write:",
                 "in_progress": "Creation of vPool __what__ is started.",
                 "started": "Started creating",
                 "storagerouter_info": "Validate whether the correct Storage Router was selected.",
@@ -839,6 +841,9 @@
                 "in_progress": "Extending vPool __what__ has started.",
                 "started": "Started extending",
                 "success": "vPool __what__ was successfully extended."
+            },
+            "gather_backend": {
+                "information": "Extending a vPool does not allow to reconfigure the backend settings"
             },
             "gather_config": {
                 "basic_info": "Configurations for the vPool",
@@ -1029,9 +1034,7 @@
         "cachereads": "Reads served from the Cache:",
         "datawritten": "Data written to the Backend:",
         "dataread": "Data read from the Backend:",
-        "bandwidthsaved": "Bandwidth Saved:",
-        "unregistered1": "Unregistered version,",
-        "unregistered2": "days remaining."
+        "bandwidthsaved": "Bandwidth Saved:"
     },
     "events": {
         "vmachine_deleted": "vMachine deleted",

@@ -131,6 +131,10 @@ class ClientMixin: #pylint: disable=W0232,R0904,old-style-class
     def get_current_state(self): #pylint: disable=R0201
         assert False
 
+    @call(protocol.GetTxID)
+    def get_tx_id(self): #pylint: disable=R0201
+        assert False
+        
     __getitem__ = get
     __setitem__ = set
     __delitem__ = delete

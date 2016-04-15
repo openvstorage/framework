@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -82,7 +82,7 @@ class Sdk(object):
         self.host = host
         self.login = login
         self._conn = None
-        self.ssh_client = None
+        self.ssh_client = SSHClient(self.host, username='root')
         logger.debug('Init complete')
 
     def _connect(self, attempt=0):
@@ -310,6 +310,10 @@ class Sdk(object):
         return self._conn.listAllDomains()
 
     def shutdown(self, vmid):
+        """
+        Shutdown vm
+        :param vmid: ID of vm
+        """
         vm_object = self.get_vm_object(vmid)
         vm_object.shutdown()
         return self.get_power_state(vmid)
@@ -356,6 +360,10 @@ class Sdk(object):
         return True
 
     def power_on(self, vmid):
+        """
+        Power on vm
+        :param vmid: ID of vm
+        """
         vm_object = self.get_vm_object(vmid)
         vm_object.create()
         return self.get_power_state(vmid)
@@ -373,6 +381,10 @@ class Sdk(object):
         return matches if matches else None
 
     def is_datastore_available(self, mountpoint):
+        """
+        Check if datastore is available
+        :param mountpoint: Mountpoint of the NFS datastore
+        """
         if self.ssh_client is None:
             self.ssh_client = SSHClient(self.host, username='root')
         return self.ssh_client.run("[ -d {0} ] && echo 'yes' || echo 'no'".format(mountpoint)) == 'yes'
@@ -386,6 +398,45 @@ class Sdk(object):
         source_vm = self.get_vm_object(vmid)
         return self.create_vm_from_template(name, source_vm, disks, mountpoint)
 
+    def create_volume(self, location, size):
+        """
+        Create volume using truncate
+        :param location: location (mountpoint + file name)
+        :param size: size (GB)
+        """
+        if self.ssh_client.file_exists(location):
+            raise RuntimeError('File already exists at %s' % location)
+        command = 'truncate -s {0}G "{1}"'.format(size, location)
+        output = self.ssh_client.run(command)
+        if not self.ssh_client.file_exists(location):
+            raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
+        logger.info('Command {0}. Output {1}'.format(command, output))
+
+    def delete_volume(self, location):
+        """
+        Remove volume using rm
+        :param location: location (mountpoint + file name)
+        """
+        if not self.ssh_client.file_exists(location):
+            logger.error('File already deleted at %s' % location)
+            return
+        command = 'rm "{0}"'.format(location)
+        output = self.ssh_client.run(command)
+        logger.info('Command {0}. Output {1}'.format(command, output))
+        if self.ssh_client.file_exists(location):
+            raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
+
+    def extend_volume(self, location, size):
+        """
+        Resize volume using truncate
+        :param location: location (mountpoint + file name)
+        :param size: new size
+        """
+        if not self.ssh_client.file_exists(location):
+            raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
+        command = 'truncate -s {0}G "{1}"'.format(size, location)
+        output = self.ssh_client.run(command)
+        logger.info('Command {0}. Output {1}'.format(command, output))
 
     @authenticated
     def create_vm_from_template(self, name, source_vm, disks, mountpoint):

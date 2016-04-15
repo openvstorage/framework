@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@ import os
 import re
 import imp
 import copy
+import time
 import inspect
 import hashlib
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -157,11 +158,11 @@ class HybridRunner(object):
         base_hybrids = []
         inherit_table = {}
         translation_table = {}
-        path = os.path.join(os.path.dirname(__file__), 'hybrids')
+        path = '/'.join([os.path.dirname(__file__), 'hybrids'])
         for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
+                module = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(module):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name:
@@ -316,11 +317,11 @@ class Migration(object):
             data = {}
 
         migrators = []
-        path = os.path.join(os.path.dirname(__file__), 'migration')
+        path = '/'.join([os.path.dirname(__file__), 'migration'])
         for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
+                module = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(module):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name \
@@ -332,3 +333,31 @@ class Migration(object):
             data[identifier] = new_version
 
         persistent.set(key, data)
+
+
+class timer(object):
+    """
+    Can be used for timing pieces of code
+    """
+
+    def __init__(self, name, ms=False):
+        """
+        Creates a timer
+        :param name: The name of the timer, will be printed
+        :type name: basestring
+        :param ms: Indicates whether it should be printed in seconds or milliseconds
+        :type ms: bool
+        """
+        self.name = name
+        self.ms = ms
+        self.start = None
+
+    def __enter__(self):
+        self.start = time.time()
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        _ = args, kwargs
+        print '{0}: {1:.3f}{2}'.format(self.name,
+                                       (time.time() - self.start) / (1000 if self.ms is True else 1),
+                                       'ms' if self.ms is True else 's')

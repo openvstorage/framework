@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -252,12 +252,23 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def add_vpool(self, storagerouter, call_parameters):
+    def add_vpool(self, storagerouter, call_parameters, version):
         """
         Adds a vPool to a given Storage Router
         """
-        call_parameters['storagerouter_ip'] = storagerouter.ip
-        return StorageRouterController.add_vpool.s(call_parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
+        if version <= 2:
+            call_parameters['storagerouter_ip'] = storagerouter.ip
+            call_parameters['fragment_cache_on_read'] = True
+            call_parameters['fragment_cache_on_write'] = False
+            call_parameters['backend_connection_info'] = {'host': call_parameters.pop('connection_host'),
+                                                          'port': call_parameters.pop('connection_port'),
+                                                          'username': call_parameters.pop('connection_username'),
+                                                          'password': call_parameters.pop('connection_password')}
+            if 'connection_backend' in call_parameters:
+                connection_backend = call_parameters.pop('connection_backend')
+                call_parameters['backend_connection_info']['backend'] = {'backend': connection_backend.pop('backend') if 'backend' in connection_backend else None,
+                                                                         'metadata': connection_backend.pop('metadata') if 'metadata' in connection_backend else None}
+        return StorageRouterController.add_vpool.delay(call_parameters)
 
     @link()
     @log()

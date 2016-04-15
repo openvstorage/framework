@@ -140,6 +140,33 @@ class AssertExists(Step):
         '''))
 
 
+class Replace(Step):
+    """\"Replace\" operation"""
+
+    TAG = 16
+    ARGS = ('key', protocol.STRING), \
+           ('wanted', protocol.Option(protocol.STRING))
+
+    def __init__(self, key, wanted):
+        super(Replace, self).__init__(key, wanted)
+
+        self._key = key
+        self._wanted = wanted
+
+    key = property(operator.attrgetter('_key'),
+                   doc=utils.format_doc('''
+Key for which the value needs to be replaced
+
+:type: :class:`str`
+'''))
+    wanted = property(operator.attrgetter('_wanted'),
+                      doc=utils.format_doc('''
+Value to set the key to or None to delete the key
+
+:type: :class:`str` or :data:`None`
+'''))
+
+
 class Sequence(Step):
     '''"Sequence" operation
 
