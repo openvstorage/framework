@@ -59,14 +59,15 @@ class TaskViewSet(viewsets.ViewSet):
         :param pk: Primary key
         """
         result = celery.AsyncResult(pk)
-        status = result.status
-        if result.successful():
+        result_status = result.status
+        result_successful = result.successful()
+        if result_successful is True:
             result_data = result.result
         else:
             result_data = str(result.result) if result.result is not None else None
         data = {'id': result.id,
-                'status': status,
-                'successful': result.successful(),
+                'status': result_status,
+                'successful': result_successful,
                 'failed': result.failed(),
                 'ready': result.ready(),
                 'result': result_data}

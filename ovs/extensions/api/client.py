@@ -171,11 +171,12 @@ class OVSClient(object):
         :param timeout: Time to wait for task before raising
         """
         start = time.time()
-        task_metadata = {'ready': False}
-        while task_metadata['status'] not in ('FAILURE', 'SUCCESS'):
+        finished = False
+        while finished is False:
             if timeout is not None and timeout < (time.time() - start):
                 raise RuntimeError('Waiting for task {0} has timed out.'.format(task_id))
             task_metadata = self.get('/tasks/{0}/'.format(task_id))
-            if task_metadata['status'] not in ('FAILURE', 'SUCCESS'):
+            finished = task_metadata['status'] in ('FAILURE', 'SUCCESS')
+            if finished is False:
                 time.sleep(1)
-        return task_metadata['successful'], task_metadata['result']
+            return task_metadata['successful'], task_metadata['result']
