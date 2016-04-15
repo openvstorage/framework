@@ -103,6 +103,11 @@ class OpenStackManagement(object):
         nova_base_path = self._get_base_path('nova')
         cinder_base_path = self._get_base_path('cinder')
         if self._stack_version in ('liberty', 'mitaka', 'newton'):
+            try:
+                import os_brick
+                cinder_brick_initiator_file = "{0}/initiator/connector.py".format(os.path.dirname(os_brick.__file__))
+            except ImportError:
+                cinder_brick_initiator_file = ''
             if self._is_devstack is True:
                 nova_volume_file = '{0}/virt/libvirt/volume/volume.py'.format(nova_base_path)
             else:
@@ -112,16 +117,15 @@ class OpenStackManagement(object):
                 nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
             else:
                 nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(self._driver_location)
+            cinder_brick_initiator_file = '{0}/brick/initiator/connector.py'.format(cinder_base_path)
 
         if self._is_devstack is True:
             nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
-            cinder_brick_initiator_file = '{0}/brick/initiator/connector.py'.format(cinder_base_path)
         else:
             nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(self._driver_location)
-            cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(self._driver_location)
 
-        file_contents = self.client.file_read(nova_volume_file).splitlines()
-        if not [line for line in file_contents if line.startswith('class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):')]:
+        file_contents = self.client.file_read(nova_volume_file)
+        if 'class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):' not in file_contents:
             logger.info('File "{0}" is not configured properly'.format(nova_volume_file))
             return False
 
@@ -130,16 +134,21 @@ class OpenStackManagement(object):
         else:
             check_line = 'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver'
 
-        file_contents = self.client.file_read(nova_driver_file).splitlines()
-        if not [line for line in file_contents if check_line in line]:
+        file_contents = self.client.file_read(nova_driver_file)
+        if check_line not in file_contents:
             logger.info('File "{0}" is not configured properly'.format(nova_driver_file))
             return False
 
         if os.path.exists(cinder_brick_initiator_file):
-            file_contents = self.client.file_read(cinder_brick_initiator_file).splitlines()
-            if not [line for line in file_contents if 'elif protocol in ["LOCAL", "FILE"]:' in line]:
-                logger.info('File "{0}" is not configured properly'.format(cinder_brick_initiator_file))
-                return False
+            file_contents = self.client.file_read(cinder_brick_initiator_file)
+            if self._stack_version in ('liberty', 'mitaka', 'newton'):
+                if 'elif protocol in [LOCAL, "FILE"]:' not in file_contents:
+                    logger.info('File "{0}" is not configured properly'.format(cinder_brick_initiator_file))
+                    return False
+            else:
+                if 'elif protocol in ["LOCAL", "FILE"]:' not in file_contents:
+                    logger.info('File "{0}" is not configured properly'.format(cinder_brick_initiator_file))
+                    return False
 
         # 4. Check messaging driver configuration
         nova_messaging_driver = 'nova.openstack.common.notifier.rpc_notifier' if self._stack_version == 'juno' else 'messaging'
@@ -346,47 +355,49 @@ class OpenStackManagement(object):
 
         logger.info('    Patching file {0}'.format(nova_volume_file))
 
-        file_contents = self.client.file_read(nova_volume_file).splitlines()
-        if not [line for line in file_contents if line.startswith('class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):')]:
-            file_contents.extend(['\n', '\n'])
-            file_contents.extend([line + '\n' for line in '''class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):
-    def __init__(self, connection):
-        super(LibvirtFileVolumeDriver,
-              self).__init__(connection, is_block_dev=False)
+        file_contents = self.client.file_read(nova_volume_file)
+        if 'class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):' not in file_contents:
+            file_contents += '\n\n'
+            file_contents += '''class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):\n
+    def __init__(self, connection):\n
+        super(LibvirtFileVolumeDriver,\n
+              self).__init__(connection, is_block_dev=False)\n
 
-    def get_config(self, connection_info, disk_info):
-        conf = super(LibvirtFileVolumeDriver,
-                     self).get_config(connection_info, disk_info)
-        conf.source_type = 'file'
-        conf.source_path = connection_info['data']['device_path']
-        return conf
-
-'''.splitlines()])
-            self.client.file_write(nova_volume_file, "".join(file_contents))
+    def get_config(self, connection_info, disk_info):\n
+        conf = super(LibvirtFileVolumeDriver,\n
+                     self).get_config(connection_info, disk_info)\n
+        conf.source_type = 'file'\n
+        conf.source_path = connection_info['data']['device_path']\n
+        return conf\n
+'''
+            self.client.file_write(nova_volume_file, file_contents)
 
         logger.info('    Patching file {0}'.format(nova_driver_file))
 
-        file_contents = self.client.file_read(nova_driver_file).splitlines()
+        file_contents = self.client.file_read(nova_driver_file)
         if self._stack_version in ('liberty', 'mitaka'):
             check_line = 'local=nova.virt.libvirt.volume.volume.LibvirtVolumeDriver'
             new_line = 'file=nova.virt.libvirt.volume.volume.LibvirtFileVolumeDriver'
         else:
             check_line = 'local=nova.virt.libvirt.volume.LibvirtVolumeDriver'
             new_line = 'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver'
-        if not [line for line in file_contents if new_line in line]:
-            for line in file_contents:
+        if new_line not in file_contents:
+            for line in file_contents.splitlines():
                 if check_line in line:
                     stripped_line = line.rstrip()
                     whitespaces = len(stripped_line) - len(stripped_line.lstrip())
                     new_line = "{0}'{1}',\n".format(' ' * whitespaces, new_line)
-                    fc = file_contents[:file_contents.index(line)] + [new_line] + file_contents[file_contents.index(line):]
+                    fc = file_contents[:file_contents.index(line)] + new_line + file_contents[file_contents.index(line):]
                     self.client.file_write(nova_driver_file, "".join(fc))
                     break
 
         if os.path.exists(cinder_brick_initiator_file):
             # fix brick/upload to glance
             logger.info('    Patching file {0}'.format(cinder_brick_initiator_file))
-            self.client.run("""sed -i 's/elif protocol == "LOCAL":/elif protocol in ["LOCAL", "FILE"]:/g' {0}""".format(cinder_brick_initiator_file))
+            if self._stack_version in ('liberty', 'mitaka', 'newton'):
+                self.client.run("""sed -i 's/elif protocol == LOCAL:/elif protocol in [LOCAL, "FILE"]:/g' {0}""".format(cinder_brick_initiator_file))
+            else:
+                self.client.run("""sed -i 's/elif protocol == "LOCAL":/elif protocol in ["LOCAL", "FILE"]:/g' {0}""".format(cinder_brick_initiator_file))
 
         # 4. Configure messaging driver
         logger.info('   - Configure messaging driver')
