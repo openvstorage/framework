@@ -120,6 +120,7 @@ class DeleteSnapshots(TestCase):
         backend_type.save()
         vpool = VPool()
         vpool.name = 'vpool'
+        vpool.status = 'RUNNING'
         vpool.backend_type = backend_type
         vpool.save()
         pmachine = PMachine()

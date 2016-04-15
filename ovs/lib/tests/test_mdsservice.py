@@ -19,7 +19,7 @@ import unittest
 import sys
 import json
 from unittest import TestCase
-from ovs.lib.tests.mockups import StorageDriverModule, StorageDriverClient
+from ovs.lib.tests.mockups import SSHClientModule, StorageDriverModule, StorageDriverClient
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
@@ -61,6 +61,7 @@ class MDSServices(TestCase):
         DummyPersistentStore._keep_in_memory_only = True
 
         # Replace mocked classes
+        sys.modules['ovs.extensions.generic.sshclient'] = SSHClientModule
         sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriverModule
         # Retrieve persistent factory client
         # Import required modules/classes after mocking is done
@@ -176,6 +177,7 @@ class MDSServices(TestCase):
         for vpool_id in structure['vpools']:
             vpool = VPool()
             vpool.name = str(vpool_id)
+            vpool.status = 'RUNNING'
             vpool.backend_type = backend_type
             vpool.save()
             vpools[vpool_id] = vpool

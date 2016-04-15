@@ -332,8 +332,11 @@ class MDSServiceController(object):
         if excluded_storagerouters is None:
             excluded_storagerouters = []
 
-        services = [mds_service.service for mds_service in vdisk.vpool.mds_services
-                    if mds_service.service.storagerouter not in excluded_storagerouters]
+        # Sorted was added merely for unittests, because they rely on specific order of services and their ports
+        # Default sorting behavior for relations used to be based on order in which relations were added
+        # Now sorting is based on guid (DAL speedup changes)
+        services = sorted([mds_service.service for mds_service in vdisk.vpool.mds_services
+                           if mds_service.service.storagerouter not in excluded_storagerouters], key=lambda k: k.ports)
         nodes = set(service.storagerouter.ip for service in services)
 
         vdisk_storagerouter = StorageRouter(vdisk.storagerouter_guid)

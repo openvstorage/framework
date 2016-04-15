@@ -17,7 +17,7 @@ Mockups module
 """
 
 
-class Snapshot():
+class Snapshot(object):
     """
     Dummy snapshot class
     """
@@ -31,7 +31,7 @@ class Snapshot():
         self.in_backend = True
 
 
-class SRClient():
+class SRClient(object):
     """
     Mocks the SRClient
     """
@@ -100,11 +100,15 @@ class SRClient():
 
     @staticmethod
     def create_clone_from_template(target_path, metadata_backend_config, parent_volume_id, node_id):
+        """
+        Create clone from template
+        """
+        _ = target_path, metadata_backend_config, parent_volume_id, node_id
         if SRClient.client_type == 'MOCK_BAD':
             raise RuntimeError('Backend Error in SRClient')
 
 
-class StorageDriverClient():
+class StorageDriverClient(object):
     """
     Mocks the StorageDriverClient
     """
@@ -123,9 +127,16 @@ class StorageDriverClient():
 
     @staticmethod
     def use_bad_client():
+        """
+        Use bad client
+        """
         StorageDriverClient.client_type = 'MOCK_BAD'
+
     @staticmethod
     def use_good_client():
+        """
+        Use good client
+        """
         StorageDriverClient.client_type = 'MOCK_OK'
 
     @staticmethod
@@ -146,7 +157,8 @@ class StorageDriverClient():
                                  'vrouter_id': property(lambda s: None)})()
     EMPTY_INFO = empty_info
 
-class MDSClient():
+
+class MDSClient(object):
     """
     Mocks the MDSClient
     """
@@ -171,7 +183,7 @@ class MDSClient():
         _ = self, volume_id
 
 
-class MetadataServerClient():
+class MetadataServerClient(object):
     """
     Mocks the MetadataServerClient
     """
@@ -192,7 +204,7 @@ class MetadataServerClient():
         return MDSClient(service)
 
 
-class StorageDriverConfiguration():
+class StorageDriverConfiguration(object):
     """
     Mocks the StorageDriverConfiguration
     """
@@ -204,7 +216,7 @@ class StorageDriverConfiguration():
         pass
 
 
-class StorageDriverModule():
+class StorageDriverModule(object):
     """
     Mocks the StorageDriver
     """
@@ -220,29 +232,40 @@ class StorageDriverModule():
 
     @staticmethod
     def use_bad_client():
+        """
+        Use bad client
+        """
         StorageDriverClient.use_bad_client()
 
     @staticmethod
     def use_good_client():
+        """
+        Use good client
+        """
         StorageDriverClient.use_good_client()
 
 
-class KVM():
+class SSHClient(object):
     """
-    Mocks the KVM hypervisor extension
+    SSHClient class
     """
-    def __init__(self, ip, username, password):
-        pass
-
-    def get_disk_path(self, machinename, devicename):
-        return '/{}_{}.raw'.format(machinename.replace(' ', '_'), devicename)
-
-    def clean_backing_disk_filename(self, disk_path):
-        return disk_path
+    def __init__(self, endpoint, username='ovs', password=None):
+        """
+        Dummy init method
+        """
+        _ = endpoint, username, password
 
 
-class KVMModule():
+class UnableToConnectException(object):
     """
-    Mocks the KVM Module
+    Custom exception thrown when client cannot connect to remote side
     """
-    KVM = KVM
+    pass
+
+
+class SSHClientModule(object):
+    """
+    Mocks the SSHClient
+    """
+    SSHClient = SSHClient
+    UnableToConnectException = UnableToConnectException
