@@ -352,6 +352,9 @@ class ArakoonInstaller(object):
         if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
             raise ValueError('Cluster type {0} is not supported. Please choose from {1}'.format(cluster_type, ', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
 
+        if EtcdConfiguration.dir_exists('/ovs/arakoon/{0}'.format(cluster_name)):
+            raise ValueError('An Arakoon cluster with name "{0}" already exists'.format(cluster_name))
+
         logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
         base_dir = base_dir.rstrip('/')
 

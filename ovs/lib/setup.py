@@ -74,7 +74,6 @@ class SetupController(object):
         Toolbox.verify_required_params(actual_params={'node_type': node_type},
                                        required_params={'node_type': (str, ['master', 'extra'], False)})
 
-        passwords = {}
         master_ip = None
         cluster_ip = None
         external_etcd = None  # Example: 'etcd0123456789=http://1.2.3.4:2380'
@@ -97,7 +96,6 @@ class SetupController(object):
                 master_password = config['master_password']
 
                 # Optional fields
-                passwords = config.get('passwords', {})
                 node_type = config.get('node_type', node_type)
                 cluster_ip = config.get('cluster_ip', master_ip)  # If cluster_ip not provided, we assume 1st node installation
                 external_etcd = config.get('external_etcd')
@@ -141,6 +139,7 @@ class SetupController(object):
                     raise RuntimeError("The 'openvstorage' package is not installed on this node")
 
                 node_name = root_client.run('hostname -s')
+                fqdn_name = root_client.run('hostname -f || hostname -s')
                 avahi_installed = SetupController._avahi_installed(root_client)
 
                 logger.debug('Current host: {0}'.format(node_name))
@@ -258,33 +257,160 @@ class SetupController(object):
                 if avahi_installed is True and cluster_name is None:
                     raise RuntimeError('The name of the cluster should be known by now.')
 
-                node_password = master_password
-                for node_info in SetupController.nodes.itervalues():
+                ip_hostname_map = {cluster_ip: list({node_name, fqdn_name})}
+                for node_host_name, node_info in SetupController.nodes.iteritems():
                     ip = node_info['ip']
-                    previous_pass = passwords.get(ip, node_password)
-                    node_password = SetupController._ask_validate_password(ip, username='root', previous=previous_pass)
-                    node_client = SSHClient(endpoint=ip, username='root', password=node_password)
-                    node_info['client'] = node_client
-
-                    node_fqdn = node_client.run('hostname -f || hostname -s')
-                    node_host = node_client.run('hostname -s')
-                    node_info['host_names'] = list({node_fqdn, node_host})
+                    if ip == master_ip:
+                        node_client = node_info.get('client', SSHClient(endpoint=ip, username='root', password=master_password))
+                        node_info['client'] = node_client
+                        master_fqdn_name = node_client.run('hostname -f || hostname -s')
+                        ip_hostname_map[ip] = list({node_host_name, master_fqdn_name})
 
                 if node_name not in SetupController.nodes:
-                    local_client = SSHClient(endpoint=cluster_ip, username='root')
-                    node_fqdn = local_client.run('hostname -f || hostname -s')
-                    node_host = local_client.run('hostname -s')
                     SetupController.nodes[node_name] = {'ip': cluster_ip,
                                                         'type': 'unknown',
-                                                        'client': local_client,
-                                                        'host_names': list({node_fqdn, node_host})}
+                                                        'client': SSHClient(endpoint=cluster_ip, username='root')}
 
-                hypervisor_info = SetupController._prepare_node(cluster_ip=cluster_ip,
-                                                                hypervisor_info={'type': hypervisor_type,
-                                                                                 'name': hypervisor_name,
-                                                                                 'username': hypervisor_username,
-                                                                                 'ip': hypervisor_ip,
-                                                                                 'password': hypervisor_password})
+                SetupController._log(messages='Preparing node', title=True)
+                SetupController._log(messages='Exchanging SSH keys and updating hosts files')
+
+                # Exchange SSH keys
+                all_ips = SetupController.host_ips
+                local_client = None
+                master_client = None
+                for node_info in SetupController.nodes.itervalues():
+                    node_ip = node_info['ip']
+                    all_ips.add(node_ip)
+                    if node_ip == cluster_ip:
+                        local_client = node_info['client']
+                    if node_ip == master_ip:
+                        master_client = node_info['client']
+
+                if local_client is None or master_client is None:
+                    raise ValueError('Retrieving client information failed')
+
+                known_hosts_ovs = '/opt/OpenvStorage/.ssh/known_hosts'
+                known_hosts_root = '/root/.ssh/known_hosts'
+                ssh_public_key_ovs = '/opt/OpenvStorage/.ssh/id_rsa.pub'
+                ssh_public_key_root = '/root/.ssh/id_rsa.pub'
+                authorized_keys_ovs = '/opt/OpenvStorage/.ssh/authorized_keys'
+                authorized_keys_root = '/root/.ssh/authorized_keys'
+
+                missing_files = set()
+                for client in [local_client, master_client]:
+                    for required_file in [known_hosts_ovs, known_hosts_root, ssh_public_key_ovs, ssh_public_key_root]:
+                        if not local_client.file_exists(ssh_public_key_ovs):
+                            missing_files.add('Could not find file {0} on node with IP {1}'.format(required_file, client.ip))
+                if missing_files:
+                    raise ValueError('Missing files:\n - {0}'.format('\n - '.join(sorted(list(missing_files)))))
+
+                # Retrieve local public SSH keys
+                local_pub_key_ovs = local_client.file_read(ssh_public_key_ovs)
+                local_pub_key_root = local_client.file_read(ssh_public_key_root)
+                if not local_pub_key_ovs or not local_pub_key_root:
+                    raise ValueError('Missing contents in the public SSH keys on node {0}'.format(local_client.ip))
+
+                # Connect to master and add the ovs and root public SSH key to all other nodes in the cluster
+                all_pub_keys = [local_pub_key_ovs, local_pub_key_root]
+                if first_node is False:
+                    with Remote(master_client.ip, [SSHClient], 'root', master_password) as remote:
+                        for node_host_name, node in SetupController.nodes.iteritems():
+                            node_ip = node['ip']
+                            if node_ip == cluster_ip:
+                                continue
+                            client = remote.SSHClient(node_ip, 'root')
+                            if client.ip not in ip_hostname_map:
+                                node_fqdn_name = client.run('hostname -f || hostname -s')
+                                ip_hostname_map[client.ip] = list({node_host_name, node_fqdn_name})
+                            for authorized_key in [authorized_keys_ovs, authorized_keys_root]:
+                                if client.file_exists(authorized_key):
+                                    master_authorized_keys = client.file_read(authorized_key)
+                                    for local_pub_key in [local_pub_key_ovs, local_pub_key_root]:
+                                        if local_pub_key not in master_authorized_keys:
+                                            master_authorized_keys += '\n{0}'.format(local_pub_key)
+                                            client.file_write(authorized_key, master_authorized_keys)
+                            all_pub_keys.append(client.file_read(ssh_public_key_ovs))
+                            all_pub_keys.append(client.file_read(ssh_public_key_root))
+
+                # Now add all public keys of all nodes in the cluster to the local node
+                for authorized_keys in [authorized_keys_ovs, authorized_keys_root]:
+                    if local_client.file_exists(authorized_keys):
+                        keys = local_client.file_read(authorized_keys)
+                        for public_key in all_pub_keys:
+                            if public_key not in keys:
+                                keys += '\n{0}'.format(public_key)
+                        local_client.file_write(authorized_keys, keys)
+
+                # Configure /etc/hosts and execute ssh-keyscan
+                for node_details in SetupController.nodes.itervalues():
+                    node_client = node_details.get('client', SSHClient(endpoint=node_details['ip'], username='root'))
+                    System.update_hosts_file(ip_hostname_map, node_client)
+                    cmd = 'cp {{0}} {{0}}.tmp; ssh-keyscan -t rsa {0} {1} 2> /dev/null >> {{0}}.tmp; cat {{0}}.tmp | sort -u - > {{0}}'.format(' '.join(all_ips), ' '.join(SetupController.nodes.keys()))
+                    root_command = cmd.format(known_hosts_root)
+                    ovs_command = cmd.format(known_hosts_ovs)
+                    ovs_command = 'su - ovs -c "{0}"'.format(ovs_command)
+                    node_client.run(root_command)
+                    node_client.run(ovs_command)
+
+                # Collecting hypervisor data
+                SetupController._log(messages='Collecting hypervisor information')
+                possible_hypervisor = None
+                module = local_client.run('lsmod | grep kvm || true').strip()
+                if module != '':
+                    possible_hypervisor = 'KVM'
+                else:
+                    disktypes = local_client.run('dmesg | grep VMware || true').strip()
+                    if disktypes != '':
+                        possible_hypervisor = 'VMWARE'
+
+                hypervisor_info = {'ip': hypervisor_ip,
+                                   'name': hypervisor_name,
+                                   'type': hypervisor_type,
+                                   'username': hypervisor_username,
+                                   'password': hypervisor_password}
+                if hypervisor_type is None:
+                    hypervisor_type = Interactive.ask_choice(choice_options=['VMWARE', 'KVM'],
+                                                             question='Which type of hypervisor is this Storage Router backing?',
+                                                             default_value=possible_hypervisor)
+                    logger.debug('Selected hypervisor type {0}'.format(hypervisor_type))
+                default_name = ('esxi{0}' if hypervisor_type == 'VMWARE' else 'kvm{0}').format(cluster_ip.split('.')[-1])
+                if hypervisor_name is None:
+                    hypervisor_name = Interactive.ask_string('Enter hypervisor hostname', default_value=default_name)
+                if hypervisor_type == 'VMWARE':
+                    first_request = True  # If parameters are wrong, we need to re-ask it
+                    while True:
+                        if hypervisor_ip is None or first_request is False:
+                            hypervisor_ip = Interactive.ask_string(message='Enter hypervisor IP address',
+                                                                   default_value=hypervisor_ip,
+                                                                   regex_info={'regex': SSHClient.IP_REGEX,
+                                                                               'message': 'Invalid hypervisor IP specified'})
+                        if hypervisor_username is None or first_request is False:
+                            hypervisor_username = Interactive.ask_string(message='Enter hypervisor username',
+                                                                         default_value=hypervisor_username)
+                        if hypervisor_password is None or first_request is False:
+                            hypervisor_password = Interactive.ask_password(message='Enter hypervisor {0} password'.format(hypervisor_username))
+                        try:
+                            SetupController._validate_hypervisor_information(ip=hypervisor_ip,
+                                                                             username=hypervisor_username,
+                                                                             password=hypervisor_password)
+                            break
+                        except Exception as ex:
+                            first_request = False
+                            SetupController._log(messages='Could not connect to {0}: {1}'.format(hypervisor_ip, ex))
+                    hypervisor_info['ip'] = hypervisor_ip
+                    hypervisor_info['username'] = hypervisor_username
+                    hypervisor_info['password'] = hypervisor_password
+                elif hypervisor_type == 'KVM':
+                    hypervisor_info['ip'] = cluster_ip
+                    hypervisor_info['password'] = None
+                    hypervisor_info['username'] = 'root'
+
+                hypervisor_info['name'] = hypervisor_name
+                hypervisor_info['type'] = hypervisor_type
+
+                logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
+
+                # Write resume config
                 resume_config['node_type'] = node_type
                 resume_config['master_ip'] = master_ip
                 resume_config['unique_id'] = unique_id
@@ -676,129 +802,6 @@ class SetupController(object):
             SetupController._log(messages='This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.', boxed=True, loglevel='error')
             sys.exit(1)
         SetupController._log(messages='Remove nodes finished', title=True)
-
-    @staticmethod
-    def _prepare_node(cluster_ip, hypervisor_info):
-        """
-        Prepares a node:
-        - Exchange SSH keys
-        - Update hosts files
-        - Request hypervisor information
-        """
-        SetupController._log(messages='Preparing node', title=True)
-        SetupController._log(messages='Exchanging SSH keys and updating hosts files')
-
-        # Exchange ssh keys
-        root_ssh_folder = '/root/.ssh'
-        ovs_ssh_folder = '/opt/OpenvStorage/.ssh'
-        public_key_filename = '{0}/id_rsa.pub'
-        authorized_keys_filename = '{0}/authorized_keys'
-        known_hosts_filename = '{0}/known_hosts'
-        authorized_keys = ''
-        target_client = None
-
-        mapping = {}
-        all_ips = SetupController.host_ips
-        all_hostnames = set()
-        for host_name, node_details in SetupController.nodes.iteritems():
-            node_ip = node_details['ip']
-            node_client = node_details['client']
-            all_ips.add(node_ip)
-            all_hostnames.add(host_name)
-            mapping[node_ip] = node_details['host_names']
-
-            if node_ip == cluster_ip:
-                target_client = node_client
-            if node_client.file_exists(authorized_keys_filename.format(root_ssh_folder)):
-                existing_keys = node_client.file_read(authorized_keys_filename.format(root_ssh_folder)).split('\n')
-                for existing_key in existing_keys:
-                    if existing_key not in authorized_keys:
-                        authorized_keys += "{0}\n".format(existing_key)
-            if node_client.file_exists(authorized_keys_filename.format(ovs_ssh_folder)):
-                existing_keys = node_client.file_read(authorized_keys_filename.format(ovs_ssh_folder))
-                for existing_key in existing_keys:
-                    if existing_key not in authorized_keys:
-                        authorized_keys += "{0}\n".format(existing_key)
-            root_pub_key = node_client.file_read(public_key_filename.format(root_ssh_folder))
-            ovs_pub_key = node_client.file_read(public_key_filename.format(ovs_ssh_folder))
-            if root_pub_key not in authorized_keys:
-                authorized_keys += '{0}\n'.format(root_pub_key)
-            if ovs_pub_key not in authorized_keys:
-                authorized_keys += '{0}\n'.format(ovs_pub_key)
-
-        for node_details in SetupController.nodes.itervalues():
-            node_client = node_details['client']
-            for ip, node_hostnames in mapping.iteritems():
-                System.update_hosts_file(node_hostnames, ip, node_client)
-            node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
-            node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
-            cmd = 'cp {{0}} {{0}}.tmp; ssh-keyscan -t rsa {0} {1} 2> /dev/null >> {{0}}.tmp; cat {{0}}.tmp | sort -u - > {{0}}'.format(' '.join(all_ips), ' '.join(all_hostnames))
-            root_command = cmd.format(known_hosts_filename.format(root_ssh_folder))
-            ovs_command = cmd.format(known_hosts_filename.format(ovs_ssh_folder))
-            ovs_command = 'su - ovs -c "{0}"'.format(ovs_command)
-            node_client.run(root_command)
-            node_client.run(ovs_command)
-
-        SetupController._log(messages='Collecting hypervisor information')
-
-        # Collecting hypervisor data
-        possible_hypervisor = None
-        module = target_client.run('lsmod | grep kvm || true').strip()
-        if module != '':
-            possible_hypervisor = 'KVM'
-        else:
-            disktypes = target_client.run('dmesg | grep VMware || true').strip()
-            if disktypes != '':
-                possible_hypervisor = 'VMWARE'
-
-        hypervisor_ip = hypervisor_info['ip']
-        hypervisor_name = hypervisor_info['name']
-        hypervisor_type = hypervisor_info['type']
-        hypervisor_username = hypervisor_info['username']
-        hypervisor_password = hypervisor_info['password']
-        if hypervisor_type is None:
-            hypervisor_type = Interactive.ask_choice(choice_options=['VMWARE', 'KVM'],
-                                                     question='Which type of hypervisor is this Storage Router backing?',
-                                                     default_value=possible_hypervisor)
-            logger.debug('Selected hypervisor type {0}'.format(hypervisor_type))
-        default_name = ('esxi{0}' if hypervisor_type == 'VMWARE' else 'kvm{0}').format(cluster_ip.split('.')[-1])
-        if hypervisor_name is None:
-            hypervisor_name = Interactive.ask_string('Enter hypervisor hostname', default_value=default_name)
-        if hypervisor_type == 'VMWARE':
-            first_request = True  # If parameters are wrong, we need to re-ask it
-            while True:
-                if hypervisor_ip is None or first_request is False:
-                    hypervisor_ip = Interactive.ask_string(message='Enter hypervisor IP address',
-                                                           default_value=hypervisor_ip,
-                                                           regex_info={'regex': SSHClient.IP_REGEX,
-                                                                       'message': 'Invalid hypervisor IP specified'})
-                if hypervisor_username is None or first_request is False:
-                    hypervisor_username = Interactive.ask_string(message='Enter hypervisor username',
-                                                                 default_value=hypervisor_username)
-                if hypervisor_password is None or first_request is False:
-                    hypervisor_password = Interactive.ask_password(message='Enter hypervisor {0} password'.format(hypervisor_username))
-                try:
-                    SetupController._validate_hypervisor_information(ip=hypervisor_ip,
-                                                                     username=hypervisor_username,
-                                                                     password=hypervisor_password)
-                    break
-                except Exception as ex:
-                    first_request = False
-                    SetupController._log(messages='Could not connect to {0}: {1}'.format(hypervisor_ip, ex))
-            hypervisor_info['ip'] = hypervisor_ip
-            hypervisor_info['username'] = hypervisor_username
-            hypervisor_info['password'] = hypervisor_password
-        elif hypervisor_type == 'KVM':
-            hypervisor_info['ip'] = cluster_ip
-            hypervisor_info['password'] = None
-            hypervisor_info['username'] = 'root'
-
-        hypervisor_info['name'] = hypervisor_name
-        hypervisor_info['type'] = hypervisor_type
-
-        logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
-
-        return hypervisor_info
 
     @staticmethod
     def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats, external_etcd):
@@ -1751,7 +1754,7 @@ EOF
                 raise
             except:
                 previous = None
-                print 'Password invalid or could not connect to this node'
+                SetupController._log(messages='Password invalid or could not connect to this node')
 
     @staticmethod
     def _validate_local_memcache_servers(ip_client_map):
@@ -1791,7 +1794,7 @@ EOF
         config = config['setup']
         actual_keys = config.keys()
         expected_keys = ['cluster_ip', 'enable_heartbeats', 'external_etcd', 'hypervisor_ip', 'hypervisor_name', 'hypervisor_password',
-                         'hypervisor_type', 'hypervisor_username', 'master_ip', 'master_password', 'node_type', 'passwords']
+                         'hypervisor_type', 'hypervisor_username', 'master_ip', 'master_password', 'node_type']
         for key in actual_keys:
             if key not in expected_keys:
                 errors.append('Key {0} is not supported by OpenvStorage to be used in the pre-configuration JSON'.format(key))
@@ -1809,8 +1812,7 @@ EOF
                                                         'hypervisor_username': (str, None, False),
                                                         'master_ip': (str, Toolbox.regex_ip),
                                                         'master_password': (str, None),
-                                                        'node_type': (str, ['master', 'extra'], False),
-                                                        'passwords': (dict, None, False)})
+                                                        'node_type': (str, ['master', 'extra'], False)})
         if config['hypervisor_type'] == 'VMWARE':
             ip = config.get('hypervisor_ip')
             username = config.get('hypervisor_username')
@@ -1823,12 +1825,6 @@ EOF
                                                                  password=password)
             except Exception as ex:
                 raise RuntimeError('Could not connect to {0}: {1}'.format(ip, ex))
-
-        if config.get('passwords') is not None:
-            storagerouters = SetupController._retrieve_storagerouters(ip=config['master_ip'], password=config['master_password'])
-            Toolbox.verify_required_params(actual_params=config['passwords'],
-                                           required_params=dict((info['ip'], (str, None)) for info in storagerouters.itervalues()))
-
         return config
 
     @staticmethod

@@ -110,7 +110,7 @@ def services_running(target):
                     from ovs.extensions.db.etcd.configuration import EtcdConfiguration
                     from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
                     cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
-                    client = PyrakoonStore(cluster=str(cluster_name))
+                    client = PyrakoonStore(cluster=cluster_name)
                     client.set(key, value)
                     if client.get(key) == value:
                         client.delete(key)
