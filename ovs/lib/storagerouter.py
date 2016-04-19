@@ -357,8 +357,8 @@ class StorageRouterController(object):
                               's3_connection_port': connection_port,
                               's3_connection_username': connection_username,
                               's3_connection_password': connection_password,
-                              's3_connection_flavour': 'SWIFT' if vpool.backend_type.code == 'swift_s3' else 'S3',
-                              's3_connection_strict_consistency': 'false' if vpool.backend_type.code == 'swift_s3' else 'true',
+                              's3_connection_flavour': 'SWIFT' if backend_type.code == 'swift_s3' else 'S3',
+                              's3_connection_strict_consistency': 'false' if backend_type.code == 'swift_s3' else 'true',
                               's3_connection_verbose_logging': 1,
                               'backend_type': 'S3'}
         else:
