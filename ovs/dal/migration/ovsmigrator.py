@@ -142,7 +142,7 @@ class OVSMigrator(object):
                 backend_type.save()
 
             # Add service types
-            for service_type_info in ['MetadataServer', 'AlbaProxy', 'Arakoon']:
+            for service_type_info in [ServiceType.SERVICE_TYPES.MD_SERVER, ServiceType.SERVICE_TYPES.ALBA_PROXY, ServiceType.SERVICE_TYPES.ARAKOON]:
                 service_type = ServiceType()
                 service_type.name = service_type_info
                 service_type.save()
@@ -233,14 +233,15 @@ class OVSMigrator(object):
         # - Flexible SSD layout
         if working_version < 4:
             import os
-            from ovs.dal.lists.storagedriverlist import StorageDriverList
-            from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
             from ovs.dal.hybrids.diskpartition import DiskPartition
+            from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
+            from ovs.dal.hybrids.servicetype import ServiceType
             from ovs.dal.lists.servicetypelist import ServiceTypeList
+            from ovs.dal.lists.storagedriverlist import StorageDriverList
             from ovs.extensions.generic.remote import Remote
             from ovs.extensions.generic.sshclient import SSHClient
             from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-            for service in ServiceTypeList.get_by_name('MetadataServer').services:
+            for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.MD_SERVER).services:
                 mds_service = service.mds_service
                 storagedriver = None
                 for current_storagedriver in service.storagerouter.storagedrivers:

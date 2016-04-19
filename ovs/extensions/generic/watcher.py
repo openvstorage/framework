@@ -13,12 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Watcher module for framework and volumedriver
+"""
+
 import sys
 import time
 import uuid
 import logging
-from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('extensions', name='watcher')
 
@@ -103,8 +107,10 @@ def services_running(target):
             tries = 0
             while tries < max_tries:
                 try:
+                    from ovs.extensions.db.etcd.configuration import EtcdConfiguration
                     from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
-                    client = PyrakoonStore('voldrv')
+                    cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
+                    client = PyrakoonStore(cluster=cluster_name)
                     client.set(key, value)
                     if client.get(key) == value:
                         client.delete(key)

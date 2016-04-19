@@ -19,7 +19,7 @@ import unittest
 import sys
 import json
 from unittest import TestCase
-from ovs.lib.tests.mockups import StorageDriverModule, StorageDriverClient
+from ovs.lib.tests.mockups import SSHClientModule, StorageDriverModule, StorageDriverClient
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
@@ -61,6 +61,7 @@ class MDSServices(TestCase):
         DummyPersistentStore._keep_in_memory_only = True
 
         # Replace mocked classes
+        sys.modules['ovs.extensions.generic.sshclient'] = SSHClientModule
         sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriverModule
         # Retrieve persistent factory client
         # Import required modules/classes after mocking is done
@@ -176,6 +177,7 @@ class MDSServices(TestCase):
         for vpool_id in structure['vpools']:
             vpool = VPool()
             vpool.name = str(vpool_id)
+            vpool.status = 'RUNNING'
             vpool.backend_type = backend_type
             vpool.save()
             vpools[vpool_id] = vpool
@@ -240,7 +242,7 @@ class MDSServices(TestCase):
             disk.size = 0
             disk.save()
             disk.reload_client()
-            if mds_service is not None:
+            if mds_service is not None and mds_service.service.storagerouter_guid is not None:
                 junction = MDSServiceVDisk()
                 junction.vdisk = disk
                 junction.mds_service = mds_service
@@ -282,7 +284,8 @@ class MDSServices(TestCase):
                 _load = 'infinite'
             else:
                 _load = round(_load, 2)
-            reality_loads.append([_mds_service.service.storagerouter.ip, _mds_service.service.ports[0], masters, slaves, capacity, _load])
+            if _mds_service.service.storagerouter_guid is not None:
+                reality_loads.append([_mds_service.service.storagerouter.ip, _mds_service.service.ports[0], masters, slaves, capacity, _load])
         if display is True:
             for l in reality_loads:
                 print l

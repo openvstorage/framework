@@ -70,8 +70,8 @@ class PyrakoonStore(object):
         nodes = {}
         for node in parser.get('global', 'cluster').split(','):
             node = node.strip()
-            nodes[node] = ([parser.get(node, 'ip')], int(parser.get(node, 'client_port')))
-        self._config = ArakoonClientConfig(cluster, nodes)
+            nodes[node] = ([str(parser.get(node, 'ip'))], int(parser.get(node, 'client_port')))
+        self._config = ArakoonClientConfig(str(cluster), nodes)
         self._client = ArakoonClient(self._config)
         self._identifier = int(round(random.random() * 10000000))
         self._lock = Lock()

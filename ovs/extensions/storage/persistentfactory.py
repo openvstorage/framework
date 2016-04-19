@@ -30,8 +30,8 @@ class PersistentFactory(object):
     def get_client(client_type=None):
         """
         Returns a persistent storage client
+        :param client_type: Type of store client
         """
-
         if not hasattr(PersistentFactory, 'store') or PersistentFactory.store is None:
             if client_type is None:
                 client_type = EtcdConfiguration.get('/ovs/framework/stores|persistent')
@@ -39,7 +39,7 @@ class PersistentFactory(object):
             PersistentFactory.store = None
             if client_type in ['pyrakoon', 'arakoon']:
                 from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
-                PersistentFactory.store = PyrakoonStore('ovsdb')
+                PersistentFactory.store = PyrakoonStore(str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|ovsdb')))
             if client_type == 'default':
                 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
                 PersistentFactory.store = DummyPersistentStore()

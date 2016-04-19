@@ -23,6 +23,13 @@ class ServiceType(DataObject):
     """
     A ServiceType represents some kind of service that needs to be managed by the framework.
     """
+    SERVICE_TYPES = DataObject.enumerator('Service_type', {'NS_MGR': 'NamespaceManager',
+                                                           'ARAKOON': 'Arakoon',
+                                                           'ALBA_MGR': 'AlbaManager',
+                                                           'MD_SERVER': 'MetadataServer',
+                                                           'ALBA_PROXY': 'AlbaProxy'})
+    ARAKOON_CLUSTER_TYPES = DataObject.enumerator('Arakoon_cluster_type', ['ABM', 'FWK', 'NSM', 'SD'])
+
     __properties = [Property('name', str, doc='Name of the ServiceType.')]
     __relations = []
     __dynamics = []

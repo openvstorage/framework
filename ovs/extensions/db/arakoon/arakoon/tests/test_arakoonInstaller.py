@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Test module to test the Arakoon Installer class
+"""
+
 import sys
+from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient
@@ -53,7 +58,7 @@ class TestArakoonInstaller(TestCase):
 
     def test_single_node(self):
         node = sorted(TestArakoonInstaller.nodes.keys())[0]
-        result = ArakoonInstaller.create_cluster(TestArakoonInstaller.cluster_name, node, '/tmp/db')
+        result = ArakoonInstaller.create_cluster(TestArakoonInstaller.cluster_name, ServiceType.ARAKOON_CLUSTER_TYPES.FWK, node, '/tmp/db')
         contents = SSHClient(node).file_read(TestArakoonInstaller.cluster_config_file)
         expected = TestArakoonInstaller.expected_global.format(TestArakoonInstaller.nodes[node], TestArakoonInstaller.cluster_name)
         expected += TestArakoonInstaller.expected_base.format(TestArakoonInstaller.nodes[node], result['client_port'], result['messaging_port'], TestArakoonInstaller.cluster_name, node)
@@ -63,7 +68,7 @@ class TestArakoonInstaller(TestCase):
         nodes = sorted(TestArakoonInstaller.nodes.keys())
         nodes = dict((node, SSHClient(node)) for node in nodes)
         first_node = nodes.keys()[0]
-        result = ArakoonInstaller.create_cluster(TestArakoonInstaller.cluster_name, first_node, '/tmp/db')
+        result = ArakoonInstaller.create_cluster(TestArakoonInstaller.cluster_name, ServiceType.ARAKOON_CLUSTER_TYPES.FWK, first_node, '/tmp/db')
         for node in nodes.keys()[1:]:
             ArakoonInstaller.extend_cluster(first_node, node, TestArakoonInstaller.cluster_name, '/tmp/db')
         expected = TestArakoonInstaller.expected_global.format(','.join(TestArakoonInstaller.nodes[node] for node in nodes), TestArakoonInstaller.cluster_name)

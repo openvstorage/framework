@@ -16,7 +16,6 @@
 Wrapper class for the storagedriver client of the voldrv team
 """
 
-import os
 import json
 import copy
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
@@ -45,6 +44,7 @@ client_storagedriver_cache = {}
 mdsclient_service_cache = {}
 
 
+# noinspection PyArgumentList
 class StorageDriverClient(object):
     """
     Client to access storagedriver client
@@ -175,6 +175,8 @@ class MetadataServerClient(object):
         Loads a MDSClient
         :param service: Service for which the MDSClient needs to be loaded
         """
+        if service.storagerouter is None:
+            raise ValueError('MDS service {0} does not have a Storage Router linked to it'.format(service.name))
 
         key = service.guid
         if key not in mdsclient_service_cache:

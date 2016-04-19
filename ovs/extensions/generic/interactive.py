@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Interactive extension
+Used to interactively ask for an integer, choice, password, ...
+"""
+
+import re
 import getpass
 
 
@@ -27,6 +33,12 @@ class Interactive(object):
     def ask_integer(question, min_value, max_value, default_value=None, invalid_message=None):
         """
         Asks an integer to the user
+        :param question: Question to ask
+        :param min_value: Minimum value for integer
+        :param max_value: Maximum value for integer
+        :param default_value: Default value
+        :param invalid_message: Message displayed when entering invalid value
+        :return: Specified integer
         """
         if invalid_message is None:
             invalid_message = 'Invalid input please try again.'
@@ -49,7 +61,15 @@ class Interactive(object):
     def ask_choice(choice_options, question=None, default_value=None, sort_choices=True):
         """
         Lets the user chose one of a set of options
+        :param choice_options: Options to choose from
+        :param question: Question to ask
+        :param default_value: Default value
+        :param sort_choices: Sort the specified options
+        :return: Option chosen
         """
+        if isinstance(choice_options, set):
+            choice_options = list(choice_options)
+
         if not choice_options:
             return None
         if len(choice_options) == 1:
@@ -73,20 +93,39 @@ class Interactive(object):
         return choice_options[result - 1]
 
     @staticmethod
-    def ask_string(message='', default_value=None):
+    def ask_string(message='', default_value=None, regex_info=None):
         """
         Asks the user a question
+        :param message: Message to show when asking the string
+        :param default_value: Default value
+        :param regex_info: Dictionary with regex and message when regex does not match
+        :return: String
         """
+        if regex_info is None:
+            regex_info = {}
+
+        if not isinstance(regex_info, dict):
+            raise ValueError('Regex info should be a dictionary with "regex" as key and the actual regex as value')
+
+        regex = regex_info.get('regex')
+        error_message = regex_info.get('message')
         default_string = ': ' if default_value is None else ' [{0}]: '.format(default_value)
-        result = raw_input(str(message) + default_string).rstrip()
-        if not result and default_value is not None:
-            return default_value
-        return result
+        while True:
+            result = raw_input(str(message) + default_string).rstrip()
+            if result == '' and default_value is not None:
+                result = default_value
+            if regex is not None and not re.match(regex, result):
+                print error_message if error_message else 'Provided string does not match regex {0}'.format(regex)
+                continue
+            return result
 
     @staticmethod
     def ask_yesno(message='', default_value=None):
         """
         Asks the user a yes/no question
+        :param message: Message to show when asking yes/no
+        :param default_value: Default value
+        :return: True or False
         """
         if default_value is None:
             ynstring = ' (y/n): '
@@ -111,6 +150,11 @@ class Interactive(object):
 
     @staticmethod
     def ask_password(message=''):
+        """
+        Ask the user for a password
+        :param message: Message to show when asking for a password
+        :return: Password specified
+        """
         if message:
             print message
         else:
@@ -122,6 +166,9 @@ class Interactive(object):
     def find_in_list(items, search_string):
         """
         Finds a given string in a list of items
+        :param items: Items to search in
+        :param search_string: String to search for in items
+        :return: Item found or None
         """
         for item in items:
             if search_string in item:
@@ -132,6 +179,10 @@ class Interactive(object):
     def boxed_message(lines, character='+', maxlength=80):
         """
         Embeds a set of lines into a box
+        :param lines: Lines to show in the boxed message
+        :param character: Character to surround box with
+        :param maxlength: Maximum length of a line
+        :return:
         """
         corrected_lines = []
         for line in lines:

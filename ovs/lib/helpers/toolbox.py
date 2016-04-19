@@ -71,8 +71,14 @@ class Toolbox(object):
         """
         Verify whether the actual parameters match the required parameters
         :param required_params: Required parameters which actual parameters have to meet
+        :type required_params: dict
+
         :param actual_params: Actual parameters to check for validity
+        :type actual_params: dict
+
         :param exact_match: Keys of both dictionaries must be identical
+        :type exact_match: bool
+
         :return: None
         """
         error_messages = []
@@ -95,9 +101,10 @@ class Toolbox(object):
                 error_messages.append('Missing required param "{0}" in actual parameters'.format(required_key))
                 continue
 
+            mandatory_or_optional = 'Optional' if optional is True else 'Mandatory'
             actual_value = actual_params[required_key]
             if HelperToolbox.check_type(actual_value, expected_type)[0] is False:
-                error_messages.append('Required param "{0}" is of type "{1}" but we expected type "{2}"'.format(required_key, type(actual_value), expected_type))
+                error_messages.append('{0} param "{1}" is of type "{2}" but we expected type "{3}"'.format(mandatory_or_optional, required_key, type(actual_value), expected_type))
                 continue
 
             if expected_value is None:
@@ -107,22 +114,22 @@ class Toolbox(object):
                 if type(expected_value) == Toolbox.compiled_regex_type:  # List of strings which need to match regex
                     for item in actual_value:
                         if not re.match(expected_value, item):
-                            error_messages.append('Required param "{0}" has an item "{1}" which does not match regex "{2}"'.format(required_key, item, expected_value.pattern))
+                            error_messages.append('{0} param "{1}" has an item "{2}" which does not match regex "{3}"'.format(mandatory_or_optional, required_key, item, expected_value.pattern))
             elif expected_type == dict:
                 Toolbox.verify_required_params(expected_value, actual_params[required_key])
             elif expected_type == int:
                 if isinstance(expected_value, list) and actual_value not in expected_value:
-                    error_messages.append('Required param "{0}" with value "{1}" should be 1 of the following: {2}'.format(required_key, actual_value, expected_value))
+                    error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
                 if isinstance(expected_value, dict):
                     minimum = expected_value.get('min', sys.maxint * -1)
                     maximum = expected_value.get('max', sys.maxint)
                     if not minimum <= actual_value <= maximum:
-                        error_messages.append('Required param "{0}" with value "{1}" should be in range: {2} - {3}'.format(required_key, actual_value, minimum, maximum))
+                        error_messages.append('{0} param "{1}" with value "{2}" should be in range: {3} - {4}'.format(mandatory_or_optional, required_key, actual_value, minimum, maximum))
             else:
                 if HelperToolbox.check_type(expected_value, list)[0] is True and actual_value not in expected_value:
-                    error_messages.append('Required param "{0}" with value "{1}" should be 1 of the following: {2}'.format(required_key, actual_value, expected_value))
+                    error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
                 elif HelperToolbox.check_type(expected_value, Toolbox.compiled_regex_type)[0] is True and not re.match(expected_value, actual_value):
-                    error_messages.append('Required param "{0}" with value "{1}" does not match regex "{2}"'.format(required_key, actual_value, expected_value.pattern))
+                    error_messages.append('{0} param "{1}" with value "{2}" does not match regex "{3}"'.format(mandatory_or_optional, required_key, actual_value, expected_value.pattern))
         if error_messages:
             raise RuntimeError('\n' + '\n'.join(error_messages))
 

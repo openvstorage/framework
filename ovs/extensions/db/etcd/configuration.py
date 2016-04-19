@@ -16,6 +16,7 @@
 Generic module for managing configuration in Etcd
 """
 
+import copy
 import etcd
 import json
 import time
@@ -93,6 +94,21 @@ class EtcdConfiguration(object):
         > print EtcdConfiguration.get('/bar')
         < {u'a': {u'b': u'test'}}
     """
+    base_config = {'cluster_id': None,
+                   'external_etcd': None,
+                   'plugins/installed': {'backends': [],
+                                         'generic': []},
+                   'paths': {'cfgdir': '/opt/OpenvStorage/config',
+                             'basedir': '/opt/OpenvStorage',
+                             'ovsdb': '/opt/OpenvStorage/db'},
+                   'support': {'enablesupport': False,
+                               'enabled': True,
+                               'interval': 60},
+                   'storagedriver': {'mds_safety': 2,
+                                     'mds_tlogs': 100,
+                                     'mds_maxload': 75},
+                   'webapps': {'html_endpoint': '/',
+                               'oauth2': {'mode': 'local'}}}
 
     def __init__(self):
         """
@@ -197,6 +213,24 @@ class EtcdConfiguration(object):
         return EtcdConfiguration._dir_exists(key)
 
     @staticmethod
+    def create_dir(key):
+        """
+        Creates a directory, including subdirs
+        :param key: full directory path to be created
+        :return: None
+        """
+        EtcdConfiguration._create_dir(key)
+
+    @staticmethod
+    def delete_dir(key):
+        """
+        Deletes a directory
+        :param key: full directory path to be deleted
+        :return: None
+        """
+        EtcdConfiguration._delete_dir(key)
+
+    @staticmethod
     def list(key):
         """
         List all keys in tree
@@ -206,23 +240,35 @@ class EtcdConfiguration(object):
         return EtcdConfiguration._list(key)
 
     @staticmethod
-    def initialize_host(host_id):
+    def initialize_host(host_id, port_info=None):
         """
         Initialize keys when setting up a host
         :param host_id: ID of the host
+        :type host_id: str
+
+        :param port_info: Information about ports to be used
+        :type port_info: dict
+
         :return: None
         """
         if EtcdConfiguration.exists('/ovs/framework/hosts/{0}/setupcompleted'.format(host_id)):
             return
-        base_config = {'/storagedriver': {'rsp': '/var/rsp',
-                                          'vmware_mode': 'ganesha'},
-                       '/ports': {'storagedriver': [[26200, 26299]],
-                                  'mds': [[26300, 26399]],
-                                  'arakoon': [26400]},
-                       '/setupcompleted': False,
-                       '/versions': {'ovs': 4},
-                       '/type': 'UNCONFIGURED'}
-        for key, value in base_config.iteritems():
+        if port_info is None:
+            port_info = {}
+
+        mds_port_range = port_info.get('mds', [26300, 26399])
+        arakoon_start_port = port_info.get('arakoon', 26400)
+        storagedriver_port_range = port_info.get('storagedriver', [26200, 26299])
+
+        host_config = {'storagedriver': {'rsp': '/var/rsp',
+                                         'vmware_mode': 'ganesha'},
+                       'ports': {'storagedriver': [storagedriver_port_range],
+                                 'mds': [mds_port_range],
+                                 'arakoon': [arakoon_start_port]},
+                       'setupcompleted': False,
+                       'versions': {'ovs': 4},
+                       'type': 'UNCONFIGURED'}
+        for key, value in host_config.iteritems():
             EtcdConfiguration._set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value, raw=False)
 
     @staticmethod
@@ -235,31 +281,34 @@ class EtcdConfiguration(object):
         cluster_id = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
         if EtcdConfiguration.exists('/ovs/framework/cluster_id'):
             return
-        base_config = {'/cluster_id': cluster_id,
-                       '/external_etcd': external_etcd,
-                       '/memcache': {'endpoints': []},
-                       '/messagequeue': {'endpoints': [],
-                                         'protocol': 'amqp',
-                                         'user': 'ovs',
-                                         'port': 5672,
-                                         'password': '0penv5tor4ge',
-                                         'queues': {'storagedriver': 'volumerouter'}},
-                       '/plugins/installed': {'backends': [],
-                                              'generic': []},
-                       '/stores': {'persistent': 'pyrakoon',
-                                   'volatile': 'memcache'},
-                       '/paths': {'cfgdir': '/opt/OpenvStorage/config',
-                                  'basedir': '/opt/OpenvStorage',
-                                  'ovsdb': '/opt/OpenvStorage/db'},
-                       '/support': {'enablesupport': False,
-                                    'enabled': True,
-                                    'interval': 60},
-                       '/storagedriver': {'mds_safety': 2,
-                                          'mds_tlogs': 100,
-                                          'mds_maxload': 75},
-                       '/webapps': {'html_endpoint': '/',
-                                    'oauth2': {'mode': 'local'}}}
-        for key, value in base_config.iteritems():
+
+        messagequeue_cfg = {'endpoints': [],
+                            'metadata': {'internal': True},
+                            'protocol': 'amqp',
+                            'user': 'ovs',
+                            'password': '0penv5tor4ge',
+                            'queues': {'storagedriver': 'volumerouter'}}
+
+        base_cfg = copy.deepcopy(EtcdConfiguration.base_config)
+        base_cfg.update({'cluster_id': cluster_id,
+                         'external_etcd': external_etcd,
+                         'arakoon_clusters': {},
+                         'stores': {'persistent': 'pyrakoon',
+                                    'volatile': 'memcache'},
+                         'messagequeue': {'protocol': 'amqp',
+                                          'queues': {'storagedriver': 'volumerouter'}}})
+
+        if EtcdConfiguration.exists('/ovs/framework/memcache') is False:
+            base_cfg['memcache'] = {'endpoints': [],
+                                    'metadata': {'internal': True}}
+        if EtcdConfiguration.exists('/ovs/framework/messagequeue') is False:
+            base_cfg['messagequeue'] = messagequeue_cfg
+        else:
+            messagequeue_info = EtcdConfiguration.get('/ovs/framework/messagequeue')
+            for key, value in messagequeue_cfg.iteritems():
+                if key not in messagequeue_info:
+                    base_cfg['messagequeue'][key] = value
+        for key, value in base_cfg.iteritems():
             EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
 
     @staticmethod
@@ -273,10 +322,24 @@ class EtcdConfiguration(object):
 
     @staticmethod
     @log_slow_calls
+    def _create_dir(key):
+        if not EtcdConfiguration._dir_exists(key):
+            client = EtcdConfiguration._get_client()
+            client.write(key, '', dir=True)
+
+    @staticmethod
+    @log_slow_calls
+    def _delete_dir(key):
+        if EtcdConfiguration._dir_exists(key):
+            client = EtcdConfiguration._get_client()
+            client.delete(key, dir=True)
+
+    @staticmethod
+    @log_slow_calls
     def _list(key):
         client = EtcdConfiguration._get_client()
         for child in client.get(key).children:
-            if child.key != key:
+            if child.key is not None and child.key != key:
                 yield child.key.replace('{0}/'.format(key), '')
 
     @staticmethod
