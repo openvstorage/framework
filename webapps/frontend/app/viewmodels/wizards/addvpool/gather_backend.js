@@ -131,7 +131,7 @@ define([
                                                 var asdsFound = false;
                                                 $.each(data.asd_statistics, function(key, value) {  // As soon as we enter loop, we know at least 1 ASD is linked to this backend
                                                     asdsFound = true;
-                                                    return true;
+                                                    return false;
                                                 });
                                                 if (asdsFound === true) {
                                                     available_backends.push(data);
