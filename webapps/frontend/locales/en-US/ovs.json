@@ -778,6 +778,7 @@
                 "access_key": "Access key:",
                 "alba_backend": "Backend:",
                 "alba_preset": "Preset:",
+                "alba_preset_unavailable": "The selected preset is not usable. To be able to make use of this vPool, please add a suitable policy or claim more ASDs for this backend",
                 "backend_type": "Backend Type:",
                 "basic_info": "Add basic vPool information",
                 "choose_backend": "Choose one of the available backends",

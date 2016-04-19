@@ -32,9 +32,10 @@ define([
         self.loadStorageRoutersHandle = undefined;
 
         // Observables
-        self.preValidateResult  = ko.observable({ valid: true, reasons: [], fields: [] });
         self.albaBackendLoading = ko.observable(false);
+        self.albaPresetMap      = ko.observable({});
         self.invalidAlbaInfo    = ko.observable(false);
+        self.preValidateResult  = ko.observable({ valid: true, reasons: [], fields: [] });
 
         // Computed
         self.canContinue = ko.computed(function() {
@@ -88,6 +89,17 @@ define([
                 }
             }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
+        });
+        self.isPresetAvailable = ko.computed(function() {
+            var presetAvailable = true;
+            if (self.data.albaBackend() !== undefined && self.data.albaPreset() !== undefined) {
+                var guid = self.data.albaBackend().guid(),
+                    name = self.data.albaPreset().name;
+                if (self.albaPresetMap().hasOwnProperty(guid) && self.albaPresetMap()[guid].hasOwnProperty(name)) {
+                    presetAvailable = self.albaPresetMap()[guid][name];
+                }
+            }
+            return presetAvailable;
         });
 
         // Functions
@@ -203,11 +215,19 @@ define([
                                 calls.push(
                                     api.get(relay + 'alba/backends/' + item.linked_guid + '/', { queryparams: getData })
                                         .then(function(data) {
-                                            data.presetNames = ko.observableArray(data.presets.filter(function(preset) {
-                                                return preset.is_available === true;
-                                            }));
-                                            if (data.available === true && data.presetNames().length > 0) {
-                                                available_backends.push(data);
+                                            if (data.available === true) {
+                                                var asdsFound = false;
+                                                $.each(data.asd_statistics, function(key, value) {  // As soon as we enter loop, we know at least 1 ASD is linked to this backend
+                                                    asdsFound = true;
+                                                    return true;
+                                                });
+                                                if (asdsFound === true) {
+                                                    available_backends.push(data);
+                                                    self.albaPresetMap()[data.guid] = {};
+                                                    $.each(data.presets, function (_, preset) {
+                                                        self.albaPresetMap()[data.guid][preset.name] = preset.is_available;
+                                                    });
+                                                }
                                             }
                                         })
                                 );
