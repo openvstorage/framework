@@ -128,6 +128,9 @@ limitations under the License.
             </div>
         </div>
     </form>
+    <div class="alert alert-warning" data-bind="visible: !isPresetAvailable()" style="margin-top: 20px;">
+        <span data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset_unavailable"></span>
+    </div>
     <div class="alert alert-info" data-bind="visible: !data.vPoolAdd()" style="margin-top: 20px;">
         <span data-i18n="ovs:wizards.extend_vpool.gather_backend.information"></span>
     </div>
