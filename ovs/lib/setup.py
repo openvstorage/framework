@@ -154,13 +154,13 @@ class SetupController(object):
                 enable_heartbeats = resume_config.get('enable_heartbeats', enable_heartbeats)
                 hypervisor_username = resume_config.get('hypervisor_username', hypervisor_username)
 
-                new_cluster = 'Create a new cluster'
-                discovery_result = SetupController._discover_nodes(root_client) if avahi_installed is True else {}
                 if cluster_name is not None and master_ip == cluster_ip and external_etcd is None and config is None:  # Failed setup with connectivity issues to the external Etcd
                     external_etcd = SetupController._retrieve_external_etcd_info()
 
                 if config is None:  # Non-automated install
                     logger.debug('Cluster selection')
+                    new_cluster = 'Create a new cluster'
+                    discovery_result = SetupController._discover_nodes(root_client) if avahi_installed is True else {}
                     join_manually = 'Join {0} cluster'.format('a' if len(discovery_result) == 0 else 'a different')
                     cluster_options = [new_cluster] + sorted(discovery_result.keys()) + [join_manually]
                     cluster_name = Interactive.ask_choice(choice_options=cluster_options,
@@ -265,6 +265,7 @@ class SetupController(object):
                         node_info['client'] = node_client
                         master_fqdn_name = node_client.run('hostname -f || hostname -s')
                         ip_hostname_map[ip] = list({node_host_name, master_fqdn_name})
+                        break
 
                 if node_name not in SetupController.nodes:
                     SetupController.nodes[node_name] = {'ip': cluster_ip,
@@ -373,8 +374,8 @@ class SetupController(object):
                                                              question='Which type of hypervisor is this Storage Router backing?',
                                                              default_value=possible_hypervisor)
                     logger.debug('Selected hypervisor type {0}'.format(hypervisor_type))
-                default_name = ('esxi{0}' if hypervisor_type == 'VMWARE' else 'kvm{0}').format(cluster_ip.split('.')[-1])
                 if hypervisor_name is None:
+                    default_name = ('esxi{0}' if hypervisor_type == 'VMWARE' else 'kvm{0}').format(cluster_ip.split('.')[-1])
                     hypervisor_name = Interactive.ask_string('Enter hypervisor hostname', default_value=default_name)
                 if hypervisor_type == 'VMWARE':
                     first_request = True  # If parameters are wrong, we need to re-ask it
@@ -866,6 +867,7 @@ class SetupController(object):
         if configure_memcached is True:
             EtcdConfiguration.set('/ovs/framework/memcache|endpoints', ['{0}:11211'.format(cluster_ip)])
             SetupController._configure_memcached(target_client)
+        VolatileFactory.store = None
 
         SetupController._log(messages='Starting model services', loglevel='debug')
         model_services = ['memcached', 'arakoon-ovsdb'] if internal is True else ['memcached']

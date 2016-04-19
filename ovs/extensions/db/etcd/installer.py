@@ -51,10 +51,19 @@ class EtcdInstaller(object):
     def create_cluster(cluster_name, ip, server_port=DEFAULT_SERVER_PORT, client_port=DEFAULT_CLIENT_PORT):
         """
         Creates a cluster
-        :param ip: IP address of the first node of the new cluster
         :param cluster_name: Name of the cluster
+        :type cluster_name: str
+
+        :param ip: IP address of the first node of the new cluster
+        :type ip: str
+
         :param server_port: Port to be used by server
+        :type server_port: int
+
         :param client_port: Port to be used by client
+        :type client_port: int
+
+        :return: None
         """
         logger.debug('Creating cluster "{0}" on {1}'.format(cluster_name, ip))
 
@@ -87,7 +96,7 @@ class EtcdInstaller(object):
                                            'INITIAL_PEERS': '-initial-advertise-peer-urls {0}'.format(EtcdInstaller.SERVER_URL.format(ip, server_port))},
                                    target_name=target_name)
         EtcdInstaller.start(cluster_name, client)
-        EtcdInstaller.wait_for_cluster(cluster_name, client)
+        EtcdInstaller.wait_for_cluster(cluster_name, client, client_port=client_port)
 
         logger.debug('Creating cluster "{0}" on {1} completed'.format(cluster_name, ip))
 
@@ -96,15 +105,24 @@ class EtcdInstaller(object):
         """
         Extends a cluster to a given new node
         :param master_ip: IP of one of the already existing nodes
+        :type master_ip: str
+
         :param new_ip: IP address of the node to be added
+        :type new_ip: str
+
         :param cluster_name: Name of the cluster to be extended
+        :type cluster_name: str
+
         :param server_port: Port to be used by server
+        :type server_port: int
+
         :param client_port: Port to be used by client
+        :type client_port: int
         """
         logger.debug('Extending cluster "{0}" from {1} to {2}'.format(cluster_name, master_ip, new_ip))
 
         client = SSHClient(master_ip, username='root')
-        if not EtcdInstaller._is_healty(cluster_name, client):
+        if not EtcdInstaller._is_healty(cluster_name, client, client_port=client_port):
             raise RuntimeError('Cluster "{0}" unhealthy, aborting extend'.format(cluster_name))
 
         cluster_members = client.run('etcdctl member list').splitlines()
@@ -149,7 +167,7 @@ class EtcdInstaller(object):
         master_client = SSHClient(master_ip, username='root')
         master_client.run('etcdctl member add {0} {1}'.format(node_name, EtcdInstaller.SERVER_URL.format(new_ip, server_port)))
         EtcdInstaller.start(cluster_name, client)
-        EtcdInstaller.wait_for_cluster(cluster_name, client)
+        EtcdInstaller.wait_for_cluster(cluster_name, client, client_port=client_port)
 
         logger.debug('Extending cluster "{0}" from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
 
@@ -157,16 +175,27 @@ class EtcdInstaller(object):
     def shrink_cluster(remaining_node_ip, ip_to_remove, cluster_name, offline_node_ips=None, client_port=DEFAULT_CLIENT_PORT):
         """
         Removes a node from a cluster, the old node will become a slave
-        :param cluster_name: The name of the cluster to shrink
-        :param ip_to_remove: The ip of the node that should be removed from the cluster
         :param remaining_node_ip: The ip of a remaining node in the cluster
+        :type remaining_node_ip: str
+
+        :param ip_to_remove: The ip of the node that should be removed from the cluster
+        :type ip_to_remove: str
+
+        :param cluster_name: The name of the cluster to shrink
+        :type cluster_name: str
+
         :param offline_node_ips: IPs of offline nodes
+        :type offline_node_ips: list
+
         :param client_port: Port to be used by client
+        :type client_port: int
+
+        :return: None
         """
         logger.debug('Shrinking cluster "{0}" from {1}'.format(cluster_name, ip_to_remove))
 
         current_client = SSHClient(remaining_node_ip, username='root')
-        if not EtcdInstaller._is_healty(cluster_name, current_client):
+        if not EtcdInstaller._is_healty(cluster_name, current_client, client_port=client_port):
             raise RuntimeError('Cluster "{0}" unhealthy, aborting shrink'.format(cluster_name))
 
         node_id = None
@@ -178,7 +207,7 @@ class EtcdInstaller(object):
             current_client.run('etcdctl member remove {0}'.format(node_id))
         if ip_to_remove not in offline_node_ips:
             EtcdInstaller.deploy_to_slave(remaining_node_ip, ip_to_remove, cluster_name)
-        EtcdInstaller.wait_for_cluster(cluster_name, current_client)
+        EtcdInstaller.wait_for_cluster(cluster_name, current_client, client_port=client_port)
 
         logger.debug('Shrinking cluster "{0}" from {1} completed'.format(cluster_name, ip_to_remove))
 
@@ -187,8 +216,13 @@ class EtcdInstaller(object):
         """
         Verify if IP has an ETCD cluster with 'cluster_name' running
         :param ip: IP on which to check for the ETCD cluster
+        :type ip: str
+
         :param cluster_name: Name of the ETCD cluster
+        :type cluster_name: str
+
         :return: True or False
+        :rtype: bool
         """
         logger.debug('Checking whether {0} has cluster "{1}" running'.format(ip, cluster_name))
         client = SSHClient(ip, username='root')
@@ -201,9 +235,16 @@ class EtcdInstaller(object):
     def deploy_to_slave(master_ip, slave_ip, cluster_name):
         """
         Deploys the configuration file to a slave
-        :param cluster_name: Name of the cluster of which to deploy the configuration file
-        :param slave_ip: IP of the slave to deploy to
         :param master_ip: IP of the node to deploy from
+        :type master_ip: str
+
+        :param slave_ip: IP of the slave to deploy to
+        :type slave_ip: str
+
+        :param cluster_name: Name of the cluster of which to deploy the configuration file
+        :type cluster_name: str
+
+        :return: None
         """
         logger.debug('  Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, master_ip, slave_ip))
         master_client = SSHClient(master_ip, username='root')
@@ -222,8 +263,15 @@ class EtcdInstaller(object):
         """
         Setup proxy for external etcd
         :param external: External etcd info
+        :type external: str
+
         :param slave_ip: IP of slave
+        :type slave_ip: str
+
         :param cluster_name: Name of cluster
+        :type cluster_name: str
+
+        :return: None
         """
         logger.debug('Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, external, slave_ip))
         EtcdInstaller._setup_proxy(external, SSHClient(slave_ip, username='root'), cluster_name)
@@ -234,7 +282,11 @@ class EtcdInstaller(object):
         """
         Remove a proxy
         :param cluster_name: Name of cluster
+        :type cluster_name: str
+
         :param ip: IP of the node on which to remove the proxy
+        :type ip: str
+
         :return: None
         """
         root_client = SSHClient(ip, username='root')
@@ -268,14 +320,19 @@ class EtcdInstaller(object):
                                            'INITIAL_CLUSTER': initial_cluster},
                                    target_name=target_name)
         EtcdInstaller.start(cluster_name, slave_client)
-        EtcdInstaller.wait_for_cluster(cluster_name, slave_client)
+        EtcdInstaller.wait_for_cluster(cluster_name, slave_client, client_port=client_port)
 
     @staticmethod
     def start(cluster_name, client):
         """
         Starts an etcd cluster
-        :param client: Client on which to start the service
         :param cluster_name: The name of the cluster service to start
+        :type cluster_name: str
+
+        :param client: Client on which to start the service
+        :type client: SSHClient
+
+        :return: None
         """
         if ServiceManager.has_service('etcd-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.start_service('etcd-{0}'.format(cluster_name), client=client)
@@ -284,8 +341,13 @@ class EtcdInstaller(object):
     def stop(cluster_name, client):
         """
         Stops an etcd service
-        :param client: Client on which to stop the service
         :param cluster_name: The name of the cluster service to stop
+        :type cluster_name: str
+
+        :param client: Client on which to stop the service
+        :type client: SSHClient
+
+        :return: None
         """
         if ServiceManager.has_service('etcd-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.stop_service('etcd-{0}'.format(cluster_name), client=client)
@@ -294,39 +356,61 @@ class EtcdInstaller(object):
     def remove(cluster_name, client):
         """
         Removes an etcd service
-        :param client: Client on which to remove the service
         :param cluster_name: The name of the cluster service to remove
+        :type cluster_name: str
+
+        :param client: Client on which to remove the service
+        :type client: SSHClient
+
+        :return: None
         """
         if ServiceManager.has_service('etcd-{0}'.format(cluster_name), client=client) is True:
             ServiceManager.remove_service('etcd-{0}'.format(cluster_name), client=client)
 
     @staticmethod
-    def wait_for_cluster(cluster_name, client):
+    def wait_for_cluster(cluster_name, client, client_port=DEFAULT_CLIENT_PORT):
         """
         Validates the health of the etcd cluster is healthy
-        :param client: The client on which to validate the cluster
         :param cluster_name: Name of the cluster
+        :type cluster_name: str
+
+        :param client: The client on which to validate the cluster
+        :type client: SSHClient
+
+        :param client_port: Port to be used by client
+        :type client_port: int
+
+        :return: None
         """
         logger.debug('Waiting for cluster "{0}"'.format(cluster_name))
         tries = 5
-        healthy = EtcdInstaller._is_healty(cluster_name, client)
+        healthy = EtcdInstaller._is_healty(cluster_name, client, client_port=client_port)
         while healthy is False and tries > 0:
             tries -= 1
             time.sleep(5 - tries)
-            healthy = EtcdInstaller._is_healty(cluster_name, client)
+            healthy = EtcdInstaller._is_healty(cluster_name, client, client_port=client_port)
         if healthy is False:
             raise etcd.EtcdConnectionFailed('Etcd cluster "{0}" could not be started correctly'.format(cluster_name))
         logger.debug('Cluster "{0}" running'.format(cluster_name))
 
     @staticmethod
-    def _is_healty(cluster_name, client):
+    def _is_healty(cluster_name, client, client_port):
         """
         Indicates whether a given cluster is healthy
         :param cluster_name: name of the cluster
+        :type cluster_name: str
+
         :param client: client on which to check
+        :type client: SSHClient
+
+        :return: True or False
+        :rtype: bool
         """
         try:
-            output = client.run('etcdctl cluster-health')
+            command = 'etcdctl cluster-health'
+            if client_port != EtcdInstaller.DEFAULT_CLIENT_PORT:
+                command = 'etcdctl --peers={0}:{1} cluster-health'.format(client.ip, client_port)
+            output = client.run(command)
             if 'cluster is healthy' not in output:
                 logger.debug('  Cluster "{0}" is not healthy: {1}'.format(cluster_name, ' - '.join(output.splitlines())))
                 return False
