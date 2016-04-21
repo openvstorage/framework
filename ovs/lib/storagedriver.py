@@ -232,7 +232,6 @@ class StorageDriverController(object):
                                                          claim=True)
                 ports = [result['client_port'], result['messaging_port']]
                 metadata = result['metadata']
-                ArakoonInstaller.restart_cluster_add(cluster_name='voldrv', current_ips=current_ips, new_ip=storagerouter.ip)
                 current_ips.append(storagerouter.ip)
             else:
                 ports = []
@@ -244,7 +243,9 @@ class StorageDriverController(object):
             StorageDriverController._configure_arakoon_to_volumedriver(cluster_name=cluster_name)
             current_services.append(add_service(service_storagerouter=storagerouter, arakoon_ports=ports))
 
-        cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
+        cluster_name = EtcdConfiguration.get('/ovs/framework/arakoon_clusters').get('voldrv')
+        if cluster_name is None:
+            return
         metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
         if 0 < len(current_services) < len(available_storagerouters) and metadata.internal is True:
             for storagerouter, partition in available_storagerouters.iteritems():
