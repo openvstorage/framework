@@ -232,6 +232,7 @@ class StorageDriverController(object):
                                                          claim=True)
                 ports = [result['client_port'], result['messaging_port']]
                 metadata = result['metadata']
+                ArakoonInstaller.restart_cluster_add(cluster_name='voldrv', current_ips=current_ips, new_ip=storagerouter.ip)
                 current_ips.append(storagerouter.ip)
             else:
                 ports = []
