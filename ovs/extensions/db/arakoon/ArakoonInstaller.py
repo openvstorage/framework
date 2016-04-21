@@ -15,6 +15,7 @@
 """
 ArakoonNodeConfig class
 ArakoonClusterConfig class
+ArakoonClusterMetadata class
 ArakoonInstaller class
 """
 
@@ -432,7 +433,7 @@ class ArakoonInstaller(object):
         logger.debug('Deleting cluster {0} on {1} completed'.format(cluster_name, ip))
 
     @staticmethod
-    def extend_cluster(master_ip, new_ip, cluster_name, base_dir):
+    def extend_cluster(master_ip, new_ip, cluster_name, base_dir, locked=True):
         """
         Extends a cluster to a given new node
         :param master_ip: IP of one of the already existing nodes
@@ -447,13 +448,14 @@ class ArakoonInstaller(object):
         :param base_dir: Base directory that will hold the db and tlogs
         :type base_dir: str
 
+        :param locked: Indicates whether the extend should run in a locked context (e.g. to prevent port conflicts)
+        :type locked: bool
+
         :return: Ports used by arakoon cluster
         :rtype: dict
         """
         logger.debug('Extending cluster {0} from {1} to {2}'.format(cluster_name, master_ip, new_ip))
         base_dir = base_dir.rstrip('/')
-        from ovs.extensions.generic.volatilemutex import VolatileMutex
-        port_mutex = VolatileMutex('arakoon_install_ports_{0}'.format(new_ip))
 
         config = ArakoonClusterConfig(cluster_name)
         config.load_config()
@@ -468,8 +470,12 @@ class ArakoonInstaller(object):
                                                               home_dir: False,
                                                               tlog_dir: False})
 
+        port_mutex = None
         try:
-            port_mutex.acquire(wait=60)
+            if locked is True:
+                from ovs.extensions.generic.volatilemutex import VolatileMutex
+                port_mutex = VolatileMutex('arakoon_install_ports_{0}'.format(new_ip))
+                port_mutex.acquire(wait=60)
             ports = ArakoonInstaller._get_free_ports(client)
             if node_name not in [node.name for node in config.nodes]:
                 config.nodes.append(ArakoonNodeConfig(name=node_name,
@@ -481,7 +487,8 @@ class ArakoonInstaller(object):
                                                       tlog_dir=tlog_dir))
             ArakoonInstaller._deploy(config)
         finally:
-            port_mutex.release()
+            if port_mutex is not None:
+                port_mutex.release()
 
         logger.debug('Extending cluster {0} from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
         return {'client_port': ports[0],
