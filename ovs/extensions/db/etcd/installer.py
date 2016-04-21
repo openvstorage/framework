@@ -121,42 +121,46 @@ class EtcdInstaller(object):
         """
         logger.debug('Extending cluster "{0}" from {1} to {2}'.format(cluster_name, master_ip, new_ip))
 
-        client = SSHClient(master_ip, username='root')
-        if not EtcdInstaller._is_healty(cluster_name, client, client_port=client_port):
+        master_client = SSHClient(master_ip, username='root')
+        if not EtcdInstaller._is_healty(cluster_name, master_client, client_port=client_port):
             raise RuntimeError('Cluster "{0}" unhealthy, aborting extend'.format(cluster_name))
 
-        cluster_members = client.run('etcdctl member list').splitlines()
+        command = 'etcdctl member list'
+        new_server_url = EtcdInstaller.SERVER_URL.format(new_ip, server_port)
+        if client_port != EtcdInstaller.DEFAULT_CLIENT_PORT:
+            command = 'etcdctl --peers={0}:{1} member list'.format(master_ip, client_port)
+        cluster_members = master_client.run(command).splitlines()
         for cluster_member in cluster_members:
-            if EtcdInstaller.SERVER_URL.format(new_ip, server_port) in cluster_member:
+            if new_server_url in cluster_member:
                 logger.info('Node {0} already member of etcd cluster'.format(new_ip))
                 return
 
         current_cluster = []
-        for item in client.run('etcdctl member list').splitlines():
+        for item in cluster_members:
             info = re.search(EtcdInstaller.MEMBER_REGEX, item).groupdict()
             current_cluster.append('{0}={1}'.format(info['name'], info['peer']))
 
-        client = SSHClient(new_ip, username='root')
-        node_name = System.get_my_machine_id(client)
-        current_cluster.append('{0}={1}'.format(node_name, EtcdInstaller.SERVER_URL.format(new_ip, server_port)))
+        new_client = SSHClient(new_ip, username='root')
+        node_name = System.get_my_machine_id(new_client)
+        current_cluster.append('{0}={1}'.format(node_name, new_server_url))
 
         data_dir = EtcdInstaller.DATA_DIR.format(cluster_name)
         wal_dir = EtcdInstaller.WAL_DIR.format(cluster_name)
         abs_paths = [data_dir, wal_dir]
-        client.dir_delete(abs_paths)
-        client.dir_create(abs_paths)
-        client.dir_chmod(abs_paths, 0755, recursive=True)
-        client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
+        new_client.dir_delete(abs_paths)
+        new_client.dir_create(abs_paths)
+        new_client.dir_chmod(abs_paths, 0755, recursive=True)
+        new_client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
 
         base_name = 'ovs-etcd'
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
-        EtcdInstaller.stop(cluster_name, client)  # Stop a possible proxy service
-        ServiceManager.add_service(base_name, client,
+        EtcdInstaller.stop(cluster_name, new_client)  # Stop a possible proxy service
+        ServiceManager.add_service(base_name, new_client,
                                    params={'CLUSTER': cluster_name,
                                            'NODE_ID': node_name,
                                            'DATA_DIR': data_dir,
                                            'WAL_DIR': wal_dir,
-                                           'SERVER_URL': EtcdInstaller.SERVER_URL.format(new_ip, server_port),
+                                           'SERVER_URL': new_server_url,
                                            'CLIENT_URL': EtcdInstaller.CLIENT_URL.format(new_ip, client_port),
                                            'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1', client_port),
                                            'INITIAL_CLUSTER': ','.join(current_cluster),
@@ -164,10 +168,12 @@ class EtcdInstaller(object):
                                            'INITIAL_PEERS': ''},
                                    target_name=target_name)
 
-        master_client = SSHClient(master_ip, username='root')
-        master_client.run('etcdctl member add {0} {1}'.format(node_name, EtcdInstaller.SERVER_URL.format(new_ip, server_port)))
-        EtcdInstaller.start(cluster_name, client)
-        EtcdInstaller.wait_for_cluster(cluster_name, client, client_port=client_port)
+        add_command = 'etcdctl member add {0} {1}'.format(node_name, new_server_url)
+        if client_port != EtcdInstaller.DEFAULT_CLIENT_PORT:
+            add_command = 'etcdctl --peers={0}:{1} member add {2} {3}'.format(master_ip, client_port, node_name, new_server_url)
+        master_client.run(add_command)
+        EtcdInstaller.start(cluster_name, new_client)
+        EtcdInstaller.wait_for_cluster(cluster_name, new_client, client_port=client_port)
 
         logger.debug('Extending cluster "{0}" from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
 
@@ -199,12 +205,18 @@ class EtcdInstaller(object):
             raise RuntimeError('Cluster "{0}" unhealthy, aborting shrink'.format(cluster_name))
 
         node_id = None
-        for item in current_client.run('etcdctl member list').splitlines():
+        list_command = 'etcdctl member list'
+        if client_port != EtcdInstaller.DEFAULT_CLIENT_PORT:
+            list_command = 'etcdctl --peers={0}:{1} member list'.format(remaining_node_ip, client_port)
+        for item in current_client.run(list_command).splitlines():
             info = re.search(EtcdInstaller.MEMBER_REGEX, item).groupdict()
             if EtcdInstaller.CLIENT_URL.format(ip_to_remove, client_port) == info['client']:
                 node_id = info['id']
         if node_id is not None:
-            current_client.run('etcdctl member remove {0}'.format(node_id))
+            remove_command = 'etcdctl member remove {0}'.format(node_id)
+            if client_port != EtcdInstaller.DEFAULT_CLIENT_PORT:
+                remove_command = 'etcdctl --peers={0}:{1} member remove {2}'.format(remaining_node_ip, client_port, node_id)
+            current_client.run(remove_command)
         if ip_to_remove not in offline_node_ips:
             EtcdInstaller.deploy_to_slave(remaining_node_ip, ip_to_remove, cluster_name)
         EtcdInstaller.wait_for_cluster(cluster_name, current_client, client_port=client_port)

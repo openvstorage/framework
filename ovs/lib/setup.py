@@ -180,7 +180,8 @@ class SetupController(object):
                         cluster_ip = master_ip
                         SetupController.nodes = {node_name: {'ip': master_ip,
                                                              'type': 'master'}}
-                        external_etcd = SetupController._retrieve_external_etcd_info()
+                        if external_etcd is None:
+                            external_etcd = SetupController._retrieve_external_etcd_info()
 
                     elif cluster_name == join_manually:  # Join an existing cluster manually
                         first_node = False
@@ -298,10 +299,9 @@ class SetupController(object):
                 authorized_keys_root = '/root/.ssh/authorized_keys'
 
                 missing_files = set()
-                for client in [local_client, master_client]:
-                    for required_file in [known_hosts_ovs, known_hosts_root, ssh_public_key_ovs, ssh_public_key_root]:
-                        if not local_client.file_exists(ssh_public_key_ovs):
-                            missing_files.add('Could not find file {0} on node with IP {1}'.format(required_file, client.ip))
+                for required_file in [known_hosts_ovs, known_hosts_root, ssh_public_key_ovs, ssh_public_key_root]:
+                    if not local_client.file_exists(ssh_public_key_ovs):
+                        missing_files.add('Could not find file {0} on node with IP {1}'.format(required_file, local_client.ip))
                 if missing_files:
                     raise ValueError('Missing files:\n - {0}'.format('\n - '.join(sorted(list(missing_files)))))
 

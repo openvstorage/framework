@@ -169,7 +169,7 @@ class SupportAgent(object):
             # Try to save the timestamp at which we last succefully send the heartbeat data
             from ovs.extensions.generic.system import System
             storagerouter = System.get_my_storagerouter()
-            storagerouter.last_heartheat = time.time()
+            storagerouter.last_heartbeat = time.time()
             storagerouter.save()
         except Exception:
             logger.error('Could not save last heartbeat timestamp')
