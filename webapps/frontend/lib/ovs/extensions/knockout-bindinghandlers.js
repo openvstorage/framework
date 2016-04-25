@@ -205,9 +205,15 @@ define([
     ko.bindingHandlers.shortText = {
         init: function(element, valueAccessor, allBindings) {
             var shortValue, value = valueAccessor(),
-                maxLength = allBindings.get('maxLength');
+                maxLength = allBindings.get('maxLength'),
+                middle = allBindings.get('middle') === true;
             if (maxLength !== undefined) {
                 if (value.length > maxLength - 3) {
+                    if (middle === true) {
+                        shortValue = value.substr(0, Math.floor((maxLength - 3) / 2)) + '&hellip;' + value.substr(value.length - Math.ceil((maxLength - 3) / 2));
+                        $(element).html('<abbr title="' + value + '"><span>' + shortValue + '</span></abbr>');
+                        return;
+                    }
                     shortValue = value.substr(0, maxLength - 3) + '&hellip;';
                     $(element).html('<abbr title="' + value + '"><span>' + shortValue + '</span></abbr>');
                     return;
@@ -217,9 +223,15 @@ define([
         },
         update: function(element, valueAccessor, allBindings) {
             var shortValue, value = valueAccessor(),
-                maxLength = allBindings.get('maxLength');
+                maxLength = allBindings.get('maxLength'),
+                middle = allBindings.get('middle') === true;
             if (maxLength !== undefined) {
                 if (value.length > maxLength - 3) {
+                    if (middle === true) {
+                        shortValue = value.substr(0, Math.floor((maxLength - 3) / 2)) + '&hellip;' + value.substr(value.length - Math.ceil((maxLength - 3) / 2));
+                        $(element).html('<abbr title="' + value + '"><span>' + shortValue + '</span></abbr>');
+                        return;
+                    }
                     shortValue = value.substr(0, maxLength - 3) + '&hellip;';
                     $(element).html('<abbr title="' + value + '"><span>' + shortValue + '</span></abbr>');
                     return;
