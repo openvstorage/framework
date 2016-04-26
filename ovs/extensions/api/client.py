@@ -22,7 +22,7 @@ import hashlib
 import requests
 
 
-class ForbiddenException(Exception):
+class ForbiddenException(RuntimeError):
     """
     Custom exception class
     """
@@ -132,11 +132,15 @@ class OVSClient(object):
             api = '{0}/'.format(api)
         if not api.startswith('/'):
             api = '/{0}'.format(api)
-        self._token = self._volatile_client.get(self._key)
+        if self._volatile_client is not None:
+            self._token = self._volatile_client.get(self._key)
+        first_connect = self._token is None
         headers, url = self._prepare(params=params)
         try:
             return self._process(function(url=url.format(api), headers=headers, verify=self._verify, **kwargs))
         except ForbiddenException:
+            if first_connect is True:  # First connect, so no token was present yet, so no need to try twice without token
+                raise
             self._token = None
             headers, url = self._prepare(params=params)
             return self._process(function(url=url.format(api), headers=headers, verify=self._verify, **kwargs))
