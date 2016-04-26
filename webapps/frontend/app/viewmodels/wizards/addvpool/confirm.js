@@ -48,7 +48,7 @@ define([
                             }
                         },
                         storage_ip: self.data.storageIP(),
-                        storagerouter_ip: self.data.target().ipAddress(),
+                        storagerouter_ip: self.data.storageRouter().ipAddress(),
                         integratemgmt: self.data.integratemgmt(),
                         readcache_size: self.data.readCacheSize(),
                         writecache_size: self.data.writeCacheSize(),
@@ -86,7 +86,7 @@ define([
                 } else {
                     generic.alertInfo($.t('ovs:wizards.extend_vpool.confirm.started'), $.t('ovs:wizards.extend_vpool.confirm.in_progress', { what: self.data.name() }));
                 }
-                api.post('storagerouters/' + self.data.target().guid() + '/add_vpool', { data: post_data })
+                api.post('storagerouters/' + self.data.storageRouter().guid() + '/add_vpool', { data: post_data })
                     .then(self.shared.tasks.wait)
                     .done(function() {
                         if (data.vPoolAdd() === true) {

@@ -28,9 +28,9 @@ define([
         self.fetchAlbaVPoolHandle = undefined;
 
         // Observables
-        self.albaBackendLoading = ko.observable(false);
-        self.albaPresetMap      = ko.observable({});
-        self.invalidAlbaInfo    = ko.observable(false);
+        self.albaBackendLoading  = ko.observable(false);
+        self.albaPresetMap       = ko.observable({});
+        self.invalidAlbaInfo     = ko.observable(false);
 
         // Computed
         self.localBackendsAvailable = ko.computed(function() {
@@ -56,12 +56,17 @@ define([
             }
             return presetAvailable;
         });
+        self.reUseableStorageRouters = ko.computed(function() {
+            var temp = self.data.storageRoutersUsed().slice();  // Make deep copy of the list
+            temp.unshift(undefined);  // Insert undefined as element 0
+            return temp;
+        });
         self.canContinue = ko.computed(function() {
             var valid = true, showErrors = false, reasons = [], fields = [];
             if (!self.data.useAA()) {
                 return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
             }
-            if (self.data.backend() === 'alba' && self.data.editBackend()) {
+            if (self.data.backend() === 'alba') {
                 if (self.data.albaAABackend() === undefined) {
                     valid = false;
                     reasons.push($.t('ovs:wizards.add_vpool.gather_backend.choose_backend'));
@@ -92,15 +97,6 @@ define([
         });
 
         // Functions
-        self.shouldSkip = function() {
-            return $.Deferred(function(deferred) {
-                if (self.data.backend() === 'alba' && self.data.editBackend()) {
-                    deferred.resolve(false);  // Don't skip this page for ALBA backends
-                } else {
-                    deferred.resolve(true);
-                }
-            }).promise();
-        };
         self.loadAlbaBackends = function() {
             return $.Deferred(function(albaDeferred) {
                 generic.xhrAbort(self.fetchAlbaVPoolHandle);
@@ -161,6 +157,9 @@ define([
                                     );
                                     $.each(self.data.albaAABackends(), function(index, albaBackend) {
                                         albaBackend.fillData(abData[albaBackend.guid()]);
+                                    });
+                                    self.data.albaAABackends.sort(function(backend1, backend2) {
+                                        return backend1.name() < backend2.name() ? -1 : 1;
                                     });
                                     self.data.albaAABackend(self.data.albaAABackends()[0]);
                                     self.data.albaAAPreset(self.data.albaAABackends()[0].enhancedPresets()[0]);

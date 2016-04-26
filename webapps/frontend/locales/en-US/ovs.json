@@ -749,6 +749,7 @@
         "add_vpool": {
             "title": "Add new vPool",
             "gather_backend": {
+                "accelerated_backend": "Accelerated backend:",
                 "accelerated_info": "Accelerated backend information",
                 "alba_backend": "Backend:",
                 "alba_preset": "Preset:",
@@ -766,6 +767,7 @@
                 "no_backends": "No backends found",
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
+                "re_use_connection_info": "Re-use connection info:",
                 "use_accelerated_alba": "Use accelerated backend"
             },
             "gather_config": {
@@ -843,9 +845,6 @@
                 "in_progress": "Extending vPool __what__ has started.",
                 "started": "Started extending",
                 "success": "vPool __what__ was successfully extended."
-            },
-            "gather_backend": {
-                "information": "Extending a vPool does not allow to reconfigure the backend settings"
             },
             "gather_config": {
                 "basic_info": "Configurations for the vPool",

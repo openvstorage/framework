@@ -29,7 +29,7 @@ define([
 
         // Durandal
         self.activate = function() {
-            self.getMgmtCenterInfo = api.get('storagerouters/' + self.data.target().guid() + '/get_mgmtcenter_info')
+            self.getMgmtCenterInfo = api.get('storagerouters/' + self.data.storageRouter().guid() + '/get_mgmtcenter_info')
                 .done(function (data) {
                     if (data.username) {
                         self.data.hasMgmtCenter(true);

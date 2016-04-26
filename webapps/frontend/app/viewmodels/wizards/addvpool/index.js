@@ -27,11 +27,11 @@ define([
         if (options.vPool !== undefined) {
             self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.extend_vpool.title')));
             data.vPool(options.vPool);
-            data.target(options.storageRouter);
+            data.storageRouter(options.storageRouter);
         } else {
             self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.add_vpool.title')));
             data.vPool(undefined);
-            data.target(undefined);
+            data.storageRouter(undefined);
         }
         self.steps([new GatherVPool(), new GatherBackend(), new GatherConfig(), new GatherCacheInfo(), new GatherMgmtCenter(), new Confirm()]);
         data.completed = options.completed;
@@ -76,6 +76,7 @@ define([
         data.partitions(undefined);
         data.port(80);
         data.readCacheSize(undefined);
+        data.reUsedStorageRouter(undefined);
         data.rdmaEnabled(false);
         data.scoSize(4);
         data.scrubAvailable(false);
@@ -84,7 +85,8 @@ define([
         data.storageDriver(undefined);
         data.storageDrivers([]);
         data.storageIP(undefined);
-        data.storageRouters([]);
+        data.storageRoutersAvailable([]);
+        data.storageRoutersUsed([]);
         data.useAA(false);
         data.writeBuffer(undefined);
         data.writeCacheSize(undefined);

@@ -369,22 +369,28 @@ class StorageRouterController(object):
             if backend_guid == backend_guid_aa:
                 raise RuntimeError('Backend and accelerated backend cannot be the same')
 
+            if vpool is not None:
+                backend_info_map = {}
+                for key, info in vpool.metadata.iteritems():
+                    local = info['connection']['local']
+                    backend_info_map[key] = {'backend': {'backend': info['backend_guid'],
+                                                         'metadata': info['preset']},
+                                             'host': info['connection']['host'] if local is False else '',
+                                             'port': info['connection']['port'] if local is False else '',
+                                             'username': info['connection']['client_id'] if local is False else '',
+                                             'password': info['connection']['client_secret'] if local is False else ''}
+            else:
+                backend_info_map = {'backend': backend_connection_info}
+            if use_accelerated_alba is True:
+                backend_info_map[storagerouter.guid] = backend_connection_info_aa
+
             vpool_metadata = {}
-            backend_guid_info = {'backend': backend_guid} if use_accelerated_alba is False else {'backend': backend_guid, 'backend_aa': backend_guid_aa}
-            for key, guid in backend_guid_info.iteritems():
-                if vpool is None:
-                    backend_info = backend_connection_info if key == 'backend' else backend_connection_info_aa
-                    preset_name = backend_info['backend']['metadata']
-                    backend_guid = backend_info['backend']['backend']
-                    connection_info = StorageRouterController._retrieve_alba_connection_info(backend_info=backend_info)
-                    fragment_cache_on_read = parameters['fragment_cache_on_read']
-                    fragment_cache_on_write = parameters['fragment_cache_on_write']
-                else:
-                    preset_name = vpool.metadata[key]['preset']
-                    backend_guid = vpool.metadata[key]['backend_guid']
-                    connection_info = vpool.metadata[key]['connection']
-                    fragment_cache_on_read = vpool.metadata[key]['backend_info']['fragment_cache_on_read']
-                    fragment_cache_on_write = vpool.metadata[key]['backend_info']['fragment_cache_on_write']
+            for key, backend_info in backend_info_map.iteritems():
+                preset_name = backend_info['backend']['metadata']
+                backend_guid = backend_info['backend']['backend']
+                connection_info = StorageRouterController._retrieve_alba_connection_info(backend_info=backend_info)
+                fragment_cache_on_read = parameters['fragment_cache_on_read']
+                fragment_cache_on_write = parameters['fragment_cache_on_write']
 
                 ovs_client = OVSClient(ip=connection_info['host'],
                                        port=connection_info['port'],
@@ -773,7 +779,7 @@ class StorageRouterController(object):
             alba_proxy.save()
 
             config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, alba_proxy.guid)
-            metadata_keys = {'backend': 'abm'} if use_accelerated_alba is False else {'backend': 'abm', 'backend_aa': 'abm_aa'}
+            metadata_keys = {'backend': 'abm'} if use_accelerated_alba is False else {'backend': 'abm', storagerouter.guid: 'abm_aa'}
             for metadata_key in metadata_keys:
                 arakoon_config = vpool.metadata[metadata_key]['arakoon_config']
                 config = RawConfigParser()
@@ -789,8 +795,8 @@ class StorageRouterController(object):
             fragment_cache_on_write = parameters['fragment_cache_on_write']
             if use_accelerated_alba is True:
                 fragment_cache_info = ['alba', {'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm_aa')),
-                                                'bucket_strategy': ['1-to-1', {'prefix': vpool.metadata['backend_aa']['name'],
-                                                                               'preset': vpool.metadata['backend_aa']['preset']}],
+                                                'bucket_strategy': ['1-to-1', {'prefix': vpool.metadata[storagerouter.guid]['name'],
+                                                                               'preset': vpool.metadata[storagerouter.guid]['preset']}],
                                                 'manifest_cache_size': 100000,
                                                 'cache_on_read': fragment_cache_on_read,
                                                 'cache_on_write': fragment_cache_on_write}]

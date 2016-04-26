@@ -22,9 +22,6 @@ import json
 import base64
 from ovs.celery_run import celery
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.api.client import OVSClient
-from ovs.extensions.support.agent import SupportAgent
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.dal.hybrids.license import License
 from ovs.dal.lists.licenselist import LicenseList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -166,6 +163,11 @@ class LicenseController(object):
     @staticmethod
     @add_hooks('setup', 'extranode')
     def add_extra_node(**kwargs):
+        """
+        Add extra node hook
+        :param kwargs: Extra parameters
+        :return: None
+        """
         ip = kwargs['cluster_ip']
         license_contents = []
         for lic in LicenseList.get_licenses():
