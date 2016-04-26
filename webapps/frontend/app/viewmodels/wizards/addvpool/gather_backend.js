@@ -28,9 +28,9 @@ define([
         self.fetchAlbaVPoolHandle = undefined;
 
         // Observables
-        self.albaBackendLoading  = ko.observable(false);
-        self.albaPresetMap       = ko.observable({});
-        self.invalidAlbaInfo     = ko.observable(false);
+        self.albaBackendLoading = ko.observable(false);
+        self.albaPresetMap      = ko.observable({});
+        self.invalidAlbaInfo    = ko.observable(false);
 
         // Computed
         self.localBackendsAvailable = ko.computed(function() {
