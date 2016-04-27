@@ -148,8 +148,8 @@ limitations under the License.
                 <span data-bind="dropdown: {
                                      key: 'guid',
                                      keyisfunction: true,
-                                     items: data.storageRouters,
-                                     target: data.target,
+                                     items: data.storageRoutersAvailable,
+                                     target: data.storageRouter,
                                      text: function(item) {
                                          if (item !== undefined) {
                                              return item.name()

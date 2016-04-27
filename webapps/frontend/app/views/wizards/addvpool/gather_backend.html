@@ -15,25 +15,25 @@ limitations under the License.
 -->
 <div>
     <form id="form.gather.backend" class="form-horizontal">
-        <p data-i18n="ovs:wizards.add_vpool.gather_backend.basic_info"></p>
+        <p data-i18n="ovs:wizards.add_vpool.gather_backend.basic_info" data-bind="visible: data.editBackend()"></p>
         <div data-bind="visible: data.backend() === 'alba' && data.editBackend()">
             <div class="form-group">
-                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.fragment_cache" style="padding-top: 1px;"></label>
+                <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.fragment_cache" style="padding-top: 1px;"></label>
                 <div class="col-lg-7">
                     <input type="checkbox" id="cacheOnRead" class="autofocus" data-bind="checked: data.fragmentCacheOnRead" />
                     <label for="cacheOnRead" data-i18n="ovs:wizards.add_vpool.gather_backend.fragment_cache_on_read" style="font-weight: normal;"></label>
                 </div>
-                <div class="col-lg-3"></div>
+                <div class="col-lg-4"></div>
                 <div class="col-lg-7">
                     <input type="checkbox" id="cacheOnWrite" class="autofocus" data-bind="checked: data.fragmentCacheOnWrite" />
                     <label for="cacheOnWrite" data-i18n="ovs:wizards.add_vpool.gather_backend.fragment_cache_on_write" style="font-weight: normal;"></label>
                 </div>
             </div>
         </div>
-        <p data-bind="visible: data.vPoolAdd()" data-i18n="ovs:wizards.add_vpool.gather_backend.accelerated_info"></p>
-        <div data-bind="visible: data.backend() === 'alba' && data.editBackend()">
+        <p data-bind="visible: data.backend() === 'alba'" data-i18n="ovs:wizards.add_vpool.gather_backend.accelerated_info"></p>
+        <div data-bind="visible: data.backend() === 'alba'">
             <div class="form-group">
-                <div class="col-lg-3"></div>
+                <div class="col-lg-4"></div>
                 <div class="col-lg-7">
                     <input type="checkbox" id="useAcceleratedAlba" class="autofocus" data-bind="checked: data.useAA" />
                     <label for="useAcceleratedAlba" data-i18n="ovs:wizards.add_vpool.gather_backend.use_accelerated_alba" style="font-weight: normal;"></label>
@@ -42,7 +42,7 @@ limitations under the License.
         </div>
         <div data-bind="visible: data.useAA() && localBackendsAvailable()">
             <div class="form-group">
-                <div class="col-lg-3"></div>
+                <div class="col-lg-4"></div>
                 <div class="col-lg-7">
                     <input type="checkbox" id="inputBackendLocalHost" class="autofocus" data-bind="checked: data.aaLocalHost" />
                     <label for="inputBackendLocalHost" data-i18n="ovs:wizards.add_vpool.gather_backend.local_host" style="font-weight: normal;"></label>
@@ -50,8 +50,29 @@ limitations under the License.
             </div>
         </div>
         <div data-bind="visible: data.useAA() && !data.aaLocalHost()">
+            <div class="form-group">
+                <label class="col-lg-4 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_backend.re_use_connection_info"></label>
+                <div class="col-lg-7">
+                    <span data-bind="dropdown: {
+                                         key: 'guid',
+                                         keyisfunction: true,
+                                         items: reUseableStorageRouters,
+                                         target: data.reUsedStorageRouter,
+                                         text: function(item) {
+                                             if (item !== undefined) {
+                                                 return item.name();
+                                             } else {
+                                                 return '-';
+                                             }
+                                         }
+                                     }">
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div data-bind="visible: data.useAA() && !data.aaLocalHost()">
             <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('host') }">
-                <label class="col-lg-3 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_backend.host"></label>
+                <label class="col-lg-4 control-label" for="inputBackendHost" data-i18n="ovs:wizards.add_vpool.gather_backend.host"></label>
                 <div class="col-lg-4">
                     <input type="text" id="inputBackendHost" class="autofocus form-control" data-bind="value: data.aaHost, valueUpdate: 'input'" />
                 </div>
@@ -63,20 +84,20 @@ limitations under the License.
         </div>
         <div data-bind="visible: data.useAA() && !data.aaLocalHost()">
             <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
-                <label class="col-lg-3 control-label" for="inputBackendClientId" data-i18n="ovs:wizards.add_vpool.gather_backend.client_id"></label>
+                <label class="col-lg-4 control-label" for="inputBackendClientId" data-i18n="ovs:wizards.add_vpool.gather_backend.client_id"></label>
                 <div class="col-lg-7">
                     <input type="text" id="inputBackendClientId" class="autofocus form-control" data-bind="value: data.aaAccesskey, valueUpdate: 'input'" />
                 </div>
             </div>
             <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientsecret') }">
-                <label class="col-lg-3 control-label" for="inputBackendClientSecret" data-i18n="ovs:wizards.add_vpool.gather_backend.client_secret"></label>
+                <label class="col-lg-4 control-label" for="inputBackendClientSecret" data-i18n="ovs:wizards.add_vpool.gather_backend.client_secret"></label>
                 <div class="col-lg-7">
                     <input type="password" id="inputBackendClientSecret" class="autofocus form-control" data-bind="value: data.aaSecretkey, valueUpdate: 'input'" />
                 </div>
             </div>
         </div>
         <div class="form-group" data-bind="visible: data.useAA()">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.alba_backend"></label>
+            <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.alba_backend"></label>
             <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('backend') }">
                 <!-- ko if: data.albaAABackends() === undefined || data.albaAABackends().length === 0 -->
                     <i data-i18n="[html]ovs:wizards.add_vpool.gather_backend.no_backends"
@@ -86,7 +107,6 @@ limitations under the License.
                     <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaAABackends() === undefined)"></span>
                     <span data-bind="visible: (data.editBackend() === true || data.albaAABackend() !== undefined),
                                      dropdown: {
-                                         enabled: data.editBackend,
                                          key: 'guid', keyisfunction: false,
                                          items: data.albaAABackends, target: data.albaAABackend,
                                          text: function(item) {
@@ -100,19 +120,18 @@ limitations under the License.
                 <button class="btn btn-default"  style="margin-left: 10px;"
                         data-bind="click: loadAlbaBackends, style: {
                                        'margin-top': (data.albaAABackends() !== undefined && data.albaAABackends().length > 0 ? '-26px' : '')
-                                   }, enable: !albaBackendLoading(), visible: data.editBackend()">
+                                   }, enable: !albaBackendLoading()">
                     <span class="fa fa-" data-bind="css: { 'fa-spin': albaBackendLoading() }" data-i18n="[html]ovs:icons.load"></span>
                     <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
                 </button>
             </div>
         </div>
         <div class="form-group" data-bind="visible: data.useAA() && data.albaAABackend() !== undefined">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.alba_preset"></label>
+            <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.alba_preset"></label>
             <div class="col-lg-7">
                 <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaAAPreset() === undefined)"></span>
                 <span data-bind="visible: (data.editBackend() === true || data.albaAAPreset() !== undefined),
                                  dropdown: {
-                                     enabled: data.editBackend,
                                      key: 'name', keyisfunction: false,
                                      items: data.enhancedAAPresets, target: data.albaAAPreset,
                                      text: function(item) {
@@ -130,9 +149,6 @@ limitations under the License.
     </form>
     <div class="alert alert-warning" data-bind="visible: !isPresetAvailable()" style="margin-top: 20px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset_unavailable"></span>
-    </div>
-    <div class="alert alert-info" data-bind="visible: !data.vPoolAdd()" style="margin-top: 20px;">
-        <span data-i18n="ovs:wizards.extend_vpool.gather_backend.information"></span>
     </div>
     <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>

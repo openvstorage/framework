@@ -21,7 +21,6 @@ import time
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.api.client import OVSClient
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
@@ -135,7 +134,7 @@ def relay(*args, **kwargs):
     ** This will translate to /apt/relay/storagerouters/
     Parameters:
     * Mandatory: ip, port, client_id, client_secret
-    * All other parameters will be passed through to the speicified node
+    * All other parameters will be passed through to the specified node
     """
 
     @authenticated()

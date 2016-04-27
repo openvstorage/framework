@@ -67,6 +67,7 @@ define(['knockout'], function(ko){
             rdmaEnabled:             ko.observable(false),
             readCacheSize:           ko.observable(1).extend({numeric: {min: 1, max: 10240}}),
             readCacheAvailableSize:  ko.observable(),
+            reUsedStorageRouter:     ko.observable(),  // Connection info for this storagerouter will be used for accelerated ALBA
             scrubAvailable:          ko.observable(false),
             scoSize:                 ko.observable(4),
             scoSizes:                ko.observableArray([4, 8, 16, 32, 64, 128]),
@@ -75,8 +76,9 @@ define(['knockout'], function(ko){
             storageDriver:           ko.observable(),
             storageDrivers:          ko.observableArray([]),
             storageIP:               ko.observable().extend({regex: ipRegex, identifier: 'storageip'}),
-            storageRouters:          ko.observableArray([]),
-            target:                  ko.observable(),
+            storageRouter:           ko.observable(),
+            storageRoutersAvailable: ko.observableArray([]),
+            storageRoutersUsed:      ko.observableArray([]),
             useAA:                   ko.observable(false),
             v260Migration:           ko.observable(false),
             vPool:                   ko.observable(),
@@ -114,6 +116,7 @@ define(['knockout'], function(ko){
             wizardData.aaPort(80);
             wizardData.aaAccesskey('');
             wizardData.aaSecretkey('');
+            wizardData.reUsedStorageRouter(undefined);
             resetAlbaAABackends();
         });
         wizardData.scoSize.subscribe(function(size) {
@@ -123,6 +126,21 @@ define(['knockout'], function(ko){
                 wizardData.writeBuffer.min = 256;
             }
             wizardData.writeBuffer(wizardData.writeBuffer());
+        });
+        wizardData.reUsedStorageRouter.subscribe(function(sr) {
+            wizardData.aaHost('');
+            wizardData.aaPort(80);
+            wizardData.aaAccesskey('');
+            wizardData.aaSecretkey('');
+            if (sr !== undefined && wizardData.vPool() !== undefined && wizardData.vPool().metadata().hasOwnProperty(sr.guid())) {
+                var md = wizardData.vPool().metadata()[sr.guid()];
+                if (md.hasOwnProperty('connection')) {
+                    wizardData.aaHost(md.connection.host);
+                    wizardData.aaPort(md.connection.port);
+                    wizardData.aaAccesskey(md.connection.client_id);
+                    wizardData.aaSecretkey(md.connection.client_secret);
+                }
+            }
         });
 
         // Computed

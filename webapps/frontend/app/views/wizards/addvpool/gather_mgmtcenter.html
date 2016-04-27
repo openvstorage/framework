@@ -19,13 +19,13 @@ limitations under the License.
             <div data-bind="visible: !data.hasMgmtCenter()" style="margin-top: 5px;">
                 <p>
                     <span data-i18n="ovs:generic.storagerouter"></span>
-                    <span data-bind="text: data.target().name()"></span>
+                    <span data-bind="text: data.storageRouter().name()"></span>
                     <span data-i18n="ovs:wizards.add_vpool.gather_mgmt_center.no_mgmt_center"></span>
                 </p>
             </div>
             <div data-bind="visible: data.hasMgmtCenter()" style="margin-top: 5px;">
                 <p>
-                    <span data-bind="text: data.target().name()"></span>
+                    <span data-bind="text: data.storageRouter().name()"></span>
                     <span data-i18n="ovs:wizards.add_vpool.gather_mgmt_center.mgmt_center"></span>
                     <span data-bind="text: data.mgmtcenterName"></span>
                     (<span data-bind="text: data.mgmtcenterIp"></span>)
