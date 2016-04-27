@@ -1421,6 +1421,9 @@ class StorageRouterController(object):
                 vpool.status = VPool.STATUSES.FAILURE
                 vpool.save()
         else:
+            if storage_router.guid in vpool.metadata:
+                vpool.metadata.pop(storage_router.guid)
+                vpool.save()
             logger.info('Remove Storage Driver - Guid {0} - Checking DTL for all virtual disks in vPool {1} with guid {2}'.format(storage_driver.guid, vpool.name, vpool.guid))
             try:
                 VDiskController.dtl_checkup(vpool_guid=vpool.guid, ensure_single_timeout=600)
