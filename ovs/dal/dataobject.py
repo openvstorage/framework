@@ -679,15 +679,12 @@ class DataObject(object):
                     if info['list'] is True:
                         if len(items) > 0:
                             if abandon is not None and (key in abandon or '_all' in abandon):
-                                try:
-                                    for item in items.itersafe():
-                                        setattr(item, info['key'], None)
-                                        try:
-                                            item.save()
-                                        except ObjectNotFoundException:
-                                            pass
-                                except KeyNotFoundException:
-                                    pass
+                                for item in items.itersafe():
+                                    setattr(item, info['key'], None)
+                                    try:
+                                        item.save()
+                                    except ObjectNotFoundException:
+                                        pass
                             else:
                                 multi = 'are {0} items'.format(len(items)) if len(items) > 1 else 'is 1 item'
                                 raise LinkedObjectException('There {0} left in self.{1}'.format(multi, key))
