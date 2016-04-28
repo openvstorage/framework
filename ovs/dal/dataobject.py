@@ -679,12 +679,15 @@ class DataObject(object):
                     if info['list'] is True:
                         if len(items) > 0:
                             if abandon is not None and (key in abandon or '_all' in abandon):
-                                for item in items.itersafe():
-                                    setattr(item, info['key'], None)
-                                    try:
-                                        item.save()
-                                    except ObjectNotFoundException:
-                                        pass
+                                try:
+                                    for item in items.itersafe():
+                                        setattr(item, info['key'], None)
+                                        try:
+                                            item.save()
+                                        except ObjectNotFoundException:
+                                            pass
+                                except KeyNotFoundException:
+                                    pass
                             else:
                                 multi = 'are {0} items'.format(len(items)) if len(items) > 1 else 'is 1 item'
                                 raise LinkedObjectException('There {0} left in self.{1}'.format(multi, key))
@@ -736,7 +739,7 @@ class DataObject(object):
                 self._persistent.apply_transaction(transaction)
                 successful = True
             except KeyNotFoundException as ex:
-                if ex.message != self._key:
+                if self._key not in ex.message:
                     raise
                 successful = True
             except AssertException as ex:
