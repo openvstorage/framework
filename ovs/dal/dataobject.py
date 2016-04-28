@@ -736,7 +736,7 @@ class DataObject(object):
                 self._persistent.apply_transaction(transaction)
                 successful = True
             except KeyNotFoundException as ex:
-                if self._key not in ex.message:
+                if ex.message != self._key:
                     raise
                 successful = True
             except AssertException as ex:

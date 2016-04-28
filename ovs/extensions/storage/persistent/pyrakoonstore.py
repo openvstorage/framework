@@ -101,7 +101,7 @@ class PyrakoonStore(object):
         except ValueError:
             raise KeyNotFoundException('Could not parse JSON stored')
         except ArakoonNotFound as field:
-            raise KeyNotFoundException(field)
+            raise KeyNotFoundException(field.message)
 
     @locked()
     def set(self, key, value, transaction=None):
@@ -221,7 +221,7 @@ class PyrakoonStore(object):
         except ArakoonAssertionFailed as assertion:
             raise AssertException(assertion)
         except ArakoonNotFound as field:
-            raise KeyNotFoundException(field)
+            raise KeyNotFoundException(field.message)
 
     @staticmethod
     def _try(identifier, method, *args, **kwargs):

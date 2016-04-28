@@ -203,12 +203,12 @@ class DataList(object):
         prefix = '{0}_{1}_'.format(DataObject.NAMESPACE, object_type_name)
 
         if self._guids is not None:
-            entries = []
-            for guid in self._guids[:]:
-                try:
-                    entries.append(self._persistent.get('{0}{1}'.format(prefix, guid)))
-                except KeyNotFoundException:
-                    self._guids.remove(guid)
+            try:
+                entries = list(self._persistent.get_multi(['{0}{1}'.format(prefix, guid) for guid in self._guids]))
+            except KeyNotFoundException as knfe:
+                guid_not_found = knfe.message.split('_')[-1]
+                self._guids.remove(guid_not_found)
+                entries = list(self._persistent.get_multi(['{0}{1}'.format(prefix, guid) for guid in self._guids]))
 
             self._data = {}
             self._objects = {}
