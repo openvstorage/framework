@@ -207,8 +207,7 @@ class DataList(object):
             for guid in self._guids[:]:
                 try:
                     entries.append(self._persistent.get('{0}{1}'.format(prefix, guid)))
-                except KeyNotFoundException as ex:
-                    print(guid, ex)
+                except KeyNotFoundException:
                     self._guids.remove(guid)
 
             self._data = {}
