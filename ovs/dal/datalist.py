@@ -273,7 +273,21 @@ class DataList(object):
         else:
             self.from_cache = True
             self._guids = cached_data
-            entries = list(self._persistent.get_multi(['{0}{1}'.format(prefix, guid) for guid in self._guids]))
+            #entries = list(self._persistent.get_multi(['{0}{1}'.format(prefix, guid) for guid in self._guids]))
+            keys = ['{0}{1}'.format(prefix, guid) for guid in self._guids]
+            successful = False
+            tries = 0
+            while successful is False:
+                tries += 1
+                if tries > 5:
+                    raise RaceConditionException()
+                try:
+                    entries = list(self._persistent.get_multi(keys))
+                    successful = True
+                except KeyNotFoundException as knfe:
+                    keys.remove(knfe.message)
+                    self._guids.remove(knfe.message.replace(prefix, ''))
+
             self._data = {}
             self._objects = {}
             for index in xrange(len(self._guids)):

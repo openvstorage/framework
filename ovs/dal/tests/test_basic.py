@@ -1369,6 +1369,27 @@ class Basic(TestCase):
         assert (vpool.storagedrivers[0].storagerouter == sr) is True, error_message
         assert (vpool.storagedrivers[0].storagerouter != sr) is False, error_message
 
+    def test_racecondition_datalist_multiget(self):
+        """
+        Verify the list can handle objects being deleted by another process
+        """
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.save()
+
+        datalist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                       'items': []})
+        self.assertEqual(len(datalist), 2, 'Datalist should have two testdisks')
+
+        PersistentFactory.store.delete('ovs_data_testdisk_{0}'.format(disk1.guid))
+
+        datalist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                       'items': []})
+        self.assertEqual(len(datalist), 1, 'Datalist should have one testdisk')
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)
