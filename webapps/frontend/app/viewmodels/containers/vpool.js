@@ -32,7 +32,6 @@ define([
         self.storageRouterHandle = undefined;
 
         // Observables
-        self.aaBackendPreset    = ko.observable();
         self.backendConnection  = ko.observable();
         self.backendPreset      = ko.observable();
         self.backendLogin       = ko.observable();
@@ -95,9 +94,6 @@ define([
 
             if (self.metadata.hasOwnProperty('backend') && self.metadata.backend.hasOwnProperty('preset')) {
                 self.backendPreset(self.metadata.backend.preset);
-            }
-            if (self.metadata.hasOwnProperty('backend_aa') && self.metadata.backend_aa.hasOwnProperty('preset')) {
-                self.aaBackendPreset(self.metadata.backend_aa.preset);
             }
 
             generic.trySet(self.backendLogin, data, 'login');

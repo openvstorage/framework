@@ -63,7 +63,7 @@ define([
         self.preValidate = function() {
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadSRMetadataHandle);
-                self.loadSRMetadataHandle = api.post('storagerouters/' + self.data.target().guid() + '/get_metadata')
+                self.loadSRMetadataHandle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/get_metadata')
                     .then(self.shared.tasks.wait)
                     .then(function(data) {
                         self.data.mountpoints(data.mountpoints);

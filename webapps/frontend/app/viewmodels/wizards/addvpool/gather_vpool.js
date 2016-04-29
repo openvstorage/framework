@@ -116,7 +116,7 @@ define([
                                 accesskey: self.data.accesskey(),
                                 secretkey: self.data.secretkey()
                             };
-                            self.checkS3Handle = api.post('storagerouters/' + self.data.target().guid() + '/check_s3', { data: postData })
+                            self.checkS3Handle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/check_s3', { data: postData })
                                 .then(self.shared.tasks.wait)
                                 .done(function(data) {
                                     if (!data) {
@@ -138,7 +138,7 @@ define([
                         var postData = {
                             name: self.data.name()
                         };
-                        self.checkMtptHandle = api.post('storagerouters/' + self.data.target().guid() + '/check_mtpt', { data: postData })
+                        self.checkMtptHandle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/check_mtpt', { data: postData })
                             .then(self.shared.tasks.wait)
                             .done(function(data) {
                                 if (!data) {
@@ -162,8 +162,8 @@ define([
             }).promise();
         };
         self.next = function() {
-            $.each(self.data.storageRouters(), function(index, storageRouter) {
-                if (storageRouter === self.data.target()) {
+            $.each(self.data.storageRoutersAvailable(), function(index, storageRouter) {
+                if (storageRouter === self.data.storageRouter()) {
                     $.each(self.data.dtlTransportModes(), function (i, key) {
                         if (key.name === 'rdma') {
                             self.data.dtlTransportModes()[i].disabled = storageRouter.rdmaCapable() === undefined ? true : !storageRouter.rdmaCapable();
@@ -250,6 +250,9 @@ define([
                                     $.each(self.data.albaBackends(), function(index, albaBackend) {
                                         albaBackend.fillData(abData[albaBackend.guid()]);
                                     });
+                                    self.data.albaBackends.sort(function(backend1, backend2) {
+                                        return backend1.name() < backend2.name() ? -1 : 1;
+                                    });
                                     self.data.albaBackend(self.data.albaBackends()[0]);
                                     self.data.albaPreset(self.data.albaBackends()[0].enhancedPresets()[0]);
                                 } else {
@@ -296,18 +299,35 @@ define([
                         srdata[item.guid] = item;
                     });
                     generic.crossFiller(
-                        guids, self.data.storageRouters,
+                        guids, self.data.storageRoutersAvailable,
                         function(guid) {
                             if (self.data.vPool() === undefined || !self.data.vPool().storageRouterGuids().contains(guid)) {
                                 return new StorageRouter(guid);
                             }
                         }, 'guid'
                     );
-                    $.each(self.data.storageRouters(), function(index, storageRouter) {
+                    generic.crossFiller(
+                        guids, self.data.storageRoutersUsed,
+                        function(guid) {
+                            if (self.data.vPool() !== undefined && self.data.vPool().storageRouterGuids().contains(guid)) {
+                                return new StorageRouter(guid);
+                            }
+                        }, 'guid'
+                    );
+                    $.each(self.data.storageRoutersAvailable(), function(index, storageRouter) {
                         storageRouter.fillData(srdata[storageRouter.guid()]);
                     });
-                    if (self.data.target() === undefined && self.data.storageRouters().length > 0) {
-                        self.data.target(self.data.storageRouters()[0]);
+                    $.each(self.data.storageRoutersUsed(), function(index, storageRouter) {
+                        storageRouter.fillData(srdata[storageRouter.guid()]);
+                    });
+                    self.data.storageRoutersAvailable.sort(function(sr1, sr2) {
+                        return sr1.name() < sr2.name() ? -1 : 1;
+                    });
+                    self.data.storageRoutersUsed.sort(function(sr1, sr2) {
+                        return sr1.name() < sr2.name() ? -1 : 1;
+                    });
+                    if (self.data.storageRouter() === undefined && self.data.storageRoutersAvailable().length > 0) {
+                        self.data.storageRouter(self.data.storageRoutersAvailable()[0]);
                     }
                 });
             if (generic.xhrCompleted(self.loadVPoolsHandle)) {
@@ -349,20 +369,6 @@ define([
                 self.data.dtlTransportMode({name: currentConfig.dtl_transport});
                 var metadata = self.data.vPool().metadata();
                 if (self.data.vPool().backendType().code() === 'alba') {
-                    if (metadata.hasOwnProperty('backend_aa') && metadata.backend_aa.hasOwnProperty('connection')) {
-                        self.data.aaLocalHost(metadata.backend_aa.connection.local);
-                        if (metadata.backend_aa.connection.local) {
-                            self.data.aaAccesskey('');
-                            self.data.aaSecretkey('');
-                            self.data.aaHost('');
-                            self.data.aaPort(80);
-                        } else {
-                            self.data.aaAccesskey(metadata.backend_aa.connection.client_id);
-                            self.data.aaSecretkey(metadata.backend_aa.connection.client_secret);
-                            self.data.aaHost(metadata.backend_aa.connection.host);
-                            self.data.aaPort(metadata.backend_aa.connection.port);
-                        }
-                    }
                     if (metadata.hasOwnProperty('backend') && metadata.backend.hasOwnProperty('connection')) {
                         // Created in or after 2.7.0
                         self.data.v260Migration(false);
@@ -390,14 +396,6 @@ define([
                                                 self.data.albaPreset(preset);
                                             }
                                         });
-                                    } else if (albaBackend.guid() === metadata.backend_aa.backend_guid) {
-                                        self.data.albaAABackend(albaBackend);
-                                        self.data.useAA(true);
-                                        $.each(albaBackend.enhancedPresets(), function(_, preset) {
-                                            if (preset.name === metadata.backend_aa.preset) {
-                                                self.data.albaAAPreset(preset);
-                                            }
-                                        })
                                     }
                                 });
                             });
