@@ -204,19 +204,18 @@ class DataList(object):
 
         if self._guids is not None:
             keys = ['{0}{1}'.format(prefix, guid) for guid in self._guids]
-            successfull = False
+            successful = False
             tries = 0
-            while successfull is False:
+            while successful is False:
                 tries += 1
                 if tries > 5:
                     raise RaceConditionException()
                 try:
                     entries = list(self._persistent.get_multi(keys))
-                    successfull = True
+                    successful = True
                 except KeyNotFoundException as knfe:
                     keys.remove(knfe.message)
                     self._guids.remove(knfe.message.replace(prefix, ''))
-                    entries = list(self._persistent.get_multi(keys))
 
             self._data = {}
             self._objects = {}
