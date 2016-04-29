@@ -22,7 +22,8 @@ import random
 import hashlib
 from random import randint
 from ovs.dal.helpers import Descriptor, HybridRunner
-from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.dal.exceptions import ObjectNotFoundException, RaceConditionException
+from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.dal.relations import RelationMapper
@@ -202,7 +203,21 @@ class DataList(object):
         prefix = '{0}_{1}_'.format(DataObject.NAMESPACE, object_type_name)
 
         if self._guids is not None:
-            entries = list(self._persistent.get_multi(['{0}{1}'.format(prefix, guid) for guid in self._guids]))
+            keys = ['{0}{1}'.format(prefix, guid) for guid in self._guids]
+            successful = False
+            tries = 0
+            entries = []
+            while successful is False:
+                tries += 1
+                if tries > 5:
+                    raise RaceConditionException()
+                try:
+                    entries = list(self._persistent.get_multi(keys))
+                    successful = True
+                except KeyNotFoundException as knfe:
+                    keys.remove(knfe.message)
+                    self._guids.remove(knfe.message.replace(prefix, ''))
+
             self._data = {}
             self._objects = {}
             for index, guid in enumerate(self._guids):
@@ -259,7 +274,22 @@ class DataList(object):
         else:
             self.from_cache = True
             self._guids = cached_data
-            entries = list(self._persistent.get_multi(['{0}{1}'.format(prefix, guid) for guid in self._guids]))
+            
+            keys = ['{0}{1}'.format(prefix, guid) for guid in self._guids]
+            successful = False
+            tries = 0
+            entries = []
+            while successful is False:
+                tries += 1
+                if tries > 5:
+                    raise RaceConditionException()
+                try:
+                    entries = list(self._persistent.get_multi(keys))
+                    successful = True
+                except KeyNotFoundException as knfe:
+                    keys.remove(knfe.message)
+                    self._guids.remove(knfe.message.replace(prefix, ''))
+
             self._data = {}
             self._objects = {}
             for index in xrange(len(self._guids)):
