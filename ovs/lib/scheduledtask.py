@@ -32,7 +32,7 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
-from ovs.extensions.db.arakoon.pyrakoon.tools.admin import ArakoonClientConfig, ArakoonAdminClient
+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonAdmin, ArakoonClientConfig
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
@@ -369,13 +369,13 @@ class ScheduledTaskController(object):
             nodes = {}
             for node in parser.get('global', 'cluster').split(','):
                 node = node.strip()
-                nodes[node] = ([parser.get(node, 'ip')], parser.get(node, 'client_port'))
+                nodes[node] = ([str(parser.get(node, 'ip'))], int(parser.get(node, 'client_port')))
             config = ArakoonClientConfig(str(cluster), nodes)
             for node in nodes.keys():
                 logger.info('    Collapsing node: {0}'.format(node))
-                client = ArakoonAdminClient(node, config)
+                client = ArakoonAdmin(config)
                 try:
-                    client.collapse_tlogs(2)
+                    client.collapse(str(node), 2)
                 except:
                     logger.exception('Error during collapsing cluster {0} node {1}'.format(cluster, node))
 
