@@ -203,12 +203,20 @@ class DataList(object):
         prefix = '{0}_{1}_'.format(DataObject.NAMESPACE, object_type_name)
 
         if self._guids is not None:
-            try:
-                entries = list(self._persistent.get_multi(['{0}{1}'.format(prefix, guid) for guid in self._guids]))
-            except KeyNotFoundException as knfe:
-                guid_not_found = knfe.message.split('_')[-1]
-                self._guids.remove(guid_not_found)
-                entries = list(self._persistent.get_multi(['{0}{1}'.format(prefix, guid) for guid in self._guids]))
+            keys = ['{0}{1}'.format(prefix, guid) for guid in self._guids]
+            successfull = False
+            tries = 0
+            while successfull is False:
+                tries += 1
+                if tries > 5:
+                    raise RaceConditionException()
+                try:
+                    entries = list(self._persistent.get_multi(keys))
+                    successfull = True
+                except KeyNotFoundException as knfe:
+                    keys.remove(knfe.message)
+                    self._guids.remove(knfe.message.replace(prefix, ''))
+                    entries = list(self._persistent.get_multi(keys))
 
             self._data = {}
             self._objects = {}

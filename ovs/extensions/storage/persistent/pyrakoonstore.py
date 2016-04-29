@@ -88,7 +88,7 @@ class PyrakoonStore(object):
         except ValueError:
             raise KeyNotFoundException('Could not parse JSON stored for {0}'.format(key))
         except ArakoonNotFound as field:
-            raise KeyNotFoundException(field)
+            raise KeyNotFoundException(field.message)
 
     @locked()
     def get_multi(self, keys):
@@ -164,7 +164,7 @@ class PyrakoonStore(object):
             else:
                 return PyrakoonStore._try(self._identifier, self._client.replace, key, None)
         except ArakoonNotFound as field:
-            raise KeyNotFoundException(field)
+            raise KeyNotFoundException(field.message)
 
     @locked()
     def nop(self):
