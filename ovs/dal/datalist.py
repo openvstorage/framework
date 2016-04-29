@@ -22,7 +22,7 @@ import random
 import hashlib
 from random import randint
 from ovs.dal.helpers import Descriptor, HybridRunner
-from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.dal.exceptions import ObjectNotFoundException, RaceConditionException
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -206,6 +206,7 @@ class DataList(object):
             keys = ['{0}{1}'.format(prefix, guid) for guid in self._guids]
             successful = False
             tries = 0
+            entries = []
             while successful is False:
                 tries += 1
                 if tries > 5:
@@ -277,6 +278,7 @@ class DataList(object):
             keys = ['{0}{1}'.format(prefix, guid) for guid in self._guids]
             successful = False
             tries = 0
+            entries = []
             while successful is False:
                 tries += 1
                 if tries > 5:
