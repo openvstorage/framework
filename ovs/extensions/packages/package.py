@@ -21,13 +21,12 @@ from ovs.extensions.packages.debian import DebianPackage
 from ovs.extensions.packages.rpm import RpmPackage
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='packagemanager')
-
 
 class PackageManager(object):
     """
     Factory class returning specialized classes
     """
+    _logger = LogHandler.get('extensions', name='packagemanager')
     ImplementationClass = None
 
     class MetaClass(type):
@@ -52,7 +51,7 @@ class PackageManager(object):
                     else:
                         raise RuntimeError('There is no handler for Distributor ID: {0}'.format(distributor))
                 except Exception as ex:
-                    logger.exception('Error loading Distributor ID: {0}'.format(ex))
+                    PackageManager._logger.exception('Error loading Distributor ID: {0}'.format(ex))
                     raise
             return getattr(PackageManager.ImplementationClass, item)
 

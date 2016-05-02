@@ -37,11 +37,6 @@ from requests.packages.urllib3.exceptions import InsecurePlatformWarning
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from requests.packages.urllib3.exceptions import SNIMissingWarning
 
-disable_warnings(InsecurePlatformWarning)
-disable_warnings(InsecureRequestWarning)
-disable_warnings(SNIMissingWarning)
-logger = LogHandler.get('extensions', name='etcdconfiguration')
-
 
 def log_slow_calls(f):
     """
@@ -49,6 +44,8 @@ def log_slow_calls(f):
     :param f: Function to wrap
     :return: Wrapped function
     """
+    logger = LogHandler.get('extensions', name='etcdconfiguration')
+
     def new_function(*args, **kwargs):
         """
         Execute function
@@ -109,6 +106,10 @@ class EtcdConfiguration(object):
                                      'mds_maxload': 75},
                    'webapps': {'html_endpoint': '/',
                                'oauth2': {'mode': 'local'}}}
+
+    disable_warnings(InsecurePlatformWarning)
+    disable_warnings(InsecureRequestWarning)
+    disable_warnings(SNIMissingWarning)
 
     def __init__(self):
         """

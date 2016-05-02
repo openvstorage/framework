@@ -29,13 +29,12 @@ from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('lib', name='license')
-
 
 class LicenseController(object):
     """
     Validates licenses
     """
+    _logger = LogHandler.get('lib', name='license')
 
     @staticmethod
     @celery.task(name='ovs.license.validate')
@@ -62,22 +61,22 @@ class LicenseController(object):
                     try:
                         valid, metadata = validate_functions[0](component=component, data=data, signature=signature)
                     except Exception, ex:
-                        logger.debug('Error validating license for {0}: {1}'.format(component, ex))
+                        LicenseController._logger.debug('Error validating license for {0}: {1}'.format(component, ex))
                         valid = False
                         metadata = None
                     if valid is False:
-                        logger.debug('Invalid license for {0}: {1}'.format(component, license_string))
+                        LicenseController._logger.debug('Invalid license for {0}: {1}'.format(component, license_string))
                         result[component] = False
                     else:
                         result[component] = {'valid_until': valid_until,
                                              'metadata': metadata,
                                              'name': name}
                 else:
-                    logger.debug('No validate nor apply functions found for {0}'.format(component))
+                    LicenseController._logger.debug('No validate nor apply functions found for {0}'.format(component))
                     result[component] = False
             return result
         except Exception, ex:
-            logger.exception('Error validating license: {0}'.format(ex))
+            LicenseController._logger.exception('Error validating license: {0}'.format(ex))
             raise
 
     @staticmethod
@@ -129,7 +128,7 @@ class LicenseController(object):
                 client = clients[storagerouter]
                 client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
         except Exception, ex:
-            logger.exception('Error applying license: {0}'.format(ex))
+            LicenseController._logger.exception('Error applying license: {0}'.format(ex))
             return None
 
     @staticmethod

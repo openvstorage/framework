@@ -17,7 +17,6 @@ OVS migration module
 """
 
 from ovs.log.logHandler import LogHandler
-logger = LogHandler.get('extensions', name='migration')
 
 
 class OVSMigrator(object):
@@ -44,6 +43,7 @@ class OVSMigrator(object):
         :param extra_ips: IP addresses of the EXTRA nodes
         """
 
+        logger = LogHandler.get('extensions', name='migration')
         working_version = previous_version
 
         # Version 1 introduced:

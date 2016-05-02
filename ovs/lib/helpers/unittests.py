@@ -20,7 +20,6 @@ Limitations:
 """
 
 import os
-import imp
 import inspect
 import unittest
 
@@ -68,7 +67,7 @@ class UnitTest(object):
                         name = filename.replace('.py', '')
                         filepath = os.path.join(root, filename)
                         try:
-                            module = imp.load_source(name, filepath)
+                            module = inspect.imp.load_source(name, filepath)
                         except Exception as ex:
                             print 'Test file {0} could not be loaded. Error: {1}'.format(filepath, ex)
                             continue

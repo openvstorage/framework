@@ -23,10 +23,8 @@ from rest_framework.request import Request
 from rest_framework.exceptions import PermissionDenied
 from django.core.handlers.wsgi import WSGIRequest
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('api', 'oauth2')
 
 
 def _find_request(args):
@@ -42,6 +40,8 @@ def auto_response():
     """
     Json response wrapper
     """
+    logger = LogHandler.get('api', 'oauth2')
+
     def wrap(f):
         """
         Wrapper function
@@ -78,6 +78,8 @@ def limit(amount, per, timeout):
     """
     Rate-limits the decorated call
     """
+    logger = LogHandler.get('api', 'oauth2')
+
     def wrap(f):
         """
         Wrapper function
@@ -92,7 +94,7 @@ def limit(amount, per, timeout):
                 request.META['HTTP_X_REAL_IP']
             )
             client = VolatileFactory.get_client()
-            mutex = VolatileMutex(key)
+            mutex = volatile_mutex(key)
             try:
                 mutex.acquire()
                 rate_info = client.get(key, {'calls': [],

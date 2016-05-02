@@ -46,7 +46,7 @@ class DeleteSnapshots(TestCase):
     DiskPartition = None
     FailureDomain = None
     StorageRouter = None
-    VolatileMutex = None
+    volatile_mutex = None
     VDiskController = None
     VMachineController = None
     ScheduledTaskController = None
@@ -68,7 +68,7 @@ class DeleteSnapshots(TestCase):
         from ovs.dal.hybrids.vdisk import VDisk
         from ovs.dal.hybrids.vmachine import VMachine
         from ovs.dal.hybrids.vpool import VPool
-        from ovs.extensions.generic.volatilemutex import VolatileMutex
+        from ovs.extensions.generic.volatilemutex import volatile_mutex
         from ovs.lib.vmachine import VMachineController
         from ovs.lib.vdisk import VDiskController
         from ovs.lib.scheduledtask import ScheduledTaskController
@@ -82,11 +82,11 @@ class DeleteSnapshots(TestCase):
         global DiskPartition
         global FailureDomain
         global StorageRouter
-        global VolatileMutex
+        global volatile_mutex
         global VMachineController
         global VDiskController
         global ScheduledTaskController
-        _ = VDisk(), VolatileMutex('dummy'), VMachine(), PMachine(), VPool(), BackendType(), FailureDomain(), \
+        _ = VDisk(), volatile_mutex('dummy'), VMachine(), PMachine(), VPool(), BackendType(), FailureDomain(), \
             VMachineController, VDiskController, ScheduledTaskController, StorageRouter(), Disk(), DiskPartition()
 
         # Cleaning storage

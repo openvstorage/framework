@@ -27,8 +27,6 @@ import os
 import re
 import shutil
 
-logger = LogHandler.get('extensions', name='xml processor')
-
 
 class Kxp(pyinotify.ProcessEvent):
 
@@ -36,7 +34,7 @@ class Kxp(pyinotify.ProcessEvent):
         """
         dummy constructor
         """
-        pass
+        self._logger = LogHandler.get('extensions', name='xml processor')
 
     def _recurse(self, treeitem):
         result = {}
@@ -90,44 +88,44 @@ class Kxp(pyinotify.ProcessEvent):
         vm = VMachineList().get_by_devicename_and_vpool(devicename, None)
         if vm:
             vm.invalidate_dynamics()
-            logger.debug('Hypervisor status invalidated for: {0}'.format(name))
+            self._logger.debug('Hypervisor status invalidated for: {0}'.format(name))
 
     def process_IN_CLOSE_WRITE(self, event):
 
-        logger.debug('path: {0} - name: {1} - close after write'.format(event.path, event.name))
+        self._logger.debug('path: {0} - name: {1} - close after write'.format(event.path, event.name))
 
     def process_IN_CREATE(self, event):
 
-        logger.debug('path: {0} - name: {1} - create'.format(event.path, event.name))
+        self._logger.debug('path: {0} - name: {1} - create'.format(event.path, event.name))
 
     def process_IN_DELETE(self, event):
 
         try:
-            logger.debug('path: {0} - name: {1} - deleted'.format(event.path, event.name))
+            self._logger.debug('path: {0} - name: {1} - deleted'.format(event.path, event.name))
             if self._is_etc_watcher(event.path):
                 file_matcher = '/mnt/*/{0}/{1}'.format(System.get_my_machine_id(), event.name)
                 for found_file in glob.glob(file_matcher):
                     if os.path.exists(found_file) and os.path.isfile(found_file):
                         os.remove(found_file)
-                        logger.info('File on vpool deleted: {0}'.format(found_file))
+                        self._logger.info('File on vpool deleted: {0}'.format(found_file))
 
             if self._is_run_watcher(event.path):
                 self.invalidate_vmachine_status(event.name)
         except Exception as exception:
-            logger.error('Exception during process_IN_DELETE: {0}'.format(str(exception)), print_msg=True)
+            self._logger.error('Exception during process_IN_DELETE: {0}'.format(str(exception)), print_msg=True)
 
     def process_IN_MODIFY(self, event):
 
-        logger.debug('path: {0} - name: {1} - modified'.format(event.path, event.name))
+        self._logger.debug('path: {0} - name: {1} - modified'.format(event.path, event.name))
 
     def process_IN_MOVED_FROM(self, event):
 
-        logger.debug('path: {0} - name: {1} - moved from'.format(event.path, event.name))
+        self._logger.debug('path: {0} - name: {1} - moved from'.format(event.path, event.name))
 
     def process_IN_MOVED_TO(self, event):
 
         try:
-            logger.debug('path: {0} - name: {1} - moved to'.format(event.path, event.name))
+            self._logger.debug('path: {0} - name: {1} - moved to'.format(event.path, event.name))
 
             if self._is_run_watcher(event.path):
                 self.invalidate_vmachine_status(event.name)
@@ -135,7 +133,7 @@ class Kxp(pyinotify.ProcessEvent):
 
             vpool_path = '/mnt/' + self.get_vpool_for_vm(event.pathname)
             if vpool_path == '/mnt/':
-                logger.warning('Vmachine not on vpool or invalid xml format for {0}'.format(event.pathname))
+                self._logger.warning('Vmachine not on vpool or invalid xml format for {0}'.format(event.pathname))
 
             if os.path.exists(vpool_path):
                 machine_id = System.get_my_machine_id()
@@ -145,14 +143,14 @@ class Kxp(pyinotify.ProcessEvent):
                     os.mkdir(target_path)
                 shutil.copy2(event.pathname, target_xml)
         except Exception as exception:
-            logger.error('Exception during process_IN_MOVED_TO: {0}'.format(str(exception)), print_msg=True)
+            self._logger.error('Exception during process_IN_MOVED_TO: {0}'.format(str(exception)), print_msg=True)
 
     def process_IN_UNMOUNT(self, event):
         """
         Trigger to cleanup vm on target
         """
-        logger.debug('path: {0} - name: {1} - fs unmounted!'.format(event.path, event.name))
+        self._logger.debug('path: {0} - name: {1} - fs unmounted!'.format(event.path, event.name))
 
     def process_default(self, event):
 
-        logger.debug('path: {0} - name: {1} - default'.format(event.path, event.name))
+        self._logger.debug('path: {0} - name: {1} - default'.format(event.path, event.name))

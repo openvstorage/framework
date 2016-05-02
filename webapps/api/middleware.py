@@ -21,9 +21,6 @@ from django.http import HttpResponse
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('api', 'middleware')
-regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
-
 
 class OVSMiddleware(object):
     """
@@ -35,6 +32,7 @@ class OVSMiddleware(object):
         Logs information about the given error
         """
         _ = self, request
+        logger = LogHandler.get('api', 'middleware')
         logger.exception('An unhandled exception occurred: {0}'.format(exception))
 
     def process_request(self, request):
@@ -47,6 +45,7 @@ class OVSMiddleware(object):
             return HttpResponse()
         # Validate version
         path = request.path
+        regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
         if path != '/api/' and '/api/oauth2/' not in path:
             if 'HTTP_ACCEPT' not in request.META or regex.match(request.META['HTTP_ACCEPT']) is None:
                 return HttpResponseNotAcceptable(

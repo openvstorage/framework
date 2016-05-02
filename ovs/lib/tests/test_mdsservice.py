@@ -46,7 +46,7 @@ class MDSServices(TestCase):
     StorageDriver = None
     StorageRouter = None
     VDisk = None
-    VolatileMutex = None
+    volatile_mutex = None
     VPool = None
     logLevel = None
 
@@ -71,7 +71,7 @@ class MDSServices(TestCase):
         from ovs.dal.hybrids.storagerouter import StorageRouter
         from ovs.dal.hybrids.vdisk import VDisk
         from ovs.dal.hybrids.vpool import VPool
-        from ovs.extensions.generic.volatilemutex import VolatileMutex
+        from ovs.extensions.generic.volatilemutex import volatile_mutex
         from ovs.lib.mdsservice import MDSServiceController
         # Globalize mocked classes
         global BackendType
@@ -85,10 +85,10 @@ class MDSServices(TestCase):
         global StorageDriver
         global StorageRouter
         global VDisk
-        global VolatileMutex
+        global volatile_mutex
         global VPool
         _ = BackendType(), FailureDomain(), MDSService(), MDSServiceController, MDSServiceVDisk(), \
-            PMachine(), Service(), ServiceType(), StorageDriver(), StorageRouter(), VDisk(), VolatileMutex('dummy'), VPool()
+            PMachine(), Service(), ServiceType(), StorageDriver(), StorageRouter(), VDisk(), volatile_mutex('dummy'), VPool()
 
         # Configuration
         def _get(key):

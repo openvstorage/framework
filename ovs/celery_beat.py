@@ -26,11 +26,9 @@ from celery import current_app
 from celery.schedules import crontab
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
-from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('celery', name='celery beat')
 
 
 class DistributedScheduler(Scheduler):
@@ -45,24 +43,25 @@ class DistributedScheduler(Scheduler):
         """
         Initializes the distributed scheduler
         """
+        self._logger = LogHandler.get('celery', name='celery beat')
         self._persistent = PersistentFactory.get_client()
         self._namespace = 'ovs_celery_beat'
-        self._mutex = VolatileMutex('celery_beat', 10)
+        self._mutex = volatile_mutex('celery_beat', 10)
         self._has_lock = False
         super(DistributedScheduler, self).__init__(*args, **kwargs)
-        logger.debug('DS init')
+        self._logger.debug('DS init')
 
     def setup_schedule(self):
         """
         Setups the schedule
         """
-        logger.debug('DS setting up schedule')
+        self._logger.debug('DS setting up schedule')
         self._load_schedule()
         self.merge_inplace(DistributedScheduler._discover_schedule())
         self.install_default_entries(self.schedule)
         for entry in self.schedule:
-            logger.debug('* {0}'.format(entry))
-        logger.debug('DS setting up schedule - done')
+            self._logger.debug('* {0}'.format(entry))
+        self._logger.debug('DS setting up schedule - done')
 
     @staticmethod
     def _discover_schedule():
@@ -89,7 +88,7 @@ class DistributedScheduler(Scheduler):
         """
         self.schedule = {}
         try:
-            logger.debug('DS loading schedule entries')
+            self._logger.debug('DS loading schedule entries')
             self._mutex.acquire(wait=10)
             try:
                 self.schedule = cPickle.loads(str(self._persistent.get('{0}_entries'.format(self._namespace))))
@@ -103,20 +102,20 @@ class DistributedScheduler(Scheduler):
     def sync(self):
         if self._has_lock is True:
             try:
-                logger.debug('DS syncing schedule entries')
+                self._logger.debug('DS syncing schedule entries')
                 self._mutex.acquire(wait=10)
                 self._persistent.set('{0}_entries'.format(
                     self._namespace), cPickle.dumps(self.schedule))
             finally:
                 self._mutex.release()
         else:
-            logger.debug('DS skipping sync: lock is not ours')
+            self._logger.debug('DS skipping sync: lock is not ours')
 
     def tick(self):
         """
         Runs one iteration of the scheduler. This is guarded with a distributed lock
         """
-        logger.debug('DS executing tick')
+        self._logger.debug('DS executing tick')
         try:
             self._has_lock = False
             with self._mutex:
@@ -130,28 +129,28 @@ class DistributedScheduler(Scheduler):
                 if lock is None:
                     # There is no lock yet, so the lock is acquired
                     self._has_lock = True
-                    logger.debug('DS there was no lock in tick')
+                    self._logger.debug('DS there was no lock in tick')
                 else:
                     if lock['name'] == node_name:
                         # The current node holds the lock
-                        logger.debug('DS keeps own lock')
+                        self._logger.debug('DS keeps own lock')
                         self._has_lock = True
                     elif node_timestamp - lock['timestamp'] > DistributedScheduler.TIMEOUT:
                         # The current lock is timed out, so the lock is stolen
-                        logger.debug('DS last lock refresh is {0}s old'.format(node_timestamp - lock['timestamp']))
-                        logger.debug('DS stealing lock from {0}'.format(lock['name']))
+                        self._logger.debug('DS last lock refresh is {0}s old'.format(node_timestamp - lock['timestamp']))
+                        self._logger.debug('DS stealing lock from {0}'.format(lock['name']))
                         self._load_schedule()
                         self._has_lock = True
                     else:
-                        logger.debug('DS lock is not ours')
+                        self._logger.debug('DS lock is not ours')
                 if self._has_lock is True:
                     lock = {'name': node_name,
                             'timestamp': node_timestamp}
-                    logger.debug('DS refreshing lock')
+                    self._logger.debug('DS refreshing lock')
                     self._persistent.set('{0}_lock'.format(self._namespace), lock)
 
             if self._has_lock is True:
-                logger.debug('DS executing tick workload')
+                self._logger.debug('DS executing tick workload')
                 remaining_times = []
                 try:
                     for entry in self.schedule.itervalues():
@@ -160,10 +159,10 @@ class DistributedScheduler(Scheduler):
                             remaining_times.append(next_time_to_run)
                 except RuntimeError:
                     pass
-                logger.debug('DS executing tick workload - done')
+                self._logger.debug('DS executing tick workload - done')
                 return min(remaining_times + [self.max_interval])
             else:
                 return self.max_interval
         except Exception as ex:
-            logger.debug('DS got error during tick: {0}'.format(ex))
+            self._logger.debug('DS got error during tick: {0}'.format(ex))
             return self.max_interval

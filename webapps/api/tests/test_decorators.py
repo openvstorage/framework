@@ -418,7 +418,7 @@ class Decorators(TestCase):
           * Parses the 'sort' parameter, optionally falling back to value specified by decorator
           * Parses the 'page' parameter
           * Parses the 'contents' parameter
-        * Passes the 'full' hint to the decorated function, indicating whether full objects are usefull
+        * Passes the 'full' hint to the decorated function, indicating whether full objects are useful
         * If sorting is requested:
           * Loads a possibly returned list of guids
           * Sorts the returned list
@@ -477,9 +477,9 @@ class Decorators(TestCase):
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
             self.assertEqual(len(response.data['data']), len(data_list_users))
             self.assertListEqual(response.data['data'], [guid_table['aa']['cc'],
-                                                        guid_table['aa']['bb'],
-                                                        guid_table['bb']['dd'],
-                                                        guid_table['bb']['aa']])
+                                                         guid_table['aa']['bb'],
+                                                         guid_table['bb']['dd'],
+                                                         guid_table['bb']['aa']])
             request.QUERY_PARAMS['sort'] = '-username,-password'
             response = function(3, request)
             self.assertEqual(response.status_code, 200)

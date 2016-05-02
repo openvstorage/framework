@@ -33,7 +33,7 @@ from ovs.dal.hybrids.t_teststoragerouter import TestStorageRouter
 from ovs.dal.hybrids.t_testvpool import TestVPool
 from ovs.dal.datalist import DataList
 from ovs.dal.helpers import Descriptor, Toolbox
-from ovs.extensions.generic.volatilemutex import VolatileMutex, NoLockAvailableException
+from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
 
 
 class Basic(TestCase):
@@ -614,7 +614,7 @@ class Basic(TestCase):
         """
         Validates the volatile mutex
         """
-        mutex = VolatileMutex('test')
+        mutex = volatile_mutex('test')
         mutex.acquire()
         mutex.acquire()  # Should not raise errors
         mutex.release()
@@ -1021,6 +1021,7 @@ class Basic(TestCase):
         Validates whether using an object property to delete these entries does not cause issues when deleting the
         object itself afterwards
         """
+        _ = self
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
@@ -1330,6 +1331,7 @@ class Basic(TestCase):
                 PersistentFactory.store.set('ovs_listcache_testdisk', {})
                 Basic._executed = True
 
+        _ = self
         PersistentFactory.store.set('ovs_listcache_testdisk', {'foo': 'bar'})
         Basic._executed = False
         disk = TestDisk()
@@ -1341,6 +1343,7 @@ class Basic(TestCase):
         """
         Verify 2 objects are the same, but when approached from a different level
         """
+        _ = self
         sr = TestStorageRouter()
         sr.name = 'storage_router1'
         sr.save()
@@ -1388,9 +1391,3 @@ class Basic(TestCase):
         datalist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                        'items': []})
         self.assertEqual(len(datalist), 1, 'Datalist should have one testdisk')
-
-if __name__ == '__main__':
-    import unittest
-    suite = unittest.TestLoader().loadTestsFromTestCase(Basic)
-    result = not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful()
-    sys.exit(result)

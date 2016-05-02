@@ -47,4 +47,3 @@ class PMachine(DataObject):
             if self.ip:
                 return mgmtcentersdk.get_host_status_by_ip(self.ip)
         return 'UNKNOWN'
-

@@ -17,7 +17,7 @@ Mockups module
 """
 
 
-class SRClient():
+class SRClient(object):
     """
     Mocks the SRClient
     """
@@ -45,7 +45,7 @@ class SRClient():
         return []
 
 
-class StorageDriverClient():
+class StorageDriverClient(object):
     """
     Mocks the StorageDriverClient
     """
@@ -73,7 +73,7 @@ class StorageDriverClient():
         Returns a fake empty object
         """
 
-        class Statistics():
+        class Statistics(object):
             """ Dummy class """
 
             def __init__(self):
@@ -167,7 +167,7 @@ class StorageDriverClient():
         return SRClient()
 
 
-class MDSClient():
+class MDSClient(object):
     """
     Mocks the MDSClient
     """
@@ -179,7 +179,7 @@ class MDSClient():
         self.service = service
 
 
-class MetadataServerClient():
+class MetadataServerClient(object):
     """
     Mocks the MetadataServerClient
     """
@@ -200,7 +200,7 @@ class MetadataServerClient():
         return MDSClient(service)
 
 
-class StorageDriver():
+class StorageDriver(object):
     """
     Mocks the StorageDriver
     """
@@ -214,7 +214,7 @@ class StorageDriver():
         pass
 
 
-class Loader():
+class Loader(object):
     """
     Mocks loader class
     """
@@ -234,7 +234,7 @@ class Loader():
         return 'unittest'
 
 
-class LoaderModule():
+class LoaderModule(object):
     """
     Mocks dependency loader module
     """
@@ -248,7 +248,7 @@ class LoaderModule():
         pass
 
 
-class Hypervisor():
+class Hypervisor(object):
     """
     Mocks a hypervisor client
     """
@@ -267,7 +267,7 @@ class Hypervisor():
         return 'RUNNING'
 
 
-class Factory():
+class Factory(object):
     """
     Mocks hypervisor factory
     """
@@ -295,7 +295,7 @@ class Factory():
         return None
 
 
-class FactoryModule():
+class FactoryModule(object):
     """
     Mocks hypervisor factory
     """

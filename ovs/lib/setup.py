@@ -29,7 +29,7 @@ from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, Ara
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.db.etcd.installer import EtcdInstaller
 from ovs.extensions.generic.interactive import Interactive
-from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
@@ -40,16 +40,14 @@ from ovs.lib.helpers.toolbox import Toolbox
 from ovs.log.logHandler import LogHandler
 from paramiko import AuthenticationException
 
-logger = LogHandler.get('lib', name='setup')
-logger.logger.propagate = False
-
 
 class SetupController(object):
     """
     This class contains all logic for setting up an environment, installed with system-native packages
     """
+    _logger = LogHandler.get('lib', name='setup')
+    _logger.logger.propagate = False
 
-    # Generic configuration files
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
     nodes = {}
     host_ips = set()
@@ -142,7 +140,7 @@ class SetupController(object):
                 fqdn_name = root_client.run('hostname -f || hostname -s')
                 avahi_installed = SetupController._avahi_installed(root_client)
 
-                logger.debug('Current host: {0}'.format(node_name))
+                SetupController._logger.debug('Current host: {0}'.format(node_name))
                 node_type = resume_config.get('node_type', node_type)
                 master_ip = resume_config.get('master_ip', master_ip)
                 cluster_ip = resume_config.get('cluster_ip', cluster_ip)
@@ -158,7 +156,7 @@ class SetupController(object):
                     external_etcd = SetupController._retrieve_external_etcd_info()
 
                 if config is None:  # Non-automated install
-                    logger.debug('Cluster selection')
+                    SetupController._logger.debug('Cluster selection')
                     new_cluster = 'Create a new cluster'
                     discovery_result = SetupController._discover_nodes(root_client) if avahi_installed is True else {}
                     join_manually = 'Join {0} cluster'.format('a' if len(discovery_result) == 0 else 'a different')
@@ -193,7 +191,7 @@ class SetupController(object):
                         if master_ip in root_client.local_ips:
                             raise ValueError("A local IP address was given, please select '{0}' or provide another IP address".format(new_cluster))
 
-                        logger.debug('Trying to manually join cluster on {0}'.format(master_ip))
+                        SetupController._logger.debug('Trying to manually join cluster on {0}'.format(master_ip))
 
                         master_password = SetupController._ask_validate_password(master_ip, username='root')
                         SetupController.nodes = SetupController._retrieve_storagerouters(ip=master_ip, password=master_password)
@@ -209,7 +207,7 @@ class SetupController(object):
                             raise Exception('The cluster on the given master node cannot be joined as not all StorageRouters could be loaded')
 
                     else:  # Join an existing cluster automatically
-                        logger.debug('Cluster {0} selected'.format(cluster_name))
+                        SetupController._logger.debug('Cluster {0} selected'.format(cluster_name))
                         first_node = False
                         for host_name, node_info in discovery_result.get(cluster_name, {}).iteritems():
                             if host_name != node_name and node_info.get('type') == 'master':
@@ -223,11 +221,11 @@ class SetupController(object):
                         SetupController.nodes = SetupController._retrieve_storagerouters(ip=master_ip, password=master_password)
 
                 else:  # Automated install
-                    logger.debug('Automated installation')
+                    SetupController._logger.debug('Automated installation')
                     cluster_ip = master_ip if cluster_ip is None else cluster_ip
                     first_node = master_ip == cluster_ip
                     cluster_name = 'preconfig-{0}'.format(master_ip.replace('.', '-'))
-                    logger.info('Detected{0} a 1st node installation'.format('' if first_node is True else ' not'))
+                    SetupController._logger.info('Detected{0} a 1st node installation'.format('' if first_node is True else ' not'))
 
                     if first_node is False:
                         SetupController.nodes = SetupController._retrieve_storagerouters(ip=master_ip, password=master_password)
@@ -249,7 +247,7 @@ class SetupController(object):
                                                                                                            ', '.join(SetupController.host_ips)))
 
                 if len(SetupController.nodes) == 0:
-                    logger.debug('No StorageRouters could be loaded, cannot join the cluster')
+                    SetupController._logger.debug('No StorageRouters could be loaded, cannot join the cluster')
                     raise RuntimeError('The cluster on the given master node cannot be joined as no StorageRouters could be loaded')
 
                 if cluster_ip is None or master_ip is None:  # Master IP and cluster IP must be known by now, cluster_ip == master_ip for 1st node
@@ -314,12 +312,12 @@ class SetupController(object):
                 # Connect to master and add the ovs and root public SSH key to all other nodes in the cluster
                 all_pub_keys = [local_pub_key_ovs, local_pub_key_root]
                 if first_node is False:
-                    with Remote(master_client.ip, [SSHClient], 'root', master_password) as remote:
+                    with remote(master_client.ip, [SSHClient], 'root', master_password) as rem:
                         for node_host_name, node in SetupController.nodes.iteritems():
                             node_ip = node['ip']
                             if node_ip == cluster_ip:
                                 continue
-                            client = remote.SSHClient(node_ip, 'root')
+                            client = rem.SSHClient(node_ip, 'root')
                             if client.ip not in ip_hostname_map:
                                 node_fqdn_name = client.run('hostname -f || hostname -s')
                                 ip_hostname_map[client.ip] = list({node_host_name, node_fqdn_name})
@@ -373,7 +371,7 @@ class SetupController(object):
                     hypervisor_type = Interactive.ask_choice(choice_options=['VMWARE', 'KVM'],
                                                              question='Which type of hypervisor is this Storage Router backing?',
                                                              default_value=possible_hypervisor)
-                    logger.debug('Selected hypervisor type {0}'.format(hypervisor_type))
+                    SetupController._logger.debug('Selected hypervisor type {0}'.format(hypervisor_type))
                 if hypervisor_name is None:
                     default_name = ('esxi{0}' if hypervisor_type == 'VMWARE' else 'kvm{0}').format(cluster_ip.split('.')[-1])
                     hypervisor_name = Interactive.ask_string('Enter hypervisor hostname', default_value=default_name)
@@ -409,7 +407,7 @@ class SetupController(object):
                 hypervisor_info['name'] = hypervisor_name
                 hypervisor_info['type'] = hypervisor_type
 
-                logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
+                SetupController._logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
 
                 # Write resume config
                 resume_config['node_type'] = node_type
@@ -461,7 +459,7 @@ class SetupController(object):
                         framework_cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|ovsdb'))
                         config = ArakoonClusterConfig(framework_cluster_name)
                         config.load_config()
-                        logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), framework_cluster_name))
+                        SetupController._logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), framework_cluster_name))
                         if (len(config.nodes) < 3 or node_type == 'master') and node_type != 'extra':
                             configure_rabbitmq = SetupController._is_internally_managed(service='rabbitmq')
                             configure_memcached = SetupController._is_internally_managed(service='memcached')
@@ -498,7 +496,7 @@ class SetupController(object):
             SetupController._log(messages=['Setup complete.',
                                            'Point your browser to https://{0} to use Open vStorage'.format(cluster_ip if len(is_master) > 0 else master_ip)],
                                  boxed=True)
-            logger.info('Setup complete')
+            SetupController._logger.info('Setup complete')
 
             try:
                 # Try to trigger setups from possibly installed other packages
@@ -874,7 +872,7 @@ class SetupController(object):
         for service in model_services:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                Toolbox.change_service_state(target_client, service, 'restart', logger)
+                Toolbox.change_service_state(target_client, service, 'restart', SetupController._logger)
 
         SetupController._log(messages='Start model migration', loglevel='debug')
         from ovs.dal.helpers import Migration
@@ -901,17 +899,17 @@ class SetupController(object):
         for service in model_services + ['rabbitmq-server']:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                Toolbox.change_service_state(target_client, service, 'start', logger)
+                Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
         # Enable HA for the rabbitMQ queues
         SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
         ServiceManager.enable_service('watcher-framework', client=target_client)
-        Toolbox.change_service_state(target_client, 'watcher-framework', 'start', logger)
+        Toolbox.change_service_state(target_client, 'watcher-framework', 'start', SetupController._logger)
 
         SetupController._log(messages='Check ovs-workers', loglevel='debug')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
         ServiceManager.enable_service('workers', client=target_client)
-        Toolbox.wait_for_service(target_client, 'workers', True, logger)
+        Toolbox.wait_for_service(target_client, 'workers', True, SetupController._logger)
 
         SetupController._run_hooks('firstnode', cluster_ip)
 
@@ -922,7 +920,7 @@ class SetupController(object):
             if not ServiceManager.has_service(service, target_client):
                 ServiceManager.add_service(service, client=target_client)
                 ServiceManager.enable_service(service, client=target_client)
-                Toolbox.change_service_state(target_client, service, 'start', logger)
+                Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -974,7 +972,7 @@ class SetupController(object):
         for service in ['memcached', 'arakoon-ovsdb', 'watcher-framework', 'workers', 'support-agent']:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.disable_service(service, client=target_client)
-                Toolbox.change_service_state(target_client, service, 'stop', logger)
+                Toolbox.change_service_state(target_client, service, 'stop', SetupController._logger)
 
         if etcd_running is True:
             endpoints = etcd_required_info['/ovs/framework/messagequeue|endpoints']
@@ -1104,7 +1102,7 @@ class SetupController(object):
             if not ServiceManager.has_service(service, target_client):
                 ServiceManager.add_service(service, client=target_client)
                 ServiceManager.enable_service(service, client=target_client)
-                Toolbox.change_service_state(target_client, service, 'start', logger)
+                Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
 
         node_name = target_client.run('hostname -s')
         SetupController._finalize_setup(target_client, node_name, 'EXTRA', hypervisor_info, unique_id)
@@ -1113,17 +1111,17 @@ class SetupController(object):
 
         SetupController._log(messages='Starting services')
         ServiceManager.enable_service('watcher-framework', client=target_client)
-        Toolbox.change_service_state(target_client, 'watcher-framework', 'start', logger)
+        Toolbox.change_service_state(target_client, 'watcher-framework', 'start', SetupController._logger)
 
         SetupController._log(messages='Check ovs-workers')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
         ServiceManager.enable_service('workers', client=target_client)
-        Toolbox.wait_for_service(target_client, 'workers', True, logger)
+        Toolbox.wait_for_service(target_client, 'workers', True, SetupController._logger)
 
         SetupController._log(messages='Restarting workers', loglevel='debug')
         for node_client in ip_client_map.itervalues():
             ServiceManager.enable_service('workers', client=node_client)
-            Toolbox.change_service_state(node_client, 'workers', 'restart', logger)
+            Toolbox.change_service_state(node_client, 'workers', 'restart', SetupController._logger)
 
         SetupController._run_hooks('extranode', cluster_ip, master_ip)
 
@@ -1231,7 +1229,7 @@ class SetupController(object):
             target_client.run('rabbitmqctl stop; sleep 5;')
 
             # Enable HA for the rabbitMQ queues
-            Toolbox.change_service_state(target_client, 'rabbitmq-server', 'start', logger)
+            Toolbox.change_service_state(target_client, 'rabbitmq-server', 'start', SetupController._logger)
             SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
         SetupController._configure_amqp_to_volumedriver()
@@ -1243,7 +1241,7 @@ class SetupController(object):
         for service in services:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                Toolbox.change_service_state(target_client, service, 'start', logger)
+                Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
 
         SetupController._log(messages='Restarting services')
         master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
@@ -1352,7 +1350,7 @@ class SetupController(object):
                         target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
                         target_client.run('rabbitmqctl reset; sleep 5;')
                         target_client.run('rabbitmqctl stop; sleep 5;')
-                        Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', logger)
+                        Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', SetupController._logger)
                         target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
                 except Exception as ex:
                     SetupController._log(messages=['\nFailed to remove/unconfigure RabbitMQ', ex], loglevel='error')
@@ -1367,7 +1365,7 @@ class SetupController(object):
                 if ServiceManager.has_service(service, client=target_client):
                     SetupController._log(messages='Removing service {0}'.format(service), loglevel='debug')
                     try:
-                        Toolbox.change_service_state(target_client, service, 'stop', logger)
+                        Toolbox.change_service_state(target_client, service, 'stop', SetupController._logger)
                         ServiceManager.remove_service(service, client=target_client)
                     except Exception as ex:
                         SetupController._log(messages=['\nFailed to remove service'.format(service), ex], loglevel='error')
@@ -1408,14 +1406,14 @@ class SetupController(object):
         for ip in masters + slaves:
             if ip not in offline_node_ips:
                 if ServiceManager.has_service(watcher, clients[ip]):
-                    Toolbox.change_service_state(clients[ip], watcher, 'stop', logger)
+                    Toolbox.change_service_state(clients[ip], watcher, 'stop', SetupController._logger)
         for ip in masters:
             if ip not in offline_node_ips:
-                Toolbox.change_service_state(clients[ip], memcached, 'restart', logger)
+                Toolbox.change_service_state(clients[ip], memcached, 'restart', SetupController._logger)
         for ip in masters + slaves:
             if ip not in offline_node_ips:
                 if ServiceManager.has_service(watcher, clients[ip]):
-                    Toolbox.change_service_state(clients[ip], watcher, 'start', logger)
+                    Toolbox.change_service_state(clients[ip], watcher, 'start', SetupController._logger)
         VolatileFactory.store = None
 
     @staticmethod
@@ -1449,7 +1447,7 @@ EOF
             if 'ovs' in users:
                 SetupController._log(messages='Already configured RabbitMQ')
                 return
-            Toolbox.change_service_state(client, 'rabbitmq-server', 'stop', logger)
+            Toolbox.change_service_state(client, 'rabbitmq-server', 'stop', SetupController._logger)
 
         client.run('rabbitmq-server -detached 2> /dev/null; sleep 5;')
 
@@ -1460,33 +1458,33 @@ EOF
         while retry < 10:
             users = Toolbox.retry_client_run(client,
                                              'rabbitmqctl list_users',
-                                             logger=logger).splitlines()[1:-1]
+                                             logger=SetupController._logger).splitlines()[1:-1]
             users = [usr.split('\t')[0] for usr in users]
-            logger.debug('Rabbitmq users {0}'.format(users))
+            SetupController._logger.debug('Rabbitmq users {0}'.format(users))
             if 'ovs' in users:
-                logger.debug('User ovs configured in rabbitmq')
+                SetupController._logger.debug('User ovs configured in rabbitmq')
                 break
             else:
-                logger.debug(Toolbox.retry_client_run(client,
-                                                      'rabbitmqctl add_user {0} {1}'.format(rabbitmq_login, rabbitmq_password),
-                                                      logger=logger))
-                logger.debug(Toolbox.retry_client_run(client,
-                                                      'rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(rabbitmq_login),
-                                                      logger=logger))
+                SetupController._logger.debug(Toolbox.retry_client_run(client,
+                                                                       'rabbitmqctl add_user {0} {1}'.format(rabbitmq_login, rabbitmq_password),
+                                                                       logger=SetupController._logger))
+                SetupController._logger.debug(Toolbox.retry_client_run(client,
+                                                                       'rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(rabbitmq_login),
+                                                                       logger=SetupController._logger))
                 retry += 1
                 time.sleep(1)
         users = Toolbox.retry_client_run(client,
                                          'rabbitmqctl list_users',
-                                         logger=logger).splitlines()[1:-1]
+                                         logger=SetupController._logger).splitlines()[1:-1]
         users = [usr.split('\t')[0] for usr in users]
-        logger.debug('Rabbitmq users {0}'.format(users))
+        SetupController._logger.debug('Rabbitmq users {0}'.format(users))
         client.run('rabbitmqctl stop; sleep 5;')
 
     @staticmethod
     def _unconfigure_rabbitmq(client):
         rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
         if rabbitmq_running is True:
-            Toolbox.change_service_state(client, 'rabbitmq-server', 'stop', logger)
+            Toolbox.change_service_state(client, 'rabbitmq-server', 'stop', SetupController._logger)
         client.file_delete('/etc/rabbitmq/rabbitmq.config')
 
     @staticmethod
@@ -1495,7 +1493,7 @@ EOF
             raise RuntimeError('Service rabbitmq-server has not been added on node {0}'.format(client.ip))
         rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
         if rabbitmq_running is False or same_process is False:
-            Toolbox.change_service_state(client, 'rabbitmq-server', 'restart', logger)
+            Toolbox.change_service_state(client, 'rabbitmq-server', 'restart', SetupController._logger)
 
         client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
 
@@ -1547,7 +1545,7 @@ EOF
 EOF
 """.format(cluster_name, node_name, node_type, SetupController.avahi_filename, client.ip.replace('.', '_')))
         client.run('avahi-daemon --reload')
-        Toolbox.change_service_state(client, 'avahi-daemon', 'restart', logger)
+        Toolbox.change_service_state(client, 'avahi-daemon', 'restart', SetupController._logger)
 
     @staticmethod
     def _add_services(client, unique_id, node_type):
@@ -1646,8 +1644,8 @@ EOF
     @staticmethod
     def _discover_nodes(client):
         nodes = {}
-        Toolbox.change_service_state(client, 'dbus', 'start', logger)
-        Toolbox.change_service_state(client, 'avahi-daemon', 'start', logger)
+        Toolbox.change_service_state(client, 'dbus', 'start', SetupController._logger)
+        Toolbox.change_service_state(client, 'avahi-daemon', 'start', SetupController._logger)
         discover_result = client.run('timeout -k 60 45 avahi-browse -artp 2> /dev/null | grep ovs_cluster || true')
         for entry in discover_result.splitlines():
             entry_parts = entry.split(';')
@@ -1703,9 +1701,9 @@ EOF
             rabbitmq_pid_sm = ServiceManager.get_service_pid('rabbitmq-server', client)
 
         same_process = rabbitmq_pid_ctl == rabbitmq_pid_sm
-        logger.debug('Rabbitmq is reported {0}running, pids: {1} and {2}'.format('' if rabbitmq_running else 'not ',
-                                                                                 rabbitmq_pid_ctl,
-                                                                                 rabbitmq_pid_sm))
+        SetupController._logger.debug('Rabbitmq is reported {0}running, pids: {1} and {2}'.format('' if rabbitmq_running else 'not ',
+                                                                                                  rabbitmq_pid_ctl,
+                                                                                                  rabbitmq_pid_sm))
         return rabbitmq_running, same_process
 
     @staticmethod
@@ -1837,12 +1835,12 @@ EOF
         storagerouters = {}
         try:
             from ovs.dal.lists.storagerouterlist import StorageRouterList
-            with Remote(ip_info=ip, modules=[StorageRouterList], username='root', password=password, strict_host_key_checking=False) as remote:
-                for sr in remote.StorageRouterList.get_storagerouters():
+            with remote(ip_info=ip, modules=[StorageRouterList], username='root', password=password, strict_host_key_checking=False) as rem:
+                for sr in rem.StorageRouterList.get_storagerouters():
                     storagerouters[sr.name] = {'ip': sr.ip,
                                                'type': sr.node_type.lower()}
         except Exception as ex:
-            logger.error('Error loading storagerouters: {0}'.format(ex))
+            SetupController._logger.error('Error loading storagerouters: {0}'.format(ex))
         return storagerouters
 
     @staticmethod
@@ -1947,4 +1945,4 @@ EOF
                 print message
 
         for message in messages:
-            getattr(logger, loglevel)(message)
+            getattr(SetupController._logger, loglevel)(message)

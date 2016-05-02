@@ -32,14 +32,13 @@ except googleapiclient.errors.HttpError as he:
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.services.systemd import Systemd
 
-logger = LogHandler.get('extensions', name='fleetctl')
-
 
 class FleetCtl(object):
     """
     Contains all logic related to managing services through fleet
     Allows services not managed by fleet to be managed through this extension - delegates to systemd
     """
+    _logger = LogHandler.get('extensions', name='fleetctl')
 
     @staticmethod
     def add_service(name, client, params=None, target_name=None, additional_dependencies=None):
@@ -55,7 +54,7 @@ class FleetCtl(object):
         client_ip = FleetCtl._get_client_ip(client)
 
         if FleetCtl.has_service(name, client):
-            logger.info('Not re-adding service {0} to machine {1}'.format(name, client_ip))
+            FleetCtl._logger.info('Not re-adding service {0} to machine {1}'.format(name, client_ip))
             return
 
         name = Systemd._get_name(name, client, '/opt/OpenvStorage/config/templates/systemd/')
@@ -85,20 +84,20 @@ class FleetCtl(object):
             name = target_name
         fleet_name = "{0}@{1}.service".format(name, client_ip)
 
-        logger.debug('Creating fleet unit {0} {1}'.format(fleet_name, template_file))
+        FleetCtl._logger.debug('Creating fleet unit {0} {1}'.format(fleet_name, template_file))
         unit = FleetCtl._create_unit(fleet_name, template_file)
         time.sleep(1)
         FLEET_CLIENT.set_unit_desired_state(unit, 'loaded')
         time.sleep(1)
         unit = FleetCtl._get_unit(fleet_name)
-        logger.info('Created unit {0}'.format(unit.as_dict()))
+        FleetCtl._logger.info('Created unit {0}'.format(unit.as_dict()))
 
     @staticmethod
     def get_service_status(name, client):
         if FleetCtl._has_service(name, client):
             fleet_name = FleetCtl._get_unit_name(name, client)
             unit = FleetCtl._get_unit(fleet_name)
-            logger.debug('Fleet unit {0} status {1}'.format(fleet_name, unit.as_dict()['currentState']))
+            FleetCtl._logger.debug('Fleet unit {0} status {1}'.format(fleet_name, unit.as_dict()['currentState']))
             return unit.as_dict()['currentState'] == 'launched'
         return Systemd.get_service_status(name, client)
 
@@ -110,12 +109,12 @@ class FleetCtl(object):
             FleetCtl.stop_service(name, client)
             result = FLEET_CLIENT.destroy_unit(unit)
             start = time.time()
-            logger.debug('Fleet destroy unit {0} {1}'.format(fleet_name, result))
+            FleetCtl._logger.debug('Fleet destroy unit {0} {1}'.format(fleet_name, result))
             while time.time() - start < 60:
                 time.sleep(1)
                 if FleetCtl._has_service(name, client) is False:
                     return
-            logger.warning('Failed to remove unit {0} after 60 seconds'.format(fleet_name))
+            FleetCtl._logger.warning('Failed to remove unit {0} after 60 seconds'.format(fleet_name))
         else:
             return Systemd.remove_service(name, client)
 
@@ -149,8 +148,8 @@ class FleetCtl(object):
                     break
             unit = FleetCtl._get_unit(fleet_name)
             if unit.as_dict()['currentState'] != 'launched':
-                logger.warning('Failed to start unit {0}'.format(unit.as_dict()))
-            logger.debug('Fleet start unit {0} > {1}'.format(fleet_name, unit.as_dict()['currentState']))
+                FleetCtl._logger.warning('Failed to start unit {0}'.format(unit.as_dict()))
+            FleetCtl._logger.debug('Fleet start unit {0} > {1}'.format(fleet_name, unit.as_dict()['currentState']))
             return unit.as_dict()['currentState']
         return Systemd.start_service(name, client)
 
@@ -168,8 +167,8 @@ class FleetCtl(object):
                     break
             unit = FleetCtl._get_unit(fleet_name)
             if unit['currentState'] != 'loaded':
-                logger.warning('Failed to stop unit {0}'.format(unit.as_dict()))
-            logger.debug('Fleet stop unit {0} {1}'.format(fleet_name, unit.as_dict()['currentState']))
+                FleetCtl._logger.warning('Failed to stop unit {0}'.format(unit.as_dict()))
+            FleetCtl._logger.debug('Fleet stop unit {0} {1}'.format(fleet_name, unit.as_dict()['currentState']))
             return unit.as_dict()['currentState']
         return Systemd.stop_service(name, client)
 
@@ -236,7 +235,7 @@ class FleetCtl(object):
         try:
             return FLEET_CLIENT.get_unit(fleet_name)
         except fleet.APIError as ae:
-            logger.debug('Unit {0} not found. {1}'.format(fleet_name, ae))
+            FleetCtl._logger.debug('Unit {0} not found. {1}'.format(fleet_name, ae))
             if ae.code == 404:
                 # make error more descriptive
                 raise ValueError('Unit with name {0} not found'.format(fleet_name))
@@ -265,7 +264,7 @@ class FleetCtl(object):
                 return unit
             except fleet.APIError as ae:
                 if ae.code == 500:
-                    logger.warning('API Error in fleet, most likely caused by etcd, retrying. {0}'.format(ae))
+                    FleetCtl._logger.warning('API Error in fleet, most likely caused by etcd, retrying. {0}'.format(ae))
                     key = '/_coreos.com/fleet/job/{0}/object'.format(fleet_name)
                     if EtcdConfiguration.exists(key):
                         EtcdConfiguration.delete(key)

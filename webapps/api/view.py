@@ -32,13 +32,12 @@ from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 
-logger = LogHandler.get('api', name='metadata')
-
 
 class MetadataView(View):
     """
     Implements retrieval of generic metadata about the services
     """
+    _logger = LogHandler.get('api', name='metadata')
 
     @auto_response()
     @limit(amount=60, per=60, timeout=60)
@@ -113,7 +112,7 @@ class MetadataView(View):
                                                       'roles': roles,
                                                       'plugins': plugins}.items())
         except Exception as ex:
-            logger.exception('Unexpected exception: {0}'.format(ex))
+            MetadataView._logger.exception('Unexpected exception: {0}'.format(ex))
             return HttpResponse, dict(data.items() + {'authentication_state': 'unexpected_exception'}.items())
 
     @csrf_exempt
@@ -166,5 +165,6 @@ def relay(*args, **kwargs):
             message = ex.detail
         if hasattr(ex, 'status_code'):
             status_code = ex.status_code
+        logger = LogHandler.get('api', name='metadata')
         logger.exception('Error relaying call: {0}'.format(message))
         return HttpResponse(json.dumps({'error': message}), content_type='application/json', status=status_code)

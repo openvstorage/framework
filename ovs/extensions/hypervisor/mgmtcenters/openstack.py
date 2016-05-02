@@ -19,8 +19,6 @@ import os
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.hypervisor.mgmtcenters.management.openstack_mgmt import OpenStackManagement
 
-logger = LogHandler.get('extensions', name='openstack_mgmt')
-
 
 class OpenStack(object):
     """
@@ -44,6 +42,8 @@ class OpenStack(object):
         except ImportError:
             from cinderclient.v1 import client as cinder_client
         from novaclient import exceptions
+
+        self._logger = LogHandler.get('extensions', name='openstack_mgmt')
         self._novaclientexceptions = exceptions
         self.nova_client = nova_client.Client(username = username,
                                               api_key = password,
@@ -58,34 +58,34 @@ class OpenStack(object):
         self.management = OpenStackManagement(cinder_client = self.cinder_client)
         self.STATE_MAPPING = {'up': 'RUNNING'}
 
-        logger.debug('Init complete')
+        self._logger.debug('Init complete')
 
     def configure_vpool_for_host(self, vpool_guid, ip):
         try:
             return self.management.configure_vpool_for_host(vpool_guid, ip)
         except (SystemExit, Exception) as ex:
-            logger.error('Management action "configure_vpool_for_host" failed {0}'.format(ex))
+            self._logger.error('Management action "configure_vpool_for_host" failed {0}'.format(ex))
             raise ex
 
     def unconfigure_vpool_for_host(self, vpool_guid, remove_volume_type, ip):
         try:
             return self.management.unconfigure_vpool_for_host(vpool_guid, remove_volume_type, ip)
         except (SystemExit, Exception) as ex:
-            logger.error('Management action "unconfigure_vpool_for_host" failed {0}'.format(ex))
+            self._logger.error('Management action "unconfigure_vpool_for_host" failed {0}'.format(ex))
             raise ex
 
     def configure_host(self, ip):
         try:
             return self.management.configure_host(ip)
         except (SystemExit, Exception) as ex:
-            logger.error('Management action "configure_host" failed {0}'.format(ex))
+            self._logger.error('Management action "configure_host" failed {0}'.format(ex))
             raise ex
 
     def unconfigure_host(self, ip):
         try:
             return self.management.unconfigure_host(ip)
         except (SystemExit, Exception) as ex:
-            logger.error('Management action "unconfigure_host" failed {0}'.format(ex))
+            self._logger.error('Management action "unconfigure_host" failed {0}'.format(ex))
             raise ex
 
     def get_host_status_by_ip(self, host_ip):
@@ -271,12 +271,12 @@ class OpenStack(object):
         try:
             return self.management.is_host_configured(ip)
         except (SystemExit, Exception) as ex:
-            logger.error('Management action "is_host_configured" failed {0}'.format(ex))
+            self._logger.error('Management action "is_host_configured" failed {0}'.format(ex))
         return False
 
     def is_host_configured_for_vpool(self, vpool_guid, ip):
         try:
             return self.management.is_host_configured_for_vpool(vpool_guid, ip)
         except (SystemExit, Exception) as ex:
-            logger.error('Management action "is_host_configured_for_vpool" failed {0}'.format(ex))
+            self._logger.error('Management action "is_host_configured_for_vpool" failed {0}'.format(ex))
         return False

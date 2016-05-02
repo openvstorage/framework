@@ -31,7 +31,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
@@ -40,13 +40,12 @@ from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient
 
-logger = LogHandler.get('lib', name='storagedriver')
-
 
 class StorageDriverController(object):
     """
     Contains all BLL related to Storage Drivers
     """
+    _logger = LogHandler.get('lib', name='storagedriver')
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.move_away')
@@ -85,19 +84,19 @@ class StorageDriverController(object):
             pmachine.invalidate_dynamics(['host_status'])
         else:
             # No management Center, cannot update status via api
-            logger.info('Updating status of pmachine {0} using SSHClient'.format(pmachine.name))
+            StorageDriverController._logger.info('Updating status of pmachine {0} using SSHClient'.format(pmachine.name))
             host_status = 'RUNNING'
             try:
                 client = SSHClient(storagerouter, username='root')
                 configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
-                logger.info('SSHClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
-                with Remote(client.ip, [LocalStorageRouterClient]) as remote:
-                    lsrc = remote.LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir,
-                                                                                                             storagedriver.vpool.name))
+                StorageDriverController._logger.info('SSHClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
+                with remote(client.ip, [LocalStorageRouterClient]) as rem:
+                    lsrc = rem.LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir,
+                                                                                                          storagedriver.vpool.name))
                     lsrc.server_revision()
-                logger.info('LocalStorageRouterClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
+                StorageDriverController._logger.info('LocalStorageRouterClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
             except Exception as ex:
-                logger.error('Connectivity check failed, assuming host {0} is halted. {1}'.format(pmachine.name, ex))
+                StorageDriverController._logger.error('Connectivity check failed, assuming host {0} is halted. {1}'.format(pmachine.name, ex))
                 host_status = 'HALTED'
             if host_status != 'RUNNING':
                 # Host is stopped
@@ -153,7 +152,7 @@ class StorageDriverController(object):
                 elif service.storagerouter.ip not in offline_node_ips:
                     remaining_ips.append(service.storagerouter.ip)
         if current_service is not None:
-            logger.debug('* Shrink StorageDriver cluster')
+            StorageDriverController._logger.debug('* Shrink StorageDriver cluster')
             cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
             ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip,
                                             cluster_name=cluster_name,
@@ -240,7 +239,7 @@ class StorageDriverController(object):
 
             cluster_name = metadata.cluster_id
             EtcdConfiguration.set('/ovs/framework/arakoon_clusters|voldrv', cluster_name)
-            logger.info('Claiming {0} managed arakoon cluster: {1}'.format('externally' if storagerouter is None else 'internally', cluster_name))
+            StorageDriverController._logger.info('Claiming {0} managed arakoon cluster: {1}'.format('externally' if storagerouter is None else 'internally', cluster_name))
             StorageDriverController._configure_arakoon_to_volumedriver(cluster_name=cluster_name)
             current_services.append(add_service(service_storagerouter=storagerouter, arakoon_ports=ports))
 
@@ -264,7 +263,7 @@ class StorageDriverController(object):
     @staticmethod
     def _configure_arakoon_to_volumedriver(cluster_name):
         print 'Update existing vPools'
-        logger.info('Update existing vPools')
+        StorageDriverController._logger.info('Update existing vPools')
         config = ArakoonClusterConfig(cluster_name)
         config.load_config()
         arakoon_nodes = []

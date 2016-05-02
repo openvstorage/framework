@@ -29,8 +29,6 @@ from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('api', 'oauth2')
-
 
 class OAuth2TokenView(View):
     """
@@ -44,6 +42,7 @@ class OAuth2TokenView(View):
         """
         Handles token post
         """
+        logger = LogHandler.get('api', 'oauth2')
         _ = args, kwargs
         if 'grant_type' not in request.POST:
             return HttpResponseBadRequest, {'error': 'invalid_request'}

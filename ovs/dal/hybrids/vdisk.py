@@ -27,14 +27,14 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('dal', name='hybrid')
-
 
 class VDisk(DataObject):
     """
     The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage.
     vDisks can be part of a vMachine or stand-alone.
     """
+    _logger = LogHandler.get('dal', name='hybrid')
+
     __properties = [Property('name', str, mandatory=False, doc='Name of the vDisk.'),
                     Property('description', str, mandatory=False, doc='Description of the vDisk.'),
                     Property('size', int, doc='Size of the vDisk in Bytes.'),
@@ -68,6 +68,10 @@ class VDisk(DataObject):
 
     @property
     def storagedriver_client(self):
+        """
+        Reload Storage Driver client
+        :return: StorageDriverClient
+        """
         if self._storagedriver_client is None:
             self.reload_client()
         return self._storagedriver_client
@@ -185,7 +189,7 @@ class VDisk(DataObject):
             try:
                 vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id))
             except Exception as ex:
-                logger.error('Error loading statistics_volume from {0}: {1}'.format(self.volume_id, ex))
+                VDisk._logger.error('Error loading statistics_volume from {0}: {1}'.format(self.volume_id, ex))
                 vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
         else:
             vdiskstats = StorageDriverClient.EMPTY_STATISTICS()

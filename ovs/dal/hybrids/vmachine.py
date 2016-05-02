@@ -15,6 +15,7 @@
 """
 VMachine module
 """
+import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.datalist import DataList
@@ -22,7 +23,6 @@ from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.hypervisor.factory import Factory as hvFactory
-import time
 
 
 class VMachine(DataObject):

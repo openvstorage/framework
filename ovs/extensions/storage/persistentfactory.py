@@ -16,9 +16,6 @@
 Generic persistent factory.
 """
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('extensions', name='persistent factory')
 
 
 class PersistentFactory(object):

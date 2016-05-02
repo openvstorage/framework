@@ -20,15 +20,15 @@ from rpyc.utils.zerodeploy import DeployedServer
 from plumbum import SshMachine
 
 
-class Remote(object):
+class remote(object):
     """
     Remote is a context-manager that allows code within its context to be executed through RPyC
     It is supposed to be used like this:
-    with Remote([<ip1>, <ip2>], [module1, module2, module3]) as (remote1, remote2):
+    with remote([<ip1>, <ip2>], [module1, module2, module3]) as (remote1, remote2):
         remote1.module1.do_something()
         remote2.module3.do_something_else()
     Or like this:
-    with Remote(<ip1>, [module1, module2, module3]) as remote1:
+    with remote(<ip1>, [module1, module2, module3]) as remote1:
         remote1.module1.do_something()
     Each module mentioned in the initialization of the remote object will be made available locally (remote1.module1), but will actually be executed remotely on the respective IP (ip1)
     """
@@ -81,4 +81,4 @@ class Remote(object):
                 remote_modules[module.__name__] = getattr(connection.modules[module.__module__], module.__name__)
             else:
                 remote_modules[module.__name__] = connection.modules[module.__name__]
-        return type('Remote', (), remote_modules)
+        return type('remote', (), remote_modules)

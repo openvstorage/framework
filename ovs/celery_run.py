@@ -65,8 +65,6 @@ celery.conf.CELERY_DEFAULT_ROUTING_KEY = 'generic.default'
 celery.conf.CELERYD_PREFETCH_MULTIPLIER = 1  # This makes sure that the workers won't be pre-fetching tasks, this to prevent deadlocks
 celery.conf.CELERYBEAT_SCHEDULE = {}
 
-loghandler = LogHandler.get('celery', name='celery')
-
 
 @task_postrun.connect
 def task_postrun_handler(sender=None, task_id=None, task=None, args=None, kwargs=None, **kwds):
@@ -77,6 +75,7 @@ def task_postrun_handler(sender=None, task_id=None, task=None, args=None, kwargs
     try:
         MessageController.fire(MessageController.Type.TASK_COMPLETE, task_id)
     except Exception as ex:
+        loghandler = LogHandler.get('celery', name='celery')
         loghandler.error('Caught error during postrun handler: {0}'.format(ex))
 
 

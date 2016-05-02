@@ -28,7 +28,8 @@ import re
 import shlex
 import shutil
 
-class InstallHelper():
+
+class InstallHelper(object):
     """
     This class contains various helper methods for the installation procedure
     """
@@ -62,10 +63,12 @@ class InstallHelper():
                     print invalid_message
 
     @staticmethod
-    def ask_choice(choice_options, default_value=None, columns=[]):
+    def ask_choice(choice_options, default_value=None, columns=None):
         """
         Lets the user chose one of a set of options
         """
+        if columns is None:
+            columns = []
         if not choice_options:
             return None
         if len(choice_options) == 1:
@@ -79,7 +82,7 @@ class InstallHelper():
             nr += 1
             output = ''
             for column in columns:
-                output = output + ' {0:<18}'.format(section[column])
+                output += ' {0:<18}'.format(section[column])
             if not output:
                 print '   {0}: {1}'.format(nr, section)
             else:
@@ -100,9 +103,9 @@ class InstallHelper():
         """
         Converts a keyvalue string
         """
-        typecasting = {'string'  : lambda x: str(x),
-                       'integer' : lambda x: int(x),
-                       'boolean' : lambda x: eval(x.capitalize()),
+        typecasting = {'string': lambda x: str(x),
+                       'integer': lambda x: int(x),
+                       'boolean': lambda x: eval(x.capitalize()),
                        'string[]': lambda x: list()}
         if datatype == 'list':
             strucregex = 'structure\[(?P<order>\d+)\].*'
@@ -119,9 +122,9 @@ class InstallHelper():
                     val = typecasting[dtype.strip()](val.strip())
                     # Check for subtype (multi values = string[])
                     if subtype:
-                        if not prop in properties:
+                        if prop not in properties:
                             properties[prop] = [val]
-                        elif not val in properties[prop]:
+                        elif val not in properties[prop]:
                             properties[prop].append(val)
                     # Single value is present
                     else:
@@ -212,7 +215,7 @@ class InstallHelper():
         return '\n'.join(newlines)
 
 
-class VMwareSystem():
+class VMwareSystem(object):
     """
     This class provides VMware specific methods
     """
@@ -228,20 +231,19 @@ class VMwareSystem():
         """
         Retrieve raw device mapping currently in use
         """
-
-        KEY = 'Maps to: '
+        _ = self
+        key = 'Maps to: '
         vmdk_to_rdm_map = {}
-        found_datastores = {}
         cmd = """find /vmfs/volumes/ -type f -name '*.vmdk' -size -1024k -exec grep -l '^createType=.*RawDeviceMap' {} \;"""
         _, rdms_in_use = InstallHelper.execute_command(shlex.split(cmd),
                                                        catch_output=False)
-        for rdm in rdms_in_use[0].split():
-            _, mapping = InstallHelper.execute_command(['vmkfstools', '-q', rdm])
+        for _rdm in rdms_in_use[0].split():
+            _, mapping = InstallHelper.execute_command(['vmkfstools', '-q', _rdm])
             for line in mapping:
-                if KEY in line:
-                    vml_link = line.replace(KEY, '')
-                    _, disk = InstallHelper.execute_command(['ls', '-alh', '/vmfs/devices/disks/' + vml_link.strip()])
-                    vmdk_to_rdm_map[rdm] = disk[0].split(' -> ')[1].strip()
+                if key in line:
+                    vml_link = line.replace(key, '')
+                    _, _disk = InstallHelper.execute_command(['ls', '-alh', '/vmfs/devices/disks/' + vml_link.strip()])
+                    vmdk_to_rdm_map[_rdm] = _disk[0].split(' -> ')[1].strip()
 
         return vmdk_to_rdm_map
 
@@ -334,7 +336,6 @@ class VMwareSystem():
         """
         List the current vmkernel ports
         """
-        vmkernelports_result = {}
         _, interfaceout = InstallHelper.execute_command(['esxcli', '--formatter=keyvalue', 'network', 'ip', 'interface', 'list'])
         vmkernel_interfaces = InstallHelper.convert_keyvalue(''.join(interfaceout))
         return vmkernel_interfaces
@@ -360,11 +361,13 @@ class VMwareSystem():
         for portgroup in nics:
             sequence = nics.index(portgroup)
 
-            nic_vmx += vmx_base % {'nicseq'   : sequence,
+            nic_vmx += vmx_base % {'nicseq': sequence,
                                    'portgroup': portgroup}
         return nic_vmx
 
     def create_vm_config(self, name, cpu_value, memory_value, guestos_value, osbits_value, nic_vmx, disk_vmx, iso_vmx):
+        """ Create VM config """
+        _ = self
         vmpath = '/vmfs/volumes/{0}/{1}'.format(datastore, name)
         vmconfigfile = '{0}/{1}.vmx'.format(vmpath, name)
         if not (os.path.exists(vmpath) or os.path.islink(vmpath)):
@@ -414,13 +417,14 @@ sched.cpu.shares = "high"
 sched.mem.min = "%(memory)s"
 sched.mem.shares = "normal"
 usb_xhci.present = "TRUE"
-""" % {'name'   : name,
-       'cpus'   : cpu_value,
-       'memory' : memory_value,
-       'guestos': guestos_value if osbits_value == 32 else '%s-64' % guestos_value,
-       'nics'   : nic_vmx,
-       'disks'  : disk_vmx,
-       'dvdrom' : iso_vmx}
+""" % {
+            'name': name,
+            'cpus': cpu_value,
+            'memory': memory_value,
+            'guestos': guestos_value if osbits_value == 32 else '%s-64' % guestos_value,
+            'nics': nic_vmx,
+            'disks': disk_vmx,
+            'dvdrom': iso_vmx}
         vmconfig = open(vmconfigfile, "wb")
         vmconfig.write(template_vmx)
         vmconfig.close()
@@ -431,6 +435,7 @@ usb_xhci.present = "TRUE"
         Deletes a VM
         @param vm: name of the vm to delete
         """
+        _ = self
         vmpath = '/vmfs/volumes/{0}/{1}'.format(datastore, vm)
         if os.path.exists(vmpath):
             if os.path.islink(vmpath):
@@ -438,12 +443,12 @@ usb_xhci.present = "TRUE"
             else:
                 shutil.rmtree(vmpath)
 
-    def create_vdisk(self, vm, seq, size, dconfig):
+    def create_vdisk(self, vm, seq, disk_size, dconfig):
         """
         Creates a virtual disk (vmdk)
         @param vm: name of the vm to incorporate into the name
         @param seq: the sequence of the disk in the given config
-        @param size: the size of the disk, given in a <number><k|K|m|M|g|G> format
+        @param disk_size: the size of the disk, given in a <number><k|K|m|M|g|G> format
         @param dconfig: the configuration to which the config has to be appended
         @return: the diskConfig
         """
@@ -456,7 +461,7 @@ usb_xhci.present = "TRUE"
         scsi0:%(target)s.fileName = "%(disksource)s"
         scsi0:%(target)s.deviceType = "scsi-hardDisk"
         """ % {'disksource': vmdkpath,
-               'target'    : seq if seq <= 6 else seq + 1}
+               'target': seq if seq <= 6 else seq + 1}
 
         if os.path.exists(vmdkpath):
             print 'Existing vmdk {0} detected - please remove vm on esx level first!'.format(vmdkpath)
@@ -465,7 +470,7 @@ usb_xhci.present = "TRUE"
         if self._verbose:
             print 'Creating vmdk'
 
-        returncode, output = InstallHelper.execute_command(['vmkfstools', '-c', size, '-d', 'zeroedthick', vmdkpath])
+        returncode, output = InstallHelper.execute_command(['vmkfstools', '-c', disk_size, '-d', 'zeroedthick', vmdkpath])
         if returncode != 0:
             print InstallHelper.boxed_message(['Error occurred during creation of vhd:'] + output)
             sys.exit(1)
@@ -487,8 +492,9 @@ usb_xhci.present = "TRUE"
         dconfig += """scsi0:%(target)s.present = "TRUE"
 scsi0:%(target)s.fileName = "%(disksource)s"
 scsi0:%(target)s.deviceType = "scsi-hardDisk"
-""" % {'disksource': vmdkpath,
-       'target'    : seq if seq <= 6 else seq + 1}
+""" % {
+            'disksource': vmdkpath,
+            'target': seq if seq <= 6 else seq + 1}
         self._verbose = False
         return dconfig
 
@@ -553,7 +559,7 @@ if __name__ == '__main__':
         sys.exit(1)
     all_pgs = VMwareSystem.list_vm_portgroups()
     kernel_pgs = map(lambda p: p['Portgroup'], VMwareSystem.list_vmkernel_ports())
-    vm_pg_names = filter(lambda p: not p in kernel_pgs, all_pgs.keys())
+    vm_pg_names = filter(lambda p: p not in kernel_pgs, all_pgs.keys())
     if len(vm_pg_names) < 2:
         print InstallHelper.boxed_message(['There should be at least two portgroups configured'])
         sys.exit(1)
@@ -644,8 +650,8 @@ ide1:0.startConnected = "FALSE"
     print 'Starting appliance'
     InstallHelper.execute_command(['vim-cmd', 'hostsvc/autostartmanager/enable_autostart', '1'])
     InstallHelper.execute_command(['vim-cmd', 'hostsvc/autostartmanager/update_autostartentry',
-                              '{0}'.format(vm_id), 'PowerOn', '5', '1', 'guestShutdown', '5',
-                              'systemDefault'])
+                                   '{0}'.format(vm_id), 'PowerOn', '5', '1', 'guestShutdown', '5',
+                                   'systemDefault'])
     InstallHelper.execute_command(['vim-cmd', 'vmsvc/power.on', vm_id])
 
     print InstallHelper.boxed_message(['The Open vStorage VM (%s) is powered on' % vm_name,

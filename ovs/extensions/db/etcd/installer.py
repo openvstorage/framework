@@ -25,8 +25,6 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='etcd_installer')
-
 
 class EtcdInstaller(object):
     """
@@ -40,6 +38,8 @@ class EtcdInstaller(object):
     SERVER_URL = 'http://{0}:{1}'
     CLIENT_URL = 'http://{0}:{1}'
     MEMBER_REGEX = re.compile(ur'^(?P<id>[^:]+): name=(?P<name>[^ ]+) peerURLs=(?P<peer>[^ ]+) clientURLs=(?P<client>[^ ]+)$')
+
+    _logger = LogHandler.get('extensions', name='etcd_installer')
 
     def __init__(self):
         """
@@ -65,12 +65,12 @@ class EtcdInstaller(object):
 
         :return: None
         """
-        logger.debug('Creating cluster "{0}" on {1}'.format(cluster_name, ip))
+        EtcdInstaller._logger.debug('Creating cluster "{0}" on {1}'.format(cluster_name, ip))
 
         client = SSHClient(ip, username='root')
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
         if ServiceManager.has_service(target_name, client) and ServiceManager.get_service_status(target_name, client) is True:
-            logger.info('Service {0} already configured and running'.format(target_name))
+            EtcdInstaller._logger.info('Service {0} already configured and running'.format(target_name))
             return
 
         node_name = System.get_my_machine_id(client)
@@ -98,7 +98,7 @@ class EtcdInstaller(object):
         EtcdInstaller.start(cluster_name, client)
         EtcdInstaller.wait_for_cluster(cluster_name, client, client_port=client_port)
 
-        logger.debug('Creating cluster "{0}" on {1} completed'.format(cluster_name, ip))
+        EtcdInstaller._logger.debug('Creating cluster "{0}" on {1} completed'.format(cluster_name, ip))
 
     @staticmethod
     def extend_cluster(master_ip, new_ip, cluster_name, server_port=DEFAULT_SERVER_PORT, client_port=DEFAULT_CLIENT_PORT):
@@ -119,7 +119,7 @@ class EtcdInstaller(object):
         :param client_port: Port to be used by client
         :type client_port: int
         """
-        logger.debug('Extending cluster "{0}" from {1} to {2}'.format(cluster_name, master_ip, new_ip))
+        EtcdInstaller._logger.debug('Extending cluster "{0}" from {1} to {2}'.format(cluster_name, master_ip, new_ip))
 
         master_client = SSHClient(master_ip, username='root')
         if not EtcdInstaller._is_healty(cluster_name, master_client, client_port=client_port):
@@ -132,7 +132,7 @@ class EtcdInstaller(object):
         cluster_members = master_client.run(command).splitlines()
         for cluster_member in cluster_members:
             if new_server_url in cluster_member:
-                logger.info('Node {0} already member of etcd cluster'.format(new_ip))
+                EtcdInstaller._logger.info('Node {0} already member of etcd cluster'.format(new_ip))
                 return
 
         current_cluster = []
@@ -175,7 +175,7 @@ class EtcdInstaller(object):
         EtcdInstaller.start(cluster_name, new_client)
         EtcdInstaller.wait_for_cluster(cluster_name, new_client, client_port=client_port)
 
-        logger.debug('Extending cluster "{0}" from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
+        EtcdInstaller._logger.debug('Extending cluster "{0}" from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
 
     @staticmethod
     def shrink_cluster(remaining_node_ip, ip_to_remove, cluster_name, offline_node_ips=None, client_port=DEFAULT_CLIENT_PORT):
@@ -198,7 +198,7 @@ class EtcdInstaller(object):
 
         :return: None
         """
-        logger.debug('Shrinking cluster "{0}" from {1}'.format(cluster_name, ip_to_remove))
+        EtcdInstaller._logger.debug('Shrinking cluster "{0}" from {1}'.format(cluster_name, ip_to_remove))
 
         current_client = SSHClient(remaining_node_ip, username='root')
         if not EtcdInstaller._is_healty(cluster_name, current_client, client_port=client_port):
@@ -221,7 +221,7 @@ class EtcdInstaller(object):
             EtcdInstaller.deploy_to_slave(remaining_node_ip, ip_to_remove, cluster_name)
         EtcdInstaller.wait_for_cluster(cluster_name, current_client, client_port=client_port)
 
-        logger.debug('Shrinking cluster "{0}" from {1} completed'.format(cluster_name, ip_to_remove))
+        EtcdInstaller._logger.debug('Shrinking cluster "{0}" from {1} completed'.format(cluster_name, ip_to_remove))
 
     @staticmethod
     def has_cluster(ip, cluster_name):
@@ -236,7 +236,7 @@ class EtcdInstaller(object):
         :return: True or False
         :rtype: bool
         """
-        logger.debug('Checking whether {0} has cluster "{1}" running'.format(ip, cluster_name))
+        EtcdInstaller._logger.debug('Checking whether {0} has cluster "{1}" running'.format(ip, cluster_name))
         client = SSHClient(ip, username='root')
         try:
             return client.run('etcdctl member list').strip() != ''
@@ -258,7 +258,7 @@ class EtcdInstaller(object):
 
         :return: None
         """
-        logger.debug('  Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, master_ip, slave_ip))
+        EtcdInstaller._logger.debug('  Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, master_ip, slave_ip))
         master_client = SSHClient(master_ip, username='root')
         slave_client = SSHClient(slave_ip, username='root')
 
@@ -268,7 +268,7 @@ class EtcdInstaller(object):
             current_cluster.append('{0}={1}'.format(info['name'], info['peer']))
 
         EtcdInstaller._setup_proxy(','.join(current_cluster), slave_client, cluster_name, force=True)
-        logger.debug('  Setting up proxy "{0}" from {1} to {2} completed'.format(cluster_name, master_ip, slave_ip))
+        EtcdInstaller._logger.debug('  Setting up proxy "{0}" from {1} to {2} completed'.format(cluster_name, master_ip, slave_ip))
 
     @staticmethod
     def use_external(external, slave_ip, cluster_name):
@@ -285,9 +285,9 @@ class EtcdInstaller(object):
 
         :return: None
         """
-        logger.debug('Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, external, slave_ip))
+        EtcdInstaller._logger.debug('Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, external, slave_ip))
         EtcdInstaller._setup_proxy(external, SSHClient(slave_ip, username='root'), cluster_name)
-        logger.debug('Setting up proxy "{0}" from {1} to {2} completed'.format(cluster_name, external, slave_ip))
+        EtcdInstaller._logger.debug('Setting up proxy "{0}" from {1} to {2} completed'.format(cluster_name, external, slave_ip))
 
     @staticmethod
     def remove_proxy(cluster_name, ip):
@@ -313,7 +313,7 @@ class EtcdInstaller(object):
         base_name = 'ovs-etcd-proxy'
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
         if force is False and ServiceManager.has_service(target_name, slave_client) and ServiceManager.get_service_status(target_name, slave_client) is True:
-            logger.info('Service {0} already configured and running'.format(target_name))
+            EtcdInstaller._logger.info('Service {0} already configured and running'.format(target_name))
             return
         EtcdInstaller.stop(cluster_name, slave_client)
 
@@ -394,7 +394,7 @@ class EtcdInstaller(object):
 
         :return: None
         """
-        logger.debug('Waiting for cluster "{0}"'.format(cluster_name))
+        EtcdInstaller._logger.debug('Waiting for cluster "{0}"'.format(cluster_name))
         tries = 5
         healthy = EtcdInstaller._is_healty(cluster_name, client, client_port=client_port)
         while healthy is False and tries > 0:
@@ -403,7 +403,7 @@ class EtcdInstaller(object):
             healthy = EtcdInstaller._is_healty(cluster_name, client, client_port=client_port)
         if healthy is False:
             raise etcd.EtcdConnectionFailed('Etcd cluster "{0}" could not be started correctly'.format(cluster_name))
-        logger.debug('Cluster "{0}" running'.format(cluster_name))
+        EtcdInstaller._logger.debug('Cluster "{0}" running'.format(cluster_name))
 
     @staticmethod
     def _is_healty(cluster_name, client, client_port):
@@ -424,10 +424,10 @@ class EtcdInstaller(object):
                 command = 'etcdctl --peers={0}:{1} cluster-health'.format(client.ip, client_port)
             output = client.run(command)
             if 'cluster is healthy' not in output:
-                logger.debug('  Cluster "{0}" is not healthy: {1}'.format(cluster_name, ' - '.join(output.splitlines())))
+                EtcdInstaller._logger.debug('  Cluster "{0}" is not healthy: {1}'.format(cluster_name, ' - '.join(output.splitlines())))
                 return False
-            logger.debug('  Cluster "{0}" is healthy'.format(cluster_name))
+            EtcdInstaller._logger.debug('  Cluster "{0}" is healthy'.format(cluster_name))
             return True
         except Exception as ex:
-            logger.debug('  Cluster "{0}" is not healthy: {1}'.format(cluster_name, ex))
+            EtcdInstaller._logger.debug('  Cluster "{0}" is not healthy: {1}'.format(cluster_name, ex))
             return False
