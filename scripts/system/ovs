@@ -11,7 +11,6 @@ function show_help {
     echo "    - ovs                       Launch Open vStorage shell (ipython)"
     echo "    - ovs help                  Show this help section"
     echo "    - ovs collect logs          Collect all Open vStorage logs to a tarball (for support purposes)"
-    echo "    - ovs unittest <filepath>   Run the unittests in <filepath>"
     echo ""
     echo "  * Setup options:"
     echo "    - ovs setup                 Launch Open vStorage setup and autodetect required node role (master/extra)"
@@ -34,6 +33,11 @@ function show_help {
     echo "  * Services options:"
     echo "    - ovs stop services         Try to stop all Open vStorage services"
     echo "    - ovs start services        Try to start all Open vStorage services"
+    echo ""
+    echo "  * Unit tests:"
+    echo "    - ovs unittest              Execute all unittests"
+    echo "    - ovs unittest list         List all unittests"
+    echo "    - ovs unittest <filepath>   Run the unittests in <filepath>"
 }
 
 if [ "$1" = "help" ] ; then
@@ -124,8 +128,15 @@ elif [ "$1" = "collect" ] ; then
         show_help
     fi
 elif [ "$1" = "unittest" ] ; then
-    shift
-    python $@
+    if [ "$#" -eq 1 ]; then
+        python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.run_tests()"
+    elif [ "$#" -ge 3 ]; then
+        show_help
+    elif [ "$2" = "list" ]; then
+        python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.list_tests(print_tests=True)"
+    else
+        python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.run_tests('$2')"
+    fi
 elif [ "$#" -ge 1 ] ; then
     show_help
 else

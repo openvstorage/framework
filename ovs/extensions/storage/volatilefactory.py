@@ -38,7 +38,7 @@ class VolatileFactory(object):
                 from ovs.extensions.storage.volatile.memcachestore import MemcacheStore
                 nodes = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
                 VolatileFactory.store = MemcacheStore(nodes)
-            if client_type == 'default':
+            if client_type == 'dummy':
                 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
                 VolatileFactory.store = DummyVolatileStore()
 

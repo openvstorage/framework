@@ -509,7 +509,7 @@ class VMachineController(object):
         """
         Remove a snapshot from the vmachine
         @param vmachineguid: Guid of the virtual machine
-        @param timestampt: timestamp of the snapshot
+        @param timestamp: timestamp of the snapshot
         """
         vmachine = VMachine(vmachineguid)
         vmachine_snapshots = [snap for snap in vmachine.snapshots if snap['timestamp'] == str(timestamp)]

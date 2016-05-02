@@ -40,7 +40,7 @@ class PersistentFactory(object):
             if client_type in ['pyrakoon', 'arakoon']:
                 from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
                 PersistentFactory.store = PyrakoonStore(str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|ovsdb')))
-            if client_type == 'default':
+            if client_type == 'dummy':
                 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
                 PersistentFactory.store = DummyPersistentStore()
 

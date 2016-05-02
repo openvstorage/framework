@@ -104,8 +104,3 @@ class Interfaces(TestCase):
                         the_class = member[1]
                         classes.append(the_class)
         return classes
-
-if __name__ == '__main__':
-    import unittest
-    suite = unittest.TestLoader().loadTestsFromTestCase(Interfaces)
-    unittest.TextTestRunner(verbosity=2).run(suite)

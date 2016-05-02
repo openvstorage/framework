@@ -511,8 +511,3 @@ class Decorators(TestCase):
                 self.assertIsInstance(response.data['data']['instance'], list)
                 self.assertIsInstance(response.data['data']['instance'][0], User)
                 self.assertIn(response.data['data']['instance'][0].username, ['aa', 'bb'])
-
-if __name__ == '__main__':
-    import unittest
-    suite = unittest.TestLoader().loadTestsFromTestCase(Decorators)
-    unittest.TextTestRunner(verbosity=2).run(suite)

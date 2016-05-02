@@ -16,7 +16,6 @@
 """
 Basic test module
 """
-import sys
 import uuid
 import time
 from unittest import TestCase

@@ -147,9 +147,3 @@ class Hybrid(TestCase):
             self.assertEqual(len(missing_metadata), 0,
                              'Missing metadata for properties in {0}: {1}'.format(cls.__name__, missing_metadata))
             instance.delete()
-
-if __name__ == '__main__':
-    import unittest
-    suite = unittest.TestLoader().loadTestsFromTestCase(Hybrid)
-    result = not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful()
-    sys.exit(result)

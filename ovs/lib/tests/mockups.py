@@ -148,6 +148,17 @@ class StorageDriverClient(object):
         return SRClient(StorageDriverClient.client_type)
 
     @staticmethod
+    def clean():
+        """
+        Restore empty settings
+        """
+        StorageDriverClient.snapshots = {}
+        StorageDriverClient.metadata_backend_config = {}
+        StorageDriverClient.catch_up = {}
+        StorageDriverClient.vrouter_id = {}
+        StorageDriverClient.client_type = 'MOCK_OK'
+
+    @staticmethod
     def empty_info():
         """
         Returns an empty info object
@@ -243,6 +254,13 @@ class StorageDriverModule(object):
         Use good client
         """
         StorageDriverClient.use_good_client()
+
+    @staticmethod
+    def clean():
+        """
+        Restore empty settings
+        """
+        StorageDriverClient.clean()
 
 
 class SSHClient(object):

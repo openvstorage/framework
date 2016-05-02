@@ -16,22 +16,25 @@
 Delete snapshots test module
 """
 import sys
-import unittest
-from time import mktime
-from datetime import datetime, timedelta
+import time
+import datetime
 from unittest import TestCase
 from ovs.lib.tests.mockups import StorageDriverModule
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
 
 
 class DeleteSnapshots(TestCase):
     """
     This test class will validate the various scenarios of the delete snapshots logic
     """
+    VolatileFactory.store = None
+    PersistentFactory.store = None
+    volatile = VolatileFactory.get_client('dummy')
+    persistent = PersistentFactory.get_client('dummy')
+    volatile._keep_in_memory_only = True
+    persistent._keep_in_memory_only = True
 
     Disk = None
     VDisk = None
@@ -54,10 +57,6 @@ class DeleteSnapshots(TestCase):
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        # Load dummy stores
-        PersistentFactory.store = DummyPersistentStore()
-        VolatileFactory.store = DummyVolatileStore()
-        # Replace mocked classes
         sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriverModule
         # Import required modules/classes after mocking is done
         from ovs.dal.hybrids.backendtype import BackendType
@@ -91,18 +90,44 @@ class DeleteSnapshots(TestCase):
             VMachineController, VDiskController, ScheduledTaskController, StorageRouter(), Disk(), DiskPartition()
 
         # Cleaning storage
-        VolatileFactory.store.clean()
-        PersistentFactory.store.clean()
+        StorageDriverModule.clean()
+        DeleteSnapshots.volatile.clean()
+        DeleteSnapshots.persistent.clean()
+        DeleteSnapshots.volatile._keep_in_memory_only = True
+        DeleteSnapshots.persistent._keep_in_memory_only = True
 
     @classmethod
     def setUp(cls):
         """
         (Re)Sets the stores on every test
         """
-        PersistentFactory.store = DummyPersistentStore()
-        PersistentFactory.store.clean()
-        VolatileFactory.store = DummyVolatileStore()
-        VolatileFactory.store.clean()
+        # Cleaning storage
+        StorageDriverModule.clean()
+        DeleteSnapshots.volatile.clean()
+        DeleteSnapshots.persistent.clean()
+
+    @classmethod
+    def tearDownClass(cls):
+        """
+        Clean up the unittest suite
+        """
+        # Restore original modules
+        sys.modules.pop('ovs.extensions.storageserver.storagedriver', sys.modules)
+
+        # Cleaning storage
+        StorageDriverModule.clean()
+        DeleteSnapshots.volatile.clean()
+        DeleteSnapshots.persistent.clean()
+
+    @classmethod
+    def tearDown(cls):
+        """
+        Clean up the unittest
+        """
+        # Cleaning storage
+        StorageDriverModule.clean()
+        DeleteSnapshots.volatile.clean()
+        DeleteSnapshots.persistent.clean()
 
     def test_happypath(self):
         """
@@ -110,7 +135,7 @@ class DeleteSnapshots(TestCase):
         every now an then. The delete policy is executed every day
         """
         # Setup
-        # There are 2 machines; one with two disks, one with one disk and an additional disk
+        # There are 2 machines; one with two disks, one with one disk and a stand-alone additional disk
         failure_domain = FailureDomain()
         failure_domain.name = 'Test'
         failure_domain.save()
@@ -207,15 +232,15 @@ class DeleteSnapshots(TestCase):
         # Run the testing scenario
         debug = True
         amount_of_days = 50
-        base = datetime.now().date()
-        day = timedelta(1)
+        base = datetime.datetime.now().date()
+        day = datetime.timedelta(1)
         minute = 60
         hour = minute * 60
 
         for d in xrange(0, amount_of_days):
             base_timestamp = DeleteSnapshots._make_timestamp(base, day * d)
             print ''
-            print 'Day cycle: {0}: {1}'.format(d, datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d'))
+            print 'Day cycle: {0}: {1}'.format(d, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d'))
 
             # At the start of the day, delete snapshot policy runs at 00:30
             print '- Deleting snapshots'
@@ -272,7 +297,7 @@ class DeleteSnapshots(TestCase):
 
         minute = 60
         hour = minute * 60
-        day = timedelta(1)
+        day = datetime.timedelta(1)
 
         print '  - {0}'.format(vdisk.name)
 
@@ -283,7 +308,7 @@ class DeleteSnapshots(TestCase):
                 snapshots[int(snapshot['timestamp'])] = snapshot
             for d in xrange(0, amount_of_days):
                 timestamp = DeleteSnapshots._make_timestamp(base_date, d * day)
-                visual = '    - {0} '.format(datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d'))
+                visual = '    - {0} '.format(datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d'))
                 for t in xrange(timestamp, timestamp + hour * 24, minute * 30):
                     if t in snapshots:
                         visual += 'C' if snapshots[t]['is_consistent'] else 'R'
@@ -309,58 +334,41 @@ class DeleteSnapshots(TestCase):
         while pointer < current_day and pointer <= 28:
             amount_consistent += 1  # One consistent snapshot per week
             pointer += 7
-        self.assertEqual(
-            len(consistent), amount_consistent,
-            'Wrong amount of consistent snapshots: {0} vs expected {1}'.format(len(consistent),
-                                                                               amount_consistent)
-        )
-        self.assertEqual(
-            len(inconsistent), amount_inconsistent,
-            'Wrong amount of inconsistent snapshots: {0} vs expected {1}'.format(len(inconsistent),
-                                                                                 amount_inconsistent)
-        )
+        self.assertEqual(first=len(consistent),
+                         second=amount_consistent,
+                         msg='Wrong amount of consistent snapshots: {0} vs expected {1}'.format(len(consistent), amount_consistent))
+        self.assertEqual(first=len(inconsistent),
+                         second=amount_inconsistent,
+                         msg='Wrong amount of inconsistent snapshots: {0} vs expected {1}'.format(len(inconsistent), amount_inconsistent))
 
         # Check of the correctness of the snapshot timestamp
         for d in xrange(0, current_day):
             if d == (current_day - 1):
                 for h in xrange(2, 23):
                     timestamp = DeleteSnapshots._make_timestamp(base_date, d * day) + (hour * h)
-                    self.assertIn(
-                        timestamp, inconsistent,
-                        'Expected hourly inconsistent snapshot for {0} at {1}'.format(
-                            vdisk.name, datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
-                        )
-                    )
+                    self.assertIn(member=timestamp,
+                                  container=inconsistent,
+                                  msg='Expected hourly inconsistent snapshot for {0} at {1}'.format(vdisk.name, DeleteSnapshots._from_timestamp(timestamp)))
                     if h in [6, 12, 18]:
                         ts = (timestamp + (minute * 30))
-                        self.assertIn(
-                            ts, consistent,
-                            'Expected random consistent snapshot for {0} at {1}'.format(
-                                vdisk.name, datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M')
-                            )
-                        )
+                        self.assertIn(member=ts,
+                                      container=consistent,
+                                      msg='Expected random consistent snapshot for {0} at {1}'.format(vdisk.name, DeleteSnapshots._from_timestamp(ts)))
             elif d > (current_day - 7):
                 timestamp = DeleteSnapshots._make_timestamp(base_date, d * day) + (hour * 18) + (minute * 30)
-                self.assertIn(
-                    timestamp, consistent,
-                    'Expected daily consistent snapshot for {0} at {1}'.format(
-                        vdisk.name, datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
-                    )
-                )
+                self.assertIn(member=timestamp,
+                              container=consistent,
+                              msg='Expected daily consistent snapshot for {0} at {1}'.format(vdisk.name, DeleteSnapshots._from_timestamp(timestamp)))
             elif d % 7 == 0 and d > 28:
                 timestamp = DeleteSnapshots._make_timestamp(base_date, d * day) + (hour * 18) + (minute * 30)
-                self.assertIn(
-                    timestamp, consistent,
-                    'Expected weekly consistent snapshot for {0} at {1}'.format(
-                        vdisk.name, datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
-                    )
-                )
+                self.assertIn(member=timestamp,
+                              container=consistent,
+                              msg='Expected weekly consistent snapshot for {0} at {1}'.format(vdisk.name, DeleteSnapshots._from_timestamp(timestamp)))
 
     @staticmethod
     def _make_timestamp(base, offset):
-        return int(mktime((base + offset).timetuple()))
+        return int(time.mktime((base + offset).timetuple()))
 
-
-if __name__ == '__main__':
-    suite = unittest.TestLoader().loadTestsFromTestCase(DeleteSnapshots)
-    unittest.TextTestRunner().run(suite)
+    @staticmethod
+    def _from_timestamp(timestamp):
+        return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')

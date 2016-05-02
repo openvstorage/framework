@@ -520,8 +520,3 @@ class Authentication(TestCase):
         response = MetadataView.as_view()(request)
         response_content = json.loads(response.content)
         self.assertDictContainsSubset(dict(result_data.items() + {'authentication_state': 'token_expired'}.items()), response_content)
-
-if __name__ == '__main__':
-    import unittest
-    suite = unittest.TestLoader().loadTestsFromTestCase(Authentication)
-    unittest.TextTestRunner(verbosity=2).run(suite)

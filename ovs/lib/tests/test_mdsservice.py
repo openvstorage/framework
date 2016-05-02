@@ -15,24 +15,26 @@
 """
 MDSService test module
 """
-import unittest
 import sys
 import json
 from unittest import TestCase
 from ovs.lib.tests.mockups import SSHClientModule, StorageDriverModule, StorageDriverClient
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
 
 
 class MDSServices(TestCase):
     """
     This test class will validate the various scenarios of the MDSService logic
     """
+    VolatileFactory.store = None
+    PersistentFactory.store = None
+    volatile = VolatileFactory.get_client('dummy')
+    persistent = PersistentFactory.get_client('dummy')
+    volatile._keep_in_memory_only = True
+    persistent._keep_in_memory_only = True
 
-    client = None
     BackendType = None
     FailureDomain = None
     MDSService = None
@@ -54,16 +56,9 @@ class MDSServices(TestCase):
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        # Load dummy stores
-        VolatileFactory.store = DummyVolatileStore()
-        PersistentFactory.store = DummyPersistentStore()
-        DummyVolatileStore._keep_in_memory_only = True
-        DummyPersistentStore._keep_in_memory_only = True
-
         # Replace mocked classes
         sys.modules['ovs.extensions.generic.sshclient'] = SSHClientModule
         sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriverModule
-        # Retrieve persistent factory client
         # Import required modules/classes after mocking is done
         from ovs.dal.hybrids.backendtype import BackendType
         from ovs.dal.hybrids.failuredomain import FailureDomain
@@ -79,7 +74,6 @@ class MDSServices(TestCase):
         from ovs.extensions.generic.volatilemutex import VolatileMutex
         from ovs.lib.mdsservice import MDSServiceController
         # Globalize mocked classes
-        global client
         global BackendType
         global FailureDomain
         global MDSService
@@ -93,42 +87,46 @@ class MDSServices(TestCase):
         global VDisk
         global VolatileMutex
         global VPool
-        client = PersistentFactory.get_client()
         _ = BackendType(), FailureDomain(), MDSService(), MDSServiceController, MDSServiceVDisk(), \
             PMachine(), Service(), ServiceType(), StorageDriver(), StorageRouter(), VDisk(), VolatileMutex('dummy'), VPool()
 
         # Configuration
         def _get(key):
-            if client.exists(key):
-                return client.get(key)
+            if MDSServices.persistent.exists(key):
+                return MDSServices.persistent.get(key)
 
         EtcdConfiguration.get = staticmethod(_get)
 
         # Cleaning storage
-        VolatileFactory.store.clean()
-        PersistentFactory.store.clean()
+        MDSServices.volatile.clean()
+        MDSServices.persistent.clean()
 
     @classmethod
     def setUp(cls):
         """
         (Re)Sets the stores on every test
         """
-        PersistentFactory.store = DummyPersistentStore()
-        PersistentFactory.store.clean()
-        VolatileFactory.store = DummyVolatileStore()
-        VolatileFactory.store.clean()
+        # Cleaning storage
+        MDSServices.volatile.clean()
+        MDSServices.persistent.clean()
 
-        client.set('/ovs/framework/logging|path', '/var/log/ovs')
-        client.set('/ovs/framework/logging|level', 'DEBUG')
-        client.set('/ovs/framework/logging|default_file', 'generic')
-        client.set('/ovs/framework/logging|default_name', 'logger')
+        MDSServices.persistent.set('/ovs/framework/logging|path', '/var/log/ovs')
+        MDSServices.persistent.set('/ovs/framework/logging|level', 'DEBUG')
+        MDSServices.persistent.set('/ovs/framework/logging|default_file', 'generic')
+        MDSServices.persistent.set('/ovs/framework/logging|default_name', 'logger')
 
     @classmethod
     def tearDownClass(cls):
         """
         Clean up the unittest
         """
-        pass
+        # Restore modules
+        sys.modules.pop('ovs.extensions.generic.sshclient', sys.modules)
+        sys.modules.pop('ovs.extensions.storageserver.storagedriver', sys.modules)
+
+        # Cleaning storage
+        MDSServices.volatile.clean()
+        MDSServices.persistent.clean()
 
     def _generate_nc_function(self, address, mds_service):
         """
@@ -146,7 +144,8 @@ class MDSServices(TestCase):
         _ = self
         return lambda s: _configs
 
-    def _build_service_structure(self, structure):
+    @staticmethod
+    def _build_service_structure(structure):
         """
         Builds an MDS service structure
         """
@@ -310,7 +309,7 @@ class MDSServices(TestCase):
             * Set capacity to 0  (also implies infinite, but caught in code, otherwise division by 0 error)
                 * Load should ALWAYS return infinite, load_plus should ALWAYS return infinite
         """
-        vpools, storagerouters, storagedrivers, services, mds_services, _, _ = self._build_service_structure(
+        vpools, storagerouters, storagedrivers, services, mds_services, _, _ = MDSServices._build_service_structure(
             {'vpools': [1],
              'failure_domains': [1],
              'storagerouters': [(1, 1, None)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
@@ -361,8 +360,8 @@ class MDSServices(TestCase):
             * Retrieve and validate preferred storage driver config for vpool2
             * Update capacity for 1 MDS service in vpool1 and validate changes in preferred storage driver config
         """
-        client.set('/ovs/framework/storagedriver|mds_safety', 3)
-        vpools, storagerouters, storagedrivers, services, mds_services, _, _ = self._build_service_structure(
+        MDSServices.persistent.set('/ovs/framework/storagedriver|mds_safety', 3)
+        vpools, storagerouters, storagedrivers, services, mds_services, _, _ = MDSServices._build_service_structure(
             {'vpools': [1, 2],
              'failure_domains': [1, 2],
              'storagerouters': [(1, 1, 2), (2, 2, 1), (3, 1, 2), (4, 2, 1), (5, 1, None), (6, 2, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
@@ -465,7 +464,7 @@ class MDSServices(TestCase):
                 for junction in disk.mds_services:
                     self.assertIn(junction.mds_service, expected_mds_services)
 
-        vpools, _, _, _, mds_services, _, _ = self._build_service_structure(
+        vpools, _, _, _, mds_services, _, _ = MDSServices._build_service_structure(
             {'vpools': [1],
              'failure_domains': [1],
              'storagerouters': [(1, 1, None), (2, 1, None), (3, 1, None), (4, 1, None)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
@@ -530,9 +529,9 @@ class MDSServices(TestCase):
             * Sub-Test 13: Change individual vdisk's secondary failure domain
             * Sub-Test 14: Remove individual vdisk's secondary failure domain
         """
-        client.set('/ovs/framework/storagedriver|mds_safety', 3)
-        client.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = self._build_service_structure(
+        MDSServices.persistent.set('/ovs/framework/storagedriver|mds_safety', 3)
+        MDSServices.persistent.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = MDSServices._build_service_structure(
             {'vpools': [1],
              'failure_domains': [1, 2],
              'storagerouters': [(1, 1, 2), (2, 1, 2), (3, 2, 1), (4, 2, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
@@ -541,7 +540,7 @@ class MDSServices(TestCase):
         )
         vdisks = {}
         for sr in storagerouters.values():
-            client.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
+            MDSServices.persistent.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
         for mds_service in mds_services.itervalues():
             vdisks.update(self._create_vdisks_for_mds_service(2, len(vdisks) + 1, mds_service=mds_service))
 
@@ -720,10 +719,10 @@ class MDSServices(TestCase):
         PersistentFactory.store.clean()
         VolatileFactory.store.clean()
 
-        client.set('/ovs/framework/storagedriver|mds_safety', 3)
-        client.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        MDSServices.persistent.set('/ovs/framework/storagedriver|mds_safety', 3)
+        MDSServices.persistent.set('/ovs/framework/storagedriver|mds_tlogs', 100)
 
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = self._build_service_structure(
+        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = MDSServices._build_service_structure(
             {'vpools': [1],
              'failure_domains': [1, 2, 3],
              'storagerouters': [(1, 1, 2), (2, 1, 2), (3, 1, None), (4, 1, 3), (5, 2, 3), (6, 3, None), (7, 3, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
@@ -731,7 +730,7 @@ class MDSServices(TestCase):
              'mds_services': [(1, 1), (2, 2), (3, 2), (4, 3), (5, 4), (6, 5), (7, 5), (8, 6), (9, 7)]}  # (<id>, <storagedriver_id>)
         )
         for sr in storagerouters.values():
-            client.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
+            MDSServices.persistent.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(self._create_vdisks_for_mds_service(1, len(vdisks) + 1, mds_service=mds_service))
@@ -891,7 +890,7 @@ class MDSServices(TestCase):
         self._check_reality(configs, loads, vdisks, mds_services)
 
         # Sub-Test 11: Add some more vDisks and increase safety
-        client.set('/ovs/framework/storagedriver|mds_safety', 5)
+        MDSServices.persistent.set('/ovs/framework/storagedriver|mds_safety', 5)
         for mds_service in mds_services.itervalues():
             vdisks.update(self._create_vdisks_for_mds_service(1, len(vdisks) + 1, mds_service=mds_service))
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
@@ -926,7 +925,7 @@ class MDSServices(TestCase):
         self._check_reality(configs, loads, vdisks, mds_services)
 
         # Sub-Test 12: Reduce safety
-        client.set('/ovs/framework/storagedriver|mds_safety', 3)
+        MDSServices.persistent.set('/ovs/framework/storagedriver|mds_safety', 3)
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
                    [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 6}],
@@ -1070,10 +1069,10 @@ class MDSServices(TestCase):
             * Sub-Test 9: Add backup failure domain
             * Sub-Test 10: Remove backup failure domain
         """
-        client.set('/ovs/framework/storagedriver|mds_safety', 2)
-        client.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        MDSServices.persistent.set('/ovs/framework/storagedriver|mds_safety', 2)
+        MDSServices.persistent.set('/ovs/framework/storagedriver|mds_tlogs', 100)
 
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = self._build_service_structure(
+        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = MDSServices._build_service_structure(
             {'vpools': [1],
              'failure_domains': [1, 2],
              'storagerouters': [(1, 1, 2), (2, 1, 2), (3, 2, 1), (4, 2, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
@@ -1081,7 +1080,7 @@ class MDSServices(TestCase):
              'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)]}  # (<id>, <storagedriver_id>)
         )
         for sr in storagerouters.values():
-            client.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 55)
+            MDSServices.persistent.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 55)
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(self._create_vdisks_for_mds_service(2, len(vdisks) + 1, mds_service=mds_service))
@@ -1255,10 +1254,10 @@ class MDSServices(TestCase):
         PersistentFactory.store.clean()
         VolatileFactory.store.clean()
 
-        client.set('/ovs/framework/storagedriver|mds_safety', 2)
-        client.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        MDSServices.persistent.set('/ovs/framework/storagedriver|mds_safety', 2)
+        MDSServices.persistent.set('/ovs/framework/storagedriver|mds_tlogs', 100)
 
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = self._build_service_structure(
+        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = MDSServices._build_service_structure(
             {'vpools': [1],
              'failure_domains': [1, 2, 3],
              'storagerouters': [(1, 1, 2), (2, 1, 2), (3, 1, None), (4, 1, 3), (5, 2, 3), (6, 3, None), (7, 3, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
@@ -1266,7 +1265,7 @@ class MDSServices(TestCase):
              'mds_services': [(1, 1), (2, 2), (3, 2), (4, 3), (5, 4), (6, 5), (7, 5), (8, 6), (9, 7)]}  # (<id>, <storagedriver_id>)
         )
         for sr in storagerouters.values():
-            client.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 35)
+            MDSServices.persistent.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 35)
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(self._create_vdisks_for_mds_service(1, len(vdisks) + 1, mds_service=mds_service))
@@ -1424,8 +1423,3 @@ class MDSServices(TestCase):
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs, loads, vdisks, mds_services)
-
-
-if __name__ == '__main__':
-    suite = unittest.TestLoader().loadTestsFromTestCase(MDSServices)
-    unittest.TextTestRunner(verbosity=2).run(suite)
