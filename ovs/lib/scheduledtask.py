@@ -284,8 +284,8 @@ class ScheduledTaskController(object):
             except Exception as ex:
                 logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(local_storage_router.ip, ex))
         try:
-            all_results = result_set.join(propagate=False, # Propagate False makes sure all jobs are waited for even when 1 or more jobs fail
-                                          timeout=3600) # The number of seconds to wait for results before the operation times out.
+            all_results = result_set.join(propagate=False,  # Propagate False makes sure all jobs are waited for even when 1 or more jobs fail
+                                          timeout=3600)  # The number of seconds to wait for results before the operation times out.
             # This raises celery.exceptions.TimeoutError, all_results is None and the task will exit with RuntimeError
         except TimeoutError as te:
             logger.exception(te)
