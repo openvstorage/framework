@@ -20,6 +20,7 @@ import copy
 import time
 from celery.result import ResultSet
 from celery.schedules import crontab
+from celery.exceptions import TimeoutError
 from ConfigParser import RawConfigParser
 from datetime import datetime
 from datetime import timedelta
@@ -37,6 +38,7 @@ from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
+from ovs.extensions.services.service import ServiceManager
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
@@ -225,8 +227,12 @@ class ScheduledTaskController(object):
                     logger.info('Gather Scrub - Storage Router {0:<15} has SCRUB partition at {1}'.format(storage_driver.storagerouter.ip, partition.path))
                     if storage_driver.storagerouter not in scrub_locations:
                         try:
-                            _ = SSHClient(storage_driver.storagerouter)
-                            scrub_locations[storage_driver.storagerouter] = str(partition.path)
+                            sshclient = SSHClient(storage_driver.storagerouter)
+                            # Use ServiceManager(sshclient) to make sure ovs-workers are actually running
+                            if ServiceManager.get_service_status('workers', sshclient) is False:
+                                logger.warning('Gather Scrub - Storage Router {0:<15} - workers are not running'.format(storage_driver.storagerouter.ip))
+                            else:
+                                scrub_locations[storage_driver.storagerouter] = str(partition.path)
                         except UnableToConnectException:
                             logger.warning('Gather Scrub - Storage Router {0:<15} is not reachable'.format(storage_driver.storagerouter.ip))
 
@@ -277,7 +283,14 @@ class ScheduledTaskController(object):
                                                                               vdisk_guids=local_vdisks_to_scrub)
             except Exception as ex:
                 logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(local_storage_router.ip, ex))
-        all_results = result_set.join(propagate=False)  # Propagate False makes sure all jobs are waited for even when 1 or more jobs fail
+        try:
+            all_results = result_set.join(propagate=False, # Propagate False makes sure all jobs are waited for even when 1 or more jobs fail
+                                          timeout=3600) # The number of seconds to wait for results before the operation times out.
+            # This raises celery.exceptions.TimeoutError, all_results is None and the task will exit with RuntimeError
+        except TimeoutError as te:
+            logger.exception(te)
+            raise RuntimeError('Scrubbing failed for 1 or more storagerouters')
+
         for index, result in enumerate(all_results):
             if isinstance(result, list):
                 processed_guids.extend(result)
