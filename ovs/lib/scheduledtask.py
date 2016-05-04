@@ -18,9 +18,7 @@ ScheduledTaskController module
 
 import copy
 import time
-from celery.result import ResultSet
 from celery.schedules import crontab
-from celery.exceptions import TimeoutError
 from ConfigParser import RawConfigParser
 from datetime import datetime
 from datetime import timedelta
