@@ -32,9 +32,9 @@ define([
 
         // Observables
         self.storageRouters = ko.observableArray([]);
-        self.clusterid = ko.observable();
-        self.dirty = ko.observable(false);
-        self._enable = ko.observable();
+        self.clusterid      = ko.observable();
+        self.dirty          = ko.observable(false);
+        self._enable        = ko.observable();
         self._enableSupport = ko.observable();
 
         // Computed
