@@ -40,6 +40,7 @@ from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
 from ovs.lib.helpers.decorators import ensure_single
+from ovs.lib.helpers.celery_toolbox import manage_running_tasks
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vmachine import VMachineController
@@ -253,7 +254,7 @@ class ScheduledTaskController(object):
         local_storage_router = None
         local_scrub_location = None
         local_vdisks_to_scrub = []
-        result_set = ResultSet([])
+        result_set = {}
         storage_router_list = []
 
         for index, scrub_info in enumerate(scrub_locations.items()):
@@ -269,10 +270,8 @@ class ScheduledTaskController(object):
                 local_scrub_location = scrub_info[1]
                 local_vdisks_to_scrub = vdisk_guids_to_scrub
             else:
-                result_set.add(ScheduledTaskController._execute_scrub_work.s(scrub_location=scrub_info[1],
-                                                                             vdisk_guids=vdisk_guids_to_scrub).apply_async(
-                    routing_key='sr.{0}'.format(storage_router.machine_id)
-                ))
+                result_set[storage_router.ip] = ScheduledTaskController._execute_scrub_work.s(scrub_location=scrub_info[1],
+                                                                                              vdisk_guids=vdisk_guids_to_scrub).apply_async(routing_key='sr.{0}'.format(storage_router.machine_id))
                 storage_router_list.append(storage_router)
 
         # Remote tasks have been launched, now start the local task and then wait for remote tasks to finish
@@ -283,13 +282,8 @@ class ScheduledTaskController(object):
                                                                               vdisk_guids=local_vdisks_to_scrub)
             except Exception as ex:
                 logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(local_storage_router.ip, ex))
-        try:
-            all_results = result_set.join(propagate=False,  # Propagate False makes sure all jobs are waited for even when 1 or more jobs fail
-                                          timeout=3600)  # The number of seconds to wait for results before the operation times out.
-            # This raises celery.exceptions.TimeoutError, all_results is None and the task will exit with RuntimeError
-        except TimeoutError as te:
-            logger.exception(te)
-            raise RuntimeError('Scrubbing failed for 1 or more storagerouters')
+
+        all_results = manage_running_tasks(result_set, timesleep=60)  # Check every 60 seconds if tasks are still running
 
         for index, result in enumerate(all_results):
             if isinstance(result, list):
