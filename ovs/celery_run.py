@@ -64,6 +64,7 @@ celery.conf.CELERY_DEFAULT_EXCHANGE_TYPE = 'topic'
 celery.conf.CELERY_DEFAULT_ROUTING_KEY = 'generic.default'
 celery.conf.CELERYD_PREFETCH_MULTIPLIER = 1  # This makes sure that the workers won't be pre-fetching tasks, this to prevent deadlocks
 celery.conf.CELERYBEAT_SCHEDULE = {}
+celery.conf.CELERY_TRACK_STARTED = True  # http://docs.celeryproject.org/en/latest/configuration.html#std:setting-CELERY_TRACK_STARTED
 
 loghandler = LogHandler.get('celery', name='celery')
 

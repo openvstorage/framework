@@ -230,8 +230,8 @@ class ScheduledTaskController(object):
                             # Use ServiceManager(sshclient) to make sure ovs-workers are actually running
                             if ServiceManager.get_service_status('workers', sshclient) is False:
                                 logger.warning('Gather Scrub - Storage Router {0:<15} - workers are not running'.format(storage_driver.storagerouter.ip))
-                            else:
-                                scrub_locations[storage_driver.storagerouter] = str(partition.path)
+                            #else:
+                            scrub_locations[storage_driver.storagerouter] = str(partition.path)
                         except UnableToConnectException:
                             logger.warning('Gather Scrub - Storage Router {0:<15} is not reachable'.format(storage_driver.storagerouter.ip))
 
@@ -254,6 +254,7 @@ class ScheduledTaskController(object):
         local_vdisks_to_scrub = []
         result_set = {}
         storage_router_list = []
+        scrub_map = {}
 
         for index, scrub_info in enumerate(scrub_locations.items()):
             start_index = index * len(vdisk_guids) / len(scrub_locations)
@@ -271,6 +272,7 @@ class ScheduledTaskController(object):
                 result_set[storage_router.ip] = ScheduledTaskController._execute_scrub_work.s(scrub_location=scrub_info[1],
                                                                                               vdisk_guids=vdisk_guids_to_scrub).apply_async(routing_key='sr.{0}'.format(storage_router.machine_id))
                 storage_router_list.append(storage_router)
+                scrub_map[storage_router.ip] = vdisk_guids_to_scrub
 
         # Remote tasks have been launched, now start the local task and then wait for remote tasks to finish
         processed_guids = []
@@ -281,14 +283,49 @@ class ScheduledTaskController(object):
             except Exception as ex:
                 logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(local_storage_router.ip, ex))
 
-        all_results = manage_running_tasks(result_set, timesleep=60)  # Check every 60 seconds if tasks are still running
+        all_results, failed_nodes = manage_running_tasks(result_set, timesleep=60)  # Check every 60 seconds if tasks are still running
 
         for index, result in enumerate(all_results):
             if isinstance(result, list):
                 processed_guids.extend(result)
             else:
                 logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(storage_router_list[index].ip, result))
-        if len(processed_guids) != len(vdisk_guids) or set(processed_guids).difference(vdisk_guids):
+
+        result_set = {}
+        for failed_node in failed_nodes:
+            logger.warning('Scrubbing failed on node {0}. Will reschedule on another node.'.format(failed_node))
+            vdisk_guids_to_scrub = scrub_map[failed_node]
+            rescheduled_work = False
+            for storage_router, scrub_location in scrub_locations.items():
+                if storage_router.ip != failed_node:
+                    if storage_router.machine_id != local_machineid:
+                        logger.info('Rescheduled scrub work from node {0} to node {1}.'.format(failed_node, storage_router.ip))
+                        result_set[storage_router.ip] = ScheduledTaskController._execute_scrub_work.s(scrub_location=scrub_info[1],
+                                                                                                      vdisk_guids=vdisk_guids_to_scrub).apply_async(routing_key='sr.{0}'.format(storage_router.machine_id))
+                        storage_router_list.append(storage_router)
+                        rescheduled_work = True
+                        break
+            if rescheduled_work is False:
+                if local_scrub_location is not None:
+                    try:
+                        processed_guids.extend(ScheduledTaskController._execute_scrub_work(scrub_location=local_scrub_location,
+                                                                                           vdisk_guids=vdisk_guids_to_scrub))
+                    except Exception as ex:
+                        logger.error('Gather Scrub - Storage Router Local - Scrubbing failed with error:\n - {0}'.format(ex))
+                else:
+                    logger.warning('No nodes left to reschedule work from node {0}'.format(failed_node))
+
+        if len(result_set) > 0:
+            all_results2, failed_nodes = manage_running_tasks(result_set, timesleep=60)  # Check every 60 seconds if tasks are still running
+            all_results.extend(all_results2)
+
+        for index, result in enumerate(all_results):
+            if isinstance(result, list):
+                processed_guids.extend(result)
+            else:
+                logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(storage_router_list[index].ip, result))
+
+        if len(set(processed_guids)) != len(vdisk_guids) or set(processed_guids).difference(vdisk_guids):
             raise RuntimeError('Scrubbing failed for 1 or more storagerouters')
         logger.info('Gather Scrub - Finished')
 

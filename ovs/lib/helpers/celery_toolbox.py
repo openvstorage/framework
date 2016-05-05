@@ -19,6 +19,7 @@ Module containing celery helpers
 import datetime
 import time
 from celery.task.control import revoke
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.service import ServiceManager
 from ovs.log.logHandler import LogHandler
@@ -37,20 +38,44 @@ def manage_running_tasks(tasklist, timesleep=10):
     @return: list of results
     """
     ssh_clients = {}
+    tasks_pending = {}
+    tasks_pending_timeout = 10 #800  # 30 minutes
     results = []
+    failed_nodes = []
     while len(tasklist.keys()) > 0:
         for ip, task in tasklist.items():
             if task.state in ('SUCCESS', 'FAILURE'):
                 logger.info('Task {0} finished: {1}'.format(task.id, task.state))
                 results.append(task.get(propagate=False))
                 del tasklist[ip]
-            elif task.state in ('PENDING', 'STARTED'):
+            elif task.state == 'PENDING':
+                if task.id not in tasks_pending:
+                    tasks_pending[task.id] = time.time()
+                else:
+                    task_pending_since = tasks_pending[task.id]
+                    if time.time() - task_pending_since > tasks_pending_timeout:
+                        logger.warning('Task {0} is pending since {1} on node {2}. Task will be revoked'.format(task.id, datetime.datetime.fromtimestamp(task_pending_since), ip))
+                        revoke(task.id)
+                        del tasklist[ip]
+                        del tasks_pending[task.id]
+                        failed_nodes.append(ip)
+            elif task.state == 'STARTED':
                 if ip not in ssh_clients:
                     ssh_clients[ip] = SSHClient(ip, username='root')
                 client = ssh_clients[ip]
                 if ServiceManager.get_service_status('workers', client) is False:
-                    logger.error('Service ovs-workers on node {0} appears halted while there is a task {1} for it {2}. Task will be revoked.'.format(ip, task.state, task.id))
+                    logger.error('Service ovs-workers on node {0} appears halted while there is a task PENDING for it {1}. Task will be revoked.'.format(ip, task.id))
                     revoke(task.id)
                     del tasklist[ip]
-        time.sleep(timesleep)
-    return results
+                    failed_nodes.append(ip)
+                else:
+                    ping_result = task.app.control.inspect().ping()
+                    storage_router = StorageRouterList.get_by_ip(ip)
+                    if "celery@{0}".format(storage_router.name) not in ping_result:
+                        logger.error('Service ovs-workers on node {0} is not reachable via rabbitmq while there is a task STARTED for it {1}. Task will be revoked.'.format(ip, task.id))
+                        revoke(task.id)
+                        del tasklist[ip]
+                        failed_nodes.append(ip)
+        if len(tasklist.keys()) > 0:
+            time.sleep(timesleep)
+    return results, failed_nodes
