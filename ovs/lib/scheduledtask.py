@@ -37,8 +37,8 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
+from ovs.lib.helpers.celery_toolbox import CeleryToolbox
 from ovs.lib.helpers.decorators import ensure_single
-from ovs.lib.helpers.celery_toolbox import manage_running_tasks
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vmachine import VMachineController
@@ -230,8 +230,8 @@ class ScheduledTaskController(object):
                             # Use ServiceManager(sshclient) to make sure ovs-workers are actually running
                             if ServiceManager.get_service_status('workers', sshclient) is False:
                                 logger.warning('Gather Scrub - Storage Router {0:<15} - workers are not running'.format(storage_driver.storagerouter.ip))
-                            #else:
-                            scrub_locations[storage_driver.storagerouter] = str(partition.path)
+                            else:
+                                scrub_locations[storage_driver.storagerouter] = str(partition.path)
                         except UnableToConnectException:
                             logger.warning('Gather Scrub - Storage Router {0:<15} is not reachable'.format(storage_driver.storagerouter.ip))
 
@@ -283,13 +283,13 @@ class ScheduledTaskController(object):
             except Exception as ex:
                 logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(local_storage_router.ip, ex))
 
-        all_results, failed_nodes = manage_running_tasks(result_set, timesleep=60)  # Check every 60 seconds if tasks are still running
+        all_results, failed_nodes = CeleryToolbox.manage_running_tasks(result_set, timesleep=60)  # Check every 60 seconds if tasks are still running
 
-        for index, result in enumerate(all_results):
+        for ip, result in all_results.iteritems():
             if isinstance(result, list):
                 processed_guids.extend(result)
             else:
-                logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(storage_router_list[index].ip, result))
+                logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(ip, result))
 
         result_set = {}
         for failed_node in failed_nodes:
@@ -297,10 +297,10 @@ class ScheduledTaskController(object):
             vdisk_guids_to_scrub = scrub_map[failed_node]
             rescheduled_work = False
             for storage_router, scrub_location in scrub_locations.items():
-                if storage_router.ip != failed_node:
+                if storage_router.ip not in failed_nodes:
                     if storage_router.machine_id != local_machineid:
                         logger.info('Rescheduled scrub work from node {0} to node {1}.'.format(failed_node, storage_router.ip))
-                        result_set[storage_router.ip] = ScheduledTaskController._execute_scrub_work.s(scrub_location=scrub_info[1],
+                        result_set[storage_router.ip] = ScheduledTaskController._execute_scrub_work.s(scrub_location=scrub_location,
                                                                                                       vdisk_guids=vdisk_guids_to_scrub).apply_async(routing_key='sr.{0}'.format(storage_router.machine_id))
                         storage_router_list.append(storage_router)
                         rescheduled_work = True
@@ -316,14 +316,14 @@ class ScheduledTaskController(object):
                     logger.warning('No nodes left to reschedule work from node {0}'.format(failed_node))
 
         if len(result_set) > 0:
-            all_results2, failed_nodes = manage_running_tasks(result_set, timesleep=60)  # Check every 60 seconds if tasks are still running
+            all_results2, failed_nodes = CeleryToolbox.manage_running_tasks(result_set, timesleep=60)  # Check every 60 seconds if tasks are still running
             all_results.extend(all_results2)
 
-        for index, result in enumerate(all_results):
+        for ip, result in all_results2.iteritems():
             if isinstance(result, list):
                 processed_guids.extend(result)
             else:
-                logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(storage_router_list[index].ip, result))
+                logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(ip, result))
 
         if len(set(processed_guids)) != len(vdisk_guids) or set(processed_guids).difference(vdisk_guids):
             raise RuntimeError('Scrubbing failed for 1 or more storagerouters')
