@@ -214,3 +214,11 @@ class Upstart(object):
                     if 'pid' in match_groups:
                         return match_groups['pid']
         return -1
+
+    @staticmethod
+    def send_signal(name, signal, client):
+        name = Upstart._get_name(name, client)
+        pid = Upstart.get_service_pid(name, client)
+        if pid == -1:
+            raise RuntimeError('Could not determine PID to send signal to')
+        client.run('kill -s {0} {1}'.format(signal, pid))

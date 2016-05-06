@@ -209,6 +209,10 @@ class FleetCtl(object):
         return Systemd.get_service_pid(name, client)
 
     @staticmethod
+    def send_signal(name, signal, client):
+        return Systemd.send_signal(name, signal, client)
+
+    @staticmethod
     def _list_fleet_machines():
         return FLEET_CLIENT.list_machines()
 
