@@ -21,11 +21,8 @@ import re
 import time
 import uuid
 from ConfigParser import RawConfigParser
-from ovs.log.logHandler import LogHandler
 from StringIO import StringIO
 from subprocess import check_output
-
-logger = LogHandler.get('extensions', name='system')
 
 
 class System(object):

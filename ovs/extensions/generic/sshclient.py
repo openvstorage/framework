@@ -25,17 +25,16 @@ import glob
 import json
 import time
 import types
-import logging
-import tempfile
-import paramiko
 import socket
-from subprocess import check_output, CalledProcessError, PIPE, Popen
+import logging
+import paramiko
+import tempfile
+import unittest
 from ovs.dal.helpers import Descriptor
 from ovs.dal.hybrids.storagerouter import StorageRouter
-from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.remote import remote
 from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('extensions', name='sshclient')
+from subprocess import check_output, CalledProcessError, PIPE, Popen
 
 
 def connected():
@@ -91,6 +90,7 @@ class SSHClient(object):
     Remote/local client
     """
 
+    _logger = LogHandler.get('extensions', name='sshclient')
     client_cache = {}
     IP_REGEX = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
 
@@ -111,16 +111,18 @@ class SSHClient(object):
             raise ValueError('The endpoint parameter should be either an ip address or a StorageRouter')
 
         self.ip = ip
-        local_ips = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
-        self.local_ips = [lip.strip() for lip in local_ips]
+        self.client = None
+        self.local_ips = [lip.strip() for lip in check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()]
         self.is_local = self.ip in self.local_ips
+        self.password = password
+        self._unittest_mode = hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True
 
-        if self.is_local is False and storagerouter is not None:
+        if self.is_local is False and storagerouter is not None and self._unittest_mode is False:
             process_heartbeat = storagerouter.heartbeats.get('process')
             if process_heartbeat is not None:
                 if time.time() - process_heartbeat > 300:
                     message = 'StorageRouter {0} process heartbeat > 300s'.format(ip)
-                    logger.error(message)
+                    SSHClient._logger.error(message)
                     raise UnableToConnectException(message)
 
         current_user = check_output('whoami', shell=True).strip()
@@ -130,9 +132,10 @@ class SSHClient(object):
             self.username = username
             if username != current_user:
                 self.is_local = False  # If specified user differs from current executing user, we always use the paramiko SSHClient
-        self.password = password
 
-        self.client = None
+        if self._unittest_mode is True:
+            self.is_local = True
+
         if not self.is_local:
             logging.getLogger('paramiko').setLevel(logging.WARNING)
             key = '{0}@{1}'.format(self.ip, self.username)
@@ -173,7 +176,7 @@ class SSHClient(object):
         except socket.error as ex:
             if 'No route to host' in str(ex):
                 message = 'SocketException: No route to host {0}'.format(self.ip)
-                logger.error(message)
+                SSHClient._logger.error(message)
                 raise UnableToConnectException(message)
             raise
 
@@ -208,7 +211,7 @@ class SSHClient(object):
                     process = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
                 except OSError as ose:
                     if suppress_logging is False:
-                        logger.error('Command: "{0}" failed with output: "{1}"'.format(command, str(ose)))
+                        SSHClient._logger.error('Command: "{0}" failed with output: "{1}"'.format(command, str(ose)))
                     raise CalledProcessError(1, command, str(ose))
                 out, err = process.communicate()
                 out = out.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
@@ -217,14 +220,14 @@ class SSHClient(object):
                 if exit_code != 0:  # Raise same error as check_output
                     raise CalledProcessError(exit_code, command, err)
                 if debug:
-                    logger.debug('stdout: {0}'.format(out))
-                    logger.debug('stderr: {0}'.format(err))
+                    SSHClient._logger.debug('stdout: {0}'.format(out))
+                    SSHClient._logger.debug('stderr: {0}'.format(err))
                     return out.strip(), err
                 else:
                     return out.strip()
             except CalledProcessError as cpe:
                 if suppress_logging is False:
-                    logger.error('Command: "{0}" failed with output: "{1}"'.format(command, cpe.output))
+                    SSHClient._logger.error('Command: "{0}" failed with output: "{1}"'.format(command, cpe.output))
                 raise cpe
         else:
             _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
@@ -233,7 +236,7 @@ class SSHClient(object):
                 stderr = ''.join(stderr.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 stdout = ''.join(stdout.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 if suppress_logging is False:
-                    logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
+                    SSHClient._logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
                 raise CalledProcessError(exit_code, command, stderr)
             if debug:
                 return '\n'.join(line.rstrip() for line in stdout).strip(), stderr
@@ -579,8 +582,8 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
                 if recursive is False:
                     break
         else:
-            with Remote(self.ip, [os], 'root') as remote:
-                for root, dirs, files in remote.os.walk(directory):
+            with remote(self.ip, [os], 'root') as rem:
+                for root, dirs, files in rem.os.walk(directory):
                     for file_name in files:
                         if abs_path is True:
                             all_files.append('/'.join([root, file_name]))

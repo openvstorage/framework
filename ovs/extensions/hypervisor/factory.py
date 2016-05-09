@@ -16,7 +16,7 @@
 Hypervisor/ManagementCenter factory module
 """
 
-from ovs.extensions.generic.filemutex import FileMutex
+from ovs.extensions.generic.filemutex import file_mutex
 
 
 class Factory(object):
@@ -38,7 +38,7 @@ class Factory(object):
         password = pmachine.password
         key = '{0}_{1}'.format(ip, username)
         if key not in Factory.hypervisors:
-            mutex = FileMutex('hypervisor_{0}'.format(key))
+            mutex = file_mutex('hypervisor_{0}'.format(key))
             try:
                 mutex.acquire(30)
                 if key not in Factory.hypervisors:
@@ -75,7 +75,7 @@ class Factory(object):
         password = mgmt_center.password
         key = '{0}_{1}'.format(ip, username)
         if key not in Factory.mgmtcenters:
-            mutex = FileMutex('mgmtcenter_{0}'.format(key))
+            mutex = file_mutex('mgmtcenter_{0}'.format(key))
             try:
                 mutex.acquire(30)
                 if key not in Factory.mgmtcenters:

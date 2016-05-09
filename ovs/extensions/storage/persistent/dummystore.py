@@ -26,18 +26,17 @@ class DummyPersistentStore(object):
     This is a dummy persistent store that makes use of a local json file
     """
     _path = '/run/dummypersistent.json'
-    _keep_in_memory_only = False
     _data = {}
 
     def __init__(self):
         self._sequences = {}
+        self._keep_in_memory_only = False
 
-    @staticmethod
-    def clean():
+    def clean(self):
         """
         Empties the store
         """
-        if DummyPersistentStore._keep_in_memory_only is True:
+        if self._keep_in_memory_only is True:
             DummyPersistentStore._data = {}
         else:
             try:
@@ -49,7 +48,7 @@ class DummyPersistentStore(object):
         """
         Reads the local json file
         """
-        if DummyPersistentStore._keep_in_memory_only is True:
+        if self._keep_in_memory_only is True:
             return DummyPersistentStore._data
 
         try:
@@ -72,7 +71,7 @@ class DummyPersistentStore(object):
 
     def get_multi(self, keys):
         """
-        Retreives values for all given keys
+        Retrieves values for all given keys
         """
         data = self._read()
         for key in keys:
@@ -176,7 +175,7 @@ class DummyPersistentStore(object):
         """
         Saves the local json file
         """
-        if DummyPersistentStore._keep_in_memory_only is True:
+        if self._keep_in_memory_only is True:
             DummyPersistentStore._data = data
         else:
             f = open(self._path, 'w+')

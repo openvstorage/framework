@@ -238,7 +238,7 @@ class OVSMigrator(object):
             from ovs.dal.hybrids.servicetype import ServiceType
             from ovs.dal.lists.servicetypelist import ServiceTypeList
             from ovs.dal.lists.storagedriverlist import StorageDriverList
-            from ovs.extensions.generic.remote import Remote
+            from ovs.extensions.generic.remote import remote
             from ovs.extensions.generic.sshclient import SSHClient
             from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
             for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.MD_SERVER).services:
@@ -260,13 +260,13 @@ class OVSMigrator(object):
                 for disk in service.storagerouter.disks:
                     for partition in disk.partitions:
                         for directory, (role, subrole) in tasks.iteritems():
-                            with Remote(storagedriver.storagerouter.ip, [os], username='root') as remote:
+                            with remote(storagedriver.storagerouter.ip, [os], username='root') as rem:
                                 stat_dir = directory
-                                while not remote.os.path.exists(stat_dir) and stat_dir != '/':
+                                while not rem.os.path.exists(stat_dir) and stat_dir != '/':
                                     stat_dir = stat_dir.rsplit('/', 1)[0]
                                     if not stat_dir:
                                         stat_dir = '/'
-                                inode = remote.os.stat(stat_dir).st_dev
+                                inode = rem.os.stat(stat_dir).st_dev
                             if partition.inode == inode:
                                 if role not in partition.roles:
                                     partition.roles.append(role)
@@ -324,8 +324,8 @@ class OVSMigrator(object):
                                         else:
                                             del storagedriver._data[key]
                                     else:
-                                        with Remote(storagedriver.storagerouter.ip, [os], username='root') as remote:
-                                            inode = remote.os.stat(entry).st_dev
+                                        with remote(storagedriver.storagerouter.ip, [os], username='root') as rem:
+                                            inode = rem.os.stat(entry).st_dev
                                         if partition.inode == inode:
                                             if role not in partition.roles:
                                                 partition.roles.append(role)
@@ -399,7 +399,7 @@ class OVSMigrator(object):
             from ovs.dal.hybrids.failuredomain import FailureDomain
             from ovs.dal.lists.failuredomainlist import FailureDomainList
             from ovs.dal.lists.storagerouterlist import StorageRouterList
-            from ovs.extensions.generic.remote import Remote
+            from ovs.extensions.generic.remote import remote
             from ovs.extensions.generic.sshclient import SSHClient
             failure_domains = FailureDomainList.get_failure_domains()
             if len(failure_domains) > 0:
@@ -416,18 +416,18 @@ class OVSMigrator(object):
                 if storagerouter.rdma_capable is None:
                     client = SSHClient(storagerouter, username='root')
                     rdma_capable = False
-                    with Remote(client.ip, [os], username='root') as remote:
-                        for root, dirs, files in remote.os.walk('/sys/class/infiniband'):
+                    with remote(client.ip, [os], username='root') as rem:
+                        for root, dirs, files in rem.os.walk('/sys/class/infiniband'):
                             for directory in dirs:
                                 ports_dir = '/'.join([root, directory, 'ports'])
-                                if not remote.os.path.exists(ports_dir):
+                                if not rem.os.path.exists(ports_dir):
                                     continue
-                                for sub_root, sub_dirs, _ in remote.os.walk(ports_dir):
+                                for sub_root, sub_dirs, _ in rem.os.walk(ports_dir):
                                     if sub_root != ports_dir:
                                         continue
                                     for sub_directory in sub_dirs:
                                         state_file = '/'.join([sub_root, sub_directory, 'state'])
-                                        if remote.os.path.exists(state_file):
+                                        if rem.os.path.exists(state_file):
                                             if 'ACTIVE' in client.run('cat {0}'.format(state_file)):
                                                 rdma_capable = True
                     storagerouter.rdma_capable = rdma_capable

@@ -27,8 +27,6 @@ from suds.sudsobject import Property
 from suds.plugin import MessagePlugin
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='vmware sdk')
-
 
 class NotAuthenticatedException(BaseException):
     pass
@@ -39,6 +37,8 @@ def authenticated(force=False):
     Decorator to make that a login is executed in case the current session isn't valid anymore
     :param force: Force a (re)login, as some methods also work when not logged in
     """
+    logger = LogHandler.get('extensions', name='vmware sdk')
+
     def wrapper(function):
         def new_function(self, *args, **kwargs):
             self.__doc__ = function.__doc__
@@ -88,6 +88,7 @@ class Sdk(object):
         """
         Initializes the SDK
         """
+        self._logger = LogHandler.get('extensions', name='vmware sdk')
         self._host = host
         self._username = login
         self._password = passwd
@@ -717,7 +718,7 @@ class Sdk(object):
         for store in host_system.datastore[0]:
             store = self._get_object(store)
             if not store.summary.accessible:
-                logger.warning('Datastore {0} is not accessible, skipping'.format(store.name))
+                self._logger.warning('Datastore {0} is not accessible, skipping'.format(store.name))
             if hasattr(store.info, 'nas'):
                 if store.info.nas.remoteHost == ip and store.info.nas.remotePath == mountpoint:
                     datastore = store
@@ -742,7 +743,7 @@ class Sdk(object):
         """
         Create a generic config object
         :param vm_object: extension specific object
-        :param host: esx host 
+        :param host: esx host
         """
         regex = '\[([^\]]+)\]\s(.+)'
         match = re.search(regex, vm_object.config.files.vmPathName)
@@ -792,13 +793,13 @@ class Sdk(object):
             try:
                 machine = Sdk._build_property('VirtualMachine', vmid)
             except Exception as ex:
-                logger.error('SDK domain retrieve failed by vmid: {}'.format(ex))
+                self._logger.error('SDK domain retrieve failed by vmid: {}'.format(ex))
         elif storagedriver_mountpoint and storagedriver_storage_ip and devicename:
             try:
                 machine_info = self.get_nfs_datastore_object(storagedriver_storage_ip, storagedriver_mountpoint, devicename)[0]
                 machine = Sdk._build_property('VirtualMachine', machine_info.obj_identifier.value)
             except Exception as ex:
-                logger.error('SDK domain retrieve failed by nfs datastore info: {}'.format(ex))
+                self._logger.error('SDK domain retrieve failed by nfs datastore info: {}'.format(ex))
         if machine:
             task = self._client.service.Destroy_Task(machine)
             if wait:
@@ -808,12 +809,12 @@ class Sdk(object):
             vmx_path = '/'.join([storagedriver_mountpoint, devicename])
             if os.path.exists(vmx_path):
                 dir_name = os.path.dirname(vmx_path)
-                logger.debug('Removing leftover files in {0}'.format(dir_name))
+                self._logger.debug('Removing leftover files in {0}'.format(dir_name))
                 try:
                     shutil.rmtree(dir_name)
-                    logger.debug('Removed dir tree {}'.format(dir_name))
+                    self._logger.debug('Removed dir tree {}'.format(dir_name))
                 except Exception as exception:
-                    logger.error('Failed to remove dir tree {0}. Reason: {1}'.format(dir_name, str(exception)))
+                    self._logger.error('Failed to remove dir tree {0}. Reason: {1}'.format(dir_name, str(exception)))
         return task
 
     @authenticated()
@@ -953,7 +954,7 @@ class Sdk(object):
         if not datastore:
             raise RuntimeError('Could not find datastore')
         if not self.file_exists(ip, mountpoint, disk_path):
-            logger.warning('Disk {0} already deleted'.format(disk_path))
+            self._logger.warning('Disk {0} already deleted'.format(disk_path))
             return
         disk_url = '[{0}] {1}'.format(datastore.name, disk_path)
 
@@ -974,7 +975,7 @@ class Sdk(object):
         result = self.get_task_info(task)
         if result.info.state == 'success':
             return [file.path for file in result.info.result.file]
-        logger.warning(result.info.error.localizedMessage)
+        self._logger.warning(result.info.error.localizedMessage)
         return []
 
     @authenticated()
@@ -1013,7 +1014,7 @@ class Sdk(object):
             self.get_nfs_datastore_object(ip, mountpoint, filename)
             return True
         except Exception as ex:
-            logger.debug('Exception in get_nfs_datastore_object: {0}'.format(ex))
+            self._logger.debug('Exception in get_nfs_datastore_object: {0}'.format(ex))
             files_on_datastore = self._get_files_on_datastore(ip, mountpoint)
             return filename.lstrip('/') in files_on_datastore
 

@@ -68,6 +68,6 @@ class InvalidRelationException(Exception):
 
 class VolatileObjectException(Exception):
     """
-    Raised when ceratin actions are executed on a volatile object (e.g. save)
+    Raised when certain actions are executed on a volatile object (e.g. save)
     """
     pass

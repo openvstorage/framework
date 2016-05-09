@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pysnmp.entity.rfc3413.oneliner import ntforg
-from pysnmp.proto import rfc1902
-from pysnmp.entity import engine
-
 """
 SNMP TRAP Sender
 """
+from pysnmp.entity.rfc3413.oneliner import ntforg
+from pysnmp.proto import rfc1902
+from pysnmp.entity import engine
 
 
 class SNMPTrapSender():

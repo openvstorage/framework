@@ -29,8 +29,6 @@ from ovs.log.logHandler import LogHandler
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
 
-logger = LogHandler.get('extensions', name='processor')
-
 CINDER_VOLUME_UPDATE_CACHE = {}
 
 
@@ -41,6 +39,7 @@ def process(queue, body, mapping):
     :param body:    Body of the message
     :param mapping:
     """
+    logger = LogHandler.get('extensions', name='processor')
     if queue == EtcdConfiguration.get('/ovs/framework/messagequeue|queues.storagedriver'):
         cache = VolatileFactory.get_client()
         all_extensions = None

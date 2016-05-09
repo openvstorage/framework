@@ -27,15 +27,13 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('dal', name='helper')
-
 
 class Descriptor(object):
     """
     The descriptor class contains metadata to instantiate objects that can be serialized.
     It points towards the sourcefile, class name and class type
     """
-
+    _logger = LogHandler.get('dal', name='helper')
     object_cache = {}
     descriptor_cache = {}
 
@@ -62,7 +60,7 @@ class Descriptor(object):
                     module = __import__(fqm_name, level=0, fromlist=[type_name])
                     _ = getattr(module, type_name)
                 except (ImportError, AttributeError):
-                    logger.info('Received object type {0} is not a hybrid'.format(object_type))
+                    Descriptor._logger.info('Received object type {0} is not a hybrid'.format(object_type))
                     raise TypeError('Invalid type for Descriptor: {0}'.format(object_type))
                 identifier = '{0}_{1}'.format(type_name, hashlib.sha1(fqm_name).hexdigest())
                 self._descriptor = {'fqmn': fqm_name,

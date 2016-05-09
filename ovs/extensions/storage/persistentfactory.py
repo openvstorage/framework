@@ -15,10 +15,8 @@
 """
 Generic persistent factory.
 """
+import unittest
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('extensions', name='persistent factory')
 
 
 class PersistentFactory(object):
@@ -33,6 +31,9 @@ class PersistentFactory(object):
         :param client_type: Type of store client
         """
         if not hasattr(PersistentFactory, 'store') or PersistentFactory.store is None:
+            if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests'):
+                client_type = 'dummy'
+
             if client_type is None:
                 client_type = EtcdConfiguration.get('/ovs/framework/stores|persistent')
 
@@ -40,7 +41,7 @@ class PersistentFactory(object):
             if client_type in ['pyrakoon', 'arakoon']:
                 from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
                 PersistentFactory.store = PyrakoonStore(str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|ovsdb')))
-            if client_type == 'default':
+            if client_type == 'dummy':
                 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
                 PersistentFactory.store = DummyPersistentStore()
 

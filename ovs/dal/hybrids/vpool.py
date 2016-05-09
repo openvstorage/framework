@@ -15,11 +15,11 @@
 """
 VPool module
 """
+import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.dal.hybrids.backendtype import BackendType
-import time
 
 
 class VPool(DataObject):

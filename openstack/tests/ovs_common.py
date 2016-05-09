@@ -26,33 +26,33 @@ from cinder import test
 from cinderclient.v1 import client as cinder_client
 from glanceclient.v1 import client as glance_client
 from keystoneclient.v2_0 import client as keystone_client
-from cinderclient import exceptions as cinder_client_exceptions
 
 # OVS
-from ovs.dal.lists.vpoollist import VPoolList
-from ovs.dal.lists.vdisklist import VDiskList
-from ovs.lib.storagerouter import StorageRouterController
-from ovs.extensions.generic.system import System
-from ovs.dal.hybrids.mgmtcenter import MgmtCenter
-
-# CONFIG
-from ovs_config import *
 from ConfigParser import RawConfigParser
+from ovs.dal.hybrids.mgmtcenter import MgmtCenter
+from ovs.dal.lists.vdisklist import VDiskList
+from ovs.dal.lists.vpoollist import VPoolList
+from ovs.extensions.generic.system import System
+from ovs.lib.storagerouter import StorageRouterController
 
 
 class OVSPluginTestException(Exception):
+    """ OVSPluginTestException """
     pass
 
 
 class WaitTimedOut(OVSPluginTestException):
+    """ WaitTimedOut """
     pass
 
 
 class VolumeInErrorState(OVSPluginTestException):
+    """ VolumeInErrorState """
     pass
 
 
 class TooManyAttempts(OVSPluginTestException):
+    """ TooManyAttempts """
     pass
 
 
@@ -63,6 +63,25 @@ class OVSPluginTestCase(test.TestCase):
     - a small delay may occur depending on rabbitmq, celery, arakoon and workers
     do not use time.sleep, implement wait_until or retry_until ...
     """
+    ip = System.get_my_storagerouter().ip
+
+    CINDER_USER = 'admin'
+    CINDER_PASS = 'rooter'
+    TENANT_NAME = 'admin'
+    CINDER_CONTROLLER = ip  # if the controller is on another node
+    AUTH_URL = 'http://{0}:35357/v2.0'.format(CINDER_CONTROLLER)
+    PROCESS = 'screen'  # on openstack it is service
+
+    VPOOL_NAME = 'local'  # string, lowercase no strange characters
+    VPOOL_PORT = 12326  # make sure it is available (!) Todo: get highest available
+    VPOOL_CLEANUP = False  # should the vpool be removed during tearDownClass
+    VPOOL_MOUNTPOINT = '/mnt/{0}'.format(VPOOL_NAME)
+
+    FILE_TYPE = 'raw'  # should not be changed unless volumedriver changes
+    VOLUME_SIZE = 2
+    VOLUME_TYPE = 'local'  # depends on volume-type created
+    MOUNT_LOCATION = '/mnt/testmount'
+
     cleanup = {}
     cinder_client = None
     glance_client = None
@@ -83,6 +102,7 @@ class OVSPluginTestCase(test.TestCase):
             print('[TRACE] [{0}] ({1}) {2}'.format(caller, time.time(), message))
 
     def set_profiled(self):
+        """ Set profiled True """
         self._profiled = True
 
     def __init__(self, *args, **kwargs):
@@ -116,20 +136,20 @@ class OVSPluginTestCase(test.TestCase):
                 if method and kwargs:
                     method(**kwargs)
 
-        if VPOOL_CLEANUP:
+        if OVSPluginTestCase.VPOOL_CLEANUP:
             if self._vpool_exists():
                 self._remove_vpool()
 
         self._debug('tearDown complete')
 
-    def register_tearDown(self, prio, key, method, kwargs):
+    def _register_teardown(self, prio, key, method, kwargs):
         if prio not in self.cleanup:
             self.cleanup[prio] = {}
         if key in self.cleanup[prio]:
             self._debug('duplicate key {0}'.format(key))
         self.cleanup[prio][key] = (method, kwargs)
 
-    def unregister_tearDown(self, key):
+    def _unregister_teardown(self, key):
         for prio in self.cleanup.keys():
             try:
                 del self.cleanup[prio][key]
@@ -142,17 +162,18 @@ class OVSPluginTestCase(test.TestCase):
             def _shell_client(command):
                 proc = subprocess.Popen(command, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
                 out, err = proc.communicate()
-                if SHELL_DEBUG:
+                if OVSPluginTestCase.SHELL_DEBUG:
                     sys.stderr.write('[SHELL_DEBUG] Command {0} Out {1} Err {2} \n'.format(command, out, err))
                 self._debug('Command {0} Out {1} Err {2}'.format(command, out, err))
                 return out, err
             self.shell_client = _shell_client
 
     def _get_vpool(self):
-        self.vpool = VPoolList.get_vpool_by_name(VPOOL_NAME)
+        self.vpool = VPoolList.get_vpool_by_name(OVSPluginTestCase.VPOOL_NAME)
 
     def _vpool_exists(self):
-        return VPoolList.get_vpool_by_name(VPOOL_NAME) is not None
+        _ = self
+        return VPoolList.get_vpool_by_name(OVSPluginTestCase.VPOOL_NAME) is not None
 
     def _mount_volume_by_filename(self, file_name):
         """
@@ -162,26 +183,26 @@ class OVSPluginTestCase(test.TestCase):
         """
         self._debug('mount file {0}'.format(file_name))
         self._get_shell_client()
-        self.shell_client('sudo mkdir -p {0}'.format(MOUNT_LOCATION))
-        self.shell_client('sudo chown -R stack {0}'.format(MOUNT_LOCATION))
+        self.shell_client('sudo mkdir -p {0}'.format(OVSPluginTestCase.MOUNT_LOCATION))
+        self.shell_client('sudo chown -R stack {0}'.format(OVSPluginTestCase.MOUNT_LOCATION))
         self.shell_client('sudo modprobe nbd max_part=16')
-        self.shell_client('sudo qemu-nbd -c /dev/nbd0 {0}/{1}'.format(VPOOL_MOUNTPOINT, file_name))
+        self.shell_client('sudo qemu-nbd -c /dev/nbd0 {0}/{1}'.format(OVSPluginTestCase.VPOOL_MOUNTPOINT, file_name))
         self.shell_client('sudo partprobe /dev/nbd0')
-        self.shell_client('sudo mount /dev/nbd0p1 {0}'.format(MOUNT_LOCATION))
-        self.register_tearDown(0, 'mount{0}'.format(file_name), self._umount_volume, {'file_name': file_name})
-        self._debug('mounted {0} as {1}'.format(file_name, MOUNT_LOCATION))
+        self.shell_client('sudo mount /dev/nbd0p1 {0}'.format(OVSPluginTestCase.MOUNT_LOCATION))
+        self._register_teardown(0, 'mount{0}'.format(file_name), self._umount_volume, {'file_name': file_name})
+        self._debug('mounted {0} as {1}'.format(file_name, OVSPluginTestCase.MOUNT_LOCATION))
 
     def _umount_volume(self, file_name):
         """
         Umount MOUNT_LOCATION
         """
-        self._debug('umounting {0}'.format(MOUNT_LOCATION))
+        self._debug('umounting {0}'.format(OVSPluginTestCase.MOUNT_LOCATION))
         self._get_shell_client()
-        self.shell_client('sudo umount {0}'.format(MOUNT_LOCATION))
+        self.shell_client('sudo umount {0}'.format(OVSPluginTestCase.MOUNT_LOCATION))
         self.shell_client('sudo qemu-nbd -d /dev/nbd0')
-        self.shell_client('sudo rm -r {0}'.format(MOUNT_LOCATION))
-        self.unregister_tearDown('mount{0}'.format(file_name))
-        self._debug('umounted {0}'.format(MOUNT_LOCATION))
+        self.shell_client('sudo rm -r {0}'.format(OVSPluginTestCase.MOUNT_LOCATION))
+        self._unregister_teardown('mount{0}'.format(file_name))
+        self._debug('umounted {0}'.format(OVSPluginTestCase.MOUNT_LOCATION))
 
     def _create_vpool(self):
         """
@@ -192,9 +213,9 @@ class OVSPluginTestCase(test.TestCase):
         pmachine = System.get_my_storagerouter().pmachine
         mgmt_center = MgmtCenter(data={'name': 'Openstack',
                                        'description': 'test',
-                                       'username': CINDER_USER,
-                                       'password': CINDER_PASS,
-                                       'ip': CINDER_CONTROLLER,
+                                       'username': OVSPluginTestCase.CINDER_USER,
+                                       'password': OVSPluginTestCase.CINDER_PASS,
+                                       'ip': OVSPluginTestCase.CINDER_CONTROLLER,
                                        'port': 80,
                                        'type': 'OPENSTACK',
                                        'metadata': {'integratemgmt': True}})
@@ -203,14 +224,14 @@ class OVSPluginTestCase(test.TestCase):
         pmachine.save()
         self._debug('Creating vpool')
 
-        parameters = {'storagerouter_ip': IP,
-                      'vpool_name': VPOOL_NAME,
+        parameters = {'storagerouter_ip': OVSPluginTestCase.ip,
+                      'vpool_name': OVSPluginTestCase.VPOOL_NAME,
                       'type': 'local',
                       'storage_ip': '127.0.0.1',  # KVM
-                      'vrouter_port': VPOOL_PORT,
+                      'vrouter_port': OVSPluginTestCase.VPOOL_PORT,
                       'integrate_vpool': True,
-                      'connection_host': IP,
-                      'connection_port': VPOOL_PORT,
+                      'connection_host': OVSPluginTestCase.ip,
+                      'connection_port': OVSPluginTestCase.VPOOL_PORT,
                       'connection_username': '',
                       'connection_password': '',
                       'connection_backend': {},
@@ -220,11 +241,11 @@ class OVSPluginTestCase(test.TestCase):
         StorageRouterController.add_vpool(parameters)
         attempt = 0
         while attempt < 10:
-            vpool = VPoolList.get_vpool_by_name(VPOOL_NAME)
+            vpool = VPoolList.get_vpool_by_name(OVSPluginTestCase.VPOOL_NAME)
             if vpool is not None:
-                self._debug('vpool {0} created'.format(VPOOL_NAME))
+                self._debug('vpool {0} created'.format(OVSPluginTestCase.VPOOL_NAME))
                 try:
-                    os.listdir(VPOOL_MOUNTPOINT)
+                    os.listdir(OVSPluginTestCase.VPOOL_MOUNTPOINT)
                     return vpool
                 except Exception as ex:
                     # either it doesn't exist, or we don't have permission
@@ -232,7 +253,7 @@ class OVSPluginTestCase(test.TestCase):
                     pass
             attempt += 1
             time.sleep(2)
-        raise RuntimeError('Vpool {0} was not modeled correctly or did not start.'.format(VPOOL_NAME))
+        raise RuntimeError('Vpool {0} was not modeled correctly or did not start.'.format(OVSPluginTestCase.VPOOL_NAME))
 
     def _remove_vpool(self):
         """
@@ -241,7 +262,7 @@ class OVSPluginTestCase(test.TestCase):
         so any failure here will be reported as a tearDown error and no cleanup will occur
         """
         self._debug('Removing vpool')
-        vpool = VPoolList.get_vpool_by_name(VPOOL_NAME)
+        vpool = VPoolList.get_vpool_by_name(OVSPluginTestCase.VPOOL_NAME)
         if vpool is None:
             self._debug('already removed')
             return
@@ -250,13 +271,13 @@ class OVSPluginTestCase(test.TestCase):
             StorageRouterController.remove_storagedriver(storagedriver_guid)
         attempt = 0
         while attempt < 10:
-            vpool = VPoolList.get_vpool_by_name(VPOOL_NAME)
+            vpool = VPoolList.get_vpool_by_name(OVSPluginTestCase.VPOOL_NAME)
             if vpool is None:
-                self._debug('vpool {0} deleted'.format(VPOOL_NAME))
+                self._debug('vpool {0} deleted'.format(OVSPluginTestCase.VPOOL_NAME))
                 return
             attempt += 1
             time.sleep(2)
-        raise RuntimeError('Vpool {0} was not removed correctly.'.format(VPOOL_NAME))
+        raise RuntimeError('Vpool {0} was not removed correctly.'.format(OVSPluginTestCase.VPOOL_NAME))
 
     def _ovs_devicename_in_vdisklist(self, devicename, exists = True, retry=10):
         if devicename is None:
@@ -284,6 +305,7 @@ class OVSPluginTestCase(test.TestCase):
         raise ValueError('No such devicename {0} in OVS model'.format(devicename))
 
     def _ovs_snapshot_id_in_vdisklist_snapshots(self, snapshot_id, retry=10):
+        _ = self
         attempt = 0
         while attempt <= int(retry):
             snap_map = dict((vd.guid, vd.snapshots) for vd in VDiskList.get_vdisks())
@@ -296,13 +318,16 @@ class OVSPluginTestCase(test.TestCase):
         return False
 
     def _random_volume_name(self):
-        return VOLUME_NAME.format(str(uuid.uuid4()))
+        _ = self
+        return 'ovs-volume-{0}'.format(str(uuid.uuid4()))
 
     def _random_snapshot_name(self):
-        return SNAP_NAME.format(str(uuid.uuid4()))
+        _ = self
+        return 'ovs-volume-snapshot-{0}'.format(str(uuid.uuid4()))
 
     def _random_clone_name(self):
-        return CLONE_NAME.format(str(uuid.uuid4()))
+        _ = self
+        return 'ovs-clone-{0}'.format(str(uuid.uuid4()))
 
     def _create_file(self, file_name, contents=''):
         self._debug('create file {0}'.format(file_name))
@@ -316,7 +341,7 @@ class OVSPluginTestCase(test.TestCase):
     def _file_exists_on_mountpoint(self, file_name, mountpoint = None):
         self._debug('check if file {0} exists'.format(file_name))
         if not mountpoint:
-            mountpoint = VPOOL_MOUNTPOINT
+            mountpoint = OVSPluginTestCase.VPOOL_MOUNTPOINT
         if not os.path.exists(mountpoint):
             self._debug('location not found {0}'.format(mountpoint))
             return False
@@ -326,10 +351,10 @@ class OVSPluginTestCase(test.TestCase):
     # KEYSTONE
     def _get_keystone_client(self):
         if not self.keystone_client:
-            self.keystone_client = keystone_client.Client(username = CINDER_USER,
-                                                          password = CINDER_PASS,
-                                                          tenant_name = TENANT_NAME,
-                                                          auth_url = AUTH_URL)
+            self.keystone_client = keystone_client.Client(username = OVSPluginTestCase.CINDER_USER,
+                                                          password = OVSPluginTestCase.CINDER_PASS,
+                                                          tenant_name = OVSPluginTestCase.TENANT_NAME,
+                                                          auth_url = OVSPluginTestCase.AUTH_URL)
 
     # GLANCE
     def _get_glance_client(self):
@@ -348,7 +373,7 @@ class OVSPluginTestCase(test.TestCase):
         raise ValueError('Image {0} not found'.format(image_name))
 
     def _glance_get_test_image(self):
-        return self._glance_get_image_by_name(IMAGE_NAME)
+        return self._glance_get_image_by_name('Fedora-x86_64-20-20140618-sda')
 
     def _glance_list_images_names(self):
         return [image.name for image in self.glance_client.images.list()]
@@ -411,9 +436,9 @@ class OVSPluginTestCase(test.TestCase):
         cfg = self._get_cinder_config()
         changed = False
         config_map = {'volume_driver': 'cinder.volume.drivers.openvstorage.OVSVolumeDriver',
-                      'volume_backend_name': VPOOL_NAME,
-                      'vpool_name': VPOOL_NAME,
-                      'default_volume_type': VOLUME_TYPE}
+                      'volume_backend_name': OVSPluginTestCase.VPOOL_NAME,
+                      'vpool_name': OVSPluginTestCase.VPOOL_NAME,
+                      'default_volume_type': OVSPluginTestCase.VOLUME_TYPE}
         for key, value in config_map.items():
             if not cfg.has_option('DEFAULT', key) or cfg.get('DEFAULT', key) != value:
                 cfg.set('DEFAULT', key, value)
@@ -428,7 +453,7 @@ class OVSPluginTestCase(test.TestCase):
 
     def _restart_cinder(self):
         self._get_shell_client()
-        if PROCESS == 'screen':
+        if OVSPluginTestCase.PROCESS == 'screen':
             # restart in screen
             self._debug('stopping cinder screen process')
             # stop
@@ -440,7 +465,7 @@ class OVSPluginTestCase(test.TestCase):
             self.shell_client('''screen -S stack -p c-vol -X stuff "export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\"\012"''')
             self.shell_client('''screen -S stack -p c-vol -X stuff "/usr/local/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\"\012"''')
             time.sleep(3)
-        elif PROCESS == 'service':
+        elif OVSPluginTestCase.PROCESS == 'service':
             # restart service
             pass
 
@@ -448,17 +473,17 @@ class OVSPluginTestCase(test.TestCase):
         self._get_cinder_client()
         volume_types = self.cinder_client.volume_types.list()
         for v in volume_types:
-            if v.name == VOLUME_TYPE:
+            if v.name == OVSPluginTestCase.VOLUME_TYPE:
                 return False
-        volume_type = self.cinder_client.volume_types.create(VOLUME_TYPE)
-        volume_type.set_keys(metadata = {'volume_backend_name': VPOOL_NAME})
+        volume_type = self.cinder_client.volume_types.create(OVSPluginTestCase.VOLUME_TYPE)
+        volume_type.set_keys(metadata = {'volume_backend_name': OVSPluginTestCase.VPOOL_NAME})
         return True
 
     def _remove_cinder_volume_type(self):
         self._get_cinder_client()
         volume_types = self.cinder_client.volume_types.list()
         for v in volume_types:
-            if v.name == VOLUME_TYPE:
+            if v.name == OVSPluginTestCase.VOLUME_TYPE:
                 try:
                     self.cinder_client.volume_types.delete(v.id)
                 except Exception as ex:
@@ -466,7 +491,7 @@ class OVSPluginTestCase(test.TestCase):
 
     def _get_cinder_client(self):
         if not self.cinder_client:
-            self.cinder_client = cinder_client.Client(CINDER_USER, CINDER_PASS, TENANT_NAME, AUTH_URL)
+            self.cinder_client = cinder_client.Client(OVSPluginTestCase.CINDER_USER, OVSPluginTestCase.CINDER_PASS, OVSPluginTestCase.TENANT_NAME, OVSPluginTestCase.AUTH_URL)
 
     def _cinder_get_volume_by_id(self, volume_id):
         """
@@ -492,7 +517,7 @@ class OVSPluginTestCase(test.TestCase):
         self._get_cinder_client()
         return self.cinder_client.volume_snapshots.get(snapshot_id)
 
-    def _cinder_create_volume(self, name, snapshot_id = None, volume_id = None, image_id = None, size = VOLUME_SIZE, attempt = 0):
+    def _cinder_create_volume(self, name, snapshot_id=None, volume_id=None, image_id=None, size=VOLUME_SIZE, attempt=0):
         """
         Creates a volume based partially on DEFAULT values
         - can be created from snapshot or another volume or an image
@@ -503,7 +528,7 @@ class OVSPluginTestCase(test.TestCase):
         self._get_cinder_client()
         volume = self.cinder_client.volumes.create(size = size,
                                                    display_name = name,
-                                                   volume_type = VOLUME_TYPE,
+                                                   volume_type = OVSPluginTestCase.VOLUME_TYPE,
                                                    snapshot_id = snapshot_id,
                                                    source_volid = volume_id,
                                                    imageRef = image_id)
@@ -688,17 +713,17 @@ class OVSPluginTestCase(test.TestCase):
     def _new_volume(self):
         self._debug('create new volume')
         volume_name = self._random_volume_name()
-        file_name = '{0}.{1}'.format(volume_name, FILE_TYPE)
+        file_name = '{0}.{1}'.format(volume_name, OVSPluginTestCase.FILE_TYPE)
         volume = self._cinder_create_volume(volume_name)
         self._debug('created new volume {0}'.format(volume_name))
-        self.register_tearDown(10, volume_name, self._cinder_delete_volume, {'volume': volume})
+        self._register_teardown(10, volume_name, self._cinder_delete_volume, {'volume': volume})
         self._debug('volume {0} created'.format(volume_name))
         return volume, volume_name, file_name
 
     def _remove_volume(self, volume, volume_name, timeout=300):
         self._debug('remove volume {0}'.format(volume_name))
         self._cinder_delete_volume(volume, timeout)
-        self.unregister_tearDown(volume_name)
+        self._unregister_teardown(volume_name)
         self._cinder_wait_until_volume_not_found(volume.id, timeout)
         self._debug('volume {0} removed'.format(volume_name))
 
@@ -706,34 +731,34 @@ class OVSPluginTestCase(test.TestCase):
         self._debug('new snapshot for {0}'.format(volume.id))
         snap_name = self._random_snapshot_name()
         snapshot = self._cinder_create_snapshot(volume, snap_name)
-        self.register_tearDown(5, snap_name, self._cinder_delete_snapshot, {'snapshot': snapshot, 'force': True})
+        self._register_teardown(5, snap_name, self._cinder_delete_snapshot, {'snapshot': snapshot, 'force': True})
         self._debug('snapshot {0} created'.format(snap_name))
         return snapshot, snap_name
 
     def _remove_snapshot(self, snap_name, snapshot, timeout=300, force=False):
         self._debug('delete snapshot {0}'.format(snap_name))
         self._cinder_delete_snapshot(snapshot, timeout = timeout, force = force)
-        self.unregister_tearDown(snap_name)
+        self._unregister_teardown(snap_name)
         self._cinder_wait_until_snapshot_not_found(snapshot.id, timeout)
         self._debug('snapshot {0} deleted'.format(snap_name))
 
     def _new_volume_from_snapshot(self, snapshot):
         self._debug('new volume from snapshot {0}'.format(snapshot.id))
         clone_name = self._random_clone_name()
-        file_name = '{0}.{1}'.format(clone_name, FILE_TYPE)
+        file_name = '{0}.{1}'.format(clone_name, OVSPluginTestCase.FILE_TYPE)
         clone_volume = self._cinder_create_volume(clone_name, snapshot_id = snapshot.id)
         self._debug('created new volume {0}'.format(clone_name))
-        self.register_tearDown(3, clone_name, self._cinder_delete_volume, {'volume': clone_volume})
+        self._register_teardown(3, clone_name, self._cinder_delete_volume, {'volume': clone_volume})
         self._debug('volume {0} created'.format(clone_volume.display_name))
         return clone_volume, clone_name, file_name
 
     def _new_volume_from_volume(self, volume):
         self._debug('new volume from volume {0}'.format(volume.id))
         clone_name = self._random_clone_name()
-        file_name = '{0}.{1}'.format(clone_name, FILE_TYPE)
+        file_name = '{0}.{1}'.format(clone_name, OVSPluginTestCase.FILE_TYPE)
         clone_volume = self._cinder_create_volume(clone_name, volume_id = volume.id)
         self._debug('created new volume {0}'.format(clone_name))
-        self.register_tearDown(2, clone_name, self._cinder_delete_volume, {'volume': clone_volume})
+        self._register_teardown(2, clone_name, self._cinder_delete_volume, {'volume': clone_volume})
         self._debug('volume {0} created'.format(clone_volume.display_name))
         return clone_volume, clone_name, file_name
 
@@ -741,19 +766,19 @@ class OVSPluginTestCase(test.TestCase):
         image = self._glance_get_test_image()
         self._debug('new volume from image {0}'.format(image))
         volume_name = self._random_volume_name()
-        file_name = '{0}.{1}'.format(volume_name, FILE_TYPE)
+        file_name = '{0}.{1}'.format(volume_name, OVSPluginTestCase.FILE_TYPE)
         volume = self._cinder_create_volume(volume_name, image_id = image.id, size = size)
         self._debug('created new volume {0}'.format(volume_name))
-        self.register_tearDown(9, volume_name, self._cinder_delete_volume, {'volume': volume})
+        self._register_teardown(9, volume_name, self._cinder_delete_volume, {'volume': volume})
         self._debug('volume {0} created'.format(volume_name))
         return volume, volume_name, file_name
 
     def _upload_volume_to_image(self, volume):
-        image_name = UPLOAD_IMAGE_NAME.format(str(uuid.uuid4()))
+        image_name = 'Upload-OVS-image-{0}'.format(str(uuid.uuid4()))
         self._debug('new image {0}'.format(image_name))
         self._cinder_upload_volume_to_glance(volume, image_name)
         image = self._glance_wait_until_image_state(image_name)
-        self.register_tearDown(11, image_name, self._glance_delete_image, {'image_name': image_name})
+        self._register_teardown(11, image_name, self._glance_delete_image, {'image_name': image_name})
         self._debug('volume uploaded')
         return image, image_name
 
@@ -762,5 +787,5 @@ class OVSPluginTestCase(test.TestCase):
         self._glance_get_image_by_name(image_name)
         self._glance_wait_until_image_state(image_name)
         self._glance_delete_image(image_name)
-        self.unregister_tearDown(image_name)
+        self._unregister_teardown(image_name)
         self._debug('image removed')

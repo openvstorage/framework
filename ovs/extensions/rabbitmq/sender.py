@@ -23,9 +23,10 @@ import pika
 
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='sender')
 
 if __name__ == '__main__':
+    logger = LogHandler.get('extensions', name='sender')
+
     data = sys.argv[1] if len(sys.argv) >= 2 else '{}'
     queue = sys.argv[2] if len(sys.argv) >= 3 else 'default'
 

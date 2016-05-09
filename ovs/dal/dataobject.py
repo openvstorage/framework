@@ -27,13 +27,11 @@ from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, L
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.datalist import DataList
-from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.exceptions import KeyNotFoundException, AssertException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('dal', name='dataobject')
 
 
 class MetaClass(type):
@@ -140,6 +138,7 @@ class DataObject(object):
     _properties = []  # Blueprint data of the object type
     _dynamics = []    # Timeout of readonly object properties cache
     _relations = []   # Blueprint for relations
+    _logger = LogHandler.get('dal', name='dataobject')
 
     NAMESPACE = 'ovs_data'
 
@@ -208,7 +207,7 @@ class DataObject(object):
         self._key = '{0}_{1}_{2}'.format(DataObject.NAMESPACE, self._classname, self._guid)
 
         # Worker mutexes
-        self._mutex_version = VolatileMutex('ovs_dataversion_{0}_{1}'.format(self._classname, self._guid))
+        self._mutex_version = volatile_mutex('ovs_dataversion_{0}_{1}'.format(self._classname, self._guid))
 
         # Load data from cache or persistent backend where appropriate
         self._volatile = VolatileFactory.get_client()
@@ -436,7 +435,7 @@ class DataObject(object):
             descriptor = Descriptor(value.__class__).descriptor
             if descriptor['identifier'] != self._data[attribute]['identifier']:
                 if descriptor['type'] == self._data[attribute]['type']:
-                    logger.error('Corrupt descriptors: {0} vs {1}'.format(descriptor, self._data[attribute]))
+                    DataObject._logger.error('Corrupt descriptors: {0} vs {1}'.format(descriptor, self._data[attribute]))
                 raise TypeError('An invalid type was given: {0} instead of {1}'.format(
                     descriptor['type'], self._data[attribute]['type']
                 ))
@@ -486,7 +485,7 @@ class DataObject(object):
         while successful is False:
             tries += 1
             if tries > 5:
-                logger.error('Raising RaceConditionException. Last AssertException: {0}'.format(last_assert))
+                DataObject._logger.error('Raising RaceConditionException. Last AssertException: {0}'.format(last_assert))
                 raise RaceConditionException()
 
             invalid_fields = []
@@ -656,6 +655,7 @@ class DataObject(object):
         """
         Delete the given object. It also invalidates certain lists
         :param abandon: Indicates whether(which) linked objects can be unlinked. Use with caution
+        :param _hook: Hook
         """
         if self.volatile is True:
             raise VolatileObjectException()
@@ -666,7 +666,7 @@ class DataObject(object):
         while successful is False:
             tries += 1
             if tries > 5:
-                logger.error('Raising RaceConditionException. Last AssertException: {0}'.format(last_assert))
+                DataObject._logger.error('Raising RaceConditionException. Last AssertException: {0}'.format(last_assert))
                 raise RaceConditionException()
 
             transaction = self._persistent.begin_transaction()
@@ -765,7 +765,7 @@ class DataObject(object):
         for dynamic in self._dynamics:
             if properties is None or dynamic.name in properties:
                 key = '{0}_{1}'.format(self._key, dynamic.name)
-                mutex = VolatileMutex(key)
+                mutex = volatile_mutex(key)
                 try:
                     if dynamic.locked:
                         mutex.acquire()
@@ -879,7 +879,7 @@ class DataObject(object):
         """
         caller_name = dynamic.name
         cache_key = '{0}_{1}'.format(self._key, caller_name)
-        mutex = VolatileMutex(cache_key)
+        mutex = volatile_mutex(cache_key)
         try:
             cached_data = self._volatile.get(cache_key)
             if cached_data is None:

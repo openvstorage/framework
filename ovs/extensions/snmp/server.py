@@ -16,7 +16,6 @@
 SNMP Server module
 """
 
-import sys
 from pysnmp.entity import engine, config
 from pysnmp.entity.rfc3413 import cmdrsp, context
 from pysnmp.carrier import error
@@ -123,7 +122,6 @@ class SNMPServer():
                          config.usmHMACMD5AuthProtocol, user[1],
                          config.usmDESPrivProtocol, user[2])
 
-
     def _add_user_permission(self, OID):
         """
         Add user permission to OID - readOnly
@@ -137,7 +135,6 @@ class SNMPServer():
              #Allow full MIB access for this user / securityModels at VACM
              config.addVacmUser(self.snmpEngine, 1, 'my-read-area',
                    'noAuthNoPriv', OID)
-
 
     def register_custom_oid(self, class_oid, instance_oid, attribute_oid, get_function, atype = str):
         """

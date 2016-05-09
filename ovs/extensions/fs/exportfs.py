@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Export FS module
+"""
 import re
 import subprocess
 from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('extensions', name='exportfs')
 
 
 class Nfsexports(object):
@@ -24,6 +25,7 @@ class Nfsexports(object):
     Basic management for /etc/exports
     """
     def __init__(self):
+        self._logger = LogHandler.get('extensions', name='exportfs')
         self._exports_file = '/etc/exports'
         self._cmd = ['/usr/bin/sudo', '-u', 'root', '/usr/sbin/exportfs']
         self._restart = ['/usr/bin/sudo', '-u', 'root', '/usr/sbin/exportfs', '-ra']
@@ -58,7 +60,7 @@ class Nfsexports(object):
         l = self._slurp()
         for i in l:
             if i['dir'] == directory:
-                logger.info('Directory already exported, to export with different params please first remove')
+                self._logger.info('Directory already exported, to export with different params please first remove')
                 return
         f = open(self._exports_file, 'a')
         f.write('%s %s(%s)\n' % (directory, network, params))
@@ -90,9 +92,9 @@ class Nfsexports(object):
         cmd = list(self._cmd)
         exports = self.list_exported()
         if directory not in exports.keys():
-            logger.info('Directory %s currently not exported' % directory)
+            self._logger.info('Directory %s currently not exported' % directory)
             return
-        logger.info('Unexporting {}:{}'.format(exports[directory] if exports[directory] != '<world>' else '*', directory))
+        self._logger.info('Unexporting {}:{}'.format(exports[directory] if exports[directory] != '<world>' else '*', directory))
         cmd.extend(['-u', '{}:{}'.format(exports[directory] if exports[directory] != '<world>' else '*', directory)])
         subprocess.call(cmd)
 
@@ -103,13 +105,16 @@ class Nfsexports(object):
         cmd = list(self._cmd)
         exports = self.list_exported()
         if directory in exports.keys():
-            logger.info('Directory already exported with options %s' % exports[directory])
+            self._logger.info('Directory already exported with options %s' % exports[directory])
             return
-        logger.info('Exporting {}:{}'.format(network, directory))
+        self._logger.info('Exporting {}:{}'.format(network, directory))
         cmd.extend(['-v', '{}:{}'.format(network, directory)])
         subprocess.call(cmd)
         subprocess.call(self._restart)
 
     def trigger_rpc_mountd(self):
+        """
+        Trigger RPC mount daemon
+        """
         subprocess.call(self._rpcmountd_stop)
         subprocess.call(self._rpcmountd_start)

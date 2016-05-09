@@ -20,14 +20,12 @@ from ovs.log.logHandler import LogHandler
 from subprocess import check_output
 from subprocess import CalledProcessError
 
-logger = LogHandler.get('lib', name='packager')
-
 
 class RpmPackage(object):
     """
     Contains all logic related to Rpm packages (used in e.g. Centos)
     """
-
+    _logger = LogHandler.get('lib', name='packager')
     OVS_PACKAGE_NAMES = ['openvstorage', 'openvstorage-backend', 'volumedriver-server', 'volumedriver-base', 'alba', 'openvstorage-sdm']
 
     @staticmethod
@@ -56,7 +54,7 @@ class RpmPackage(object):
             except CalledProcessError as cpe:
                 # Retry 3 times if fail
                 if counter == max_counter:
-                    logger.error('Install {0} failed. Error: {1}'.format(package_name, cpe.output))
+                    RpmPackage._logger.error('Install {0} failed. Error: {1}'.format(package_name, cpe.output))
                     raise cpe
             except Exception as ex:
                 raise ex
@@ -69,7 +67,7 @@ class RpmPackage(object):
         except CalledProcessError as cpe:
             # Returns exit value of 100 if there are packages available for an update
             if cpe.returncode != 100:
-                logger.error('Update failed. Error: {0}'.format(cpe.output))
+                RpmPackage._logger.error('Update failed. Error: {0}'.format(cpe.output))
                 raise cpe
 
     @staticmethod

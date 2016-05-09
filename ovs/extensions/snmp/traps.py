@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ovs.extensions.snmp.trapsender import SNMPTrapSender
-
 """
 OVS defined traps
 """
+from ovs.extensions.snmp.trapsender import SNMPTrapSender
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 
-
 STORAGE_PREFIX = "ovs_snmp"
+
 
 class OVSTraps():
     """

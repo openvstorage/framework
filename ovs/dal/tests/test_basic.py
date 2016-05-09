@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # Copyright 2016 iNuron NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,28 +15,25 @@
 """
 Basic test module
 """
-import sys
-import uuid
 import time
-from unittest import TestCase
+import uuid
+import unittest
+from ovs.dal.datalist import DataList
 from ovs.dal.exceptions import *
-from ovs.extensions.generic import fakesleep
-from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
-from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.dal.helpers import Descriptor, Toolbox
 from ovs.dal.hybrids.t_testdisk import TestDisk
 from ovs.dal.hybrids.t_testemachine import TestEMachine
 from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.hybrids.t_teststoragedriver import TestStorageDriver
 from ovs.dal.hybrids.t_teststoragerouter import TestStorageRouter
 from ovs.dal.hybrids.t_testvpool import TestVPool
-from ovs.dal.datalist import DataList
-from ovs.dal.helpers import Descriptor, Toolbox
-from ovs.extensions.generic.volatilemutex import VolatileMutex, NoLockAvailableException
+from ovs.extensions.generic import fakesleep
+from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
-class Basic(TestCase):
+class Basic(unittest.TestCase):
     """
     The basic unit-testsuite will test all basic functionality of the DAL framework
     It will also try accessing all dynamic properties of all hybrids making sure
@@ -51,24 +47,19 @@ class Basic(TestCase):
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        PersistentFactory.store = DummyPersistentStore()
-        PersistentFactory.store.clean()
-        PersistentFactory.store.clean()
-        VolatileFactory.store = DummyVolatileStore()
-        VolatileFactory.store.clean()
-        VolatileFactory.store.clean()
+        cls.persistent = PersistentFactory.get_client()
+        cls.volatile = VolatileFactory.get_client()
+        cls.persistent.clean()
+        cls.volatile.clean()
 
         fakesleep.monkey_patch()
 
-    @classmethod
-    def setUp(cls):
+    def setUp(self):
         """
         (Re)Sets the stores on every test
         """
-        PersistentFactory.store = DummyPersistentStore()
-        PersistentFactory.store.clean()
-        VolatileFactory.store = DummyVolatileStore()
-        VolatileFactory.store.clean()
+        self.persistent.clean()
+        self.volatile.clean()
         DataList.test_hooks = {}
 
     @classmethod
@@ -245,7 +236,7 @@ class Basic(TestCase):
         disk3 = TestDisk(disk.guid)
         self.assertTrue(disk3._metadata['cache'], 'Object should be retrieved from cache')
         # After the object expiry passed, it will be retrieved from backend again
-        DummyVolatileStore().delete(disk._key)  # We clear the entry
+        self.volatile.delete(disk._key)  # We clear the entry
         disk4 = TestDisk(disk.guid)
         self.assertFalse(disk4._metadata['cache'], 'Object should be retrieved from persistent backend')
 
@@ -615,7 +606,7 @@ class Basic(TestCase):
         """
         Validates the volatile mutex
         """
-        mutex = VolatileMutex('test')
+        mutex = volatile_mutex('test')
         mutex.acquire()
         mutex.acquire()  # Should not raise errors
         mutex.release()
@@ -1022,6 +1013,7 @@ class Basic(TestCase):
         Validates whether using an object property to delete these entries does not cause issues when deleting the
         object itself afterwards
         """
+        _ = self
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
@@ -1331,6 +1323,7 @@ class Basic(TestCase):
                 PersistentFactory.store.set('ovs_listcache_testdisk', {})
                 Basic._executed = True
 
+        _ = self
         PersistentFactory.store.set('ovs_listcache_testdisk', {'foo': 'bar'})
         Basic._executed = False
         disk = TestDisk()
@@ -1342,6 +1335,7 @@ class Basic(TestCase):
         """
         Verify 2 objects are the same, but when approached from a different level
         """
+        _ = self
         sr = TestStorageRouter()
         sr.name = 'storage_router1'
         sr.save()
@@ -1389,9 +1383,3 @@ class Basic(TestCase):
         datalist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                        'items': []})
         self.assertEqual(len(datalist), 1, 'Datalist should have one testdisk')
-
-if __name__ == '__main__':
-    import unittest
-    suite = unittest.TestLoader().loadTestsFromTestCase(Basic)
-    result = not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful()
-    sys.exit(result)

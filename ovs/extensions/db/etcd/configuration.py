@@ -23,6 +23,8 @@ import time
 import random
 import signal
 import string
+import unittest
+from itertools import groupby
 from ovs.log.logHandler import LogHandler
 try:
     from requests.packages.urllib3 import disable_warnings
@@ -37,11 +39,6 @@ from requests.packages.urllib3.exceptions import InsecurePlatformWarning
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from requests.packages.urllib3.exceptions import SNIMissingWarning
 
-disable_warnings(InsecurePlatformWarning)
-disable_warnings(InsecureRequestWarning)
-disable_warnings(SNIMissingWarning)
-logger = LogHandler.get('extensions', name='etcdconfiguration')
-
 
 def log_slow_calls(f):
     """
@@ -49,6 +46,8 @@ def log_slow_calls(f):
     :param f: Function to wrap
     :return: Wrapped function
     """
+    logger = LogHandler.get('extensions', name='etcdconfiguration')
+
     def new_function(*args, **kwargs):
         """
         Execute function
@@ -94,6 +93,7 @@ class EtcdConfiguration(object):
         > print EtcdConfiguration.get('/bar')
         < {u'a': {u'b': u'test'}}
     """
+    _unittest_data = {}
     base_config = {'cluster_id': None,
                    'external_etcd': None,
                    'plugins/installed': {'backends': [],
@@ -109,6 +109,10 @@ class EtcdConfiguration(object):
                                      'mds_maxload': 75},
                    'webapps': {'html_endpoint': '/',
                                'oauth2': {'mode': 'local'}}}
+
+    disable_warnings(InsecurePlatformWarning)
+    disable_warnings(InsecureRequestWarning)
+    disable_warnings(SNIMissingWarning)
 
     def __init__(self):
         """
@@ -213,24 +217,6 @@ class EtcdConfiguration(object):
         return EtcdConfiguration._dir_exists(key)
 
     @staticmethod
-    def create_dir(key):
-        """
-        Creates a directory, including subdirs
-        :param key: full directory path to be created
-        :return: None
-        """
-        EtcdConfiguration._create_dir(key)
-
-    @staticmethod
-    def delete_dir(key):
-        """
-        Deletes a directory
-        :param key: full directory path to be deleted
-        :return: None
-        """
-        EtcdConfiguration._delete_dir(key)
-
-    @staticmethod
     def list(key):
         """
         List all keys in tree
@@ -314,6 +300,19 @@ class EtcdConfiguration(object):
     @staticmethod
     @log_slow_calls
     def _dir_exists(key):
+        key = EtcdConfiguration._coalesce_dashes(key=key)
+
+        # Unittests
+        if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+            stripped_key = key.strip('/')
+            current_dict = EtcdConfiguration._unittest_data
+            for part in stripped_key.split('/'):
+                if part not in current_dict or not isinstance(current_dict[part], dict):
+                    return False
+                current_dict = current_dict[part]
+            return True
+
+        # Real implementation
         try:
             client = EtcdConfiguration._get_client()
             return client.get(key).dir
@@ -322,21 +321,30 @@ class EtcdConfiguration(object):
 
     @staticmethod
     @log_slow_calls
-    def _create_dir(key):
-        if not EtcdConfiguration._dir_exists(key):
-            client = EtcdConfiguration._get_client()
-            client.write(key, '', dir=True)
-
-    @staticmethod
-    @log_slow_calls
-    def _delete_dir(key):
-        if EtcdConfiguration._dir_exists(key):
-            client = EtcdConfiguration._get_client()
-            client.delete(key, dir=True)
-
-    @staticmethod
-    @log_slow_calls
     def _list(key):
+        key = EtcdConfiguration._coalesce_dashes(key=key)
+
+        # Unittests
+        if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+            data = EtcdConfiguration._unittest_data
+            ends_with_dash = key.endswith('/')
+            starts_with_dash = key.startswith('/')
+            stripped_key = key.strip('/')
+            for part in stripped_key.split('/'):
+                if part not in data:
+                    raise etcd.EtcdKeyNotFound('Key not found: {0}'.format(key))
+                data = data[part]
+            if data:
+                for sub_key in data:
+                    if ends_with_dash is True:
+                        yield '/{0}/{1}'.format(stripped_key, sub_key)
+                    else:
+                        yield sub_key if starts_with_dash is True else '/{0}'.format(sub_key)
+            elif starts_with_dash is False or ends_with_dash is True:
+                yield '/{0}'.format(stripped_key)
+            return
+
+        # Real implementation
         client = EtcdConfiguration._get_client()
         for child in client.get(key).children:
             if child.key is not None and child.key != key:
@@ -345,14 +353,51 @@ class EtcdConfiguration(object):
     @staticmethod
     @log_slow_calls
     def _delete(key, recursive):
+        key = EtcdConfiguration._coalesce_dashes(key=key)
+
+        # Unittests
+        if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+            stripped_key = key.strip('/')
+            data = EtcdConfiguration._unittest_data
+            for part in stripped_key.split('/')[:-1]:
+                if part not in data:
+                    raise etcd.EtcdKeyNotFound('Key not found : {0}'.format(key))
+                data = data[part]
+            key_to_remove = stripped_key.split('/')[-1]
+            if key_to_remove in data:
+                del data[key_to_remove]
+            return
+
+        # Real implementation
         client = EtcdConfiguration._get_client()
         client.delete(key, recursive=recursive)
 
     @staticmethod
     @log_slow_calls
     def _get(key, raw):
-        client = EtcdConfiguration._get_client()
-        data = client.read(key).value
+        key = EtcdConfiguration._coalesce_dashes(key=key)
+
+        # Unittests
+        if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+            if key in ['', '/']:
+                return
+            stripped_key = key.strip('/')
+            data = EtcdConfiguration._unittest_data
+            for part in stripped_key.split('/')[:-1]:
+                if part not in data:
+                    raise etcd.EtcdKeyNotFound('Key not found : {0}'.format(key))
+                data = data[part]
+            last_part = stripped_key.split('/')[-1]
+            if last_part not in data:
+                raise etcd.EtcdKeyNotFound('Key not found : {0}'.format(key))
+            data = data[last_part]
+            if isinstance(data, dict):
+                data = None
+        else:
+            # Real implementation
+            client = EtcdConfiguration._get_client()
+            data = client.read(key).value
+
         if raw is True:
             return data
         return json.loads(data)
@@ -360,10 +405,25 @@ class EtcdConfiguration(object):
     @staticmethod
     @log_slow_calls
     def _set(key, value, raw):
-        client = EtcdConfiguration._get_client()
+        key = EtcdConfiguration._coalesce_dashes(key=key)
         data = value
         if raw is False:
             data = json.dumps(value)
+
+        # Unittests
+        if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+            stripped_key = key.strip('/')
+            ut_data = EtcdConfiguration._unittest_data
+            for part in stripped_key.split('/')[:-1]:
+                if part not in ut_data:
+                    ut_data[part] = {}
+                ut_data = ut_data[part]
+
+            ut_data[stripped_key.split('/')[-1]] = data
+            return
+
+        # Real implementation
+        client = EtcdConfiguration._get_client()
         client.write(key, data)
         try:
             def _escape(*args, **kwargs):
@@ -381,3 +441,15 @@ class EtcdConfiguration(object):
     @staticmethod
     def _get_client():
         return etcd.Client(port=2379, use_proxies=True)
+
+    @staticmethod
+    def _coalesce_dashes(key):
+        """
+        Remove multiple dashes, eg: //ovs//framework/ becomes /ovs/framework/
+        :param key: Key to convert
+        :type key: str
+
+        :return: Key without multiple dashes after one another
+        :rtype: str
+        """
+        return ''.join(k if k == '/' else ''.join(group) for k, group in groupby(key))

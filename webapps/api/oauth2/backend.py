@@ -21,10 +21,6 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 
-from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('api', 'oauth2')
-
 
 class OAuth2Backend(BaseAuthentication):
     """

@@ -30,9 +30,6 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.helpers.decorators import log
-from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('lib', name='vpool')
 
 
 class VPoolController(object):

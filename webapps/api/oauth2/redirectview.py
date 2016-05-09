@@ -32,13 +32,12 @@ from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.rolelist import RoleList
 from oauth2.toolbox import Toolbox
 
-logger = LogHandler.get('api', 'oauth2')
-
 
 class OAuth2RedirectView(View):
     """
     Implements OAuth 2 redirect views
     """
+    _logger = LogHandler.get('api', 'oauth2')
 
     @log()
     @auto_response()
@@ -50,17 +49,17 @@ class OAuth2RedirectView(View):
         _ = args, kwargs
         html_endpoint = EtcdConfiguration.get('/ovs/framework/webapps|html_endpoint')
         if 'code' not in request.GET:
-            logger.error('Got OAuth2 redirection request without code')
+            OAuth2RedirectView._logger.error('Got OAuth2 redirection request without code')
             return HttpResponseRedirect, html_endpoint
         code = request.GET['code']
         if 'state' not in request.GET:
-            logger.error('Got OAuth2 redirection request without state')
+            OAuth2RedirectView._logger.error('Got OAuth2 redirection request without state')
             return HttpResponseRedirect, html_endpoint
         state = request.GET['state']
         if 'error' in request.GET:
             error = request.GET['error']
             description = request.GET['error_description'] if 'error_description' in request.GET else ''
-            logger.error('Error {0} during OAuth2 redirection request: {1}'.format(error, description))
+            OAuth2RedirectView._logger.error('Error {0} during OAuth2 redirection request: {1}'.format(error, description))
             return HttpResponseRedirect, html_endpoint
 
         base_url = EtcdConfiguration.get('/ovs/framework/webapps|oauth2.token_uri')
@@ -78,7 +77,7 @@ class OAuth2RedirectView(View):
         if 'error' in response:
             error = response['error']
             description = response['error_description'] if 'error_description' in response else ''
-            logger.error('Error {0} during OAuth2 redirection access token: {1}'.format(error, description))
+            OAuth2RedirectView._logger.error('Error {0} during OAuth2 redirection access token: {1}'.format(error, description))
             return HttpResponseRedirect, html_endpoint
 
         token = response['access_token']
@@ -91,7 +90,7 @@ class OAuth2RedirectView(View):
                 client = current_client
                 break
         if client is None:
-            logger.error('Could not find INTERNAL CLIENT_CREDENTIALS client in administrator group.')
+            OAuth2RedirectView._logger.error('Could not find INTERNAL CLIENT_CREDENTIALS client in administrator group.')
             return HttpResponseRedirect, html_endpoint
 
         roles = RoleList.get_roles_by_codes(['read', 'write', 'manage'])

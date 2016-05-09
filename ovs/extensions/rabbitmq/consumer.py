@@ -25,53 +25,32 @@ import time
 import sys
 import logging
 import pyinotify
-from ConfigParser import RawConfigParser
 from ovs.extensions.rabbitmq.processor import process
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='consumer')
-logging.basicConfig()
 KVM_ETC = '/etc/libvirt/qemu/'
 KVM_RUN = '/run/libvirt/qemu/'
 
 mapping = {}
 
 
-def run_kvm_watcher():
-    """
-    Check whether to run the KVM file watcher
-    """
-    return System.get_my_storagerouter().pmachine.hvtype == 'KVM'
-
-
-def run_event_consumer():
-    """
-    Check whether to run the event consumer
-    """
-    my_ip = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(System.get_my_machine_id()))
-    for endpoint in EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints'):
-        if endpoint.startswith(my_ip):
-            return True
-    return False
-
-
-def callback(ch, method, properties, body):
-    """
-    Handles the message, making sure it gets acknowledged once processed
-    """
-    _ = properties
-    try:
-        if type(body) == unicode:
-            data = bytearray(body, 'utf-8')
-            body = bytes(data)
-        process(queue, body, mapping)
-    except Exception as e:
-        logger.exception('Error processing message: {0}'.format(e))
-    ch.basic_ack(delivery_tag=method.delivery_tag)
-
 if __name__ == '__main__':
+    def callback(ch, method, properties, body):
+        """
+        Handles the message, making sure it gets acknowledged once processed
+        """
+        _ = properties
+        try:
+            if type(body) == unicode:
+                data = bytearray(body, 'utf-8')
+                body = bytes(data)
+            process(queue, body, mapping)
+        except Exception as e:
+            logger.exception('Error processing message: {0}'.format(e))
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
     import argparse
     parser = argparse.ArgumentParser(description = 'KVM File Watcher and Rabbitmq Event Processor for OVS',
                                      formatter_class = argparse.RawDescriptionHelpFormatter)
@@ -83,11 +62,14 @@ if __name__ == '__main__':
     parser.add_argument('--watcher', dest='file_watcher', action='store_const', default=False, const=True,
                         help='Enable file watcher')
 
+    logger = LogHandler.get('extensions', name='consumer')
+    logging.basicConfig()
     args = parser.parse_args()
     print(args.rabbitmq_queue, args.queue_durable, args.file_watcher)
     notifier = None
+    run_kvm_watcher = System.get_my_storagerouter().pmachine.hvtype == 'KVM'
     try:
-        if args.file_watcher and run_kvm_watcher():
+        if args.file_watcher and run_kvm_watcher:
             from ovs.extensions.rabbitmq.kvm_xml_processor import Kxp
 
             wm = pyinotify.WatchManager()
@@ -112,7 +94,13 @@ if __name__ == '__main__':
             logger.info('Watching {0}...'.format(KVM_RUN), print_msg=True)
             logger.info('KVM xml processor active...', print_msg=True)
 
-        if run_event_consumer():
+        run_event_consumer = False
+        my_ip = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(System.get_my_machine_id()))
+        for endpoint in EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints'):
+            if endpoint.startswith(my_ip):
+                run_event_consumer = True
+
+        if run_event_consumer is True:
             # Load mapping
             mapping = {}
             path = '/'.join([os.path.dirname(__file__), 'mappings'])
@@ -174,10 +162,10 @@ if __name__ == '__main__':
                 time.sleep(3600)
 
     except KeyboardInterrupt:
-        if run_kvm_watcher() and notifier is not None:
+        if run_kvm_watcher and notifier is not None:
             notifier.stop()
     except Exception as exception:
         logger.error('Unexpected exception: {0}'.format(str(exception)), print_msg=True)
-        if run_kvm_watcher() and notifier is not None:
+        if run_kvm_watcher and notifier is not None:
             notifier.stop()
         sys.exit(1)
