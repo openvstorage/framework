@@ -319,11 +319,11 @@ class ScheduledTaskController(object):
             all_results2, failed_nodes = CeleryToolbox.manage_running_tasks(result_set, timesleep=60)  # Check every 60 seconds if tasks are still running
             all_results.extend(all_results2)
 
-        for ip, result in all_results2.iteritems():
-            if isinstance(result, list):
-                processed_guids.extend(result)
-            else:
-                logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(ip, result))
+            for ip, result in all_results2.iteritems():
+                if isinstance(result, list):
+                    processed_guids.extend(result)
+                else:
+                    logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(ip, result))
 
         if len(set(processed_guids)) != len(vdisk_guids) or set(processed_guids).difference(vdisk_guids):
             raise RuntimeError('Scrubbing failed for 1 or more storagerouters')
