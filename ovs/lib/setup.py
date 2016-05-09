@@ -435,7 +435,7 @@ class SetupController(object):
                                                           enable_heartbeats=enable_heartbeats,
                                                           external_etcd=external_etcd)
                     except Exception as ex:
-                        SetupController._log(messages=['Failed to setup first node', ex], loglevel='error')
+                        SetupController._log(messages=['Failed to setup first node', ex], loglevel='exception')
                         SetupController._rollback_setup(target_client=ip_client_map[cluster_ip],
                                                         first_node=True)
                         raise
@@ -449,7 +449,7 @@ class SetupController(object):
                                                           ip_client_map=ip_client_map,
                                                           hypervisor_info=hypervisor_info)
                     except Exception as ex:
-                        SetupController._log(messages=['Failed to setup extra node', ex], loglevel='error')
+                        SetupController._log(messages=['Failed to setup extra node', ex], loglevel='exception')
                         SetupController._rollback_setup(target_client=ip_client_map[cluster_ip],
                                                         first_node=False)
                         raise
@@ -472,7 +472,7 @@ class SetupController(object):
                                                               configure_memcached=configure_memcached,
                                                               configure_rabbitmq=configure_rabbitmq)
                             except Exception as ex:
-                                SetupController._log(messages=['\nFailed to promote node, rolling back', ex], loglevel='error')
+                                SetupController._log(messages=['\nFailed to promote node, rolling back', ex], loglevel='exception')
                                 SetupController._demote_node(cluster_ip=cluster_ip,
                                                              master_ip=master_ip,
                                                              cluster_name=cluster_name,
@@ -509,7 +509,7 @@ class SetupController(object):
 
         except Exception as exception:
             SetupController._log(messages='\n')
-            SetupController._log(messages=['An unexpected error occurred:', str(exception).lstrip('\n')], boxed=True, loglevel='error')
+            SetupController._log(messages=['An unexpected error occurred:', str(exception).lstrip('\n')], boxed=True, loglevel='exception')
             sys.exit(1)
         except KeyboardInterrupt:
             SetupController._log(messages='\n')
@@ -631,7 +631,7 @@ class SetupController(object):
             SetupController._log(messages='{0} complete.'.format(node_action.capitalize()), boxed=True)
         except Exception as exception:
             SetupController._log(messages='\n')
-            SetupController._log(messages=['An unexpected error occurred:', str(exception)], boxed=True, loglevel='error')
+            SetupController._log(messages=['An unexpected error occurred:', str(exception)], boxed=True, loglevel='exception')
             sys.exit(1)
         except KeyboardInterrupt:
             SetupController._log(messages='\n')
@@ -794,7 +794,7 @@ class SetupController(object):
                 SetupController._log(messages='    Successfully removed node\n')
         except Exception as exception:
             SetupController._log(messages='\n')
-            SetupController._log(messages=['An unexpected error occurred:', str(exception)], boxed=True, loglevel='error')
+            SetupController._log(messages=['An unexpected error occurred:', str(exception)], boxed=True, loglevel='exception')
             sys.exit(1)
         except KeyboardInterrupt:
             SetupController._log(messages='\n')
@@ -981,7 +981,7 @@ class SetupController(object):
                 try:
                     SetupController._unconfigure_rabbitmq(target_client)
                 except Exception as ex:
-                    SetupController._log(messages=['Failed to unconfigure RabbitMQ', ex], loglevel='error')
+                    SetupController._log(messages=['Failed to unconfigure RabbitMQ', ex], loglevel='exception')
 
                 for endpoint in endpoints:
                     if endpoint.startswith(target_client.ip):
@@ -1018,7 +1018,7 @@ class SetupController(object):
                 try:
                     ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
                 except Exception as ex:
-                    SetupController._log(messages=['\nFailed to delete cluster', ex], loglevel='error')
+                    SetupController._log(messages=['\nFailed to delete cluster', ex], loglevel='exception')
                 base_dir = etcd_required_info['/ovs/framework/paths|ovsdb']
                 directory_info = {ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name): True,
                                   ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name): False,
@@ -1039,7 +1039,7 @@ class SetupController(object):
                     EtcdInstaller.stop('config', target_client)
                     EtcdInstaller.remove('config', target_client)
                 except Exception as ex:
-                    SetupController._log(messages=['\nFailed to unconfigure Etcd', ex], loglevel='error')
+                    SetupController._log(messages=['\nFailed to unconfigure Etcd', ex], loglevel='exception')
 
             SetupController._log(messages='Cleaning up model')
             memcache_configured = etcd_required_info['/ovs/framework/memcache']
@@ -1300,7 +1300,7 @@ class SetupController(object):
                 SetupController._log(messages='Leaving Etcd cluster')
                 EtcdInstaller.shrink_cluster(master_ip, cluster_ip, 'config', offline_node_ips)
         except Exception as ex:
-            SetupController._log(messages=['\nFailed to leave Etcd cluster', ex], loglevel='error')
+            SetupController._log(messages=['\nFailed to leave Etcd cluster', ex], loglevel='exception')
 
         SetupController._log(messages='Update configurations')
         try:
@@ -1317,7 +1317,7 @@ class SetupController(object):
                     endpoints.remove(endpoint)
                 EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
         except Exception as ex:
-            SetupController._log(messages=['\nFailed to update configurations', ex], loglevel='error')
+            SetupController._log(messages=['\nFailed to update configurations', ex], loglevel='exception')
 
         if arakoon_metadata.internal is True:
             SetupController._log(messages='Restarting master node services')
@@ -1340,7 +1340,7 @@ class SetupController(object):
                 try:
                     client.run('rabbitmqctl forget_cluster_node rabbit@{0}'.format(storagerouter.name))
                 except Exception as ex:
-                    SetupController._log(messages=['\nFailed to forget RabbitMQ cluster node', ex], loglevel='error')
+                    SetupController._log(messages=['\nFailed to forget RabbitMQ cluster node', ex], loglevel='exception')
         else:
             target_client = ip_client_map[cluster_ip]
             if unconfigure_rabbitmq is True:
@@ -1353,7 +1353,7 @@ class SetupController(object):
                         Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', SetupController._logger)
                         target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
                 except Exception as ex:
-                    SetupController._log(messages=['\nFailed to remove/unconfigure RabbitMQ', ex], loglevel='error')
+                    SetupController._log(messages=['\nFailed to remove/unconfigure RabbitMQ', ex], loglevel='exception')
 
             SetupController._log(messages='Removing services')
             services = ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'snmp', 'webapp-api']
@@ -1368,7 +1368,7 @@ class SetupController(object):
                         Toolbox.change_service_state(target_client, service, 'stop', SetupController._logger)
                         ServiceManager.remove_service(service, client=target_client)
                     except Exception as ex:
-                        SetupController._log(messages=['\nFailed to remove service'.format(service), ex], loglevel='error')
+                        SetupController._log(messages=['\nFailed to remove service'.format(service), ex], loglevel='exception')
 
             if ServiceManager.has_service('workers', client=target_client):
                 ServiceManager.add_service(name='workers',
@@ -1378,7 +1378,7 @@ class SetupController(object):
         try:
             SetupController._configure_amqp_to_volumedriver()
         except Exception as ex:
-            SetupController._log(messages=['\nFailed to configure AMQP to Storage Driver', ex], loglevel='error')
+            SetupController._log(messages=['\nFailed to configure AMQP to Storage Driver', ex], loglevel='exception')
 
         SetupController._log(messages='Restarting services', loglevel='debug')
         master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
@@ -1840,7 +1840,7 @@ EOF
                     storagerouters[sr.name] = {'ip': sr.ip,
                                                'type': sr.node_type.lower()}
         except Exception as ex:
-            SetupController._logger.error('Error loading storagerouters: {0}'.format(ex))
+            SetupController._log('Error loading storagerouters: {0}'.format(ex), loglevel='exception')
         return storagerouters
 
     @staticmethod
@@ -1940,7 +1940,7 @@ EOF
             for message in messages:
                 if title is True:
                     message = '\n+++ {0} +++\n'.format(message)
-                if loglevel == 'error':
+                if loglevel in ['error', 'exception']:
                     message = 'ERROR: {0}'.format(message)
                 print message
 

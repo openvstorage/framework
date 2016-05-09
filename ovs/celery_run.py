@@ -55,7 +55,7 @@ class CeleryMockup(object):
         return _outer_function
 
 
-if hasattr(unittest, 'running_tests') or getattr(unittest, 'running_tests') is True:
+if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
     celery = CeleryMockup()
 else:
     memcache_servers = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
