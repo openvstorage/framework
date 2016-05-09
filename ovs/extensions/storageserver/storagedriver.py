@@ -16,8 +16,9 @@
 Wrapper class for the storagedriver client of the voldrv team
 """
 
-import json
 import copy
+import json
+import unittest
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.remote import remote
 from ovs.log.logHandler import LogHandler
@@ -25,13 +26,17 @@ from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import ClusterContact
 from volumedriver.storagerouter.storagerouterclient import DTLMode
 from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient as LSRClient
-from volumedriver.storagerouter.storagerouterclient import MDSClient
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
 from volumedriver.storagerouter.storagerouterclient import ReadCacheBehaviour
 from volumedriver.storagerouter.storagerouterclient import ReadCacheMode
 from volumedriver.storagerouter.storagerouterclient import Statistics
-from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient
 from volumedriver.storagerouter.storagerouterclient import VolumeInfo
+if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+    from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient as SRClient
+    from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient as MDSClient
+else:
+    from volumedriver.storagerouter.storagerouterclient import MDSClient
+    from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient
 
 client_vpool_cache = {}
 mdsclient_service_cache = {}

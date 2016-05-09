@@ -12,18 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest import TestCase
-from ovs.extensions.generic.system import System
+"""
+Test module for the System class
+"""
+import unittest
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.system import System
 
 
-class TestSystem(TestCase):
+class TestSystem(unittest.TestCase):
     multiple_port_range = [[5000, 6000], [7000, 7500], [8000, 9000]]
     single_port = [1500]
     single_port_range = [[8870, 8880]]
     ip = '127.0.0.1'
 
-    def setup(self):
+    def setUp(self):
         pass
 
     def test_no_free_port_can_be_found_within_system_range(self):

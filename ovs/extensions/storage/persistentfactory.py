@@ -15,6 +15,7 @@
 """
 Generic persistent factory.
 """
+import unittest
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 
 
@@ -30,6 +31,9 @@ class PersistentFactory(object):
         :param client_type: Type of store client
         """
         if not hasattr(PersistentFactory, 'store') or PersistentFactory.store is None:
+            if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests'):
+                client_type = 'dummy'
+
             if client_type is None:
                 client_type = EtcdConfiguration.get('/ovs/framework/stores|persistent')
 

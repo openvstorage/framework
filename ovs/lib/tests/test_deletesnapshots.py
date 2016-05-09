@@ -15,119 +15,63 @@
 """
 Delete snapshots test module
 """
-import sys
 import time
 import datetime
-from unittest import TestCase
-from ovs.lib.tests.mockups import StorageDriverModule
+import unittest
+from ovs.dal.hybrids.backendtype import BackendType
+from ovs.dal.hybrids.disk import Disk
+from ovs.dal.hybrids.diskpartition import DiskPartition
+from ovs.dal.hybrids.failuredomain import FailureDomain
+from ovs.dal.hybrids.pmachine import PMachine
+from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.vdisk import VDisk
+from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient
+from ovs.lib.vmachine import VMachineController
+from ovs.lib.vdisk import VDiskController
+from ovs.lib.scheduledtask import ScheduledTaskController
 
 
-class DeleteSnapshots(TestCase):
+class DeleteSnapshots(unittest.TestCase):
     """
     This test class will validate the various scenarios of the delete snapshots logic
     """
-    VolatileFactory.store = None
-    PersistentFactory.store = None
-    volatile = VolatileFactory.get_client('dummy')
-    persistent = PersistentFactory.get_client('dummy')
-    volatile._keep_in_memory_only = True
-    persistent._keep_in_memory_only = True
-
-    Disk = None
-    VDisk = None
-    VPool = None
-    VMachine = None
-    PMachine = None
-    logLevel = None
-    BackendType = None
-    DiskPartition = None
-    FailureDomain = None
-    StorageRouter = None
-    volatile_mutex = None
-    VDiskController = None
-    VMachineController = None
-    ScheduledTaskController = None
-
     @classmethod
     def setUpClass(cls):
         """
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriverModule
-        # Import required modules/classes after mocking is done
-        from ovs.dal.hybrids.backendtype import BackendType
-        from ovs.dal.hybrids.disk import Disk
-        from ovs.dal.hybrids.diskpartition import DiskPartition
-        from ovs.dal.hybrids.failuredomain import FailureDomain
-        from ovs.dal.hybrids.pmachine import PMachine
-        from ovs.dal.hybrids.storagerouter import StorageRouter
-        from ovs.dal.hybrids.vdisk import VDisk
-        from ovs.dal.hybrids.vmachine import VMachine
-        from ovs.dal.hybrids.vpool import VPool
-        from ovs.extensions.generic.volatilemutex import volatile_mutex
-        from ovs.lib.vmachine import VMachineController
-        from ovs.lib.vdisk import VDiskController
-        from ovs.lib.scheduledtask import ScheduledTaskController
-        # Globalize mocked classes
-        global Disk
-        global VDisk
-        global VMachine
-        global PMachine
-        global VPool
-        global BackendType
-        global DiskPartition
-        global FailureDomain
-        global StorageRouter
-        global volatile_mutex
-        global VMachineController
-        global VDiskController
-        global ScheduledTaskController
-        _ = VDisk(), volatile_mutex('dummy'), VMachine(), PMachine(), VPool(), BackendType(), FailureDomain(), \
-            VMachineController, VDiskController, ScheduledTaskController, StorageRouter(), Disk(), DiskPartition()
+        cls.persistent = PersistentFactory.get_client()
+        cls.persistent._keep_in_memory_only = True
+        cls.persistent.clean()
 
-        # Cleaning storage
-        StorageDriverModule.clean()
-        DeleteSnapshots.volatile.clean()
-        DeleteSnapshots.persistent.clean()
-        DeleteSnapshots.volatile._keep_in_memory_only = True
-        DeleteSnapshots.persistent._keep_in_memory_only = True
+        cls.volatile = VolatileFactory.get_client()
+        cls.volatile._keep_in_memory_only = True
+        cls.volatile.clean()
+        MockStorageRouterClient.clean()
 
-    @classmethod
-    def setUp(cls):
+    def setUp(self):
         """
         (Re)Sets the stores on every test
         """
         # Cleaning storage
-        StorageDriverModule.clean()
-        DeleteSnapshots.volatile.clean()
-        DeleteSnapshots.persistent.clean()
+        self.volatile.clean()
+        self.persistent.clean()
+        MockStorageRouterClient.clean()
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Clean up the unittest suite
-        """
-        # Restore original modules
-        sys.modules.pop('ovs.extensions.storageserver.storagedriver', sys.modules)
-
-        # Cleaning storage
-        StorageDriverModule.clean()
-        DeleteSnapshots.volatile.clean()
-        DeleteSnapshots.persistent.clean()
-
-    @classmethod
-    def tearDown(cls):
+    def tearDown(self):
         """
         Clean up the unittest
         """
         # Cleaning storage
-        StorageDriverModule.clean()
-        DeleteSnapshots.volatile.clean()
-        DeleteSnapshots.persistent.clean()
+        self.volatile.clean()
+        self.persistent.clean()
+        MockStorageRouterClient.clean()
 
     def test_happypath(self):
         """
@@ -238,7 +182,7 @@ class DeleteSnapshots(TestCase):
         hour = minute * 60
 
         for d in xrange(0, amount_of_days):
-            base_timestamp = DeleteSnapshots._make_timestamp(base, day * d)
+            base_timestamp = self._make_timestamp(base, day * d)
             print ''
             print 'Day cycle: {0}: {1}'.format(d, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d'))
 
@@ -307,7 +251,7 @@ class DeleteSnapshots(TestCase):
             for snapshot in vdisk.snapshots:
                 snapshots[int(snapshot['timestamp'])] = snapshot
             for d in xrange(0, amount_of_days):
-                timestamp = DeleteSnapshots._make_timestamp(base_date, d * day)
+                timestamp = self._make_timestamp(base_date, d * day)
                 visual = '    - {0} '.format(datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d'))
                 for t in xrange(timestamp, timestamp + hour * 24, minute * 30):
                     if t in snapshots:
@@ -345,25 +289,25 @@ class DeleteSnapshots(TestCase):
         for d in xrange(0, current_day):
             if d == (current_day - 1):
                 for h in xrange(2, 23):
-                    timestamp = DeleteSnapshots._make_timestamp(base_date, d * day) + (hour * h)
+                    timestamp = self._make_timestamp(base_date, d * day) + (hour * h)
                     self.assertIn(member=timestamp,
                                   container=inconsistent,
-                                  msg='Expected hourly inconsistent snapshot for {0} at {1}'.format(vdisk.name, DeleteSnapshots._from_timestamp(timestamp)))
+                                  msg='Expected hourly inconsistent snapshot for {0} at {1}'.format(vdisk.name, self._from_timestamp(timestamp)))
                     if h in [6, 12, 18]:
                         ts = (timestamp + (minute * 30))
                         self.assertIn(member=ts,
                                       container=consistent,
-                                      msg='Expected random consistent snapshot for {0} at {1}'.format(vdisk.name, DeleteSnapshots._from_timestamp(ts)))
+                                      msg='Expected random consistent snapshot for {0} at {1}'.format(vdisk.name, self._from_timestamp(ts)))
             elif d > (current_day - 7):
-                timestamp = DeleteSnapshots._make_timestamp(base_date, d * day) + (hour * 18) + (minute * 30)
+                timestamp = self._make_timestamp(base_date, d * day) + (hour * 18) + (minute * 30)
                 self.assertIn(member=timestamp,
                               container=consistent,
-                              msg='Expected daily consistent snapshot for {0} at {1}'.format(vdisk.name, DeleteSnapshots._from_timestamp(timestamp)))
+                              msg='Expected daily consistent snapshot for {0} at {1}'.format(vdisk.name, self._from_timestamp(timestamp)))
             elif d % 7 == 0 and d > 28:
-                timestamp = DeleteSnapshots._make_timestamp(base_date, d * day) + (hour * 18) + (minute * 30)
+                timestamp = self._make_timestamp(base_date, d * day) + (hour * 18) + (minute * 30)
                 self.assertIn(member=timestamp,
                               container=consistent,
-                              msg='Expected weekly consistent snapshot for {0} at {1}'.format(vdisk.name, DeleteSnapshots._from_timestamp(timestamp)))
+                              msg='Expected weekly consistent snapshot for {0} at {1}'.format(vdisk.name, self._from_timestamp(timestamp)))
 
     @staticmethod
     def _make_timestamp(base, offset):

@@ -135,7 +135,15 @@ elif [ "$1" = "unittest" ] ; then
     elif [ "$2" = "list" ]; then
         python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.list_tests(print_tests=True)"
     else
-        python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.run_tests('$2')"
+        if [[ "$2" == *.py ]]; then
+            directory=$(dirname "$2")
+            filename=$(basename "$2")
+            filename="${filename%.*}"
+            filename="$directory"/"$filename"
+        else
+            filename="$2"
+        fi
+        python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.run_tests('$filename')"
     fi
 elif [ "$#" -ge 1 ] ; then
     show_help

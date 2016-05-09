@@ -33,7 +33,7 @@ class LotsOfObjects(object):
     """
     def __init__(self):
         """
-        Dummy init method
+        Init method
         """
         self.persistent = PersistentFactory.get_client()
 

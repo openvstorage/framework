@@ -27,8 +27,9 @@ import time
 import types
 import socket
 import logging
-import tempfile
 import paramiko
+import tempfile
+import unittest
 from ovs.dal.helpers import Descriptor
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.remote import remote
@@ -110,11 +111,13 @@ class SSHClient(object):
             raise ValueError('The endpoint parameter should be either an ip address or a StorageRouter')
 
         self.ip = ip
-        local_ips = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
-        self.local_ips = [lip.strip() for lip in local_ips]
+        self.client = None
+        self.local_ips = [lip.strip() for lip in check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()]
         self.is_local = self.ip in self.local_ips
+        self.password = password
+        self._unittest_mode = hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True
 
-        if self.is_local is False and storagerouter is not None:
+        if self.is_local is False and storagerouter is not None and self._unittest_mode is False:
             process_heartbeat = storagerouter.heartbeats.get('process')
             if process_heartbeat is not None:
                 if time.time() - process_heartbeat > 300:
@@ -129,9 +132,10 @@ class SSHClient(object):
             self.username = username
             if username != current_user:
                 self.is_local = False  # If specified user differs from current executing user, we always use the paramiko SSHClient
-        self.password = password
 
-        self.client = None
+        if self._unittest_mode is True:
+            self.is_local = True
+
         if not self.is_local:
             logging.getLogger('paramiko').setLevel(logging.WARNING)
             key = '{0}@{1}'.format(self.ip, self.username)

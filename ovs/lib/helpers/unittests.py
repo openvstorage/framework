@@ -20,6 +20,7 @@ Limitations:
 """
 
 import os
+import time
 import inspect
 import unittest
 
@@ -38,6 +39,29 @@ class UnitTest(object):
         raise Exception('Static class, cannot be instantiated')
 
     @staticmethod
+    def _sec_to_readable(seconds):
+        """
+        Parse the seconds to hours, minutes, seconds
+        :param seconds: Amount of seconds
+        :type seconds: float
+        :return: Human readable string
+        :rtype: str
+        """
+        seconds = int(seconds)
+        if seconds < 1:
+            return '< 1 second'
+        hours = seconds / 3600
+        rest = seconds % 3600
+        minutes = rest / 60
+        seconds = rest % 60
+        if hours > 0:
+            return '{0} hour{1}, {2} minute{3} and {4} second{5}'.format(hours, '' if hours == 1 else 's', minutes, '' if minutes == 1 else 's', seconds, '' if seconds == 1 else 's')
+        elif minutes > 0:
+            return '{0} minute{1} and {2} second{3}'.format(minutes, '' if minutes == 1 else 's', seconds, '' if seconds == 1 else 's')
+        else:
+            return '{0} second{1}'.format(seconds, '' if seconds == 1 else 's')
+
+    @staticmethod
     def _gather_test_info(directories=None):
         """
         Retrieve all test classes recursively in the specified directories
@@ -46,6 +70,7 @@ class UnitTest(object):
 
         :return: None
         """
+        unittest.running_tests = True
         if directories is None:
             directories = [UnitTest._OVS_PATH]
         if isinstance(directories, str):
@@ -159,24 +184,43 @@ class UnitTest(object):
 
         # Execute the tests
         test_results = ['############', '# OVERVIEW #', '############', '']
+        start_all = time.time()
+        total_tests = 0.0
+        total_error = 0
+        total_success = 0
+        total_failure = 0
         for test in tests:
+            start_test = time.time()
             text_string = '# Processing {0} {1} #'.format(UnitTest._test_info[test]['use_case'], test)
             print '\n\n\n{0}\n{1}\n{0}\n'.format(len(text_string) * '#', text_string, len(text_string) * '#')
             tests_to_run = UnitTest._test_info[test]['tests']
             test_amount = tests_to_run.countTestCases()
             result = unittest.TextTestRunner(verbosity=2).run(tests_to_run)
             test_results.append('  - Module: {0}  ({1} test{2})'.format(test.split('.')[0], test_amount, '' if test_amount == 1 else 's'))
-            if result.wasSuccessful() is True:
-                test_results.append('    - SUCCESS: {0}'.format(test_amount))
-            else:
-                test_results.append('    - SUCCESS: {0}'.format(test_amount - len(result.errors) - len(result.failures)))
-                if len(result.failures) > 0:
-                    test_results.append('    - FAILURE: {0}'.format(len(result.failures)))
-                    for failure in result.failures:
-                        test_results.append('      - Class: {0}, Test: {1}, Message: {2}'.format(failure[0].id().split('.')[-2], failure[0].id().split('.')[-1], failure[1].splitlines()[-1]))
-                if len(result.errors) > 0:
-                    test_results.append('    - ERRORS: {0}'.format(len(result.errors)))
-                    for error in result.errors:
-                        test_results.append('      - Class: {0}, Test: {1}, Message: {2}'.format(error[0].id().split('.')[-2], error[0].id().split('.')[-1], error[1].splitlines()[-1]))
+            test_results.append('    - DURATION: {0}'.format(UnitTest._sec_to_readable(time.time() - start_test)))
+            test_results.append('    - SUCCESS: {0}'.format(test_amount - len(result.errors) - len(result.failures)))
+
+            total_tests += test_amount
+            total_success += test_amount - len(result.errors) - len(result.failures)
+            if len(result.failures) > 0:
+                total_failure += len(result.failures)
+                test_results.append('    - FAILURE: {0}'.format(len(result.failures)))
+                for failure in result.failures:
+                    test_results.append('      - Class: {0}, Test: {1}, Message: {2}'.format(failure[0].id().split('.')[-2], failure[0].id().split('.')[-1], failure[1].splitlines()[-1]))
+            if len(result.errors) > 0:
+                total_error += len(result.errors)
+                test_results.append('    - ERRORS: {0}'.format(len(result.errors)))
+                for error in result.errors:
+                    test_results.append('      - Class: {0}, Test: {1}, Message: {2}'.format(error[0].id().split('.')[-2], error[0].id().split('.')[-1], error[1].splitlines()[-1]))
             test_results.append('')
+        if len(tests) > 1:
+            test_results.insert(4, '')
+            if total_error > 0:
+                test_results.insert(4, '    - ERROR: {0} / {1} ({2:.2f} %)'.format(total_error, int(total_tests), total_error / total_tests * 100))
+            if total_failure > 0:
+                test_results.insert(4, '    - FAILURE: {0} / {1} ({2:.2f} %)'.format(total_failure, int(total_tests), total_failure / total_tests * 100))
+            test_results.insert(4, '    - SUCCESS: {0} / {1} ({2:.2f} %)'.format(total_success, int(total_tests), total_success / total_tests * 100))
+            test_results.insert(4, '  - Total amount of tests: {0}'.format(int(total_tests)))
+            test_results.insert(4, '  - Total duration: {0}'.format(UnitTest._sec_to_readable(time.time() - start_all)))
         print '\n\n\n{0}'.format('\n'.join(test_results))
+        unittest.running_tests = False

@@ -22,7 +22,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
-from ovs.extensions.hypervisor.factory import Factory as hvFactory
+from ovs.extensions.hypervisor.factory import Factory
 
 
 class VMachine(DataObject):
@@ -89,7 +89,7 @@ class VMachine(DataObject):
         """
         if self.hypervisor_id is None or self.pmachine is None:
             return 'UNKNOWN'
-        hv = hvFactory.get(self.pmachine)
+        hv = Factory.get(self.pmachine)
         try:
             return hv.get_state(self.hypervisor_id)
         except:
