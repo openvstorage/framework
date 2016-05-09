@@ -15,24 +15,22 @@
 """
 KVM XML watcher
 """
-
-from ovs.extensions.generic.system import System
-from xml.etree import ElementTree
-from ovs.log.logHandler import LogHandler
-from ovs.dal.lists.vmachinelist import VMachineList
-
-import glob
-import pyinotify
 import os
 import re
+import glob
 import shutil
+import pyinotify
+from ovs.dal.lists.vmachinelist import VMachineList
+from ovs.extensions.generic.system import System
+from ovs.log.logHandler import LogHandler
+from xml.etree import ElementTree
 
 
 class Kxp(pyinotify.ProcessEvent):
 
     def __init__(self):
         """
-        dummy constructor
+        Constructor
         """
         self._logger = LogHandler.get('extensions', name='xml processor')
 
