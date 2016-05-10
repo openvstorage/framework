@@ -45,12 +45,6 @@ from ovs.lib.vmachine import VMachineController
 from ovs.log.logHandler import LogHandler
 from StringIO import StringIO
 from time import mktime
-from volumedriver.storagerouter import storagerouterclient
-
-logger = LogHandler.get('lib', name='scheduled tasks')
-storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
-# noinspection PyArgumentList
-storagerouterclient.Logger.enableLogging()
 
 SCRUBBER_LOGFILE_LOCATION = '/var/log/upstart/ovs-scrubber.log'
 
@@ -60,6 +54,7 @@ class ScheduledTaskController(object):
     This controller contains all scheduled task code. These tasks can be
     executed at certain intervals and should be self-containing
     """
+    _logger = LogHandler.get('lib', name='scheduled tasks')
 
     @staticmethod
     @celery.task(name='ovs.scheduled.snapshot_all_vms', schedule=crontab(minute='0', hour='2-22'))
@@ -68,7 +63,7 @@ class ScheduledTaskController(object):
         """
         Snapshots all VMachines
         """
-        logger.info('[SSA] started')
+        ScheduledTaskController._logger.info('[SSA] started')
         success = []
         fail = []
         machines = VMachineList.get_customer_vmachines()
@@ -82,7 +77,7 @@ class ScheduledTaskController(object):
                 success.append(machine.guid)
             except:
                 fail.append(machine.guid)
-        logger.info('[SSA] Snapshot has been taken for {0} vMachines, {1} failed.'.format(len(success), len(fail)))
+        ScheduledTaskController._logger.info('[SSA] Snapshot has been taken for {0} vMachines, {1} failed.'.format(len(success), len(fail)))
 
     @staticmethod
     @celery.task(name='ovs.scheduled.delete_snapshots', schedule=crontab(minute='1', hour='2'))
@@ -102,7 +97,7 @@ class ScheduledTaskController(object):
 
         :return: None
         """
-        logger.info('Delete snapshots started')
+        ScheduledTaskController._logger.info('Delete snapshots started')
 
         day = timedelta(1)
         week = day * 7
@@ -207,7 +202,7 @@ class ScheduledTaskController(object):
                 for snapshot in bucket['snapshots']:
                     VDiskController.delete_snapshot(diskguid=snapshot['diskguid'],
                                                     snapshotid=snapshot['snapshotid'])
-        logger.info('Delete snapshots finished')
+        ScheduledTaskController._logger.info('Delete snapshots finished')
 
     @staticmethod
     @celery.task(name='ovs.scheduled.gather_scrub_work', schedule=crontab(minute='0', hour='3'))
@@ -283,7 +278,8 @@ class ScheduledTaskController(object):
             except Exception as ex:
                 logger.error('Gather Scrub - Storage Router {0:<15} - Scrubbing failed with error:\n - {1}'.format(local_storage_router.ip, ex))
 
-        all_results, failed_nodes = CeleryToolbox.manage_running_tasks(result_set, timesleep=60)  # Check every 60 seconds if tasks are still running
+        all_results, failed_nodes = CeleryToolbox.manage_running_tasks(result_set,
+                                                                       timesleep=60)  # Check every 60 seconds if tasks are still running
 
         for ip, result in all_results.iteritems():
             if isinstance(result, list):
@@ -301,7 +297,8 @@ class ScheduledTaskController(object):
                     if storage_router.machine_id != local_machineid:
                         logger.info('Rescheduled scrub work from node {0} to node {1}.'.format(failed_node, storage_router.ip))
                         result_set[storage_router.ip] = ScheduledTaskController._execute_scrub_work.s(scrub_location=scrub_location,
-                                                                                                      vdisk_guids=vdisk_guids_to_scrub).apply_async(routing_key='sr.{0}'.format(storage_router.machine_id))
+                                                                                                      vdisk_guids=vdisk_guids_to_scrub).apply_async(
+                                                                                                      routing_key='sr.{0}'.format(storage_router.machine_id))
                         storage_router_list.append(storage_router)
                         rescheduled_work = True
                         break
@@ -311,12 +308,14 @@ class ScheduledTaskController(object):
                         processed_guids.extend(ScheduledTaskController._execute_scrub_work(scrub_location=local_scrub_location,
                                                                                            vdisk_guids=vdisk_guids_to_scrub))
                     except Exception as ex:
-                        logger.error('Gather Scrub - Storage Router Local - Scrubbing failed with error:\n - {0}'.format(ex))
+                        logger.error(
+                            'Gather Scrub - Storage Router Local - Scrubbing failed with error:\n - {0}'.format(ex))
                 else:
                     logger.warning('No nodes left to reschedule work from node {0}'.format(failed_node))
 
         if len(result_set) > 0:
-            all_results2, failed_nodes = CeleryToolbox.manage_running_tasks(result_set, timesleep=60)  # Check every 60 seconds if tasks are still running
+            all_results2, failed_nodes = CeleryToolbox.manage_running_tasks(result_set,
+                                                                            timesleep=60)  # Check every 60 seconds if tasks are still running
             all_results.extend(all_results2)
 
             for ip, result in all_results2.iteritems():
@@ -339,8 +338,8 @@ class ScheduledTaskController(object):
                 raise RuntimeError('Could not load MDS configuration')
             return vdisk_configs
 
-        logger.info('Execute Scrub - Started')
-        logger.info('Execute Scrub - Scrub location - {0}'.format(scrub_location))
+        ScheduledTaskController._logger.info('Execute Scrub - Started')
+        ScheduledTaskController._logger.info('Execute Scrub - Scrub location - {0}'.format(scrub_location))
         total = len(vdisk_guids)
         skipped = 0
         storagedrivers = {}
@@ -349,7 +348,7 @@ class ScheduledTaskController(object):
             vdisk = VDisk(vdisk_guid)
             try:
                 # Load the vDisk's StorageDriver
-                logger.info('Execute Scrub - Virtual disk {0} - {1} - Started'.format(vdisk.guid, vdisk.name))
+                ScheduledTaskController._logger.info('Execute Scrub - Virtual disk {0} - {1} - Started'.format(vdisk.guid, vdisk.name))
                 vdisk.invalidate_dynamics(['storagedriver_id'])
                 if vdisk.storagedriver_id not in storagedrivers:
                     storagedrivers[vdisk.storagedriver_id] = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
@@ -360,28 +359,28 @@ class ScheduledTaskController(object):
 
                 # Check MDS master is local. Trigger MDS handover if necessary
                 if configs[0].get('ip') != storagedriver.storagerouter.ip:
-                    logger.debug('Execute Scrub - Virtual disk {0} - {1} - MDS master is not local, trigger handover'.format(vdisk.guid, vdisk.name))
+                    ScheduledTaskController._logger.debug('Execute Scrub - Virtual disk {0} - {1} - MDS master is not local, trigger handover'.format(vdisk.guid, vdisk.name))
                     MDSServiceController.ensure_safety(vdisk)
                     configs = _verify_mds_config(current_vdisk=vdisk)
                     if configs[0].get('ip') != storagedriver.storagerouter.ip:
                         skipped += 1
-                        logger.info('Execute Scrub - Virtual disk {0} - {1} - Skipping because master MDS still not local'.format(vdisk.guid, vdisk.name))
+                        ScheduledTaskController._logger.info('Execute Scrub - Virtual disk {0} - {1} - Skipping because master MDS still not local'.format(vdisk.guid, vdisk.name))
                         continue
                 with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id)) as locked_client:
-                    logger.info('Execute Scrub - Virtual disk {0} - {1} - Retrieve and apply scrub work'.format(vdisk.guid, vdisk.name))
+                    ScheduledTaskController._logger.info('Execute Scrub - Virtual disk {0} - {1} - Retrieve and apply scrub work'.format(vdisk.guid, vdisk.name))
                     work_units = locked_client.get_scrubbing_workunits()
                     for work_unit in work_units:
                         scrubbing_result = locked_client.scrub(work_unit, scrub_location, log_sinks=[SCRUBBER_LOGFILE_LOCATION])
                         locked_client.apply_scrubbing_result(scrubbing_result)
                     if work_units:
-                        logger.info('Execute Scrub - Virtual disk {0} - {1} - Scrub successfully applied'.format(vdisk.guid, vdisk.name))
+                        ScheduledTaskController._logger.info('Execute Scrub - Virtual disk {0} - {1} - Scrub successfully applied'.format(vdisk.guid, vdisk.name))
                     else:
-                        logger.info('Execute Scrub - Virtual disk {0} - {1} - No scrubbing required'.format(vdisk.guid, vdisk.name))
+                        ScheduledTaskController._logger.info('Execute Scrub - Virtual disk {0} - {1} - No scrubbing required'.format(vdisk.guid, vdisk.name))
             except Exception as ex:
                 failures.append('Failed scrubbing work unit for volume {0} with guid {1}: {2}'.format(vdisk.name, vdisk.guid, ex))
 
         failed = len(failures)
-        logger.info('Execute Scrub - Finished - Success: {0} - Failed: {1} - Skipped: {2}'.format((total - failed - skipped), failed, skipped))
+        ScheduledTaskController._logger.info('Execute Scrub - Finished - Success: {0} - Failed: {1} - Skipped: {2}'.format((total - failed - skipped), failed, skipped))
         if failed > 0:
             raise Exception('\n - '.join(failures))
         return vdisk_guids
@@ -394,7 +393,7 @@ class ScheduledTaskController(object):
         Collapse Arakoon's Tlogs
         :return: None
         """
-        logger.info('Starting arakoon collapse')
+        ScheduledTaskController._logger.info('Starting arakoon collapse')
         arakoon_clusters = []
         for service in ServiceList.get_services():
             if service.is_internal is True and \
@@ -404,7 +403,7 @@ class ScheduledTaskController(object):
                 arakoon_clusters.append(service.name.replace('arakoon-', ''))
 
         for cluster in arakoon_clusters:
-            logger.info('  Collapsing cluster {0}'.format(cluster))
+            ScheduledTaskController._logger.info('  Collapsing cluster {0}'.format(cluster))
             contents = EtcdConfiguration.get(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(cluster), raw=True)
             parser = RawConfigParser()
             parser.readfp(StringIO(contents))
@@ -414,11 +413,11 @@ class ScheduledTaskController(object):
                 nodes[node] = ([str(parser.get(node, 'ip'))], int(parser.get(node, 'client_port')))
             config = ArakoonClientConfig(str(cluster), nodes)
             for node in nodes.keys():
-                logger.info('    Collapsing node: {0}'.format(node))
+                ScheduledTaskController._logger.info('    Collapsing node: {0}'.format(node))
                 client = ArakoonAdmin(config)
                 try:
                     client.collapse(str(node), 2)
                 except:
-                    logger.exception('Error during collapsing cluster {0} node {1}'.format(cluster, node))
+                    ScheduledTaskController._logger.exception('Error during collapsing cluster {0} node {1}'.format(cluster, node))
 
-        logger.info('Arakoon collapse finished')
+        ScheduledTaskController._logger.info('Arakoon collapse finished')

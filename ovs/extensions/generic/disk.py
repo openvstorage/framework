@@ -20,13 +20,12 @@ from subprocess import check_output, CalledProcessError
 from ovs.extensions.os.os import OSManager
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='disktools')
-
 
 class DiskTools(object):
     """
     This class contains various helper methods wrt Disk maintenance
     """
+    _logger = LogHandler.get('extensions', name='disktools')
 
     @staticmethod
     def create_partition(disk_path, disk_size, partition_start, partition_size):
@@ -49,17 +48,17 @@ class DiskTools(object):
         # 1. Verify current label type and add GPT label if none present
         try:
             command_1 = 'parted {0} print | grep "Partition Table"'.format(disk_path)
-            logger.info('Checking partition label-type with command: {0}'.format(command_1))
+            DiskTools._logger.info('Checking partition label-type with command: {0}'.format(command_1))
             label_type = check_output(command_1, shell=True).strip().split(': ')[1]
         except CalledProcessError:
             label_type = 'error'
         if label_type in ('error', 'unknown'):
             try:
-                logger.info('Adding GPT label and trying to create partition again')
+                DiskTools._logger.info('Adding GPT label and trying to create partition again')
                 check_output('parted {0} -s mklabel gpt'.format(disk_path), shell=True)
                 label_type = 'gpt'
             except Exception as ex:
-                logger.exception('Error during label creation: {0}'.format(ex))
+                DiskTools._logger.exception('Error during label creation: {0}'.format(ex))
                 raise
 
         # 2. Determine command to use based upon label type
@@ -78,8 +77,8 @@ class DiskTools(object):
             raise ValueError('Unsupported label-type detected: {0}'.format(label_type))
 
         # 3. Create partition
-        logger.info('Label type detected: {0}'.format(label_type))
-        logger.info('Command to create partition: {0}'.format(command_2))
+        DiskTools._logger.info('Label type detected: {0}'.format(label_type))
+        DiskTools._logger.info('Command to create partition: {0}'.format(command_2))
         check_output(command_2, shell=True)
 
     @staticmethod
@@ -93,7 +92,7 @@ class DiskTools(object):
         """
         result = {}
         command = "parted -m {0} unit B print -s".format(device)
-        logger.debug('Checking partitions with command: {0}'.format(command))
+        DiskTools._logger.debug('Checking partitions with command: {0}'.format(command))
         try:
             output = check_output(command, shell=True).splitlines()
         except CalledProcessError as cpe:
@@ -103,7 +102,7 @@ class DiskTools(object):
             if line.startswith('BYT;'):
                 break
         model_info = output.pop(0)
-        logger.debug('Got model info: {0}'.format(model_info))
+        DiskTools._logger.debug('Got model info: {0}'.format(model_info))
         for line in output:
             number, start, end, size, fs, name, flags = line.split(':')
             partition_device = "{0}{1}".format(device, number)
@@ -124,7 +123,7 @@ class DiskTools(object):
         try:
             check_output('mkfs.ext4 -q {0}'.format(partition), shell=True)
         except Exception as ex:
-            logger.exception('Error during filesystem creation: {0}'.format(ex))
+            DiskTools._logger.exception('Error during filesystem creation: {0}'.format(ex))
             raise
 
     @staticmethod
@@ -186,5 +185,5 @@ class DiskTools(object):
             check_output('mkdir -p {0}'.format(mountpoint), shell=True)
             check_output('mount {0}'.format(mountpoint), shell=True)
         except Exception as ex:
-            logger.exception('Error during mount: {0}'.format(ex))
+            DiskTools._logger.exception('Error during mount: {0}'.format(ex))
             raise

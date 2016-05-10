@@ -13,5 +13,5 @@
 # limitations under the License.
 
 """
-This package contains test related stuff
+Package for tests related to storagedriver
 """

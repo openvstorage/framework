@@ -24,14 +24,14 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('dal', name='hybrid')
-
 
 class StorageDriver(DataObject):
     """
     The StorageDriver class represents a Storage Driver. A Storage Driver is an application
     on a Storage Router to which the vDisks connect. The Storage Driver is the gateway to the Storage Backend.
     """
+    _logger = LogHandler.get('dal', name='hybrid')
+
     __properties = [Property('name', str, doc='Name of the Storage Driver.'),
                     Property('description', str, mandatory=False, doc='Description of the Storage Driver.'),
                     Property('ports', list, doc='Ports on which the Storage Driver is listening [mgmt, xmlrpc, dtl].'),
@@ -84,7 +84,7 @@ class StorageDriver(DataObject):
             try:
                 sdstats = self.vpool.storagedriver_client.statistics_node(str(self.storagedriver_id))
             except Exception as ex:
-                logger.error('Error loading statistics_node from {0}: {1}'.format(self.storagedriver_id, ex))
+                StorageDriver._logger.error('Error loading statistics_node from {0}: {1}'.format(self.storagedriver_id, ex))
                 sdstats = StorageDriverClient.EMPTY_STATISTICS()
         else:
             sdstats = StorageDriverClient.EMPTY_STATISTICS()

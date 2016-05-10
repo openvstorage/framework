@@ -22,12 +22,11 @@ import random
 import string
 import time
 from ovs.dal.lists.storagedriverlist import StorageDriverList
-from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('lib', name='scheduled tasks')
 ENSURE_SINGLE_KEY = 'ovs_ensure_single'
 
 
@@ -102,6 +101,8 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
 
     :return:                 Pointer to function
     """
+    logger = LogHandler.get('lib', name='scheduled tasks')
+
     def wrap(function):
         """
         Wrapper function
@@ -133,7 +134,7 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 :param value_to_update: Value to append to the list or remove from the list
                 :return:                Updated value
                 """
-                with VolatileMutex(name=key, wait=5):
+                with volatile_mutex(name=key, wait=5):
                     if persistent_client.exists(key):
                         val = persistent_client.get(key)
                         if append is True and value_to_update is not None:
@@ -158,7 +159,7 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
             persistent_client = PersistentFactory.get_client()
 
             if mode == 'DEFAULT':
-                with VolatileMutex(persistent_key, wait=5):
+                with volatile_mutex(persistent_key, wait=5):
                     for task in task_names:
                         key_to_check = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task)
                         if persistent_client.exists(key_to_check):
@@ -172,12 +173,12 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                     log_message('Task {0} finished successfully'.format(task_name))
                     return output
                 finally:
-                    with VolatileMutex(persistent_key, wait=5):
+                    with volatile_mutex(persistent_key, wait=5):
                         if persistent_client.exists(persistent_key):
                             log_message('Deleting key {0}'.format(persistent_key))
                             persistent_client.delete(persistent_key)
             elif mode == 'DEDUPED':
-                with VolatileMutex(persistent_key, wait=5):
+                with volatile_mutex(persistent_key, wait=5):
                     if extra_task_names is not None:
                         for task in extra_task_names:
                             key_to_check = '{0}_{1}'.format(ENSURE_SINGLE_KEY, task)

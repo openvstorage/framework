@@ -21,13 +21,12 @@ import time
 from subprocess import CalledProcessError
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='servicemanager')
-
 
 class Upstart(object):
     """
     Contains all logic related to Upstart services
     """
+    _logger = LogHandler.get('extensions', name='servicemanager')
 
     @staticmethod
     def _service_exists(name, client, path):
@@ -48,7 +47,7 @@ class Upstart(object):
         name = 'ovs-{0}'.format(name)
         if Upstart._service_exists(name, client, path):
             return name
-        logger.info('Service {0} could not be found.'.format(name))
+        Upstart._logger.info('Service {0} could not be found.'.format(name))
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
@@ -108,7 +107,7 @@ class Upstart(object):
                 return False, output
             return False
         except CalledProcessError as ex:
-            logger.error('Get {0}.service status failed: {1}'.format(name, ex))
+            Upstart._logger.error('Get {0}.service status failed: {1}'.format(name, ex))
             raise Exception('Retrieving status for service "{0}" failed'.format(name))
 
     @staticmethod
@@ -138,7 +137,7 @@ class Upstart(object):
             client.run('service {0} start'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
-            logger.error('Start {0} failed, {1}'.format(name, output))
+            Upstart._logger.error('Start {0} failed, {1}'.format(name, output))
             raise RuntimeError('Start {0} failed. {1}'.format(name, output))
         tries = 10
         while tries > 0:
@@ -150,7 +149,7 @@ class Upstart(object):
         status, output = Upstart.get_service_status(name, client, True)
         if status is True:
             return output
-        logger.error('Start {0} failed. {1}'.format(name, output))
+        Upstart._logger.error('Start {0} failed. {1}'.format(name, output))
         raise RuntimeError('Start {0} failed. {1}'.format(name, output))
 
     @staticmethod
@@ -163,7 +162,7 @@ class Upstart(object):
             client.run('service {0} stop'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
-            logger.error('Stop {0} failed, {1}'.format(name, output))
+            Upstart._logger.error('Stop {0} failed, {1}'.format(name, output))
             raise RuntimeError('Stop {0} failed, {1}'.format(name, output))
         tries = 10
         while tries > 0:
@@ -175,7 +174,7 @@ class Upstart(object):
         status, output = Upstart.get_service_status(name, client, True)
         if status is False:
             return output
-        logger.error('Stop {0} failed. {1}'.format(name, output))
+        Upstart._logger.error('Stop {0} failed. {1}'.format(name, output))
         raise RuntimeError('Stop {0} failed. {1}'.format(name, output))
 
     @staticmethod

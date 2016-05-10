@@ -12,13 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
+"""
+Plugin module
+"""
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 
 
 class PluginManager(object):
+    """
+    Plugin Manager class
+    """
 
     @staticmethod
     def install_plugins():

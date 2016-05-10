@@ -35,7 +35,8 @@ Image functionality testing for the cinder plugin
 * validate on FS (volumedriver filesystem)
 """
 
-from ovs_common import OVSPluginTestCase, VPOOL_MOUNTPOINT, IMAGE_NAME, MOUNT_LOCATION
+from ovs_common import OVSPluginTestCase
+
 
 class OVSPluginImageTestCase(OVSPluginTestCase):
     """
@@ -59,12 +60,12 @@ class OVSPluginImageTestCase(OVSPluginTestCase):
          none
         """
         volume, volume_name, file_name = self._new_volume_from_default_image()
-        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name), 'Device not modeled in OVS')
-        self.assertTrue(volume.volume_image_metadata['image_name'] == IMAGE_NAME, 'Wrong volume image metadata %s' % volume.volume_image_metadata)
+        self.assertTrue(volume.volume_image_metadata['image_name'] == OVSPluginTestCase.IMAGE_NAME, 'Wrong volume image metadata %s' % volume.volume_image_metadata)
 
         self._remove_volume(volume, volume_name)
-        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name, exists=False), 'Device still modeled in OVS')
 
     def test_create_delete_volume_from_default_image_upload_to_glance(self):
@@ -87,9 +88,9 @@ class OVSPluginImageTestCase(OVSPluginTestCase):
         """
 
         volume, volume_name, file_name = self._new_volume_from_default_image()
-        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name), 'Device not modeled in OVS')
-        self.assertTrue(volume.volume_image_metadata['image_name'] == IMAGE_NAME, 'Wrong volume image metadata %s' % volume.volume_image_metadata)
+        self.assertTrue(volume.volume_image_metadata['image_name'] == OVSPluginTestCase.IMAGE_NAME, 'Wrong volume image metadata %s' % volume.volume_image_metadata)
 
         image, image_name = self._upload_volume_to_image(volume)
         self.assertTrue(image_name in self._glance_list_images_names(), 'Image not uploaded to glance')
@@ -100,7 +101,7 @@ class OVSPluginImageTestCase(OVSPluginTestCase):
         self.assertFalse(image_name in self._glance_list_images_names(), 'Image not removed from glance')
 
         self._remove_volume(volume, volume_name)
-        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name, exists=False), 'Device still modeled in OVS')
 
     def test_create_delete_volume_check_file_from_default_image(self):
@@ -144,33 +145,32 @@ class OVSPluginImageTestCase(OVSPluginTestCase):
          -none
         """
         volume, volume_name, file_name = self._new_volume_from_default_image()
-        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name), 'Device not modeled in OVS')
-        self.assertTrue(volume.volume_image_metadata['image_name'] == IMAGE_NAME, 'Wrong volume image metadata %s' % volume.volume_image_metadata)
+        self.assertTrue(volume.volume_image_metadata['image_name'] == OVSPluginTestCase.IMAGE_NAME, 'Wrong volume image metadata %s' % volume.volume_image_metadata)
 
         self._mount_volume_by_filename(file_name)
 
-        self._create_file('%s/autotest_generated_file' % MOUNT_LOCATION)
-        self.assertTrue(self._file_exists_on_mountpoint('autotest_generated_file', MOUNT_LOCATION), 'Generated file is not present in %s' % MOUNT_LOCATION)
+        self._create_file('%s/autotest_generated_file' % OVSPluginTestCase.MOUNT_LOCATION)
+        self.assertTrue(self._file_exists_on_mountpoint('autotest_generated_file', OVSPluginTestCase.MOUNT_LOCATION), 'Generated file is not present in %s' % OVSPluginTestCase.MOUNT_LOCATION)
 
         self._umount_volume(file_name)
-        self.assertFalse(self._file_exists_on_mountpoint('autotest_generated_file', MOUNT_LOCATION), 'Generated file is still present in %s' % MOUNT_LOCATION)
+        self.assertFalse(self._file_exists_on_mountpoint('autotest_generated_file', OVSPluginTestCase.MOUNT_LOCATION), 'Generated file is still present in %s' % OVSPluginTestCase.MOUNT_LOCATION)
 
         clone, clone_name, clone_file_name = self._new_volume_from_volume(volume)
-        self.assertTrue(self._file_exists_on_mountpoint(clone_file_name), 'File %s not created on mountpoint %s ' % (clone_file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._file_exists_on_mountpoint(clone_file_name), 'File %s not created on mountpoint %s ' % (clone_file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(clone_file_name), 'Device not modeled in OVS')
 
         self._mount_volume_by_filename(clone_file_name)
 
-        self.assertTrue(self._file_exists_on_mountpoint('autotest_generated_file', MOUNT_LOCATION), '(clone) Generated file is not present in %s' % MOUNT_LOCATION)
+        self.assertTrue(self._file_exists_on_mountpoint('autotest_generated_file', OVSPluginTestCase.MOUNT_LOCATION), '(clone) Generated file is not present in %s' % OVSPluginTestCase.MOUNT_LOCATION)
 
         self._umount_volume(clone_file_name)
 
         self._remove_volume(clone, clone_name)
-        self.assertFalse(self._file_exists_on_mountpoint(clone_file_name), 'File %s not deleted from mountpoint %s ' % (clone_file_name, VPOOL_MOUNTPOINT))
+        self.assertFalse(self._file_exists_on_mountpoint(clone_file_name), 'File %s not deleted from mountpoint %s ' % (clone_file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(clone_file_name, exists=False), 'Device still modeled in OVS')
 
         self._remove_volume(volume, volume_name)
-        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name, exists=False), 'Device still modeled in OVS')
-

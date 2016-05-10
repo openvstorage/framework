@@ -15,8 +15,6 @@
 """
 Module for the KVM hypervisor client
 """
-
-import os
 from ovs.extensions.hypervisor.apis.kvm.sdk import Sdk
 
 

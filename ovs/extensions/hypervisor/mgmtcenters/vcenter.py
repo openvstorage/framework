@@ -17,9 +17,6 @@ Module for the vcenter management center client
 """
 
 from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
-from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('extensions', name='mgmtcenter')
 
 
 class VCenter(object):

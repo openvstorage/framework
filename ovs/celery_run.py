@@ -21,6 +21,7 @@ import sys
 sys.path.append('/opt/OpenvStorage')
 
 import os
+import unittest
 from kombu import Queue
 from celery import Celery
 from celery.signals import task_postrun, worker_process_init
@@ -31,42 +32,65 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 
-memcache_servers = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
-rmq_servers = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
+class CeleryMockup(object):
+    """
+    Mockup class for Celery
+    """
+    def task(self, *args, **kwargs):
+        """
+        Celery task mockup
+        Is used as a decorator, so should return a function, which does nothing (for now)
+        """
+        _ = self, args, kwargs
 
-unique_id = System.get_my_machine_id()
+        def _outer_function(outer_function):
+            def _inner_function(*arguments, **kwarguments):
+                _ = arguments, kwarguments
+                return outer_function(*arguments, **kwarguments)
 
-include = []
-path = '/'.join([os.path.dirname(__file__), 'lib'])
-for filename in os.listdir(path):
-    if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
-        name = filename.replace('.py', '')
-        include.append('ovs.lib.{0}'.format(name))
+            _inner_function.__name__ = outer_function.__name__
+            _inner_function.__module__ = outer_function.__module__
+            return _inner_function
+        return _outer_function
 
-celery = Celery('ovs', include=include)
 
-# http://docs.celeryproject.org/en/latest/configuration.html#cache-backend-settings
-celery.conf.CELERY_RESULT_BACKEND = "cache+memcached://{0}/".format(';'.join(memcache_servers))
-celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(EtcdConfiguration.get('/ovs/framework/messagequeue|protocol'),
-                                                                EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
-                                                                EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
-                                                                server)
-                                   for server in rmq_servers])
-celery.conf.BROKER_CONNECTION_MAX_RETRIES = 5
-celery.conf.BROKER_HEARTBEAT = 10
-celery.conf.BROKER_HEARTBEAT_CHECKRATE = 2
-celery.conf.CELERY_DEFAULT_QUEUE = 'ovs_generic'
-celery.conf.CELERY_QUEUES = tuple([Queue('ovs_generic', routing_key='generic.#'),
-                                   Queue('ovs_masters', routing_key='masters.#'),
-                                   Queue('ovs_{0}'.format(unique_id), routing_key='sr.{0}.#'.format(unique_id))])
-celery.conf.CELERY_DEFAULT_EXCHANGE = 'generic'
-celery.conf.CELERY_DEFAULT_EXCHANGE_TYPE = 'topic'
-celery.conf.CELERY_DEFAULT_ROUTING_KEY = 'generic.default'
-celery.conf.CELERYD_PREFETCH_MULTIPLIER = 1  # This makes sure that the workers won't be pre-fetching tasks, this to prevent deadlocks
-celery.conf.CELERYBEAT_SCHEDULE = {}
-celery.conf.CELERY_TRACK_STARTED = True  # http://docs.celeryproject.org/en/latest/configuration.html#std:setting-CELERY_TRACK_STARTED
+if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+    celery = CeleryMockup()
+else:
+    memcache_servers = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
+    rmq_servers = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
 
-loghandler = LogHandler.get('celery', name='celery')
+    unique_id = System.get_my_machine_id()
+
+    include = []
+    path = '/'.join([os.path.dirname(__file__), 'lib'])
+    for filename in os.listdir(path):
+        if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
+            name = filename.replace('.py', '')
+            include.append('ovs.lib.{0}'.format(name))
+
+    celery = Celery('ovs', include=include)
+
+    # http://docs.celeryproject.org/en/latest/configuration.html#cache-backend-settings
+    celery.conf.CELERY_RESULT_BACKEND = "cache+memcached://{0}/".format(';'.join(memcache_servers))
+    celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(EtcdConfiguration.get('/ovs/framework/messagequeue|protocol'),
+                                                                    EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
+                                                                    EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
+                                                                    server)
+                                       for server in rmq_servers])
+    celery.conf.BROKER_CONNECTION_MAX_RETRIES = 5
+    celery.conf.BROKER_HEARTBEAT = 10
+    celery.conf.BROKER_HEARTBEAT_CHECKRATE = 2
+    celery.conf.CELERY_DEFAULT_QUEUE = 'ovs_generic'
+    celery.conf.CELERY_QUEUES = tuple([Queue('ovs_generic', routing_key='generic.#'),
+                                       Queue('ovs_masters', routing_key='masters.#'),
+                                       Queue('ovs_{0}'.format(unique_id), routing_key='sr.{0}.#'.format(unique_id))])
+    celery.conf.CELERY_DEFAULT_EXCHANGE = 'generic'
+    celery.conf.CELERY_DEFAULT_EXCHANGE_TYPE = 'topic'
+    celery.conf.CELERY_DEFAULT_ROUTING_KEY = 'generic.default'
+    celery.conf.CELERYD_PREFETCH_MULTIPLIER = 1  # This makes sure that the workers won't be pre-fetching tasks, this to prevent deadlocks
+    celery.conf.CELERYBEAT_SCHEDULE = {}
+    celery.conf.CELERY_TRACK_STARTED = True  # http://docs.celeryproject.org/en/latest/configuration.html#std:setting-CELERY_TRACK_STARTED
 
 
 @task_postrun.connect
@@ -78,6 +102,7 @@ def task_postrun_handler(sender=None, task_id=None, task=None, args=None, kwargs
     try:
         MessageController.fire(MessageController.Type.TASK_COMPLETE, task_id)
     except Exception as ex:
+        loghandler = LogHandler.get('celery', name='celery')
         loghandler.error('Caught error during postrun handler: {0}'.format(ex))
 
 

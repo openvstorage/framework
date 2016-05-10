@@ -15,6 +15,7 @@
 """
 Generic volatile factory.
 """
+import unittest
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 
 
@@ -28,8 +29,9 @@ class VolatileFactory(object):
         """
         Returns a volatile storage client
         """
-
         if not hasattr(VolatileFactory, 'store') or VolatileFactory.store is None:
+            if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests'):
+                client_type = 'dummy'
             if client_type is None:
                 client_type = EtcdConfiguration.get('/ovs/framework/stores|volatile')
 
@@ -38,7 +40,7 @@ class VolatileFactory(object):
                 from ovs.extensions.storage.volatile.memcachestore import MemcacheStore
                 nodes = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
                 VolatileFactory.store = MemcacheStore(nodes)
-            if client_type == 'default':
+            if client_type == 'dummy':
                 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
                 VolatileFactory.store = DummyVolatileStore()
 

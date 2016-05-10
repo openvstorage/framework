@@ -27,17 +27,16 @@ from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.disk import DiskTools
 from ovs.lib.helpers.decorators import ensure_single
-
-logger = LogHandler.get('lib', name='disk')
 
 
 class DiskController(object):
     """
     Contains all BLL wrt physical Disks
     """
+    _logger = LogHandler.get('lib', name='disk')
 
     @staticmethod
     @celery.task(name='ovs.disk.sync_with_reality')
@@ -56,7 +55,7 @@ class DiskController(object):
             try:
                 client = SSHClient(storagerouter, username='root')
             except UnableToConnectException:
-                logger.info('Could not connect to StorageRouter {0}, skipping'.format(storagerouter.ip))
+                DiskController._logger.info('Could not connect to StorageRouter {0}, skipping'.format(storagerouter.ip))
                 continue
             configuration = {}
             # Gather mount data
@@ -81,8 +80,8 @@ class DiskController(object):
             for member in re.findall('(?: +[0-9]+){4} +[^/]+/dev/([a-z0-9]+)', md_information):
                 raid_members.append(member)
             # Gather disk information
-            with Remote(storagerouter.ip, [Context, os]) as remote:
-                context = remote.Context()
+            with remote(storagerouter.ip, [Context, os]) as rem:
+                context = rem.Context()
                 devices = [device for device in context.list_devices(subsystem='block')
                            if ('ID_TYPE' in device and device['ID_TYPE'] == 'disk') or
                               ('DEVNAME' in device and ('loop' in device['DEVNAME'] or 'nvme' in device['DEVNAME'] or 'md' in device['DEVNAME']))]
@@ -105,11 +104,11 @@ class DiskController(object):
                             else:
                                 device_name = device_name[:0 - int(len(partition_id))]
                         else:
-                            logger.debug('Partition {0} has no partition metadata'.format(device_path))
+                            DiskController._logger.debug('Partition {0} has no partition metadata'.format(device_path))
                             extended_partition_info = False
                             match = re.match('^(\D+?)(\d+)$', device_name)
                             if match is None:
-                                logger.debug('Could not handle disk/partition {0}'.format(device_path))
+                                DiskController._logger.debug('Could not handle disk/partition {0}'.format(device_path))
                                 continue  # Unable to handle this disk/partition
                             partition_id = match.groups()[1]
                             device_name = match.groups()[0]
@@ -142,7 +141,7 @@ class DiskController(object):
                         else:
                             match = re.match('^(\D+?)(\d+)$', device_path)
                             if match is None:
-                                logger.debug('Could not handle disk/partition {0}'.format(device_path))
+                                DiskController._logger.debug('Could not handle disk/partition {0}'.format(device_path))
                                 continue  # Unable to handle this disk/partition
                             partitions_info = DiskTools.get_partitions_info(match.groups()[0])
                             if device_path in partitions_info:
@@ -150,7 +149,7 @@ class DiskController(object):
                                 offset = int(partition_info['start'])
                                 size = int(partition_info['size'])
                             else:
-                                logger.warning('Could not retrieve partition info for disk/partition {0}'.format(device_path))
+                                DiskController._logger.warning('Could not retrieve partition info for disk/partition {0}'.format(device_path))
                                 continue
                         configuration[device_name]['partitions'][partition_id] = {'offset': offset,
                                                                                   'size': size,
@@ -160,7 +159,7 @@ class DiskController(object):
                         if partition_name in mount_mapping:
                             mountpoint = mount_mapping[partition_name]
                             partition_data['mountpoint'] = mountpoint
-                            partition_data['inode'] = remote.os.stat(mountpoint).st_dev
+                            partition_data['inode'] = rem.os.stat(mountpoint).st_dev
                             del mount_mapping[partition_name]
                             try:
                                 client.run('touch {0}/{1}; rm {0}/{1}'.format(mountpoint, str(time.time())))

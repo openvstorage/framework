@@ -17,7 +17,7 @@ Mockups module
 """
 
 
-class FullSerializer():
+class FullSerializer(object):
     """
     Dummy class
     """
@@ -32,7 +32,7 @@ class FullSerializer():
                      'many': many}
 
 
-class Serializers():
+class Serializers(object):
     """
     Dummy class
     """

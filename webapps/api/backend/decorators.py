@@ -36,11 +36,7 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import FullSerializer
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.generic.volatilemutex import VolatileMutex
-
-
-logger = LogHandler.get('api')
-regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 
 
 def _find_request(args):
@@ -84,6 +80,8 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
     """
     Parameter discovery decorator
     """
+    regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
+
     def wrap(f):
         """
         Wrapper function
@@ -344,6 +342,8 @@ def limit(amount, per, timeout):
     """
     Rate-limits the decorated call
     """
+    logger = LogHandler.get('api')
+
     def wrap(f):
         """
         Wrapper function
@@ -360,7 +360,7 @@ def limit(amount, per, timeout):
                 request.META['HTTP_X_REAL_IP']
             )
             client = VolatileFactory.get_client()
-            with VolatileMutex(key):
+            with volatile_mutex(key):
                 rate_info = client.get(key, {'calls': [],
                                              'timeout': None})
                 active_timeout = rate_info['timeout']
@@ -391,6 +391,7 @@ def log(log_slow=True):
     Task logger
     :param log_slow: Indicates whether a slow call should be logged
     """
+    logger = LogHandler.get('api')
 
     def wrap(f):
         """

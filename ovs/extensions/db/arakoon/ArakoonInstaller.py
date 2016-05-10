@@ -24,16 +24,13 @@ import time
 from ConfigParser import RawConfigParser
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import CalledProcessError, SSHClient
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.service import ServiceManager
 from ovs.log.logHandler import LogHandler
 from StringIO import StringIO
-
-logger = LogHandler.get('extensions', name='arakoon_installer')
-logger.logger.propagate = False
 
 
 class ArakoonNodeConfig(object):
@@ -256,6 +253,9 @@ class ArakoonInstaller(object):
     ETCD_CONFIG_PATH = 'etcd://127.0.0.1:2379' + ETCD_CONFIG_KEY
     SSHCLIENT_USER = 'ovs'
 
+    _logger = LogHandler.get('extensions', name='arakoon_installer')
+    _logger.logger.propagate = False
+
     def __init__(self):
         """
         ArakoonInstaller should not be instantiated
@@ -281,15 +281,15 @@ class ArakoonInstaller(object):
 
         # Verify whether all files to be archived have been released properly
         open_file_errors = []
-        logger.debug('Cleanup old arakoon - Checking open files')
+        ArakoonInstaller._logger.debug('Cleanup old arakoon - Checking open files')
         dirs_with_files = {}
         for directory, archive in directories.iteritems():
-            logger.debug('Cleaning old arakoon - Checking directory {0}'.format(directory))
+            ArakoonInstaller._logger.debug('Cleaning old arakoon - Checking directory {0}'.format(directory))
             if root_client.dir_exists(directory):
-                logger.debug('Cleaning old arakoon - Directory {0} exists'.format(directory))
+                ArakoonInstaller._logger.debug('Cleaning old arakoon - Directory {0} exists'.format(directory))
                 file_names = root_client.file_list(directory, abs_path=True, recursive=True)
                 if len(file_names) > 0:
-                    logger.debug('Cleaning old arakoon - Files found in directory {0}'.format(directory))
+                    ArakoonInstaller._logger.debug('Cleaning old arakoon - Files found in directory {0}'.format(directory))
                     dirs_with_files[directory] = {'files': file_names,
                                                   'archive': archive}
                 for file_name in file_names:
@@ -306,17 +306,17 @@ class ArakoonInstaller(object):
         for directory, info in dirs_with_files.iteritems():
             if info['archive'] is True:
                 # Create zipped tar
-                logger.debug('Cleanup old arakoon - Start archiving directory {0}'.format(directory))
+                ArakoonInstaller._logger.debug('Cleanup old arakoon - Start archiving directory {0}'.format(directory))
                 archive_dir = '{0}/archive'.format(directory)
                 if not root_client.dir_exists(archive_dir):
-                    logger.debug('Cleanup old arakoon - Creating archive directory {0}'.format(archive_dir))
+                    ArakoonInstaller._logger.debug('Cleanup old arakoon - Creating archive directory {0}'.format(archive_dir))
                     root_client.dir_create(archive_dir)
 
-                logger.debug('Cleanup old arakoon - Creating tar file')
+                ArakoonInstaller._logger.debug('Cleanup old arakoon - Creating tar file')
                 tar_name = '{0}/{1}.tgz'.format(archive_dir, int(time.time()))
                 root_client.run('cd {0}; tar -cz -f {1} --exclude "archive" *'.format(directory, tar_name))
 
-            logger.debug('Cleanup old arakoon - Removing old files from {0}'.format(directory))
+            ArakoonInstaller._logger.debug('Cleanup old arakoon - Removing old files from {0}'.format(directory))
             root_client.file_delete(info['files'])
 
     @staticmethod
@@ -356,12 +356,12 @@ class ArakoonInstaller(object):
         if EtcdConfiguration.dir_exists('/ovs/arakoon/{0}'.format(cluster_name)):
             raise ValueError('An Arakoon cluster with name "{0}" already exists'.format(cluster_name))
 
-        logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
+        ArakoonInstaller._logger.debug('Creating cluster {0} on {1}'.format(cluster_name, ip))
         base_dir = base_dir.rstrip('/')
 
         client = SSHClient(ip, username=ArakoonInstaller.SSHCLIENT_USER)
         if ArakoonInstaller.is_running(cluster_name, client):
-            logger.info('Arakoon service running for cluster {0}'.format(cluster_name))
+            ArakoonInstaller._logger.info('Arakoon service running for cluster {0}'.format(cluster_name))
             config = ArakoonClusterConfig(cluster_name, plugins)
             config.load_config()
             for node in config.nodes:
@@ -381,8 +381,8 @@ class ArakoonInstaller(object):
         port_mutex = None
         try:
             if locked is True:
-                from ovs.extensions.generic.volatilemutex import VolatileMutex
-                port_mutex = VolatileMutex('arakoon_install_ports_{0}'.format(ip))
+                from ovs.extensions.generic.volatilemutex import volatile_mutex
+                port_mutex = volatile_mutex('arakoon_install_ports_{0}'.format(ip))
                 port_mutex.acquire(wait=60)
             ports = ArakoonInstaller._get_free_ports(client)
             config = ArakoonClusterConfig(cluster_name, plugins)
@@ -405,7 +405,7 @@ class ArakoonInstaller(object):
             if port_mutex is not None:
                 port_mutex.release()
 
-        logger.debug('Creating cluster {0} on {1} completed'.format(cluster_name, ip))
+        ArakoonInstaller._logger.debug('Creating cluster {0} on {1} completed'.format(cluster_name, ip))
         return {'metadata': metadata,
                 'client_port': ports[0],
                 'messaging_port': ports[1]}
@@ -422,7 +422,7 @@ class ArakoonInstaller(object):
 
         :return: None
         """
-        logger.debug('Deleting cluster {0} on {1}'.format(cluster_name, ip))
+        ArakoonInstaller._logger.debug('Deleting cluster {0} on {1}'.format(cluster_name, ip))
         config = ArakoonClusterConfig(cluster_name)
         config.load_config()
 
@@ -430,7 +430,7 @@ class ArakoonInstaller(object):
         for node in config.nodes:
             ArakoonInstaller._destroy_node(config, node)
         EtcdConfiguration.delete('{0}/{1}'.format(ArakoonInstaller.ETCD_CONFIG_ROOT, cluster_name), raw=True)
-        logger.debug('Deleting cluster {0} on {1} completed'.format(cluster_name, ip))
+        ArakoonInstaller._logger.debug('Deleting cluster {0} on {1} completed'.format(cluster_name, ip))
 
     @staticmethod
     def extend_cluster(master_ip, new_ip, cluster_name, base_dir, locked=True):
@@ -454,7 +454,7 @@ class ArakoonInstaller(object):
         :return: Ports used by arakoon cluster
         :rtype: dict
         """
-        logger.debug('Extending cluster {0} from {1} to {2}'.format(cluster_name, master_ip, new_ip))
+        ArakoonInstaller._logger.debug('Extending cluster {0} from {1} to {2}'.format(cluster_name, master_ip, new_ip))
         base_dir = base_dir.rstrip('/')
 
         config = ArakoonClusterConfig(cluster_name)
@@ -473,8 +473,8 @@ class ArakoonInstaller(object):
         port_mutex = None
         try:
             if locked is True:
-                from ovs.extensions.generic.volatilemutex import VolatileMutex
-                port_mutex = VolatileMutex('arakoon_install_ports_{0}'.format(new_ip))
+                from ovs.extensions.generic.volatilemutex import volatile_mutex
+                port_mutex = volatile_mutex('arakoon_install_ports_{0}'.format(new_ip))
                 port_mutex.acquire(wait=60)
             ports = ArakoonInstaller._get_free_ports(client)
             if node_name not in [node.name for node in config.nodes]:
@@ -490,7 +490,7 @@ class ArakoonInstaller(object):
             if port_mutex is not None:
                 port_mutex.release()
 
-        logger.debug('Extending cluster {0} from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
+        ArakoonInstaller._logger.debug('Extending cluster {0} from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
         return {'client_port': ports[0],
                 'messaging_port': ports[1]}
 
@@ -509,7 +509,7 @@ class ArakoonInstaller(object):
 
         :return: None
         """
-        logger.debug('Shrinking cluster {0} from {1}'.format(cluster_name, deleted_node_ip))
+        ArakoonInstaller._logger.debug('Shrinking cluster {0} from {1}'.format(cluster_name, deleted_node_ip))
         config = ArakoonClusterConfig(cluster_name)
         config.load_config()
 
@@ -522,7 +522,7 @@ class ArakoonInstaller(object):
                 if node.ip not in offline_nodes:
                     ArakoonInstaller._destroy_node(config, node)
         ArakoonInstaller._deploy(config, offline_nodes)
-        logger.debug('Shrinking cluster {0} from {1} completed'.format(cluster_name, deleted_node_ip))
+        ArakoonInstaller._logger.debug('Shrinking cluster {0} from {1} completed'.format(cluster_name, deleted_node_ip))
 
     @staticmethod
     def deploy_cluster(cluster_name, node_ip):
@@ -536,7 +536,7 @@ class ArakoonInstaller(object):
 
         :return: None
         """
-        logger.debug('(Re)deploying cluster {0} from {1}'.format(cluster_name, node_ip))
+        ArakoonInstaller._logger.debug('(Re)deploying cluster {0} from {1}'.format(cluster_name, node_ip))
         config = ArakoonClusterConfig(cluster_name)
         config.load_config()
         ArakoonInstaller._deploy(config)
@@ -560,7 +560,7 @@ class ArakoonInstaller(object):
         if not EtcdConfiguration.dir_exists('/ovs/arakoon'):
             return None
 
-        mutex = VolatileMutex('claim_arakoon_metadata', wait=10)
+        mutex = volatile_mutex('claim_arakoon_metadata', wait=10)
         try:
             if locked is True:
                 mutex.acquire()
@@ -611,10 +611,10 @@ class ArakoonInstaller(object):
                             exclude_ports.append(node.client_port)
                             exclude_ports.append(node.messaging_port)
                 except:
-                    logger.error('  Could not load port information of cluster {0}'.format(cluster_name))
+                    ArakoonInstaller._logger.error('  Could not load port information of cluster {0}'.format(cluster_name))
 
         ports = System.get_free_ports(EtcdConfiguration.get('/ovs/framework/hosts/{0}/ports|arakoon'.format(node_name)), exclude_ports, 2, client)
-        logger.debug('  Loaded free ports {0} based on existing clusters {1}'.format(ports, clusters))
+        ArakoonInstaller._logger.debug('  Loaded free ports {0} based on existing clusters {1}'.format(ports, clusters))
         return ports
 
     @staticmethod
@@ -622,7 +622,7 @@ class ArakoonInstaller(object):
         """
         Cleans up a single node (remove services, directories and configuration files)
         """
-        logger.debug('Destroy node {0} in cluster {1}'.format(node.ip, config.cluster_id))
+        ArakoonInstaller._logger.debug('Destroy node {0} in cluster {1}'.format(node.ip, config.cluster_id))
 
         # Removes services for a cluster on a given node
         root_client = SSHClient(node.ip, username='root')
@@ -635,20 +635,20 @@ class ArakoonInstaller(object):
 
         # Removes a configuration file from a node
         config.delete_config()
-        logger.debug('Destroy node {0} in cluster {1} completed'.format(node.ip, config.cluster_id))
+        ArakoonInstaller._logger.debug('Destroy node {0} in cluster {1} completed'.format(node.ip, config.cluster_id))
 
     @staticmethod
     def _deploy(config, offline_nodes=None):
         """
         Deploys a complete cluster: Distributing the configuration files, creating directories and services
         """
-        logger.debug('Deploying cluster {0}'.format(config.cluster_id))
+        ArakoonInstaller._logger.debug('Deploying cluster {0}'.format(config.cluster_id))
         if offline_nodes is None:
             offline_nodes = []
         for node in config.nodes:
             if node.ip in offline_nodes:
                 continue
-            logger.debug('  Deploying cluster {0} on {1}'.format(config.cluster_id, node.ip))
+            ArakoonInstaller._logger.debug('  Deploying cluster {0} on {1}'.format(config.cluster_id, node.ip))
             root_client = SSHClient(node.ip, username='root')
 
             # Distributes a configuration file to all its nodes
@@ -669,7 +669,7 @@ class ArakoonInstaller(object):
                                                'NODE_ID': node.name,
                                                'CONFIG_PATH': ArakoonInstaller.ETCD_CONFIG_PATH.format(config.cluster_id)},
                                        target_name=target_name)
-            logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
+            ArakoonInstaller._logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
 
     @staticmethod
     def start(cluster_name, client):
@@ -745,12 +745,12 @@ class ArakoonInstaller(object):
         :return: True
         :rtype: Boolean
         """
-        logger.debug('Waiting for cluster {0}'.format(cluster_name))
+        ArakoonInstaller._logger.debug('Waiting for cluster {0}'.format(cluster_name))
         from ovs.extensions.storage.persistentfactory import PersistentFactory
-        with Remote(sshclient.ip, [PersistentFactory], 'ovs') as remote:
-            client = remote.PersistentFactory.get_client()
+        with remote(sshclient.ip, [PersistentFactory], 'ovs') as rem:
+            client = rem.PersistentFactory.get_client()
             client.nop()
-            logger.debug('Waiting for cluster {0}: available'.format(cluster_name))
+            ArakoonInstaller._logger.debug('Waiting for cluster {0}: available'.format(cluster_name))
             return True
 
     @staticmethod
@@ -765,26 +765,26 @@ class ArakoonInstaller(object):
 
         :return: None
         """
-        logger.debug('Restart sequence for {0} via {1}'.format(cluster_name, master_ip))
+        ArakoonInstaller._logger.debug('Restart sequence for {0} via {1}'.format(cluster_name, master_ip))
 
         config = ArakoonClusterConfig(cluster_name)
         config.load_config()
 
         all_clients = [SSHClient(node.ip, username='root') for node in config.nodes]
         if len(config.nodes) <= 2:
-            logger.debug('  Insufficient nodes in cluster {0}. Full restart'.format(cluster_name))
+            ArakoonInstaller._logger.debug('  Insufficient nodes in cluster {0}. Full restart'.format(cluster_name))
             for function in [ArakoonInstaller.stop, ArakoonInstaller.start]:
                 for client in all_clients:
                     function(cluster_name, client)
             ArakoonInstaller.wait_for_cluster(cluster_name, all_clients[0])
         else:
-            logger.debug('  Sufficient nodes in cluster {0}. Sequential restart'.format(cluster_name))
+            ArakoonInstaller._logger.debug('  Sufficient nodes in cluster {0}. Sequential restart'.format(cluster_name))
             for client in all_clients:
                 ArakoonInstaller.stop(cluster_name, client)
                 ArakoonInstaller.start(cluster_name, client)
-                logger.debug('  Restarted node {0} on cluster {1}'.format(client.ip, cluster_name))
+                ArakoonInstaller._logger.debug('  Restarted node {0} on cluster {1}'.format(client.ip, cluster_name))
                 ArakoonInstaller.wait_for_cluster(cluster_name, client)
-        logger.debug('Restart sequence for {0} via {1} completed'.format(cluster_name, master_ip))
+        ArakoonInstaller._logger.debug('Restart sequence for {0} via {1} completed'.format(cluster_name, master_ip))
 
     @staticmethod
     def restart_cluster_add(cluster_name, current_ips, new_ip):
@@ -801,23 +801,23 @@ class ArakoonInstaller(object):
 
         :return: None
         """
-        logger.debug('Restart sequence (add) for {0}'.format(cluster_name))
-        logger.debug('Current ips: {0}'.format(', '.join(current_ips)))
-        logger.debug('New ip: {0}'.format(new_ip))
+        ArakoonInstaller._logger.debug('Restart sequence (add) for {0}'.format(cluster_name))
+        ArakoonInstaller._logger.debug('Current ips: {0}'.format(', '.join(current_ips)))
+        ArakoonInstaller._logger.debug('New ip: {0}'.format(new_ip))
 
         client = SSHClient(new_ip, username=ArakoonInstaller.SSHCLIENT_USER)
         if ArakoonInstaller.is_running(cluster_name, client):
-            logger.info('Arakoon service for {0} is already running'.format(cluster_name))
+            ArakoonInstaller._logger.info('Arakoon service for {0} is already running'.format(cluster_name))
             return
         config = ArakoonClusterConfig(cluster_name)
         config.load_config()
 
         if len(config.nodes) > 1:
-            logger.debug('Catching up new node {0} for cluster {1}'.format(new_ip, cluster_name))
+            ArakoonInstaller._logger.debug('Catching up new node {0} for cluster {1}'.format(new_ip, cluster_name))
             node_name = [node.name for node in config.nodes if node.ip == new_ip][0]
             config_path = ArakoonInstaller.ETCD_CONFIG_PATH.format(cluster_name)
             client.run(ArakoonInstaller.ARAKOON_CATCHUP_COMMAND.format(node_name, config_path))
-            logger.debug('Catching up new node {0} for cluster {1} completed'.format(new_ip, cluster_name))
+            ArakoonInstaller._logger.debug('Catching up new node {0} for cluster {1} completed'.format(new_ip, cluster_name))
 
         threshold = 2 if new_ip in current_ips else 1
         for ip in current_ips:
@@ -826,13 +826,13 @@ class ArakoonInstaller(object):
             current_client = SSHClient(ip, username='root')
             ArakoonInstaller.stop(cluster_name, client=current_client)
             ArakoonInstaller.start(cluster_name, client=current_client)
-            logger.debug('  Restarted node {0} for cluster {1}'.format(current_client.ip, cluster_name))
+            ArakoonInstaller._logger.debug('  Restarted node {0} for cluster {1}'.format(current_client.ip, cluster_name))
             if len(current_ips) > threshold:  # A two node cluster needs all nodes running
                 ArakoonInstaller.wait_for_cluster(cluster_name, current_client)
         client = SSHClient(new_ip, username='root')
         ArakoonInstaller.start(cluster_name, client=client)
         ArakoonInstaller.wait_for_cluster(cluster_name, client)
-        logger.debug('Started node {0} for cluster {1}'.format(new_ip, cluster_name))
+        ArakoonInstaller._logger.debug('Started node {0} for cluster {1}'.format(new_ip, cluster_name))
 
     @staticmethod
     def restart_cluster_remove(cluster_name, remaining_ips):
@@ -846,13 +846,13 @@ class ArakoonInstaller(object):
 
         :return: None
         """
-        logger.debug('Restart sequence (remove) for {0}'.format(cluster_name))
-        logger.debug('Remaining ips: {0}'.format(', '.join(remaining_ips)))
+        ArakoonInstaller._logger.debug('Restart sequence (remove) for {0}'.format(cluster_name))
+        ArakoonInstaller._logger.debug('Remaining ips: {0}'.format(', '.join(remaining_ips)))
         for ip in remaining_ips:
             client = SSHClient(ip, username='root')
             ArakoonInstaller.stop(cluster_name, client=client)
             ArakoonInstaller.start(cluster_name, client=client)
-            logger.debug('  Restarted node {0} for cluster {1}'.format(client.ip, cluster_name))
+            ArakoonInstaller._logger.debug('  Restarted node {0} for cluster {1}'.format(client.ip, cluster_name))
             if len(remaining_ips) > 2:  # A two node cluster needs all nodes running
                 ArakoonInstaller.wait_for_cluster(cluster_name, client)
-        logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))
+        ArakoonInstaller._logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))

@@ -27,15 +27,19 @@ class DummyVolatileStore(object):
     _path = '/run/dummyvolatile.json'
     _storage = {}
     _timeout = {}
-    _keep_in_memory_only = False
     _data = {'t': {}, 's': {}}
 
-    @staticmethod
-    def clean():
+    def __init__(self):
+        """
+        Init method
+        """
+        self._keep_in_memory_only = False
+
+    def clean(self):
         """
         Empties the store
         """
-        if DummyVolatileStore._keep_in_memory_only is True:
+        if self._keep_in_memory_only is True:
             DummyVolatileStore._data = {'t': {}, 's': {}}
         else:
             try:
@@ -47,7 +51,7 @@ class DummyVolatileStore(object):
         """
         Reads the local json file
         """
-        if DummyVolatileStore._keep_in_memory_only is True:
+        if self._keep_in_memory_only is True:
             return DummyVolatileStore._data
 
         try:
@@ -117,7 +121,7 @@ class DummyVolatileStore(object):
         """
         Saves the local json file
         """
-        if DummyVolatileStore._keep_in_memory_only is True:
+        if self._keep_in_memory_only is True:
             DummyVolatileStore._data = data
         else:
             rawdata = json.dumps(data, sort_keys=True, indent=2)

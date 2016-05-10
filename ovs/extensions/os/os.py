@@ -21,14 +21,13 @@ from ovs.extensions.os.ubuntu import Ubuntu
 from ovs.extensions.os.centos import Centos
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='osmanager')
-
 
 class OSManager(object):
     """
     Factory class returning specialized classes
     """
     ImplementationClass = None
+    _logger = LogHandler.get('extensions', name='osmanager')
 
     class MetaClass(type):
         """
@@ -51,7 +50,7 @@ class OSManager(object):
                     else:
                         raise RuntimeError('There was no known OSManager detected')
                 except Exception as ex:
-                    logger.exception('Error loading OSManager: {0}'.format(ex))
+                    OSManager._logger.exception('Error loading OSManager: {0}'.format(ex))
                     raise
             return getattr(OSManager.ImplementationClass, item)
 

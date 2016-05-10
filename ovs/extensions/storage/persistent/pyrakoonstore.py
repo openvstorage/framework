@@ -30,8 +30,6 @@ from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNotFound, 
 from ovs.extensions.storage.exceptions import KeyNotFoundException, AssertException
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='arakoon_store')
-
 
 def locked():
     """
@@ -57,7 +55,7 @@ class PyrakoonStore(object):
     * Uses json serialisation
     * Raises generic exception
     """
-
+    _logger = LogHandler.get('extensions', name='arakoon_store')
     ETCD_CONFIG_KEY = '/ovs/arakoon/{0}/config'
 
     def __init__(self, cluster):
@@ -233,18 +231,18 @@ class PyrakoonStore(object):
             try:
                 return_value = method(*args, **kwargs)
             except (ArakoonSockNotReadable, ArakoonSockReadNoBytes, ArakoonSockSendError):
-                logger.debug('Error during arakoon call {0}, retry'.format(method.__name__))
+                PyrakoonStore._logger.debug('Error during arakoon call {0}, retry'.format(method.__name__))
                 time.sleep(1)
                 return_value = method(*args, **kwargs)
             duration = time.time() - start
             if duration > 0.5:
-                logger.warning('Arakoon call {0} took {1}s'.format(method.__name__, round(duration, 2)))
+                PyrakoonStore._logger.warning('Arakoon call {0} took {1}s'.format(method.__name__, round(duration, 2)))
             return return_value
         except (ArakoonNotFound, ArakoonAssertionFailed):
             # No extra logging for some errors
             raise
         except Exception:
-            logger.error('Error during {0}. Process {1}, thread {2}, clientid {3}'.format(
+            PyrakoonStore._logger.error('Error during {0}. Process {1}, thread {2}, clientid {3}'.format(
                 method.__name__, os.getpid(), current_thread().ident, identifier
             ))
             raise
