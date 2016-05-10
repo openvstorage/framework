@@ -320,7 +320,6 @@ class ScheduledTaskController(object):
         if len(result_set) > 0:
             all_results2, failed_nodes = CeleryToolbox.manage_running_tasks(result_set,
                                                                             timesleep=60)  # Check every 60 seconds if tasks are still running
-            all_results.extend(all_results2)
 
             for ip, result in all_results2.iteritems():
                 if isinstance(result, list):
