@@ -32,6 +32,7 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 
+
 class CeleryMockup(object):
     """
     Mockup class for Celery
