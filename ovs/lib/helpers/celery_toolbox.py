@@ -47,7 +47,7 @@ class CeleryToolbox():
         logger = LogHandler.get('lib', name='celery toolbox')
         ssh_clients = {}
         tasks_pending = {}
-        tasks_pending_timeout = 10 #800  # 30 minutes
+        tasks_pending_timeout = 1800  # 30 minutes
         results = {}
         failed_nodes = []
         while len(tasklist.keys()) > 0:

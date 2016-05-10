@@ -242,6 +242,10 @@ class ScheduledTaskController(object):
             if vdisk.info['object_type'] == 'BASE':
                 vdisk_guids.add(vdisk.guid)
 
+        if len(vdisk_guids) == 0:
+            ScheduledTaskController._logger.info('Gather Scrub - No scrub work needed'.format(len(vdisk_guids)))
+            return
+
         ScheduledTaskController._logger.info('Gather Scrub - Checking {0} volumes for scrub work'.format(len(vdisk_guids)))
         local_machineid = System.get_my_machine_id()
         local_storage_router = None
