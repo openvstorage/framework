@@ -203,3 +203,11 @@ class Systemd(object):
                             pid = 0
                         break
         return pid
+
+    @staticmethod
+    def send_signal(name, signal, client):
+        name = Systemd._get_name(name, client)
+        pid = Systemd.get_service_pid(name, client)
+        if pid == 0:
+            raise RuntimeError('Could not determine PID to send signal to')
+        client.run('kill -s {0} {1}'.format(signal, pid))
