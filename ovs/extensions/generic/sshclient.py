@@ -27,7 +27,6 @@ import time
 import types
 import socket
 import logging
-import paramiko
 import tempfile
 import unittest
 from ovs.dal.helpers import Descriptor
@@ -140,6 +139,7 @@ class SSHClient(object):
             logging.getLogger('paramiko').setLevel(logging.WARNING)
             key = '{0}@{1}'.format(self.ip, self.username)
             if key not in SSHClient.client_cache:
+                import paramiko
                 client = paramiko.SSHClient()
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.is_connected = types.MethodType(is_connected, client)
