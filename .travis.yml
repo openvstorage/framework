@@ -16,5 +16,4 @@ before_script:
   - mv ../framework /opt/OpenvStorage
   - export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages/:/usr/lib/python2.7/dist-packages
 script:
-  - ovs unittest /opt/OpenvStorage/ovs/dal/tests/test_basic.py
-  - ovs unittest /opt/OpenvStorage/ovs/dal/tests/test_hybrids.py
+  - ovs unittest
