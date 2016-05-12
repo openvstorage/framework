@@ -20,6 +20,7 @@ Limitations:
 """
 
 import os
+import sys
 import time
 import inspect
 import unittest
@@ -224,3 +225,4 @@ class UnitTest(object):
             test_results.insert(4, '  - Total duration: {0}'.format(UnitTest._sec_to_readable(time.time() - start_all)))
         print '\n\n\n{0}'.format('\n'.join(test_results))
         unittest.running_tests = False
+        sys.exit(0 if total_tests == total_success else 1)

@@ -15,6 +15,7 @@
 """
 Delete snapshots test module
 """
+import os
 import time
 import datetime
 import unittest
@@ -174,7 +175,10 @@ class DeleteSnapshots(unittest.TestCase):
             [dynamic for dynamic in disk._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         # Run the testing scenario
-        debug = True
+        travis = 'TRAVIS' in os.environ and os.environ['TRAVIS'] == 'true'
+        if travis is True:
+            print 'Running in Travis, reducing output.'
+        debug = not travis
         amount_of_days = 50
         base = datetime.datetime.now().date()
         day = datetime.timedelta(1)
