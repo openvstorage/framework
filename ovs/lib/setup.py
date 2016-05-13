@@ -81,6 +81,7 @@ class SetupController(object):
         master_password = None
         enable_heartbeats = True
         hypervisor_password = None
+        logging_target = None
         hypervisor_username = 'root'
 
         try:
@@ -101,6 +102,7 @@ class SetupController(object):
                 enable_heartbeats = config.get('enable_heartbeats', enable_heartbeats)
                 hypervisor_password = config.get('hypervisor_password')
                 hypervisor_username = config.get('hypervisor_username', hypervisor_username)
+                logging_target = config.get('logging_target', logging_target)
 
             # Support resume setup - store entered parameters so when retrying, we have the values
             resume_config = {}
@@ -804,7 +806,7 @@ class SetupController(object):
         SetupController._log(messages='Remove nodes finished', title=True)
 
     @staticmethod
-    def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats, external_etcd):
+    def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats, external_etcd, logging_target):
         """
         Sets up the first node services. This node is always a master
         """
@@ -867,7 +869,7 @@ class SetupController(object):
             EtcdConfiguration.set('/ovs/framework/memcache|endpoints', ['{0}:11211'.format(cluster_ip)])
             SetupController._configure_memcached(target_client)
         SetupController._configure_redis(target_client)
-        Toolbox.change_service_state(target_client, 'redis-server', 'restart', logger)
+        Toolbox.change_service_state(target_client, 'redis-server', 'restart', SetupController._logger)
         VolatileFactory.store = None
 
         SetupController._log(messages='Starting model services', loglevel='debug')
@@ -1173,7 +1175,7 @@ class SetupController(object):
         if configure_memcached:
             SetupController._configure_memcached(target_client)
         SetupController._configure_redis(target_client)
-        Toolbox.change_service_state(target_client, 'redis-server', 'restart', logger)
+        Toolbox.change_service_state(target_client, 'redis-server', 'restart', SetupController._logger)
         SetupController._add_services(target_client, unique_id, 'master')
 
         arakoon_ports = []

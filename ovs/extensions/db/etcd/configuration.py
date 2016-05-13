@@ -283,8 +283,9 @@ class EtcdConfiguration(object):
                                     'volatile': 'memcache'},
                          'messagequeue': {'protocol': 'amqp',
                                           'queues': {'storagedriver': 'volumerouter'}},
-                         '/logging': {'type': 'console'}})
-
+                         'logging': {'type': 'console'}})
+        if logging_target is not None:
+            base_cfg['logging'] = logging_target
         if EtcdConfiguration.exists('/ovs/framework/memcache') is False:
             base_cfg['memcache'] = {'endpoints': [],
                                     'metadata': {'internal': True}}

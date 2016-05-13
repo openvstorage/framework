@@ -20,7 +20,6 @@ ArakoonInstaller class
 """
 
 import os
-import time
 from ConfigParser import RawConfigParser
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
@@ -267,15 +266,12 @@ class ArakoonInstaller(object):
     @staticmethod
     def clean_leftover_arakoon_data(ip, directories):
         """
-        Delete existing arakoon data or copy to the side
-        Directories should be a dict with key the absolute paths and value a boolean indicating archive or delete
-        eg: {'/var/log/arakoon/ovsdb': True,                     --> Files under this directory will be archived
-             '/opt/OpenvStorage/db/arakoon/ovsdb/tlogs': False}  --> Files under this directory will be deleted
+        Delete existing arakoon data
         :param ip: IP on which to check for existing data
         :type ip: str
 
-        :param directories: Directories to archive or delete
-        :type directories: dict
+        :param directories: Directories to delete
+        :type directories: list
 
         :return: None
         """
@@ -285,15 +281,14 @@ class ArakoonInstaller(object):
         open_file_errors = []
         ArakoonInstaller._logger.debug('Cleanup old arakoon - Checking open files')
         dirs_with_files = {}
-        for directory, archive in directories.iteritems():
+        for directory in directories:
             ArakoonInstaller._logger.debug('Cleaning old arakoon - Checking directory {0}'.format(directory))
             if root_client.dir_exists(directory):
                 ArakoonInstaller._logger.debug('Cleaning old arakoon - Directory {0} exists'.format(directory))
                 file_names = root_client.file_list(directory, abs_path=True, recursive=True)
                 if len(file_names) > 0:
                     ArakoonInstaller._logger.debug('Cleaning old arakoon - Files found in directory {0}'.format(directory))
-                    dirs_with_files[directory] = {'files': file_names,
-                                                  'archive': archive}
+                    dirs_with_files[directory] = file_names
                 for file_name in file_names:
                     try:
                         open_files = root_client.run('lsof {0}'.format(file_name))
@@ -306,20 +301,8 @@ class ArakoonInstaller(object):
             raise RuntimeError('\n - ' + '\n - '.join(open_file_errors))
 
         for directory, info in dirs_with_files.iteritems():
-            if info['archive'] is True:
-                # Create zipped tar
-                ArakoonInstaller._logger.debug('Cleanup old arakoon - Start archiving directory {0}'.format(directory))
-                archive_dir = '{0}/archive'.format(directory)
-                if not root_client.dir_exists(archive_dir):
-                    ArakoonInstaller._logger.debug('Cleanup old arakoon - Creating archive directory {0}'.format(archive_dir))
-                    root_client.dir_create(archive_dir)
-
-                ArakoonInstaller._logger.debug('Cleanup old arakoon - Creating tar file')
-                tar_name = '{0}/{1}.tgz'.format(archive_dir, int(time.time()))
-                root_client.run('cd {0}; tar -cz -f {1} --exclude "archive" *'.format(directory, tar_name))
-
             ArakoonInstaller._logger.debug('Cleanup old arakoon - Removing old files from {0}'.format(directory))
-            root_client.file_delete(info['files'])
+            root_client.file_delete(info)
 
     @staticmethod
     def create_cluster(cluster_name, cluster_type, ip, base_dir, plugins=None, locked=True, internal=True, claim=False):
@@ -375,9 +358,7 @@ class ArakoonInstaller(object):
 
         home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
         tlog_dir = ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)
-        ArakoonInstaller.clean_leftover_arakoon_data(ip, {log_dir: True,
-                                                          home_dir: False,
-                                                          tlog_dir: False})
+        ArakoonInstaller.clean_leftover_arakoon_data(ip, [home_dir, tlog_dir])
 
         port_mutex = None
         try:
@@ -467,9 +448,7 @@ class ArakoonInstaller(object):
 
         home_dir = ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name)
         tlog_dir = ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)
-        ArakoonInstaller.clean_leftover_arakoon_data(new_ip, {log_dir: True,
-                                                              home_dir: False,
-                                                              tlog_dir: False})
+        ArakoonInstaller.clean_leftover_arakoon_data(new_ip, [home_dir, tlog_dir])
 
         port_mutex = None
         try:
@@ -613,7 +592,7 @@ class ArakoonInstaller(object):
                             exclude_ports.append(node.client_port)
                             exclude_ports.append(node.messaging_port)
                 except:
-                    ArakoonInstaller._logger.error('  Could not load port information of cluster {0}'.format(cluster_name))
+                    ArakoonInstaller._logger.exception('  Could not load port information of cluster {0}'.format(cluster_name))
 
         ports = System.get_free_ports(EtcdConfiguration.get('/ovs/framework/hosts/{0}/ports|arakoon'.format(node_name)), exclude_ports, 2, client)
         ArakoonInstaller._logger.debug('  Loaded free ports {0} based on existing clusters {1}'.format(ports, clusters))
