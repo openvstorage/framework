@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,7 @@
 """
 Generic volatile factory.
 """
-import os
-from ConfigParser import RawConfigParser
+import unittest
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 
 
@@ -30,8 +29,9 @@ class VolatileFactory(object):
         """
         Returns a volatile storage client
         """
-
         if not hasattr(VolatileFactory, 'store') or VolatileFactory.store is None:
+            if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests'):
+                client_type = 'dummy'
             if client_type is None:
                 client_type = EtcdConfiguration.get('/ovs/framework/stores|volatile')
 
@@ -40,7 +40,7 @@ class VolatileFactory(object):
                 from ovs.extensions.storage.volatile.memcachestore import MemcacheStore
                 nodes = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
                 VolatileFactory.store = MemcacheStore(nodes)
-            if client_type == 'default':
+            if client_type == 'dummy':
                 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
                 VolatileFactory.store = DummyVolatileStore()
 

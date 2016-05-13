@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,10 +16,8 @@
 Messaging module
 """
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.generic.volatilemutex import VolatileMutex
-from ovs.extensions.generic.filemutex import FileMutex
-
-_cache = VolatileFactory.get_client()
+from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.generic.filemutex import file_mutex
 
 
 def synchronized():
@@ -34,10 +32,10 @@ def synchronized():
             """
             Executes the decorated function in a locked context
             """
-            filemutex = FileMutex('messaging')
+            filemutex = file_mutex('messaging')
             try:
                 filemutex.acquire(wait=60)
-                mutex = VolatileMutex('messaging')
+                mutex = volatile_mutex('messaging')
                 try:
                     mutex.acquire(wait=60)
                     return f(*args, **kw)
@@ -55,8 +53,9 @@ class MessageController(object):
     clients. It covers a long-polling scenario providing a realtime-alike experience.
     """
     TIMEOUT = 300
+    _cache = VolatileFactory.get_client()
 
-    class Type:
+    class Type(object):
         """
         Message types
         """
@@ -69,14 +68,14 @@ class MessageController(object):
         """
         Returns all subscriptions
         """
-        return _cache.get('msg_subscriptions', [])
+        return MessageController._cache.get('msg_subscriptions', [])
 
     @staticmethod
     def subscriptions(subscriber_id):
         """
         Returns all subscriptions for a given subscriber
         """
-        return _cache.get('msg_subscriptions_%d' % subscriber_id, [])
+        return MessageController._cache.get('msg_subscriptions_%d' % subscriber_id, [])
 
     @staticmethod
     @synchronized()
@@ -84,12 +83,12 @@ class MessageController(object):
         """
         Subscribes a given subscriber to a set of Types
         """
-        _cache.set('msg_subscriptions_%d' % subscriber_id, subscriptions, MessageController.TIMEOUT)
-        all_subscriptions = _cache.get('msg_subscriptions', [])
+        MessageController._cache.set('msg_subscriptions_%d' % subscriber_id, subscriptions, MessageController.TIMEOUT)
+        all_subscriptions = MessageController._cache.get('msg_subscriptions', [])
         for subscription in subscriptions:
             if subscription not in all_subscriptions:
                 all_subscriptions.append(subscription)
-        _cache.set('msg_subscriptions', all_subscriptions, MessageController.TIMEOUT)
+        MessageController._cache.set('msg_subscriptions', all_subscriptions, MessageController.TIMEOUT)
 
     @staticmethod
     @synchronized()
@@ -98,16 +97,16 @@ class MessageController(object):
         Re-caches all subscriptions
         """
         subscriber_key = 'msg_subscriptions_%d' % subscriber_id
-        _cache.set(subscriber_key, _cache.get(subscriber_key, []), MessageController.TIMEOUT)
-        _cache.set('msg_subscriptions', _cache.get('msg_subscriptions', []), MessageController.TIMEOUT)
+        MessageController._cache.set(subscriber_key, MessageController._cache.get(subscriber_key, []), MessageController.TIMEOUT)
+        MessageController._cache.set('msg_subscriptions', MessageController._cache.get('msg_subscriptions', []), MessageController.TIMEOUT)
 
     @staticmethod
     def get_messages(subscriber_id, message_id):
         """
         Gets all messages pending for a given subscriber, from a given message id
         """
-        subscriptions = _cache.get('msg_subscriptions_%d' % subscriber_id, [])
-        all_messages = _cache.get('msg_messages', [])
+        subscriptions = MessageController._cache.get('msg_subscriptions_%d' % subscriber_id, [])
+        all_messages = MessageController._cache.get('msg_messages', [])
         messages = []
         last_message_id = 0
         for message in all_messages:
@@ -123,17 +122,17 @@ class MessageController(object):
         """
         Adds a new message to the messaging queue
         """
-        last_message_id = max([m['id'] for m in _cache.get('msg_messages', [])] + [0])
-        message = {'id'  : last_message_id + 1,
+        last_message_id = max([m['id'] for m in MessageController._cache.get('msg_messages', [])] + [0])
+        message = {'id': last_message_id + 1,
                    'type': message_type,
                    'body': body}
-        messages = _cache.get('msg_messages', [])
+        messages = MessageController._cache.get('msg_messages', [])
         messages.append(message)
-        _cache.set('msg_messages', messages, MessageController.TIMEOUT)
+        MessageController._cache.set('msg_messages', messages, MessageController.TIMEOUT)
 
     @staticmethod
     def last_message_id():
         """
         Gets the last messageid
         """
-        return max([m['id'] for m in _cache.get('msg_messages', [])] + [0])
+        return max([m['id'] for m in MessageController._cache.get('msg_messages', [])] + [0])

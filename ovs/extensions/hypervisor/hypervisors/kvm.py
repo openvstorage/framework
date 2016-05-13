@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,6 @@
 """
 Module for the KVM hypervisor client
 """
-
 from ovs.extensions.hypervisor.apis.kvm.sdk import Sdk
 
 
@@ -189,3 +188,42 @@ class KVM(object):
         _ = storagedriver
         matches = self.sdk.find_devicename(devicename)
         return matches is not None
+
+    def create_volume(self, vpool_mountpoint, storage_ip, diskname, size):
+        """
+        Create new volume - this is a truncate command
+        :param vpool_mountpoint: mountpoint of the vpool
+        :param storage_ip: IP of the storagerouter
+        :param diskname: name of the disk
+        :param size: size in GB
+        """
+        _ = storage_ip
+        disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
+        location = '/'.join([vpool_mountpoint, disk_path])
+        self.sdk.create_volume(location, size)
+        return disk_path
+
+    def delete_volume(self, vpool_mountpoint, storage_ip, diskname):
+        """
+        Delete volume - this is a rm command
+        :param vpool_mountpoint: mountpoint of the vpool
+        :param storage_ip: IP of the storagerouter
+        :param diskname: name of the disk
+        """
+        _ = storage_ip
+        disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
+        location = '/'.join([vpool_mountpoint, disk_path])
+        self.sdk.delete_volume(location)
+
+    def extend_volume(self, vpool_mountpoint, storage_ip, diskname, size):
+        """
+        Extend volume - this is a truncate command
+        :param vpool_mountpoint: mountpoint of the vpool
+        :param storage_ip: IP of the storagerouter
+        :param diskname: name of the disk
+        :param size: size in GB
+        """
+        _ = storage_ip
+        disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
+        location = '/'.join([vpool_mountpoint, disk_path])
+        self.sdk.extend_volume(location, size)

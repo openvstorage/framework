@@ -1,13 +1,7 @@
 /var/log/ovs/*.log {
-    su ovs ovs
-    rotate 10
-    size 50M
+    rotate 5
+    size 20M
     compress
-    delaycompress
-    missingok
+    copytruncate
     notifempty
-    create 666 ovs ovs
-    postrotate
-        /usr/bin/pkill -SIGUSR1 arakoon
-    endscript
 }

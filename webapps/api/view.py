@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,6 @@ import time
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.api.client import OVSClient
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
@@ -33,13 +32,12 @@ from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 
-logger = LogHandler.get('api', name='metadata')
-
 
 class MetadataView(View):
     """
     Implements retrieval of generic metadata about the services
     """
+    _logger = LogHandler.get('api', name='metadata')
 
     @auto_response()
     @limit(amount=60, per=60, timeout=60)
@@ -57,9 +55,7 @@ class MetadataView(View):
                 'identification': {},
                 'storagerouter_ips': [sr.ip for sr in StorageRouterList.get_storagerouters()],
                 'versions': list(settings.VERSION),
-                'plugins': {},
-                'registration': {'registered': False,
-                                 'remaining': None}}
+                'plugins': {}}
         try:
             # Gather plugin metadata
             plugins = {}
@@ -79,15 +75,6 @@ class MetadataView(View):
 
             # Fill identification
             data['identification'] = {'cluster_id': EtcdConfiguration.get('/ovs/framework/cluster_id')}
-
-            # Registration data
-            registered = EtcdConfiguration.get('/ovs/framework/registered')
-            data['registration']['registered'] = registered
-            if registered is False:
-                cluster_install_time = EtcdConfiguration.get('/ovs/framework/install_time')
-                if cluster_install_time is not None:
-                    timeout_days = 30 * 24 * 60 * 60
-                    data['registration']['remaining'] = (timeout_days - time.time() + cluster_install_time) / 24 / 60 / 60
 
             # Get authentication metadata
             authentication_metadata = {'ip': System.get_my_storagerouter().ip}
@@ -125,7 +112,7 @@ class MetadataView(View):
                                                       'roles': roles,
                                                       'plugins': plugins}.items())
         except Exception as ex:
-            logger.exception('Unexpected exception: {0}'.format(ex))
+            MetadataView._logger.exception('Unexpected exception: {0}'.format(ex))
             return HttpResponse, dict(data.items() + {'authentication_state': 'unexpected_exception'}.items())
 
     @csrf_exempt
@@ -146,7 +133,7 @@ def relay(*args, **kwargs):
     ** This will translate to /apt/relay/storagerouters/
     Parameters:
     * Mandatory: ip, port, client_id, client_secret
-    * All other parameters will be passed through to the speicified node
+    * All other parameters will be passed through to the specified node
     """
 
     @authenticated()
@@ -178,5 +165,6 @@ def relay(*args, **kwargs):
             message = ex.detail
         if hasattr(ex, 'status_code'):
             status_code = ex.status_code
+        logger = LogHandler.get('api', name='metadata')
         logger.exception('Error relaying call: {0}'.format(message))
         return HttpResponse(json.dumps({'error': message}), content_type='application/json', status=status_code)

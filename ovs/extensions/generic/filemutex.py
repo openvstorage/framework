@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,10 +19,7 @@ import time
 import fcntl
 import os
 import stat
-
 from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('extensions', 'file mutex')
 
 
 class NoLockAvailableException(Exception):
@@ -32,7 +29,7 @@ class NoLockAvailableException(Exception):
     pass
 
 
-class FileMutex(object):
+class file_mutex(object):
     """
     This is mutex backed on the filesystem. It's cross thread and cross process. However
     its limited to the boundaries of a filesystem
@@ -42,6 +39,7 @@ class FileMutex(object):
         """
         Creates a file mutex object
         """
+        self._logger = LogHandler.get('extensions', 'file mutex')
         self.name = name
         self._has_lock = False
         self._start = 0
@@ -87,7 +85,7 @@ class FileMutex(object):
             while True:
                 passed = time.time() - self._start
                 if passed > wait:
-                    logger.error('Lock for {0} could not be acquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
+                    self._logger.error('Lock for {0} could not be acquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
                     raise NoLockAvailableException('Could not acquire lock %s' % self.key())
                 try:
                     fcntl.flock(self._handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -95,7 +93,7 @@ class FileMutex(object):
                 except IOError:
                     time.sleep(0.005)
         if passed > 1:  # More than 1 s is a long time to wait!
-            logger.warning('Waited {0} sec for lock {1}'.format(passed, self.key()))
+            self._logger.warning('Waited {0} sec for lock {1}'.format(passed, self.key()))
         self._start = time.time()
         self._has_lock = True
         return True
@@ -108,7 +106,7 @@ class FileMutex(object):
             fcntl.flock(self._handle, fcntl.LOCK_UN)
             passed = time.time() - self._start
             if passed > 2.5:  # More than 2.5 s is a long time to hold a lock
-                logger.warning('A lock on {0} was kept for {1} sec'.format(self.key(), passed))
+                self._logger.warning('A lock on {0} was kept for {1} sec'.format(self.key(), passed))
             self._has_lock = False
 
     def key(self):

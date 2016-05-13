@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,27 +16,28 @@
 Generic module for managing configuration in Etcd
 """
 
+import copy
 import etcd
 import json
 import time
 import random
 import signal
 import string
+import unittest
+from itertools import groupby
 from ovs.log.logHandler import LogHandler
 try:
     from requests.packages.urllib3 import disable_warnings
 except ImportError:
     import requests
-    reload(requests)  # Required for 2.6 > 2.7 upgrade (new requests.packages module)
+    try:
+        reload(requests)  # Required for 2.6 > 2.7 upgrade (new requests.packages module)
+    except ImportError:
+        pass  # So, this reload fails because of some FileNodeWarning that can't be found. But it did reload. Yay.
     from requests.packages.urllib3 import disable_warnings
 from requests.packages.urllib3.exceptions import InsecurePlatformWarning
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from requests.packages.urllib3.exceptions import SNIMissingWarning
-
-disable_warnings(InsecurePlatformWarning)
-disable_warnings(InsecureRequestWarning)
-disable_warnings(SNIMissingWarning)
-logger = LogHandler.get('extensions', name='etcdconfiguration')
 
 
 def log_slow_calls(f):
@@ -45,6 +46,8 @@ def log_slow_calls(f):
     :param f: Function to wrap
     :return: Wrapped function
     """
+    logger = LogHandler.get('extensions', name='etcdconfiguration')
+
     def new_function(*args, **kwargs):
         """
         Execute function
@@ -90,6 +93,26 @@ class EtcdConfiguration(object):
         > print EtcdConfiguration.get('/bar')
         < {u'a': {u'b': u'test'}}
     """
+    _unittest_data = {}
+    base_config = {'cluster_id': None,
+                   'external_etcd': None,
+                   'plugins/installed': {'backends': [],
+                                         'generic': []},
+                   'paths': {'cfgdir': '/opt/OpenvStorage/config',
+                             'basedir': '/opt/OpenvStorage',
+                             'ovsdb': '/opt/OpenvStorage/db'},
+                   'support': {'enablesupport': False,
+                               'enabled': True,
+                               'interval': 60},
+                   'storagedriver': {'mds_safety': 2,
+                                     'mds_tlogs': 100,
+                                     'mds_maxload': 75},
+                   'webapps': {'html_endpoint': '/',
+                               'oauth2': {'mode': 'local'}}}
+
+    disable_warnings(InsecurePlatformWarning)
+    disable_warnings(InsecureRequestWarning)
+    disable_warnings(SNIMissingWarning)
 
     def __init__(self):
         """
@@ -203,23 +226,35 @@ class EtcdConfiguration(object):
         return EtcdConfiguration._list(key)
 
     @staticmethod
-    def initialize_host(host_id):
+    def initialize_host(host_id, port_info=None):
         """
         Initialize keys when setting up a host
         :param host_id: ID of the host
+        :type host_id: str
+
+        :param port_info: Information about ports to be used
+        :type port_info: dict
+
         :return: None
         """
         if EtcdConfiguration.exists('/ovs/framework/hosts/{0}/setupcompleted'.format(host_id)):
             return
-        base_config = {'/storagedriver': {'rsp': '/var/rsp',
-                                          'vmware_mode': 'ganesha'},
-                       '/ports': {'storagedriver': [[26200, 26299]],
-                                  'mds': [[26300, 26399]],
-                                  'arakoon': [26400]},
-                       '/setupcompleted': False,
-                       '/versions': {'ovs': 4},
-                       '/type': 'UNCONFIGURED'}
-        for key, value in base_config.iteritems():
+        if port_info is None:
+            port_info = {}
+
+        mds_port_range = port_info.get('mds', [26300, 26399])
+        arakoon_start_port = port_info.get('arakoon', 26400)
+        storagedriver_port_range = port_info.get('storagedriver', [26200, 26299])
+
+        host_config = {'storagedriver': {'rsp': '/var/rsp',
+                                         'vmware_mode': 'ganesha'},
+                       'ports': {'storagedriver': [storagedriver_port_range],
+                                 'mds': [mds_port_range],
+                                 'arakoon': [arakoon_start_port]},
+                       'setupcompleted': False,
+                       'versions': {'ovs': 4},
+                       'type': 'UNCONFIGURED'}
+        for key, value in host_config.iteritems():
             EtcdConfiguration._set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value, raw=False)
 
     @staticmethod
@@ -232,40 +267,53 @@ class EtcdConfiguration(object):
         cluster_id = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
         if EtcdConfiguration.exists('/ovs/framework/cluster_id'):
             return
-        base_config = {'/cluster_id': cluster_id,
-                       '/external_etcd': external_etcd,
-                       '/registered': False,
-                       '/memcache': {'endpoints': []},
-                       '/messagequeue': {'endpoints': [],
-                                         'protocol': 'amqp',
-                                         'user': 'ovs',
-                                         'port': 5672,
-                                         'password': '0penv5tor4ge',
-                                         'queues': {'storagedriver': 'volumerouter'}},
-                       '/plugins/installed': {'backends': [],
-                                              'generic': []},
-                       '/stores': {'persistent': 'pyrakoon',
-                                   'volatile': 'memcache'},
-                       '/paths': {'cfgdir': '/opt/OpenvStorage/config',
-                                  'basedir': '/opt/OpenvStorage',
-                                  'ovsdb': '/opt/OpenvStorage/db'},
-                       '/support': {'enablesupport': False,
-                                    'enabled': True,
-                                    'interval': 60},
-                       '/storagedriver': {'mds_safety': 2,
-                                          'mds_tlogs': 100,
-                                          'mds_maxload': 75},
-                       '/webapps': {'html_endpoint': '/',
-                                    'oauth2': {'mode': 'local'}},
-                       '/logging': {'type': 'console'}}
-        if logging_target is not None:
-            base_config['/logging'] = logging_target
-        for key, value in base_config.iteritems():
+
+        messagequeue_cfg = {'endpoints': [],
+                            'metadata': {'internal': True},
+                            'protocol': 'amqp',
+                            'user': 'ovs',
+                            'password': '0penv5tor4ge',
+                            'queues': {'storagedriver': 'volumerouter'}}
+
+        base_cfg = copy.deepcopy(EtcdConfiguration.base_config)
+        base_cfg.update({'cluster_id': cluster_id,
+                         'external_etcd': external_etcd,
+                         'arakoon_clusters': {},
+                         'stores': {'persistent': 'pyrakoon',
+                                    'volatile': 'memcache'},
+                         'messagequeue': {'protocol': 'amqp',
+                                          'queues': {'storagedriver': 'volumerouter'}},
+                         '/logging': {'type': 'console'}})
+
+        if EtcdConfiguration.exists('/ovs/framework/memcache') is False:
+            base_cfg['memcache'] = {'endpoints': [],
+                                    'metadata': {'internal': True}}
+        if EtcdConfiguration.exists('/ovs/framework/messagequeue') is False:
+            base_cfg['messagequeue'] = messagequeue_cfg
+        else:
+            messagequeue_info = EtcdConfiguration.get('/ovs/framework/messagequeue')
+            for key, value in messagequeue_cfg.iteritems():
+                if key not in messagequeue_info:
+                    base_cfg['messagequeue'][key] = value
+        for key, value in base_cfg.iteritems():
             EtcdConfiguration._set('/ovs/framework/{0}'.format(key), value, raw=False)
 
     @staticmethod
     @log_slow_calls
     def _dir_exists(key):
+        key = EtcdConfiguration._coalesce_dashes(key=key)
+
+        # Unittests
+        if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+            stripped_key = key.strip('/')
+            current_dict = EtcdConfiguration._unittest_data
+            for part in stripped_key.split('/'):
+                if part not in current_dict or not isinstance(current_dict[part], dict):
+                    return False
+                current_dict = current_dict[part]
+            return True
+
+        # Real implementation
         try:
             client = EtcdConfiguration._get_client()
             return client.get(key).dir
@@ -275,22 +323,82 @@ class EtcdConfiguration(object):
     @staticmethod
     @log_slow_calls
     def _list(key):
+        key = EtcdConfiguration._coalesce_dashes(key=key)
+
+        # Unittests
+        if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+            data = EtcdConfiguration._unittest_data
+            ends_with_dash = key.endswith('/')
+            starts_with_dash = key.startswith('/')
+            stripped_key = key.strip('/')
+            for part in stripped_key.split('/'):
+                if part not in data:
+                    raise etcd.EtcdKeyNotFound('Key not found: {0}'.format(key))
+                data = data[part]
+            if data:
+                for sub_key in data:
+                    if ends_with_dash is True:
+                        yield '/{0}/{1}'.format(stripped_key, sub_key)
+                    else:
+                        yield sub_key if starts_with_dash is True else '/{0}'.format(sub_key)
+            elif starts_with_dash is False or ends_with_dash is True:
+                yield '/{0}'.format(stripped_key)
+            return
+
+        # Real implementation
         client = EtcdConfiguration._get_client()
         for child in client.get(key).children:
-            if child.key != key:
+            if child.key is not None and child.key != key:
                 yield child.key.replace('{0}/'.format(key), '')
 
     @staticmethod
     @log_slow_calls
     def _delete(key, recursive):
+        key = EtcdConfiguration._coalesce_dashes(key=key)
+
+        # Unittests
+        if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+            stripped_key = key.strip('/')
+            data = EtcdConfiguration._unittest_data
+            for part in stripped_key.split('/')[:-1]:
+                if part not in data:
+                    raise etcd.EtcdKeyNotFound('Key not found : {0}'.format(key))
+                data = data[part]
+            key_to_remove = stripped_key.split('/')[-1]
+            if key_to_remove in data:
+                del data[key_to_remove]
+            return
+
+        # Real implementation
         client = EtcdConfiguration._get_client()
         client.delete(key, recursive=recursive)
 
     @staticmethod
     @log_slow_calls
     def _get(key, raw):
-        client = EtcdConfiguration._get_client()
-        data = client.read(key).value
+        key = EtcdConfiguration._coalesce_dashes(key=key)
+
+        # Unittests
+        if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+            if key in ['', '/']:
+                return
+            stripped_key = key.strip('/')
+            data = EtcdConfiguration._unittest_data
+            for part in stripped_key.split('/')[:-1]:
+                if part not in data:
+                    raise etcd.EtcdKeyNotFound('Key not found : {0}'.format(key))
+                data = data[part]
+            last_part = stripped_key.split('/')[-1]
+            if last_part not in data:
+                raise etcd.EtcdKeyNotFound('Key not found : {0}'.format(key))
+            data = data[last_part]
+            if isinstance(data, dict):
+                data = None
+        else:
+            # Real implementation
+            client = EtcdConfiguration._get_client()
+            data = client.read(key).value
+
         if raw is True:
             return data
         return json.loads(data)
@@ -298,10 +406,25 @@ class EtcdConfiguration(object):
     @staticmethod
     @log_slow_calls
     def _set(key, value, raw):
-        client = EtcdConfiguration._get_client()
+        key = EtcdConfiguration._coalesce_dashes(key=key)
         data = value
         if raw is False:
             data = json.dumps(value)
+
+        # Unittests
+        if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+            stripped_key = key.strip('/')
+            ut_data = EtcdConfiguration._unittest_data
+            for part in stripped_key.split('/')[:-1]:
+                if part not in ut_data:
+                    ut_data[part] = {}
+                ut_data = ut_data[part]
+
+            ut_data[stripped_key.split('/')[-1]] = data
+            return
+
+        # Real implementation
+        client = EtcdConfiguration._get_client()
         client.write(key, data)
         try:
             def _escape(*args, **kwargs):
@@ -319,3 +442,15 @@ class EtcdConfiguration(object):
     @staticmethod
     def _get_client():
         return etcd.Client(port=2379, use_proxies=True)
+
+    @staticmethod
+    def _coalesce_dashes(key):
+        """
+        Remove multiple dashes, eg: //ovs//framework/ becomes /ovs/framework/
+        :param key: Key to convert
+        :type key: str
+
+        :return: Key without multiple dashes after one another
+        :rtype: str
+        """
+        return ''.join(k if k == '/' else ''.join(group) for k, group in groupby(key))

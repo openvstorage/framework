@@ -1,10 +1,10 @@
-﻿// Copyright 2014 iNuron NV
+﻿// Copyright 2016 iNuron NV
 //
-// Licensed under the Open vStorage Modified Apache License (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/license
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +23,7 @@ define([
 
         // Variables
         self.shared    = shared;
-        self.guard     = { authenticated: true, registered: true };
+        self.guard     = { authenticated: true };
         self.refresher = new Refresher();
         self.topItems  = 10;
         self.query     = {
@@ -35,29 +35,19 @@ define([
         // Handles
         self.loadStorageRoutersHandle = undefined;
         self.loadVPoolsHandle         = undefined;
-        self.loadVMachinesHandle      = undefined;
-        self.loadVMachineGuidsHandle  = undefined;
         self.loadFailureDomainsHandle = undefined;
 
         // Observ ables
         self.storageRoutersLoading = ko.observable(false);
         self.failureDomainsLoading = ko.observable(false);
         self.vPoolsLoading         = ko.observable(false);
-        self.vMachinesLoading      = ko.observable(false);
-        self.topVPoolMode          = ko.observable('topstoreddata');
-        self.topVmachineMode       = ko.observable('topstoreddata');
         self.storageRouters        = ko.observableArray([]);
         self.vPools                = ko.observableArray([]);
         self.failureDomains        = ko.observableArray([]);
         self.amountOfVMachines     = ko.observable(0);
         self.topVMachines          = ko.observableArray([]);
-        self.topVpoolModes         = ko.observableArray(['topstoreddata', 'topbandwidth']);
-        self.topVmachineModes      = ko.observableArray(['topstoreddata', 'topbandwidth']);
 
         // Computed
-        self.topVPools = ko.computed(function() {
-            return self.vPools.slice(0, 10);
-        });
         self._cacheRatio = ko.computed(function() {
             var hits = 0, misses = 0, total, raw;
             $.each(self.vPools(), function(index, vpool) {
@@ -136,7 +126,6 @@ define([
                 self.loadStorageRouters()
                     .then(self.loadFailureDomains)
                     .then(self.loadVPools)
-                    .then(self.loadVMachines)
                     .done(deferred.resolve)
                     .fail(deferred.reject);
             }).promise();
@@ -174,42 +163,12 @@ define([
                 }
             }).promise();
         };
-        self.loadVMachines = function() {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadVMachinesHandle)) {
-                    self.vMachinesLoading(true);
-                    var filter = {
-                        contents: (self.topVmachineMode() === 'topstoreddata' ? 'stored_data' : 'statistics'),
-                        sort: (self.topVmachineMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transferred_ps],name'),
-                        page: 1,
-                        query: JSON.stringify(self.query)
-                    };
-                    self.loadVMachinesHandle = api.get('vmachines', { queryparams: filter })
-                        .done(function(data) {
-                            var vms = [], vm;
-                            $.each(data.data, function(index, vmdata) {
-                                vm = new VMachine(vmdata.guid);
-                                vm.fillData(vmdata);
-                                vms.push(vm);
-                            });
-                            self.topVMachines(vms);
-                            self.amountOfVMachines(data._paging.total_items);
-                            self.vMachinesLoading(false);
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
-        };
         self.loadVPools = function() {
             return $.Deferred(function(deferred) {
                 self.vPoolsLoading(true);
                 if (generic.xhrCompleted(self.loadVPoolsHandle)) {
                     var filter = {
-                        contents: 'statistics,stored_data',
-                        sort: (self.topVPoolMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transferred_ps],name')
+                        contents: 'statistics,stored_data'
                     };
                     self.loadVPoolsHandle = api.get('vpools', { queryparams: filter })
                         .done(function(data) {
@@ -266,14 +225,6 @@ define([
                 }
             }).promise();
         };
-
-        // Subscriptions
-        self.topVmachineMode.subscribe(function() {
-            self.loadVMachines();
-        });
-        self.topVPoolMode.subscribe(function() {
-            self.loadVPools();
-        });
 
         // Durandal
         self.activate = function() {

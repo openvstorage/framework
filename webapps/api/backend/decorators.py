@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ import inspect
 import time
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.helpers import Toolbox as DalToolbox
 from rest_framework.response import Response
 from toolbox import Toolbox
 from rest_framework.exceptions import PermissionDenied, NotAuthenticated, NotAcceptable, Throttled
@@ -35,11 +36,7 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import FullSerializer
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.generic.volatilemutex import VolatileMutex
-
-
-logger = LogHandler.get('api')
-regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 
 
 def _find_request(args):
@@ -83,6 +80,8 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
     """
     Parameter discovery decorator
     """
+    regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
+
     def wrap(f):
         """
         Wrapper function
@@ -193,6 +192,9 @@ def return_list(object_type, default_sort=None):
             sort = None if sort is None else [s for s in reversed(sort.split(','))]
             page = request.QUERY_PARAMS.get('page')
             page = int(page) if page is not None and page.isdigit() else None
+            page_size = request.QUERY_PARAMS.get('page_size')
+            page_size = int(page_size) if page_size is not None and page_size.isdigit() else None
+            page_size = page_size if page_size in [10, 25, 50, 100] else 10
             contents = request.QUERY_PARAMS.get('contents')
             contents = None if contents is None else contents.split(',')
 
@@ -213,26 +215,26 @@ def return_list(object_type, default_sort=None):
                 for sort_item in sort:
                     desc = sort_item[0] == '-'
                     field = sort_item[1 if desc else 0:]
-                    data_list.sort(key=lambda e: Toolbox.extract_key(e, field), reverse=desc)
+                    data_list.sort(key=lambda e: DalToolbox.extract_key(e, field), reverse=desc)
 
             # 5. Paging
-            items_pp = 10
             total_items = len(data_list)
             page_metadata = {'total_items': total_items,
                              'current_page': 1,
                              'max_page': 1,
+                             'page_size': page_size,
                              'start_number': min(1, total_items),
                              'end_number': total_items}
             if page is not None:
-                max_page = int(math.ceil(total_items / (items_pp * 1.0)))
+                max_page = int(math.ceil(total_items / (page_size * 1.0)))
                 if page > max_page:
                     page = max_page
                 if page == 0:
                     start_number = -1
                     end_number = 0
                 else:
-                    start_number = (page - 1) * items_pp  # Index - e.g. 0 for page 1, 10 for page 2
-                    end_number = start_number + items_pp  # Index - e.g. 10 for page 1, 20 for page 2
+                    start_number = (page - 1) * page_size  # Index - e.g. 0 for page 1, 10 for page 2
+                    end_number = start_number + page_size  # Index - e.g. 10 for page 1, 20 for page 2
                 data_list = data_list[start_number: end_number]
                 page_metadata = dict(page_metadata.items() + {'current_page': max(1, page),
                                                               'max_page': max(1, max_page),
@@ -340,6 +342,8 @@ def limit(amount, per, timeout):
     """
     Rate-limits the decorated call
     """
+    logger = LogHandler.get('api')
+
     def wrap(f):
         """
         Wrapper function
@@ -356,7 +360,7 @@ def limit(amount, per, timeout):
                 request.META['HTTP_X_REAL_IP']
             )
             client = VolatileFactory.get_client()
-            with VolatileMutex(key):
+            with volatile_mutex(key):
                 rate_info = client.get(key, {'calls': [],
                                              'timeout': None})
                 active_timeout = rate_info['timeout']
@@ -387,6 +391,7 @@ def log(log_slow=True):
     Task logger
     :param log_slow: Indicates whether a slow call should be logged
     """
+    logger = LogHandler.get('api')
 
     def wrap(f):
         """

@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,9 +22,6 @@ import json
 import base64
 from ovs.celery_run import celery
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.api.client import OVSClient
-from ovs.extensions.support.agent import SupportAgent
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.dal.hybrids.license import License
 from ovs.dal.lists.licenselist import LicenseList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -32,13 +29,12 @@ from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('lib', name='license')
-
 
 class LicenseController(object):
     """
     Validates licenses
     """
+    _logger = LogHandler.get('lib', name='license')
 
     @staticmethod
     @celery.task(name='ovs.license.validate')
@@ -65,22 +61,22 @@ class LicenseController(object):
                     try:
                         valid, metadata = validate_functions[0](component=component, data=data, signature=signature)
                     except Exception, ex:
-                        logger.debug('Error validating license for {0}: {1}'.format(component, ex))
+                        LicenseController._logger.debug('Error validating license for {0}: {1}'.format(component, ex))
                         valid = False
                         metadata = None
                     if valid is False:
-                        logger.debug('Invalid license for {0}: {1}'.format(component, license_string))
+                        LicenseController._logger.debug('Invalid license for {0}: {1}'.format(component, license_string))
                         result[component] = False
                     else:
                         result[component] = {'valid_until': valid_until,
                                              'metadata': metadata,
                                              'name': name}
                 else:
-                    logger.debug('No validate nor apply functions found for {0}'.format(component))
+                    LicenseController._logger.debug('No validate nor apply functions found for {0}'.format(component))
                     result[component] = False
             return result
         except Exception, ex:
-            logger.exception('Error validating license: {0}'.format(ex))
+            LicenseController._logger.exception('Error validating license: {0}'.format(ex))
             raise
 
     @staticmethod
@@ -132,7 +128,7 @@ class LicenseController(object):
                 client = clients[storagerouter]
                 client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
         except Exception, ex:
-            logger.exception('Error applying license: {0}'.format(ex))
+            LicenseController._logger.exception('Error applying license: {0}'.format(ex))
             return None
 
     @staticmethod
@@ -166,32 +162,17 @@ class LicenseController(object):
     @staticmethod
     @add_hooks('setup', 'extranode')
     def add_extra_node(**kwargs):
+        """
+        Add extra node hook
+        :param kwargs: Extra parameters
+        :return: None
+        """
         ip = kwargs['cluster_ip']
         license_contents = []
         for lic in LicenseList.get_licenses():
             license_contents.append(lic.hash)
         client = SSHClient(ip)
         client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
-
-    @staticmethod
-    @celery.task(name='ovs.license.register')
-    def register(name, email, company, phone, newsletter):
-        """
-        Registers the environment
-        """
-        SupportAgent().run()  # Execute a single heartbeat run
-        client = OVSClient('monitoring.openvstorage.com', 443, credentials=None, verify=True, version=1)
-        task_id = client.post('/support/register/',
-                              data={'cluster_id': EtcdConfiguration.get('/ovs/framework/cluster_id'),
-                                    'name': name,
-                                    'email': email,
-                                    'company': company,
-                                    'phone': phone,
-                                    'newsletter': newsletter,
-                                    'register_only': True})
-        if task_id:
-            client.wait_for_task(task_id, timeout=120)
-        EtcdConfiguration.set('/ovs/framework/registered', True)
 
     @staticmethod
     def _encode(data):

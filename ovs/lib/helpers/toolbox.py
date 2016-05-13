@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,7 +35,7 @@ class Toolbox(object):
 
     regex_ip = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
     regex_guid = re.compile('^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$')
-    regex_vpool = re.compile('^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$')
+    regex_vpool = re.compile('^[0-9a-z][\-a-z0-9]{1,20}[a-z0-9]$')
     regex_preset = re.compile('^[0-9a-zA-Z][a-zA-Z0-9]{1,18}[a-zA-Z0-9]$')
     regex_mountpoint = re.compile('^(/[a-zA-Z0-9\-_\.]+)+/?$')
     compiled_regex_type = type(re.compile('some_regex'))
@@ -50,9 +50,9 @@ class Toolbox(object):
         functions = []
         path = '{0}/../'.format(os.path.dirname(__file__))
         for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py') and filename != '__init__.py':
+            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
+                module = imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(module):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name \
@@ -71,8 +71,14 @@ class Toolbox(object):
         """
         Verify whether the actual parameters match the required parameters
         :param required_params: Required parameters which actual parameters have to meet
+        :type required_params: dict
+
         :param actual_params: Actual parameters to check for validity
+        :type actual_params: dict
+
         :param exact_match: Keys of both dictionaries must be identical
+        :type exact_match: bool
+
         :return: None
         """
         error_messages = []
@@ -95,9 +101,10 @@ class Toolbox(object):
                 error_messages.append('Missing required param "{0}" in actual parameters'.format(required_key))
                 continue
 
+            mandatory_or_optional = 'Optional' if optional is True else 'Mandatory'
             actual_value = actual_params[required_key]
             if HelperToolbox.check_type(actual_value, expected_type)[0] is False:
-                error_messages.append('Required param "{0}" is of type "{1}" but we expected type "{2}"'.format(required_key, type(actual_value), expected_type))
+                error_messages.append('{0} param "{1}" is of type "{2}" but we expected type "{3}"'.format(mandatory_or_optional, required_key, type(actual_value), expected_type))
                 continue
 
             if expected_value is None:
@@ -107,22 +114,22 @@ class Toolbox(object):
                 if type(expected_value) == Toolbox.compiled_regex_type:  # List of strings which need to match regex
                     for item in actual_value:
                         if not re.match(expected_value, item):
-                            error_messages.append('Required param "{0}" has an item "{1}" which does not match regex "{2}"'.format(required_key, item, expected_value.pattern))
+                            error_messages.append('{0} param "{1}" has an item "{2}" which does not match regex "{3}"'.format(mandatory_or_optional, required_key, item, expected_value.pattern))
             elif expected_type == dict:
                 Toolbox.verify_required_params(expected_value, actual_params[required_key])
             elif expected_type == int:
                 if isinstance(expected_value, list) and actual_value not in expected_value:
-                    error_messages.append('Required param "{0}" with value "{1}" should be 1 of the following: {2}'.format(required_key, actual_value, expected_value))
+                    error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
                 if isinstance(expected_value, dict):
                     minimum = expected_value.get('min', sys.maxint * -1)
                     maximum = expected_value.get('max', sys.maxint)
                     if not minimum <= actual_value <= maximum:
-                        error_messages.append('Required param "{0}" with value "{1}" should be in range: {2} - {3}'.format(required_key, actual_value, minimum, maximum))
+                        error_messages.append('{0} param "{1}" with value "{2}" should be in range: {3} - {4}'.format(mandatory_or_optional, required_key, actual_value, minimum, maximum))
             else:
                 if HelperToolbox.check_type(expected_value, list)[0] is True and actual_value not in expected_value:
-                    error_messages.append('Required param "{0}" with value "{1}" should be 1 of the following: {2}'.format(required_key, actual_value, expected_value))
+                    error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
                 elif HelperToolbox.check_type(expected_value, Toolbox.compiled_regex_type)[0] is True and not re.match(expected_value, actual_value):
-                    error_messages.append('Required param "{0}" with value "{1}" does not match regex "{2}"'.format(required_key, actual_value, expected_value.pattern))
+                    error_messages.append('{0} param "{1}" with value "{2}" does not match regex "{3}"'.format(mandatory_or_optional, required_key, actual_value, expected_value.pattern))
         if error_messages:
             raise RuntimeError('\n' + '\n'.join(error_messages))
 
@@ -197,3 +204,24 @@ class Toolbox(object):
         else:
             logger.debug('  {0:<15} - Service {1} {2}'.format(client.ip, name, action))
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
+
+    @staticmethod
+    def wait_for_service(client, name, status, logger):
+        """
+        Wait for service to enter status
+        :param client: SSHClient to run commands
+        :param name: name of service
+        :param status: True - running/False - not running
+        :param logger: Logging object
+        """
+        tries = 10
+        while tries > 0:
+            service_status = ServiceManager.get_service_status(name, client)
+            if service_status == status:
+                break
+            logger.debug('... waiting for service {0}'.format(name))
+            tries -= 1
+            time.sleep(10 - tries)
+        service_status, output = ServiceManager.get_service_status(name, client, True)
+        if service_status != status:
+            raise RuntimeError('Service {0} does not have expected status: {1}'.format(name, output))

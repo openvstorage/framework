@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,14 +21,13 @@ from ovs.extensions.os.ubuntu import Ubuntu
 from ovs.extensions.os.centos import Centos
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='osmanager')
-
 
 class OSManager(object):
     """
     Factory class returning specialized classes
     """
     ImplementationClass = None
+    _logger = LogHandler.get('extensions', name='osmanager')
 
     class MetaClass(type):
         """
@@ -51,7 +50,7 @@ class OSManager(object):
                     else:
                         raise RuntimeError('There was no known OSManager detected')
                 except Exception as ex:
-                    logger.exception('Error loading OSManager: {0}'.format(ex))
+                    OSManager._logger.exception('Error loading OSManager: {0}'.format(ex))
                     raise
             return getattr(OSManager.ImplementationClass, item)
 

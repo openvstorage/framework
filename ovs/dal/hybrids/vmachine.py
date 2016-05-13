@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +15,14 @@
 """
 VMachine module
 """
+import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
-from ovs.extensions.hypervisor.factory import Factory as hvFactory
-import time
+from ovs.extensions.hypervisor.factory import Factory
 
 
 class VMachine(DataObject):
@@ -90,7 +89,7 @@ class VMachine(DataObject):
         """
         if self.hypervisor_id is None or self.pmachine is None:
             return 'UNKNOWN'
-        hv = hvFactory.get(self.pmachine)
+        hv = Factory.get(self.pmachine)
         try:
             return hv.get_state(self.hypervisor_id)
         except:
@@ -116,7 +115,7 @@ class VMachine(DataObject):
         """
         Aggregates the Stored Data of each vDisk of the vMachine.
         """
-        return sum([vdisk.info['stored'] for vdisk in self.vdisks])
+        return self.statistics['stored']
 
     def _dtl_mode(self):
         """
@@ -139,12 +138,11 @@ class VMachine(DataObject):
         storagerouter_guids = set()
         from ovs.dal.hybrids.storagedriver import StorageDriver
         storagedriver_ids = [vdisk.storagedriver_id for vdisk in self.vdisks if vdisk.storagedriver_id is not None]
-        storagedrivers = DataList({'object': StorageDriver,
-                                   'data': DataList.select.GUIDS,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': [('storagedriver_id', DataList.operator.IN, storagedriver_ids)]}}).data
-        for storagedriver in DataObjectList(storagedrivers, StorageDriver):
-            storagerouter_guids.add(storagedriver.storagerouter_guid)
+        sds = DataList(StorageDriver,
+                       {'type': DataList.where_operator.AND,
+                        'items': [('storagedriver_id', DataList.operator.IN, storagedriver_ids)]})
+        for sd in sds:
+            storagerouter_guids.add(sd.storagerouter_guid)
         return list(storagerouter_guids)
 
     def _vpools_guids(self):

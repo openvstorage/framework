@@ -1,11 +1,10 @@
-#!/usr/bin/env python2
-#  Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,18 +15,14 @@
 """
 Basic test module
 """
-import sys
-from unittest import TestCase
-from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
-from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
-from ovs.dal.tests.mockups import FactoryModule, StorageDriver
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+import unittest
 from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations import RelationMapper
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
-class Hybrid(TestCase):
+class Hybrid(unittest.TestCase):
     """
     The basic unittest suite will test all basic functionality of the DAL framework
     It will also try accessing all dynamic properties of all hybrids making sure
@@ -41,33 +36,17 @@ class Hybrid(TestCase):
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        # Replace mocked classes
-        sys.modules['ovs.extensions.hypervisor.factory'] = FactoryModule
-        sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriver
+        cls.persistent = PersistentFactory.get_client()
+        cls.persistent.clean()
+        cls.volatile = VolatileFactory.get_client()
+        cls.volatile.clean()
 
-        PersistentFactory.store = DummyPersistentStore()
-        PersistentFactory.store.clean()
-        PersistentFactory.store.clean()
-        VolatileFactory.store = DummyVolatileStore()
-        VolatileFactory.store.clean()
-        VolatileFactory.store.clean()
-
-    @classmethod
-    def setUp(cls):
+    def setUp(self):
         """
         (Re)Sets the stores on every test
         """
-        PersistentFactory.store = DummyPersistentStore()
-        PersistentFactory.store.clean()
-        VolatileFactory.store = DummyVolatileStore()
-        VolatileFactory.store.clean()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Clean up the unittest
-        """
-        pass
+        self.persistent.clean()
+        self.volatile.clean()
 
     def test_objectproperties(self):
         """
@@ -133,6 +112,7 @@ class Hybrid(TestCase):
             missing_metadata = []
             for found_prop in properties:
                 found = found_prop in [prop.name for prop in cls._properties] \
+                    or found_prop in (cls._fixed_properties if hasattr(cls, '_fixed_properties') else []) \
                     or found_prop in [relation.name for relation in cls._relations] \
                     or found_prop in ['{0}_guid'.format(relation.name) for relation in cls._relations] \
                     or found_prop in [dynamic.name for dynamic in cls._dynamics] \
@@ -146,9 +126,3 @@ class Hybrid(TestCase):
             self.assertEqual(len(missing_metadata), 0,
                              'Missing metadata for properties in {0}: {1}'.format(cls.__name__, missing_metadata))
             instance.delete()
-
-if __name__ == '__main__':
-    import unittest
-    suite = unittest.TestLoader().loadTestsFromTestCase(Hybrid)
-    result = not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful()
-    sys.exit(result)

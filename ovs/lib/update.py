@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,9 +19,9 @@ Module for UpdateController
 import os
 import json
 import subprocess
-from ovs.extensions.generic.filemutex import FileMutex
+from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.filemutex import NoLockAvailableException
-from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.migration.migrator import Migrator
 from ovs.extensions.packages.package import PackageManager
@@ -30,14 +30,13 @@ from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('lib', name='update')
-logger.logger.propagate = False
-
 
 class UpdateController(object):
     """
     This class contains all logic for updating an environment
     """
+    _logger = LogHandler.get('lib', name='update')
+    _logger.logger.propagate = False
     model_services = ['memcached', 'arakoon-ovsdb']
 
     @staticmethod
@@ -46,12 +45,12 @@ class UpdateController(object):
         Update the framework
         :return: None
         """
-        file_mutex = FileMutex('system_update', wait=2)
+        filemutex = file_mutex('system_update', wait=2)
         upgrade_file = '/etc/ready_for_upgrade'
         upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
         ssh_clients = []
         try:
-            file_mutex.acquire()
+            filemutex.acquire()
             UpdateController._log_message('+++ Starting framework update +++')
 
             from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -144,7 +143,7 @@ class UpdateController(object):
                 UpdateController._change_services_state(services=services_to_restart,
                                                         ssh_clients=ssh_clients,
                                                         action='start')
-                UpdateController._log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients])),
+                UpdateController._log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients]), this_client.ip),
                                               this_client.ip,
                                               'error')
                 return
@@ -154,12 +153,12 @@ class UpdateController(object):
                 try:
                     UpdateController._log_message('Started code migration', client.ip)
                     try:
-                        with Remote(client.ip, [Migrator]) as remote:
-                            remote.Migrator.migrate(master_ips, extra_ips)
+                        with remote(client.ip, [Migrator]) as rem:
+                            rem.Migrator.migrate(master_ips, extra_ips)
                     except EOFError as eof:
                         UpdateController._log_message('EOFError during code migration, retrying {0}'.format(eof), client.ip, 'warning')
-                        with Remote(client.ip, [Migrator]) as remote:
-                            remote.Migrator.migrate(master_ips, extra_ips)
+                        with remote(client.ip, [Migrator]) as rem:
+                            rem.Migrator.migrate(master_ips, extra_ips)
                     UpdateController._log_message('Finished code migration', client.ip)
                 except Exception as ex:
                     UpdateController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
@@ -183,7 +182,8 @@ class UpdateController(object):
             UpdateController._log_message('Started model migration', client_ip=this_client.ip)
             try:
                 from ovs.dal.helpers import Migration
-                Migration.migrate()
+                with remote(ssh_clients[0].ip, [Migration]) as rem:
+                    rem.Migration.migrate()
                 UpdateController._log_message('Finished model migration', client_ip=this_client.ip)
             except Exception as ex:
                 UpdateController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
@@ -194,12 +194,12 @@ class UpdateController(object):
             # Post upgrade actions
             UpdateController._log_message('Executing post upgrade actions', client_ip=this_client.ip)
             for client in ssh_clients:
-                with Remote(client.ip, [Toolbox, SSHClient]) as remote:
-                    for function in remote.Toolbox.fetch_hooks('update', 'postupgrade'):
+                with remote(client.ip, [Toolbox, SSHClient]) as rem:
+                    for function in rem.Toolbox.fetch_hooks('update', 'postupgrade'):
                         UpdateController._log_message('Executing action {0}'.format(function.__name__),
                                                       client_ip=client.ip)
                         try:
-                            function(remote.SSHClient(client.ip, username='root'))
+                            function(rem.SSHClient(client.ip, username='root'))
                             UpdateController._log_message('Executing action {0} completed'.format(function.__name__),
                                                           client_ip=client.ip)
                         except Exception as ex:
@@ -225,7 +225,7 @@ class UpdateController(object):
             UpdateController._log_message('Error during framework update: {0}'.format(ex), severity='error')
             UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
         finally:
-            file_mutex.release()
+            filemutex.release()
 
     @staticmethod
     def update_volumedriver():
@@ -233,12 +233,12 @@ class UpdateController(object):
         Update the volumedriver
         :return: None
         """
-        file_mutex = FileMutex('system_update', wait=2)
+        filemutex = file_mutex('system_update', wait=2)
         upgrade_file = '/etc/ready_for_upgrade'
         upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
         ssh_clients = []
         try:
-            file_mutex.acquire()
+            filemutex.acquire()
             UpdateController._log_message('+++ Starting volumedriver update +++')
 
             from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -319,7 +319,7 @@ class UpdateController(object):
                 UpdateController._change_services_state(services=services_to_restart,
                                                         ssh_clients=ssh_clients,
                                                         action='start')
-                UpdateController._log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients])),
+                UpdateController._log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients]), this_client.ip),
                                               this_client.ip,
                                               'error')
                 return
@@ -352,18 +352,18 @@ class UpdateController(object):
             UpdateController._log_message('Error during volumedriver update: {0}'.format(ex), severity='error')
             UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
         finally:
-            file_mutex.release()
+            filemutex.release()
 
     @staticmethod
     def _log_message(message, client_ip=None, severity='info'):
         if client_ip is not None:
             message = '{0:<15}: {1}'.format(client_ip, message)
         if severity == 'info':
-            logger.info(message, print_msg=True)
+            UpdateController._logger.info(message, print_msg=True)
         elif severity == 'warning':
-            logger.warning(message, print_msg=True)
+            UpdateController._logger.warning(message, print_msg=True)
         elif severity == 'error':
-            logger.error(message, print_msg=True)
+            UpdateController._logger.error(message, print_msg=True)
 
     @staticmethod
     def _remove_lock_files(files, ssh_clients):
@@ -390,7 +390,7 @@ class UpdateController(object):
                         Toolbox.change_service_state(client=ssh_client,
                                                      name=service_name,
                                                      state=action,
-                                                     logger=logger)
+                                                     logger=UpdateController._logger)
                         UpdateController._log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started' if action == 'start' else 'Restarted', service_name), ssh_client.ip)
                 except Exception as exc:
                     UpdateController._log_message('Something went wrong {0} service {1}: {2}'.format(description, service_name, exc), ssh_client.ip, severity='warning')
@@ -409,32 +409,32 @@ class UpdateController(object):
         # If we can reach Etcd with a valid config, and there's still an old config file present, delete it
         from ovs.extensions.db.etcd.configuration import EtcdConfiguration
         path = '/opt/OpenvStorage/config/ovs.json'
-        if EtcdConfiguration.exists('/ovs/framework/registered') and client.file_exists(path):
+        if EtcdConfiguration.exists('/ovs/framework/cluster_id') and client.file_exists(path):
             client.file_delete(path)
         # Migrate volumedriver & albaproxy configuration files
         import uuid
         from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
         from ovs.dal.lists.storagedriverlist import StorageDriverList
         from ovs.extensions.generic.system import System
-        with Remote(client.ip, [StorageDriverConfiguration, os, open, json, System], username='ovs') as remote:
+        with remote(client.ip, [StorageDriverConfiguration, os, open, json, System], username='ovs') as rem:
             configuration_dir = '{0}/storagedriver/storagedriver'.format(EtcdConfiguration.get('/ovs/framework/paths|cfgdir'))
-            host_id = remote.System.get_my_machine_id()
-            if remote.os.path.exists(configuration_dir):
-                for storagedriver in StorageDriverList.get_storagedrivers_by_storagerouter(remote.System.get_my_storagerouter().guid):
+            host_id = rem.System.get_my_machine_id()
+            if rem.os.path.exists(configuration_dir):
+                for storagedriver in StorageDriverList.get_storagedrivers_by_storagerouter(rem.System.get_my_storagerouter().guid):
                     vpool = storagedriver.vpool
                     if storagedriver.alba_proxy is not None:
                         config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, storagedriver.alba_proxy.guid)
                         # ABM config
                         abm_config = '{0}/{1}_alba.cfg'.format(configuration_dir, vpool.name)
-                        if remote.os.path.exists(abm_config):
-                            with remote.open(abm_config) as config_file:
+                        if rem.os.path.exists(abm_config):
+                            with rem.open(abm_config) as config_file:
                                 EtcdConfiguration.set(config_tree.format('abm'), config_file.read(), raw=True)
-                            remote.os.remove(abm_config)
+                            rem.os.remove(abm_config)
                         # Albaproxy config
                         alba_config = '{0}/{1}_alba.json'.format(configuration_dir, vpool.name)
-                        if remote.os.path.exists(alba_config):
-                            with remote.open(alba_config) as config_file:
-                                config = remote.json.load(config_file)
+                        if rem.os.path.exists(alba_config):
+                            with rem.open(alba_config) as config_file:
+                                config = rem.json.load(config_file)
                                 del config['albamgr_cfg_file']
                                 config['albamgr_cfg_url'] = 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm'))
                                 EtcdConfiguration.set(config_tree.format('main'), json.dumps(config, indent=4), raw=True)
@@ -443,20 +443,20 @@ class UpdateController(object):
                                       'PROXY_ID': storagedriver.alba_proxy.guid}
                             alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
                             ServiceManager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
-                            remote.os.remove(alba_config)
+                            rem.os.remove(alba_config)
                     # Volumedriver config
                     current_file = '{0}/{1}.json'.format(configuration_dir, vpool.name)
-                    if remote.os.path.exists(current_file):
+                    if rem.os.path.exists(current_file):
                         readcache_size = 0
-                        with remote.open(current_file) as config_file:
-                            config = remote.json.load(config_file)
+                        with rem.open(current_file) as config_file:
+                            config = rem.json.load(config_file)
                         config['distributed_transaction_log'] = {}
                         config['distributed_transaction_log']['dtl_transport'] = config['failovercache']['failovercache_transport']
                         config['distributed_transaction_log']['dtl_path'] = config['failovercache']['failovercache_path']
                         config['volume_manager']['dtl_throttle_usecs'] = config['volume_manager']['foc_throttle_usecs']
                         del config['failovercache']
                         del config['volume_manager']['foc_throttle_usecs']
-                        sdc = remote.StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
+                        sdc = rem.StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
                         sdc.configuration = config
                         sdc.save(reload_config=False)
                         for mountpoint in config['content_addressed_cache']['clustercache_mount_points']:
@@ -483,11 +483,11 @@ class UpdateController(object):
                             template_name = 'ovs-volumedriver'
                         voldrv_service = 'ovs-volumedriver_{0}'.format(vpool.name)
                         ServiceManager.add_service(name=template_name, params=params, client=client, target_name=voldrv_service, additional_dependencies=dependencies)
-                        remote.os.remove(current_file)
+                        rem.os.remove(current_file)
                     # Ganesha config, if available
                     current_file = '{0}/{1}_ganesha.conf'.format(configuration_dir, vpool.name)
-                    if remote.os.path.exists(current_file):
-                        sdc = remote.StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
+                    if rem.os.path.exists(current_file):
+                        sdc = rem.StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
                         contents = ''
                         for template in ['ganesha-core', 'ganesha-export']:
                             contents += client.file_read('/opt/OpenvStorage/config/templates/{0}.conf'.format(template))

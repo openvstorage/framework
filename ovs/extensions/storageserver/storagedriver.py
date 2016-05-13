@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,39 +16,41 @@
 Wrapper class for the storagedriver client of the voldrv team
 """
 
-import os
-import json
 import copy
+import json
+import unittest
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.remote import remote
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import ClusterContact
 from volumedriver.storagerouter.storagerouterclient import DTLMode
 from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient as LSRClient
-from volumedriver.storagerouter.storagerouterclient import MDSClient
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
 from volumedriver.storagerouter.storagerouterclient import ReadCacheBehaviour
 from volumedriver.storagerouter.storagerouterclient import ReadCacheMode
 from volumedriver.storagerouter.storagerouterclient import Statistics
-from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient
 from volumedriver.storagerouter.storagerouterclient import VolumeInfo
-
-
-logger = LogHandler.get('extensions', name='storagedriver')
-storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
-# noinspection PyArgumentList
-storagerouterclient.Logger.enableLogging()
+if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+    from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient as SRClient
+    from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient as MDSClient
+else:
+    from volumedriver.storagerouter.storagerouterclient import MDSClient
+    from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient
 
 client_vpool_cache = {}
-client_storagedriver_cache = {}
 mdsclient_service_cache = {}
 
 
+# noinspection PyArgumentList
 class StorageDriverClient(object):
     """
     Client to access storagedriver client
     """
+    storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+    # noinspection PyArgumentList
+    storagerouterclient.Logger.enableLogging()
+
     VOLDRV_DTL_SYNC = 'Synchronous'
     VOLDRV_DTL_ASYNC = 'Asynchronous'
     VOLDRV_NO_CACHE = 'NoCache'
@@ -71,6 +73,9 @@ class StorageDriverClient(object):
     FRAMEWORK_LOCATION_BASED = 'non_dedupe'
     FRAMEWORK_DTL_TRANSPORT_TCP = 'tcp'
     FRAMEWORK_DTL_TRANSPORT_RSOCKET = 'rdma'
+
+    METADATA_CACHE_PAGE_SIZE = 256 * 24
+    DEFAULT_METADATA_CACHE_SIZE = 8192 * METADATA_CACHE_PAGE_SIZE
 
     VDISK_CACHE_MAP = {FRAMEWORK_NO_CACHE: ReadCacheBehaviour.NO_CACHE,
                        FRAMEWORK_CACHE_ON_READ: ReadCacheBehaviour.CACHE_ON_READ,
@@ -129,7 +134,7 @@ class StorageDriverClient(object):
     STAT_KEYS = ['backend_data_read', 'backend_data_written', 'backend_read_operations', 'backend_write_operations',
                  'cluster_cache_hits', 'cluster_cache_misses', 'data_read', 'data_written', 'metadata_store_hits',
                  'metadata_store_misses', 'read_operations', 'sco_cache_hits', 'sco_cache_misses', 'write_operations',
-                 '4k_read_operations', '4k_write_operations']
+                 '4k_read_operations', '4k_write_operations', 'stored']
     STAT_KEYS.extend(STAT_SUMS.keys())
 
     def __init__(self):
@@ -145,8 +150,7 @@ class StorageDriverClient(object):
         Loads and returns the client
         :param vpool: vPool for which the StorageRouterClient needs to be loaded
         """
-
-        key = '{0}_{1}'.format(vpool.guid, '_'.join(guid for guid in vpool.storagedrivers_guids))
+        key = vpool.identifier
         if key not in client_vpool_cache:
             cluster_contacts = []
             for storagedriver in vpool.storagedrivers[:3]:
@@ -160,6 +164,10 @@ class MetadataServerClient(object):
     """
     Builds a MDSClient
     """
+    _logger = LogHandler.get('extensions', name='storagedriver')
+    storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+    # noinspection PyArgumentList
+    storagerouterclient.Logger.enableLogging()
 
     def __init__(self):
         """
@@ -173,6 +181,8 @@ class MetadataServerClient(object):
         Loads a MDSClient
         :param service: Service for which the MDSClient needs to be loaded
         """
+        if service.storagerouter is None:
+            raise ValueError('MDS service {0} does not have a Storage Router linked to it'.format(service.name))
 
         key = service.guid
         if key not in mdsclient_service_cache:
@@ -181,7 +191,7 @@ class MetadataServerClient(object):
                 client = MDSClient(MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0]))
                 mdsclient_service_cache[key] = client
             except RuntimeError as ex:
-                logger.error('Error loading MDSClient on {0}: {1}'.format(service.storagerouter.ip, ex))
+                MetadataServerClient._logger.error('Error loading MDSClient on {0}: {1}'.format(service.storagerouter.ip, ex))
                 return None
         return mdsclient_service_cache[key]
 
@@ -299,6 +309,12 @@ class StorageDriverConfiguration(object):
 
         if config_type != 'storagedriver':
             raise RuntimeError('Invalid configuration type. Allowed: storagedriver')
+
+        storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+        # noinspection PyArgumentList
+        storagerouterclient.Logger.enableLogging()
+
+        self._logger = LogHandler.get('extensions', name='storagedriver')
         self.config_type = config_type
         self.configuration = {}
         self.path = '/ovs/vpools/{0}/hosts/{1}/config/{{0}}'.format(vpool_guid, storagedriver_id)
@@ -324,7 +340,7 @@ class StorageDriverConfiguration(object):
                 if EtcdConfiguration.exists(self.path.format(key)):
                     self.configuration[key] = json.loads(EtcdConfiguration.get(self.path.format(key), raw=True))
         else:
-            logger.debug('Could not find config {0}, a new one will be created'.format(self.path.format('')))
+            self._logger.debug('Could not find config {0}, a new one will be created'.format(self.path.format('')))
         self.dirty_entries = []
 
     def save(self, client=None, reload_config=True):
@@ -340,22 +356,22 @@ class StorageDriverConfiguration(object):
         if self.config_type == 'storagedriver' and reload_config is True:
             if len(self.dirty_entries) > 0:
                 if client is None:
-                    logger.info('Applying local storagedriver configuration changes')
+                    self._logger.info('Applying local storagedriver configuration changes')
                     changes = LSRClient(self.remote_path).update_configuration(self.remote_path)
                 else:
-                    logger.info('Applying storagedriver configuration changes on {0}'.format(client.ip))
-                    with Remote(client.ip, [LSRClient]) as remote:
-                        changes = copy.deepcopy(remote.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
+                    self._logger.info('Applying storagedriver configuration changes on {0}'.format(client.ip))
+                    with remote(client.ip, [LSRClient]) as rem:
+                        changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
                 for change in changes:
                     if change['param_name'] not in self.dirty_entries:
                         raise RuntimeError('Unexpected configuration change: {0}'.format(change['param_name']))
-                    logger.info('Changed {0} from "{1}" to "{2}"'.format(change['param_name'], change['old_value'], change['new_value']))
+                    self._logger.info('Changed {0} from "{1}" to "{2}"'.format(change['param_name'], change['old_value'], change['new_value']))
                     self.dirty_entries.remove(change['param_name'])
-                logger.info('Changes applied')
+                self._logger.info('Changes applied')
                 if len(self.dirty_entries) > 0:
-                    logger.warning('Following changes were not applied: {0}'.format(', '.join(self.dirty_entries)))
+                    self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self.dirty_entries)))
             else:
-                logger.debug('No need to apply changes, nothing changed')
+                self._logger.debug('No need to apply changes, nothing changed')
         self.is_new = False
         self.dirty_entries = []
 
@@ -435,14 +451,21 @@ class StorageDriverConfiguration(object):
             self.configuration[section][item] = value
 
 
-class GaneshaConfiguration:
-
+class GaneshaConfiguration(object):
+    """
+    Ganesha Configuration
+    """
     def __init__(self):
         config_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
-        self._config_corefile = os.path.join(config_dir, 'templates', 'ganesha-core.conf')
-        self._config_exportfile = os.path.join(config_dir, 'templates', 'ganesha-export.conf')
+        self._config_corefile = '/'.join([config_dir, 'templates', 'ganesha-core.conf'])
+        self._config_exportfile = '/'.join([config_dir, 'templates', 'ganesha-export.conf'])
 
     def generate_config(self, target_file, params):
+        """
+        Generate configuration
+        :param target_file: Configuration file
+        :param params: Parameters
+        """
         with open(self._config_corefile, 'r') as core_config_file:
             config = core_config_file.read()
         with open(self._config_exportfile, 'r') as export_section_file:

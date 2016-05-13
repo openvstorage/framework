@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,7 @@
 UserList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobject import DataObjectList
 from ovs.dal.hybrids.user import User
-from ovs.dal.helpers import Descriptor
 
 
 class UserList(object):
@@ -31,14 +29,10 @@ class UserList(object):
         """
         Returns a single User for the given username. Returns None if no user was found
         """
-        # pylint: disable=line-too-long
-        users = DataList({'object': User,
-                          'data': DataList.select.GUIDS,
-                          'query': {'type': DataList.where_operator.AND,
-                                    'items': [('username', DataList.operator.EQUALS, username)]}}).data  # noqa
-        # pylint: enable=line-too-long
+        users = DataList(User, {'type': DataList.where_operator.AND,
+                                'items': [('username', DataList.operator.EQUALS, username)]})
         if len(users) == 1:
-            return Descriptor(User, users[0]).get_object(True)
+            return users[0]
         return None
 
     @staticmethod
@@ -46,8 +40,5 @@ class UserList(object):
         """
         Returns a list of all Users
         """
-        users = DataList({'object': User,
-                          'data': DataList.select.GUIDS,
-                          'query': {'type': DataList.where_operator.AND,
-                                    'items': []}}).data
-        return DataObjectList(users, User)
+        return DataList(User, {'type': DataList.where_operator.AND,
+                               'items': []})

@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,6 @@ from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.vmachine import VMachineController
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.decorators import required_roles, load, return_list, return_object, return_task, log
@@ -60,10 +59,7 @@ class VMachineViewSet(viewsets.ViewSet):
                         vmachines.append(vdisk.vmachine)
         elif query is not None:
             query = json.loads(query)
-            query_result = DataList({'object': VMachine,
-                                     'data': DataList.select.GUIDS,
-                                     'query': query}).data
-            vmachines = DataObjectList(query_result, VMachine)
+            vmachines = DataList(VMachine, query)
         else:
             vmachines = VMachineList.get_vmachines()
         return vmachines

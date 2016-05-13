@@ -1,16 +1,21 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""
+SSHClient module
+Used for remote or local command execution
+"""
 
 import os
 import re
@@ -20,17 +25,15 @@ import glob
 import json
 import time
 import types
+import socket
 import logging
 import tempfile
-import paramiko
-import socket
-from subprocess import check_output, CalledProcessError, PIPE, Popen
+import unittest
 from ovs.dal.helpers import Descriptor
 from ovs.dal.hybrids.storagerouter import StorageRouter
-from ovs.extensions.generic.remote import Remote
+from ovs.extensions.generic.remote import remote
 from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('extensions', name='sshclient')
+from subprocess import check_output, CalledProcessError, PIPE, Popen
 
 
 def connected():
@@ -86,6 +89,7 @@ class SSHClient(object):
     Remote/local client
     """
 
+    _logger = LogHandler.get('extensions', name='sshclient')
     client_cache = {}
     IP_REGEX = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
 
@@ -106,16 +110,18 @@ class SSHClient(object):
             raise ValueError('The endpoint parameter should be either an ip address or a StorageRouter')
 
         self.ip = ip
-        local_ips = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
-        self.local_ips = [lip.strip() for lip in local_ips]
+        self.client = None
+        self.local_ips = [lip.strip() for lip in check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()]
         self.is_local = self.ip in self.local_ips
+        self.password = password
+        self._unittest_mode = hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True
 
-        if self.is_local is False and storagerouter is not None:
+        if self.is_local is False and storagerouter is not None and self._unittest_mode is False:
             process_heartbeat = storagerouter.heartbeats.get('process')
             if process_heartbeat is not None:
                 if time.time() - process_heartbeat > 300:
                     message = 'StorageRouter {0} process heartbeat > 300s'.format(ip)
-                    logger.error(message)
+                    SSHClient._logger.error(message)
                     raise UnableToConnectException(message)
 
         current_user = check_output('whoami', shell=True).strip()
@@ -125,18 +131,21 @@ class SSHClient(object):
             self.username = username
             if username != current_user:
                 self.is_local = False  # If specified user differs from current executing user, we always use the paramiko SSHClient
-        self.password = password
 
-        self.client = None
+        if self._unittest_mode is True:
+            self.is_local = True
+
         if not self.is_local:
             logging.getLogger('paramiko').setLevel(logging.WARNING)
             key = '{0}@{1}'.format(self.ip, self.username)
             if key not in SSHClient.client_cache:
+                import paramiko
                 client = paramiko.SSHClient()
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.is_connected = types.MethodType(is_connected, client)
                 SSHClient.client_cache[key] = client
             self.client = SSHClient.client_cache[key]
+        self._connect()
 
     def __del__(self):
         """
@@ -167,7 +176,7 @@ class SSHClient(object):
         except socket.error as ex:
             if 'No route to host' in str(ex):
                 message = 'SocketException: No route to host {0}'.format(self.ip)
-                logger.error(message)
+                SSHClient._logger.error(message)
                 raise UnableToConnectException(message)
             raise
 
@@ -202,7 +211,7 @@ class SSHClient(object):
                     process = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
                 except OSError as ose:
                     if suppress_logging is False:
-                        logger.error('Command: "{0}" failed with output: "{1}"'.format(command, str(ose)))
+                        SSHClient._logger.error('Command: "{0}" failed with output: "{1}"'.format(command, str(ose)))
                     raise CalledProcessError(1, command, str(ose))
                 out, err = process.communicate()
                 out = out.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
@@ -211,14 +220,14 @@ class SSHClient(object):
                 if exit_code != 0:  # Raise same error as check_output
                     raise CalledProcessError(exit_code, command, err)
                 if debug:
-                    logger.debug('stdout: {0}'.format(out))
-                    logger.debug('stderr: {0}'.format(err))
+                    SSHClient._logger.debug('stdout: {0}'.format(out))
+                    SSHClient._logger.debug('stderr: {0}'.format(err))
                     return out.strip(), err
                 else:
                     return out.strip()
             except CalledProcessError as cpe:
                 if suppress_logging is False:
-                    logger.error('Command: "{0}" failed with output: "{1}"'.format(command, cpe.output))
+                    SSHClient._logger.error('Command: "{0}" failed with output: "{1}"'.format(command, cpe.output))
                 raise cpe
         else:
             _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
@@ -227,7 +236,7 @@ class SSHClient(object):
                 stderr = ''.join(stderr.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 stdout = ''.join(stdout.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 if suppress_logging is False:
-                    logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
+                    SSHClient._logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
                 raise CalledProcessError(exit_code, command, stderr)
             if debug:
                 return '\n'.join(line.rstrip() for line in stdout).strip(), stderr
@@ -268,9 +277,9 @@ class SSHClient(object):
                     if os.path.exists(directory):
                         for dirpath, dirnames, filenames in os.walk(directory, topdown=False, followlinks=follow_symlinks):
                             for filename in filenames:
-                                os.remove(os.path.join(dirpath, filename))
+                                os.remove('/'.join([dirpath, filename]))
                             for sub_directory in dirnames:
-                                os.rmdir(os.path.join(dirpath, sub_directory))
+                                os.rmdir('/'.join([dirpath, sub_directory]))
                         os.rmdir(directory)
                 else:
                     if self.dir_exists(directory):
@@ -308,7 +317,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
                 if recursive is True:
                     for root, dirs, _ in os.walk(directory):
                         for sub_dir in dirs:
-                            os.chmod(os.path.join(root, sub_dir), mode)
+                            os.chmod('/'.join([root, sub_dir]), mode)
             else:
                 recursive_str = '-R' if recursive is True else ''
                 self.run('chmod {0} {1} {2}'.format(recursive_str, oct(mode), directory))
@@ -341,7 +350,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
                 if recursive is True:
                     for root, dirs, _ in os.walk(directory):
                         for sub_dir in dirs:
-                            os.chown(os.path.join(root, sub_dir), uid, gid)
+                            os.chown('/'.join([root, sub_dir]), uid, gid)
             else:
                 recursive_str = '-R' if recursive is True else ''
                 self.run('chown {0} {1}:{2} {3}'.format(recursive_str, user, group, directory))
@@ -444,11 +453,12 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
             if os.path.islink(path):
                 return os.path.realpath(path)
         else:
+            command = """import os, json
+if os.path.islink('{0}'):
+    print json.dumps(os.path.realpath('{0}'))""".format(path)
             try:
-                real_path = self.run('readlink {0}'.format(path), suppress_logging=True)
-                if real_path:
-                    return "/".join(path.split('/')[:-1] + [real_path])
-            except:
+                return json.loads(self.run('python -c """{0}"""'.format(command)))
+            except ValueError:
                 pass
 
     def file_read(self, filename):
@@ -510,7 +520,7 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
 print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             return json.loads(self.run('python -c """{0}"""'.format(command)))
 
-    def file_attribs(self, filename, mode):
+    def file_chmod(self, filename, mode):
         """
         Sets the mode of a remote file
         :param filename: File to chmod
@@ -521,6 +531,34 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             check_output(command, shell=True)
         else:
             self.run(command)
+
+    def file_chown(self, filenames, user, group):
+        """
+        Sets the ownership of a remote file
+        :param filenames: Files to chown
+        :param user: User to set
+        :param group: Group to set
+        :return: None
+        """
+        all_users = [user_info[0] for user_info in pwd.getpwall()]
+        all_groups = [group_info[0] for group_info in grp.getgrall()]
+
+        if user not in all_users:
+            raise ValueError('User "{0}" is unknown on the system'.format(user))
+        if group not in all_groups:
+            raise ValueError('Group "{0}" is unknown on the system'.format(group))
+
+        uid = pwd.getpwnam(user)[2]
+        gid = grp.getgrnam(group)[2]
+        if isinstance(filenames, basestring):
+            filenames = [filenames]
+        for filename in filenames:
+            if self.file_exists(filename=filename) is False:
+                continue
+            if self.is_local is True:
+                os.chown(filename, uid, gid)
+            else:
+                self.run('chown {0}:{1} {2}'.format(user, group, filename))
 
     def file_list(self, directory, abs_path=False, recursive=False):
         """
@@ -538,20 +576,39 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             for root, dirs, files in os.walk(directory):
                 for file_name in files:
                     if abs_path is True:
-                        all_files.append(os.path.join(root, file_name))
+                        all_files.append('/'.join([root, file_name]))
                     else:
                         all_files.append(file_name)
                 if recursive is False:
                     break
         else:
-            with Remote(self.ip, [os], 'root') as remote:
-                for root, dirs, files in remote.os.walk(directory):
+            with remote(self.ip, [os], 'root') as rem:
+                for root, dirs, files in rem.os.walk(directory):
                     for file_name in files:
                         if abs_path is True:
-                            all_files.append(os.path.join(root, file_name))
+                            all_files.append('/'.join([root, file_name]))
                         else:
                             all_files.append(file_name)
                     if recursive is False:
                         break
         return all_files
 
+    def is_mounted(self, path):
+        """
+        Verify whether a mountpoint is mounted
+        :param path: Path to check
+        :type path: str
+
+        :return: True if mountpoint is mounted
+        :rtype: bool
+        """
+        path = self.shell_safe(path.rstrip('/'))
+        if self.is_local is True:
+            return os.path.ismount(path)
+
+        command = """import os, json
+print json.dumps(os.path.ismount('{0}'))""".format(path)
+        try:
+            return json.loads(self.run('python -c """{0}"""'.format(command)))
+        except ValueError:
+            return False

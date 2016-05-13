@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,15 +27,19 @@ class DummyVolatileStore(object):
     _path = '/run/dummyvolatile.json'
     _storage = {}
     _timeout = {}
-    _keep_in_memory_only = False
     _data = {'t': {}, 's': {}}
 
-    @staticmethod
-    def clean():
+    def __init__(self):
+        """
+        Init method
+        """
+        self._keep_in_memory_only = False
+
+    def clean(self):
         """
         Empties the store
         """
-        if DummyVolatileStore._keep_in_memory_only is True:
+        if self._keep_in_memory_only is True:
             DummyVolatileStore._data = {'t': {}, 's': {}}
         else:
             try:
@@ -47,7 +51,7 @@ class DummyVolatileStore(object):
         """
         Reads the local json file
         """
-        if DummyVolatileStore._keep_in_memory_only is True:
+        if self._keep_in_memory_only is True:
             return DummyVolatileStore._data
 
         try:
@@ -117,7 +121,7 @@ class DummyVolatileStore(object):
         """
         Saves the local json file
         """
-        if DummyVolatileStore._keep_in_memory_only is True:
+        if self._keep_in_memory_only is True:
             DummyVolatileStore._data = data
         else:
             rawdata = json.dumps(data, sort_keys=True, indent=2)

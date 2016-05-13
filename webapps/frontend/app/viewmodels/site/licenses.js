@@ -1,10 +1,10 @@
-// Copyright 2015 iNuron NV
+// Copyright 2016 iNuron NV
 //
-// Licensed under the Open vStorage Modified Apache License (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/license
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,7 +24,7 @@ define([
         // Variables
         self.widgets        = [];
         self.shared         = shared;
-        self.guard          = { authenticated: true, registered: true };
+        self.guard          = { authenticated: true };
         self.generic        = generic;
         self.licensesHandle = {};
         self.licenseHeaders = [
@@ -42,15 +42,12 @@ define([
                 modal: true
             }));
         };
-        self.loadLicenses = function(page) {
+        self.loadLicenses = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.licensesHandle[page])) {
-                    var options = {
-                        sort: 'component,name,valid_until',
-                        page: page,
-                        contents: '_dynamics'
-                    };
-                    self.licensesHandle[page] = api.get('licenses', { queryparams: options })
+                if (generic.xhrCompleted(self.licensesHandle[options.page])) {
+                    options.sort = 'component,name,valid_until';
+                    options.contents = '_dynamics';
+                    self.licensesHandle[options.page] = api.get('licenses', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,

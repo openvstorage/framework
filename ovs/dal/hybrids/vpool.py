@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,11 @@
 """
 VPool module
 """
+import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.dal.hybrids.backendtype import BackendType
-import time
 
 
 class VPool(DataObject):
@@ -35,12 +35,33 @@ class VPool(DataObject):
                     Property('login', str, mandatory=False, doc='Login/Username for the Storage BackendType.'),
                     Property('password', str, mandatory=False, doc='Password for the Storage BackendType.'),
                     Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domain name, Zone, ...) for the Storage BackendType.'),
-                    Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.'),
+                    Property('metadata', dict, mandatory=False, doc='Metadata for the backends, as used by the Storage Drivers.'),
                     Property('rdma_enabled', bool, default=False, doc='Has the vpool been configured to use RDMA for DTL transport, which is only possible if all storagerouters are RDMA capable'),
                     Property('status', STATUSES.keys(), doc='Status of the vPool')]
     __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
-    __dynamics = [Dynamic('statistics', dict, 4, locked=True),
+    __dynamics = [Dynamic('statistics', dict, 4),
+                  Dynamic('identifier', str, 120),
                   Dynamic('stored_data', int, 60)]
+    _fixed_properties = ['storagedriver_client']
+
+    def __init__(self, *args, **kwargs):
+        """
+        Initializes a vPool, setting up its additional helpers
+        """
+        DataObject.__init__(self, *args, **kwargs)
+        self._frozen = False
+        self._storagedriver_client = None
+        self._frozen = True
+
+    @property
+    def storagedriver_client(self):
+        """
+        Client used for communication between Storage Driver and framework
+        :return: StorageDriverClient
+        """
+        if self._storagedriver_client is None:
+            self.reload_client()
+        return self._storagedriver_client
 
     def _statistics(self, dynamic):
         """
@@ -51,8 +72,8 @@ class VPool(DataObject):
         for key in StorageDriverClient.STAT_KEYS:
             statistics[key] = 0
             statistics['{0}_ps'.format(key)] = 0
-        for vdisk in self.vdisks:
-            for key, value in vdisk.fetch_statistics().iteritems():
+        for storagedriver in self.storagedrivers:
+            for key, value in storagedriver.fetch_statistics().iteritems():
                 statistics[key] += value
         statistics['timestamp'] = time.time()
         VDisk.calculate_delta(self._key, dynamic, statistics)
@@ -62,4 +83,18 @@ class VPool(DataObject):
         """
         Aggregates the Stored Data of each vDisk served by the vPool.
         """
-        return sum([disk.info['stored'] for disk in self.vdisks])
+        return self.statistics['stored']
+
+    def _identifier(self):
+        """
+        An identifier of this vPool in its current configuration state
+        """
+        return '{0}_{1}'.format(self.guid, '_'.join(self.storagedrivers_guids))
+
+    def reload_client(self):
+        """
+        Reloads the StorageDriver Client
+        """
+        self._frozen = False
+        self._storagedriver_client = StorageDriverClient.load(self)
+        self._frozen = True

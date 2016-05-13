@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,6 @@
 DiskList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.disk import Disk
 
 
@@ -30,8 +29,5 @@ class DiskList(object):
         """
         Returns a list of all Disks
         """
-        disks = DataList({'object': Disk,
-                          'data': DataList.select.GUIDS,
-                          'query': {'type': DataList.where_operator.AND,
-                                    'items': []}}).data
-        return DataObjectList(disks, Disk)
+        return DataList(Disk, {'type': DataList.where_operator.AND,
+                               'items': []})

@@ -1,11 +1,10 @@
-#!/usr/bin/env python2
-#  Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,15 +18,14 @@ Authentication test module
 import os
 import sys
 import json
-import uuid
 import time
+import uuid
 import hashlib
-from unittest import TestCase
+import unittest
+from backend.toolbox import Toolbox  # Required for the tests
 from django.http import HttpResponse
-from rest_framework.exceptions import Throttled
+from oauth2.toolbox import Toolbox as OAuth2Toolbox
 from ovs.extensions.generic import fakesleep
-from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
-from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.dal.hybrids.user import User
@@ -38,31 +36,26 @@ from ovs.dal.hybrids.j_rolegroup import RoleGroup
 from ovs.dal.hybrids.j_roleclient import RoleClient
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
-from oauth2.toolbox import Toolbox as OAuth2Toolbox
+from rest_framework.exceptions import Throttled
 from tests.mockups import Serializers
-from backend.toolbox import Toolbox  # Required for the tests
 
 
-class Decorators(TestCase):
+class Decorators(unittest.TestCase):
     """
     The decorators test suite will validate all backend decorators
     """
-
-    factory = None
-    initial_data = None
-
     @classmethod
     def setUpClass(cls):
         """
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        PersistentFactory.store = DummyPersistentStore()
-        PersistentFactory.store.clean()
-        PersistentFactory.store.clean()
-        VolatileFactory.store = DummyVolatileStore()
-        VolatileFactory.store.clean()
-        VolatileFactory.store.clean()
+        cls.factory = None
+        cls.initial_data = None
+        cls.persistent = PersistentFactory.get_client()
+        cls.persistent.clean()
+        cls.volatile = VolatileFactory.get_client()
+        cls.volatile.clean()
 
         admin_group = Group()
         admin_group.name = 'administrators'
@@ -160,7 +153,7 @@ class Decorators(TestCase):
                         roleclient.role = role
                         roleclient.save()
 
-        Decorators.initial_data = PersistentFactory.store._read(), VolatileFactory.store._read()
+        cls.initial_data = PersistentFactory.store._read(), VolatileFactory.store._read()
 
         sys.modules['backend.serializers.serializers'] = Serializers
 
@@ -170,22 +163,18 @@ class Decorators(TestCase):
         from django.conf import settings
         settings.VERSION = (1, 2, 3)
         from django.test import RequestFactory
-        Decorators.factory = RequestFactory()
+        cls.factory = RequestFactory()
 
         fakesleep.monkey_patch()
 
-    @classmethod
-    def setUp(cls):
+    def setUp(self):
         """
         (Re)Sets the stores on every test
         """
-        PersistentFactory.store = DummyPersistentStore()
-        PersistentFactory.store.clean()
-        VolatileFactory.store = DummyVolatileStore()
-        VolatileFactory.store.clean()
-
-        PersistentFactory.store._save(Decorators.initial_data[0])
-        VolatileFactory.store._save(Decorators.initial_data[1])
+        self.persistent.clean()
+        self.volatile.clean()
+        self.persistent._save(self.initial_data[0])
+        self.volatile._save(self.initial_data[1])
 
     @classmethod
     def tearDownClass(cls):
@@ -210,7 +199,7 @@ class Decorators(TestCase):
             return HttpResponse(json.dumps(input_value))
 
         output = {'value': None}
-        request = Decorators.factory.post('/users/')
+        request = self.factory.post('/users/')
         with self.assertRaises(KeyError):
             # Should raise a KeyError complaining about the HTTP_X_REAL_IP
             the_function(1, request)
@@ -255,7 +244,7 @@ class Decorators(TestCase):
 
         output = {'value': None}
         user = UserList.get_user_by_username('user')
-        request = Decorators.factory.get('/')
+        request = self.factory.get('/')
         with self.assertRaises(NotAuthenticated) as context:
             the_function(1, request)
         self.assertEqual(context.exception.status_code, 401)
@@ -317,22 +306,22 @@ class Decorators(TestCase):
 
         output = {'value': None}
         user = UserList.get_user_by_username('user')
-        request = Decorators.factory.get('/', HTTP_ACCEPT='application/json; version=1')
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
         with self.assertRaises(NotAcceptable) as context:
             the_function_1(1, request)
         self.assertEqual(context.exception.status_code, 406)
         self.assertEqual(context.exception.detail, 'API version requirements: {0} <= <version> <= {1}. Got {2}'.format(2, 2, 1))
-        request = Decorators.factory.get('/', HTTP_ACCEPT='application/json; version=*')
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         with self.assertRaises(Http404):
             the_function_1(2, request, pk=str(uuid.uuid4()))
-        request = Decorators.factory.get('/', HTTP_ACCEPT='application/json; version=*')
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         request.DATA = {}
         request.QUERY_PARAMS = {}
         with self.assertRaises(NotAcceptable) as context:
             the_function_1(3, request, pk=user.guid)
         self.assertEqual(context.exception.status_code, 406)
         self.assertEqual(context.exception.detail, 'Invalid data passed: mandatory is missing')
-        request = Decorators.factory.get('/', HTTP_ACCEPT='application/json; version=*')
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         request.DATA = {'mandatory': 'mandatory'}
         request.QUERY_PARAMS = {}
         response = the_function_1(4, request, pk=user.guid)
@@ -342,7 +331,7 @@ class Decorators(TestCase):
                                        'user': user}, output['value'])
         self.assertIn('request', output['value'].keys())
         self.assertEqual(json.loads(response.content), 4)
-        request = Decorators.factory.get('/', HTTP_ACCEPT='application/json; version=*')
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         request.DATA = {}
         request.QUERY_PARAMS = {'mandatory': 'mandatory',
                                 'optional': 'optional'}
@@ -354,7 +343,7 @@ class Decorators(TestCase):
                                        'user': user}, output['value'])
         self.assertIn('request', output['value'].keys())
         self.assertEqual(json.loads(response.content), 5)
-        request = Decorators.factory.get('/', HTTP_ACCEPT='application/json; version=*')
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         request.DATA = {}
         request.QUERY_PARAMS = {'mandatory': 'mandatory',
                                 'optional': 'optional'}
@@ -399,7 +388,7 @@ class Decorators(TestCase):
             _ = args, kwargs
             return type('User', (), {'input_value': input_value})
 
-        request = Decorators.factory.get('/', HTTP_ACCEPT='application/json; version=1')
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
         request.QUERY_PARAMS = {}
         response = the_function(1, request)
         self.assertEqual(response.status_code, 200)
@@ -418,7 +407,7 @@ class Decorators(TestCase):
           * Parses the 'sort' parameter, optionally falling back to value specified by decorator
           * Parses the 'page' parameter
           * Parses the 'contents' parameter
-        * Passes the 'full' hint to the decorated function, indicating whether full objects are usefull
+        * Passes the 'full' hint to the decorated function, indicating whether full objects are useful
         * If sorting is requested:
           * Loads a possibly returned list of guids
           * Sorts the returned list
@@ -428,7 +417,6 @@ class Decorators(TestCase):
         """
         from backend.decorators import return_list
         from ovs.dal.datalist import DataList
-        from ovs.dal.dataobjectlist import DataObjectList
 
         @return_list(User)
         def the_function_1(*args, **kwargs):
@@ -450,12 +438,9 @@ class Decorators(TestCase):
 
         # Username/password combinations: [('bb', 'aa'), ('aa', 'cc'), ('bb', 'dd'), ('aa', 'bb')]
         output_values = {}
-        users = DataList({'object': User,
-                          'data': DataList.select.GUIDS,
-                          'query': {'type': DataList.where_operator.OR,
-                                    'items': [('username', DataList.operator.EQUALS, 'aa'),
-                                              ('username', DataList.operator.EQUALS, 'bb')]}}).data
-        data_list_users = DataObjectList(users, User)
+        data_list_users = DataList(User, {'type': DataList.where_operator.OR,
+                                          'items': [('username', DataList.operator.EQUALS, 'aa'),
+                                                    ('username', DataList.operator.EQUALS, 'bb')]})
         self.assertEqual(len(data_list_users), 4)
         guid_table = {}
         for user in data_list_users:
@@ -463,7 +448,7 @@ class Decorators(TestCase):
                 guid_table[user.username] = {}
             guid_table[user.username][user.password] = user.guid
         data_list_userguids = [user.guid for user in data_list_users]
-        request = Decorators.factory.get('/', HTTP_ACCEPT='application/json; version=1')
+        request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
         for function in [the_function_1, the_function_2]:
             request.QUERY_PARAMS = {}
             response = function(1, request)
@@ -481,9 +466,9 @@ class Decorators(TestCase):
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
             self.assertEqual(len(response.data['data']), len(data_list_users))
             self.assertListEqual(response.data['data'], [guid_table['aa']['cc'],
-                                                        guid_table['aa']['bb'],
-                                                        guid_table['bb']['dd'],
-                                                        guid_table['bb']['aa']])
+                                                         guid_table['aa']['bb'],
+                                                         guid_table['bb']['dd'],
+                                                         guid_table['bb']['aa']])
             request.QUERY_PARAMS['sort'] = '-username,-password'
             response = function(3, request)
             self.assertEqual(response.status_code, 200)
@@ -508,15 +493,10 @@ class Decorators(TestCase):
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
             self.assertEqual(len(response.data['data']), len(data_list_users))
             if function.__name__ == 'the_function_1':
-                self.assertIsInstance(response.data['data']['instance'], DataObjectList)
+                self.assertIsInstance(response.data['data']['instance'], DataList)
                 self.assertIsInstance(response.data['data']['instance'][0], User)
                 self.assertIn(response.data['data']['instance'][0].username, ['aa', 'bb'])
             else:
                 self.assertIsInstance(response.data['data']['instance'], list)
                 self.assertIsInstance(response.data['data']['instance'][0], User)
                 self.assertIn(response.data['data']['instance'][0].username, ['aa', 'bb'])
-
-if __name__ == '__main__':
-    import unittest
-    suite = unittest.TestLoader().loadTestsFromTestCase(Decorators)
-    unittest.TextTestRunner(verbosity=2).run(suite)

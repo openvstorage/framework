@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,8 +20,6 @@ import re
 
 from threading import Lock
 from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('extensions', 'memcache store')
 
 
 def locked():
@@ -58,6 +56,7 @@ class MemcacheStore(object):
         """
         Initializes the client
         """
+        self._logger = LogHandler.get('extensions', 'memcache store')
         self._nodes = nodes
         self._client = memcache.Client(self._nodes, cache_cas=True, socket_timeout=0.5)
         self._lock = Lock()
@@ -79,7 +78,7 @@ class MemcacheStore(object):
             if data['key'] == key:
                 return data['value']
             error = 'Invalid data received'
-            logger.exception('Invalid data received: Got key {0} instead of {1}'.format(data['key'], key))
+            self._logger.exception('Invalid data received: Got key {0} instead of {1}'.format(data['key'], key))
             raise RuntimeError(error)
         else:
             return data

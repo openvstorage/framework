@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -142,7 +142,7 @@ class OVSMigrator(object):
                 backend_type.save()
 
             # Add service types
-            for service_type_info in ['MetadataServer', 'AlbaProxy', 'Arakoon']:
+            for service_type_info in [ServiceType.SERVICE_TYPES.MD_SERVER, ServiceType.SERVICE_TYPES.ALBA_PROXY, ServiceType.SERVICE_TYPES.ARAKOON]:
                 service_type = ServiceType()
                 service_type.name = service_type_info
                 service_type.save()
@@ -233,14 +233,15 @@ class OVSMigrator(object):
         # - Flexible SSD layout
         if working_version < 4:
             import os
-            from ovs.dal.lists.storagedriverlist import StorageDriverList
-            from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
             from ovs.dal.hybrids.diskpartition import DiskPartition
+            from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
+            from ovs.dal.hybrids.servicetype import ServiceType
             from ovs.dal.lists.servicetypelist import ServiceTypeList
-            from ovs.extensions.generic.remote import Remote
+            from ovs.dal.lists.storagedriverlist import StorageDriverList
+            from ovs.extensions.generic.remote import remote
             from ovs.extensions.generic.sshclient import SSHClient
             from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-            for service in ServiceTypeList.get_by_name('MetadataServer').services:
+            for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.MD_SERVER).services:
                 mds_service = service.mds_service
                 storagedriver = None
                 for current_storagedriver in service.storagerouter.storagedrivers:
@@ -259,13 +260,13 @@ class OVSMigrator(object):
                 for disk in service.storagerouter.disks:
                     for partition in disk.partitions:
                         for directory, (role, subrole) in tasks.iteritems():
-                            with Remote(storagedriver.storagerouter.ip, [os], username='root') as remote:
+                            with remote(storagedriver.storagerouter.ip, [os], username='root') as rem:
                                 stat_dir = directory
-                                while not remote.os.path.exists(stat_dir) and stat_dir != '/':
+                                while not rem.os.path.exists(stat_dir) and stat_dir != '/':
                                     stat_dir = stat_dir.rsplit('/', 1)[0]
                                     if not stat_dir:
                                         stat_dir = '/'
-                                inode = remote.os.stat(stat_dir).st_dev
+                                inode = rem.os.stat(stat_dir).st_dev
                             if partition.inode == inode:
                                 if role not in partition.roles:
                                     partition.roles.append(role)
@@ -323,8 +324,8 @@ class OVSMigrator(object):
                                         else:
                                             del storagedriver._data[key]
                                     else:
-                                        with Remote(storagedriver.storagerouter.ip, [os], username='root') as remote:
-                                            inode = remote.os.stat(entry).st_dev
+                                        with remote(storagedriver.storagerouter.ip, [os], username='root') as rem:
+                                            inode = rem.os.stat(entry).st_dev
                                         if partition.inode == inode:
                                             if role not in partition.roles:
                                                 partition.roles.append(role)
@@ -398,7 +399,7 @@ class OVSMigrator(object):
             from ovs.dal.hybrids.failuredomain import FailureDomain
             from ovs.dal.lists.failuredomainlist import FailureDomainList
             from ovs.dal.lists.storagerouterlist import StorageRouterList
-            from ovs.extensions.generic.remote import Remote
+            from ovs.extensions.generic.remote import remote
             from ovs.extensions.generic.sshclient import SSHClient
             failure_domains = FailureDomainList.get_failure_domains()
             if len(failure_domains) > 0:
@@ -415,18 +416,18 @@ class OVSMigrator(object):
                 if storagerouter.rdma_capable is None:
                     client = SSHClient(storagerouter, username='root')
                     rdma_capable = False
-                    with Remote(client.ip, [os], username='root') as remote:
-                        for root, dirs, files in remote.os.walk('/sys/class/infiniband'):
+                    with remote(client.ip, [os], username='root') as rem:
+                        for root, dirs, files in rem.os.walk('/sys/class/infiniband'):
                             for directory in dirs:
-                                ports_dir = remote.os.path.join(root, directory, 'ports')
-                                if not remote.os.path.exists(ports_dir):
+                                ports_dir = '/'.join([root, directory, 'ports'])
+                                if not rem.os.path.exists(ports_dir):
                                     continue
-                                for sub_root, sub_dirs, _ in remote.os.walk(ports_dir):
+                                for sub_root, sub_dirs, _ in rem.os.walk(ports_dir):
                                     if sub_root != ports_dir:
                                         continue
                                     for sub_directory in sub_dirs:
-                                        state_file = remote.os.path.join(sub_root, sub_directory, 'state')
-                                        if remote.os.path.exists(state_file):
+                                        state_file = '/'.join([sub_root, sub_directory, 'state'])
+                                        if rem.os.path.exists(state_file):
                                             if 'ACTIVE' in client.run('cat {0}'.format(state_file)):
                                                 rdma_capable = True
                     storagerouter.rdma_capable = rdma_capable
@@ -473,5 +474,72 @@ class OVSMigrator(object):
                 if hasattr(vpool, 'status') and vpool.status is None:
                     vpool.status = VPool.STATUSES.RUNNING
                     vpool.save()
+
+            working_version = 7
+
+        # Version 10 introduced:
+        # - Reverse indexes are stored in persistent store
+        # - Store more non-changing metadata on disk iso using a dynamic property
+        if working_version < 10:
+            from ovs.dal.helpers import HybridRunner, Descriptor
+            from ovs.dal.datalist import DataList
+            from ovs.extensions.storage.persistentfactory import PersistentFactory
+            from ovs.extensions.storage.volatilefactory import VolatileFactory
+            persistent = PersistentFactory.get_client()
+            for prefix in ['ovs_listcache', 'ovs_reverseindex']:
+                for key in persistent.prefix(prefix):
+                    persistent.delete(key)
+            for key in persistent.prefix('ovs_data_'):
+                persistent.set(key, persistent.get(key))
+            base_reverse_key = 'ovs_reverseindex_{0}_{1}|{2}|{3}'
+            hybrid_structure = HybridRunner.get_hybrids()
+            for class_descriptor in hybrid_structure.values():
+                cls = Descriptor().load(class_descriptor).get_object()
+                all_objects = DataList(cls, {'type': DataList.where_operator.AND,
+                                             'items': []})
+                for item in all_objects:
+                    guid = item.guid
+                    for relation in item._relations:
+                        if relation.foreign_type is None:
+                            rcls = cls
+                            rclsname = rcls.__name__.lower()
+                        else:
+                            rcls = relation.foreign_type
+                            rclsname = rcls.__name__.lower()
+                        key = relation.name
+                        rguid = item._data[key]['guid']
+                        if rguid is not None:
+                            reverse_key = base_reverse_key.format(rclsname, rguid, relation.foreign_key, guid)
+                            persistent.set(reverse_key, 0)
+            volatile = VolatileFactory.get_client()
+            try:
+                volatile._client.flush_all()
+            except:
+                pass
+            from ovs.dal.lists.vdisklist import VDiskList
+            for vdisk in VDiskList.get_vdisks():
+                try:
+                    vdisk.metadata = {'lba_size': vdisk.info['lba_size'],
+                                      'cluster_multiplier': vdisk.info['cluster_multiplier']}
+                    vdisk.save()
+                except:
+                    pass
+
+            working_version = 10
+
+        # Version 11 introduced:
+        # - ALBA accelerated ALBA, meaning different vpool.metadata information
+        if working_version < 11:
+            from ovs.dal.lists.vpoollist import VPoolList
+
+            for vpool in VPoolList.get_vpools():
+                vpool.metadata = {'backend': vpool.metadata}
+                if 'metadata' in vpool.metadata['backend']:
+                    vpool.metadata['backend']['arakoon_config'] = vpool.metadata['backend'].pop('metadata')
+                if 'backend_info' in vpool.metadata['backend']:
+                    vpool.metadata['backend']['backend_info']['fragment_cache_on_read'] = True
+                    vpool.metadata['backend']['backend_info']['fragment_cache_on_write'] = False
+                vpool.save()
+            working_version = 11
 
         return working_version

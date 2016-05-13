@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,8 +31,7 @@ class MgmtCenter(DataObject):
                     Property('ip', str, doc='IP address of the Management Center.'),
                     Property('port', int, doc='Port of the Management Center.'),
                     Property('type', ['VCENTER', 'OPENSTACK'], doc='Management Center type.'),
-                    Property('metadata', dict, default=dict(), doc='Management Center specific metadata')]
-                    # to avoid adding custom properties for every value
+                    Property('metadata', dict, default=dict(), doc='Management Center specific metadata')]  # to avoid adding custom properties for every value
     __relations = []
     __dynamics = [Dynamic('hosts', dict, 60)]
 

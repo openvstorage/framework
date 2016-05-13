@@ -1,11 +1,11 @@
 <!--
-Copyright 2014 iNuron NV
+Copyright 2016 iNuron NV
 
-Licensed under the Open vStorage Modified Apache License (the "License");
+Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.openvstorage.org/license
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,13 +19,13 @@ limitations under the License.
             <div data-bind="visible: !data.hasMgmtCenter()" style="margin-top: 5px;">
                 <p>
                     <span data-i18n="ovs:generic.storagerouter"></span>
-                    <span data-bind="text: data.target().name()"></span>
+                    <span data-bind="text: data.storageRouter().name()"></span>
                     <span data-i18n="ovs:wizards.add_vpool.gather_mgmt_center.no_mgmt_center"></span>
                 </p>
             </div>
             <div data-bind="visible: data.hasMgmtCenter()" style="margin-top: 5px;">
                 <p>
-                    <span data-bind="text: data.target().name()"></span>
+                    <span data-bind="text: data.storageRouter().name()"></span>
                     <span data-i18n="ovs:wizards.add_vpool.gather_mgmt_center.mgmt_center"></span>
                     <span data-bind="text: data.mgmtcenterName"></span>
                     (<span data-bind="text: data.mgmtcenterIp"></span>)

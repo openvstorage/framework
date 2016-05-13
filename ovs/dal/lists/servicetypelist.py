@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,7 @@
 ServiceTypeList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobject import DataObjectList
 from ovs.dal.hybrids.servicetype import ServiceType
-from ovs.dal.helpers import Descriptor
 
 
 class ServiceTypeList(object):
@@ -31,12 +29,10 @@ class ServiceTypeList(object):
         """
         Returns a single ServiceType for the given name. Returns None if no ServiceType was found
         """
-        servicetypes = DataList({'object': ServiceType,
-                                 'data': DataList.select.GUIDS,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': [('name', DataList.operator.EQUALS, name)]}}).data
+        servicetypes = DataList(ServiceType, {'type': DataList.where_operator.AND,
+                                              'items': [('name', DataList.operator.EQUALS, name)]})
         if len(servicetypes) == 1:
-            return Descriptor(ServiceType, servicetypes[0]).get_object(True)
+            return servicetypes[0]
         return None
 
     @staticmethod
@@ -44,8 +40,5 @@ class ServiceTypeList(object):
         """
         Returns a list of all ServiceTypes
         """
-        servicetypes = DataList({'object': ServiceType,
-                                 'data': DataList.select.GUIDS,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': []}}).data
-        return DataObjectList(servicetypes, ServiceType)
+        return DataList(ServiceType, {'type': DataList.where_operator.AND,
+                                      'items': []})

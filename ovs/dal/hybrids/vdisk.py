@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,17 +15,17 @@
 """
 VDisk module
 """
+import time
+import pickle
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.failuredomain import FailureDomain
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-import pickle
-import time
+from ovs.log.logHandler import LogHandler
 
 
 class VDisk(DataObject):
@@ -33,6 +33,8 @@ class VDisk(DataObject):
     The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage.
     vDisks can be part of a vMachine or stand-alone.
     """
+    _logger = LogHandler.get('dal', name='hybrid')
+
     __properties = [Property('name', str, mandatory=False, doc='Name of the vDisk.'),
                     Property('description', str, mandatory=False, doc='Description of the vDisk.'),
                     Property('size', int, doc='Size of the vDisk in Bytes.'),
@@ -41,17 +43,19 @@ class VDisk(DataObject):
                     Property('volume_id', str, mandatory=False, doc='ID of the vDisk in the Open vStorage Volume Driver.'),
                     Property('parentsnapshot', str, mandatory=False, doc='Points to a parent storage driver parent ID. None if there is no parent Snapshot'),
                     Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder'),
-                    Property('has_manual_dtl', bool, default=False, doc='Indicates whether the default DTL location has been overruled by customer')]
+                    Property('has_manual_dtl', bool, default=False, doc='Indicates whether the default DTL location has been overruled by customer'),
+                    Property('metadata', dict, default=dict(), doc='Contains fixed metadata about the volume (e.g. lba_size, ...)')]
     __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
                    Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False),
                    Relation('secondary_failure_domain', FailureDomain, 'secondary_vdisks', mandatory=False)]
     __dynamics = [Dynamic('snapshots', list, 60),
                   Dynamic('info', dict, 60),
-                  Dynamic('statistics', dict, 4, locked=True),
+                  Dynamic('statistics', dict, 4),
                   Dynamic('storagedriver_id', str, 60),
                   Dynamic('storagerouter_guid', str, 15),
                   Dynamic('is_vtemplate', bool, 60)]
+    _fixed_properties = ['storagedriver_client']
 
     def __init__(self, *args, **kwargs):
         """
@@ -59,9 +63,18 @@ class VDisk(DataObject):
         """
         DataObject.__init__(self, *args, **kwargs)
         self._frozen = False
-        self.storagedriver_client = None
+        self._storagedriver_client = None
         self._frozen = True
-        self.reload_client()
+
+    @property
+    def storagedriver_client(self):
+        """
+        Reload Storage Driver client
+        :return: StorageDriverClient
+        """
+        if self._storagedriver_client is None:
+            self.reload_client()
+        return self._storagedriver_client
 
     def _snapshots(self):
         """
@@ -146,15 +159,10 @@ class VDisk(DataObject):
         if not self.storagedriver_id:
             return None
         from ovs.dal.hybrids.storagedriver import StorageDriver
-        storagedrivers = DataObjectList(
-            DataList({'object': StorageDriver,
-                      'data': DataList.select.GUIDS,
-                      'query': {'type': DataList.where_operator.AND,
-                                'items': [('storagedriver_id', DataList.operator.EQUALS, self.storagedriver_id)]}}).data,
-            StorageDriver
-        )
-        if len(storagedrivers) == 1:
-            return storagedrivers[0].storagerouter_guid
+        sds = DataList(StorageDriver, {'type': DataList.where_operator.AND,
+                                       'items': [('storagedriver_id', DataList.operator.EQUALS, self.storagedriver_id)]})
+        if len(sds) == 1:
+            return sds[0].storagerouter_guid
         return None
 
     def _is_vtemplate(self):
@@ -167,9 +175,9 @@ class VDisk(DataObject):
         """
         Reloads the StorageDriver Client
         """
-        if self.vpool:
+        if self.vpool_guid:
             self._frozen = False
-            self.storagedriver_client = StorageDriverClient.load(self.vpool)
+            self._storagedriver_client = StorageDriverClient.load(self.vpool)
             self._frozen = True
 
     def fetch_statistics(self):
@@ -180,13 +188,11 @@ class VDisk(DataObject):
         if self.volume_id and self.vpool:
             try:
                 vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id))
-                vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id))
-            except:
+            except Exception as ex:
+                VDisk._logger.error('Error loading statistics_volume from {0}: {1}'.format(self.volume_id, ex))
                 vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
-                vdiskinfo = StorageDriverClient.EMPTY_INFO()
         else:
             vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
-            vdiskinfo = StorageDriverClient.EMPTY_INFO()
         # Load volumedriver data in dictionary
         vdiskstatsdict = {}
         try:
@@ -200,10 +206,10 @@ class VDisk(DataObject):
             vdiskstatsdict['read_operations'] = pc.read_request_size.events()
             vdiskstatsdict['write_operations'] = pc.write_request_size.events()
             for key in ['cluster_cache_hits', 'cluster_cache_misses', 'metadata_store_hits',
-                        'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses']:
+                        'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses', 'stored']:
                 vdiskstatsdict[key] = getattr(vdiskstats, key)
             # Do some more manual calculations
-            block_size = vdiskinfo.lba_size * vdiskinfo.cluster_multiplier
+            block_size = self.metadata.get('lba_size', 0) * self.metadata.get('cluster_multiplier', 0)
             if block_size == 0:
                 block_size = 4096
             vdiskstatsdict['4k_read_operations'] = vdiskstatsdict['data_read'] / block_size

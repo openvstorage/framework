@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+FS tab module
+"""
 import re
 from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('extensions', name='fstab')
 
 
 class Fstab(object):
@@ -26,6 +27,7 @@ class Fstab(object):
         """
         Init
         """
+        self._logger = LogHandler.get('extensions', name='fstab')
         self.fstab_file = '/etc/fstab'
 
     def _slurp(self):
@@ -51,7 +53,7 @@ class Fstab(object):
         """
         l = self._slurp()
         for i in l:
-            logger.debug("%s %s %s %s %s %s" % (i['device'], i['directory'], i['fstype'], i['options'], i['dump'], i['fsck']))
+            self._logger.debug("%s %s %s %s %s %s" % (i['device'], i['directory'], i['fstype'], i['options'], i['dump'], i['fsck']))
 
     def add_config(self, fs_spec, fs_file, fs_vfstype, fs_mntops='defaults', fs_freq='0', fs_passno='0'):
         """
@@ -64,7 +66,7 @@ class Fstab(object):
         @param fs_freq: dump value
         @param fs_passno: fsck value
         """
-        logger.debug(
+        self._logger.debug(
             "/etc/fstab: appending entry %s %s %s %s %s %s to %s" %
             (fs_spec, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno, self.fstab_file)
         )
@@ -83,7 +85,7 @@ class Fstab(object):
         @param fs_freq: dump value
         @param fs_passno: fsck value
         """
-        logger.debug(
+        self._logger.debug(
             "%s: modifying entry %s to %s %s %s %s %s to %s" %
             (self.fstab_file, device, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno, self.fstab_file)
         )
@@ -137,4 +139,4 @@ class Fstab(object):
                     fstab_file.write("%s %s %s %s %s %s\n" %
                                      (line['device'], line['directory'], line['fstype'], line['options'], line['dump'], line['fsck']))
         else:
-            logger.debug("%s: no such entry %s found" % (self.fstab_file, match_value))
+            self._logger.debug("%s: no such entry %s found" % (self.fstab_file, match_value))

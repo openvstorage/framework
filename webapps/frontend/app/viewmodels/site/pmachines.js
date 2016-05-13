@@ -1,10 +1,10 @@
-﻿// Copyright 2014 iNuron NV
+﻿// Copyright 2016 iNuron NV
 //
-// Licensed under the Open vStorage Modified Apache License (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/license
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,7 +26,7 @@ define([
         // Variables
         self.shared            = shared;
         self.holdLoading       = false;
-        self.guard             = { authenticated: true, registered: true };
+        self.guard             = { authenticated: true };
         self.refresher         = new Refresher();
         self.widgets           = [];
         self.mgmtCenterHeaders = [
@@ -90,19 +90,16 @@ define([
         });
 
         // Functions
-        self.loadPMachines = function(page) {
+        self.loadPMachines = function(options) {
             return $.Deferred(function(deferred) {
                 if (self.holdLoading === true) {
                     deferred.resolve();
                     return;
                 }
-                if (generic.xhrCompleted(self.pMachinesHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        contents: 'mgmtcenter',
-                        page: page
-                    };
-                    self.pMachinesHandle[page] = api.get('pmachines', { queryparams: options })
+                if (generic.xhrCompleted(self.pMachinesHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = 'mgmtcenter';
+                    self.pMachinesHandle[options.page] = api.get('pmachines', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,
@@ -190,15 +187,12 @@ define([
                 }
             }).promise();
         };
-        self.loadMgmtCenters = function(page) {
+        self.loadMgmtCenters = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.mgmtCentersHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        contents: 'hosts',
-                        page: page
-                    };
-                    self.mgmtCentersHandle[page] = api.get('mgmtcenters', { queryparams: options })
+                if (generic.xhrCompleted(self.mgmtCentersHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = 'hosts';
+                    self.mgmtCentersHandle[options.page] = api.get('mgmtcenters', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,

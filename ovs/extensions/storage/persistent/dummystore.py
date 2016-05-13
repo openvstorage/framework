@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,8 @@ Dummy persistent module
 """
 import os
 import json
-from ovs.extensions.storage.exceptions import KeyNotFoundException
+import uuid
+from ovs.extensions.storage.exceptions import KeyNotFoundException, AssertException
 
 
 class DummyPersistentStore(object):
@@ -25,15 +26,17 @@ class DummyPersistentStore(object):
     This is a dummy persistent store that makes use of a local json file
     """
     _path = '/run/dummypersistent.json'
-    _keep_in_memory_only = False
     _data = {}
 
-    @staticmethod
-    def clean():
+    def __init__(self):
+        self._sequences = {}
+        self._keep_in_memory_only = False
+
+    def clean(self):
         """
         Empties the store
         """
-        if DummyPersistentStore._keep_in_memory_only is True:
+        if self._keep_in_memory_only is True:
             DummyPersistentStore._data = {}
         else:
             try:
@@ -45,7 +48,7 @@ class DummyPersistentStore(object):
         """
         Reads the local json file
         """
-        if DummyPersistentStore._keep_in_memory_only is True:
+        if self._keep_in_memory_only is True:
             return DummyPersistentStore._data
 
         try:
@@ -62,9 +65,20 @@ class DummyPersistentStore(object):
         """
         data = self._read()
         if key in data:
-            return self._read()[key]
+            return data[key]
         else:
             raise KeyNotFoundException(key)
+
+    def get_multi(self, keys):
+        """
+        Retrieves values for all given keys
+        """
+        data = self._read()
+        for key in keys:
+            if key in data:
+                yield data[key]
+            else:
+                raise KeyNotFoundException(key)
 
     def prefix(self, key):
         """
@@ -73,23 +87,34 @@ class DummyPersistentStore(object):
         data = self._read()
         return [k for k in data.keys() if k.startswith(key)]
 
-    def set(self, key, value):
+    def prefix_entries(self, key):
+        """
+        Returns all key-values starting with the given prefix
+        """
+        data = self._read()
+        return [(k, v) for k, v in data.iteritems() if k.startswith(key)]
+
+    def set(self, key, value, transaction=None):
         """
         Sets the value for a key to a given value
         """
+        if transaction is not None:
+            return self._sequences[transaction].append([self.set, {'key': key, 'value': value}])
         data = self._read()
         data[key] = value
         self._save(data)
 
-    def delete(self, key):
+    def delete(self, key, must_exist=True, transaction=None):
         """
         Deletes a given key from the store
         """
+        if transaction is not None:
+            return self._sequences[transaction].append([self.delete, {'key': key}])
         data = self._read()
         if key in data:
             del data[key]
             self._save(data)
-        else:
+        elif must_exist is True:
             raise KeyNotFoundException(key)
 
     def exists(self, key):
@@ -109,11 +134,48 @@ class DummyPersistentStore(object):
         _ = self
         pass
 
+    def assert_value(self, key, value, transaction=None):
+        """
+        Asserts a key-value pair
+        """
+        if transaction is not None:
+            return self._sequences[transaction].append([self.assert_value, {'key': key, 'value': value}])
+        data = self._read()
+        if key not in data:
+            raise AssertException(key)
+        if json.dumps(data[key], sort_keys=True) != json.dumps(value, sort_keys=True):
+            raise AssertException(key)
+
+    def assert_exists(self, key, transaction=None):
+        """
+        Asserts whether a given key exists
+        """
+        if transaction is not None:
+            return self._sequences[transaction].append([self.assert_exists, {'key': key}])
+        data = self._read()
+        if key not in data:
+            raise AssertException(key)
+
+    def begin_transaction(self):
+        """
+        Creates a transaction (wrapper around Arakoon sequences)
+        """
+        key = str(uuid.uuid4())
+        self._sequences[key] = []
+        return key
+
+    def apply_transaction(self, transaction):
+        """
+        Applies a transaction
+        """
+        for item in self._sequences[transaction]:
+            item[0](**item[1])
+
     def _save(self, data):
         """
         Saves the local json file
         """
-        if DummyPersistentStore._keep_in_memory_only is True:
+        if self._keep_in_memory_only is True:
             DummyPersistentStore._data = data
         else:
             f = open(self._path, 'w+')

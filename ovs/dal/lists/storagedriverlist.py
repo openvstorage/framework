@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,6 @@
 VDiskList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.storagedriver import StorageDriver
 
 
@@ -30,25 +29,18 @@ class StorageDriverList(object):
         """
         Returns a list of all StorageDrivers
         """
-        storagedrivers = DataList({'object': StorageDriver,
-                                   'data': DataList.select.GUIDS,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': []}}).data
-        return DataObjectList(storagedrivers, StorageDriver)
+        return DataList(StorageDriver, {'type': DataList.where_operator.AND,
+                                        'items': []})
 
     @staticmethod
     def get_by_storagedriver_id(storagedriver_id):
         """
         Returns a list of all StorageDrivers based on a given storagedriver_id
         """
-        # pylint: disable=line-too-long
-        storagedrivers = DataList({'object': StorageDriver,
-                                   'data': DataList.select.GUIDS,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': [('storagedriver_id', DataList.operator.EQUALS, storagedriver_id)]}}).data
-        # pylint: enable=line-too-long
-        if storagedrivers:
-            return DataObjectList(storagedrivers, StorageDriver)[0]
+        storagedrivers = DataList(StorageDriver, {'type': DataList.where_operator.AND,
+                                                  'items': [('storagedriver_id', DataList.operator.EQUALS, storagedriver_id)]})
+        if len(storagedrivers) > 0:
+            return storagedrivers[0]
         return None
 
     @staticmethod
@@ -56,8 +48,5 @@ class StorageDriverList(object):
         """
         Returns a list of all StorageDrivers for Storage Router
         """
-        storagedrivers = DataList({'object': StorageDriver,
-                                   'data': DataList.select.GUIDS,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': [('storagerouter_guid', DataList.operator.EQUALS, machineguid)]}}).data
-        return DataObjectList(storagedrivers, StorageDriver)
+        return DataList(StorageDriver, {'type': DataList.where_operator.AND,
+                                        'items': [('storagerouter_guid', DataList.operator.EQUALS, machineguid)]})

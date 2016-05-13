@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,13 +30,11 @@ from ovs.extensions.packages.package import PackageManager
 from ovs.log.logHandler import LogHandler
 
 
-logger = LogHandler.get('support', name='agent')
-
-
 class SupportAgent(object):
     """
     Represents the Support client
     """
+    _logger = LogHandler.get('support', name='agent')
 
     def __init__(self):
         """
@@ -112,7 +110,7 @@ class SupportAgent(object):
         Processes a task
         """
         try:
-            logger.debug('Processing: {0}'.format(task))
+            SupportAgent._logger.debug('Processing: {0}'.format(task))
             cid = EtcdConfiguration.get('/ovs/framework/cluster_id')
             nid = System.get_my_machine_id()
 
@@ -143,16 +141,16 @@ class SupportAgent(object):
             else:
                 raise RuntimeError('Unknown task')
         except Exception, ex:
-            logger.exception('Unexpected error while processing task {0} (data: {1}): {2}'.format(task, json.dumps(metadata), ex))
+            SupportAgent._logger.exception('Unexpected error while processing task {0} (data: {1}): {2}'.format(task, json.dumps(metadata), ex))
             raise
         finally:
-            logger.debug('Completed')
+            SupportAgent._logger.debug('Completed')
 
     def run(self):
         """
         Executes a call
         """
-        logger.debug('Processing heartbeat')
+        SupportAgent._logger.debug('Processing heartbeat')
 
         try:
             response = requests.post(self._url,
@@ -162,17 +160,17 @@ class SupportAgent(object):
                 raise RuntimeError('Received invalid status code: {0} - {1}'.format(response.status_code, response.text))
             return_data = response.json()
         except Exception, ex:
-            logger.exception('Unexpected error during support call: {0}'.format(ex))
+            SupportAgent._logger.exception('Unexpected error during support call: {0}'.format(ex))
             raise
 
         try:
             # Try to save the timestamp at which we last succefully send the heartbeat data
             from ovs.extensions.generic.system import System
             storagerouter = System.get_my_storagerouter()
-            storagerouter.last_heartheat = time.time()
+            storagerouter.last_heartbeat = time.time()
             storagerouter.save()
         except Exception:
-            logger.error('Could not save last heartbeat timestamp')
+            SupportAgent._logger.error('Could not save last heartbeat timestamp')
             # Ignore this error, it's not mandatory for the support agent
 
         if self._enable_support:
@@ -180,7 +178,7 @@ class SupportAgent(object):
                 for task in return_data['tasks']:
                     self._process_task(task['code'], task['metadata'], self.servicemanager)
             except Exception, ex:
-                logger.exception('Unexpected error processing tasks: {0}'.format(ex))
+                SupportAgent._logger.exception('Unexpected error processing tasks: {0}'.format(ex))
                 raise
         if 'interval' in return_data:
             interval = return_data['interval']
@@ -191,6 +189,7 @@ class SupportAgent(object):
 
 
 if __name__ == '__main__':
+    logger = LogHandler.get('support', name='agent')
     try:
         if EtcdConfiguration.get('/ovs/framework/support|enabled') is False:
             print 'Support not enabled'

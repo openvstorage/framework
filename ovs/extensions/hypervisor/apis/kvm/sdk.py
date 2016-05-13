@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,6 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='kvm sdk')
 ROOT_PATH = '/etc/libvirt/qemu/'  # Get static info from here, or use dom.XMLDesc(0)
 RUN_PATH = '/var/run/libvirt/qemu/'  # Get live info from here
 
@@ -69,7 +68,8 @@ class Sdk(object):
     """
 
     def __init__(self, host='127.0.0.1', login='root'):
-        logger.debug('Init libvirt')
+        self._logger = LogHandler.get('extensions', name='kvm sdk')
+        self._logger.debug('Init libvirt')
         self.states = {libvirt.VIR_DOMAIN_NOSTATE: 'NO STATE',
                        libvirt.VIR_DOMAIN_RUNNING: 'RUNNING',
                        libvirt.VIR_DOMAIN_BLOCKED: 'BLOCKED',
@@ -82,13 +82,13 @@ class Sdk(object):
         self.host = host
         self.login = login
         self._conn = None
-        self.ssh_client = None
-        logger.debug('Init complete')
+        self.ssh_client = SSHClient(self.host, username='root')
+        self._logger.debug('Init complete')
 
     def _connect(self, attempt=0):
         if self._conn:
             self._disconnect()  # Clean up existing conn
-        logger.debug('Init connection: %s, %s, %s, %s', self.host, self.login, os.getgid(), os.getuid())
+        self._logger.debug('Init connection: %s, %s, %s, %s', self.host, self.login, os.getgid(), os.getuid())
         try:
             if self.host.lower() in ['localhost', '127.0.0.1']:  # Or host in (localips...):
                 self.host = '127.0.0.1'
@@ -96,7 +96,7 @@ class Sdk(object):
             else:
                 self._conn = self.libvirt.open('qemu+ssh://{0}@{1}/system'.format(self.login, self.host))
         except self.libvirt.libvirtError as le:
-            logger.error('Error during connect: %s (%s)', str(le), le.get_error_code())
+            self._logger.error('Error during connect: %s (%s)', str(le), le.get_error_code())
             if attempt < 5:
                 time.sleep(1)
                 self._connect(attempt + 1)
@@ -105,13 +105,13 @@ class Sdk(object):
         return True
 
     def _disconnect(self):
-        logger.debug('Disconnecting libvirt')
+        self._logger.debug('Disconnecting libvirt')
         if self._conn:
             try:
                 self._conn.close()
             except self.libvirt.libvirtError as le:
                 # Ignore error, connection might be already closed
-                logger.error('Error during disconnect: %s (%s)', str(le), le.get_error_code())
+                self._logger.error('Error during disconnect: %s (%s)', str(le), le.get_error_code())
 
         self._conn = None
         return True
@@ -251,7 +251,7 @@ class Sdk(object):
         try:
             config['name'] = self._get_nova_name(vm_object)
         except Exception as ex:
-            logger.debug('Cannot retrieve nova:name {0}'.format(ex))
+            self._logger.debug('Cannot retrieve nova:name {0}'.format(ex))
             # not an error, as we have a fallback, but still keep logging for debug purposes
             config['name'] = vm_object.name()
         config['id'] = str(vm_object.UUIDString())
@@ -287,12 +287,12 @@ class Sdk(object):
         try:
             return getattr(self._conn, func)(vmid)
         except self.libvirt.libvirtError as le:
-            logger.error(str(le))
+            self._logger.error(str(le))
             try:
                 self._connect()
                 return getattr(self._conn, func)(vmid)
             except self.libvirt.libvirtError as le:
-                logger.error(str(le))
+                self._logger.error(str(le))
                 raise RuntimeError('Virtual Machine with id/name {} could not be found.'.format(vmid))
 
     def get_vm_object_by_filename(self, filename):
@@ -310,6 +310,10 @@ class Sdk(object):
         return self._conn.listAllDomains()
 
     def shutdown(self, vmid):
+        """
+        Shutdown vm
+        :param vmid: ID of vm
+        """
         vm_object = self.get_vm_object(vmid)
         vm_object.shutdown()
         return self.get_power_state(vmid)
@@ -326,12 +330,12 @@ class Sdk(object):
         try:
             vm_object = self.get_vm_object(vmid)
         except Exception as ex:
-            logger.error('SDK domain retrieve failed: {}'.format(ex))
+            self._logger.error('SDK domain retrieve failed: {}'.format(ex))
         found_files = self.find_devicename(devicename)
         if found_files is not None:
             for found_file in found_files:
                 self.ssh_client.file_delete(found_file)
-                logger.info('File on vpool deleted: {0}'.format(found_file))
+                self._logger.info('File on vpool deleted: {0}'.format(found_file))
         if vm_object:
             found_file = ''
             # VM partially created, most likely we have disks
@@ -344,7 +348,7 @@ class Sdk(object):
                     found_file = disk['source']['dev']
                 if found_file and os.path.exists(found_file) and os.path.isfile(found_file):
                     self.ssh_client.file_delete(found_file)
-                    logger.info('File on vpool deleted: {0}'.format(found_file))
+                    self._logger.info('File on vpool deleted: {0}'.format(found_file))
             vm_object.undefine()
         elif disks_info:
             # VM not created, we have disks to rollback
@@ -352,10 +356,14 @@ class Sdk(object):
                 found_file = '{}/{}'.format(path, devicename)
                 if os.path.exists(found_file) and os.path.isfile(found_file):
                     self.ssh_client.file_delete(found_file)
-                    logger.info('File on vpool deleted: {0}'.format(found_file))
+                    self._logger.info('File on vpool deleted: {0}'.format(found_file))
         return True
 
     def power_on(self, vmid):
+        """
+        Power on vm
+        :param vmid: ID of vm
+        """
         vm_object = self.get_vm_object(vmid)
         vm_object.create()
         return self.get_power_state(vmid)
@@ -373,6 +381,10 @@ class Sdk(object):
         return matches if matches else None
 
     def is_datastore_available(self, mountpoint):
+        """
+        Check if datastore is available
+        :param mountpoint: Mountpoint of the NFS datastore
+        """
         if self.ssh_client is None:
             self.ssh_client = SSHClient(self.host, username='root')
         return self.ssh_client.run("[ -d {0} ] && echo 'yes' || echo 'no'".format(mountpoint)) == 'yes'
@@ -386,6 +398,45 @@ class Sdk(object):
         source_vm = self.get_vm_object(vmid)
         return self.create_vm_from_template(name, source_vm, disks, mountpoint)
 
+    def create_volume(self, location, size):
+        """
+        Create volume using truncate
+        :param location: location (mountpoint + file name)
+        :param size: size (GB)
+        """
+        if self.ssh_client.file_exists(location):
+            raise RuntimeError('File already exists at %s' % location)
+        command = 'truncate -s {0}G "{1}"'.format(size, location)
+        output = self.ssh_client.run(command)
+        if not self.ssh_client.file_exists(location):
+            raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
+        self._logger.info('Command {0}. Output {1}'.format(command, output))
+
+    def delete_volume(self, location):
+        """
+        Remove volume using rm
+        :param location: location (mountpoint + file name)
+        """
+        if not self.ssh_client.file_exists(location):
+            self._logger.error('File already deleted at %s' % location)
+            return
+        command = 'rm "{0}"'.format(location)
+        output = self.ssh_client.run(command)
+        self._logger.info('Command {0}. Output {1}'.format(command, output))
+        if self.ssh_client.file_exists(location):
+            raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
+
+    def extend_volume(self, location, size):
+        """
+        Resize volume using truncate
+        :param location: location (mountpoint + file name)
+        :param size: new size
+        """
+        if not self.ssh_client.file_exists(location):
+            raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
+        command = 'truncate -s {0}G "{1}"'.format(size, location)
+        output = self.ssh_client.run(command)
+        self._logger.info('Command {0}. Output {1}'.format(command, output))
 
     @authenticated
     def create_vm_from_template(self, name, source_vm, disks, mountpoint):
@@ -435,12 +486,12 @@ class Sdk(object):
         try:
             return self.get_vm_object(name).UUIDString()
         except self.libvirt.libvirtError as le:
-            logger.error(str(le))
+            self._logger.error(str(le))
             try:
                 self._connect()
                 return self.get_vm_object(name).UUIDString()
             except self.libvirt.libvirtError as le:
-                logger.error(str(le))
+                self._logger.error(str(le))
                 raise RuntimeError('Virtual Machine with id/name {} could not be found.'.format(name))
 
     def _vm_create(self, name, vcpus, ram, disks,

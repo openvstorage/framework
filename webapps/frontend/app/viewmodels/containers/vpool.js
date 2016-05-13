@@ -1,10 +1,10 @@
-// Copyright 2014 iNuron NV
+// Copyright 2016 iNuron NV
 //
-// Licensed under the Open vStorage Modified Apache License (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/license
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -91,9 +91,11 @@ define([
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.metadata, data, 'metadata');
             generic.trySet(self.backendConnection, data, 'connection');
-            if (data.hasOwnProperty('metadata') && data.metadata.hasOwnProperty('preset')) {
-                self.backendPreset(data.metadata.preset);
+
+            if (self.metadata.hasOwnProperty('backend') && self.metadata.backend.hasOwnProperty('preset')) {
+                self.backendPreset(self.metadata.backend.preset);
             }
+
             generic.trySet(self.backendLogin, data, 'login');
             generic.trySet(self.rdmaEnabled, data, 'rdma_enabled');
             if (data.hasOwnProperty('backend_type_guid')) {

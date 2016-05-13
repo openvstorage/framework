@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,7 +36,8 @@ class TestDisk(DataObject):
                    Relation('parent', None, 'children', mandatory=False)]
     __dynamics = [Dynamic('used_size', int, 5),
                   Dynamic('wrong_type', int, 5),
-                  Dynamic('updatable', int, 5)]
+                  Dynamic('updatable', int, 5),
+                  Dynamic('predictable', int, 5)]
 
     # For testing purposes
     wrong_type_data = 0
@@ -60,3 +61,9 @@ class TestDisk(DataObject):
         Returns an external settable value
         """
         return self.dynamic_value
+
+    def _predictable(self):
+        """
+        A predictable dynamic property
+        """
+        return self.size

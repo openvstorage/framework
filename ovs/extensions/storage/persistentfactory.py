@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,10 +15,8 @@
 """
 Generic persistent factory.
 """
+import unittest
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('extensions', name='persistent factory')
 
 
 class PersistentFactory(object):
@@ -30,17 +28,20 @@ class PersistentFactory(object):
     def get_client(client_type=None):
         """
         Returns a persistent storage client
+        :param client_type: Type of store client
         """
-
         if not hasattr(PersistentFactory, 'store') or PersistentFactory.store is None:
+            if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests'):
+                client_type = 'dummy'
+
             if client_type is None:
                 client_type = EtcdConfiguration.get('/ovs/framework/stores|persistent')
 
             PersistentFactory.store = None
-            if client_type == 'pyrakoon':
+            if client_type in ['pyrakoon', 'arakoon']:
                 from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
-                PersistentFactory.store = PyrakoonStore('ovsdb')
-            if client_type == 'default':
+                PersistentFactory.store = PyrakoonStore(str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|ovsdb')))
+            if client_type == 'dummy':
                 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
                 PersistentFactory.store = DummyPersistentStore()
 

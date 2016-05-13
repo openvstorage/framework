@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,7 +25,8 @@ Basic functionality unit tests for the OVS Cinder Plugin
 * validate on FS (volumedriver filesystem)
 """
 
-from ovs_common import OVSPluginTestCase, VPOOL_MOUNTPOINT
+from ovs_common import OVSPluginTestCase
+
 
 class OVSPluginBasicTestCase(OVSPluginTestCase):
     """
@@ -46,7 +47,7 @@ class OVSPluginBasicTestCase(OVSPluginTestCase):
         """
         volume, volume_name, file_name = self._new_volume()
 
-        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name), 'Device not modeled in OVS')
 
     def test_create_delete_volume(self):
@@ -64,11 +65,11 @@ class OVSPluginBasicTestCase(OVSPluginTestCase):
          -none
         """
         volume, volume_name, file_name = self._new_volume()
-        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name), 'Device not modeled in OVS')
 
         self._remove_volume(volume, volume_name)
-        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name, exists=False), 'Device still modeled in OVS')
 
     def test_create_delete_volume_snapshots(self):
@@ -99,7 +100,7 @@ class OVSPluginBasicTestCase(OVSPluginTestCase):
         """
         self._debug('started test')
         volume, volume_name, file_name = self._new_volume()
-        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name), 'Device not modeled in OVS')
 
         snapshot, snap_name = self._new_snapshot(volume)
@@ -114,7 +115,7 @@ class OVSPluginBasicTestCase(OVSPluginTestCase):
         self.assertFalse(snapshot.id in cinder_snapshots.keys(), 'Snapshot still modeled in Cinder')
 
         self._remove_volume(volume, volume_name)
-        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name, exists=False), 'Device still modeled in OVS')
         self._debug('ended test')
 
@@ -152,7 +153,7 @@ class OVSPluginBasicTestCase(OVSPluginTestCase):
         """
         self._debug('started test')
         volume, volume_name, file_name = self._new_volume()
-        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name), 'Device not modeled in OVS')
 
         snapshot, snap_name = self._new_snapshot(volume)
@@ -163,11 +164,11 @@ class OVSPluginBasicTestCase(OVSPluginTestCase):
         self.assertTrue(self._ovs_snapshot_id_in_vdisklist_snapshots(snapshot.id), 'Snapshot not modeled in OVS')
 
         clone, clone_name, clone_file_name = self._new_volume_from_snapshot(snapshot)
-        self.assertTrue(self._file_exists_on_mountpoint(clone_file_name), 'File %s not created on mountpoint %s ' % (clone_file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._file_exists_on_mountpoint(clone_file_name), 'File %s not created on mountpoint %s ' % (clone_file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(clone_file_name), 'Device not modeled in OVS')
 
         self._remove_volume(clone, clone_name)
-        self.assertFalse(self._file_exists_on_mountpoint(clone_file_name), 'File %s not deleted from mountpoint %s ' % (clone_file_name, VPOOL_MOUNTPOINT))
+        self.assertFalse(self._file_exists_on_mountpoint(clone_file_name), 'File %s not deleted from mountpoint %s ' % (clone_file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(clone_file_name, exists=False), 'Device still modeled in OVS')
 
         self._remove_snapshot(snap_name, snapshot, force = True)
@@ -175,7 +176,7 @@ class OVSPluginBasicTestCase(OVSPluginTestCase):
         self.assertFalse(snapshot.id in cinder_snapshots.keys(), 'Snapshot still modeled in Cinder')
 
         self._remove_volume(volume, volume_name)
-        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name, exists=False), 'Device still modeled in OVS')
         self._debug('ended test')
 
@@ -204,11 +205,11 @@ class OVSPluginBasicTestCase(OVSPluginTestCase):
         """
         self._debug('started test')
         volume, volume_name, file_name = self._new_volume()
-        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name), 'Device not modeled in OVS')
 
         clone, clone_name, clone_file_name = self._new_volume_from_volume(volume)
-        self.assertTrue(self._file_exists_on_mountpoint(clone_file_name), 'File %s not created on mountpoint %s ' % (clone_file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._file_exists_on_mountpoint(clone_file_name), 'File %s not created on mountpoint %s ' % (clone_file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(clone_file_name), 'Device not modeled in OVS')
 
         # assert snapshot created for volume
@@ -216,10 +217,10 @@ class OVSPluginBasicTestCase(OVSPluginTestCase):
         self.assertTrue(len(vdisk.snapshots) > 0, 'No snapshots created for source disk, expected at least 1')
 
         self._remove_volume(clone, clone_name)
-        self.assertFalse(self._file_exists_on_mountpoint(clone_file_name), 'File %s not deleted from mountpoint %s ' % (clone_file_name, VPOOL_MOUNTPOINT))
+        self.assertFalse(self._file_exists_on_mountpoint(clone_file_name), 'File %s not deleted from mountpoint %s ' % (clone_file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(clone_file_name, exists=False), 'Device still modeled in OVS')
 
         self._remove_volume(volume, volume_name)
-        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, OVSPluginTestCase.VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name, exists=False), 'Device still modeled in OVS')
         self._debug('ended test')

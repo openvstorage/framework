@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -59,13 +59,15 @@ class TaskViewSet(viewsets.ViewSet):
         :param pk: Primary key
         """
         result = celery.AsyncResult(pk)
-        if result.successful():
+        result_status = result.status
+        result_successful = result.successful()
+        if result_successful is True:
             result_data = result.result
         else:
             result_data = str(result.result) if result.result is not None else None
         data = {'id': result.id,
-                'status': result.status,
-                'successful': result.successful(),
+                'status': result_status,
+                'successful': result_successful,
                 'failed': result.failed(),
                 'ready': result.ready(),
                 'result': result_data}

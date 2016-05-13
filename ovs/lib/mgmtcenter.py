@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,13 +22,12 @@ from ovs.dal.hybrids.pmachine import PMachine
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('lib', name='mgmtcenter')
-
 
 class MgmtCenterController(object):
     """
     Contains all BLL regarding MgmtCenters
     """
+    _logger = LogHandler.get('lib', name='mgmtcenter')
 
     @staticmethod
     @celery.task(name='ovs.mgmtcenter.test_connection')
@@ -40,12 +39,12 @@ class MgmtCenterController(object):
         try:
             mgmt_center_client = Factory.get_mgmtcenter(mgmt_center=mgmt_center)
         except Exception as ex:
-            logger.error('Cannot get mgmt center client: {0}'.format(ex))
+            MgmtCenterController._logger.error('Cannot get mgmt center client: {0}'.format(ex))
             return None
         try:
             is_mgmt_center = mgmt_center_client.test_connection()
         except Exception as ex:
-            logger.error('Cannot test connection: {0}'.format(ex))
+            MgmtCenterController._logger.error('Cannot test connection: {0}'.format(ex))
             return False
         return is_mgmt_center
 
@@ -58,9 +57,9 @@ class MgmtCenterController(object):
         try:
             mgmt_center_client = Factory.get_mgmtcenter(mgmt_center=mgmt_center)
         except Exception as ex:
-            logger.error('Cannot get management center client: {0}'.format(ex))
+            MgmtCenterController._logger.error('Cannot get management center client: {0}'.format(ex))
         if mgmt_center_client is not None:
-            logger.info('Configuring host {0} on management center {1}'.format(pmachine.name, mgmt_center.name))
+            MgmtCenterController._logger.info('Configuring host {0} on management center {1}'.format(pmachine.name, mgmt_center.name))
             mgmt_center_client.configure_host(pmachine.ip)
             if update_link is True:
                 pmachine.mgmtcenter = mgmt_center
@@ -75,9 +74,9 @@ class MgmtCenterController(object):
         try:
             mgmt_center_client = Factory.get_mgmtcenter(mgmt_center=mgmt_center)
         except Exception as ex:
-            logger.error('Cannot get management center client: {0}'.format(ex))
+            MgmtCenterController._logger.error('Cannot get management center client: {0}'.format(ex))
         if mgmt_center_client is not None:
-            logger.info('Unconfiguring host {0} from management center {1}'.format(pmachine.name, mgmt_center.name))
+            MgmtCenterController._logger.info('Unconfiguring host {0} from management center {1}'.format(pmachine.name, mgmt_center.name))
             mgmt_center_client.unconfigure_host(pmachine.ip)
             if update_link is True:
                 pmachine.mgmtcenter = None
@@ -92,7 +91,7 @@ class MgmtCenterController(object):
             mgmt_center_client = Factory.get_mgmtcenter(pmachine=pmachine)
         except Exception as ex:
             if pmachine.mgmtcenter_guid:
-                logger.error('Cannot get management center client: {0}'.format(ex))
+                MgmtCenterController._logger.error('Cannot get management center client: {0}'.format(ex))
 
         if mgmt_center_client is not None:
             return mgmt_center_client.is_host_configured(pmachine.ip)
@@ -106,9 +105,9 @@ class MgmtCenterController(object):
         try:
             mgmt_center_client = Factory.get_mgmtcenter(pmachine=pmachine)
         except Exception as ex:
-            logger.error('Cannot get management center client: {0}'.format(ex))
+            MgmtCenterController._logger.error('Cannot get management center client: {0}'.format(ex))
         if mgmt_center_client is not None:
-            logger.info('Configuring vPool {0} on host {1}'.format(vpool_guid, pmachine.name))
+            MgmtCenterController._logger.info('Configuring vPool {0} on host {1}'.format(vpool_guid, pmachine.name))
             mgmt_center_client.configure_vpool_for_host(vpool_guid, pmachine.ip)
 
     @staticmethod
@@ -119,9 +118,9 @@ class MgmtCenterController(object):
         try:
             mgmt_center_client = Factory.get_mgmtcenter(pmachine=pmachine)
         except Exception as ex:
-            logger.error('Cannot get management center client: {0}'.format(ex))
+            MgmtCenterController._logger.error('Cannot get management center client: {0}'.format(ex))
         if mgmt_center_client is not None:
-            logger.info('Unconfiguring vPool {0} on host {1}'.format(vpool_guid, pmachine.name))
+            MgmtCenterController._logger.info('Unconfiguring vPool {0} on host {1}'.format(vpool_guid, pmachine.name))
             mgmt_center_client.unconfigure_vpool_for_host(vpool_guid, False, pmachine.ip)
 
     @staticmethod
@@ -133,7 +132,7 @@ class MgmtCenterController(object):
             mgmt_center_client = Factory.get_mgmtcenter(pmachine=pmachine)
         except Exception as ex:
             if pmachine.mgmtcenter_guid:
-                logger.error('Cannot get management center client: {0}'.format(ex))
+                MgmtCenterController._logger.error('Cannot get management center client: {0}'.format(ex))
 
         if mgmt_center_client is not None:
             return mgmt_center_client.is_host_configured_for_vpool(vpool_guid, pmachine.ip)

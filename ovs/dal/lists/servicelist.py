@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,7 @@
 ServiceList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.service import Service
-from ovs.dal.helpers import Descriptor
 
 
 class ServiceList(object):
@@ -31,24 +29,19 @@ class ServiceList(object):
         """
         Get all services of all types
         """
-        services = DataList({'object': Service,
-                             'data': DataList.select.GUIDS,
-                             'query': {'type': DataList.where_operator.AND,
-                                       'items': []}}).data
-        return DataObjectList(services, Service)
+        return DataList(Service, {'type': DataList.where_operator.AND,
+                                  'items': []})
 
     @staticmethod
     def get_by_ip_ports(ip, ports):
         """
         Returns a single Service for the ip/ports. Returns None if no Service was found
         """
-        services = DataList({'object': Service,
-                             'data': DataList.select.GUIDS,
-                             'query': {'type': DataList.where_operator.AND,
-                                       'items': [('storagerouter.ip', DataList.operator.EQUALS, ip),
-                                                 ('ports', DataList.operator.EQUALS, ports)]}}).data
+        services = DataList(Service, {'type': DataList.where_operator.AND,
+                                      'items': [('storagerouter.ip', DataList.operator.EQUALS, ip),
+                                                ('ports', DataList.operator.EQUALS, ports)]})
         if len(services) == 1:
-            return Descriptor(Service, services[0]).get_object(True)
+            return services[0]
         return None
 
     @staticmethod
@@ -56,11 +49,9 @@ class ServiceList(object):
         """
         Returns a list of ports for all services on a given (StorageRouter) ip
         """
-        services = DataList({'object': Service,
-                             'data': DataList.select.GUIDS,
-                             'query': {'type': DataList.where_operator.AND,
-                                       'items': [('storagerouter.ip', DataList.operator.EQUALS, ip)]}}).data
+        services = DataList(Service, {'type': DataList.where_operator.AND,
+                                      'items': [('storagerouter.ip', DataList.operator.EQUALS, ip)]})
         ports = []
-        for service in DataObjectList(services, Service):
+        for service in services:
             ports.extend(service.ports)
         return list(set(ports))

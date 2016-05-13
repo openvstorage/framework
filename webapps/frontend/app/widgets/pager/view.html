@@ -1,11 +1,11 @@
 <!--
-Copyright 2014 iNuron NV
+Copyright 2016 iNuron NV
 
-Licensed under the Open vStorage Modified Apache License (the "License");
+Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.openvstorage.org/license
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -55,34 +55,50 @@ limitations under the License.
         </tbody>
     </table>
     <div data-bind="if: showControls()">
-        <p style="margin-bottom: -15px;">
-            <span data-i18n="ovs:generic.showing"></span> <span data-bind="text: pageFirst"></span>-<span data-bind="text: pageLast"></span>
-            <span data-i18n="ovs:generic.from"></span> <span data-bind="text: totalItems()"></span> <span data-i18n="ovs:generic.results"></span>.</p>
-        <ul class="pagination">
-            <!-- ko if: hasPrevious() -->
-                <li><a data-bind="click: function() { current(1); }" class="hand">&laquo;&laquo;</a></li>
-                <li><a data-bind="click: function() { step(false); }" class="hand">&laquo;</a></li>
-            <!-- /ko -->
-            <!-- ko if: !hasPrevious() -->
-                <li class="disabled"><span>&laquo;&laquo;</span></li>
-                <li class="disabled"><span>&laquo;</span></li>
-            <!-- /ko -->
-            <!-- ko foreach: pages -->
-                <!-- ko if: $data == $parent.current() -->
-                    <li class="active"><span data-bind="text: $data"></span></li>
+        <div style="float: left;">
+            <p style="margin-bottom: -15px;">
+                <span data-i18n="ovs:generic.showing"></span> <span data-bind="text: pageFirst"></span>-<span data-bind="text: pageLast"></span>
+                <span data-i18n="ovs:generic.from"></span> <span data-bind="text: totalItems()"></span> <span data-i18n="ovs:generic.results"></span>.
+            </p>
+            <ul class="pagination">
+                <!-- ko if: hasPrevious() -->
+                    <li><a data-bind="click: function() { current(1); }" class="hand">&laquo;&laquo;</a></li>
+                    <li><a data-bind="click: function() { step(false); }" class="hand">&laquo;</a></li>
                 <!-- /ko -->
-                <!-- ko if: $data != $parent.current() -->
-                    <li><a data-bind="text: $data, click: function() { $parent.current($data); }" class="hand"></a></li>
+                <!-- ko if: !hasPrevious() -->
+                    <li class="disabled"><span>&laquo;&laquo;</span></li>
+                    <li class="disabled"><span>&laquo;</span></li>
                 <!-- /ko -->
-            <!-- /ko -->
-            <!-- ko if: hasNext() -->
-                <li><a data-bind="click: function() { step(true); }" class="hand">&raquo;</a></li>
-                <li><a data-bind="click: function() { current(lastPage()); }" class="hand">&raquo;&raquo;</a></li>
-            <!-- /ko -->
-            <!-- ko if: !hasNext() -->
-                <li class="disabled"><span>&raquo;</span></li>
-                <li class="disabled"><span>&raquo;&raquo;</span></li>
-            <!-- /ko -->
-        </ul>
+                <!-- ko foreach: pages -->
+                    <!-- ko if: $data == $parent.current() -->
+                        <li class="active"><span data-bind="text: $data"></span></li>
+                    <!-- /ko -->
+                    <!-- ko if: $data != $parent.current() -->
+                        <li><a data-bind="text: $data, click: function() { $parent.current($data); }" class="hand"></a></li>
+                    <!-- /ko -->
+                <!-- /ko -->
+                <!-- ko if: hasNext() -->
+                    <li><a data-bind="click: function() { step(true); }" class="hand">&raquo;</a></li>
+                    <li><a data-bind="click: function() { current(lastPage()); }" class="hand">&raquo;&raquo;</a></li>
+                <!-- /ko -->
+                <!-- ko if: !hasNext() -->
+                    <li class="disabled"><span>&raquo;</span></li>
+                    <li class="disabled"><span>&raquo;&raquo;</span></li>
+                <!-- /ko -->
+            </ul>
+        </div>
+        <div style="float: right; text-align: right;">
+            <p style="margin-bottom: -15px;">
+                <span data-i18n="ovs:generic.showing"></span> <span data-bind="text: pageSize"></span> <span data-i18n="ovs:generic.resultspp"></span>
+            </p>
+            <div data-bind="dropdown: {
+                     items: pageSizes, target: pageSize,
+                     text: function(item) {
+                         return item;
+                     }
+                 }" style="margin-top: 20px;">
+            </div>
+        </div>
+        <div style="clear: both;"></div>
     </div>
 </div>

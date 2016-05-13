@@ -1,10 +1,10 @@
-// Copyright 2014 iNuron NV
+// Copyright 2016 iNuron NV
 //
-// Licensed under the Open vStorage Modified Apache License (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/license
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,7 +25,7 @@ define([
         // Variables
         self.widgets       = [];
         self.shared        = shared;
-        self.guard         = { authenticated: true, registered: true };
+        self.guard         = { authenticated: true };
         self.refresher     = new Refresher();
         self.userHeaders   = [
             { key: 'username', value: $.t('ovs:generic.username'), width: 250       },
@@ -128,14 +128,12 @@ define([
             }, client);
             return client;
         };
-        self.loadUsers = function(page) {
+        self.loadUsers = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.usersHandle[page])) {
-                    var options = {
-                        sort: 'username',
-                        contents: '_relations'
-                    };
-                    self.usersHandle[page] = api.get('users', { queryparams: options })
+                if (generic.xhrCompleted(self.usersHandle[options.page])) {
+                    options.sort = 'username';
+                    options.contents = '_relations';
+                    self.usersHandle[options.page] = api.get('users', { queryparams: options })
                         .then(function(data) {
                             deferred.resolve({
                                 data: data,
@@ -172,17 +170,14 @@ define([
                 }
             }).promise();
         };
-        self.loadClients = function(page) {
+        self.loadClients = function(options) {
             return $.Deferred(function(deferred) {
-                if (self.selectedUserGuid() !== undefined && generic.xhrCompleted(self.clientsHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        page: page,
-                        contents: '_relations',
-                        userguid: self.selectedUserGuid(),
-                        type: 'USER'
-                    };
-                    self.clientsHandle[page] = api.get('clients', { queryparams: options })
+                if (self.selectedUserGuid() !== undefined && generic.xhrCompleted(self.clientsHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = '_relations';
+                    options.userguid = self.selectedUserGuid();
+                    options.type = 'USER';
+                    self.clientsHandle[options.page] = api.get('clients', { queryparams: options })
                         .then(function(data) {
                             deferred.resolve({
                                 data: data,

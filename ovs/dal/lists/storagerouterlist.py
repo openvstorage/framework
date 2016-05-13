@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,6 @@
 StorageRouterList module
 """
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.storagerouter import StorageRouter
 
 
@@ -30,48 +29,36 @@ class StorageRouterList(object):
         """
         Returns a list of all StorageRouters
         """
-        storagerouters = DataList({'object': StorageRouter,
-                                   'data': DataList.select.GUIDS,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': []}}).data
-        return DataObjectList(storagerouters, StorageRouter)
+        return DataList(StorageRouter, {'type': DataList.where_operator.AND,
+                                        'items': []})
 
     @staticmethod
     def get_slaves():
         """
         Get all SLAVE StorageRouters
         """
-        storagerouters = DataList({'object': StorageRouter,
-                                   'data': DataList.select.GUIDS,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': [('node_type', DataList.operator.EQUALS, 'EXTRA')]}}).data
-        return DataObjectList(storagerouters, StorageRouter)
+        return DataList(StorageRouter, {'type': DataList.where_operator.AND,
+                                        'items': [('node_type', DataList.operator.EQUALS, 'EXTRA')]})
 
     @staticmethod
     def get_masters():
         """
         Get all MASTER StorageRouters
         """
-        storagerouters = DataList({'object': StorageRouter,
-                                   'data': DataList.select.GUIDS,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': [('node_type', DataList.operator.EQUALS, 'MASTER')]}}).data
-        return DataObjectList(storagerouters, StorageRouter)
+        return DataList(StorageRouter, {'type': DataList.where_operator.AND,
+                                        'items': [('node_type', DataList.operator.EQUALS, 'MASTER')]})
 
     @staticmethod
     def get_by_machine_id(machine_id):
         """
         Returns a StorageRouter by its machine_id
         """
-        storagerouters = DataList({'object': StorageRouter,
-                                   'data': DataList.select.GUIDS,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': [('machine_id', DataList.operator.EQUALS, machine_id)]}}).data
-        srs = DataObjectList(storagerouters, StorageRouter)
-        if len(srs) == 0:
+        storagerouters = DataList(StorageRouter, {'type': DataList.where_operator.AND,
+                                                  'items': [('machine_id', DataList.operator.EQUALS, machine_id)]})
+        if len(storagerouters) == 0:
             return None
-        if len(srs) == 1:
-            return srs[0]
+        if len(storagerouters) == 1:
+            return storagerouters[0]
         raise RuntimeError('There should be only one StorageRouter with machine_id: {0}'.format(machine_id))
 
     @staticmethod
@@ -79,15 +66,12 @@ class StorageRouterList(object):
         """
         Returns a StorageRouter by its ip
         """
-        storagerouters = DataList({'object': StorageRouter,
-                                   'data': DataList.select.GUIDS,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': [('ip', DataList.operator.EQUALS, ip)]}}).data
-        srs = DataObjectList(storagerouters, StorageRouter)
-        if len(srs) == 0:
+        storagerouters = DataList(StorageRouter, {'type': DataList.where_operator.AND,
+                                                  'items': [('ip', DataList.operator.EQUALS, ip)]})
+        if len(storagerouters) == 0:
             return None
-        if len(srs) == 1:
-            return srs[0]
+        if len(storagerouters) == 1:
+            return storagerouters[0]
         raise RuntimeError('There should be only one StorageRouter with ip: {0}'.format(ip))
 
     @staticmethod
@@ -95,13 +79,10 @@ class StorageRouterList(object):
         """
         Returns a StorageRouter by its name
         """
-        storagerouters = DataList({'object': StorageRouter,
-                                   'data': DataList.select.GUIDS,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': [('name', DataList.operator.EQUALS, name)]}}).data
-        srs = DataObjectList(storagerouters, StorageRouter)
-        if len(srs) == 0:
+        storagerouters = DataList(StorageRouter, {'type': DataList.where_operator.AND,
+                                                  'items': [('name', DataList.operator.EQUALS, name)]})
+        if len(storagerouters) == 0:
             return None
-        if len(srs) == 1:
-            return srs[0]
+        if len(storagerouters) == 1:
+            return storagerouters[0]
         raise RuntimeError('There should be only one StorageRouter with name: {0}'.format(name))

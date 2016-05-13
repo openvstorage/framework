@@ -1,11 +1,11 @@
 #!/usr/bin/env python2
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,114 +28,118 @@ import socket
 import os
 from optparse import OptionParser
 
-def run_command(command, fail=True):
-    """
-    Executed a command
-    """
-    rcode = subprocess.call(command.split(' '))
-    if rcode != 0 and fail:
-        raise Exception('{0} failed with return value {1}'.format(command, rcode))
+if __name__ == '__main__':
+    def run_command(command, fail=True):
+        """
+        Executed a command
+        """
+        rcode = subprocess.call(command.split(' '))
+        if rcode != 0 and fail:
+            raise Exception('{0} failed with return value {1}'.format(command, rcode))
 
-parser = OptionParser(description='Open vStorage Ceph Deployment script')
-parser.add_option('-d', '--disks', dest='disks',
-                  help="Disks to use for Ceph OSD's")
-parser.add_option('-a', '--host', dest='additional_hostnames',
-                  help="Additional hosts to install")
-(options, args) = parser.parse_args()
+    def disks_are_member_of_raid(raid_disks):
+        """
+        Check if disks are RAID members
+        """
+        disk_in_raid = False
+        if os.path.exists('/sbin/mdadm'):
+            # check if disks list has active mdadm members
+            output = subprocess.check_output(['cat', '/proc/mdstat'])
+            for _line in str(output).splitlines():
+                if 'md' in _line:
+                    for _disk in raid_disks:
+                        disk_in_raid = _disk in _line
+                        if disk_in_raid:
+                            break
+                if disk_in_raid:
+                    break
+        return disk_in_raid
 
-def disks_are_member_of_raid(disks):
-    disk_in_raid = False
-    if os.path.exists('/sbin/mdadm'):
-        # check if disks list has active mdadm members
-        output = subprocess.check_output(['cat', '/proc/mdstat'])
-        for line in str(output).splitlines():
-            if 'md' in line:
-                for disk in disks:
-                    disk_in_raid = disk in line
-                    if disk_in_raid: break
-            if disk_in_raid: break
-    return disk_in_raid
+    parser = OptionParser(description='Open vStorage Ceph Deployment script')
+    parser.add_option('-d', '--disks', dest='disks',
+                      help="Disks to use for Ceph OSD's")
+    parser.add_option('-a', '--host', dest='additional_hostnames',
+                      help="Additional hosts to install")
+    (options, args) = parser.parse_args()
 
-if not options.additional_hostnames:
-    hostname = socket.gethostname()
-    disks = options.disks.split(',')
-    ceph_disks = ''
-    for disk in disks:
-        ceph_disks += ' {}:{}'.format(hostname, disk)
-    single_node = True;
-else:
-    single_node = False;
-    hostname = socket.gethostname()
-    disks = options.disks.split(',')
-    ceph_disks = ''
-    for disk in disks:
-        ceph_disks += ' {}:{}'.format(hostname, disk)
-    hosts = options.additional_hostnames.split(',')
-    for host in hosts:
-        hostname = hostname + ' ' + host
+    if not options.additional_hostnames:
+        hostname = socket.gethostname()
+        disks = options.disks.split(',')
+        ceph_disks = ''
         for disk in disks:
-            ceph_disks += ' {}:{}'.format(host, disk)
+            ceph_disks += ' {}:{}'.format(hostname, disk)
+        single_node = True
+    else:
+        single_node = False
+        hostname = socket.gethostname()
+        disks = options.disks.split(',')
+        ceph_disks = ''
+        for disk in disks:
+            ceph_disks += ' {}:{}'.format(hostname, disk)
+        hosts = options.additional_hostnames.split(',')
+        for host in hosts:
+            hostname = hostname + ' ' + host
+            for disk in disks:
+                ceph_disks += ' {}:{}'.format(host, disk)
 
-if disks and disks_are_member_of_raid(disks):
-    raise RuntimeError("At least one disk out of {} is member of a raid configuration, cleanup raid config or select other disks".format(disks))
+    if disks and disks_are_member_of_raid(disks):
+        raise RuntimeError("At least one disk out of {} is member of a raid configuration, cleanup raid config or select other disks".format(disks))
 
-if os.path.exists('/etc/ceph/ceph.conf'):
-    raise RuntimeError('Please cleanup first as a ceph.conf file already exists, script has been executed before!')
+    if os.path.exists('/etc/ceph/ceph.conf'):
+        raise RuntimeError('Please cleanup first as a ceph.conf file already exists, script has been executed before!')
 
-ceph_disks = ceph_disks[1:]  # Stripping first space
-os.chdir('/root')
-run_command('apt-get -y update')
-run_command('apt-get -y install ceph-deploy')
-run_command('ceph-deploy install {}'.format(hostname))
-run_command('ceph-deploy new {}'.format(hostname))
-run_command('ceph-deploy mon create {}'.format(hostname))
-run_command('ceph-deploy gatherkeys {}'.format(socket.gethostname()), fail=False)
-run_command('ceph-deploy gatherkeys {}'.format(socket.gethostname()), fail=False)
-from time import sleep
-sleep(5)
-run_command('ceph-deploy gatherkeys {}'.format(socket.gethostname()))
+    ceph_disks = ceph_disks[1:]  # Stripping first space
+    os.chdir('/root')
+    run_command('apt-get -y update')
+    run_command('apt-get -y install ceph-deploy')
+    run_command('ceph-deploy install {}'.format(hostname))
+    run_command('ceph-deploy new {}'.format(hostname))
+    run_command('ceph-deploy mon create {}'.format(hostname))
+    run_command('ceph-deploy gatherkeys {}'.format(socket.gethostname()), fail=False)
+    run_command('ceph-deploy gatherkeys {}'.format(socket.gethostname()), fail=False)
+    from time import sleep
+    sleep(5)
+    run_command('ceph-deploy gatherkeys {}'.format(socket.gethostname()))
 
+    ceph_disks = ceph_disks.split(' ')
+    for disk in ceph_disks:
+        run_command('ceph-deploy disk zap {}'.format(disk))
+        run_command('ceph-deploy osd create {}'.format(disk))
+    run_command('ceph-deploy mds create {}'.format(hostname))
 
-ceph_disks = ceph_disks.split(' ')
-for disk in ceph_disks:
-    run_command('ceph-deploy disk zap {}'.format(disk))
-    run_command('ceph-deploy osd create {}'.format(disk))
-run_command('ceph-deploy mds create {}'.format(hostname))
+    run_command('service ceph start')
+    run_command('ceph health')
 
+    if not options.additional_hostnames:
+        if len(disks) > 1:
+            run_command('ceph osd getcrushmap -o /tmp/current_crushmap')
+            run_command('crushtool -d /tmp/current_crushmap -o /tmp/current_crushmap_editable')
+            fh = open('/tmp/current_crushmap_editable', 'r')
+            fc = fh.readlines()
+            fh.close()
+            nfc = list()
+            for line in fc:
+                if line.find('step chooseleaf') > -1:
+                    nfc.append(line.replace('host', 'osd'))
+                else:
+                    nfc.append(line)
+            fh = open('/tmp/current_crushmap_editable', 'w')
+            fh.write(''.join(nfc))
+            fh.close()
+            run_command('crushtool -c /tmp/current_crushmap_editable -o /tmp/new_crushmap')
+            run_command('ceph osd setcrushmap -i /tmp/new_crushmap')
 
-run_command('service ceph start')
-run_command('ceph health')
+    run_command('apt-get -y install apache2 libapache2-mod-fastcgi')
+    fh = open('/etc/apache2/apache2.conf', 'a')
+    fh.write('ServerName {}'.format(socket.gethostname()))
+    fh.close()
+    run_command('a2enmod rewrite')
+    run_command('a2enmod ssl')
+    run_command('mkdir /etc/apache2/ssl')
+    run_command('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/apache2/ssl/apache.key -out /etc/apache2/ssl/apache.crt')
+    run_command('service apache2 restart')
 
-if not options.additional_hostnames:
-    if len(disks) > 1:
-        run_command('ceph osd getcrushmap -o /tmp/current_crushmap')
-        run_command('crushtool -d /tmp/current_crushmap -o /tmp/current_crushmap_editable')
-        fh = open('/tmp/current_crushmap_editable', 'r')
-        fc = fh.readlines()
-        fh.close()
-        nfc = list()
-        for line in fc:
-            if line.find('step chooseleaf') > -1:
-                nfc.append(line.replace('host', 'osd'))
-            else:
-                nfc.append(line)
-        fh = open('/tmp/current_crushmap_editable', 'w')
-        fh.write(''.join(nfc))
-        fh.close()
-        run_command('crushtool -c /tmp/current_crushmap_editable -o /tmp/new_crushmap')
-        run_command('ceph osd setcrushmap -i /tmp/new_crushmap')
-
-run_command('apt-get -y install apache2 libapache2-mod-fastcgi')
-fh = open('/etc/apache2/apache2.conf', 'a')
-fh.write('ServerName {}'.format(socket.gethostname()))
-fh.close()
-run_command('a2enmod rewrite')
-run_command('a2enmod ssl')
-run_command('mkdir /etc/apache2/ssl')
-run_command('openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/apache2/ssl/apache.key -out /etc/apache2/ssl/apache.crt')
-run_command('service apache2 restart')
-
-radosgw = """
+    radosgw = """
 FastCgiExternalServer /var/www/s3gw.fcgi -socket /tmp/radosgw.sock
 
 <VirtualHost *:80>
@@ -163,85 +167,84 @@ FastCgiExternalServer /var/www/s3gw.fcgi -socket /tmp/radosgw.sock
         ServerSignature Off
 </VirtualHost>
 """
-fh = open('/etc/apache2/sites-available/rgw.conf', 'w')
-fh.write(radosgw)
-fh.close
+    fh = open('/etc/apache2/sites-available/rgw.conf', 'w')
+    fh.write(radosgw)
+    fh.close()
 
-run_command('a2ensite rgw.conf')
-run_command('a2dissite 000-default.conf')
-run_command('service apache2 reload')
+    run_command('a2ensite rgw.conf')
+    run_command('a2dissite 000-default.conf')
+    run_command('service apache2 reload')
 
-run_command('apt-get -y install radosgw')
+    run_command('apt-get -y install radosgw')
 
-fh = open('/etc/ceph/ceph.conf', 'a')
-radosgw_ceph_config = """
+    fh = open('/etc/ceph/ceph.conf', 'a')
+    radosgw_ceph_config = """
 [client.radosgw.gateway]
 host = {}
 keyring = /etc/ceph/keyring.radosgw.gateway
 rgw socket path = /tmp/radosgw.sock
 log file = /var/log/ceph/radosgw.log
 """.format(socket.gethostname())
-fh.write(radosgw_ceph_config)
-fh.close()
+    fh.write(radosgw_ceph_config)
+    fh.close()
 
-os.makedirs('/var/lib/ceph/radosgw/ceph-radosgw.gateway')
+    os.makedirs('/var/lib/ceph/radosgw/ceph-radosgw.gateway')
 
-fh = open('/var/www/s3gw.fcgi', 'w')
-fcgi_content = """
+    fh = open('/var/www/s3gw.fcgi', 'w')
+    fcgi_content = """
 #!/usr/bin/env sh
 exec /usr/bin/radosgw -c /etc/ceph/ceph.conf -n client.radosgw.gateway
 """
-fh.write(fcgi_content)
-fh.close()
+    fh.write(fcgi_content)
+    fh.close()
 
+    run_command('ceph-authtool --create-keyring /etc/ceph/keyring.radosgw.gateway')
+    run_command('chmod +r /etc/ceph/keyring.radosgw.gateway')
 
-run_command('ceph-authtool --create-keyring /etc/ceph/keyring.radosgw.gateway')
-run_command('chmod +r /etc/ceph/keyring.radosgw.gateway')
+    run_command('ceph-authtool /etc/ceph/keyring.radosgw.gateway -n client.radosgw.gateway --gen-key')
+    os.system("ceph-authtool -n client.radosgw.gateway --cap osd 'allow rwx' --cap mon 'allow rw' /etc/ceph/keyring.radosgw.gateway")
 
-run_command('ceph-authtool /etc/ceph/keyring.radosgw.gateway -n client.radosgw.gateway --gen-key')
-os.system("ceph-authtool -n client.radosgw.gateway --cap osd 'allow rwx' --cap mon 'allow rw' /etc/ceph/keyring.radosgw.gateway")
+    run_command('ceph -k /etc/ceph/ceph.client.admin.keyring auth add client.radosgw.gateway -i /etc/ceph/keyring.radosgw.gateway')
 
-run_command('ceph -k /etc/ceph/ceph.client.admin.keyring auth add client.radosgw.gateway -i /etc/ceph/keyring.radosgw.gateway')
+    run_command('ceph osd pool create .rgw 100 100')
+    run_command('ceph osd pool create .rgw.control 100 100')
+    run_command('ceph osd pool create .rgw.gc 100 100')
+    run_command('ceph osd pool create .rgw.root 100 100')
+    run_command('ceph osd pool create .log 100 100')
+    run_command('ceph osd pool create .intent-log 100 100')
+    run_command('ceph osd pool create .usage 100 100')
+    run_command('ceph osd pool create .users 100 100')
+    run_command('ceph osd pool create .users.email 100 100')
+    run_command('ceph osd pool create .users.swift 100 100')
+    run_command('ceph osd pool create .users.uid 100 100')
 
-run_command('ceph osd pool create .rgw 100 100')
-run_command('ceph osd pool create .rgw.control 100 100')
-run_command('ceph osd pool create .rgw.gc 100 100')
-run_command('ceph osd pool create .rgw.root 100 100')
-run_command('ceph osd pool create .log 100 100')
-run_command('ceph osd pool create .intent-log 100 100')
-run_command('ceph osd pool create .usage 100 100')
-run_command('ceph osd pool create .users 100 100')
-run_command('ceph osd pool create .users.email 100 100')
-run_command('ceph osd pool create .users.swift 100 100')
-run_command('ceph osd pool create .users.uid 100 100')
+    if single_node & (len(disks) == 1):
+        print "Single node, single disk"
+        run_command('ceph osd pool set data size 1')
+        run_command('ceph osd pool set metadata size 1')
+        run_command('ceph osd pool set rbd size 1')
+        run_command('ceph osd pool set .rgw size 1')
+        run_command('ceph osd pool set .rgw.control size 1')
+        run_command('ceph osd pool set .rgw.gc size 1')
+        run_command('ceph osd pool set .rgw.root size 1')
+        run_command('ceph osd pool set .log size 1')
+        run_command('ceph osd pool set .intent-log size 1')
+        run_command('ceph osd pool set .usage size 1')
+        run_command('ceph osd pool set .users size 1')
+        run_command('ceph osd pool set .users.email size 1')
+        run_command('ceph osd pool set .users.swift size 1')
+        run_command('ceph osd pool set .users.uid size 1')
 
-if single_node & (len(disks) == 1):
-    print "Single node, single disk"
-    run_command('ceph osd pool set data size 1')
-    run_command('ceph osd pool set metadata size 1')
-    run_command('ceph osd pool set rbd size 1')
-    run_command('ceph osd pool set .rgw size 1')
-    run_command('ceph osd pool set .rgw.control size 1')
-    run_command('ceph osd pool set .rgw.gc size 1')
-    run_command('ceph osd pool set .rgw.root size 1')
-    run_command('ceph osd pool set .log size 1')
-    run_command('ceph osd pool set .intent-log size 1')
-    run_command('ceph osd pool set .usage size 1')
-    run_command('ceph osd pool set .users size 1')
-    run_command('ceph osd pool set .users.email size 1')
-    run_command('ceph osd pool set .users.swift size 1')
-    run_command('ceph osd pool set .users.uid size 1')
+    run_command('service ceph restart')
+    run_command('service apache2 restart')
+    run_command('/etc/init.d/radosgw start')
 
-run_command('service ceph restart')
-run_command('service apache2 restart')
-run_command('/etc/init.d/radosgw start')
+    run_command('radosgw-admin user create --uid=johndoe --display-name="John Doe" --email=john@example.com')
 
-run_command('radosgw-admin user create --uid=johndoe --display-name="John Doe" --email=john@example.com')
+    run_command('ceph status')
 
-run_command('ceph status')
+    run_command('touch /var/lib/ceph/radosgw/ceph-radosgw.gateway/done')
 
-run_command('touch /var/lib/ceph/radosgw/ceph-radosgw.gateway/done')
-
-print 'To use this Ceph server with OVS nodes, please copy the following files:'
-print '/etc/ceph/ceph.conf -> ovs_node:/etc/ceph/ceph.conf'
-print '/etc/ceph/ceph.client.admin.keyring -> ovs_node:/etc/ceph/ceph.keyring'
+    print 'To use this Ceph server with OVS nodes, please copy the following files:'
+    print '/etc/ceph/ceph.conf -> ovs_node:/etc/ceph/ceph.conf'
+    print '/etc/ceph/ceph.client.admin.keyring -> ovs_node:/etc/ceph/ceph.keyring'

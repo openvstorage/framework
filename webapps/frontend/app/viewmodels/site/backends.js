@@ -1,10 +1,10 @@
-// Copyright 2014 iNuron NV
+// Copyright 2016 iNuron NV
 //
-// Licensed under the Open vStorage Modified Apache License (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/license
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +23,7 @@ define([
 
         // Variables
         self.shared           = shared;
-        self.guard            = { authenticated: true, registered: true };
+        self.guard            = { authenticated: true };
         self.refresher        = new Refresher();
         self.widgets          = [];
         self.backendHeaders   = [
@@ -46,15 +46,12 @@ define([
         self.backendsHandle         = {};
 
         // Functions
-        self.loadBackends = function(page) {
+        self.loadBackends = function(options) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.backendsHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        page: page,
-                        contents: '_relations'
-                    };
-                    self.backendsHandle[page] = api.get('backends', { queryparams: options })
+                if (generic.xhrCompleted(self.backendsHandle[options.page])) {
+                    options.sort = 'name';
+                    options.contents = '_relations';
+                    self.backendsHandle[options.page] = api.get('backends', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
                                 data: data,

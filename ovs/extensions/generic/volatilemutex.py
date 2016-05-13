@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,13 +15,9 @@
 """
 Volatile mutex module
 """
-
 import time
-
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('extensions', 'volatile mutex')
 
 
 class NoLockAvailableException(Exception):
@@ -31,7 +27,7 @@ class NoLockAvailableException(Exception):
     pass
 
 
-class VolatileMutex(object):
+class volatile_mutex(object):
     """
     This is a volatile, distributed mutex to provide cross thread, cross process and cross node
     locking. However, this mutex is volatile and thus can fail. You want to make sure you don't
@@ -42,6 +38,7 @@ class VolatileMutex(object):
         """
         Creates a volatile mutex object
         """
+        self._logger = LogHandler.get('extensions', 'volatile mutex')
         self._volatile = VolatileFactory.get_client()
         self.name = name
         self._has_lock = False
@@ -74,11 +71,11 @@ class VolatileMutex(object):
             time.sleep(0.005)
             passed = time.time() - self._start
             if wait is not None and passed > wait:
-                logger.error('Lock for {0} could not be acquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
+                self._logger.error('Lock for {0} could not be acquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
                 raise NoLockAvailableException('Could not acquire lock %s' % self.key())
         passed = time.time() - self._start
         if passed > 0.1:  # More than 100 ms is a long time to wait!
-            logger.warning('Waited {0} sec for lock {1}'.format(passed, self.key()))
+            self._logger.warning('Waited {0} sec for lock {1}'.format(passed, self.key()))
         self._start = time.time()
         self._has_lock = True
         return True
@@ -91,7 +88,7 @@ class VolatileMutex(object):
             self._volatile.delete(self.key())
             passed = time.time() - self._start
             if passed > 0.25:  # More than 250 ms is a long time to hold a lock
-                logger.warning('A lock on {0} was kept for {1} sec'.format(self.key(), passed))
+                self._logger.warning('A lock on {0} was kept for {1} sec'.format(self.key(), passed))
             self._has_lock = False
 
     def key(self):

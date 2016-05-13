@@ -1,10 +1,10 @@
-# Copyright 2015 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,13 +21,12 @@ from ovs.extensions.packages.debian import DebianPackage
 from ovs.extensions.packages.rpm import RpmPackage
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='packagemanager')
-
 
 class PackageManager(object):
     """
     Factory class returning specialized classes
     """
+    _logger = LogHandler.get('extensions', name='packagemanager')
     ImplementationClass = None
 
     class MetaClass(type):
@@ -52,7 +51,7 @@ class PackageManager(object):
                     else:
                         raise RuntimeError('There is no handler for Distributor ID: {0}'.format(distributor))
                 except Exception as ex:
-                    logger.exception('Error loading Distributor ID: {0}'.format(ex))
+                    PackageManager._logger.exception('Error loading Distributor ID: {0}'.format(ex))
                     raise
             return getattr(PackageManager.ImplementationClass, item)
 

@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,94 +15,64 @@
 """
 Delete snapshots test module
 """
-import sys
+import os
+import time
+import datetime
 import unittest
-from time import mktime
-from datetime import datetime, timedelta
-from unittest import TestCase
-from ovs.lib.tests.mockups import StorageDriverModule
+from ovs.dal.hybrids.backendtype import BackendType
+from ovs.dal.hybrids.disk import Disk
+from ovs.dal.hybrids.diskpartition import DiskPartition
+from ovs.dal.hybrids.failuredomain import FailureDomain
+from ovs.dal.hybrids.pmachine import PMachine
+from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.vdisk import VDisk
+from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
+from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient
+from ovs.lib.vmachine import VMachineController
+from ovs.lib.vdisk import VDiskController
+from ovs.lib.scheduledtask import ScheduledTaskController
 
 
-class DeleteSnapshots(TestCase):
+class DeleteSnapshots(unittest.TestCase):
     """
     This test class will validate the various scenarios of the delete snapshots logic
     """
-
-    Disk = None
-    VDisk = None
-    VPool = None
-    VMachine = None
-    PMachine = None
-    logLevel = None
-    BackendType = None
-    DiskPartition = None
-    FailureDomain = None
-    StorageRouter = None
-    VolatileMutex = None
-    VDiskController = None
-    VMachineController = None
-    ScheduledTaskController = None
-
     @classmethod
     def setUpClass(cls):
         """
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        # Load dummy stores
-        PersistentFactory.store = DummyPersistentStore()
-        VolatileFactory.store = DummyVolatileStore()
-        # Replace mocked classes
-        sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriverModule
-        # Import required modules/classes after mocking is done
-        from ovs.dal.hybrids.backendtype import BackendType
-        from ovs.dal.hybrids.disk import Disk
-        from ovs.dal.hybrids.diskpartition import DiskPartition
-        from ovs.dal.hybrids.failuredomain import FailureDomain
-        from ovs.dal.hybrids.pmachine import PMachine
-        from ovs.dal.hybrids.storagerouter import StorageRouter
-        from ovs.dal.hybrids.vdisk import VDisk
-        from ovs.dal.hybrids.vmachine import VMachine
-        from ovs.dal.hybrids.vpool import VPool
-        from ovs.extensions.generic.volatilemutex import VolatileMutex
-        from ovs.lib.vmachine import VMachineController
-        from ovs.lib.vdisk import VDiskController
-        from ovs.lib.scheduledtask import ScheduledTaskController
-        # Globalize mocked classes
-        global Disk
-        global VDisk
-        global VMachine
-        global PMachine
-        global VPool
-        global BackendType
-        global DiskPartition
-        global FailureDomain
-        global StorageRouter
-        global VolatileMutex
-        global VMachineController
-        global VDiskController
-        global ScheduledTaskController
-        _ = VDisk(), VolatileMutex('dummy'), VMachine(), PMachine(), VPool(), BackendType(), FailureDomain(), \
-            VMachineController, VDiskController, ScheduledTaskController, StorageRouter(), Disk(), DiskPartition()
+        cls.persistent = PersistentFactory.get_client()
+        cls.persistent._keep_in_memory_only = True
+        cls.persistent.clean()
 
-        # Cleaning storage
-        VolatileFactory.store.clean()
-        PersistentFactory.store.clean()
+        cls.volatile = VolatileFactory.get_client()
+        cls.volatile._keep_in_memory_only = True
+        cls.volatile.clean()
+        MockStorageRouterClient.clean()
 
-    @classmethod
-    def setUp(cls):
+    def setUp(self):
         """
         (Re)Sets the stores on every test
         """
-        PersistentFactory.store = DummyPersistentStore()
-        PersistentFactory.store.clean()
-        VolatileFactory.store = DummyVolatileStore()
-        VolatileFactory.store.clean()
+        # Cleaning storage
+        self.volatile.clean()
+        self.persistent.clean()
+        MockStorageRouterClient.clean()
+
+    def tearDown(self):
+        """
+        Clean up the unittest
+        """
+        # Cleaning storage
+        self.volatile.clean()
+        self.persistent.clean()
+        MockStorageRouterClient.clean()
 
     def test_happypath(self):
         """
@@ -110,7 +80,7 @@ class DeleteSnapshots(TestCase):
         every now an then. The delete policy is executed every day
         """
         # Setup
-        # There are 2 machines; one with two disks, one with one disk and an additional disk
+        # There are 2 machines; one with two disks, one with one disk and a stand-alone additional disk
         failure_domain = FailureDomain()
         failure_domain.name = 'Test'
         failure_domain.save()
@@ -120,6 +90,7 @@ class DeleteSnapshots(TestCase):
         backend_type.save()
         vpool = VPool()
         vpool.name = 'vpool'
+        vpool.status = 'RUNNING'
         vpool.backend_type = backend_type
         vpool.save()
         pmachine = PMachine()
@@ -204,17 +175,20 @@ class DeleteSnapshots(TestCase):
             [dynamic for dynamic in disk._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         # Run the testing scenario
-        debug = True
+        travis = 'TRAVIS' in os.environ and os.environ['TRAVIS'] == 'true'
+        if travis is True:
+            print 'Running in Travis, reducing output.'
+        debug = not travis
         amount_of_days = 50
-        base = datetime.now().date()
-        day = timedelta(1)
+        base = datetime.datetime.now().date()
+        day = datetime.timedelta(1)
         minute = 60
         hour = minute * 60
 
         for d in xrange(0, amount_of_days):
-            base_timestamp = DeleteSnapshots._make_timestamp(base, day * d)
+            base_timestamp = self._make_timestamp(base, day * d)
             print ''
-            print 'Day cycle: {0}: {1}'.format(d, datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d'))
+            print 'Day cycle: {0}: {1}'.format(d, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d'))
 
             # At the start of the day, delete snapshot policy runs at 00:30
             print '- Deleting snapshots'
@@ -271,7 +245,7 @@ class DeleteSnapshots(TestCase):
 
         minute = 60
         hour = minute * 60
-        day = timedelta(1)
+        day = datetime.timedelta(1)
 
         print '  - {0}'.format(vdisk.name)
 
@@ -281,8 +255,8 @@ class DeleteSnapshots(TestCase):
             for snapshot in vdisk.snapshots:
                 snapshots[int(snapshot['timestamp'])] = snapshot
             for d in xrange(0, amount_of_days):
-                timestamp = DeleteSnapshots._make_timestamp(base_date, d * day)
-                visual = '    - {0} '.format(datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d'))
+                timestamp = self._make_timestamp(base_date, d * day)
+                visual = '    - {0} '.format(datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d'))
                 for t in xrange(timestamp, timestamp + hour * 24, minute * 30):
                     if t in snapshots:
                         visual += 'C' if snapshots[t]['is_consistent'] else 'R'
@@ -308,58 +282,41 @@ class DeleteSnapshots(TestCase):
         while pointer < current_day and pointer <= 28:
             amount_consistent += 1  # One consistent snapshot per week
             pointer += 7
-        self.assertEqual(
-            len(consistent), amount_consistent,
-            'Wrong amount of consistent snapshots: {0} vs expected {1}'.format(len(consistent),
-                                                                               amount_consistent)
-        )
-        self.assertEqual(
-            len(inconsistent), amount_inconsistent,
-            'Wrong amount of inconsistent snapshots: {0} vs expected {1}'.format(len(inconsistent),
-                                                                                 amount_inconsistent)
-        )
+        self.assertEqual(first=len(consistent),
+                         second=amount_consistent,
+                         msg='Wrong amount of consistent snapshots: {0} vs expected {1}'.format(len(consistent), amount_consistent))
+        self.assertEqual(first=len(inconsistent),
+                         second=amount_inconsistent,
+                         msg='Wrong amount of inconsistent snapshots: {0} vs expected {1}'.format(len(inconsistent), amount_inconsistent))
 
         # Check of the correctness of the snapshot timestamp
         for d in xrange(0, current_day):
             if d == (current_day - 1):
                 for h in xrange(2, 23):
-                    timestamp = DeleteSnapshots._make_timestamp(base_date, d * day) + (hour * h)
-                    self.assertIn(
-                        timestamp, inconsistent,
-                        'Expected hourly inconsistent snapshot for {0} at {1}'.format(
-                            vdisk.name, datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
-                        )
-                    )
+                    timestamp = self._make_timestamp(base_date, d * day) + (hour * h)
+                    self.assertIn(member=timestamp,
+                                  container=inconsistent,
+                                  msg='Expected hourly inconsistent snapshot for {0} at {1}'.format(vdisk.name, self._from_timestamp(timestamp)))
                     if h in [6, 12, 18]:
                         ts = (timestamp + (minute * 30))
-                        self.assertIn(
-                            ts, consistent,
-                            'Expected random consistent snapshot for {0} at {1}'.format(
-                                vdisk.name, datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M')
-                            )
-                        )
+                        self.assertIn(member=ts,
+                                      container=consistent,
+                                      msg='Expected random consistent snapshot for {0} at {1}'.format(vdisk.name, self._from_timestamp(ts)))
             elif d > (current_day - 7):
-                timestamp = DeleteSnapshots._make_timestamp(base_date, d * day) + (hour * 18) + (minute * 30)
-                self.assertIn(
-                    timestamp, consistent,
-                    'Expected daily consistent snapshot for {0} at {1}'.format(
-                        vdisk.name, datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
-                    )
-                )
+                timestamp = self._make_timestamp(base_date, d * day) + (hour * 18) + (minute * 30)
+                self.assertIn(member=timestamp,
+                              container=consistent,
+                              msg='Expected daily consistent snapshot for {0} at {1}'.format(vdisk.name, self._from_timestamp(timestamp)))
             elif d % 7 == 0 and d > 28:
-                timestamp = DeleteSnapshots._make_timestamp(base_date, d * day) + (hour * 18) + (minute * 30)
-                self.assertIn(
-                    timestamp, consistent,
-                    'Expected weekly consistent snapshot for {0} at {1}'.format(
-                        vdisk.name, datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
-                    )
-                )
+                timestamp = self._make_timestamp(base_date, d * day) + (hour * 18) + (minute * 30)
+                self.assertIn(member=timestamp,
+                              container=consistent,
+                              msg='Expected weekly consistent snapshot for {0} at {1}'.format(vdisk.name, self._from_timestamp(timestamp)))
 
     @staticmethod
     def _make_timestamp(base, offset):
-        return int(mktime((base + offset).timetuple()))
+        return int(time.mktime((base + offset).timetuple()))
 
-
-if __name__ == '__main__':
-    suite = unittest.TestLoader().loadTestsFromTestCase(DeleteSnapshots)
-    unittest.TextTestRunner().run(suite)
+    @staticmethod
+    def _from_timestamp(timestamp):
+        return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')

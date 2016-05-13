@@ -24,16 +24,18 @@
      '''NurseryConfig type'''
 --- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/protocol/__init__.py
 +++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/protocol/__init__.py
-@@ -26,7 +26,7 @@
+@@ -26,8 +26,8 @@
  except ImportError:
      import StringIO
 
 -from pyrakoon import utils
+-import pyrakoon.consistency
 +from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import utils
++import ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency
 
  # Result codes
  RESULT_SUCCESS = 0x0000
-@@ -300,7 +300,7 @@
+@@ -302,7 +302,7 @@
      '''Step type'''
 
      def check(self, value):
@@ -42,7 +44,53 @@
 
          if not isinstance(value, sequence.Step):
              raise TypeError
-@@ -708,7 +708,7 @@
+@@ -650,18 +650,18 @@
+     #pylint: disable=R0912
+
+     def check(self, value):
+-        if value is not pyrakoon.consistency.CONSISTENT \
+-            and value is not pyrakoon.consistency.INCONSISTENT \
++        if value is not ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.CONSISTENT \
++            and value is not ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.INCONSISTENT \
+             and value is not None \
+-            and not isinstance(value, pyrakoon.consistency.AtLeast):
++            and not isinstance(value, ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.AtLeast):
+             raise ValueError('Invalid `consistency` value')
+
+     def serialize(self, value):
+-        if value is pyrakoon.consistency.CONSISTENT or value is None:
++        if value is ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.CONSISTENT or value is None:
+             yield '\0'
+-        elif value is pyrakoon.consistency.INCONSISTENT:
++        elif value is ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.INCONSISTENT:
+             yield '\1'
+-        elif isinstance(value, pyrakoon.consistency.AtLeast):
++        elif isinstance(value, ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.AtLeast):
+             yield '\2'
+             for data in INT64.serialize(value.i):
+                 yield data
+@@ -680,9 +680,9 @@
+             raise TypeError
+
+         if request.value == 0:
+-            yield Result(pyrakoon.consistency.CONSISTENT)
++            yield Result(ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.CONSISTENT)
+         elif request.value == 1:
+-            yield Result(pyrakoon.consistency.INCONSISTENT)
++            yield Result(ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.INCONSISTENT)
+         elif request.value == 2:
+             i_receiver = INT64.receive()
+             request = i_receiver.next()
+@@ -694,7 +694,7 @@
+             if not isinstance(request, Result):
+                 raise TypeError
+
+-            yield Result(pyrakoon.consistency.AtLeast(request.value))
++            yield Result(ovs.extensions.db.arakoon.pyrakoon.pyrakoon.consistency.AtLeast(request.value))
+         else:
+             raise ValueError('Unknown consistency tag \'%d\'' % request.value)
+
+@@ -766,7 +766,7 @@
          :see: :func:`pyrakoon.utils.process_blocking`
          '''
 
@@ -51,7 +99,7 @@
 
          code_receiver = UINT32.receive()
          request = code_receiver.next() #pylint: disable=E1101
-@@ -1034,7 +1034,7 @@
+@@ -1092,7 +1092,7 @@
      ''')
 
      def __init__(self, steps, sync):
@@ -145,7 +193,7 @@
 
  def validate_types(specs, args):
      '''Validate method call argument types
-@@ -87,7 +87,7 @@
+@@ -88,7 +88,7 @@
              self = kwargs['self']
 
              if not self.connected:
@@ -169,7 +217,7 @@
 
  class ClientMixin: #pylint: disable=W0232,R0904,old-style-class
      '''Mixin providing client actions for standard cluster functionality
-@@ -234,7 +234,7 @@
+@@ -238,7 +238,7 @@
              for part in message.serialize():
                  self._socket.sendall(part)
 
@@ -191,21 +239,24 @@
      '''"optimize_db" message'''
 --- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/compat.py
 +++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/compat.py
-@@ -20,11 +20,11 @@
+@@ -21,14 +21,14 @@
  import random
  import select
  import socket
 -import logging
  import functools
  import threading
+ import inspect
+ import operator
+ import ssl
 
--from pyrakoon import client, errors, protocol, sequence, utils
-+from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, errors, protocol, sequence, utils
+-from pyrakoon import client, consistency, errors, protocol, sequence, utils
++from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, consistency, errors, protocol, sequence, utils
 +from ovs.log.logHandler import LogHandler
 
  __docformat__ = 'epytext'
 
-@@ -48,22 +48,7 @@
+@@ -52,22 +52,7 @@
  # E1121: Too many positional arguments for function call
  # R0904: Too many public methods
 
@@ -227,8 +278,8 @@
 -del _add_handler
 +LOGGER = LogHandler.get('arakoon_client', 'pyrakoon', propagate=False)
 
-
- def _validate_signature_helper(fun, *args):
+ class Consistency:
+     pass
 --- ovs/extensions/db/arakoon/pyrakoon/pyrakoon/tx.py
 +++ ovs/extensions/db/arakoon/pyrakoon/pyrakoon/tx.py
 @@ -26,7 +26,7 @@
@@ -239,4 +290,3 @@
 +from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, errors, protocol, utils
 
  #pylint: disable=R0904,C0103,R0901
-

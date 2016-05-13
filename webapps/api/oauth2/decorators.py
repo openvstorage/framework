@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,10 +23,8 @@ from rest_framework.request import Request
 from rest_framework.exceptions import PermissionDenied
 from django.core.handlers.wsgi import WSGIRequest
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.log.logHandler import LogHandler
-
-logger = LogHandler.get('api', 'oauth2')
 
 
 def _find_request(args):
@@ -42,6 +40,8 @@ def auto_response():
     """
     Json response wrapper
     """
+    logger = LogHandler.get('api', 'oauth2')
+
     def wrap(f):
         """
         Wrapper function
@@ -78,6 +78,8 @@ def limit(amount, per, timeout):
     """
     Rate-limits the decorated call
     """
+    logger = LogHandler.get('api', 'oauth2')
+
     def wrap(f):
         """
         Wrapper function
@@ -92,7 +94,7 @@ def limit(amount, per, timeout):
                 request.META['HTTP_X_REAL_IP']
             )
             client = VolatileFactory.get_client()
-            mutex = VolatileMutex(key)
+            mutex = volatile_mutex(key)
             try:
                 mutex.acquire()
                 rate_info = client.get(key, {'calls': [],

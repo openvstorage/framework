@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,18 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest import TestCase
-from ovs.extensions.generic.system import System
+"""
+Test module for the System class
+"""
+import unittest
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.system import System
 
 
-class TestSystem(TestCase):
+class TestSystem(unittest.TestCase):
     multiple_port_range = [[5000, 6000], [7000, 7500], [8000, 9000]]
     single_port = [1500]
     single_port_range = [[8870, 8880]]
     ip = '127.0.0.1'
 
-    def setup(self):
+    def setUp(self):
         pass
 
     def test_no_free_port_can_be_found_within_system_range(self):

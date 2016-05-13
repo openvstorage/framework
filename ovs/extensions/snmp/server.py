@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,6 @@
 SNMP Server module
 """
 
-import sys
 from pysnmp.entity import engine, config
 from pysnmp.entity.rfc3413 import cmdrsp, context
 from pysnmp.carrier import error
@@ -123,7 +122,6 @@ class SNMPServer():
                          config.usmHMACMD5AuthProtocol, user[1],
                          config.usmDESPrivProtocol, user[2])
 
-
     def _add_user_permission(self, OID):
         """
         Add user permission to OID - readOnly
@@ -137,7 +135,6 @@ class SNMPServer():
              #Allow full MIB access for this user / securityModels at VACM
              config.addVacmUser(self.snmpEngine, 1, 'my-read-area',
                    'noAuthNoPriv', OID)
-
 
     def register_custom_oid(self, class_oid, instance_oid, attribute_oid, get_function, atype = str):
         """

@@ -1,10 +1,10 @@
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,7 @@
 Hypervisor/ManagementCenter factory module
 """
 
-from ovs.extensions.generic.filemutex import FileMutex
+from ovs.extensions.generic.filemutex import file_mutex
 
 
 class Factory(object):
@@ -38,7 +38,7 @@ class Factory(object):
         password = pmachine.password
         key = '{0}_{1}'.format(ip, username)
         if key not in Factory.hypervisors:
-            mutex = FileMutex('hypervisor_{0}'.format(key))
+            mutex = file_mutex('hypervisor_{0}'.format(key))
             try:
                 mutex.acquire(30)
                 if key not in Factory.hypervisors:
@@ -75,7 +75,7 @@ class Factory(object):
         password = mgmt_center.password
         key = '{0}_{1}'.format(ip, username)
         if key not in Factory.mgmtcenters:
-            mutex = FileMutex('mgmtcenter_{0}'.format(key))
+            mutex = file_mutex('mgmtcenter_{0}'.format(key))
             try:
                 mutex.acquire(30)
                 if key not in Factory.mgmtcenters:

@@ -1,11 +1,11 @@
 #!/usr/bin/env python2
-# Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,53 +25,32 @@ import time
 import sys
 import logging
 import pyinotify
-from ConfigParser import RawConfigParser
 from ovs.extensions.rabbitmq.processor import process
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler.get('extensions', name='consumer')
-logging.basicConfig()
 KVM_ETC = '/etc/libvirt/qemu/'
 KVM_RUN = '/run/libvirt/qemu/'
 
 mapping = {}
 
 
-def run_kvm_watcher():
-    """
-    Check whether to run the KVM file watcher
-    """
-    return System.get_my_storagerouter().pmachine.hvtype == 'KVM'
-
-
-def run_event_consumer():
-    """
-    Check whether to run the event consumer
-    """
-    my_ip = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(System.get_my_machine_id()))
-    for endpoint in EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints'):
-        if endpoint.startswith(my_ip):
-            return True
-    return False
-
-
-def callback(ch, method, properties, body):
-    """
-    Handles the message, making sure it gets acknowledged once processed
-    """
-    _ = properties
-    try:
-        if type(body) == unicode:
-            data = bytearray(body, 'utf-8')
-            body = bytes(data)
-        process(queue, body, mapping)
-    except Exception as e:
-        logger.exception('Error processing message: {0}'.format(e))
-    ch.basic_ack(delivery_tag=method.delivery_tag)
-
 if __name__ == '__main__':
+    def callback(ch, method, properties, body):
+        """
+        Handles the message, making sure it gets acknowledged once processed
+        """
+        _ = properties
+        try:
+            if type(body) == unicode:
+                data = bytearray(body, 'utf-8')
+                body = bytes(data)
+            process(queue, body, mapping)
+        except Exception as e:
+            logger.exception('Error processing message: {0}'.format(e))
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+
     import argparse
     parser = argparse.ArgumentParser(description = 'KVM File Watcher and Rabbitmq Event Processor for OVS',
                                      formatter_class = argparse.RawDescriptionHelpFormatter)
@@ -83,11 +62,14 @@ if __name__ == '__main__':
     parser.add_argument('--watcher', dest='file_watcher', action='store_const', default=False, const=True,
                         help='Enable file watcher')
 
+    logger = LogHandler.get('extensions', name='consumer')
+    logging.basicConfig()
     args = parser.parse_args()
     print(args.rabbitmq_queue, args.queue_durable, args.file_watcher)
     notifier = None
+    run_kvm_watcher = System.get_my_storagerouter().pmachine.hvtype == 'KVM'
     try:
-        if args.file_watcher and run_kvm_watcher():
+        if args.file_watcher and run_kvm_watcher:
             from ovs.extensions.rabbitmq.kvm_xml_processor import Kxp
 
             wm = pyinotify.WatchManager()
@@ -112,14 +94,20 @@ if __name__ == '__main__':
             logger.info('Watching {0}...'.format(KVM_RUN), print_msg=True)
             logger.info('KVM xml processor active...', print_msg=True)
 
-        if run_event_consumer():
+        run_event_consumer = False
+        my_ip = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(System.get_my_machine_id()))
+        for endpoint in EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints'):
+            if endpoint.startswith(my_ip):
+                run_event_consumer = True
+
+        if run_event_consumer is True:
             # Load mapping
             mapping = {}
-            path = os.path.join(os.path.dirname(__file__), 'mappings')
+            path = '/'.join([os.path.dirname(__file__), 'mappings'])
             for filename in os.listdir(path):
-                if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+                if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                     name = filename.replace('.py', '')
-                    module = imp.load_source(name, os.path.join(path, filename))
+                    module = imp.load_source(name, '/'.join([path, filename]))
                     for member in inspect.getmembers(module):
                         if inspect.isclass(member[1]) \
                                 and member[1].__module__ == name \
@@ -174,10 +162,10 @@ if __name__ == '__main__':
                 time.sleep(3600)
 
     except KeyboardInterrupt:
-        if run_kvm_watcher() and notifier is not None:
+        if run_kvm_watcher and notifier is not None:
             notifier.stop()
     except Exception as exception:
         logger.error('Unexpected exception: {0}'.format(str(exception)), print_msg=True)
-        if run_kvm_watcher() and notifier is not None:
+        if run_kvm_watcher and notifier is not None:
             notifier.stop()
         sys.exit(1)

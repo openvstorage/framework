@@ -1,10 +1,10 @@
-// Copyright 2014 iNuron NV
+// Copyright 2016 iNuron NV
 //
-// Licensed under the Open vStorage Modified Apache License (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/license
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -34,6 +34,7 @@ define([
         self._lastPage       = ko.observable(1);
         self._pageFirst      = ko.observable(0);
         self._pageLast       = ko.observable(0);
+        self._pageSize       = ko.observable(10);
         self.headers         = ko.observableArray([]);
         self.settings        = ko.observable({});
         self.padding         = ko.observable(2);
@@ -44,6 +45,7 @@ define([
         self.sortable        = ko.observable(false);
         self.preloading      = ko.observable(false);
         self.sorting         = ko.observable({sequence: [], directions: {}});
+        self.pageSizes       = ko.observableArray([10, 25, 50, 100]);
 
         // Handles
         self.preloadHandle = undefined;
@@ -64,8 +66,17 @@ define([
                 self.container()(value);
             }
         });
+        self.pageSize = ko.computed({
+            read: self._pageSize,
+            write: function(value) {
+                if (self._pageSize() !== value) {
+                    self._pageSize(value);
+                    self.current(self.current());
+                }
+            }
+        });
         self.showControls = ko.computed(function() {
-            return self.controls() || (self.totalItems() > 10);
+            return self.controls() || (self.totalItems() > self.pageSize());
         });
         self.totalItems = ko.computed(function() {
             if (self.external()) {
@@ -75,7 +86,7 @@ define([
         });
         self.lastPage = ko.computed(function() {
             if (self.external()) {
-                return Math.floor((self.totalItems() - 1) / 10) + 1;
+                return Math.floor((self.totalItems() - 1) / self.pageSize()) + 1;
             }
             return self._lastPage();
         });
@@ -83,7 +94,7 @@ define([
             // One-based
             read: function() {
                 if (self.external()) {
-                    return Math.min(self.internalCurrent(), Math.floor(self.totalItems() / 10) + 1);
+                    return Math.min(self.internalCurrent(), Math.floor(self.totalItems() / self.pageSize()) + 1);
                 }
                 return self.internalCurrent();
             },
@@ -108,7 +119,7 @@ define([
         });
         self.pageFirst = ko.computed(function() {
             if (self.external()) {
-                return Math.min((self.current() - 1) * 10 + 1, self.items().length);
+                return Math.min((self.current() - 1) * self.pageSize() + 1, self.items().length);
             }
             return self._pageFirst();
         });
@@ -133,8 +144,8 @@ define([
         self.viewportCalculator = ko.computed(function() {
             if (self.external()) {
                 var i, items = self.items(), vItems = [],
-                    start = (self.current() - 1) * 10,
-                    max = Math.min(start + 10, items.length);
+                    start = (self.current() - 1) * self.pageSize(),
+                    max = Math.min(start + self.pageSize(), items.length);
                 for (i = start; i < max; i += 1) {
                     vItems.push(items[i]);
                 }
@@ -201,8 +212,15 @@ define([
             return false;
         };
         self.load = function(page, preload) {
+            var options = {
+                page: page,
+                page_size: parseInt(self.pageSize(), 10)
+            };
+            if (self.sortable()) {
+                options.sort = self.sortingKey()
+            }
             if (self.external()) {
-                self.loadData(page, self.sortingKey());
+                self.loadData(options);
             } else {
                 if (self.hasLoad(preload, !preload)) {
                     // If there's a preload, it shouldn't abort. If it's not a preload, it should abort.
@@ -219,14 +237,19 @@ define([
                     self._pageFirst(self.viewportCache[page].pageFirst);
                     self._pageLast(self.viewportCache[page].pageLast);
                 }
-                var promise = self.loadData(page, self.sortingKey())
+                var promise = self.loadData(options)
                     .then(function (dataset) {
                         if (dataset !== undefined && (preload || page === self.current())) {
-                            var keys = [], idata = {};
+                            var keys = [], idata = {}, maxPage = dataset.data._paging.max_page;
                             $.each(dataset.data.data, function (index, item) {
                                 keys.push(item[self.key]);
                                 idata[item[self.key]] = item;
                             });
+                            if (page > maxPage) {
+                                self.viewportCache = {};
+                                self.internalCurrent(maxPage);
+                                page = maxPage;
+                            }
                             self.viewportCache[page] = {
                                 keys: keys,
                                 totalItems: dataset.data._paging.total_items,

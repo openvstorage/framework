@@ -1,11 +1,10 @@
-#!/usr/bin/env python2
-#  Copyright 2014 iNuron NV
+# Copyright 2016 iNuron NV
 #
-# Licensed under the Open vStorage Modified Apache License (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.openvstorage.org/license
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,12 +16,11 @@
 Interface test module
 """
 import os
-import imp
 import inspect
-from unittest import TestCase
+import unittest
 
 
-class Interfaces(TestCase):
+class Interfaces(unittest.TestCase):
     """
     This Interfaces test will verify whether the different hypervisor/mgmtcenter classes do share an identical
     interface. This is required to be able to keep the calling code hypervisor agnostic
@@ -92,11 +90,11 @@ class Interfaces(TestCase):
         Returns the classes in the given module
         """
         classes = []
-        path = os.path.join(os.path.dirname(__file__), '../' + module_name)
+        path = '/'.join([os.path.dirname(__file__), '../' + module_name])
         for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+            if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
                 name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
+                module = inspect.imp.load_source(name, '/'.join([path, filename]))
                 for member in inspect.getmembers(module):
                     if inspect.isclass(member[1]) \
                             and member[1].__module__ == name \
@@ -104,8 +102,3 @@ class Interfaces(TestCase):
                         the_class = member[1]
                         classes.append(the_class)
         return classes
-
-if __name__ == '__main__':
-    import unittest
-    suite = unittest.TestLoader().loadTestsFromTestCase(Interfaces)
-    unittest.TextTestRunner(verbosity=2).run(suite)

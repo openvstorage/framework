@@ -1,10 +1,10 @@
-// Copyright 2014 iNuron NV
+// Copyright 2016 iNuron NV
 //
-// Licensed under the Open vStorage Modified Apache License (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/license
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +27,7 @@ define([
 
         // Handles
         self.loadPMachinesHandle = undefined;
+        self.loadVMachinesHandle = undefined;
 
         // Computed
         self.namehelp = ko.computed(function() {
@@ -65,6 +66,27 @@ define([
                 valid = false;
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.createft.gather.noname'));
+            }
+            if (self.data.amount() === 1) {
+                if (self.data.vMachinesNames().contains(self.data.name())) {
+                    valid = false;
+                    fields.push('name');
+                    reasons.push($.t('ovs:wizards.createft.gather.duplicatename', {
+                        name: self.data.name()
+                    }));
+                }
+            } else {
+                var name, i = self.data.startnr();
+                for (i = self.data.startnr(); i < (self.data.startnr() + self.data.amount()); i++) {
+                    name = self.data.name() + '-' + i;
+                    if (self.data.vMachinesNames().contains(name)) {
+                        valid = false;
+                        fields.push('name');
+                        reasons.push($.t('ovs:wizards.createft.gather.duplicatename', {
+                            name: name
+                        }));
+                    }
+                }
             }
             if (self.data.selectedPMachines().length === 0) {
                 valid = false;
@@ -155,6 +177,13 @@ define([
                 self.data.vm().load();
                 self.data.selectedPMachines([]);
             }
+            generic.xhrAbort(self.loadVMachinesHandle);
+            self.loadVMachinesHandle = api.get('vmachines/', { queryparams: {contents: 'name'}})
+                .done(function(data) {
+                    $.each(data.data, function(index, item) {
+                        self.data.vMachinesNames.push(item.name);
+                    });
+                });
             generic.xhrAbort(self.loadPMachinesHandle);
             self.loadPMachinesHandle = api.get('vmachines/' + self.data.guid() + '/get_target_pmachines', {
                 queryparams: {

@@ -1,10 +1,10 @@
-// Copyright 2014 iNuron NV
+// Copyright 2016 iNuron NV
 //
-// Licensed under the Open vStorage Modified Apache License (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.openvstorage.org/license
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,18 +25,17 @@ define([
         self.data   = data;
         self.shared = shared;
 
-        //Handles
+        // Handles
         self.checkS3Handle            = undefined;
         self.checkMtptHandle          = undefined;
         self.fetchAlbaVPoolHandle     = undefined;
-        self.loadStorageDriversHandle = undefined;
         self.loadStorageRoutersHandle = undefined;
-        self.loadStorageDriversHandle = {};
 
         // Observables
-        self.preValidateResult  = ko.observable({ valid: true, reasons: [], fields: [] });
         self.albaBackendLoading = ko.observable(false);
+        self.albaPresetMap      = ko.observable({});
         self.invalidAlbaInfo    = ko.observable(false);
+        self.preValidateResult  = ko.observable({ valid: true, reasons: [], fields: [] });
 
         // Computed
         self.canContinue = ko.computed(function() {
@@ -91,6 +90,17 @@ define([
             }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
+        self.isPresetAvailable = ko.computed(function() {
+            var presetAvailable = true;
+            if (self.data.albaBackend() !== undefined && self.data.albaPreset() !== undefined) {
+                var guid = self.data.albaBackend().guid(),
+                    name = self.data.albaPreset().name;
+                if (self.albaPresetMap().hasOwnProperty(guid) && self.albaPresetMap()[guid].hasOwnProperty(name)) {
+                    presetAvailable = self.albaPresetMap()[guid][name];
+                }
+            }
+            return presetAvailable;
+        });
 
         // Functions
         self.preValidate = function() {
@@ -106,7 +116,7 @@ define([
                                 accesskey: self.data.accesskey(),
                                 secretkey: self.data.secretkey()
                             };
-                            self.checkS3Handle = api.post('storagerouters/' + self.data.target().guid() + '/check_s3', { data: postData })
+                            self.checkS3Handle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/check_s3', { data: postData })
                                 .then(self.shared.tasks.wait)
                                 .done(function(data) {
                                     if (!data) {
@@ -128,7 +138,7 @@ define([
                         var postData = {
                             name: self.data.name()
                         };
-                        self.checkMtptHandle = api.post('storagerouters/' + self.data.target().guid() + '/check_mtpt', { data: postData })
+                        self.checkMtptHandle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/check_mtpt', { data: postData })
                             .then(self.shared.tasks.wait)
                             .done(function(data) {
                                 if (!data) {
@@ -152,8 +162,8 @@ define([
             }).promise();
         };
         self.next = function() {
-            $.each(self.data.storageRouters(), function(index, storageRouter) {
-                if (storageRouter === self.data.target()) {
+            $.each(self.data.storageRoutersAvailable(), function(index, storageRouter) {
+                if (storageRouter === self.data.storageRouter()) {
                     $.each(self.data.dtlTransportModes(), function (i, key) {
                         if (key.name === 'rdma') {
                             self.data.dtlTransportModes()[i].disabled = storageRouter.rdmaCapable() === undefined ? true : !storageRouter.rdmaCapable();
@@ -205,11 +215,19 @@ define([
                                 calls.push(
                                     api.get(relay + 'alba/backends/' + item.linked_guid + '/', { queryparams: getData })
                                         .then(function(data) {
-                                            data.presetNames = ko.observableArray(data.presets.filter(function(preset) {
-                                                return preset.is_available === true;
-                                            }));
-                                            if (data.available === true && data.presetNames().length > 0) {
-                                                available_backends.push(data);
+                                            if (data.available === true) {
+                                                var asdsFound = false;
+                                                $.each(data.asd_statistics, function(key, value) {  // As soon as we enter loop, we know at least 1 ASD is linked to this backend
+                                                    asdsFound = true;
+                                                    return false;
+                                                });
+                                                if (asdsFound === true) {
+                                                    available_backends.push(data);
+                                                    self.albaPresetMap()[data.guid] = {};
+                                                    $.each(data.presets, function (_, preset) {
+                                                        self.albaPresetMap()[data.guid][preset.name] = preset.is_available;
+                                                    });
+                                                }
                                             }
                                         })
                                 );
@@ -231,6 +249,9 @@ define([
                                     );
                                     $.each(self.data.albaBackends(), function(index, albaBackend) {
                                         albaBackend.fillData(abData[albaBackend.guid()]);
+                                    });
+                                    self.data.albaBackends.sort(function(backend1, backend2) {
+                                        return backend1.name() < backend2.name() ? -1 : 1;
                                     });
                                     self.data.albaBackend(self.data.albaBackends()[0]);
                                     self.data.albaPreset(self.data.albaBackends()[0].enhancedPresets()[0]);
@@ -254,6 +275,7 @@ define([
                     .fail(function() {
                         self.data.albaBackends([]);
                         self.data.albaBackend(undefined);
+                        self.data.albaPreset(undefined);
                         self.albaBackendLoading(false);
                         self.invalidAlbaInfo(true);
                         albaDeferred.reject();
@@ -277,18 +299,35 @@ define([
                         srdata[item.guid] = item;
                     });
                     generic.crossFiller(
-                        guids, self.data.storageRouters,
+                        guids, self.data.storageRoutersAvailable,
                         function(guid) {
                             if (self.data.vPool() === undefined || !self.data.vPool().storageRouterGuids().contains(guid)) {
                                 return new StorageRouter(guid);
                             }
                         }, 'guid'
                     );
-                    $.each(self.data.storageRouters(), function(index, storageRouter) {
+                    generic.crossFiller(
+                        guids, self.data.storageRoutersUsed,
+                        function(guid) {
+                            if (self.data.vPool() !== undefined && self.data.vPool().storageRouterGuids().contains(guid)) {
+                                return new StorageRouter(guid);
+                            }
+                        }, 'guid'
+                    );
+                    $.each(self.data.storageRoutersAvailable(), function(index, storageRouter) {
                         storageRouter.fillData(srdata[storageRouter.guid()]);
                     });
-                    if (self.data.target() === undefined && self.data.storageRouters().length > 0) {
-                        self.data.target(self.data.storageRouters()[0]);
+                    $.each(self.data.storageRoutersUsed(), function(index, storageRouter) {
+                        storageRouter.fillData(srdata[storageRouter.guid()]);
+                    });
+                    self.data.storageRoutersAvailable.sort(function(sr1, sr2) {
+                        return sr1.name() < sr2.name() ? -1 : 1;
+                    });
+                    self.data.storageRoutersUsed.sort(function(sr1, sr2) {
+                        return sr1.name() < sr2.name() ? -1 : 1;
+                    });
+                    if (self.data.storageRouter() === undefined && self.data.storageRoutersAvailable().length > 0) {
+                        self.data.storageRouter(self.data.storageRoutersAvailable()[0]);
                     }
                 });
             if (generic.xhrCompleted(self.loadVPoolsHandle)) {
@@ -330,28 +369,30 @@ define([
                 self.data.dtlTransportMode({name: currentConfig.dtl_transport});
                 var metadata = self.data.vPool().metadata();
                 if (self.data.vPool().backendType().code() === 'alba') {
-                    if (metadata.hasOwnProperty('connection')) {
+                    if (metadata.hasOwnProperty('backend') && metadata.backend.hasOwnProperty('connection')) {
                         // Created in or after 2.7.0
                         self.data.v260Migration(false);
-                        self.data.localHost(metadata.connection.local);
-                        if (metadata.connection.local) {
+                        self.data.localHost(metadata.backend.connection.local);
+                        self.data.fragmentCacheOnRead(metadata.backend.backend_info.fragment_cache_on_read);
+                        self.data.fragmentCacheOnWrite(metadata.backend.backend_info.fragment_cache_on_write);
+                        if (metadata.backend.connection.local) {
                             self.data.accesskey('');
                             self.data.secretkey('');
                             self.data.host('');
-                            self.data.port('');
+                            self.data.port(80);
                         } else {
-                            self.data.accesskey(metadata.connection.client_id);
-                            self.data.secretkey(metadata.connection.client_secret);
-                            self.data.host(metadata.connection.host);
-                            self.data.port(metadata.connection.port);
+                            self.data.accesskey(metadata.backend.connection.client_id);
+                            self.data.secretkey(metadata.backend.connection.client_secret);
+                            self.data.host(metadata.backend.connection.host);
+                            self.data.port(metadata.backend.connection.port);
                         }
                         self.loadAlbaBackends()
                             .done(function () {
                                 $.each(self.data.albaBackends(), function (_, albaBackend) {
-                                    if (albaBackend.guid() === metadata.backend_guid) {
+                                    if (albaBackend.guid() === metadata.backend.backend_guid) {
                                         self.data.albaBackend(albaBackend);
                                         $.each(albaBackend.enhancedPresets(), function (_, preset) {
-                                            if (preset.name === self.data.vPool().backendPreset()) {
+                                            if (preset.name === metadata.backend.preset) {
                                                 self.data.albaPreset(preset);
                                             }
                                         });
