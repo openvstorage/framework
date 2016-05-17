@@ -1052,7 +1052,7 @@ class SetupController(object):
                         pass
 
             try:
-                EtcdConfiguration.delete(key='/ovs/framework/{0}'.format('hosts/{0}'.format(machine_id)))
+                EtcdConfiguration.delete(key='/ovs/framework/hosts/{0}'.format(machine_id))
             except (EtcdKeyNotFound, EtcdConnectionFailed, KeyError):
                 pass
 
