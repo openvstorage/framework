@@ -1056,19 +1056,22 @@ class SetupController(object):
             except (EtcdKeyNotFound, EtcdConnectionFailed, KeyError):
                 pass
 
-            #  Arakoon and ETCD must be the last services to be removed
-            for service in ['memcached', 'arakoon-ovsdb']:
+            #  Memcached, Arakoon and ETCD must be the last services to be removed
+            services = ['memcached']
+            cluster_name = etcd_required_info['/ovs/framework/arakoon_clusters|ovsdb']
+            try:
+                metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+            except ValueError:
+                metadata = None
+            if metadata is not None and metadata.internal is True:
+                services.append('arakoon-ovsdb')
+            for service in services:
                 if ServiceManager.has_service(service, client=target_client):
                     ServiceManager.disable_service(service, client=target_client)
                     Toolbox.change_service_state(target_client, service, 'stop', SetupController._logger)
 
             if first_node is True:
                 SetupController._log(messages='Unconfigure Arakoon')
-                cluster_name = etcd_required_info['/ovs/framework/arakoon_clusters|ovsdb']
-                try:
-                    metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
-                except ValueError:
-                    metadata = None
                 if metadata is not None and metadata.internal is True:
                     try:
                         ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
