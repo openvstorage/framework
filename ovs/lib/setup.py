@@ -266,7 +266,9 @@ class SetupController(object):
                         ip_hostname_map[ip] = list({node_host_name, master_fqdn_name})
                         break
 
-                if node_name not in SetupController.nodes:
+                if node_name in SetupController.nodes:
+                    SetupController.nodes[node_name]['client'] = SSHClient(endpoint=cluster_ip, username='root')
+                else:
                     SetupController.nodes[node_name] = {'ip': cluster_ip,
                                                         'type': 'unknown',
                                                         'client': SSHClient(endpoint=cluster_ip, username='root')}
@@ -969,7 +971,7 @@ class SetupController(object):
         target_client.dir_delete('/opt/OpenvStorage/webapps/frontend/logging')
 
         SetupController._log(messages='Stopping services', loglevel='debug')
-        for service in ['memcached', 'arakoon-ovsdb', 'watcher-framework', 'workers', 'support-agent']:
+        for service in ['watcher-framework', 'workers', 'support-agent']:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.disable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'stop', SetupController._logger)
@@ -1007,41 +1009,10 @@ class SetupController(object):
 
         SetupController._remove_services(target_client, 'master')
 
-        if first_node is True and etcd_running is True:
-            SetupController._log(messages='Unconfigure Arakoon')
-            cluster_name = etcd_required_info['/ovs/framework/arakoon_clusters|ovsdb']
-            try:
-                metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
-            except ValueError:
-                metadata = None
-            if metadata is not None and metadata.internal is True:
-                try:
-                    ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
-                except Exception as ex:
-                    SetupController._log(messages=['\nFailed to delete cluster', ex], loglevel='exception')
-                base_dir = etcd_required_info['/ovs/framework/paths|ovsdb']
-                directory_info = {ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name): True,
-                                  ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name): False,
-                                  ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name): False}
-
-                try:
-                    ArakoonInstaller.clean_leftover_arakoon_data(ip=cluster_ip,
-                                                                 directories=directory_info)
-                except Exception as ex:
-                    SetupController._log(messages=['Failed to clean Arakoon data', ex])
-
-        SetupController._log(messages='Unconfigure Etcd')
         if etcd_running is True:
             external_etcd = etcd_required_info['/ovs/framework/external_etcd']
-            if external_etcd is None:
-                SetupController._log(messages='Removing Etcd cluster')
-                try:
-                    EtcdInstaller.stop('config', target_client)
-                    EtcdInstaller.remove('config', target_client)
-                except Exception as ex:
-                    SetupController._log(messages=['\nFailed to unconfigure Etcd', ex], loglevel='exception')
-
             SetupController._log(messages='Cleaning up model')
+            #  Model is completely cleaned up when the arakoon cluster is destroyed
             memcache_configured = etcd_required_info['/ovs/framework/memcache']
             pmachine = None
             storagerouter = None
@@ -1056,24 +1027,73 @@ class SetupController(object):
                     try:
                         for service in storagerouter.services:
                             service.delete()
+                        for disk in storagerouter.disks:
+                            for partition in disk.partitions:
+                                partition.delete()
+                            disk.delete()
+                        for alba_node in storagerouter.alba_nodes:
+                            alba_node.delete()
                         storagerouter.delete()
                         if len(pmachine.storagerouters) == 0:
                             pmachine.delete()
                     except Exception as ex:
                         SetupController._log(messages='Cleaning up model failed with error: {0}'.format(ex), loglevel='error')
-
                 if first_node is True:
                     try:
                         for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:  # Externally managed Arakoon services not linked to the storagerouter
                             service.delete()
                     except Exception as ex:
                         SetupController._log(messages='Cleaning up services failed with error: {0}'.format(ex), loglevel='error')
+            if first_node is True:
+                for key in EtcdConfiguration.base_config.keys() + ['install_time', 'plugins']:
+                    try:
+                        EtcdConfiguration.delete(key='/ovs/framework/{0}'.format(key))
+                    except (EtcdKeyNotFound, EtcdConnectionFailed, KeyError):
+                        pass
 
-            for key in EtcdConfiguration.base_config.keys() + ['install_time', 'plugins', 'hosts/{0}'.format(machine_id)]:
+            try:
+                EtcdConfiguration.delete(key='/ovs/framework/{0}'.format('hosts/{0}'.format(machine_id)))
+            except (EtcdKeyNotFound, EtcdConnectionFailed, KeyError):
+                pass
+
+            #  Arakoon and ETCD must be the last services to be removed
+            for service in ['memcached', 'arakoon-ovsdb']:
+                if ServiceManager.has_service(service, client=target_client):
+                    ServiceManager.disable_service(service, client=target_client)
+                    Toolbox.change_service_state(target_client, service, 'stop', SetupController._logger)
+
+            if first_node is True:
+                SetupController._log(messages='Unconfigure Arakoon')
+                cluster_name = etcd_required_info['/ovs/framework/arakoon_clusters|ovsdb']
                 try:
-                    EtcdConfiguration.delete(key='/ovs/framework/{0}'.format(key))
-                except (EtcdKeyNotFound, KeyError):
-                    pass
+                    metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+                except ValueError:
+                    metadata = None
+                if metadata is not None and metadata.internal is True:
+                    try:
+                        ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
+                    except Exception as ex:
+                        SetupController._log(messages=['\nFailed to delete cluster', ex], loglevel='exception')
+                    base_dir = etcd_required_info['/ovs/framework/paths|ovsdb']
+                    #  ArakoonInstall.delete_cluster calls destroy_node which removes these directories already
+                    directory_info = {ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name): True,
+                                      ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name): False,
+                                      ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name): False}
+
+                    try:
+                        ArakoonInstaller.clean_leftover_arakoon_data(ip=cluster_ip,
+                                                                     directories=directory_info)
+                    except Exception as ex:
+                        SetupController._log(messages=['Failed to clean Arakoon data', ex])
+
+            SetupController._log(messages='Unconfigure Etcd')
+            if external_etcd is None:
+                SetupController._log(messages='Removing Etcd cluster')
+                try:
+                    EtcdInstaller.stop('config', target_client)
+                    EtcdInstaller.remove('config', target_client)
+                except Exception as ex:
+                    SetupController._log(messages=['\nFailed to unconfigure Etcd', ex], loglevel='exception')
         SetupController._log(messages='Removing Etcd proxy')
         EtcdInstaller.remove_proxy('config', cluster_ip)
 
@@ -1110,8 +1130,9 @@ class SetupController(object):
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/ip'.format(machine_id), cluster_ip)
 
         SetupController._log(messages='Starting services')
-        ServiceManager.enable_service('watcher-framework', client=target_client)
-        Toolbox.change_service_state(target_client, 'watcher-framework', 'start', SetupController._logger)
+        if ServiceManager.get_service_status('watcher-framework', target_client) is False:
+            ServiceManager.enable_service('watcher-framework', client=target_client)
+            Toolbox.change_service_state(target_client, 'watcher-framework', 'start', SetupController._logger)
 
         SetupController._log(messages='Check ovs-workers')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
