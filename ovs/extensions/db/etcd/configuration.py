@@ -24,6 +24,7 @@ import random
 import signal
 import string
 import unittest
+import logging
 from itertools import groupby
 from ovs.log.logHandler import LogHandler
 try:
@@ -38,6 +39,7 @@ except ImportError:
 from requests.packages.urllib3.exceptions import InsecurePlatformWarning
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from requests.packages.urllib3.exceptions import SNIMissingWarning
+logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 
 def log_slow_calls(f):

@@ -611,8 +611,14 @@ class ArakoonInstaller(object):
         ArakoonInstaller.remove(config.cluster_id, client=root_client)
 
         # Cleans all directories on a given node
-        for directory in [node.log_dir, node.tlog_dir, node.home]:
-            root_client.dir_delete([directory])
+        abs_paths = {node.tlog_dir, node.home}  # That's a set
+        if node.log_sinks.startswith('/'):
+            abs_paths.add(os.path.dirname(os.path.abspath(node.log_sinks)))
+        if node.crash_log_sinks.startswith('/'):
+            abs_paths.add(os.path.dirname(os.path.abspath(node.crash_log_sinks)))
+        abs_paths = list(abs_paths)
+        for directory in abs_paths:
+            root_client.dir_delete(directory)
 
         # Removes a configuration file from a node
         config.delete_config()

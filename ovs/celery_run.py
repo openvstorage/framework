@@ -92,6 +92,7 @@ else:
     celery.conf.CELERYD_PREFETCH_MULTIPLIER = 1  # This makes sure that the workers won't be pre-fetching tasks, this to prevent deadlocks
     celery.conf.CELERYBEAT_SCHEDULE = {}
     celery.conf.CELERY_TRACK_STARTED = True  # http://docs.celeryproject.org/en/latest/configuration.html#std:setting-CELERY_TRACK_STARTED
+    celery.conf.CELERYD_HIJACK_ROOT_LOGGER = False
 
 
 @task_postrun.connect
@@ -121,11 +122,7 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
 @after_setup_logger.connect
 def load_ovs_logger(**kwargs):
     if 'logger' in kwargs:
-        logger = kwargs['logger']
-        if len(logger.handlers) > 0:
-            logger.handlers[0] = loghandler.handler
-        else:
-            logger.addHandler(loghandler.handler)
+        kwargs['logger'] = LogHandler.get('celery', name='celery', propagate=False)
 
 
 if __name__ == '__main__':

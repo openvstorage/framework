@@ -58,7 +58,7 @@ class LogHandler(object):
     cache = {}
     propagate_cache = {}
 
-    def __init__(self, source, name=None, propagate=True):
+    def __init__(self, source, name, propagate):
         """
         Initializes the logger
         """
@@ -71,7 +71,7 @@ class LogHandler(object):
 
         formatter = OVSFormatter('%(asctime)s - %(hostname)s - %(process)s/%(thread)d - {0}/%(name)s - %(sequence)s - %(levelname)s - %(message)s'.format(source))
 
-        target_definition = LogHandler.load_target_definition(source)
+        target_definition = LogHandler.load_target_definition(source, allow_override=True)
         if target_definition['type'] == 'redis':
             from redis import Redis
             from ovs.log.redis_logging import RedisListHandler
@@ -90,7 +90,7 @@ class LogHandler(object):
         self._key = '{0}_{1}'.format(source, name)
 
     @staticmethod
-    def load_target_definition(source):
+    def load_target_definition(source, allow_override=False):
         logging_target = {'type': 'console'}
         try:
             from ovs.extensions.db.etcd.configuration import EtcdConfiguration
@@ -99,7 +99,7 @@ class LogHandler(object):
             pass
 
         target_type = logging_target['type']
-        if 'OVS_LOGTYPE_OVERRIDE' in os.environ:
+        if allow_override is True and 'OVS_LOGTYPE_OVERRIDE' in os.environ:
             target_type = os.environ['OVS_LOGTYPE_OVERRIDE']
 
         if target_type == 'redis':
@@ -116,8 +116,8 @@ class LogHandler(object):
         return {'type': 'console'}
 
     @staticmethod
-    def get_sink_path(source):
-        target_definition = LogHandler.load_target_definition(source)
+    def get_sink_path(source, allow_override=False):
+        target_definition = LogHandler.load_target_definition(source, allow_override)
         if target_definition['type'] == 'redis':
             sink = 'redis://{0}:{1}{2}'.format(target_definition['host'], target_definition['port'], target_definition['queue'])
         elif target_definition['type'] == 'file':
