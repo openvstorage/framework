@@ -1064,7 +1064,7 @@ class SetupController(object):
             except ValueError:
                 metadata = None
             if metadata is not None and metadata.internal is True:
-                services.append('arakoon-ovsdb')
+                services.append('arakoon-{0}'.format(cluster_name))
             for service in services:
                 if ServiceManager.has_service(service, client=target_client):
                     ServiceManager.disable_service(service, client=target_client)
