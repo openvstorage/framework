@@ -8,7 +8,7 @@ configuration management and Celery as distributed task queue.
 The intuitive GUI allows easy setup and management of an Open vStorage Backend and link that to a distributed vPool.
 Having the ability to interface with hypervisors like KVM and VMware the framework turns the platform into a VM-Centric Storage platform.
 
-The Open vStorage Framework is licensed under the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0).
+The Open vStorage Framework is licensed under the [GNU AFFERO GENERAL PUBLIC LICENSE Version 3](https://www.gnu.org/licenses/agpl.html).
 
 ## Get started
 
