@@ -64,9 +64,6 @@ INCLUDED AND/OR USED SOFTWARE
     Setuptools                  ZPL
     Librabbitmq                 MPL 1.1
 
-    Jumpscale                   BSD 3
-        Copyright (c) 2013, JumpScale. All rights reserved.
-
     Bootstrap                   MIT
         Copyright (c) 2011-2014 Twitter, Inc
 
