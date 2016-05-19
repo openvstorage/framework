@@ -1086,8 +1086,8 @@ class SetupController(object):
                         SetupController._log(messages=['\nFailed to delete cluster', ex], loglevel='exception')
                     base_dir = etcd_required_info['/ovs/framework/paths|ovsdb']
                     #  ArakoonInstall.delete_cluster calls destroy_node which removes these directories already
-                    directory_info = {ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name): False,
-                                      ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name): False}
+                    directory_info = [ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name),
+                                      ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)]
 
                     try:
                         ArakoonInstaller.clean_leftover_arakoon_data(ip=cluster_ip,
