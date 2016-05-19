@@ -472,20 +472,15 @@
     "dashboard": {
         "title": "Dashboard",
         "panels": {
-            "storagerouter": {
-                "helpcontent": "The Storage Router panel list all the Storage Routers registered in the Open vStorage Cluster. For each Storage Router the status, name, IP address and amount of vDisks is displayed.",
-                "helptitle": "Help - Storage Router",
-                "title": "Storage Routers"
-            },
-            "cache": {
-                "helpcontent": "The Cache Hit Ratio panel contains the percentage of the cache hits to the total amount of cache lookups for all vDisks. Below the current amount of IOPS is displayed for the whole Cluster. This panel gets updated every 5 seconds.",
-                "helptitle": "Help - Cache Hit Ratio",
-                "title": "Cache Hit Ratio"
-            },
             "statistics": {
                 "helpcontent": "This panels lists the average on IOPS, Read and Write Speed and Cache Hits over 5 seconds summarized for all vDisks in the Cluster. The values are updated automatically every 5 seconds.",
                 "helptitle": "Help - vDisk Statistics",
                 "title": "vDisk Statistics"
+            },
+            "vpools": {
+                "helpcontent": "The vPool panel lists all the vPools registered in the Open vStorage Cluster. For each vPool the matching Storage Routers and their statuses are displayed.",
+                "helptitle": "Help - vPools",
+                "title": "vPools"
             }
         }
     },

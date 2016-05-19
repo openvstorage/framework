@@ -95,7 +95,7 @@ define([
             return generic.formatSpeed(total);
         });
         self.statusColor = ko.computed(function() {
-            if (self.status() === "ok") {
+            if (self.status() === 'ok') {
                 return 'green';
             }
             if (self.status() === 'failure') {
