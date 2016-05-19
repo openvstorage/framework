@@ -28,7 +28,7 @@ from kombu import Queue
 from celery import Celery
 from celery.signals import task_postrun, worker_process_init, after_setup_logger, after_setup_task_logger
 from ovs.lib.messaging import MessageController
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.system import System

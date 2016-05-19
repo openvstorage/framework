@@ -34,7 +34,7 @@ import unittest
 from ovs.dal.helpers import Descriptor
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.remote import remote
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from subprocess import check_output, CalledProcessError, PIPE, Popen
 
 

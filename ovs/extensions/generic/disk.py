@@ -20,7 +20,7 @@ Disk module
 import re
 from subprocess import check_output, CalledProcessError
 from ovs.extensions.os.os import OSManager
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class DiskTools(object):

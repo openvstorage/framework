@@ -23,7 +23,7 @@ import time
 from subprocess import CalledProcessError
 from pyudev import Context
 from ovs.celery_run import celery
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.storagerouter import StorageRouter

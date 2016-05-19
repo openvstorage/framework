@@ -21,7 +21,7 @@ Package Factory module
 from subprocess import check_output
 from ovs.extensions.packages.debian import DebianPackage
 from ovs.extensions.packages.rpm import RpmPackage
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class PackageManager(object):

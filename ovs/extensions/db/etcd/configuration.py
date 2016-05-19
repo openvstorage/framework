@@ -28,7 +28,7 @@ import string
 import unittest
 import logging
 from itertools import groupby
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 try:
     from requests.packages.urllib3 import disable_warnings
 except ImportError:

@@ -37,7 +37,7 @@ class OVSFormatter(logging.Formatter):
         tz = time.altzone if time.daylight and ct.tm_isdst > 0 else time.timezone
         offset = '{0}{1:0>2}{2:0>2}'.format('-' if tz > 0 else '+', abs(tz) // 3600, abs(tz // 60) % 60)
         base_time = time.strftime('%Y-%m-%d %H:%M:%S', ct)
-        return '{0} {1:05.0f} {2}'.format(base_time, record.msecs, offset)
+        return '{0} {1:03.0f}00 {2}'.format(base_time, record.msecs, offset)
 
     def format(self, record):
         if 'hostname' not in record.__dict__:
@@ -130,7 +130,10 @@ class LogHandler(object):
 
     @staticmethod
     def load_path(source):
-        log_filename = '/var/log/ovs/{0}.log'.format(source)
+        log_path = '/var/log/ovs'
+        log_filename = '{0}/{1}.log'.format(log_path, source)
+        if not os.path.exists(log_path):
+            os.mkdir(log_path, 0777)
         if not os.path.exists(log_filename):
             open(log_filename, 'a').close()
             os.chmod(log_filename, 0o666)

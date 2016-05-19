@@ -30,7 +30,7 @@ from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNotFound, ArakoonSockNotReadable, ArakoonSockReadNoBytes, ArakoonSockSendError, ArakoonAssertionFailed
 from ovs.extensions.storage.exceptions import KeyNotFoundException, AssertException
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 def locked():

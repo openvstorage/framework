@@ -30,7 +30,7 @@ import pyinotify
 from ovs.extensions.rabbitmq.processor import process
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 KVM_ETC = '/etc/libvirt/qemu/'
 KVM_RUN = '/run/libvirt/qemu/'

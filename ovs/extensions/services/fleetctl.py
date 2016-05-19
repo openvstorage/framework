@@ -31,7 +31,7 @@ try:
 except googleapiclient.errors.HttpError as he:
     raise ValueError(he)
 
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from ovs.extensions.services.systemd import Systemd
 
 

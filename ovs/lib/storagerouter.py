@@ -61,7 +61,7 @@ from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vpool import VPoolController
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import ArakoonNodeConfig
 from volumedriver.storagerouter.storagerouterclient import ClusterNodeConfig
@@ -957,6 +957,7 @@ class StorageRouterController(object):
         if vpool.backend_type.code == 'alba':
             alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
             params['PROXY_ID'] = storagedriver.alba_proxy_guid
+            params['LOG_SINK'] = LogHandler.get_sink_path('alba_proxy')
             ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name=alba_proxy_service)
             ServiceManager.start_service(alba_proxy_service, client=root_client)
             dependencies = [alba_proxy_service]

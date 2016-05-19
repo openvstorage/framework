@@ -44,7 +44,7 @@ from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vmachine import VMachineController
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from StringIO import StringIO
 from time import mktime
 

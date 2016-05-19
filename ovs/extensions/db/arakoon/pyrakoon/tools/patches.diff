@@ -14,7 +14,7 @@
 
 -from pyrakoon import protocol, utils
 +from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import protocol, utils
-+from ovs.log.logHandler import LogHandler
++from ovs.log.log_handler import LogHandler
 
 -
 -LOGGER = logging.getLogger(__name__)
@@ -124,7 +124,7 @@
 
 -from pyrakoon import client, compat, errors, protocol, utils
 +from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, compat, errors, protocol, utils
-+from ovs.log.logHandler import LogHandler
++from ovs.log.log_handler import LogHandler
 
 -
 -LOGGER = logging.getLogger(__name__)
@@ -155,7 +155,7 @@
 -import logging
  import functools
  import itertools
-+from ovs.log.logHandler import LogHandler
++from ovs.log.log_handler import LogHandler
 
 -LOGGER = logging.getLogger(__name__)
 +LOGGER = LogHandler.get('arakoon_client', 'pyrakoon', propagate=False)
@@ -252,7 +252,7 @@
 
 -from pyrakoon import client, consistency, errors, protocol, sequence, utils
 +from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, consistency, errors, protocol, sequence, utils
-+from ovs.log.logHandler import LogHandler
++from ovs.log.log_handler import LogHandler
 
  __docformat__ = 'epytext'
 

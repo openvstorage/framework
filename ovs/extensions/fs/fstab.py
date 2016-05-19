@@ -18,7 +18,7 @@
 FS tab module
 """
 import re
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class Fstab(object):

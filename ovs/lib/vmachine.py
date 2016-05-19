@@ -35,7 +35,7 @@ from ovs.extensions.hypervisor.factory import Factory
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 
 

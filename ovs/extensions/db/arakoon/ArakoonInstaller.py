@@ -30,7 +30,7 @@ from ovs.extensions.generic.sshclient import CalledProcessError, SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.services.service import ServiceManager
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from StringIO import StringIO
 
 

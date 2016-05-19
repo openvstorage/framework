@@ -23,7 +23,7 @@ import json
 import unittest
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.remote import remote
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import ClusterContact
 from volumedriver.storagerouter.storagerouterclient import DTLMode

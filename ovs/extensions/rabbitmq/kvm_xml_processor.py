@@ -24,7 +24,7 @@ import shutil
 import pyinotify
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.extensions.generic.system import System
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from xml.etree import ElementTree
 
 

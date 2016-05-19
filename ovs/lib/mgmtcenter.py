@@ -22,7 +22,7 @@ from ovs.celery_run import celery
 from ovs.dal.hybrids.mgmtcenter import MgmtCenter
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.extensions.hypervisor.factory import Factory
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class MgmtCenterController(object):

@@ -21,7 +21,7 @@ Middleware module
 import re
 from django.http import HttpResponse
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class OVSMiddleware(object):
