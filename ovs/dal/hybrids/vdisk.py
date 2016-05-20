@@ -27,7 +27,7 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.failuredomain import FailureDomain
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class VDisk(DataObject):

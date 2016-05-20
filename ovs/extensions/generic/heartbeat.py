@@ -19,7 +19,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.os.os import OSManager
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from subprocess import check_output, CalledProcessError
 
 

@@ -20,7 +20,7 @@ Metadata views
 
 import json
 import time
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.api.client import OVSClient

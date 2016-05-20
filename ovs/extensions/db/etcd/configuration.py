@@ -26,8 +26,9 @@ import random
 import signal
 import string
 import unittest
+import logging
 from itertools import groupby
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 try:
     from requests.packages.urllib3 import disable_warnings
 except ImportError:
@@ -40,6 +41,7 @@ except ImportError:
 from requests.packages.urllib3.exceptions import InsecurePlatformWarning
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from requests.packages.urllib3.exceptions import SNIMissingWarning
+logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 
 def log_slow_calls(f):
@@ -260,11 +262,11 @@ class EtcdConfiguration(object):
             EtcdConfiguration._set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value, raw=False)
 
     @staticmethod
-    def initialize(external_etcd=None):
+    def initialize(external_etcd=None, logging_target=None):
         """
         Initialize general keys for all hosts in cluster
         :param external_etcd: ETCD runs on another host outside the cluster
-        :return: None
+        :param logging_target: Configures (overwrites) logging configuration
         """
         cluster_id = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(16))
         if EtcdConfiguration.exists('/ovs/framework/cluster_id'):
@@ -284,8 +286,10 @@ class EtcdConfiguration(object):
                          'stores': {'persistent': 'pyrakoon',
                                     'volatile': 'memcache'},
                          'messagequeue': {'protocol': 'amqp',
-                                          'queues': {'storagedriver': 'volumerouter'}}})
-
+                                          'queues': {'storagedriver': 'volumerouter'}},
+                         'logging': {'type': 'console'}})
+        if logging_target is not None:
+            base_cfg['logging'] = logging_target
         if EtcdConfiguration.exists('/ovs/framework/memcache') is False:
             base_cfg['memcache'] = {'endpoints': [],
                                     'metadata': {'internal': True}}

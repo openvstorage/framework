@@ -18,7 +18,7 @@
 Module for the OpenStack Controller API
 """
 import os
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from ovs.extensions.hypervisor.mgmtcenters.management.openstack_mgmt import OpenStackManagement
 
 

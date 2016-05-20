@@ -39,7 +39,7 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.toolbox import Toolbox
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from paramiko import AuthenticationException
 
 
@@ -78,6 +78,7 @@ class SetupController(object):
         cluster_ip = None
         external_etcd = None  # Example: 'etcd0123456789=http://1.2.3.4:2380'
         hypervisor_ip = None
+        logging_target = None
         hypervisor_name = None
         hypervisor_type = None
         master_password = None
@@ -100,6 +101,7 @@ class SetupController(object):
                 cluster_ip = config.get('cluster_ip', master_ip)  # If cluster_ip not provided, we assume 1st node installation
                 external_etcd = config.get('external_etcd')
                 hypervisor_ip = config.get('hypervisor_ip')
+                logging_target = config.get('logging_target', logging_target)
                 enable_heartbeats = config.get('enable_heartbeats', enable_heartbeats)
                 hypervisor_password = config.get('hypervisor_password')
                 hypervisor_username = config.get('hypervisor_username', hypervisor_username)
@@ -437,7 +439,8 @@ class SetupController(object):
                                                           node_name=node_name,
                                                           hypervisor_info=hypervisor_info,
                                                           enable_heartbeats=enable_heartbeats,
-                                                          external_etcd=external_etcd)
+                                                          external_etcd=external_etcd,
+                                                          logging_target=logging_target)
                     except Exception as ex:
                         SetupController._log(messages=['Failed to setup first node', ex], loglevel='exception')
                         SetupController._rollback_setup(target_client=ip_client_map[cluster_ip],
@@ -807,7 +810,7 @@ class SetupController(object):
         SetupController._log(messages='Remove nodes finished', title=True)
 
     @staticmethod
-    def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats, external_etcd):
+    def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats, external_etcd, logging_target):
         """
         Sets up the first node services. This node is always a master
         """
@@ -833,7 +836,7 @@ class SetupController(object):
                         resume_cfg.write(json.dumps(resume_config))
                 raise
 
-        EtcdConfiguration.initialize(external_etcd=external_etcd)
+        EtcdConfiguration.initialize(external_etcd=external_etcd, logging_target=logging_target)
         EtcdConfiguration.initialize_host(machine_id)
 
         if ServiceManager.has_fleet():
@@ -869,6 +872,8 @@ class SetupController(object):
         if configure_memcached is True:
             EtcdConfiguration.set('/ovs/framework/memcache|endpoints', ['{0}:11211'.format(cluster_ip)])
             SetupController._configure_memcached(target_client)
+        SetupController._configure_redis(target_client)
+        Toolbox.change_service_state(target_client, 'redis-server', 'restart', SetupController._logger)
         VolatileFactory.store = None
 
         SetupController._log(messages='Starting model services', loglevel='debug')
@@ -1081,9 +1086,8 @@ class SetupController(object):
                         SetupController._log(messages=['\nFailed to delete cluster', ex], loglevel='exception')
                     base_dir = etcd_required_info['/ovs/framework/paths|ovsdb']
                     #  ArakoonInstall.delete_cluster calls destroy_node which removes these directories already
-                    directory_info = {ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name): True,
-                                      ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name): False,
-                                      ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name): False}
+                    directory_info = [ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name),
+                                      ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)]
 
                     try:
                         ArakoonInstaller.clean_leftover_arakoon_data(ip=cluster_ip,
@@ -1195,6 +1199,8 @@ class SetupController(object):
 
         if configure_memcached:
             SetupController._configure_memcached(target_client)
+        SetupController._configure_redis(target_client)
+        Toolbox.change_service_state(target_client, 'redis-server', 'restart', SetupController._logger)
         SetupController._add_services(target_client, unique_id, 'master')
 
         arakoon_ports = []
@@ -1449,6 +1455,12 @@ class SetupController(object):
         client.run("""sed -i 's/^-m.*/-m 1024/g' /etc/memcached.conf""")
         client.run("""sed -i -E 's/^-v(.*)/# -v\1/g' /etc/memcached.conf""")  # Put all -v, -vv, ... back in comment
         client.run("""sed -i 's/^# -v[^v]*$/-v/g' /etc/memcached.conf""")     # Uncomment only -v
+
+    @staticmethod
+    def _configure_redis(client):
+        SetupController._log(messages='Setting up Redis')
+        client.run("""sed -i 's/^# maxmemory <bytes>.*/maxmemory 128mb/g' /etc/redis/redis.conf""")
+        client.run("""sed -i 's/^# maxmemory-policy .*/maxmemory-policy allkeys-lru/g' /etc/redis/redis.conf""")
 
     @staticmethod
     def _configure_rabbitmq(client):

@@ -24,7 +24,7 @@ from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class StorageDriver(DataObject):

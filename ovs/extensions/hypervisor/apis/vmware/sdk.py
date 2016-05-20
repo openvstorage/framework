@@ -27,7 +27,7 @@ from suds.client import Client, WebFault
 from suds.cache import ObjectCache
 from suds.sudsobject import Property
 from suds.plugin import MessagePlugin
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class NotAuthenticatedException(BaseException):

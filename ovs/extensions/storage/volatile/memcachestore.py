@@ -21,7 +21,7 @@ import memcache
 import re
 
 from threading import Lock
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 def locked():

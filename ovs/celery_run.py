@@ -26,9 +26,9 @@ import os
 import unittest
 from kombu import Queue
 from celery import Celery
-from celery.signals import task_postrun, worker_process_init
+from celery.signals import task_postrun, worker_process_init, after_setup_logger, after_setup_task_logger
 from ovs.lib.messaging import MessageController
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.system import System
@@ -94,6 +94,7 @@ else:
     celery.conf.CELERYD_PREFETCH_MULTIPLIER = 1  # This makes sure that the workers won't be pre-fetching tasks, this to prevent deadlocks
     celery.conf.CELERYBEAT_SCHEDULE = {}
     celery.conf.CELERY_TRACK_STARTED = True  # http://docs.celeryproject.org/en/latest/configuration.html#std:setting-CELERY_TRACK_STARTED
+    celery.conf.CELERYD_HIJACK_ROOT_LOGGER = False
 
 
 @task_postrun.connect
@@ -117,6 +118,13 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
     _ = args, kwargs, kwds
     VolatileFactory.store = None
     PersistentFactory.store = None
+
+
+@after_setup_task_logger.connect
+@after_setup_logger.connect
+def load_ovs_logger(**kwargs):
+    if 'logger' in kwargs:
+        kwargs['logger'] = LogHandler.get('celery', name='celery', propagate=False)
 
 
 if __name__ == '__main__':

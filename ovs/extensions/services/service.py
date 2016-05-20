@@ -22,7 +22,7 @@ import time
 from subprocess import check_output, CalledProcessError
 from ovs.extensions.services.upstart import Upstart
 from ovs.extensions.services.systemd import Systemd
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class ServiceManager(object):

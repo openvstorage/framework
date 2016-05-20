@@ -52,7 +52,7 @@ from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.decorators import log
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter import VolumeDriverEvents_pb2
 from volumedriver.storagerouter.storagerouterclient import DTLConfig

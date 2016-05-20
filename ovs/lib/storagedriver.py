@@ -39,7 +39,7 @@ from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import add_hooks, ensure_single, log
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient, ClusterNotReachableException
 
 

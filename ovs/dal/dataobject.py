@@ -33,7 +33,7 @@ from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.exceptions import KeyNotFoundException, AssertException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class MetaClass(type):

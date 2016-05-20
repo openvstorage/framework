@@ -19,7 +19,7 @@ Export FS module
 """
 import re
 import subprocess
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class Nfsexports(object):

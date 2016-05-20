@@ -18,7 +18,7 @@
 Rpm Package module
 """
 import time
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from subprocess import check_output
 from subprocess import CalledProcessError
 

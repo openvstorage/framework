@@ -36,7 +36,7 @@ from django.http import Http404
 from django.conf import settings
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import FullSerializer
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 
