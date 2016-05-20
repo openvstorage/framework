@@ -88,6 +88,7 @@ class StorageDriverController(object):
         else:
             # No management Center, cannot update status via api
             StorageDriverController._logger.info('Updating status of pmachine {0} using SSHClient'.format(pmachine.name))
+            path = StorageDriverConfiguration('storagedriver', storagedriver.vpool.guid, storagedriver.storagedriver_id).remote_path
             host_status = 'RUNNING'
             try:
                 client = SSHClient(storagerouter, username='root')
@@ -98,8 +99,6 @@ class StorageDriverController(object):
             else:
                 try:
                     with remote(client.ip, [LocalStorageRouterClient]) as rem:
-                        path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(storagedriver.vpool.guid,
-                                                                                              storagedriver.storagedriver_id)
                         lsrc = rem.LocalStorageRouterClient(path)
                         lsrc.server_revision()
 
