@@ -78,12 +78,12 @@ class SetupController(object):
         cluster_ip = None
         external_etcd = None  # Example: 'etcd0123456789=http://1.2.3.4:2380'
         hypervisor_ip = None
+        logging_target = None
         hypervisor_name = None
         hypervisor_type = None
         master_password = None
         enable_heartbeats = True
         hypervisor_password = None
-        logging_target = None
         hypervisor_username = 'root'
 
         try:
@@ -101,10 +101,10 @@ class SetupController(object):
                 cluster_ip = config.get('cluster_ip', master_ip)  # If cluster_ip not provided, we assume 1st node installation
                 external_etcd = config.get('external_etcd')
                 hypervisor_ip = config.get('hypervisor_ip')
+                logging_target = config.get('logging_target', logging_target)
                 enable_heartbeats = config.get('enable_heartbeats', enable_heartbeats)
                 hypervisor_password = config.get('hypervisor_password')
                 hypervisor_username = config.get('hypervisor_username', hypervisor_username)
-                logging_target = config.get('logging_target', logging_target)
 
             # Support resume setup - store entered parameters so when retrying, we have the values
             resume_config = {}
@@ -1458,7 +1458,7 @@ class SetupController(object):
 
     @staticmethod
     def _configure_redis(client):
-        print "Setting up Redis"
+        SetupController._log(messages='Setting up Redis')
         client.run("""sed -i 's/^# maxmemory <bytes>.*/maxmemory 128mb/g' /etc/redis/redis.conf""")
         client.run("""sed -i 's/^# maxmemory-policy .*/maxmemory-policy allkeys-lru/g' /etc/redis/redis.conf""")
 

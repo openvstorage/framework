@@ -618,9 +618,7 @@ class ArakoonInstaller(object):
             abs_paths.add(os.path.dirname(os.path.abspath(node.log_sinks)))
         if node.crash_log_sinks.startswith('/'):
             abs_paths.add(os.path.dirname(os.path.abspath(node.crash_log_sinks)))
-        abs_paths = list(abs_paths)
-        for directory in abs_paths:
-            root_client.dir_delete(directory)
+        root_client.dir_delete(list(abs_paths))
 
         # Removes a configuration file from a node
         config.delete_config()

@@ -21,8 +21,8 @@ Contains the loghandler module
 import os
 import sys
 import time
-import inspect
 import socket
+import inspect
 import logging
 import itertools
 
@@ -100,7 +100,7 @@ class LogHandler(object):
         except:
             pass
 
-        target_type = logging_target['type']
+        target_type = logging_target.get('type', 'console')
         if allow_override is True and 'OVS_LOGTYPE_OVERRIDE' in os.environ:
             target_type = os.environ['OVS_LOGTYPE_OVERRIDE']
 
@@ -158,8 +158,10 @@ class LogHandler(object):
         if propagate is not None:
             self.logger.propagate = propagate
 
-    def info(self, msg, *args, **kwargs):
-        """ Info """
+    def _log(self, msg, severity, *args, **kwargs):
+        """
+        Log pass-through
+        """
         self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']
@@ -169,96 +171,34 @@ class LogHandler(object):
         extra['sequence'] = LogHandler.counter.next()
         kwargs['extra'] = extra
         try:
-            return self.logger.info(msg, *args, **kwargs)
+            return getattr(self.logger, severity)(msg, *args, **kwargs)
         except:
             pass
+
+    def info(self, msg, *args, **kwargs):
+        """ Info """
+        return self._log(msg, 'info', *args, **kwargs)
 
     def error(self, msg, *args, **kwargs):
         """ Error """
-        self._fix_propagate()
-        if 'print_msg' in kwargs:
-            del kwargs['print_msg']
-            print msg
-        extra = kwargs.get('extra', {})
-        extra['hostname'] = socket.gethostname()
-        extra['sequence'] = LogHandler.counter.next()
-        kwargs['extra'] = extra
-        try:
-            return self.logger.error(msg, *args, **kwargs)
-        except:
-            pass
+        return self._log(msg, 'error', *args, **kwargs)
 
     def debug(self, msg, *args, **kwargs):
         """ Debug """
-        self._fix_propagate()
-        if 'print_msg' in kwargs:
-            del kwargs['print_msg']
-            print msg
-        extra = kwargs.get('extra', {})
-        extra['hostname'] = socket.gethostname()
-        extra['sequence'] = LogHandler.counter.next()
-        kwargs['extra'] = extra
-        try:
-            return self.logger.debug(msg, *args, **kwargs)
-        except:
-            pass
+        return self._log(msg, 'debug', *args, **kwargs)
 
     def warning(self, msg, *args, **kwargs):
         """ Warning """
-        self._fix_propagate()
-        if 'print_msg' in kwargs:
-            del kwargs['print_msg']
-            print msg
-        extra = kwargs.get('extra', {})
-        extra['hostname'] = socket.gethostname()
-        extra['sequence'] = LogHandler.counter.next()
-        kwargs['extra'] = extra
-        try:
-            return self.logger.warning(msg, *args, **kwargs)
-        except:
-            pass
+        return self._log(msg, 'warning', *args, **kwargs)
 
     def log(self, msg, *args, **kwargs):
         """ Log """
-        self._fix_propagate()
-        if 'print_msg' in kwargs:
-            del kwargs['print_msg']
-            print msg
-        extra = kwargs.get('extra', {})
-        extra['hostname'] = socket.gethostname()
-        extra['sequence'] = LogHandler.counter.next()
-        kwargs['extra'] = extra
-        try:
-            return self.logger.log(msg, *args, **kwargs)
-        except:
-            pass
+        return self._log(msg, 'log', *args, **kwargs)
 
     def critical(self, msg, *args, **kwargs):
         """ Critical """
-        self._fix_propagate()
-        if 'print_msg' in kwargs:
-            del kwargs['print_msg']
-            print msg
-        extra = kwargs.get('extra', {})
-        extra['hostname'] = socket.gethostname()
-        extra['sequence'] = LogHandler.counter.next()
-        kwargs['extra'] = extra
-        try:
-            return self.logger.critical(msg, *args, **kwargs)
-        except:
-            pass
+        return self._log(msg, 'critical', *args, **kwargs)
 
     def exception(self, msg, *args, **kwargs):
         """ Exception """
-        self._fix_propagate()
-        if 'print_msg' in kwargs:
-            del kwargs['print_msg']
-            print msg
-        extra = kwargs.get('extra', {})
-        extra['hostname'] = socket.gethostname()
-        extra['sequence'] = LogHandler.counter.next()
-        kwargs['extra'] = extra
-        try:
-            return self.logger.exception(msg, *args, **kwargs)
-        except:
-            pass
+        return self._log(msg, 'exception', *args, **kwargs)
