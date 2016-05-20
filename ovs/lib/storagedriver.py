@@ -34,13 +34,13 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import add_hooks, ensure_single, log
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.logHandler import LogHandler
-from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient
+from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient, ClusterNotReachableException
 
 
 class StorageDriverController(object):
@@ -84,26 +84,34 @@ class StorageDriverController(object):
         if pmachine.mgmtcenter:
             # Update status
             pmachine.invalidate_dynamics(['host_status'])
+            host_status = pmachine.host_status
         else:
             # No management Center, cannot update status via api
             StorageDriverController._logger.info('Updating status of pmachine {0} using SSHClient'.format(pmachine.name))
+            path = StorageDriverConfiguration('storagedriver', storagedriver.vpool.guid, storagedriver.storagedriver_id).remote_path
             host_status = 'RUNNING'
             try:
                 client = SSHClient(storagerouter, username='root')
-                configuration_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
                 StorageDriverController._logger.info('SSHClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
-                with remote(client.ip, [LocalStorageRouterClient]) as rem:
-                    lsrc = rem.LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir,
-                                                                                                          storagedriver.vpool.name))
-                    lsrc.server_revision()
-                StorageDriverController._logger.info('LocalStorageRouterClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
-            except Exception as ex:
-                StorageDriverController._logger.error('Connectivity check failed, assuming host {0} is halted. {1}'.format(pmachine.name, ex))
+            except UnableToConnectException as ex:
+                StorageDriverController._logger.error('SSHClient connectivity check failed, assuming host {0} is halted. {1}'.format(pmachine.name, ex))
                 host_status = 'HALTED'
-            if host_status != 'RUNNING':
-                # Host is stopped
-                storagedriver_client = StorageDriverClient.load(storagedriver.vpool)
-                storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
+            else:
+                try:
+                    with remote(client.ip, [LocalStorageRouterClient]) as rem:
+                        lsrc = rem.LocalStorageRouterClient(path)
+                        lsrc.server_revision()
+
+                    StorageDriverController._logger.info('LocalStorageRouterClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
+                except (EOFError, RuntimeError, ClusterNotReachableException) as ex:
+                    StorageDriverController._logger.error('LocalStorageRouterClient check failed, assuming volumedriver on host {0} {1} is halted. {2}'.format(pmachine.name, client.ip, ex))
+                    host_status = 'HALTED'
+
+        if host_status != 'RUNNING':
+            # Host is stopped
+            storagedriver_client = StorageDriverClient.load(storagedriver.vpool)
+            storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
+            StorageDriverController._logger.warning('Storagedriver {0} marked offline'.format(storagedriver.storagedriver_id))
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.volumedriver_error')
