@@ -26,7 +26,7 @@ from rest_framework.exceptions import PermissionDenied
 from django.core.handlers.wsgi import WSGIRequest
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import volatile_mutex
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 def _find_request(args):

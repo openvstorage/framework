@@ -28,7 +28,7 @@ import operator
 import ssl
 
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon import client, consistency, errors, protocol, sequence, utils
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 __docformat__ = 'epytext'
 
@@ -52,7 +52,7 @@ __docformat__ = 'epytext'
 # E1121: Too many positional arguments for function call
 # R0904: Too many public methods
 
-LOGGER = LogHandler.get('arakoon', 'pyrakoon', propagate=False)
+LOGGER = LogHandler.get('arakoon_client', 'pyrakoon')
 
 class Consistency:
     pass

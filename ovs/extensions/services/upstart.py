@@ -21,7 +21,7 @@ Upstart module
 import re
 import time
 from subprocess import CalledProcessError
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class Upstart(object):

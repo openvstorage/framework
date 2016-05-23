@@ -40,7 +40,7 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.storageserver.storagedriver import MetadataServerClient
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig

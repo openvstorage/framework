@@ -24,7 +24,7 @@ import time
 import uuid
 import logging
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class Watcher(object):

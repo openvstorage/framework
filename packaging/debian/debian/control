@@ -15,7 +15,7 @@ Depends: rabbitmq-server (>= 3.2.4), python-memcache (>= 1.47-2), memcached (>= 
  ipython, devscripts, openssh-server, python-paramiko, python-rpyc, python-librabbitmq (>= 1.5.2),
  python-pysnmp4, python-kombu (>= 3.0.7), python-celery (>= 3.1.18), python-pika, etcd, python-etcd,
  python-six, python-protobuf, python-pyudev, sshpass, openvstorage-cinder-plugin, python-billiard (>= 3.3.0.20),
- python-requests (>=2.9.1), python-ujson
+ python-requests (>=2.9.1), redis-server, python-redis, python-ujson
 Recommends: avahi-utils (>= 0.6.31), openvpn, ntp
 Suggests: logstash (>= 1.4.0-1-c82dc09), virtinst (>= 0.600.4)
 Description: openvStorage core

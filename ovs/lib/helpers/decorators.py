@@ -27,7 +27,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.helpers.exceptions import EnsureSingleTimeoutReached
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 ENSURE_SINGLE_KEY = 'ovs_ensure_single'
 

@@ -23,7 +23,7 @@ body of a new entry on the queue.
 import sys
 import pika
 
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 if __name__ == '__main__':

@@ -21,7 +21,7 @@ OS manager Factory module
 from subprocess import check_output
 from ovs.extensions.os.ubuntu import Ubuntu
 from ovs.extensions.os.centos import Centos
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class OSManager(object):

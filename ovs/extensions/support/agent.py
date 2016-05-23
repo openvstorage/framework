@@ -29,7 +29,7 @@ from ConfigParser import RawConfigParser
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.system import System
 from ovs.extensions.packages.package import PackageManager
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class SupportAgent(object):

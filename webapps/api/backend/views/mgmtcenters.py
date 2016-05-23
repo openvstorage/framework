@@ -27,7 +27,7 @@ from rest_framework.exceptions import NotAcceptable
 from rest_framework.response import Response
 from rest_framework import status
 from backend.decorators import required_roles, load, return_object, return_list, log
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from ovs.lib.mgmtcenter import MgmtCenterController
 
 from celery.exceptions import TimeoutError

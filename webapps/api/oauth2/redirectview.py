@@ -29,7 +29,7 @@ from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponseRedirect
 from oauth2.decorators import auto_response, limit, log
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.rolelist import RoleList
 from oauth2.toolbox import Toolbox

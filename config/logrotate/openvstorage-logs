@@ -5,16 +5,3 @@
     copytruncate
     notifempty
 }
-
-/var/log/arakoon/*/*.log {
-    su ovs ovs
-    rotate 10
-    size 19M
-    compress
-    delaycompress
-    notifempty
-    create 666 ovs ovs
-    postrotate
-        /usr/bin/pkill -SIGUSR1 arakoon
-    endscript
-}

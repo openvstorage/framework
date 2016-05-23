@@ -29,7 +29,7 @@ from ovs.dal.lists.licenselist import LicenseList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.helpers.decorators import add_hooks
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class LicenseController(object):

@@ -19,7 +19,7 @@ Systemd module
 """
 
 from subprocess import CalledProcessError
-from ovs.log.logHandler import LogHandler
+from ovs.log.log_handler import LogHandler
 
 
 class Systemd(object):

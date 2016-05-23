@@ -6,7 +6,7 @@ After=ovs-watcher-volumedriver<_SERVICE_SUFFIX_>.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/failovercachehelper --config <CONFIG_PATH> --logrotation --logsink=/var/log/ovs/volumedriver/dtl_<VPOOL_NAME>.log
+ExecStart=/usr/bin/failovercachehelper --config <CONFIG_PATH> --logrotation --logsink <LOG_SINK>
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=60
