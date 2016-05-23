@@ -124,7 +124,7 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
 @after_setup_logger.connect
 def load_ovs_logger(**kwargs):
     if 'logger' in kwargs:
-        kwargs['logger'] = LogHandler.get('celery', name='celery', propagate=False)
+        kwargs['logger'] = LogHandler.get('celery', name='celery')
 
 
 if __name__ == '__main__':

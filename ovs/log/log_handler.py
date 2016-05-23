@@ -140,7 +140,7 @@ class LogHandler(object):
         return log_filename
 
     @staticmethod
-    def get(source, name=None, propagate=True):
+    def get(source, name=None, propagate=False):
         key = '{0}_{1}'.format(source, name)
         if key not in LogHandler.cache:
             logger = LogHandler(source, name, propagate)

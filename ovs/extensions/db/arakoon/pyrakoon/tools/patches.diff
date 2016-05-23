@@ -18,7 +18,7 @@
 
 -
 -LOGGER = logging.getLogger(__name__)
-+LOGGER = LogHandler.get('arakoon_client', 'pyrakoon', propagate=False)
++LOGGER = LogHandler.get('arakoon_client', 'pyrakoon')
 
  class NurseryConfigType(protocol.Type):
      '''NurseryConfig type'''
@@ -128,7 +128,7 @@
 
 -
 -LOGGER = logging.getLogger(__name__)
-+LOGGER = LogHandler.get('arakoon_client', 'pyrakoon', propagate=False)
++LOGGER = LogHandler.get('arakoon_client', 'pyrakoon')
 
  #pylint: disable=R0904
  class FakeClient(object, client.AbstractClient, client.ClientMixin):
@@ -158,7 +158,7 @@
 +from ovs.log.log_handler import LogHandler
 
 -LOGGER = logging.getLogger(__name__)
-+LOGGER = LogHandler.get('arakoon_client', 'pyrakoon', propagate=False)
++LOGGER = LogHandler.get('arakoon_client', 'pyrakoon')
  '''Logger for code in this module''' #pylint: disable=W0105
 
 
@@ -276,7 +276,7 @@
 -
 -_add_handler()
 -del _add_handler
-+LOGGER = LogHandler.get('arakoon_client', 'pyrakoon', propagate=False)
++LOGGER = LogHandler.get('arakoon_client', 'pyrakoon')
 
  class Consistency:
      pass
