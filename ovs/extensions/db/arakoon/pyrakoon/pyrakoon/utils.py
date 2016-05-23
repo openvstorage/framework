@@ -22,7 +22,7 @@ import functools
 import itertools
 from ovs.log.log_handler import LogHandler
 
-LOGGER = LogHandler.get('arakoon_client', 'pyrakoon', propagate=False)
+LOGGER = LogHandler.get('arakoon_client', 'pyrakoon')
 '''Logger for code in this module''' #pylint: disable=W0105
 
 

@@ -52,7 +52,7 @@ __docformat__ = 'epytext'
 # E1121: Too many positional arguments for function call
 # R0904: Too many public methods
 
-LOGGER = LogHandler.get('arakoon_client', 'pyrakoon', propagate=False)
+LOGGER = LogHandler.get('arakoon_client', 'pyrakoon')
 
 class Consistency:
     pass
@@ -155,7 +155,7 @@ def _convert_exceptions(fun):
 
 
 
-
+    
 
 class ArakoonClient(object):
     def __init__(self, config):
@@ -244,7 +244,7 @@ class ArakoonClient(object):
 
         consistency_ = self._determine_consistency(consistency)
         return self._client.get(key,consistency = consistency_)
-
+    
 
     @utils.update_argspec('self', 'key', 'value')
     @_convert_exceptions
@@ -370,7 +370,7 @@ class ArakoonClient(object):
                                     endKey, endKeyIncluded,
                                     maxElements,
                                     consistency = consistency_)
-
+        
 
         return result
 
@@ -612,7 +612,7 @@ class ArakoonClient(object):
         message = protocol.Version()
         r = self._client._process(message, node_id = nodeId)
         return r
-
+        
 
     @utils.update_argspec('self')
     @_convert_exceptions
@@ -691,7 +691,7 @@ class ArakoonClient(object):
         Force the client to read from the master
         """
         self._consistency = Consistent()
-
+    
     def makeSequence(self):
         return Sequence()
 
@@ -927,14 +927,14 @@ class ArakoonClientConfig :
           - nodeids as keys
           - ([ip], port) as values
         e.g. ::
-            cfg = ArakoonClientConfig ( 'ricky',
+            cfg = ArakoonClientConfig ( 'ricky', 
                 { "myFirstNode" : ( ["127.0.0.1"], 4000 ),
                   "mySecondNode" : (["127.0.0.1", "192.168.0.1"], 5000 ) ,
-                  "myThirdNode"  : (["127.0.0.1"], 6000 )
+                  "myThirdNode"  : (["127.0.0.1"], 6000 ) 
                 })
 
         Note: This client only supports TLSv1 when connecting to nodes,
-        due to Python 2.x.
+        due to Python 2.x. 
 
         @type clusterId: string
         @param clusterId: name of the cluster
@@ -945,7 +945,7 @@ class ArakoonClientConfig :
             a `ValueError` will be raised
         @type tls: 'bool'
         @param tls_cert: Path of client certificate & key files
-            These should be passed as a tuple. When provided, `tls_ca_cert`
+            These should be passed as a tuple. When provided, `tls_ca_cert` 
             *must* be provided as well, otherwise a `ValueError` will be raised.
         @type tls_cert: '(str, str)'
         """
@@ -957,7 +957,7 @@ class ArakoonClientConfig :
         nodes = dict(
             (node_id, (sanitize(addr), port))
             for (node_id, (addr, port)) in nodes.iteritems())
-
+        
         self._nodes = nodes
 
         if tls_ca_cert and not tls:
@@ -982,7 +982,7 @@ class ArakoonClientConfig :
     tls = property(operator.attrgetter('_tls'))
     tls_ca_cert = property(operator.attrgetter('_tls_ca_cert'))
     tls_cert = property(operator.attrgetter('_tls_cert'))
-
+    
     @staticmethod
     def getNoMasterRetryPeriod() :
         """
@@ -997,7 +997,7 @@ class ArakoonClientConfig :
 
     def getNodeLocations(self, nodeId):
         return self._nodes[nodeId]
-
+    
     def getNodeLocation(self, nodeId):
         """
         Retrieve location of the server node with give node identifier
@@ -1081,7 +1081,7 @@ class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
         return True
 
     def _process(self, message, node_id = None, retry = True):
-
+        
         bytes_ = ''.join(message.serialize())
 
         self._lock.acquire()
@@ -1107,7 +1107,7 @@ class _ArakoonClient(object, client.AbstractClient, client.ClientMixin):
                         ArakoonSockReadNoBytes):
                     self.master_id = None
                     self.drop_connections()
-
+                    
                     sleepPeriod = backoffPeriod * tryCount
                     if retry and time.time() + sleepPeriod <= deadline:
                         tryCount += 1.0
@@ -1268,14 +1268,14 @@ class _ClientConnection(object):
             self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, after_idle_sec)
             self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, interval_sec)
             self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, max_fails)
-
+            
             if self._tls:
                 kwargs = {
                     'ssl_version': ssl.PROTOCOL_TLSv1,
                     'cert_reqs': ssl.CERT_OPTIONAL,
                     'do_handshake_on_onnect' : True
                 }
-
+                
                 if self._tls_ca_cert:
                     kwargs['cert_reqs'] = ssl.CERT_REQUIRED
                     kwargs['ca_certs'] = self._tls_ca_cert
@@ -1286,8 +1286,8 @@ class _ClientConnection(object):
                     kwargs['certfile'] = cert
 
                 self._socket = ssl.wap_socket(self._socket, **kwargs)
-
-
+            
+            
             data = protocol.build_prologue(self._cluster_id)
             self._socket.sendall(data)
 
@@ -1333,7 +1333,7 @@ class _ClientConnection(object):
                 tmp = self._socket.recv(min(bytes_remaining, pending))
                 result.append(tmp)
                 bytes_remaining = bytes_remaining - len(tmp)
-
+    
         while bytes_remaining > 0:
             reads, _, _ = select.select([self._socket], [], [], self._timeout)
 
