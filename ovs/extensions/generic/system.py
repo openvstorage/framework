@@ -99,7 +99,8 @@ class System(object):
 
             result = re.search('^{0}\s.*\n'.format(ip), contents, re.MULTILINE)
             if result:
-                contents = contents.replace(result.group(0), '{0} {1}\n'.format(ip, hostnames))
+                if hostnames not in result.groups(0):
+                    contents = contents.replace(result.group(0), '{0} {1}\n'.format(ip, hostnames))
             else:
                 contents += '{0} {1}\n'.format(ip, hostnames)
 
