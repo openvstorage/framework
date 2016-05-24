@@ -54,7 +54,6 @@ class OVSMigrator(object):
             from ovs.dal.hybrids.group import Group
             from ovs.dal.hybrids.role import Role
             from ovs.dal.hybrids.client import Client
-            from ovs.dal.hybrids.failuredomain import FailureDomain
             from ovs.dal.hybrids.j_rolegroup import RoleGroup
             from ovs.dal.hybrids.j_roleclient import RoleClient
             from ovs.dal.hybrids.backendtype import BackendType
@@ -164,11 +163,6 @@ class OVSMigrator(object):
             slate.productname = 'Open vStorage'
             slate.is_default = False
             slate.save()
-
-            # Failure Domain
-            failure_domain = FailureDomain()
-            failure_domain.name = 'Default'
-            failure_domain.save()
 
             # We're now at version 1
             working_version = 1
@@ -395,26 +389,13 @@ class OVSMigrator(object):
             working_version = 4
 
         # Version 5 introduced:
-        # - Failure Domains
+        # - RDMA Capability
         if working_version < 5:
             import os
-            from ovs.dal.hybrids.failuredomain import FailureDomain
-            from ovs.dal.lists.failuredomainlist import FailureDomainList
             from ovs.dal.lists.storagerouterlist import StorageRouterList
             from ovs.extensions.generic.remote import remote
             from ovs.extensions.generic.sshclient import SSHClient
-            failure_domains = FailureDomainList.get_failure_domains()
-            if len(failure_domains) > 0:
-                failure_domain = failure_domains[0]
-            else:
-                failure_domain = FailureDomain()
-                failure_domain.name = 'Default'
-                failure_domain.save()
             for storagerouter in StorageRouterList.get_storagerouters():
-                change = False
-                if storagerouter.primary_failure_domain is None:
-                    storagerouter.primary_failure_domain = failure_domain
-                    change = True
                 if storagerouter.rdma_capable is None:
                     client = SSHClient(storagerouter, username='root')
                     rdma_capable = False
@@ -433,8 +414,6 @@ class OVSMigrator(object):
                                             if 'ACTIVE' in client.run('cat {0}'.format(state_file)):
                                                 rdma_capable = True
                     storagerouter.rdma_capable = rdma_capable
-                    change = True
-                if change is True:
                     storagerouter.save()
 
             working_version = 5

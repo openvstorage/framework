@@ -1,0 +1,35 @@
+<!--
+Copyright (C) 2016 iNuron NV
+
+This file is part of Open vStorage Open Source Edition (OSE),
+as available from
+
+      http://www.openvstorage.org and
+      http://www.openvstorage.com.
+
+This file is free software; you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+as published by the Free Software Foundation, in version 3 as it comes
+in the LICENSE.txt file of the Open vStorage OSE distribution.
+
+Open vStorage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY of any kind.
+-->
+<section>
+    <div>
+        <h2 class="pull-left" data-i18n="ovs:domains.users.title"></h2>
+    </div>
+    <div data-bind="pager: { loadData: loadDomains, headers: domainHeaders, refreshInterval: 5000, controls: true }"
+         style="clear: both;">
+        <table data-dummy="dummy">
+            <tr data-part="vitem">
+                <td style="position: relative;">
+                    <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
+                       <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    </span>
+                    <span data-bind="text: name"></span>
+                </td>
+            </tr>
+        </table>
+    </div>
+</section>

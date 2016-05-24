@@ -24,7 +24,6 @@ from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.hybrids.failuredomain import FailureDomain
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
@@ -49,8 +48,7 @@ class VDisk(DataObject):
                     Property('metadata', dict, default=dict(), doc='Contains fixed metadata about the volume (e.g. lba_size, ...)')]
     __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
                    Relation('vpool', VPool, 'vdisks'),
-                   Relation('parent_vdisk', None, 'child_vdisks', mandatory=False),
-                   Relation('secondary_failure_domain', FailureDomain, 'secondary_vdisks', mandatory=False)]
+                   Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('snapshots', list, 60),
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4),

@@ -24,10 +24,12 @@ define([
         var self = this;
 
         // Variables
+        self.backupDomainGuids  = [];
+        self.domainGuids        = [];
         self.shared             = shared;
-        self.vPoolGuids         = [];
-        self.vMachineGuids      = [];
         self.storageDriverGuids = [];
+        self.vMachineGuids      = [];
+        self.vPoolGuids         = [];
 
         // Handles
         self.loadHandle  = undefined;
@@ -35,46 +37,44 @@ define([
         self.loadDisks   = undefined;
 
         // External dependencies
-        self.pMachine               = ko.observable();
-        self.primaryFailureDomain   = ko.observable();
-        self.secondaryFailureDomain = ko.observable();
-        self.vPools                 = ko.observableArray([]);
-        self.vMachines              = ko.observableArray([]);
+        self.backupDomains = ko.observableArray([]);
+        self.domains       = ko.observableArray([]);
+        self.pMachine      = ko.observable();
+        self.vPools        = ko.observableArray([]);
+        self.vMachines     = ko.observableArray([]);
 
         // Observables
-        self.availableActions           = ko.observableArray([]);
-        self.backendRead                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.backendWritten             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.bandwidthSaved             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.cacheHits                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheMisses                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.disks                      = ko.observableArray([]);
-        self.disksLoaded                = ko.observable(false);
-        self.downloadLogState           = ko.observable($.t('ovs:support.downloadlogs'));
-        self.edit                       = ko.observable(false);
-        self.guid                       = ko.observable(guid);
-        self.iops                       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.ipAddress                  = ko.observable();
-        self.lastHeartbeat              = ko.observable();
-        self.loaded                     = ko.observable(false);
-        self.loading                    = ko.observable(false);
-        self.machineId                  = ko.observable();
-        self.name                       = ko.observable();
-        self.nodeType                   = ko.observable();
-        self.pMachineGuid               = ko.observable();
-        self.primaryFailureDomainGuid   = ko.observable();
-        self.rdmaCapable                = ko.observable(false);
-        self.readSpeed                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.saving                     = ko.observable(false);
-        self.scrubCapable               = ko.observable(false);
-        self.secondaryFailureDomainGuid = ko.observable();
-        self.status                     = ko.observable();
-        self.storedData                 = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.totalCacheHits             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.updates                    = ko.observable();
-        self.vDisks                     = ko.observableArray([]);
-        self.versions                   = ko.observable();
-        self.writeSpeed                 = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.availableActions  = ko.observableArray([]);
+        self.backendRead       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendWritten    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.cacheHits         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheMisses       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.disks             = ko.observableArray([]);
+        self.disksLoaded       = ko.observable(false);
+        self.downloadLogState  = ko.observable($.t('ovs:support.downloadlogs'));
+        self.edit              = ko.observable(false);
+        self.guid              = ko.observable(guid);
+        self.iops              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.ipAddress         = ko.observable();
+        self.lastHeartbeat     = ko.observable();
+        self.loaded            = ko.observable(false);
+        self.loading           = ko.observable(false);
+        self.machineId         = ko.observable();
+        self.name              = ko.observable();
+        self.nodeType          = ko.observable();
+        self.pMachineGuid      = ko.observable();
+        self.rdmaCapable       = ko.observable(false);
+        self.readSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.saving            = ko.observable(false);
+        self.scrubCapable      = ko.observable(false);
+        self.status            = ko.observable();
+        self.storedData        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.totalCacheHits    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.updates           = ko.observable();
+        self.vDisks            = ko.observableArray([]);
+        self.versions          = ko.observable();
+        self.writeSpeed        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -195,13 +195,19 @@ define([
                 });
         };
         self.fillData = function(data) {
-            generic.trySet(self.name, data, 'name');
-            generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.ipAddress, data, 'ip');
             generic.trySet(self.machineId, data, 'machineid');
-            generic.trySet(self.status, data, 'status', generic.lower);
+            generic.trySet(self.name, data, 'name');
             generic.trySet(self.nodeType, data, 'node_type');
             generic.trySet(self.rdmaCapable, data, 'rdma_capable');
+            generic.trySet(self.status, data, 'status', generic.lower);
+            generic.trySet(self.storedData, data, 'stored_data');
+            if (data.hasOwnProperty('backup_domains')) {
+                self.backupDomainGuids = data.backup_domains;
+            }
+            if (data.hasOwnProperty('regular_domains')) {
+                self.domainGuids = data.regular_domains;
+            }
             if (data.hasOwnProperty('last_heartbeat')) {
                 self.lastHeartbeat(data.last_heartbeat === null ? undefined : data.last_heartbeat);
             }
@@ -239,26 +245,6 @@ define([
                         return d;
                     }, 'guid'
                 );
-            }
-            if (data.hasOwnProperty('primary_failure_domain_guid')) {
-                var pfdGuid = data.primary_failure_domain_guid;
-                if (pfdGuid === null || pfdGuid === undefined) {
-                    self.primaryFailureDomainGuid(undefined);
-                } else {
-                    if (self.primaryFailureDomainGuid() === undefined || self.primaryFailureDomainGuid() !== pfdGuid) {
-                        self.primaryFailureDomainGuid(pfdGuid);
-                    }
-                }
-            }
-            if (data.hasOwnProperty('secondary_failure_domain_guid')) {
-                var sfdGuid = data.secondary_failure_domain_guid;
-                if (sfdGuid === null || sfdGuid === undefined) {
-                    self.secondaryFailureDomainGuid(undefined);
-                } else {
-                    if (self.secondaryFailureDomainGuid() === undefined || self.secondaryFailureDomainGuid() !== sfdGuid) {
-                        self.secondaryFailureDomainGuid(sfdGuid);
-                    }
-                }
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;
@@ -306,21 +292,20 @@ define([
                 }
             }).promise();
         };
-        self.save = function() {
-            return $.Deferred(function(deferred) {
-                self.saving(true);
-                var data = {
-                    primary_failure_domain_guid: self.primaryFailureDomain().guid(),
-                    secondary_failure_domain_guid: self.secondaryFailureDomain() === undefined ? null : self.secondaryFailureDomain().guid()
-                };
-                api.patch('storagerouters/' + self.guid(), { data: data })
-                    .done(deferred.resolve)
-                    .fail(deferred.reject)
-                    .always(function() {
-                        self.edit(false);
-                        self.saving(false);
-                    });
-            }).promise();
-        };
+        // self.save = function() {
+        //     return $.Deferred(function(deferred) {
+        //         self.saving(true);
+        //         var data = {
+        //
+        //         };
+        //         api.patch('storagerouters/' + self.guid(), { data: data })
+        //             .done(deferred.resolve)
+        //             .fail(deferred.reject)
+        //             .always(function() {
+        //                 self.edit(false);
+        //                 self.saving(false);
+        //             });
+        //     }).promise();
+        // };
     };
 });

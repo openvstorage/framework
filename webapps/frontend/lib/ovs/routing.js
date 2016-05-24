@@ -35,7 +35,7 @@ define(['jquery'], function($) {
         { route: 'vtemplates',           moduleId: 'vtemplates',           title: $.t('ovs:vtemplates.title'),            titlecode: 'ovs:vtemplates.title',            nav: true,  main: true  },
         { route: 'login',                moduleId: 'login',                title: $.t('ovs:login.title'),                 titlecode: 'ovs:login.title',                 nav: false, main: false },
         { route: 'hmc',                  moduleId: 'pmachines',            title: $.t('ovs:pmachines.title'),             titlecode: 'ovs:pmachines.title',             nav: true,  main: false },
-        { route: 'failuredomains',       moduleId: 'failuredomains',       title: $.t('ovs:failuredomains.title'),        titlecode: 'ovs:failuredomains.title',        nav: true,  main: false },
+        { route: 'domains',              moduleId: 'domains',              title: $.t('ovs:domains.title'),               titlecode: 'ovs:domains.title',               nav: true,  main: false },
         { route: 'users',                moduleId: 'users',                title: $.t('ovs:users.title'),                 titlecode: 'ovs:users.title',                 nav: true,  main: false },
         { route: 'statistics',           moduleId: 'statistics',           title: $.t('ovs:statistics.title'),            titlecode: 'ovs:statistics.title',            nav: true,  main: false },
         { route: 'support',              moduleId: 'support',              title: $.t('ovs:support.title'),               titlecode: 'ovs:support.title',               nav: true,  main: false },

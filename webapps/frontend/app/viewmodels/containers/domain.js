@@ -26,39 +26,24 @@ define([
         self.loadHandle = undefined;
 
         // Observables
-        self.address          = ko.observable('');
-        self.city             = ko.observable('');
-        self.country          = ko.observable('');
         self.disabled         = ko.observable(false);
         self.edit             = ko.observable(false);
         self.guid             = ko.observable(guid);
         self.loaded           = ko.observable(false);
         self.loading          = ko.observable(false);
         self.name             = ko.observable('');
-        self.primarySRGuids   = ko.observableArray([]);
-        self.secondarySRGuids = ko.observableArray([]);
 
         // Computed
         self.canSave = ko.computed(function() {
-            return !(self.name() === undefined || self.name() === '');
+            return self.name() !== undefined && self.name() !== '';
         });
         self.canDelete = ko.computed(function() {
-            return self.primarySRGuids().length === 0 && self.secondarySRGuids().length === 0;
+            return true;
         });
 
         // Functions
         self.fillData = function(data) {
             self.name(data.name);
-            generic.trySet(self.city, data, 'city');
-            generic.trySet(self.address, data, 'address');
-            generic.trySet(self.country, data, 'country');
-            if (data.hasOwnProperty('primary_storagerouters_guids')) {
-                self.primarySRGuids(data.primary_storagerouters_guids);
-            }
-            if (data.hasOwnProperty('secondary_storagerouters_guids')) {
-                self.secondarySRGuids(data.secondary_storagerouters_guids);
-            }
-
             self.loaded(true);
             self.loading(false);
         };
@@ -66,7 +51,7 @@ define([
             return $.Deferred(function(deferred) {
                 self.loading(true);
                 if (generic.xhrCompleted(self.loadHandle)) {
-                    self.loadHandle = api.get('failure_domains/' + self.guid())
+                    self.loadHandle = api.get('domains/' + self.guid())
                         .done(function(data) {
                             self.fillData(data);
                             deferred.resolve();
@@ -82,14 +67,8 @@ define([
         };
         self.save = function() {
             return $.Deferred(function(deferred) {
-                var data = {
-                    name: self.name(),
-                    address: self.address(),
-                    city: self.city(),
-                    country: self.country()
-                };
                 if (self.guid() === undefined) {
-                    api.post('failure_domains', { data: data })
+                    api.post('domains', {data: {name: self.name()}})
                         .done(function (data) {
                             deferred.resolve(data.guid);
                         })
@@ -98,7 +77,7 @@ define([
                             self.edit(false);
                         });
                 } else {
-                    api.patch('failure_domains/' + self.guid(), { data: data })
+                    api.patch('domains/' + self.guid(), {data: {name: self.name()}})
                         .done(function (data) {
                             deferred.resolve(data.guid);
                         })

@@ -34,41 +34,16 @@ but WITHOUT ANY WARRANTY of any kind.
                     <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
                 </td>
                 <td><span data-bind="text: ipAddress"></span></td>
-                <td>
-                    <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                        <span data-part="lazy-entry" data-bind="tooltip: item().ipAddress(), text: item().name" class="pointer"></span>
-                    </span>
-                </td>
-                <td>
-                    <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                        <span data-part="lazy-entry" data-bind="text: $.t('ovs:generic.hypervisors.' + item().hvtype())"></span>
-                    </span>
-                </td>
                 <td><span data-bind="text: vDisks().length"></span></td>
-                <td><span data-bind="text: storedData"></span></td>
-                <td><span data-bind="text: cacheRatio"></span></td>
                 <td><span data-bind="text: iops"></span></td>
+                <td><span data-bind="text: storedData"></span></td>
                 <td><span data-bind="text: readSpeed"></span></td>
                 <td><span data-bind="text: writeSpeed"></span></td>
-                <td>
-                    <span data-bind="lazyloader: { item: primaryFailureDomain, loadedObservable: 'loaded', undefinedLoading: false }">
-                        <span data-part="lazy-entry" data-bind="text: item().name"></span>
-                        <span data-part="lazy-entry-undefined">-</span>
-                    </span>
+                <td data-bind="lazylist: { items: domains, loadedObservable: 'loaded' }">
+                    <span data-part="entry" data-bind="text: name"></span>
                 </td>
-                <td>
-                    <span data-bind="lazyloader: { item: secondaryFailureDomain, loadedObservable: 'loaded', undefinedLoading: false }">
-                        <span data-part="lazy-entry" data-bind="text: item().name"></span>
-                        <span data-part="lazy-entry-undefined">-</span>
-                    </span>
-                </td>
-                <td>
-                    <!-- ko if: scrubCapable() === false -->
-                        <span class="fa" data-i18n="[html]ovs:icons.cancel_circle" style="color: red;"></span>
-                    <!-- /ko -->
-                    <!-- ko if: scrubCapable() === true -->
-                        <span class="fa" data-i18n="[html]ovs:icons.check_circle" style="color: green;"></span>
-                    <!-- /ko -->
+                <td data-bind="lazylist: { items: backupDomains, loadedObservable: 'loaded' }">
+                    <span data-part="entry" data-bind="text: name"></span>
                 </td>
             </tr>
         </table>

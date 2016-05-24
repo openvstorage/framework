@@ -24,7 +24,6 @@ import unittest
 from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
-from ovs.dal.hybrids.failuredomain import FailureDomain
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
@@ -83,9 +82,6 @@ class DeleteSnapshots(unittest.TestCase):
         """
         # Setup
         # There are 2 machines; one with two disks, one with one disk and a stand-alone additional disk
-        failure_domain = FailureDomain()
-        failure_domain.name = 'Test'
-        failure_domain.save()
         backend_type = BackendType()
         backend_type.name = 'BackendType'
         backend_type.code = 'BT'
@@ -107,7 +103,6 @@ class DeleteSnapshots(unittest.TestCase):
         storage_router.pmachine = pmachine
         storage_router.machine_id = System.get_my_machine_id()
         storage_router.rdma_capable = False
-        storage_router.primary_failure_domain = failure_domain
         storage_router.save()
         disk = Disk()
         disk.name = 'physical_disk_1'

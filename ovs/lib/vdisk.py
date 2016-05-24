@@ -19,46 +19,38 @@ Module for VDiskController
 """
 import os
 import re
-import pickle
-import random
 import time
 import uuid
+import pickle
+import random
 from celery.schedules import crontab
 from ovs.celery_run import celery
-from ovs.dal.exceptions import ObjectNotFoundException
-from ovs.dal.hybrids.failuredomain import FailureDomain
+from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.lists.mgmtcenterlist import MgmtCenterList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.generic.sshclient import UnableToConnectException
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.volatilemutex import NoLockAvailableException
-from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-from ovs.lib.helpers.decorators import ensure_single
-from ovs.lib.helpers.decorators import log
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
+from ovs.lib.helpers.decorators import ensure_single, log
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
-from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter import VolumeDriverEvents_pb2
-from volumedriver.storagerouter.storagerouterclient import DTLConfig
-from volumedriver.storagerouter.storagerouterclient import DTLConfigMode
-from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig
-from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
+from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
+from volumedriver.storagerouter.storagerouterclient import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig
 
 
 class VDiskController(object):
@@ -857,7 +849,7 @@ class VDiskController(object):
         Toolbox.verify_required_params(required_params, new_config_params)
 
         if new_config_params['dtl_mode'] != 'no_sync' and new_config_params.get('dtl_target') is None:
-            raise Exception('If DTL mode is Asynchronous or Synchronous, a target Failure Domain guid should always be specified')
+            raise Exception('If DTL mode is Asynchronous or Synchronous, a Domain guid should always be specified')
 
         errors = False
         vdisk = VDisk(vdisk_guid)
@@ -892,27 +884,20 @@ class VDiskController(object):
                 vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
             elif (new_dtl_target is not None and new_dtl_target != old_dtl_target or old_dtl_mode != new_dtl_mode) and new_dtl_mode != 'no_sync':
                 VDiskController._logger.info('Changing DTL to use global values for vDisk {0}'.format(vdisk_guid))
-                possible_srs = FailureDomain(new_dtl_target).primary_storagerouters
-                if len(possible_srs) is None:
-                    VDiskController._logger.error('Failed to retrieve primary Storage Routers for Failure Domain with guid {0}'.format(new_dtl_target))
-                    errors = True
+                dtl_target = StorageRouter(new_dtl_target)
+                if vdisk.storagerouter_guid == new_dtl_target:
+                    raise ValueError('Cannot reconfigure DTL to StorageRouter {0} because the vDisk is hosted on this StorageRouter'.format(dtl_target.name))
 
-                possible_srs.shuffle()
                 dtl_config = None
-                for storagerouter in possible_srs:
-                    if storagerouter.guid == vdisk.storagerouter_guid:
-                        continue
-                    if dtl_config is not None:
+                for sd in dtl_target.storagedrivers:
+                    if sd.vpool == vdisk.vpool:
+                        dtl_config = DTLConfig(str(dtl_target.ip), sd.ports[2], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
+                        vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
+                        vdisk.has_manual_dtl = True
+                        vdisk.save()
                         break
-                    for sd in storagerouter.storagedrivers:
-                        if sd.vpool == vdisk.vpool:
-                            dtl_config = DTLConfig(str(storagerouter.ip), sd.ports[2], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
-                            vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
-                            vdisk.has_manual_dtl = True
-                            vdisk.save()
-                            break
                 if dtl_config is None:
-                    VDiskController._logger.error('Failure Domain with guid {0} has no Storage Routers serving vPool {1}'.format(new_dtl_target, vdisk.vpool.name))
+                    VDiskController._logger.error('Domain with guid {0} has no Storage Routers serving vPool {1}'.format(new_dtl_target, vdisk.vpool.name))
                     errors = True
 
         # 2nd update rest
@@ -1101,7 +1086,7 @@ class VDiskController(object):
                 this_storage_router = StorageRouter(vdisk.storagerouter_guid)
                 available_primary_storagerouters = []
                 available_secondary_storagerouters = []
-                # 1. Check available storage routers in the backup failure domain
+                # 1. Check available storage routers in the failure domain
                 for failure_domain in [this_storage_router.secondary_failure_domain, this_storage_router.primary_failure_domain]:
                     if failure_domain is None:
                         continue

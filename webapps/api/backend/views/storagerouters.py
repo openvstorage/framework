@@ -19,23 +19,18 @@ StorageRouter module
 """
 
 import json
-from celery.task.control import revoke
-from rest_framework import viewsets, status
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action, link
-from rest_framework.exceptions import NotAcceptable
-from rest_framework.response import Response
-from backend.serializers.serializers import FullSerializer
-from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.dal.hybrids.storagerouter import StorageRouter
-from ovs.dal.datalist import DataList
-from ovs.lib.disk import DiskController
-from ovs.lib.mdsservice import MDSServiceController
-from ovs.lib.storagerouter import StorageRouterController
-from ovs.lib.storagedriver import StorageDriverController
-from ovs.lib.vdisk import VDiskController
 from backend.decorators import required_roles, return_list, return_object, return_task, return_plain, load, log
+from backend.serializers.serializers import FullSerializer
+from ovs.dal.datalist import DataList
+from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.lib.disk import DiskController
+from ovs.lib.storagedriver import StorageDriverController
+from ovs.lib.storagerouter import StorageRouterController
+from rest_framework import viewsets, status
+from rest_framework.decorators import action, link
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 
 class StorageRouterViewSet(viewsets.ViewSet):
@@ -78,39 +73,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Update a StorageRouter
         """
         contents = None if contents is None else contents.split(',')
-        previous_primary = storagerouter.primary_failure_domain
-        previous_secondary = storagerouter.secondary_failure_domain
         serializer = FullSerializer(StorageRouter, contents=contents, instance=storagerouter, data=request.DATA)
         if serializer.is_valid():
-            primary = storagerouter.primary_failure_domain
-            secondary = storagerouter.secondary_failure_domain
-            if primary is None:
-                raise NotAcceptable('A StorageRouter must have a primary FD configured')
-            if secondary is not None:
-                if primary.guid == secondary.guid:
-                    raise NotAcceptable('A StorageRouter cannot have the same FD for both primary and secondary')
-                if len(secondary.primary_storagerouters) == 0:
-                    raise NotAcceptable('The secondary FD should be set as primary FD by at least one StorageRouter')
-            if len(previous_primary.secondary_storagerouters) > 0 and len(previous_primary.primary_storagerouters) == 1 and \
-                    previous_primary.primary_storagerouters[0].guid == storagerouter.guid and previous_primary.guid != primary.guid:
-                raise NotAcceptable('Cannot change the primary FD as this StorageRouter is the only one serving it while it is used as secondary FD')
             serializer.save()
-            if previous_primary != primary or previous_secondary != secondary:
-                cache = VolatileFactory.get_client()
-                key_mds = 'ovs_dedupe_fdchange_mds_{0}'.format(storagerouter.guid)
-                key_dtl = 'ovs_dedupe_fdchange_dtl_{0}'.format(storagerouter.guid)
-                task_mds_id = cache.get(key_mds)
-                task_dtl_id = cache.get(key_dtl)
-                if task_mds_id:
-                    # Key exists, task was already scheduled. If task is already running, the revoke message will be ignored
-                    revoke(task_mds_id)
-                if task_dtl_id:
-                    revoke(task_dtl_id)
-                async_mds_result = MDSServiceController.mds_checkup.s().apply_async(countdown=60)
-                async_dtl_result = VDiskController.dtl_checkup.s().apply_async(countdown=60)
-                cache.set(key_mds, async_mds_result.id, 600)  # Store the task id
-                cache.set(key_mds, async_dtl_result.id, 600)  # Store the task id
-
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

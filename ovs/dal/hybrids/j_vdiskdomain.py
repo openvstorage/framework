@@ -15,21 +15,19 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-FailureDomainList module
+VDiskDomain module
 """
-from ovs.dal.datalist import DataList
-from ovs.dal.hybrids.failuredomain import FailureDomain
+from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Relation
+from ovs.dal.hybrids.domain import Domain
+from ovs.dal.hybrids.vdisk import VDisk
 
 
-class FailureDomainList(object):
+class VDiskDomain(DataObject):
     """
-    This FailureDomainList class contains various lists related to the FailureDomain class
+    The VDiskDomain class represents the junction table between vDisk and Domain.
     """
-
-    @staticmethod
-    def get_failure_domains():
-        """
-        Returns a list of all failure domains
-        """
-        return DataList(FailureDomain, {'type': DataList.where_operator.AND,
-                                        'items': []})
+    __properties = []
+    __relations = [Relation('domain', Domain, 'vdisks_dtl'),
+                   Relation('vdisk', VDisk, 'domains_dtl')]
+    __dynamics = []

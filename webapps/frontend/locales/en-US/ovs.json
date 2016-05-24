@@ -121,8 +121,6 @@
         "api": "API",
         "areyousure": "Are you sure?",
         "backendtype": "Type",
-        "backup_failure_domain_short": "Backup <abbr title='Failure Domain'>FD</abbr>",
-        "backup_failure_domain": "Backup Failure Domain",
         "bandwidth": "Bandwidth",
         "cache": "Cache",
         "cacheratio": "Cache Hit Ratio",
@@ -143,13 +141,14 @@
         "description": "Description",
         "disk": "Disk",
         "disks": "Disks",
+        "domain": "Domain",
+        "domains": "Domains",
         "dtl_port": "DTL Port",
         "dtl_status": "DTL",
         "elementsloading": "Items loading...",
         "error": "Error",
         "errorsfound": "Errors were found. Please check the contents of all fields.",
-        "failure_domain_short": "<abbr title='Failure Domain'>FD</abbr>",
-        "failure_domain": "Failure Domain",
+        "failure_domains": "Failure Domains",
         "filesystem": "Filesystem",
         "finish": "Finish",
         "finished": "Finished",
@@ -199,6 +198,7 @@
         "read": "Read",
         "readspeed": "Read Speed",
         "reload": "Reload",
+        "removesnapshot": "Remove Snapshot",
         "rescan": "Rescan",
         "results": "results",
         "resultspp": "results per page",
@@ -215,6 +215,7 @@
         "spaceleft": "__amount__ left",
         "state": "State",
         "status": "Status",
+        "sticky": "Sticky",
         "storageip": "Storage IP",
         "storagerouter": "Storage Router",
         "storagerouters": "Storage Routers",
@@ -243,10 +244,7 @@
         "write": "Write",
         "writespeed": "Write Speed",
         "xmlrpcport": "XML-RPC",
-        "sticky": "Sticky",
-        "removesnapshot": "Remove Snapshot",
-        "yes": "Yes",
-        "failuredomains": "Failure Domains"
+        "yes": "Yes"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -283,6 +281,7 @@
             "moveawaymsg": "Move all vDisks away from this Storage Router and start them on other Storage Routers.",
             "moveawaytitle": "Move all vDisks",
             "rdma_capable": "RDMA Capable",
+            "scrub_capable": "SCRUB Capable",
             "storageroutervpoollink": "vPools served by this Storage Router",
             "title": "Storage Router",
             "updateserving": "Save changes",
@@ -320,7 +319,7 @@
                     "sync": "Synchronous",
                     "undefined": "Unknown"
                 },
-                "dtl_target": "Target Failure Domain",
+                "dtl_target": "Target Domain",
                 "dtl_transport": "Transport Mode",
                 "dtl_transport_modes": {
                     "rdma": "RDMA",
@@ -499,7 +498,7 @@
         },
         "configure": {
             "host": {
-                "warning": "Are you want you want to __what__ __which__?"
+                "warning": "Are you sure you want to __what__ __which__?"
             },
             "vpool": {
                 "failed": "Failed to __which__ vPool",
@@ -509,7 +508,6 @@
                 "success_msg": "Successfully __which__ vPool",
                 "warning": "Are you sure you want to __what__ the vPool?"
             }
-
         },
         "delete": {
             "warning": "Are you sure you want to delete __what__?",
@@ -518,30 +516,25 @@
             "done": "Deleted",
             "donemsg": "Management center __what__ deleted",
             "errormsg": "deleting __what__"
-        },
-        "save": {
-            "complete": "Save completed",
-            "success": "PMachine __what__ updated.",
-            "failed": "Updating __what__ failed: __why__"
         }
     },
-    "failuredomains": {
-        "title": "Failure domains",
+    "domains": {
+        "title": "Domains",
         "save": {
             "complete": "Safe completed",
-            "success": "Failure Domain __what__ updated.",
+            "success": "Domain __what__ updated.",
             "failed": "Updating __what__ failed: __why__"
         },
         "new": {
             "complete": "Created",
-            "addsuccess": "Failure Domain created",
-            "addfailed": "Failure Domain could not be created: __why__"
+            "addsuccess": "Domain created",
+            "addfailed": "Domain could not be created: __why__"
         },
         "delete": {
-            "delete": "Are you sure you want to delete Failure Domain '__what__'?",
+            "delete": "Are you sure you want to delete Domain '__what__'?",
             "complete": "Deleted",
-            "deletesuccess": "Failure Domain deleted",
-            "deletefailed": "Could not delete the Failure Domain: __why__"
+            "deletesuccess": "Domain deleted",
+            "deletefailed": "Could not delete the Domain: __why__"
         }
     },
     "users": {

@@ -15,55 +15,46 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define*/
 define([
-    'jquery', 'knockout', 'plugins/dialog',
+    'jquery', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vpool', '../containers/storagerouter', '../containers/pmachine', '../containers/failuredomain'
-], function($, ko, dialog, shared, generic, Refresher, api, VPool, StorageRouter, PMachine, FailureDomain) {
+    '../containers/domain', '../containers/storagerouter'
+], function($, ko, shared, generic, Refresher, api, Domain, StorageRouter) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
+        self.domainCache           = {};
         self.shared                = shared;
         self.guard                 = { authenticated: true };
         self.refresher             = new Refresher();
         self.widgets               = [];
-        self.pMachineCache         = {};
-        self.fdCache               = {};
         self.storageRoutersHeaders = [
-            { key: 'status',      value: $.t('ovs:generic.status'),                      width: 60        },
-            { key: 'name',        value: $.t('ovs:generic.name'),                        width: 100       },
-            { key: 'ip',          value: $.t('ovs:generic.ip'),                          width: 100       },
-            { key: 'host',        value: $.t('ovs:generic.host'),                        width: 55        },
-            { key: 'type',        value: $.t('ovs:generic.type'),                        width: 55        },
-            { key: 'vdisks',      value: $.t('ovs:generic.vdisks'),                      width: 55        },
-            { key: 'storedData',  value: $.t('ovs:generic.storeddata'),                  width: 96        },
-            { key: 'cacheRatio',  value: $.t('ovs:generic.cache'),                       width: 80        },
-            { key: 'iops',        value: $.t('ovs:generic.iops'),                        width: 55        },
-            { key: 'readSpeed',   value: $.t('ovs:generic.read'),                        width: 100       },
-            { key: 'writeSpeed',  value: $.t('ovs:generic.write'),                       width: 100       },
-            { key: 'primaryFD',   value: $.t('ovs:generic.failure_domain_short'),        width: 100       },
-            { key: 'secondaryFD', value: $.t('ovs:generic.backup_failure_domain_short'), width: 100       },
-            { key: 'scrub',       value: $.t('ovs:generic.scrub'),                       width: undefined }
+            { key: 'status',        value: $.t('ovs:generic.status'),          width: 60        },
+            { key: 'name',          value: $.t('ovs:generic.name'),            width: 125       },
+            { key: 'ip',            value: $.t('ovs:generic.ip'),              width: 125       },
+            { key: 'vdisks',        value: $.t('ovs:generic.vdisks'),          width: 60        },
+            { key: 'iops',          value: $.t('ovs:generic.iops'),            width: 60        },
+            { key: 'storedData',    value: $.t('ovs:generic.storeddata'),      width: 100       },
+            { key: 'readSpeed',     value: $.t('ovs:generic.read'),            width: 100       },
+            { key: 'writeSpeed',    value: $.t('ovs:generic.write'),           width: 100       },
+            { key: 'domain',        value: $.t('ovs:generic.domains'),         width: 200       },
+            { key: 'failureDomain', value: $.t('ovs:generic.failure_domains'), width: undefined }
         ];
 
         // Observables
-        self.vPools         = ko.observableArray([]);
-        self.failureDomains = ko.observableArray([]);
-        self.storageRouters = ko.observableArray([]);
+        self.vPools = ko.observableArray([]);
 
         // Handles
+        self.domainsHandle        = undefined;
         self.storageRoutersHandle = {};
-        self.vPoolsHandle         = undefined;
-        self.failureDomainHandle  = undefined;
-        self.storageRouterHandle  = undefined;
 
         // Functions
         self.loadStorageRouters = function(options) {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.storageRoutersHandle[options.page])) {
                     options.sort = 'name';
-                    options.contents = '_relations,statistics,stored_data,vdisks_guids,status,partition_config';
+                    options.contents = '_relations,statistics,stored_data,vdisks_guids,status,partition_config,regular_domains,backup_domains';
                     self.storageRoutersHandle[options.page] = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
@@ -72,38 +63,34 @@ define([
                                     return new StorageRouter(guid);
                                 },
                                 dependencyLoader: function(item) {
-                                    var pMachineGuid = item.pMachineGuid(), pm, pfd, sfd,
-                                        primaryFailureDomainGuid = item.primaryFailureDomainGuid(),
-                                        secondaryFailureDomainGuid = item.secondaryFailureDomainGuid();
-                                    if (pMachineGuid && (item.pMachine() === undefined || item.pMachine().guid() !== pMachineGuid)) {
-                                        if (!self.pMachineCache.hasOwnProperty(pMachineGuid)) {
-                                            pm = new PMachine(pMachineGuid);
-                                            pm.load();
-                                            self.pMachineCache[pMachineGuid] = pm;
-                                        }
-                                        item.pMachine(self.pMachineCache[pMachineGuid]);
-                                    } else if (pMachineGuid && item.pMachine() !== undefined && item.pMachine().loaded() === false) {
-                                        if (!self.pMachineCache.hasOwnProperty(item.pMachine().guid())) {
-                                            self.pMachineCache[item.pMachine().guid()] = item.pMachine();
-                                        }
-                                        item.pMachine().load();
-                                    }
-                                    if (primaryFailureDomainGuid && (item.primaryFailureDomain() === undefined || item.primaryFailureDomainGuid() !== primaryFailureDomainGuid)) {
-                                        if (!self.fdCache.hasOwnProperty(primaryFailureDomainGuid)) {
-                                            pfd = new FailureDomain(primaryFailureDomainGuid);
-                                            pfd.load();
-                                            self.fdCache[primaryFailureDomainGuid] = pfd;
-                                        }
-                                        item.primaryFailureDomain(self.fdCache[primaryFailureDomainGuid]);
-                                    }
-                                    if (secondaryFailureDomainGuid && (item.secondaryFailureDomain() === undefined || item.secondaryFailureDomainGuid() !== secondaryFailureDomainGuid)) {
-                                        if (!self.fdCache.hasOwnProperty(secondaryFailureDomainGuid)) {
-                                            sfd = new FailureDomain(secondaryFailureDomainGuid);
-                                            sfd.load();
-                                            self.fdCache[secondaryFailureDomainGuid] = sfd;
-                                        }
-                                        item.secondaryFailureDomain(self.fdCache[secondaryFailureDomainGuid]);
-                                    }
+                                    generic.crossFiller(
+                                        item.domainGuids, item.domains,
+                                        function(guid) {
+                                            if (!self.domainCache.hasOwnProperty(guid)) {
+                                                var domain = new Domain(guid);
+                                                domain.load();
+                                                self.domainCache[guid] = domain;
+                                            }
+                                            return self.domainCache[guid];
+                                        }, 'guid'
+                                    );
+                                    generic.crossFiller(
+                                        item.backupDomainGuids, item.backupDomains,
+                                        function(guid) {
+                                            if (!self.domainCache.hasOwnProperty(guid)) {
+                                                var domain = new Domain(guid);
+                                                domain.load();
+                                                self.domainCache[guid] = domain;
+                                            }
+                                            return self.domainCache[guid];
+                                        }, 'guid'
+                                    );
+                                    item.backupDomains().sort(function(dom1, dom2) {
+                                        return dom1.name() < dom2.name() ? -1 : 1;
+                                    });
+                                    item.domains().sort(function(dom1, dom2) {
+                                        return dom1.name() < dom2.name() ? -1 : 1;
+                                    });
                                 }
                             });
                         })
@@ -113,35 +100,30 @@ define([
                 }
             }).promise();
         };
+        self.loadDomains = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.domainsHandle)) {
+                    self.domainsHandle = api.get('domains', {queryparams: {contents: ''}})
+                        .done(function(data) {
+                            $.each(data.data, function(index, item) {
+                                if (!self.domainCache.hasOwnProperty(item.guid)) {
+                                    self.domainCache[item.guid] = new Domain(item.guid);
+                                }
+                                var domain = self.domainCache[item.guid];
+                                domain.fillData(item);
+                            });
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
 
         // Durandal
         self.activate = function() {
-            self.refresher.init(function() {
-                if (generic.xhrCompleted(self.failureDomainHandle)) {
-                    self.failureDomainHandle = api.get('failure_domains', { queryparams: { contents: '', sort: 'name' } })
-                        .done(function(data) {
-                            var guids = [], fdData = {};
-                            $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                                fdData[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.failureDomains,
-                                function(guid) {
-                                    if (!self.fdCache.hasOwnProperty(guid)) {
-                                        self.fdCache[guid] = new FailureDomain(guid);
-                                    }
-                                    return self.fdCache[guid];
-                                }, 'guid'
-                            );
-                            $.each(self.failureDomains(), function(index, item) {
-                                if (fdData.hasOwnProperty(item.guid())) {
-                                    item.fillData(fdData[item.guid()]);
-                                }
-                            });
-                        });
-                }
-            }, 60000);
+            self.refresher.init(self.loadDomains, 5000);
             self.refresher.start();
             self.refresher.run();
             self.shared.footerData(self.vPools);

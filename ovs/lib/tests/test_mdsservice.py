@@ -20,7 +20,7 @@ MDSService test module
 import json
 import unittest
 from ovs.dal.hybrids.backendtype import BackendType
-from ovs.dal.hybrids.failuredomain import FailureDomain
+from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
 from ovs.dal.hybrids.pmachine import PMachine
@@ -134,7 +134,7 @@ class MDSServices(unittest.TestCase):
         pmachine.hvtype = 'VMWARE'
         pmachine.save()
         for fd_id in structure['failure_domains']:
-            failure_domain = FailureDomain()
+            failure_domain = Domain()
             failure_domain.name = 'failure_domain_{0}'.format(fd_id)
             failure_domain.save()
             failure_domains[fd_id] = failure_domain

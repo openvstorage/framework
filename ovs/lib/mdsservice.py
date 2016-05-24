@@ -30,6 +30,7 @@ from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.lists.domainlist import DomainList
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.vpoollist import VPoolList
@@ -327,7 +328,7 @@ class MDSServiceController(object):
         ######################
         MDSServiceController._logger.debug('MDS safety: vDisk {0}: Start checkup for virtual disk {1}'.format(vdisk.guid, vdisk.name))
         vdisk.reload_client()
-        vdisk.invalidate_dynamics(['info', 'storagedriver_id', 'storagerouter_guid'])
+        vdisk.invalidate_dynamics(['info', 'storagedriver_id', 'storagerouter_guid', 'domains_dtl'])
         if vdisk.storagerouter_guid is None:
             raise ValueError('Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any Storage Router'.format(vdisk.name, vdisk.guid))
 
@@ -342,6 +343,16 @@ class MDSServiceController(object):
         nodes = set(service.storagerouter.ip for service in services)
 
         vdisk_storagerouter = StorageRouter(vdisk.storagerouter_guid)
+        primary_domains = [junction.domain for junction in vdisk_storagerouter.domains if junction.backup is False]
+        secondary_domains = [junction.domain for junction in vdisk_storagerouter.domains if junction.backup is True]
+        primary_storagerouters = []
+        secondary_storagerouters = []
+        for domain in primary_domains:
+            primary_storagerouters.extend(StorageRouterList.get_primary_storagerouters_for_domain(domain))
+        for domain in secondary_domains:
+            secondary_storagerouters.extend(StorageRouterList.get_secondary_storagerouters_for_domain(domain))
+
+
         primary_failure_domain = vdisk_storagerouter.primary_failure_domain
         if vdisk.secondary_failure_domain is not None:
             secondary_failure_domain = vdisk.secondary_failure_domain

@@ -16,8 +16,8 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/generic', 'ovs/api', 'ovs/shared', 'viewmodels/containers/failuredomain'
-], function($, ko, generic, api, shared, FailureDomain) {
+    'ovs/generic', 'ovs/api', 'ovs/shared', 'viewmodels/containers/storagerouter'
+], function($, ko, generic, api, shared, StorageRouter) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -26,11 +26,10 @@ define([
         self.shared = shared;
 
         // Handles
-        self.loadHandle               = undefined;
-        self.loadConfig               = undefined;
-        self.loadParentConfig         = undefined;
-        self.loadStorageRouterHandle  = undefined;
-        self.loadFailureDomainsHandle = undefined;
+        self.loadHandle              = undefined;
+        self.loadConfig              = undefined;
+        self.loadParentConfig        = undefined;
+        self.loadStorageRouterHandle = undefined;
 
         // External dependencies
         self.dtlTargets    = ko.observableArray([]);
@@ -53,7 +52,6 @@ define([
         self.dtlModes            = ko.observableArray([{name: 'no_sync', disabled: false}, {name: 'a_sync', disabled: false}, {name: 'sync', disabled: false}]);
         self.dtlStatus           = ko.observable();
         self.dtlTarget           = ko.observable();
-        self.failureDomains      = ko.observableArray([]);
         self.guid                = ko.observable(guid);
         self.iops                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.loaded              = ko.observable(false);
@@ -71,7 +69,6 @@ define([
         self.size                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.snapshots           = ko.observableArray([]);
         self.storageRouterGuid   = ko.observable();
-        self.storageRouterGuids  = ko.observableArray([]);
         self.storedData          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.totalCacheHits      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.vMachineGuid        = ko.observable();
@@ -226,7 +223,6 @@ define([
             self.loadingConfig(true);
             return $.Deferred(function (deferred) {
                 var calls = [];
-                calls.push(self.loadFailureDomains());
                 calls.push(self.loadParentConfiguration());
                 calls.push(self.loadStorageRouters());
                 $.when.apply($, calls)
@@ -263,27 +259,20 @@ define([
                                 }
                             });
                         }
-                        var dtlTargets = [];
                         var dtlTarget = null;
-                        $.each(self.failureDomains(), function(index, fd) {
-                            if (fd.guid() === self.storageRouter().secondaryFailureDomainGuid() || fd.guid() === self.storageRouter().primaryFailureDomainGuid()) {
-                                if (generic.overlap(fd.primarySRGuids(), self.storageRouterGuids())) {
-                                    if (fd.guid() === data.dtl_target) {
-                                        dtlTarget = fd;
-                                    }
-                                    dtlTargets.push(fd);
-                                }
+                        $.each(self.dtlTargets(), function(_, sr) {
+                            if (data.dtl_target === sr.guid()) {
+                                dtlTarget = sr;
                             }
                         });
                         data.dtl_target = dtlTarget;
-                        if (dtlTargets.length === 0) {
+                        if (self.dtlTargets().length === 0) {
                             $.each(self.dtlModes(), function(index, item) {
                                 if (item.name === 'a_sync' || item.name === 'sync') {
                                     item.disabled = true;
                                 }
                             });
                         }
-                        self.dtlTargets(dtlTargets);
                         self.configuration(data);
                         if (self.oldConfiguration() === undefined || reload === true) {
                             self.oldConfiguration($.extend({}, data));  // Used to make comparison to check for changes
@@ -305,39 +294,26 @@ define([
                     .fail(deferred.reject);
             }).promise();
         };
-        self.loadFailureDomains = function() {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadFailureDomainsHandle)) {
-                    self.loadFailureDomainsHandle = api.get('failure_domains', { queryparams: { sort: 'name', contents: '_relations' } } )
-                        .done(function(data) {
-                            var guids = [], fddata = {};
-                            $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                                fddata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.failureDomains,
-                                function(guid) {
-                                    var domain = new FailureDomain(guid);
-                                    domain.fillData(fddata[guid]);
-                                    return domain;
-                                }, 'guid'
-                            );
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
-        };
         self.loadStorageRouters = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadStorageRouterHandle)) {
                     self.loadStorageRouterHandle = api.get('vpools/' + self.vpoolGuid() + '/storagerouters')
                         .done(function(data) {
-                            generic.removeElement(data.data, self.storageRouterGuid());
-                            self.storageRouterGuids(data.data);
+                            var guids = [], srdata = {};
+                            $.each(data.data, function(index, item) {
+                                if (item.guid !== self.storageRouterGuid()) {
+                                    guids.push(item.guid);
+                                    srdata[item.guid] = item;
+                                }
+                            });
+                            generic.crossFiller(
+                                guids, self.dtlTargets,
+                                function(guid) {
+                                    var sr = new StorageRouter(guid);
+                                    sr.fillData(srdata[guid]);
+                                    return sr;
+                                }, 'guid'
+                            );
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
