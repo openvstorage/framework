@@ -1,4 +1,4 @@
-#### The scrubber
+### The scrubber
 The scrubber process is responsible for freeing up backend storage space by removing data which is no longer of any use.  The very definition of data being no longer of use is SCOs (the actual data) and tlogs (the metadata) belonging to snapshots that where deleted in which LBAs are referenced that are over written in one of the next snapshot.
 This might sound a little complication but the example will clear things up.
 
