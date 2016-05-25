@@ -39,7 +39,7 @@ class EtcdInstaller(object):
     DEFAULT_CLIENT_PORT = 2379
     SERVER_URL = 'http://{0}:{1}'
     CLIENT_URL = 'http://{0}:{1}'
-    MEMBER_REGEX = re.compile(ur'^(?P<id>[^:]+): name=(?P<name>[^ ]+) peerURLs=(?P<peer>[^ ]+) clientURLs=(?P<client>[^ ]+)$')
+    MEMBER_REGEX = re.compile(ur'^(?P<id>[^:]+): name=(?P<name>[^ ]+) peerURLs=(?P<peer>[^ ]+) clientURLs=(?P<client>[^ ]+).*')
 
     _logger = LogHandler.get('extensions', name='etcd_installer')
 
