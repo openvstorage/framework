@@ -260,14 +260,21 @@ class SetupController(object):
                 if avahi_installed is True and cluster_name is None:
                     raise RuntimeError('The name of the cluster should be known by now.')
 
-                ip_hostname_map = {cluster_ip: list({node_name, fqdn_name})}
+                if node_name != fqdn_name:
+                    ip_hostname_map = {cluster_ip: [fqdn_name, node_name]}
+                else:
+                    ip_hostname_map = {cluster_ip: [fqdn_name]}
+
                 for node_host_name, node_info in SetupController.nodes.iteritems():
                     ip = node_info['ip']
                     if ip == master_ip:
                         node_client = node_info.get('client', SSHClient(endpoint=ip, username='root', password=master_password))
                         node_info['client'] = node_client
                         master_fqdn_name = node_client.run('hostname -f || hostname -s')
-                        ip_hostname_map[ip] = list({node_host_name, master_fqdn_name})
+                        if node_host_name != master_fqdn_name:
+                            ip_hostname_map[ip] = [master_fqdn_name, node_host_name]
+                        else:
+                            ip_hostname_map[ip] = [master_fqdn_name]
                         break
 
                 if node_name in SetupController.nodes:
@@ -326,7 +333,10 @@ class SetupController(object):
                             client = rem.SSHClient(node_ip, 'root')
                             if client.ip not in ip_hostname_map:
                                 node_fqdn_name = client.run('hostname -f || hostname -s')
-                                ip_hostname_map[client.ip] = list({node_host_name, node_fqdn_name})
+                                if node_host_name != node_fqdn_name:
+                                    ip_hostname_map[client.ip] = [node_fqdn_name, node_host_name]
+                                else:
+                                    ip_hostname_map[client.ip] = [node_fqdn_name]
                             for authorized_key in [authorized_keys_ovs, authorized_keys_root]:
                                 if client.file_exists(authorized_key):
                                     master_authorized_keys = client.file_read(authorized_key)

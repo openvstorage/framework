@@ -10,6 +10,7 @@ arakoon_clusters = {"ovsdb": "$framework_arakoon_cluster_name",
 cluster_id = "$cluster_id"
 external_etcd = "$external_etcd"
 install_time = "$epoch"
+logging = {"type": "console|file|redis"}
 memcache = {"endpoints": ["$endpoint_1", "$endpoint2"],
             "metadata": {"internal": True|False}}
 messagequeue = {"endpoints": ["$endpoint_3", "$endpoint_4"],
