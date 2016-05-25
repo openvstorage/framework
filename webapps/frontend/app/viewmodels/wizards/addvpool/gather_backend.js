@@ -15,14 +15,22 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout',
+    'require', 'jquery', 'knockout',
     'ovs/api', 'ovs/generic',
-    '../../containers/albabackend', './data'
-], function($, ko, api, generic, AlbaBackend, data) {
+    './data'
+], function(require, $, ko, api, generic, data) {
     "use strict";
     return function() {
         var self = this;
-
+        try {
+            require(['../../containers/albabackend'], function(AlbaBackend){
+                self.AlbaBackend = AlbaBackend;
+            })
+        }
+        catch(err) {
+            console.log('Alba not installed');
+            self.AlbaBackend = undefined;
+        }
         // Variables
         self.data = data;
 
@@ -154,7 +162,7 @@ define([
                                     generic.crossFiller(
                                         guids, self.data.albaAABackends,
                                         function(guid) {
-                                            return new AlbaBackend(guid);
+                                            return new self.AlbaBackend(guid);
                                         }, 'guid'
                                     );
                                     $.each(self.data.albaAABackends(), function(index, albaBackend) {
