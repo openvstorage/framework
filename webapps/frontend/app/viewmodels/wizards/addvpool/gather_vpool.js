@@ -41,7 +41,7 @@ define([
         self.fetchAlbaVPoolHandle     = undefined;
         self.loadStorageRoutersHandle = undefined;
 
-        // Observablesff
+        // Observables
         self.albaBackendLoading = ko.observable(false);
         self.albaPresetMap      = ko.observable({});
         self.invalidAlbaInfo    = ko.observable(false);
