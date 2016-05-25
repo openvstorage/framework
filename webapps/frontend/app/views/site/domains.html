@@ -17,17 +17,61 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <section>
     <div>
-        <h2 class="pull-left" data-i18n="ovs:domains.users.title"></h2>
+        <h2 class="pull-left" data-i18n="ovs:failuredomains.users.title"></h2>
     </div>
-    <div data-bind="pager: { loadData: loadDomains, headers: domainHeaders, refreshInterval: 5000, controls: true }"
-         style="clear: both;">
+    <div data-bind="pager: {
+                        loadData: loadDomains, headers: domainHeaders, refreshInterval: 5000, controls: true,
+                        container: domains, skipon: 'edit', trigger: trigger
+                    }" style="clear: both;">
         <table data-dummy="dummy">
             <tr data-part="vitem">
                 <td style="position: relative;">
                     <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
                        <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     </span>
-                    <span data-bind="text: name"></span>
+                    <span data-bind="visible: !edit()">
+                        <span data-bind="text: name"></span>
+                    </span>
+                    <span data-bind="visible: edit()">
+                        <input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/>
+                    </span>
+                </td>
+                <td>
+                    <span data-bind="visible: !edit()">
+                        <i data-bind="click: function() {
+                                          edit(true);
+                                      }"
+                           class="hand fa fa-fw" data-i18n="[html]ovs:icons.edit"></i>
+                    </span>
+                    <span data-bind="visible: edit()">
+                        <i data-bind="click: function() {
+                                          if (canSave()) {
+                                              save();
+                                          }
+                                      },
+                                      style: { color: canSave() ? 'black' : 'lightgrey' }"
+                           class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
+                    </span>
+                    <i data-bind="click: function() {
+                                      if (canDelete()) {
+                                           $root.deleteDomain($data.guid());
+                                      }
+                                  },
+                                  style: { color: canDelete() ? 'black' : 'lightgrey' }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
+                </td>
+
+            </tr>
+            <tr data-part="vnew" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1, with: $root.newDomain()">
+                <td><input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
+                <td>
+                    <i data-bind="click: function() {
+                                      if (canSave()) {
+                                          $root.createDomain();
+                                      }
+                                  },
+                                  style: { color: canSave() ? 'black' : 'lightgrey' }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
                 </td>
             </tr>
         </table>

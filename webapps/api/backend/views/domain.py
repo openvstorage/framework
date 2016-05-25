@@ -85,6 +85,21 @@ class DomainViewSet(viewsets.ViewSet):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @load(Domain)
+    def partial_update(self, domain, request, contents=None):
+        """
+        Update a Failure Domain
+        """
+        contents = None if contents is None else contents.split(',')
+        serializer = FullSerializer(Domain, contents=contents, instance=domain, data=request.DATA)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     @action()
     @log()
     @required_roles(['read', 'write', 'manage'])

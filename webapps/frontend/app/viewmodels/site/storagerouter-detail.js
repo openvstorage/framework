@@ -17,9 +17,9 @@
 define([
     'jquery', 'knockout', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver',
+    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver', '../containers/domain',
     '../wizards/configurepartition/index'
-], function($, ko, dialog, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver, ConfigurePartitionWizard) {
+], function($, ko, dialog, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver, Domain, ConfigurePartitionWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -29,16 +29,28 @@ define([
         self.guard                    = { authenticated: true };
         self.refresher                = new Refresher();
         self.widgets                  = [];
-        self.pMachineCache            = {};
+        self.domainCache              = {};
         self.loadVPoolsHandle         = undefined;
         self.loadStorageDriversHandle = {};
+        self.loadDomainsHandle        = undefined;
 
         // Observables
+        self.domains           = ko.observableArray([]);
+        self.domainsLoaded     = ko.observable(false);
         self.refreshing        = ko.observable(false);
         self.storageRouter     = ko.observable();
-        self.vPoolsLoaded      = ko.observable(false);
         self.vPools            = ko.observableArray([]);
+        self.vPoolsLoaded      = ko.observable(false);
         self.checkedVPoolGuids = ko.observableArray([]);
+
+        // Computed
+        self.domainGuids = ko.computed(function() {
+            var guids = [];
+            $.each(self.domains(), function(index, domain) {
+                guids.push(domain.guid());
+            });
+            return guids;
+        });
 
         // Functions
         self.load = function() {
@@ -49,6 +61,7 @@ define([
                 }
                 calls.push(storageRouter.getAvailableActions());
                 calls.push(storageRouter.getDisks());
+                calls.push(self.loadDomains());
                 $.when.apply($, calls)
                     .then(self.loadStorageDrivers)
                     .then(self.loadVPools)
@@ -56,17 +69,9 @@ define([
                         self.checkedVPoolGuids(self.storageRouter().vPoolGuids);
                         var pMachineGuid = storageRouter.pMachineGuid();
                         if (pMachineGuid && (storageRouter.pMachine() === undefined || storageRouter.pMachine().guid() !== pMachineGuid)) {
-                            if (!self.pMachineCache.hasOwnProperty(pMachineGuid)) {
-                                var pm = new PMachine(pMachineGuid);
-                                pm.load();
-                                self.pMachineCache[pMachineGuid] = pm;
-                            }
-                            storageRouter.pMachine(self.pMachineCache[pMachineGuid]);
-                        } else if (pMachineGuid && storageRouter.pMachine() !== undefined && storageRouter.pMachine().loaded() === false) {
-                            if (!self.pMachineCache.hasOwnProperty(storageRouter.pMachine().guid())) {
-                                self.pMachineCache[storageRouter.pMachine().guid()] = storageRouter.pMachine();
-                            }
-                            storageRouter.pMachine().load();
+                            var pm = new PMachine(pMachineGuid);
+                            pm.load();
+                            storageRouter.pMachine(pm);
                         }
                         // Move child guids to the observables for easy display
                         storageRouter.vPools(storageRouter.vPoolGuids);
@@ -99,6 +104,42 @@ define([
                                 }, 'guid'
                             );
                             self.vPoolsLoaded(true);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
+        self.loadDomains = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadDomainsHandle)) {
+                    self.loadDomainsHandle = api.get('domains', {
+                        queryparams: { sort: 'name' }
+                    })
+                        .done(function(data) {
+                            var guids = [], ddata = {};
+                            $.each(data.data, function(index, item) {
+                                guids.push(item.guid);
+                                ddata[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.domains,
+                                function(guid) {
+                                    return new Domain(guid);
+                                }, 'guid'
+                            );
+                            $.each(self.domains(), function(index, domain) {
+                                if (ddata.hasOwnProperty(domain.guid())) {
+                                    domain.fillData(ddata[domain.guid()]);
+                                }
+                                self.domainCache[domain.guid()] = domain;
+                            });
+                            self.domains.sort(function(dom1, dom2) {
+                                return dom1.name() < dom2.name() ? -1 : 1;
+                            });
+                            self.domainsLoaded(true);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);

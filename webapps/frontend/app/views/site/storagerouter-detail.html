@@ -122,12 +122,23 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td><span data-bind="text: iops"></span></td>
                         </tr>
                         <tr>
-                            <td colspan="2" data-i18n="ovs:generic.domain"></td>
+                            <td data-i18n="ovs:generic.domain"></td>
+                            <td>
+                                <span data-bind="dropdown: {
+                                                     items: $root.domainGuids, target: domainGuids,
+                                                     text: function(guid) {
+                                                        return $root.domainCache[guid].name();
+                                                     }, enabled: edit
+                                                 }"></span>
+                            </td>
                             <td data-i18n="ovs:generic.readspeed"></td>
                             <td><span data-bind="text: readSpeed"></span></td>
                         </tr>
                         <tr>
-                            <td colspan="2" data-i18n="ovs:generic.failure_domain"></td>
+                            <td data-i18n="ovs:generic.failure_domain"></td>
+                            <td>
+
+                            </td>
                             <td data-i18n="ovs:generic.writespeed"></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
                         </tr>

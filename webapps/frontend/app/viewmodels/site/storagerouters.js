@@ -85,10 +85,10 @@ define([
                                             return self.domainCache[guid];
                                         }, 'guid'
                                     );
-                                    item.backupDomains().sort(function(dom1, dom2) {
+                                    item.backupDomains.sort(function(dom1, dom2) {
                                         return dom1.name() < dom2.name() ? -1 : 1;
                                     });
-                                    item.domains().sort(function(dom1, dom2) {
+                                    item.domains.sort(function(dom1, dom2) {
                                         return dom1.name() < dom2.name() ? -1 : 1;
                                     });
                                 }
