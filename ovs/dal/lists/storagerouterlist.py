@@ -100,15 +100,3 @@ class StorageRouterList(object):
         :rtype: list
         """
         return [junction.storagerouter for junction in domain.storagerouters if junction.backup is False]
-
-    @staticmethod
-    def get_secondary_storagerouters_for_domain(domain):
-        """
-        Retrieve a Storage Router pool of Storage Routers using the specified Domain as secondary Domain
-        :param domain: Domain to filter on
-        :type domain: Domain
-
-        :return: List of Storage Routers
-        :rtype: list
-        """
-        return [junction.storagerouter for junction in domain.storagerouters if junction.backup is True]
