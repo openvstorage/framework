@@ -34,9 +34,9 @@ def MyNewClass(DataObject):
 
 ```
 #!python
-__properties = {}
-__relations = {}
-__dynamics = {}
+__properties = []
+__relations = []
+__dynamics = []
 ```
 
 Where `__properties` is a dictionary containing the fieldname as key, and a tuple with 2 or 3 elements as value:
@@ -115,17 +115,18 @@ An example for a vDisk:
 
 ```
 __dynamics = [Dynamic('snapshots', list, 60),
-Dynamic('info', dict, 60),
-Dynamic('statistics', dict, 4, locked=True),
-Dynamic('storagedriver_id', str, 60),
-Dynamic('storagerouter_guid', str, 15)]
+              Dynamic('info', dict, 60),
+              Dynamic('statistics', dict, 4, locked=True),
+              Dynamic('storagedriver_id', str, 60),
+              Dynamic('storagerouter_guid', str, 15)]
 ```
 
 In this situation we can see that the list of the snapshots for this vDisk is refreshed (from the storagedriver) every 60 seconds:
 ```
 Dynamic('snapshots', list, 60)
+```
 
-This info get stored in Memcached and .
+This info get stored in Memcached.
 
 #### Persistent  - Arakoon
 The [Arakoon](https://openvstorage.gitbooks.io/Arakoon/content) key-value database (OVSDB) stores data about the Open vStorage model which doesn't frequently change, typically static properties of the object.
