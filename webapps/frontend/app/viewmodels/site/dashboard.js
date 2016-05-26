@@ -64,7 +64,7 @@ define([
             var dataset = {};
             $.each(self.storageRouters(), function(index, storageRouter) {
                 var color = storageRouter.statusColor(),
-                    vPoolGuids = storageRouter.vPoolGuids;
+                    vPoolGuids = storageRouter.vPoolGuids();
                 $.each(vPoolGuids, function(_, guid) {
                     if (!dataset.hasOwnProperty(guid)) {
                         dataset[guid] = {
@@ -93,10 +93,7 @@ define([
             return $.Deferred(function(deferred) {
                 self.vPoolsLoading(true);
                 if (generic.xhrCompleted(self.loadVPoolsHandle)) {
-                    var filter = {
-                        contents: 'statistics,stored_data'
-                    };
-                    self.loadVPoolsHandle = api.get('vpools', { queryparams: filter })
+                    self.loadVPoolsHandle = api.get('vpools', {queryparams: {contents: 'statistics,stored_data'}})
                         .done(function(data) {
                             var vpools = [], vpool;
                             $.each(data.data, function(index, vpdata) {
@@ -120,11 +117,7 @@ define([
             return $.Deferred(function(deferred) {
                 self.storageRoutersLoading(true);
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
-                    self.loadStorageRoutersHandle = api.get('storagerouters', {
-                        queryparams: {
-                            contents: 'status,vpools_guids'
-                        }
-                    })
+                    self.loadStorageRoutersHandle = api.get('storagerouters', {queryparams: {contents: 'status,vpools_guids'}})
                         .done(function(data) {
                             var guids = [], sadata = {};
                             $.each(data.data, function(index, item) {

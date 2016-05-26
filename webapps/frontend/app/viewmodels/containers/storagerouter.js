@@ -24,59 +24,57 @@ define([
         var self = this;
 
         // Variables
-        self.backupDomainGuids = [];
-        self.domainGuids = [];
-        self.shared = shared;
+        self.shared             = shared;
         self.storageDriverGuids = [];
-        self.vMachineGuids = [];
-        self.vPoolGuids = [];
+        self.vMachineGuids      = [];
 
         // Handles
-        self.loadHandle = undefined;
         self.loadActions = undefined;
-        self.loadDisks = undefined;
+        self.loadDisks   = undefined;
+        self.loadHandle  = undefined;
 
         // External dependencies
-        self.failureDomains = ko.observableArray([]);
-        self.domains = ko.observableArray([]);
-        self.pMachine = ko.observable();
-        self.vPools = ko.observableArray([]);
-        self.vMachines = ko.observableArray([]);
+        self.domains         = ko.observableArray([]);
+        self.pMachine        = ko.observable();
+        self.recoveryDomains = ko.observableArray([]);
+        self.vPools          = ko.observableArray([]);
+        self.vMachines       = ko.observableArray([]);
 
         // Observables
-        self.availableActions = ko.observableArray([]);
-        self.backendRead = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
-        self.backendWritten = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
-        self.bandwidthSaved = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
-        self.cacheHits = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
-        self.cacheMisses = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
-        self.disks = ko.observableArray([]);
-        self.disksLoaded = ko.observable(false);
-        self.domainGuids = ko.observableArray([]);
-        self.downloadLogState = ko.observable($.t('ovs:support.downloadlogs'));
-        self.edit = ko.observable(false);
-        self.failureDomainGuids = ko.observableArray([]);
-        self.guid = ko.observable(guid);
-        self.iops = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
-        self.ipAddress = ko.observable();
-        self.lastHeartbeat = ko.observable();
-        self.loaded = ko.observable(false);
-        self.loading = ko.observable(false);
-        self.machineId = ko.observable();
-        self.name = ko.observable();
-        self.nodeType = ko.observable();
-        self.pMachineGuid = ko.observable();
-        self.rdmaCapable = ko.observable(false);
-        self.readSpeed = ko.observable().extend({smooth: {}}).extend({format: generic.formatSpeed});
-        self.saving = ko.observable(false);
-        self.scrubCapable = ko.observable(false);
-        self.status = ko.observable();
-        self.storedData = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
-        self.totalCacheHits = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
-        self.updates = ko.observable();
-        self.vDisks = ko.observableArray([]);
-        self.versions = ko.observable();
-        self.writeSpeed = ko.observable().extend({smooth: {}}).extend({format: generic.formatSpeed});
+        self.availableActions    = ko.observableArray([]);
+        self.backendRead         = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
+        self.backendWritten      = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
+        self.bandwidthSaved      = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
+        self.cacheHits           = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
+        self.cacheMisses         = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
+        self.disks               = ko.observableArray([]);
+        self.disksLoaded         = ko.observable(false);
+        self.domainGuids         = ko.observableArray([]);
+        self.downloadLogState    = ko.observable($.t('ovs:support.downloadlogs'));
+        self.edit                = ko.observable(false);
+        self.guid                = ko.observable(guid);
+        self.iops                = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
+        self.ipAddress           = ko.observable();
+        self.lastHeartbeat       = ko.observable();
+        self.loaded              = ko.observable(false);
+        self.loading             = ko.observable(false);
+        self.machineId           = ko.observable();
+        self.name                = ko.observable();
+        self.nodeType            = ko.observable();
+        self.pMachineGuid        = ko.observable();
+        self.recoveryDomainGuids = ko.observableArray([]);
+        self.rdmaCapable         = ko.observable(false);
+        self.readSpeed           = ko.observable().extend({smooth: {}}).extend({format: generic.formatSpeed});
+        self.saving              = ko.observable(false);
+        self.scrubCapable        = ko.observable(false);
+        self.status              = ko.observable();
+        self.storedData          = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
+        self.totalCacheHits      = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
+        self.updates             = ko.observable();
+        self.vDisks              = ko.observableArray([]);
+        self.versions            = ko.observable();
+        self.vPoolGuids          = ko.observableArray([]);
+        self.writeSpeed          = ko.observable().extend({smooth: {}}).extend({format: generic.formatSpeed});
 
         // Computed
         self.cacheRatio = ko.computed(function () {
@@ -210,8 +208,8 @@ define([
             generic.trySet(self.rdmaCapable, data, 'rdma_capable');
             generic.trySet(self.status, data, 'status', generic.lower);
             generic.trySet(self.storedData, data, 'stored_data');
-            if (data.hasOwnProperty('backup_domains')) {
-                self.failureDomainGuids(data.backup_domains);
+            if (data.hasOwnProperty('recovery_domains')) {
+                self.recoveryDomainGuids(data.recovery_domains);
             }
             if (data.hasOwnProperty('regular_domains')) {
                 self.domainGuids(data.regular_domains);
@@ -220,7 +218,7 @@ define([
                 self.lastHeartbeat(data.last_heartbeat === null ? undefined : data.last_heartbeat);
             }
             if (data.hasOwnProperty('vpools_guids')) {
-                self.vPoolGuids = data.vpools_guids;
+                self.vPoolGuids(data.vpools_guids);
             }
             if (data.hasOwnProperty('pmachine_guid')) {
                 if (data.pmachine_guid !== self.pMachineGuid()) {
@@ -305,7 +303,7 @@ define([
                 self.saving(true);
                 var data = {
                     domain_guids: self.domainGuids(),
-                    failure_domain_guids: self.failureDomainGuids()
+                    recovery_domain_guids: self.recoveryDomainGuids()
                 };
                 api.post('storagerouters/' + self.guid() + '/set_domains', { data: data })
                     .done(function() {

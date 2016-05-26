@@ -40,9 +40,20 @@ define([
         // Handles
         self.domainsHandle = {};
 
+        // Computed
+        self.domainNames = ko.computed(function() {
+            var names = [];
+            $.each(self.domains(), function(i, domain) {
+                names.push(domain.name().toLowerCase());
+            });
+            return names;
+        });
+
         // Functions
         self.buildDomain = function() {
-            return new Domain();
+            var domain = new Domain();
+            domain.existingDomainNames = self.domainNames;
+            return domain;
         };
         self.loadDomains = function(options) {
             return $.Deferred(function(deferred) {
@@ -54,7 +65,9 @@ define([
                             deferred.resolve({
                                 data: data,
                                 loader: function(guid) {
-                                    return new Domain(guid);
+                                    var domain = new Domain(guid);
+                                    domain.existingDomainNames = self.domainNames;
+                                    return domain;
                                 }
                             });
                         })
@@ -104,7 +117,7 @@ define([
                                     error = $.parseJSON(error.responseText);
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
-                                        $.t('ovs:domains.clients.deletefailed', { why: error.detail })
+                                        $.t('ovs:domains.delete.deletefailed', { why: error.detail })
                                     );
                                 });
                         }

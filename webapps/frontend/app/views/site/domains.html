@@ -17,7 +17,7 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <section>
     <div>
-        <h2 class="pull-left" data-i18n="ovs:failuredomains.users.title"></h2>
+        <h2 class="pull-left" data-i18n="ovs:domains.title"></h2>
     </div>
     <div data-bind="pager: {
                         loadData: loadDomains, headers: domainHeaders, refreshInterval: 5000, controls: true,
@@ -33,7 +33,7 @@ but WITHOUT ANY WARRANTY of any kind.
                         <span data-bind="text: name"></span>
                     </span>
                     <span data-bind="visible: edit()">
-                        <input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/>
+                        <input title="inputName" type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/>
                     </span>
                 </td>
                 <td>
@@ -62,8 +62,8 @@ but WITHOUT ANY WARRANTY of any kind.
                 </td>
 
             </tr>
-            <tr data-part="vnew" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1, with: $root.newDomain()">
-                <td><input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
+            <tr data-part="vnew" data-bind="visible: $root.shared.user.roles().contains('manage'), with: $root.newDomain()">
+                <td><input title="createDomain" type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
                 <td>
                     <i data-bind="click: function() {
                                       if (canSave()) {

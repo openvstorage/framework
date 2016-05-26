@@ -135,10 +135,10 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td><span data-bind="text: readSpeed"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.failure_domains"></td>
+                            <td data-i18n="ovs:generic.recovery_domains"></td>
                             <td>
                                 <span data-bind="dropdown: {
-                                                     items: $root.domainGuids, target: failureDomainGuids,
+                                                     items: $root.domainGuids, target: recoveryDomainGuids,
                                                      text: function(guid) {
                                                         return $root.domainCache[guid].name();
                                                      }, enabled: edit, small: true

@@ -30,16 +30,16 @@ define([
         self.refresher             = new Refresher();
         self.widgets               = [];
         self.storageRoutersHeaders = [
-            { key: 'status',        value: $.t('ovs:generic.status'),          width: 60        },
-            { key: 'name',          value: $.t('ovs:generic.name'),            width: 125       },
-            { key: 'ip',            value: $.t('ovs:generic.ip'),              width: 125       },
-            { key: 'vdisks',        value: $.t('ovs:generic.vdisks'),          width: 60        },
-            { key: 'iops',          value: $.t('ovs:generic.iops'),            width: 60        },
-            { key: 'storedData',    value: $.t('ovs:generic.storeddata'),      width: 100       },
-            { key: 'readSpeed',     value: $.t('ovs:generic.read'),            width: 100       },
-            { key: 'writeSpeed',    value: $.t('ovs:generic.write'),           width: 100       },
-            { key: 'domain',        value: $.t('ovs:generic.domains'),         width: 200       },
-            { key: 'failureDomain', value: $.t('ovs:generic.failure_domains'), width: undefined }
+            { key: 'status',         value: $.t('ovs:generic.status'),           width: 60        },
+            { key: 'name',           value: $.t('ovs:generic.name'),             width: 125       },
+            { key: 'ip',             value: $.t('ovs:generic.ip'),               width: 125       },
+            { key: 'vdisks',         value: $.t('ovs:generic.vdisks'),           width: 60        },
+            { key: 'iops',           value: $.t('ovs:generic.iops'),             width: 60        },
+            { key: 'storedData',     value: $.t('ovs:generic.storeddata'),       width: 100       },
+            { key: 'readSpeed',      value: $.t('ovs:generic.read'),             width: 100       },
+            { key: 'writeSpeed',     value: $.t('ovs:generic.write'),            width: 100       },
+            { key: 'domain',         value: $.t('ovs:generic.domains'),          width: 200       },
+            { key: 'recoveryDomain', value: $.t('ovs:generic.recovery_domains'), width: undefined }
         ];
 
         // Observables
@@ -54,7 +54,7 @@ define([
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.storageRoutersHandle[options.page])) {
                     options.sort = 'name';
-                    options.contents = '_relations,statistics,stored_data,vdisks_guids,status,partition_config,regular_domains,backup_domains';
+                    options.contents = '_relations,statistics,stored_data,vdisks_guids,status,partition_config,regular_domains,recovery_domains';
                     self.storageRoutersHandle[options.page] = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
@@ -75,7 +75,7 @@ define([
                                         }, 'guid'
                                     );
                                     generic.crossFiller(
-                                        item.failureDomainGuids(), item.failureDomains,
+                                        item.recoveryDomainGuids(), item.recoveryDomains,
                                         function(guid) {
                                             if (!self.domainCache.hasOwnProperty(guid)) {
                                                 var domain = new Domain(guid);
@@ -85,7 +85,7 @@ define([
                                             return self.domainCache[guid];
                                         }, 'guid'
                                     );
-                                    item.failureDomains.sort(function(dom1, dom2) {
+                                    item.recoveryDomains.sort(function(dom1, dom2) {
                                         return dom1.name() < dom2.name() ? -1 : 1;
                                     });
                                     item.domains.sort(function(dom1, dom2) {

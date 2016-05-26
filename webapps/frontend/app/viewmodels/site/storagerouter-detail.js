@@ -66,12 +66,12 @@ define([
                     .then(self.loadStorageDrivers)
                     .then(self.loadVPools)
                     .done(function() {
-                        self.checkedVPoolGuids(self.storageRouter().vPoolGuids);
+                        self.checkedVPoolGuids(self.storageRouter().vPoolGuids());
                         if (storageRouter.pMachine() !== undefined && !storageRouter.pMachine().loaded()) {
                             storageRouter.pMachine().load();
                         }
                         // Move child guids to the observables for easy display
-                        storageRouter.vPools(storageRouter.vPoolGuids);
+                        storageRouter.vPools(storageRouter.vPoolGuids());
                         storageRouter.vMachines(storageRouter.vMachineGuids);
                     })
                     .always(deferred.resolve);
@@ -80,12 +80,7 @@ define([
         self.loadVPools = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadVPoolsHandle)) {
-                    self.loadVPoolsHandle = api.get('vpools', {
-                        queryparams: {
-                            sort: 'name',
-                            contents: 'storagedrivers'
-                        }
-                    })
+                    self.loadVPoolsHandle = api.get('vpools', {queryparams: {sort: 'name', contents: 'storagedrivers'}})
                         .done(function(data) {
                             var guids = [], vpdata = {};
                             $.each(data.data, function(index, item) {

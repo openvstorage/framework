@@ -84,6 +84,18 @@ class DomainViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write', 'manage'])
     @load(Domain)
+    def destroy(self, domain):
+        """
+        Deletes a Domain
+        """
+        if len(domain.storagerouters) > 0 or len(domain.backends) > 0 or len(domain.vdisks_dtl) > 0:
+            raise NotAcceptable('The given Domain is still in use')
+        domain.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @load(Domain)
     def partial_update(self, domain, request, contents=None):
         """
         Update a Failure Domain

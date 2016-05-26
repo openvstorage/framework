@@ -44,7 +44,7 @@ define(['jquery', 'knockout'], function($, ko){
             var guids = [], result = [];
             $.each(wizardData.storageRouters(), function(index, storageRouter) {
                 if (wizardData.vPool() !== undefined &&
-                    storageRouter.vPoolGuids.contains(wizardData.vPool().guid())) {
+                    storageRouter.vPoolGuids().contains(wizardData.vPool().guid())) {
                     result.push(storageRouter);
                     guids.push(storageRouter.guid());
                 }

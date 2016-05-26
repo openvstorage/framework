@@ -26,16 +26,24 @@ define([
         self.loadHandle = undefined;
 
         // Observables
-        self.disabled         = ko.observable(false);
-        self.edit             = ko.observable(false);
-        self.guid             = ko.observable(guid);
-        self.loaded           = ko.observable(false);
-        self.loading          = ko.observable(false);
-        self.name             = ko.observable('');
+        self.disabled            = ko.observable(false);
+        self.edit                = ko.observable(false);
+        self.guid                = ko.observable(guid);
+        self.loaded              = ko.observable(false);
+        self.loading             = ko.observable(false);
+        self.name                = ko.observable('').extend({removeWhiteSpaces: null});
+        self.existingDomainNames = undefined;
 
         // Computed
         self.canSave = ko.computed(function() {
-            return self.name() !== undefined && self.name() !== '';
+            var names = [];
+            if (self.existingDomainNames !== undefined) {
+                names = self.existingDomainNames().slice();
+                if (self.guid() !== undefined) { // Remove yourself when editing the name
+                    names.remove(self.name());
+                }
+            }
+            return self.name() !== undefined && self.name() !== '' && !names.contains(self.name().toLowerCase()) && self.name().length < 31;
         });
         self.canDelete = ko.computed(function() {
             return true;
