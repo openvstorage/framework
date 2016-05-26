@@ -128,7 +128,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                      items: $root.domainGuids, target: domainGuids,
                                                      text: function(guid) {
                                                         return $root.domainCache[guid].name();
-                                                     }, enabled: edit, small: true
+                                                     }, enabled: edit, small: true, emptyisloading: false
                                                  }"></span>
                             </td>
                             <td data-i18n="ovs:generic.readspeed"></td>
@@ -141,7 +141,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                      items: $root.domainGuids, target: recoveryDomainGuids,
                                                      text: function(guid) {
                                                         return $root.domainCache[guid].name();
-                                                     }, enabled: edit, small: true
+                                                     }, enabled: edit, small: true, emptyisloading: false
                                                  }"></span>
                             </td>
                             <td data-i18n="ovs:generic.writespeed"></td>

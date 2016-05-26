@@ -48,7 +48,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     base_name = 'storagerouters'
 
     DOMAIN_CHANGE_KEY = 'ovs_dedupe_domain_change'
-    FAILURE_DOMAIN_CHANGE_KEY = 'ovs_dedupe_failure_domain_change'
+    RECOVERY_DOMAIN_CHANGE_KEY = 'ovs_dedupe_recovery_domain_change'
 
     @log()
     @required_roles(['read'])
@@ -337,15 +337,15 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_plain()
     @load(StorageRouter)
-    def set_domains(self, storagerouter, domain_guids, failure_domain_guids):
+    def set_domains(self, storagerouter, domain_guids, recovery_domain_guids):
         """
         Configures the given domains to the StorageRouter.
         :param storagerouter: The StorageRouter to update
         :type storagerouter: StorageRouter
         :param domain_guids: A list of Domain guids
         :type domain_guids: list
-        :param failure_domain_guids: A list of Domain guids to set as failure Domain
-        :type failure_domain_guids: list
+        :param recovery_domain_guids: A list of Domain guids to set as recovery Domain
+        :type recovery_domain_guids: list
         """
         change = False
         for junction in storagerouter.domains:
@@ -356,15 +356,15 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 else:
                     domain_guids.remove(junction.domain_guid)
             else:
-                if junction.domain_guid not in failure_domain_guids:
+                if junction.domain_guid not in recovery_domain_guids:
                     junction.delete()
                     change = True
                 else:
-                    failure_domain_guids.remove(junction.domain_guid)
-        for domain_guid in domain_guids + failure_domain_guids:
+                    recovery_domain_guids.remove(junction.domain_guid)
+        for domain_guid in domain_guids + recovery_domain_guids:
             junction = StorageRouterDomain()
             junction.domain = Domain(domain_guid)
-            junction.backup = domain_guid in failure_domain_guids
+            junction.backup = domain_guid in recovery_domain_guids
             junction.storagerouter = storagerouter
             junction.save()
             change = True
@@ -373,7 +373,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         if change is True:
             cache = VolatileFactory.get_client()
             task_id_domain = cache.get(StorageRouterViewSet.DOMAIN_CHANGE_KEY)
-            task_id_backup = cache.get(StorageRouterViewSet.FAILURE_DOMAIN_CHANGE_KEY)
+            task_id_backup = cache.get(StorageRouterViewSet.RECOVERY_DOMAIN_CHANGE_KEY)
             if task_id_domain:
                 revoke(task_id_domain)  # If key exists, task was already scheduled. If task is already running, the revoke message will be ignored
             if task_id_backup:
@@ -381,5 +381,5 @@ class StorageRouterViewSet(viewsets.ViewSet):
             async_mds_result = MDSServiceController.mds_checkup.s().apply_async(countdown=60)
             async_dtl_result = VDiskController.dtl_checkup.s().apply_async(countdown=60)
             cache.set(StorageRouterViewSet.DOMAIN_CHANGE_KEY, async_mds_result.id, 600)  # Store the task id
-            cache.set(StorageRouterViewSet.FAILURE_DOMAIN_CHANGE_KEY, async_dtl_result.id, 600)  # Store the task id
-            storagerouter.invalidate_dynamics(['regular_domains', 'backup_domains'])
+            cache.set(StorageRouterViewSet.RECOVERY_DOMAIN_CHANGE_KEY, async_dtl_result.id, 600)  # Store the task id
+            storagerouter.invalidate_dynamics(['regular_domains', 'recovery_domains'])
