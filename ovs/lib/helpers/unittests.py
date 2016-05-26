@@ -73,7 +73,7 @@ class UnitTest(object):
 
         :return: None
         """
-        unittest.running_tests = True
+        os.environ['RUNNING_UNITTESTS'] = 'True'
         if directories is None:
             directories = [UnitTest._OVS_PATH]
         if isinstance(directories, str):
@@ -226,5 +226,5 @@ class UnitTest(object):
             test_results.insert(4, '  - Total amount of tests: {0}'.format(int(total_tests)))
             test_results.insert(4, '  - Total duration: {0}'.format(UnitTest._sec_to_readable(time.time() - start_all)))
         print '\n\n\n{0}'.format('\n'.join(test_results))
-        unittest.running_tests = False
+        os.environ['RUNNING_UNITTESTS'] = 'False'
         sys.exit(0 if total_tests == total_success else 1)

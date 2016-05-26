@@ -19,7 +19,6 @@ MDSService test module
 """
 import json
 import unittest
-# unittest.running_tests = True  # Uncomment when running unittests from within PyCharm
 from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_mdsservice import MDSService
