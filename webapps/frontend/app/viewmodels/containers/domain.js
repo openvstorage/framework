@@ -26,13 +26,16 @@ define([
         self.loadHandle = undefined;
 
         // Observables
+        self.backendGuids        = ko.observableArray([]);
         self.disabled            = ko.observable(false);
         self.edit                = ko.observable(false);
+        self.existingDomainNames = undefined;
         self.guid                = ko.observable(guid);
         self.loaded              = ko.observable(false);
         self.loading             = ko.observable(false);
         self.name                = ko.observable('').extend({removeWhiteSpaces: null});
-        self.existingDomainNames = undefined;
+        self.storageRouterGuids  = ko.observableArray([]);
+        self.vdiskDtlGuids       = ko.observableArray([]);
 
         // Computed
         self.canSave = ko.computed(function() {
@@ -46,12 +49,17 @@ define([
             return self.name() !== undefined && self.name() !== '' && !names.contains(self.name().toLowerCase()) && self.name().length < 31;
         });
         self.canDelete = ko.computed(function() {
-            return true;
+            return self.storageRouterGuids() !== undefined && self.storageRouterGuids().length === 0 &&
+                   self.backendGuids() !== undefined && self.backendGuids().length === 0 &&
+                   self.vdiskDtlGuids() !== undefined && self.vdiskDtlGuids().length === 0;
         });
 
         // Functions
         self.fillData = function(data) {
             self.name(data.name);
+            self.backendGuids(data.backends_guids);
+            self.vdiskDtlGuids(data.vdisks_dtl_guids);
+            self.storageRouterGuids(data.storagerouters_guids);
             self.loaded(true);
             self.loading(false);
         };

@@ -20,7 +20,6 @@ MDSService module
 import math
 import time
 import random
-
 from celery.schedules import crontab
 from ovs.celery_run import celery
 from ovs.dal.hybrids.diskpartition import DiskPartition
@@ -30,9 +29,9 @@ from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagerouter import StorageRouter
-from ovs.dal.lists.domainlist import DomainList
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.sshclient import SSHClient
@@ -794,7 +793,6 @@ class MDSServiceController(object):
 
 
 if __name__ == '__main__':
-    from ovs.dal.lists.storagerouterlist import StorageRouterList
     try:
         while True:
             output = ['',
