@@ -21,6 +21,7 @@ import os
 import time
 import datetime
 import unittest
+# unittest.running_tests = True  # Uncomment when running unittests from within PyCharm
 from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition

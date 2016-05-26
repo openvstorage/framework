@@ -704,12 +704,12 @@ class MDSServiceController(object):
 
                 for load in sorted(mds_per_load):
                     if len(config_set[storagerouter.guid]) >= safety:
-                        return config_set
+                        break
                     other_storagerouters = mds_per_load[load]
                     random.shuffle(other_storagerouters)
                     for other_storagerouter in other_storagerouters:
                         if len(config_set[storagerouter.guid]) >= safety:
-                            return config_set
+                            break
                         if other_storagerouter != storagerouter and other_storagerouter in possible_storagerouters:
                             config_set[storagerouter.guid].append(mds_per_storagerouter[other_storagerouter])
         return config_set
