@@ -119,7 +119,7 @@ class MDSServices(unittest.TestCase):
         mds_services = {}
         storagerouters = {}
         storagedrivers = {}
-        failure_domains = {}
+        recovery_domains = {}
         service_type = ServiceType()
         service_type.name = 'MetadataServer'
         service_type.save()
@@ -133,11 +133,11 @@ class MDSServices(unittest.TestCase):
         pmachine.ip = '127.0.0.1'
         pmachine.hvtype = 'VMWARE'
         pmachine.save()
-        for fd_id in structure['failure_domains']:
-            failure_domain = Domain()
-            failure_domain.name = 'failure_domain_{0}'.format(fd_id)
-            failure_domain.save()
-            failure_domains[fd_id] = failure_domain
+        for fd_id in structure['recovery_domains']:
+            recovery_domain = Domain()
+            recovery_domain.name = 'recovery_domain_{0}'.format(fd_id)
+            recovery_domain.save()
+            recovery_domains[fd_id] = recovery_domain
         for vpool_id in structure['vpools']:
             vpool = VPool()
             vpool.name = str(vpool_id)
@@ -151,9 +151,9 @@ class MDSServices(unittest.TestCase):
             storagerouter.ip = '10.0.0.{0}'.format(sr_id)
             storagerouter.pmachine = pmachine
             storagerouter.rdma_capable = False
-            storagerouter.primary_failure_domain = failure_domains[fd_primary_id]
+            storagerouter.primary_failure_domain = recovery_domains[fd_primary_id]
             if fd_secondary_id is not None:
-                storagerouter.secondary_failure_domain = failure_domains[fd_secondary_id]
+                storagerouter.secondary_failure_domain = recovery_domains[fd_secondary_id]
             storagerouter.save()
             storagerouters[sr_id] = storagerouter
         for sd_id, vpool_id, sr_id in structure['storagedrivers']:
@@ -185,7 +185,7 @@ class MDSServices(unittest.TestCase):
             mds_service.vpool = sd.vpool
             mds_service.save()
             mds_services[mds_id] = mds_service
-        return vpools, storagerouters, storagedrivers, services, mds_services, service_type, failure_domains
+        return vpools, storagerouters, storagedrivers, services, mds_services, service_type, recovery_domains
 
     def _create_vdisks_for_mds_service(self, amount, start_id, mds_service=None, vpool=None):
         """
@@ -276,7 +276,7 @@ class MDSServices(unittest.TestCase):
         """
         vpools, storagerouters, storagedrivers, services, mds_services, _, _ = MDSServices._build_service_structure(
             {'vpools': [1],
-             'failure_domains': [1],
+             'recovery_domains': [1],
              'storagerouters': [(1, 1, None)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1)]}  # (<id>, <storagedriver_id>)
@@ -328,7 +328,7 @@ class MDSServices(unittest.TestCase):
         EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 3)
         vpools, storagerouters, storagedrivers, services, mds_services, _, _ = MDSServices._build_service_structure(
             {'vpools': [1, 2],
-             'failure_domains': [1, 2],
+             'recovery_domains': [1, 2],
              'storagerouters': [(1, 1, 2), (2, 2, 1), (3, 1, 2), (4, 2, 1), (5, 1, None), (6, 2, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4), (5, 2, 4), (6, 2, 5), (7, 2, 6)],  # <id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 1), (3, 2), (4, 3), (5, 4), (6, 5), (7, 6), (8, 7), (9, 7)]}  # (<id>, <storagedriver_id>)
@@ -431,7 +431,7 @@ class MDSServices(unittest.TestCase):
 
         vpools, _, _, _, mds_services, _, _ = MDSServices._build_service_structure(
             {'vpools': [1],
-             'failure_domains': [1],
+             'recovery_domains': [1],
              'storagerouters': [(1, 1, None), (2, 1, None), (3, 1, None), (4, 1, None)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4)],  # (<id>, <vpool_id>, <sr_id>)
              'mds_services': [(1, 1), (2, 1), (3, 2), (4, 3), (5, 4)]}  # (<id>, <sd_id>)
@@ -496,9 +496,9 @@ class MDSServices(unittest.TestCase):
         """
         EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 3)
         EtcdConfiguration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = MDSServices._build_service_structure(
+        vpools, storagerouters, storagedrivers, _, mds_services, service_type, recovery_domains = MDSServices._build_service_structure(
             {'vpools': [1],
-             'failure_domains': [1, 2],
+             'recovery_domains': [1, 2],
              'storagerouters': [(1, 1, 2), (2, 1, 2), (3, 2, 1), (4, 2, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)]}  # (<id>, <storagedriver_id>)
@@ -687,9 +687,9 @@ class MDSServices(unittest.TestCase):
         EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 3)
         EtcdConfiguration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
 
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = MDSServices._build_service_structure(
+        vpools, storagerouters, storagedrivers, _, mds_services, service_type, recovery_domains = MDSServices._build_service_structure(
             {'vpools': [1],
-             'failure_domains': [1, 2, 3],
+             'recovery_domains': [1, 2, 3],
              'storagerouters': [(1, 1, 2), (2, 1, 2), (3, 1, None), (4, 1, 3), (5, 2, 3), (6, 3, None), (7, 3, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4), (5, 1, 5), (6, 1, 6), (7, 1, 7)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2), (3, 2), (4, 3), (5, 4), (6, 5), (7, 5), (8, 6), (9, 7)]}  # (<id>, <storagedriver_id>)
@@ -747,8 +747,8 @@ class MDSServices(unittest.TestCase):
         # Sub-Test 7: Update 2 primary failure domains (Cannot be identical to secondary failure domains)
         storagerouter2 = storagerouters[2]
         storagerouter4 = storagerouters[4]
-        storagerouter2.primary_failure_domain = failure_domains[3]
-        storagerouter4.primary_failure_domain = failure_domains[2]
+        storagerouter2.primary_failure_domain = recovery_domains[3]
+        storagerouter4.primary_failure_domain = recovery_domains[2]
         storagerouter2.save()
         storagerouter4.save()
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.5', 'port': 6}],
@@ -775,7 +775,7 @@ class MDSServices(unittest.TestCase):
 
         # Sub-Test 8: Update a secondary failure domain (Cannot be identical to primary failure domain)
         storagerouter5 = storagerouters[5]
-        storagerouter5.secondary_failure_domain = failure_domains[1]
+        storagerouter5.secondary_failure_domain = recovery_domains[1]
         storagerouter5.save()
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.5', 'port': 6}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 7}],
@@ -801,7 +801,7 @@ class MDSServices(unittest.TestCase):
 
         # Sub-Test 9: Add a secondary failure domain (Cannot be identical to primary failure domain)
         storagerouter3 = storagerouters[3]
-        storagerouter3.secondary_failure_domain = failure_domains[3]
+        storagerouter3.secondary_failure_domain = recovery_domains[3]
         storagerouter3.save()
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}, {'ip': '10.0.0.5', 'port': 6}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 7}],
@@ -924,7 +924,7 @@ class MDSServices(unittest.TestCase):
 
         # Sub-Test 13: Change individual vdisk's secondary failure domain
         vdisk5 = vdisks[5]
-        vdisk5.secondary_failure_domain = failure_domains[1]
+        vdisk5.secondary_failure_domain = recovery_domains[1]
         vdisk5.save()
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
@@ -1037,9 +1037,9 @@ class MDSServices(unittest.TestCase):
         EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 2)
         EtcdConfiguration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
 
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = MDSServices._build_service_structure(
+        vpools, storagerouters, storagedrivers, _, mds_services, service_type, recovery_domains = MDSServices._build_service_structure(
             {'vpools': [1],
-             'failure_domains': [1, 2],
+             'recovery_domains': [1, 2],
              'storagerouters': [(1, 1, 2), (2, 1, 2), (3, 2, 1), (4, 2, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)]}  # (<id>, <storagedriver_id>)
@@ -1222,9 +1222,9 @@ class MDSServices(unittest.TestCase):
         EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 2)
         EtcdConfiguration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
 
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, failure_domains = MDSServices._build_service_structure(
+        vpools, storagerouters, storagedrivers, _, mds_services, service_type, recovery_domains = MDSServices._build_service_structure(
             {'vpools': [1],
-             'failure_domains': [1, 2, 3],
+             'recovery_domains': [1, 2, 3],
              'storagerouters': [(1, 1, 2), (2, 1, 2), (3, 1, None), (4, 1, 3), (5, 2, 3), (6, 3, None), (7, 3, 1)],  # (<id>, <primary_failure_domain_id>, <secondary_failure_domain_id>)
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4), (5, 1, 5), (6, 1, 6), (7, 1, 7)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2), (3, 2), (4, 3), (5, 4), (6, 5), (7, 5), (8, 6), (9, 7)]}  # (<id>, <storagedriver_id>)
@@ -1282,8 +1282,8 @@ class MDSServices(unittest.TestCase):
         # Sub-Test 7: Update 2 primary failure domains (Cannot be identical to secondary failure domains)
         storagerouter2 = storagerouters[2]
         storagerouter4 = storagerouters[4]
-        storagerouter2.primary_failure_domain = failure_domains[3]
-        storagerouter4.primary_failure_domain = failure_domains[2]
+        storagerouter2.primary_failure_domain = recovery_domains[3]
+        storagerouter4.primary_failure_domain = recovery_domains[2]
         storagerouter2.save()
         storagerouter4.save()
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.5', 'port': 6}],
@@ -1310,7 +1310,7 @@ class MDSServices(unittest.TestCase):
 
         # Sub-Test 8: Update a secondary failure domain (Cannot be identical to primary failure domain)
         storagerouter5 = storagerouters[5]
-        storagerouter5.secondary_failure_domain = failure_domains[1]
+        storagerouter5.secondary_failure_domain = recovery_domains[1]
         storagerouter5.save()
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.5', 'port': 6}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.5', 'port': 7}],
@@ -1336,7 +1336,7 @@ class MDSServices(unittest.TestCase):
 
         # Sub-Test 9: Add a secondary failure domain (Cannot be identical to primary failure domain)
         storagerouter3 = storagerouters[3]
-        storagerouter3.secondary_failure_domain = failure_domains[3]
+        storagerouter3.secondary_failure_domain = recovery_domains[3]
         storagerouter3.save()
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.5', 'port': 6}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.5', 'port': 7}],

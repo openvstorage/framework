@@ -46,7 +46,7 @@ class StorageRouter(DataObject):
                   Dynamic('status', str, 10),
                   Dynamic('partition_config', dict, 3600),
                   Dynamic('regular_domains', list, 60),
-                  Dynamic('backup_domains', list, 60)]
+                  Dynamic('recovery_domains', list, 60)]
 
     def _statistics(self, dynamic):
         """
@@ -142,7 +142,7 @@ class StorageRouter(DataObject):
         """
         return [sr_domain.domain_guid for sr_domain in self.domains if sr_domain.backup is False]
 
-    def _backup_domains(self):
+    def _recovery_domains(self):
         """
         Returns a list of domain guids with backup flag True
         :return: List of domain guids

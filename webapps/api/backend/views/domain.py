@@ -135,7 +135,7 @@ class DomainViewSet(viewsets.ViewSet):
                 junction.backup = backup
                 junction.storagerouter = storagerouter
                 junction.save()
-                storagerouter.invalidate_dynamics(['regular_domains', 'backup_domains'])
+                storagerouter.invalidate_dynamics(['regular_domains', 'recovery_domains'])
         elif object_type == 'vdisk':
             vdisk = VDisk(object_guid)
             if not any(dom for dom in vdisk.domains_dtl if dom.domain_guid == domain.guid):
@@ -197,7 +197,7 @@ class DomainViewSet(viewsets.ViewSet):
             if junction.domain == domain:
                 change = object_type in ['storagerouter', 'vdisk']
                 junction.delete()
-                object_to_unlink.invalidate_dynamics(['regular_domains', 'backup_domains'])
+                object_to_unlink.invalidate_dynamics(['regular_domains', 'recovery_domains'])
                 break
 
         # Verify if the domain is still in use by another object

@@ -698,7 +698,7 @@ class MDSServiceController(object):
         for storagerouter, ip_info in mds_per_storagerouter.iteritems():
             config_set[storagerouter.guid] = [ip_info]
             for importance in ['primary', 'secondary']:
-                domains = [junction.domain for junction in storagerouter.domains if junction.backup is importance == 'secondary']
+                domains = [junction.domain for junction in storagerouter.domains if junction.backup is (importance == 'secondary')]
                 possible_storagerouters = set()
                 for domain in domains:
                     possible_storagerouters.update(StorageRouterList.get_primary_storagerouters_for_domain(domain))
