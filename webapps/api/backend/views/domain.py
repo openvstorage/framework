@@ -24,7 +24,6 @@ from celery.task.control import revoke
 from ovs.dal.hybrids.backend import Backend
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_backendomain import BackendDomain
-from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
@@ -43,9 +42,6 @@ class DomainViewSet(viewsets.ViewSet):
     """
     Information about Domains
     """
-    DOMAIN_CHANGE_KEY = 'ovs_dedupe_domain_change'
-    FAILURE_DOMAIN_CHANGE_KEY = 'ovs_dedupe_failure_domain_change'
-
     permission_classes = (IsAuthenticated,)
     prefix = r'domains'
     base_name = 'domains'

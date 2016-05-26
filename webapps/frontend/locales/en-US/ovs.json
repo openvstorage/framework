@@ -281,6 +281,10 @@
             "moveawaymsg": "Move all vDisks away from this Storage Router and start them on other Storage Routers.",
             "moveawaytitle": "Move all vDisks",
             "rdma_capable": "RDMA Capable",
+            "save": {
+                "success": "This StorageRouter was saved.",
+                "failure": "Error saving this StorageRouter."
+            },
             "scrub_capable": "SCRUB Capable",
             "storageroutervpoollink": "vPools served by this Storage Router",
             "title": "Storage Router",

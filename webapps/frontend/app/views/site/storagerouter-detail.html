@@ -32,7 +32,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
                 <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="buttonEdit"
-                        data-bind="click: function() { if (edit()) { save() } else { edit(true); } },
+                        data-bind="click: function() { if (edit()) { save(); } else { edit(true); } },
                                    enable: loaded() && $root.shared.user.roles().contains('manage'),
                                    tooltip: 'ovs:storagerouters.detail.edit'">
                     <span class="hand fa" data-bind="visible: edit() && !saving()" data-i18n="[html]ovs:icons.save"></span>
@@ -122,22 +122,27 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td><span data-bind="text: iops"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.domain"></td>
+                            <td data-i18n="ovs:generic.domains"></td>
                             <td>
                                 <span data-bind="dropdown: {
                                                      items: $root.domainGuids, target: domainGuids,
                                                      text: function(guid) {
                                                         return $root.domainCache[guid].name();
-                                                     }, enabled: edit
+                                                     }, enabled: edit, small: true
                                                  }"></span>
                             </td>
                             <td data-i18n="ovs:generic.readspeed"></td>
                             <td><span data-bind="text: readSpeed"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.failure_domain"></td>
+                            <td data-i18n="ovs:generic.failure_domains"></td>
                             <td>
-
+                                <span data-bind="dropdown: {
+                                                     items: $root.domainGuids, target: failureDomainGuids,
+                                                     text: function(guid) {
+                                                        return $root.domainCache[guid].name();
+                                                     }, enabled: edit, small: true
+                                                 }"></span>
                             </td>
                             <td data-i18n="ovs:generic.writespeed"></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
