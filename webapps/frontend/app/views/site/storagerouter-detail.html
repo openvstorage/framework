@@ -127,7 +127,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                 <span data-bind="dropdown: {
                                                      items: $root.domainGuids, target: domainGuids,
                                                      text: function(guid) {
-                                                        return $root.domainCache[guid].name();
+                                                         return $root.domainCache[guid].name();
                                                      }, enabled: edit, small: true, emptyisloading: false
                                                  }"></span>
                             </td>
@@ -138,9 +138,9 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td data-i18n="ovs:generic.recovery_domains"></td>
                             <td>
                                 <span data-bind="dropdown: {
-                                                     items: $root.domainGuids, target: recoveryDomainGuids,
+                                                     items: $root.recoveryDomainGuids, target: recoveryDomainGuids,
                                                      text: function(guid) {
-                                                        return $root.domainCache[guid].name();
+                                                         return $root.domainCache[guid].name();
                                                      }, enabled: edit, small: true, emptyisloading: false
                                                  }"></span>
                             </td>

@@ -45,9 +45,26 @@ define([
 
         // Computed
         self.domainGuids = ko.computed(function() {
-            var guids = [];
+            var guids = [], storageRouter = self.storageRouter();
+            if (storageRouter === undefined) {
+                return guids;
+            }
             $.each(self.domains(), function(index, domain) {
-                guids.push(domain.guid());
+                if (!storageRouter.recoveryDomainGuids().contains(domain.guid())) {
+                    guids.push(domain.guid());
+                }
+            });
+            return guids;
+        });
+        self.recoveryDomainGuids = ko.computed(function() {
+            var guids = [], storageRouter = self.storageRouter();
+            if (storageRouter === undefined) {
+                return guids;
+            }
+            $.each(self.domains(), function(index, domain) {
+                if (!storageRouter.domainGuids().contains(domain.guid())) {
+                    guids.push(domain.guid());
+                }
             });
             return guids;
         });
