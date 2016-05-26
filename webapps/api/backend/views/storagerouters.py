@@ -19,14 +19,20 @@ StorageRouter module
 """
 
 import json
+from celery.task.control import revoke
 from backend.decorators import required_roles, return_list, return_object, return_task, return_plain, load, log
 from backend.serializers.serializers import FullSerializer
 from ovs.dal.datalist import DataList
+from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.disk import DiskController
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.storagerouter import StorageRouterController
+from ovs.lib.vdisk import VDiskController
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, link
 from rest_framework.permissions import IsAuthenticated
@@ -40,6 +46,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
     permission_classes = (IsAuthenticated,)
     prefix = r'storagerouters'
     base_name = 'storagerouters'
+
+    DOMAIN_CHANGE_KEY = 'ovs_dedupe_domain_change'
+    FAILURE_DOMAIN_CHANGE_KEY = 'ovs_dedupe_failure_domain_change'
 
     @log()
     @required_roles(['read'])
@@ -322,3 +331,55 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Refreshes all hardware parameters
         """
         return StorageRouterController.refresh_hardware.delay(storagerouter.guid)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_plain()
+    @load(StorageRouter)
+    def set_domains(self, storagerouter, domain_guids, failure_domain_guids):
+        """
+        Configures the given domains to the StorageRouter.
+        :param storagerouter: The StorageRouter to update
+        :type storagerouter: StorageRouter
+        :param domain_guids: A list of Domain guids
+        :type domain_guids: list
+        :param failure_domain_guids: A list of Domain guids to set as failure Domain
+        :type failure_domain_guids: list
+        """
+        change = False
+        for junction in storagerouter.domains:
+            if junction.backup is False:
+                if junction.domain_guid not in domain_guids:
+                    junction.delete()
+                    change = True
+                else:
+                    domain_guids.remove(junction.domain_guid)
+            else:
+                if junction.domain_guid not in failure_domain_guids:
+                    junction.delete()
+                    change = True
+                else:
+                    failure_domain_guids.remove(junction.domain_guid)
+        for domain_guid in domain_guids + failure_domain_guids:
+            junction = StorageRouterDomain()
+            junction.domain = Domain(domain_guid)
+            junction.backup = domain_guid in failure_domain_guids
+            junction.storagerouter = storagerouter
+            junction.save()
+            change = True
+
+        # Schedule a task to run after 60 seconds, re-schedule task if another identical task gets triggered
+        if change is True:
+            cache = VolatileFactory.get_client()
+            task_id_domain = cache.get(StorageRouterViewSet.DOMAIN_CHANGE_KEY)
+            task_id_backup = cache.get(StorageRouterViewSet.FAILURE_DOMAIN_CHANGE_KEY)
+            if task_id_domain:
+                revoke(task_id_domain)  # If key exists, task was already scheduled. If task is already running, the revoke message will be ignored
+            if task_id_backup:
+                revoke(task_id_backup)
+            async_mds_result = MDSServiceController.mds_checkup.s().apply_async(countdown=60)
+            async_dtl_result = VDiskController.dtl_checkup.s().apply_async(countdown=60)
+            cache.set(StorageRouterViewSet.DOMAIN_CHANGE_KEY, async_mds_result.id, 600)  # Store the task id
+            cache.set(StorageRouterViewSet.FAILURE_DOMAIN_CHANGE_KEY, async_dtl_result.id, 600)  # Store the task id
+            storagerouter.invalidate_dynamics(['regular_domains', 'backup_domains'])

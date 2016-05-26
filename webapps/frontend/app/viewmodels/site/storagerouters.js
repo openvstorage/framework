@@ -64,7 +64,7 @@ define([
                                 },
                                 dependencyLoader: function(item) {
                                     generic.crossFiller(
-                                        item.domainGuids, item.domains,
+                                        item.domainGuids(), item.domains,
                                         function(guid) {
                                             if (!self.domainCache.hasOwnProperty(guid)) {
                                                 var domain = new Domain(guid);
@@ -75,7 +75,7 @@ define([
                                         }, 'guid'
                                     );
                                     generic.crossFiller(
-                                        item.backupDomainGuids, item.backupDomains,
+                                        item.failureDomainGuids(), item.failureDomains,
                                         function(guid) {
                                             if (!self.domainCache.hasOwnProperty(guid)) {
                                                 var domain = new Domain(guid);
@@ -85,7 +85,7 @@ define([
                                             return self.domainCache[guid];
                                         }, 'guid'
                                     );
-                                    item.backupDomains.sort(function(dom1, dom2) {
+                                    item.failureDomains.sort(function(dom1, dom2) {
                                         return dom1.name() < dom2.name() ? -1 : 1;
                                     });
                                     item.domains.sort(function(dom1, dom2) {
@@ -109,8 +109,7 @@ define([
                                 if (!self.domainCache.hasOwnProperty(item.guid)) {
                                     self.domainCache[item.guid] = new Domain(item.guid);
                                 }
-                                var domain = self.domainCache[item.guid];
-                                domain.fillData(item);
+                                self.domainCache[item.guid].fillData(item);
                             });
                             deferred.resolve();
                         })

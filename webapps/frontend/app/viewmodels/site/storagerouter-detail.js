@@ -67,11 +67,8 @@ define([
                     .then(self.loadVPools)
                     .done(function() {
                         self.checkedVPoolGuids(self.storageRouter().vPoolGuids);
-                        var pMachineGuid = storageRouter.pMachineGuid();
-                        if (pMachineGuid && (storageRouter.pMachine() === undefined || storageRouter.pMachine().guid() !== pMachineGuid)) {
-                            var pm = new PMachine(pMachineGuid);
-                            pm.load();
-                            storageRouter.pMachine(pm);
+                        if (storageRouter.pMachine() !== undefined && !storageRouter.pMachine().loaded()) {
+                            storageRouter.pMachine().load();
                         }
                         // Move child guids to the observables for easy display
                         storageRouter.vPools(storageRouter.vPoolGuids);
@@ -116,7 +113,7 @@ define([
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadDomainsHandle)) {
                     self.loadDomainsHandle = api.get('domains', {
-                        queryparams: { sort: 'name' }
+                        queryparams: { sort: 'name', contents: '' }
                     })
                         .done(function(data) {
                             var guids = [], ddata = {};
