@@ -792,7 +792,8 @@ class VDiskController(object):
         if len(vdisk.domains_dtl) > 0:
             dtl_target = [junction.domain_guid for junction in vdisk.domains_dtl]
         else:
-            dtl_target = [junction.domain_guid for junction in vdisk.storagerouter.domains if junction.backup is False]
+            storagerouter = StorageRouter(vdisk.storagerouter_guid)
+            dtl_target = [junction.domain_guid for junction in storagerouter.domains if junction.backup is False]
 
         if dtl_config is None:
             dtl_mode = 'no_sync'
@@ -895,8 +896,9 @@ class VDiskController(object):
                     domain = Domain(domain_guid)
                     dtl_targets.update(StorageRouterList.get_primary_storagerouters_for_domain(domain))
 
-                if vdisk.storagerouter in dtl_targets:
-                    dtl_targets.remove(vdisk.storagerouter)
+                storagerouter = StorageRouter(vdisk.storagerouter_guid)
+                if storagerouter in dtl_targets:
+                    dtl_targets.remove(storagerouter)
 
                 if len(dtl_targets) == 0:
                     raise ValueError('Cannot reconfigure DTL to StorageRouter {0} because the vDisk is hosted on this StorageRouter'.format(vdisk.storagerouter.name))
