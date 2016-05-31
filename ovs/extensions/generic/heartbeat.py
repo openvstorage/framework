@@ -53,8 +53,6 @@ class HeartBeat(object):
         with Celery(broker=amqp) as celery:
             worker_states = celery.control.inspect().ping()
 
-        celery.close()
-
         routers = StorageRouterList.get_storagerouters()
         for node in routers:
             if node.heartbeats is None:
