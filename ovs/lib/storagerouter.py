@@ -970,6 +970,13 @@ class StorageRouterController(object):
             root_client.run('service nfs-kernel-server start')
 
         if storagerouter.pmachine.hvtype == 'KVM':
+            try:
+                root_client.run('which virsh')
+            except CalledProcessError:
+                vpool.status = VPool.STATUSES.FAILURE
+                vpool.save()
+                raise RuntimeError('Dependency "virsh" is missing on the system.')
+
             vpool_overview = root_client.run('virsh pool-list --all').splitlines()
             if vpool_overview:
                 vpool_overview.pop(1)  # Pop   ---------------
