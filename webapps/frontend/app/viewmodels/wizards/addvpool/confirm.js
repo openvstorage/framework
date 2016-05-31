@@ -35,7 +35,7 @@ define([
         // Functions
         self.finish = function() {
             return $.Deferred(function(deferred) {
-                var post_data = {
+                var postData = {
                     call_parameters: {
                         vpool_name: self.data.name(),
                         type: self.data.backend(),
@@ -69,10 +69,10 @@ define([
                 };
 
                 if (self.data.backend() === 'distributed') {
-                    post_data.call_parameters.distributed_mountpoint = self.data.distributedMtpt();
+                    postData.call_parameters.distributed_mountpoint = self.data.distributedMtpt();
                 }
                 if (self.data.useAA() === true) {
-                    post_data.call_parameters.backend_connection_info_aa = {
+                    postData.call_parameters.backend_connection_info_aa = {
                         host: self.data.aaHost(),
                         port: self.data.aaPort(),
                         username: self.data.aaAccesskey(),
@@ -88,7 +88,7 @@ define([
                 } else {
                     generic.alertInfo($.t('ovs:wizards.extend_vpool.confirm.started'), $.t('ovs:wizards.extend_vpool.confirm.in_progress', { what: self.data.name() }));
                 }
-                api.post('storagerouters/' + self.data.storageRouter().guid() + '/add_vpool', { data: post_data })
+                api.post('storagerouters/' + self.data.storageRouter().guid() + '/add_vpool', { data: postData })
                     .then(self.shared.tasks.wait)
                     .done(function() {
                         if (data.vPoolAdd() === true) {

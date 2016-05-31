@@ -27,7 +27,7 @@ define([
         self.data = data;
 
         // Setup
-        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addbackend.title')));
+        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.add_backend.title')));
         self.modal(generic.tryGet(options, 'modal', false));
         self.steps([new Gather()]);
         self.activateStep();
@@ -36,7 +36,8 @@ define([
         data.backends([]);
         data.backendTypes([]);
         data.name('');
+        data.scaling('LOCAL');
         data.storageRoutersChecked(false);
-        data.validStorageRouterFound();
+        data.validStorageRouterFound(false);
     };
 });

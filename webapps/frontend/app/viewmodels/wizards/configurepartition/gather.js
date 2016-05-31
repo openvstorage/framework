@@ -38,7 +38,7 @@ define([
         self.isEmpty = generic.isEmpty;
         self.finish = function() {
             return $.Deferred(function(deferred) {
-                var roles = [], post_data = {
+                var roles = [], postData = {
                     disk_guid: self.data.disk().guid(),
                     partition_guid: self.data.partition().guid(),
                     offset: self.data.partition().offset.raw(),
@@ -47,8 +47,8 @@ define([
                 $.each(self.data.roles(), function(index, roleInfo) {
                     roles.push(roleInfo.name.toUpperCase());
                 });
-                post_data.roles = roles;
-                api.post('storagerouters/' + self.data.storageRouter().guid() + '/configure_disk', { data: post_data })
+                postData.roles = roles;
+                api.post('storagerouters/' + self.data.storageRouter().guid() + '/configure_disk', { data: postData })
                         .then(self.shared.tasks.wait)
                         .done(function() {
                             generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:wizards.configurepartition.confirm.success'));

@@ -706,18 +706,20 @@
                 "basicinfo": "The entered Lincense contains the following components. Press &quot;Finish&quot; to apply the License."
             }
         },
-        "addbackend": {
+        "add_backend": {
             "title": "Add new Backend",
             "gather": {
-                "backendtype": "Backend type",
-                "basicinfo": "Enter the requested information",
-                "duplicatename": "This name already exists.",
+                "backend_type": "Backend type:",
+                "basic_info": "Enter the requested information",
+                "complete": "Completed",
+                "duplicate_name": "This name already exists.",
                 "failed": "The backend could not be created.",
-                "invalidname": "The name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
+                "invalid_name": "The name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
                 "missing_arakoon": "A partition with DB role should be defined",
-                "missing_role": "Missing role",
-                "name": "Name",
-                "role_check": "Role check",
+                "name": "Name:",
+                "role_check": "Role check:",
+                "scaling": "Scaling:",
+                "success": "Added backend __what__",
                 "unable_to_determine_roles": "Failed to determine all required roles"
             }
         },
@@ -770,7 +772,7 @@
                 "missing_storage_ip": "Required Storage IP __what__ could not be found"
             },
             "gather_vpool": {
-                "access_key": "Access key:",
+                "access_key": "Access Key:",
                 "alba_backend": "Backend:",
                 "alba_preset": "Preset:",
                 "alba_preset_unavailable": "The selected preset is not usable. To be able to make use of this vPool, please add a suitable policy or claim more ASDs for this backend",
@@ -793,7 +795,7 @@
                 "no_backends": "No backends found",
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
-                "secret_key": "Secret key:"
+                "secret_key": "Secret Key:"
             },
             "gather_cache_info": {
                 "basic_info": "Enter/select the requested information.",

@@ -40,11 +40,11 @@ define([
             if (!self.data.name.valid()) {
                 valid = false;
                 fields.push('name');
-                reasons.push($.t('ovs:wizards.addbackend.gather.invalidname'));
+                reasons.push($.t('ovs:wizards.add_backend.gather.invalid_name'));
             }
-            if (self.data.validStorageRouterFound() === false) {
+            if (self.data.scaling() === 'LOCAL' && self.data.validStorageRouterFound() === false) {
                 valid = false;
-                reasons.push($.t('ovs:wizards.addbackend.gather.missing_arakoon'));
+                reasons.push($.t('ovs:wizards.add_backend.gather.missing_arakoon'));
             }
             if (self.data.storageRoutersChecked() !== true) {
                 valid = false;
@@ -53,7 +53,7 @@ define([
                 if (backend.name() === self.data.name() && !fields.contains('name')) {
                     valid = false;
                     fields.push('name');
-                    reasons.push($.t('ovs:wizards.addbackend.gather.duplicatename'));
+                    reasons.push($.t('ovs:wizards.add_backend.gather.duplicate_name'));
                 }
             });
             return { value: valid, reasons: reasons, fields: fields };
@@ -68,14 +68,24 @@ define([
                         backend_type_guid: self.data.backendType().guid()
                     }
                 };
+                if (self.data.backendType().code() === 'alba' && self.data.scaling() === 'GLOBAL') {
+                    postData.data.status = 'RUNNING';
+                }
                 api.post('backends', postData)
                     .done(function(data) {
-                        router.navigate(shared.routing.loadHash('backend-' + self.data.backendType().code() + '-detail', { guid: data.guid }));
+                        if (self.data.backendType().code() === 'alba' && self.data.scaling() === 'GLOBAL') {
+                            generic.alertSuccess(
+                                $.t('ovs:wizards.add_backend.gather.complete'),
+                                $.t('ovs:wizards.add_backend.gather.success', {what: self.data.name()})
+                            );
+                        } else {
+                            router.navigate(self.shared.routing.loadHash('backend-' + self.data.backendType().code() + '-detail', {guid: data.guid}));
+                        }
                     })
                     .fail(function() {
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:wizards.addbackend.gather.failed')
+                            $.t('ovs:wizards.add_backend.gather.failed')
                         );
                     })
                     .always(deferred.resolve);
@@ -103,7 +113,7 @@ define([
                             }, 'guid'
                         );
                         $.each(self.data.backends(), function (index, backend) {
-                            if ($.inArray(backend.guid(), guids) !== -1) {
+                            if (guids.contains(backend.guid())) {
                                 backend.fillData(bdata[backend.guid()]);
                             }
                         });

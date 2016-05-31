@@ -29,11 +29,11 @@ define([
         self.backendType = ko.observable();
 
         // Observables
-        self.loading         = ko.observable(false);
-        self.loaded          = ko.observable(false);
-        self.guid            = ko.observable(guid);
-        self.name            = ko.observable();
         self.backendTypeGuid = ko.observable();
+        self.guid            = ko.observable(guid);
+        self.loaded          = ko.observable(false);
+        self.loading         = ko.observable(false);
+        self.name            = ko.observable();
         self.status          = ko.observable();
 
         // Functions
