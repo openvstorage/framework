@@ -15,10 +15,10 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 import time
+from celery import Celery
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-from ovs.extensions.os.os import OSManager
 from ovs.log.log_handler import LogHandler
 from subprocess import check_output, CalledProcessError
 
@@ -50,13 +50,15 @@ class HeartBeat(object):
                                             EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
                                             EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(machine_id)))
 
-        celery_path = OSManager.get_path('celery')
-        worker_states = check_output("{0} inspect ping -b {1} --timeout=5 2> /dev/null | grep OK | perl -pe 's/\x1b\[[0-9;]*m//g' || true".format(celery_path, amqp), shell=True)
+        celery = Celery(broker=amqp)
+        worker_states = celery.control.inspect().ping()
+        celery.close()
+
         routers = StorageRouterList.get_storagerouters()
         for node in routers:
             if node.heartbeats is None:
                 node.heartbeats = {}
-            if 'celery@{0}: OK'.format(node.name) in worker_states:
+            if worker_states.get('celery@{0}'.format(node.name), {}).get('ok') == 'pong':
                 node.heartbeats['celery'] = current_time
             if node.machine_id == machine_id:
                 node.heartbeats['process'] = current_time
@@ -64,7 +66,7 @@ class HeartBeat(object):
                 try:
                     # check timeout of other nodes and clear arp cache
                     if node.heartbeats and 'process' in node.heartbeats:
-                        if current_time - node.heartbeats['process'] >= HeartBeat.ARP_TIMEOUT:
+                        if current_time - node.heartbeats['process'] >= 30:
                             check_output("/usr/sbin/arp -d {0}".format(node.name), shell=True)
                 except CalledProcessError:
                     logger.exception('Error clearing ARP cache')
