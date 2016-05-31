@@ -50,8 +50,9 @@ class HeartBeat(object):
                                             EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
                                             EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(machine_id)))
 
-        celery = Celery(broker=amqp)
-        worker_states = celery.control.inspect().ping()
+        with Celery(broker=amqp) as celery:
+            worker_states = celery.control.inspect().ping()
+
         celery.close()
 
         routers = StorageRouterList.get_storagerouters()
@@ -66,7 +67,7 @@ class HeartBeat(object):
                 try:
                     # check timeout of other nodes and clear arp cache
                     if node.heartbeats and 'process' in node.heartbeats:
-                        if current_time - node.heartbeats['process'] >= 30:
+                        if current_time - node.heartbeats['process'] >= HeartBeat.ARP_TIMEOUT:
                             check_output("/usr/sbin/arp -d {0}".format(node.name), shell=True)
                 except CalledProcessError:
                     logger.exception('Error clearing ARP cache')
