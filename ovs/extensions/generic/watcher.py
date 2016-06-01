@@ -141,13 +141,14 @@ class Watcher(object):
                 self.log_message(target, 'Test rabbitMQ...', 0)
                 import pika
                 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-                rmq_servers = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
+                messagequeue = EtcdConfiguration.get('/ovs/framework/messagequeue')
+                rmq_servers = messagequeue['endpoints']
                 good_node = False
                 for server in rmq_servers:
                     try:
-                        connection_string = '{0}://{1}:{2}@{3}/%2F'.format(EtcdConfiguration.get('/ovs/framework/messagequeue|protocol'),
-                                                                           EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
-                                                                           EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
+                        connection_string = '{0}://{1}:{2}@{3}/%2F'.format(messagequeue['protocol'],
+                                                                           messagequeue['user'],
+                                                                           messagequeue['password'],
                                                                            server)
                         connection = pika.BlockingConnection(pika.URLParameters(connection_string))
                         channel = connection.channel()

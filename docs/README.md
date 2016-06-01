@@ -1,13 +1,3 @@
-# Framework
+For all Framework documentation, please visit:
 
-
-{% include "dal.md" %}
-
-{% include "masterextra.md" %}
-
-{% include "watchers.md" %}
-
-{% include "scrubber.md" %}
-
-{% include "log.md" %}
-
+https://openvstorage.gitbooks.io/framework

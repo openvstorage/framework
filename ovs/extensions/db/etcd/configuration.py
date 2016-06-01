@@ -402,7 +402,7 @@ class EtcdConfiguration(object):
         else:
             # Real implementation
             client = EtcdConfiguration._get_client()
-            data = client.read(key).value
+            data = client.read(key, quorum=True).value
 
         if raw is True:
             return data
