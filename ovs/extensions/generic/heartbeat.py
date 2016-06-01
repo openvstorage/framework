@@ -45,10 +45,12 @@ class HeartBeat(object):
 
         current_time = int(time.time())
         machine_id = System.get_my_machine_id()
-        amqp = '{0}://{1}:{2}@{3}//'.format(EtcdConfiguration.get('/ovs/framework/messagequeue|protocol'),
-                                            EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
-                                            EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
-                                            EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(machine_id)))
+        rmq_servers = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
+        amqp = ';'.join(['{0}://{1}:{2}@{3}//'.format(EtcdConfiguration.get('/ovs/framework/messagequeue|protocol'),
+                                                      EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
+                                                      EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
+                                                      server)
+                         for server in rmq_servers])
 
         with Celery(broker=amqp) as celery:
             worker_states = celery.control.inspect().ping()
