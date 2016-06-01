@@ -1323,12 +1323,11 @@ class VDiskController(object):
         Set metadata page cache size to ratio 1:500 of vdisk.size
         :param vdisk: Object VDisk
         """
-        storagedriver_client = StorageDriverClient.load(vdisk.vpool)
         storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, vdisk.storagedriver_id)
         storagedriver_config.load()
         metadata_page_capacity = 256
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
         num_pages = int(vdisk.size / (metadata_page_capacity * cluster_size))
         VDiskController._logger.info('Setting metadata pagecache size for vdisk {0} to {1}'.format(vdisk.name, num_pages))
-        storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), num_pages)
+        vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), num_pages)
 
