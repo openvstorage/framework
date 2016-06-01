@@ -217,6 +217,7 @@ class VDiskController(object):
             disk.metadata = {'lba_size': disk.info['lba_size'],
                              'cluster_multiplier': disk.info['cluster_multiplier']}
             disk.save()
+            VDiskController._set_vdisk_metadata_pagecache_size(disk)
         finally:
             mutex.release()
 
@@ -396,6 +397,7 @@ class VDiskController(object):
 
         new_vdisk.volume_id = volume_id
         new_vdisk.save()
+        VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
 
         # 5. Check MDS & DTL for new clone
         try:
@@ -587,6 +589,7 @@ class VDiskController(object):
             new_vdisk.save()
             MDSServiceController.ensure_safety(new_vdisk)
             VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
+            VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
         except Exception as ex:
             VDiskController._logger.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
             try:
@@ -1313,3 +1316,18 @@ class VDiskController(object):
         storagedriver_client = StorageDriverClient.load(vdisk.vpool)
 
         return storagedriver_client.is_volume_synced_up_to_snapshot(str(vdisk.volume_id), str(snapshot_id))
+
+    @staticmethod
+    def _set_vdisk_metadata_pagecache_size(vdisk):
+        """
+        Set metadata page cache size to ratio 1:500 of vdisk.size
+        :param vdisk: Object VDisk
+        """
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, vdisk.storagedriver_id)
+        storagedriver_config.load()
+        metadata_page_capacity = 256
+        cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
+        num_pages = int(vdisk.size / (metadata_page_capacity * cluster_size))
+        VDiskController._logger.info('Setting metadata pagecache size for vdisk {0} to {1}'.format(vdisk.name, num_pages))
+        vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), num_pages)
+
