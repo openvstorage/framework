@@ -42,14 +42,6 @@ requirejs.config({
             deps   : ['jquery'],
             exports: 'jQuery'
         },
-        'jqp/jquery-ui': {
-            deps   : ['jquery'],
-            exports: 'jQuery'
-        },
-        'jqp/tag-it': {
-            deps   : ['jquery', 'jqp/jquery-ui'],
-            exports: 'jQuery'
-        },
         'd3': {
             exports: 'd3'
         },

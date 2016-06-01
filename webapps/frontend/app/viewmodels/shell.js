@@ -143,6 +143,20 @@ define([
                                                             });
                                                         });
                                                 });
+                                                $.each(hook.wizards, function(wizard, moduleName) {
+                                                    if (!shared.hooks.wizards.hasOwnProperty(wizard)) {
+                                                        shared.hooks.wizards[wizard] = [];
+                                                    }
+                                                    system.acquire('viewmodels/wizards/' + wizard + '/' + moduleName)
+                                                        .then(function(module) {
+                                                            var moduleInstance = new module();
+                                                            shared.hooks.wizards[wizard].push({
+                                                                name: moduleName,
+                                                                module: moduleInstance,
+                                                                activator: activator.create()
+                                                            });
+                                                        });
+                                                });
                                                 moduleDeferred.resolve();
                                             });
                                         }).promise();

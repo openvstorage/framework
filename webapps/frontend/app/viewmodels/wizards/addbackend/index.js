@@ -36,8 +36,5 @@ define([
         data.backends([]);
         data.backendTypes([]);
         data.name('');
-        data.scaling('LOCAL');
-        data.storageRoutersChecked(false);
-        data.validStorageRouterFound(false);
     };
 });

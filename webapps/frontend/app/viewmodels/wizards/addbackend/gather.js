@@ -30,11 +30,26 @@ define([
         self.shared = shared;
 
         // Handles
-        self.loadBackendsHandle       = undefined;
-        self.loadBackendTypesHandle   = undefined;
-        self.loadStorageRoutersHandle = undefined;
+        self.loadBackendsHandle     = undefined;
+        self.loadBackendTypesHandle = undefined;
 
         // Computed
+        self.modules = ko.computed(function() {
+            var modules = [];
+            if (self.data.backendType() === undefined) {
+                return modules;
+            }
+            $.each(shared.hooks.wizards, function (wizard, wModules) {
+                if (wizard === 'addbackend') {
+                    $.each(wModules, function (index, module) {
+                        if (module.name.toLowerCase() == self.data.backendType().name().toLowerCase()) {
+                            modules.push(module);
+                        }
+                    });
+                }
+            });
+            return modules;
+        });
         self.canContinue = ko.computed(function() {
             var valid = true, reasons = [], fields = [];
             if (!self.data.name.valid()) {
@@ -42,18 +57,19 @@ define([
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.add_backend.gather.invalid_name'));
             }
-            if (self.data.scaling() === 'LOCAL' && self.data.validStorageRouterFound() === false) {
-                valid = false;
-                reasons.push($.t('ovs:wizards.add_backend.gather.missing_arakoon'));
-            }
-            if (self.data.storageRoutersChecked() !== true) {
-                valid = false;
-            }
             $.each(self.data.backends(), function(index, backend) {
                 if (backend.name() === self.data.name() && !fields.contains('name')) {
                     valid = false;
                     fields.push('name');
                     reasons.push($.t('ovs:wizards.add_backend.gather.duplicate_name'));
+                }
+            });
+            $.each(self.modules(), function(index, module) {
+                var cc = module.module.canContinue();
+                if (cc.value === false) {
+                    valid = false;
+                    reasons = reasons.concat(cc.reasons);
+                    fields = fields.concat(cc.fields);
                 }
             });
             return { value: valid, reasons: reasons, fields: fields };
@@ -68,19 +84,15 @@ define([
                         backend_type_guid: self.data.backendType().guid()
                     }
                 };
-                if (self.data.backendType().code() === 'alba' && self.data.scaling() === 'GLOBAL') {
-                    postData.data.status = 'RUNNING';
-                }
-                api.post('backends', postData)
-                    .done(function(data) {
-                        if (self.data.backendType().code() === 'alba' && self.data.scaling() === 'GLOBAL') {
-                            generic.alertSuccess(
-                                $.t('ovs:wizards.add_backend.gather.complete'),
-                                $.t('ovs:wizards.add_backend.gather.success', {what: self.data.name()})
-                            );
-                        } else {
-                            router.navigate(self.shared.routing.loadHash('backend-' + self.data.backendType().code() + '-detail', {guid: data.guid}));
-                        }
+                var chain = api.post('backends', postData);
+                $.each(self.modules(), function(index, module) {
+                    chain.then(module.module.finish);
+                });
+                chain.done(function() {
+                        generic.alertInfo(
+                            $.t('ovs:wizards.add_backend.gather.creating'),
+                            $.t('ovs:wizards.add_backend.gather.started')
+                        );
                     })
                     .fail(function() {
                         generic.alertError(
@@ -94,6 +106,11 @@ define([
 
         // Durandal
         self.activate = function() {
+            $.each(shared.hooks.wizards, function (wizard, modules) {
+                $.each(modules, function (index, module) {
+                    module.activator.activateItem(module.module);
+                });
+            });
             if (generic.xhrCompleted(self.loadBackendsHandle)) {
                 var options = {
                     sort: 'name',
@@ -117,36 +134,6 @@ define([
                                 backend.fillData(bdata[backend.guid()]);
                             }
                         });
-                    });
-            }
-            if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
-                self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: { contents: '' } })
-                    .done(function(data) {
-                        var subcalls = [];
-                        $.each(data.data, function(index, item) {
-                            subcalls.push($.Deferred(function(deferred) {
-                                api.post('storagerouters/' + item.guid + '/get_metadata')
-                                    .then(self.shared.tasks.wait)
-                                    .done(function(metadata) {
-                                        $.each(metadata.partitions, function(role, partitions) {
-                                            if (role === 'DB' && partitions.length > 0) {
-                                                self.data.validStorageRouterFound(true);
-                                            }
-                                        });
-                                        deferred.resolve();
-                                    })
-                                    .fail(deferred.resolve);
-                                }).promise());
-                        });
-                        $.when.apply($, subcalls)
-                            .done(function(){
-                                if (self.data.validStorageRouterFound() === undefined) {
-                                    self.data.validStorageRouterFound(false);
-                                }
-                            })
-                            .always(function() {
-                                self.data.storageRoutersChecked(true);
-                            });
                     });
             }
             return $.Deferred(function(deferred) {
@@ -184,6 +171,13 @@ define([
                     deferred.reject();
                 }
             }).promise();
+        };
+        self.deactivate = function() {
+            $.each(shared.hooks.wizards, function (wizard, modules) {
+                $.each(modules, function (index, module) {
+                    module.activator.deactivateItem(module.module);
+                });
+            });
         };
     };
 });

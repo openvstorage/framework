@@ -37,37 +37,9 @@ but WITHOUT ANY WARRANTY of any kind.
                 </span>
             </div>
         </div>
-        <div class="form-group" data-bind="visible: data.backendType() !== undefined && data.backendType().code() === 'alba'">
-            <label class="col-lg-3 control-label" for="scaling" data-i18n="ovs:wizards.add_backend.gather.scaling"></label>
-            <div class="col-lg-7">
-                <span id="scaling"
-                      data-bind="dropdown: {
-                          items: data.scalings, target: data.scaling,
-                          text: function(item) {
-                              return item;
-                          }
-                      }">
-                </span>
-            </div>
-        </div>
-        <div class="form-group" data-bind="visible: data.backendType() !== undefined && data.backendType().code() === 'alba' && data.scaling() === 'LOCAL'">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_backend.gather.role_check" style="padding-top: 0;"></label>
-            <div class="col-lg-7" style="margin-left: 5px;">
-                <!-- ko if: data.storageRoutersChecked() !== true -->
-                    <span class="fa fa-1p5x fa-spin" data-i18n="[html]ovs:icons.loading"></span>
-                <!-- /ko -->
-                <!-- ko if: data.storageRoutersChecked() === true && data.validStorageRouterFound() === undefined -->
-                    <span class="fa" data-i18n="[html]ovs:icons.warning" style="color: orange;"></span>
-                    <span data-i18n="ovs:wizards.add_backend.gather.unable_to_determine_roles"></span>
-                <!-- /ko -->
-                <!-- ko if: data.storageRoutersChecked() === true && data.validStorageRouterFound() === false -->
-                    <span class="fa" data-i18n="[html]ovs:icons.cancel_circle" style="color: red;"></span>
-                <!-- /ko -->
-                <!-- ko if: data.storageRoutersChecked() === true && data.validStorageRouterFound() === true -->
-                    <span class="fa" data-i18n="[html]ovs:icons.check_circle" style="color: green;"></span>
-                <!-- /ko -->
-            </div>
-        </div>
+        <!-- ko foreach: modules -->
+            <div data-bind="compose: $data.activator"></div>
+        <!-- /ko -->
     </form>
     <div class="alert alert-danger" data-bind="visible: !canContinue().value" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
