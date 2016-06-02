@@ -26,6 +26,7 @@ from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
 from StringIO import StringIO
 from ovs.celery_run import celery
+from ovs.dal.exceptions import ConcurrencyException
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
@@ -85,9 +86,16 @@ class StorageRouterController(object):
     @staticmethod
     @celery.task(name='ovs.storagerouter.ping')
     def ping(storagerouter_guid, timestamp):
-        storagerouter = StorageRouter(storagerouter_guid)
-        storagerouter.heartbeats['celery'] = timestamp
-        storagerouter.save()
+        for _ in xrange(2):
+            storagerouter = StorageRouter(storagerouter_guid, datastore_wins=None)
+            storagerouter.heartbeats['celery'] = timestamp
+            try:
+                storagerouter.save()
+                break
+            except ConcurrencyException as ex:
+                pass
+
+        return storagerouter_guid, timestamp
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_metadata')

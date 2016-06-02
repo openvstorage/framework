@@ -16,6 +16,7 @@
 
 import time
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.extensions.generic.system import System
 from ovs.log.log_handler import LogHandler
@@ -43,13 +44,14 @@ class HeartBeat(object):
         logger = LogHandler.get('extensions', name='heartbeat')
         machine_id = System.get_my_machine_id()
         current_time = int(time.time())
-        storagerouter = StorageRouterList.get_by_machine_id(machine_id)
-        StorageRouterController.ping.s(storagerouter.guid, current_time).apply_async(routing_key='sr.{0}'.format(machine_id))
 
         routers = StorageRouterList.get_storagerouters()
-        for node in routers:
+        for n in routers:
+            node = StorageRouter(n.guid, datastore_wins=None)
             if node.machine_id == machine_id:
                 node.heartbeats['process'] = current_time
+                node.save()
+                StorageRouterController.ping.s(node.guid, current_time).apply_async(routing_key='sr.{0}'.format(machine_id))
             else:
                 try:
                     # check timeout of other nodes and clear arp cache
@@ -58,7 +60,6 @@ class HeartBeat(object):
                             check_output("/usr/sbin/arp -d {0}".format(node.name), shell=True)
                 except CalledProcessError:
                     logger.exception('Error clearing ARP cache')
-            node.save()
 
 if __name__ == '__main__':
     HeartBeat.pulse()
