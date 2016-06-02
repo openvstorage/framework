@@ -185,6 +185,7 @@
         "nrofvdisks": "# vDisks",
         "nrofvmachines": "# vMachines",
         "nrofvpools": "# vPools",
+        "null": "-",
         "of": "of",
         "ok": "OK",
         "partitionusage": "Detailed partition usage:",
@@ -628,6 +629,13 @@
             "complete": "Backend added",
             "addsuccess": "The backend was added. Please open the details to configure",
             "addfailed": "The backend could not be added: __why__"
+        },
+        "save": {
+            "success": "The backend was successfully saved",
+            "failure": "Error saving the backend"
+        },
+        "edit": {
+            "edit": "Edit backend"
         }
     },
     "licenses": {

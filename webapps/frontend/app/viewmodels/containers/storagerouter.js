@@ -311,7 +311,7 @@ define([
                         deferred.resolve();
                     })
                     .fail(function() {
-                        generic.alertSuccess($.t('ovs:generic.error'), $.t('ovs:storagerouters.detail.save.failure'));
+                        generic.alertError($.t('ovs:generic.error'), $.t('ovs:storagerouters.detail.save.failure'));
                         deferred.reject();
                     })
                     .always(function() {

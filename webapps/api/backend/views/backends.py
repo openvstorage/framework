@@ -18,17 +18,17 @@
 Contains the BackendViewSet
 """
 
-from urllib2 import HTTPError, URLError
-from backend.serializers.serializers import FullSerializer
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.exceptions import NotAcceptable
+from backend.decorators import return_object, return_list, load, required_roles, log, return_plain
+from backend.serializers.serializers import FullSerializer
 from ovs.dal.lists.backendlist import BackendList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.hybrids.backend import Backend
-from backend.decorators import return_object, return_list, load, required_roles, log
-from ovs.extensions.api.client import OVSClient
+from ovs.dal.hybrids.domain import Domain
+from ovs.dal.hybrids.j_backenddomain import BackendDomain
 
 
 class BackendViewSet(viewsets.ViewSet):
@@ -75,3 +75,30 @@ class BackendViewSet(viewsets.ViewSet):
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_plain()
+    @load(Backend)
+    def set_domains(self, backend, domain_guids):
+        """
+        Configures the given domains to the StorageRouter.
+        :param storagerouter: The StorageRouter to update
+        :type storagerouter: StorageRouter
+        :param domain_guids: A list of Domain guids
+        :type domain_guids: list
+        :param recovery_domain_guids: A list of Domain guids to set as recovery Domain
+        :type recovery_domain_guids: list
+        """
+        for junction in backend.domains:
+            if junction.domain_guid not in domain_guids:
+                junction.delete()
+            else:
+                domain_guids.remove(junction.domain_guid)
+        for domain_guid in domain_guids:
+            junction = BackendDomain()
+            junction.domain = Domain(domain_guid)
+            junction.backend = backend
+            junction.save()
+        backend.invalidate_dynamics(['regular_domains'])

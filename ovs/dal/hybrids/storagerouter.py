@@ -140,11 +140,11 @@ class StorageRouter(DataObject):
         Returns a list of domain guids with backup flag False
         :return: List of domain guids
         """
-        return [sr_domain.domain_guid for sr_domain in self.domains if sr_domain.backup is False]
+        return [junction.domain_guid for junction in self.domains if junction.backup is False]
 
     def _recovery_domains(self):
         """
         Returns a list of domain guids with backup flag True
         :return: List of domain guids
         """
-        return [sr_domain.domain_guid for sr_domain in self.domains if sr_domain.backup is True]
+        return [junction.domain_guid for junction in self.domains if junction.backup is True]

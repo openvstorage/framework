@@ -27,20 +27,31 @@ define([
 
         // External dependencies
         self.backendType = ko.observable();
+        self.domains     = ko.observableArray([]);
 
         // Observables
         self.backendTypeGuid = ko.observable();
+        self.domainGuids     = ko.observableArray([]);
+        self.edit            = ko.observable(false);
         self.guid            = ko.observable(guid);
         self.loaded          = ko.observable(false);
         self.loading         = ko.observable(false);
         self.name            = ko.observable();
         self.status          = ko.observable();
+        self.saving          = ko.observable(false);
 
         // Functions
         self.fillData = function(data) {
+            if (self.edit() === true) {
+                self.loading(false);
+                return;
+            }
             self.name(data.name);
             generic.trySet(self.backendTypeGuid, data, 'backend_type_guid');
             self.status(data.status !== undefined ? data.status.toLowerCase() : 'unknown');
+            if (data.hasOwnProperty('regular_domains')) {
+                self.domainGuids(data.regular_domains);
+            }
 
             self.loaded(true);
             self.loading(false);
@@ -49,7 +60,7 @@ define([
             return $.Deferred(function(deferred) {
                 self.loading(true);
                 if (generic.xhrCompleted(self.loadHandle)) {
-                    self.loadHandle = api.get('backends/' + self.guid(), { queryparams: { contents: '_relations' } })
+                    self.loadHandle = api.get('backends/' + self.guid(), { queryparams: { contents: '_relations,regular_domains' } })
                         .done(function(data) {
                             self.fillData(data);
                             deferred.resolve(data);
@@ -61,6 +72,27 @@ define([
                 } else {
                     deferred.reject();
                 }
+            }).promise();
+        };
+        self.save = function() {
+            return $.Deferred(function(deferred) {
+                self.saving(true);
+                var data = {
+                    domain_guids: self.domainGuids()
+                };
+                api.post('backends/' + self.guid() + '/set_domains', { data: data })
+                    .done(function() {
+                        generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:backends.save.success'));
+                        deferred.resolve();
+                    })
+                    .fail(function() {
+                        generic.alertError($.t('ovs:generic.error'), $.t('ovs:backends.save.failure'));
+                        deferred.reject();
+                    })
+                    .always(function() {
+                        self.edit(false);
+                        self.saving(false);
+                    });
             }).promise();
         };
     };
