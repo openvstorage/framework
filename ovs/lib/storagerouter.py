@@ -83,6 +83,13 @@ class StorageRouterController(object):
     storagerouterclient.Logger.enableLogging()
 
     @staticmethod
+    @celery.task(name='ovs.storagerouter.ping')
+    def ping(storagerouter_guid, timestamp):
+        storagerouter = StorageRouter(storagerouter_guid)
+        storagerouter.heartbeats['celery'] = timestamp
+        storagerouter.save()
+
+    @staticmethod
     @celery.task(name='ovs.storagerouter.get_metadata')
     def get_metadata(storagerouter_guid):
         """
