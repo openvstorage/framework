@@ -88,12 +88,13 @@ class StorageRouterController(object):
     def ping(storagerouter_guid, timestamp):
         for _ in xrange(2):
             storagerouter = StorageRouter(storagerouter_guid, datastore_wins=None)
-            storagerouter.heartbeats['celery'] = timestamp
+            if timestamp > storagerouter.heartbeats['celery']:
+                storagerouter.heartbeats['celery'] = timestamp
             try:
                 storagerouter.save()
                 break
             except ConcurrencyException as ex:
-                pass
+                StorageRouterController._logger.warning('Failed to save {0}. {1}'.format(storagerouter.name, ex))
 
         return storagerouter_guid, timestamp
 

@@ -15,8 +15,9 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 import time
-from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.exceptions import ConcurrencyException
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.extensions.generic.system import System
 from ovs.log.log_handler import LogHandler
@@ -49,8 +50,13 @@ class HeartBeat(object):
         for n in routers:
             node = StorageRouter(n.guid, datastore_wins=None)
             if node.machine_id == machine_id:
-                node.heartbeats['process'] = current_time
-                node.save()
+                for _ in xrange(2):
+                    node_save = StorageRouter(n.guid, datastore_wins=None)
+                    node_save.heartbeats['process'] = current_time
+                    try:
+                        node_save.save()
+                    except ConcurrencyException as ex:
+                        logger.warning('Failed to save {0}. {1}'.format(node.name, ex))
                 StorageRouterController.ping.s(node.guid, current_time).apply_async(routing_key='sr.{0}'.format(machine_id))
             else:
                 try:
