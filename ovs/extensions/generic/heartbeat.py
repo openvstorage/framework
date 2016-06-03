@@ -18,8 +18,8 @@ import time
 from ovs.dal.exceptions import ConcurrencyException
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.lib.storagerouter import StorageRouterController
 from ovs.extensions.generic.system import System
+from ovs.lib.storagerouter import StorageRouterController
 from ovs.log.log_handler import LogHandler
 from subprocess import check_output, CalledProcessError
 
