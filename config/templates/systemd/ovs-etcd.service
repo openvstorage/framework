@@ -9,7 +9,7 @@ Group=ovs
 Environment=PYTHONPATH=/opt/OpenvStorage
 WorkingDirectory=/opt/OpenvStorage
 ExecStartPre=/bin/bash -c "if [ ! -d /opt/OpenvStorage/run ]; then mkdir /opt/OpenvStorage/run; chown ovs:ovs /opt/OpenvStorage/run; fi; echo `etcd --version | grep etcd | awk '{print $3}'` > /opt/OpenvStorage/run/<SERVICE_NAME>.version"
-ExecStart=/usr/sbin/etcd -name <NODE_ID> -data-dir <DATA_DIR> -wal-dir <WAL_DIR> -listen-peer-urls <SERVER_URL> -listen-client-urls <CLIENT_URL>,<LOCAL_CLIENT_URL> -advertise-client-urls <CLIENT_URL> -initial-cluster-token <CLUSTER> -initial-cluster <INITIAL_CLUSTER> -initial-cluster-state <INITIAL_STATE> <INITIAL_PEERS>
+ExecStart=/usr/sbin/etcd -name <NODE_ID> -heartbeat-interval=1000 -election-timeout=5000 -data-dir <DATA_DIR> -wal-dir <WAL_DIR> -listen-peer-urls <SERVER_URL> -listen-client-urls <CLIENT_URL>,<LOCAL_CLIENT_URL> -advertise-client-urls <CLIENT_URL> -initial-cluster-token <CLUSTER> -initial-cluster <INITIAL_CLUSTER> -initial-cluster-state <INITIAL_STATE> <INITIAL_PEERS>
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=60
