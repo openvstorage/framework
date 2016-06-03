@@ -92,13 +92,9 @@ class StorageRouterController(object):
                 storagerouter.heartbeats['celery'] = timestamp
                 try:
                     storagerouter.save()
-                    break
+                    return
                 except ConcurrencyException as ex:
                     StorageRouterController._logger.warning('Failed to save {0}. {1}'.format(storagerouter.name, ex))
-            else:
-                break
-
-        return storagerouter_guid, timestamp
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_metadata')
