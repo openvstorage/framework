@@ -238,8 +238,7 @@ class OVSPluginTestCase(test.TestCase):
                       'connection_password': '',
                       'connection_backend': {},
                       'readcache_size': 50,
-                      'writecache_size': 50
-                      }
+                      'writecache_size': 50}
         StorageRouterController.add_vpool(parameters)
         attempt = 0
         while attempt < 10:
