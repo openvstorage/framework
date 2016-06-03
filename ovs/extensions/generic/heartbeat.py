@@ -47,14 +47,14 @@ class HeartBeat(object):
         current_time = int(time.time())
 
         routers = StorageRouterList.get_storagerouters()
-        for n in routers:
-            node = StorageRouter(n.guid, datastore_wins=None)
+        for node in routers:
             if node.machine_id == machine_id:
                 for _ in xrange(2):
-                    node_save = StorageRouter(n.guid, datastore_wins=None)
+                    node_save = StorageRouter(node.guid, datastore_wins=None)
                     node_save.heartbeats['process'] = current_time
                     try:
                         node_save.save()
+                        break
                     except ConcurrencyException as ex:
                         logger.warning('Failed to save {0}. {1}'.format(node.name, ex))
                 StorageRouterController.ping.s(node.guid, current_time).apply_async(routing_key='sr.{0}'.format(machine_id))

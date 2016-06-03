@@ -90,11 +90,13 @@ class StorageRouterController(object):
             storagerouter = StorageRouter(storagerouter_guid, datastore_wins=None)
             if timestamp > storagerouter.heartbeats['celery']:
                 storagerouter.heartbeats['celery'] = timestamp
-            try:
-                storagerouter.save()
+                try:
+                    storagerouter.save()
+                    break
+                except ConcurrencyException as ex:
+                    StorageRouterController._logger.warning('Failed to save {0}. {1}'.format(storagerouter.name, ex))
+            else:
                 break
-            except ConcurrencyException as ex:
-                StorageRouterController._logger.warning('Failed to save {0}. {1}'.format(storagerouter.name, ex))
 
         return storagerouter_guid, timestamp
 
