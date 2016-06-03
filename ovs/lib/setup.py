@@ -1237,7 +1237,7 @@ class SetupController(object):
         if configure_rabbitmq is True:
             endpoints = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
             endpoint = '{0}:5672'.format(cluster_ip)
-            if endpoint not in endpoint:
+            if endpoint not in endpoints:
                 endpoints.append(endpoint)
                 EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
 
