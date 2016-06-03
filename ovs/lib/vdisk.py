@@ -909,7 +909,7 @@ class VDiskController(object):
                         break
                     for sd in storagerouter.storagedrivers:
                         if sd.vpool == vdisk.vpool:
-                            dtl_config = DTLConfig(str(storagerouter.ip), sd.ports[2], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
+                            dtl_config = DTLConfig(str(storagerouter.ip), sd.ports['dtl'], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
                             vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
                             vdisk.has_manual_dtl = True
                             vdisk.save()
@@ -1173,7 +1173,7 @@ class VDiskController(object):
                         if dtl_host not in [sr.ip for sr in available_primary_storagerouters]:
                             VDiskController._logger.info('        Host not in available primary Storage Routers')
                             reconfigure_required = True
-                    if dtl_port != storage_drivers[0].ports[2]:
+                    if dtl_port != storage_drivers[0].ports['dtl']:
                         VDiskController._logger.info('        Configured port does not match expected port ({0} vs {1})'.format(dtl_port, storage_drivers[0].ports[2]))
                         reconfigure_required = True
 
@@ -1190,7 +1190,7 @@ class VDiskController(object):
                         vdisks.remove(vdisk)
                         continue
 
-                    port = storage_drivers[0].ports[2]
+                    port = storage_drivers[0].ports['dtl']
                     vpool_dtl_mode = vpool_config.get('dtl_mode', StorageDriverClient.FRAMEWORK_DTL_ASYNC)
                     VDiskController._logger.info('        DTL config that will be set -->  Host: {0}, Port: {1}, Mode: {2}'.format(dtl_target.ip, port, vpool_dtl_mode))
                     dtl_config = DTLConfig(str(dtl_target.ip), port, StorageDriverClient.VDISK_DTL_MODE_MAP[vpool_dtl_mode])

@@ -95,12 +95,9 @@ class StorageRouterController(object):
         """
         storagerouter = StorageRouter(storagerouter_guid)
         client = SSHClient(storagerouter)
-        if storagerouter.pmachine.hvtype == 'KVM':
-            ipaddresses = ['127.0.0.1']
-        else:
-            ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
-            ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses]
-            ipaddresses.remove('127.0.0.1')
+        ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
+        ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses]
+        ipaddresses.remove('127.0.0.1')
 
         mountpoints = StorageRouterController._get_mountpoints(client)
         partitions = dict((role, []) for role in DiskPartition.ROLES)
@@ -569,12 +566,12 @@ class StorageRouterController(object):
         for port_storagedriver in StorageDriverList.get_storagedrivers():
             if port_storagedriver.storagerouter_guid == storagerouter.guid:
                 # Local storagedrivers
-                model_ports_in_use += port_storagedriver.ports
+                model_ports_in_use += port_storagedriver.ports.values()
                 if port_storagedriver.alba_proxy is not None:
                     model_ports_in_use.append(port_storagedriver.alba_proxy.service.ports[0])
 
         # Connection information is Storage Driver related information
-        ports = StorageRouterController._get_free_ports(client, model_ports_in_use, 3)
+        ports = StorageRouterController._get_free_ports(client, model_ports_in_use, 4)
         model_ports_in_use += ports
 
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
@@ -591,9 +588,9 @@ class StorageRouterController(object):
             if existing_storagedriver.vpool_guid == vpool.guid:
                 node_configs.append(ClusterNodeConfig(str(existing_storagedriver.storagedriver_id),
                                                       str(existing_storagedriver.cluster_ip),
-                                                      existing_storagedriver.ports[0],
-                                                      existing_storagedriver.ports[1],
-                                                      existing_storagedriver.ports[2]))
+                                                      existing_storagedriver.ports['management'],
+                                                      existing_storagedriver.ports['xmlrpc'],
+                                                      existing_storagedriver.ports['dtl']))
         node_configs.append(ClusterNodeConfig(vrouter_id, str(grid_ip), ports[0], ports[1], ports[2]))
 
         try:
@@ -610,15 +607,19 @@ class StorageRouterController(object):
         filesystem_config.update({'fs_enable_shm_interface': 1,
                                   'fs_metadata_backend_arakoon_cluster_nodes': [],
                                   'fs_metadata_backend_mds_nodes': [],
-                                  'fs_metadata_backend_type': 'MDS'})
+                                  'fs_metadata_backend_type': 'MDS',
+                                  'fs_enable_network_interface': 1})
 
         # Updating the model
         storagedriver = StorageDriver()
         storagedriver.name = vrouter_id.replace('_', ' ')
-        storagedriver.ports = ports
+        storagedriver.ports = {'management': ports[0],
+                               'xmlrpc': ports[1],
+                               'dtl': ports[2],
+                               'edge': ports[3]}
         storagedriver.vpool = vpool
         storagedriver.cluster_ip = grid_ip
-        storagedriver.storage_ip = '127.0.0.1' if storagerouter.pmachine.hvtype == 'KVM' else storage_ip
+        storagedriver.storage_ip = storage_ip
         storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
         storagedriver.mountpoint_dfs = local_backend_data.get('local_connection_path')
         storagedriver.description = storagedriver.name
@@ -924,6 +925,8 @@ class StorageRouterController(object):
         storagedriver_config.configure_event_publisher(events_amqp_routing_key=EtcdConfiguration.get('/ovs/framework/messagequeue|queues.storagedriver'),
                                                        events_amqp_uris=queue_urls)
         storagedriver_config.configure_threadpool_component(num_threads=16)
+        storagedriver_config.configure_network_interface(network_uri='tcp://{0}:{1}'.format(storagedriver.storage_ip,
+                                                                                            storagedriver.ports['edge']))
         storagedriver_config.save(client, reload_config=False)
 
         DiskController.sync_with_reality(storagerouter.guid)
