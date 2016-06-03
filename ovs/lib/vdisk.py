@@ -1174,7 +1174,7 @@ class VDiskController(object):
                             VDiskController._logger.info('        Host not in available primary Storage Routers')
                             reconfigure_required = True
                     if dtl_port != storage_drivers[0].ports['dtl']:
-                        VDiskController._logger.info('        Configured port does not match expected port ({0} vs {1})'.format(dtl_port, storage_drivers[0].ports[2]))
+                        VDiskController._logger.info('        Configured port does not match expected port ({0} vs {1})'.format(dtl_port, storage_drivers[0].ports['dtl']))
                         reconfigure_required = True
 
                 # Perform the reconfiguration
