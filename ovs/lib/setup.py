@@ -1237,7 +1237,7 @@ class SetupController(object):
         if configure_rabbitmq is True:
             endpoints = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
             endpoint = '{0}:5672'.format(cluster_ip)
-            if endpoint not in endpoint:
+            if endpoint not in endpoints:
                 endpoints.append(endpoint)
                 EtcdConfiguration.set('/ovs/framework/messagequeue|endpoints', endpoints)
 
@@ -1592,7 +1592,6 @@ EOF
 </service-group>
 EOF
 """.format(cluster_name, node_name, node_type, SetupController.avahi_filename, client.ip.replace('.', '_')))
-        client.run('avahi-daemon --reload')
         Toolbox.change_service_state(client, 'avahi-daemon', 'restart', SetupController._logger)
 
     @staticmethod

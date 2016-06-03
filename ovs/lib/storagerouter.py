@@ -26,6 +26,7 @@ from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
 from StringIO import StringIO
 from ovs.celery_run import celery
+from ovs.dal.exceptions import ConcurrencyException
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
@@ -81,6 +82,19 @@ class StorageRouterController(object):
     storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.ping')
+    def ping(storagerouter_guid, timestamp):
+        for _ in xrange(2):
+            storagerouter = StorageRouter(storagerouter_guid, datastore_wins=None)
+            if timestamp > storagerouter.heartbeats['celery']:
+                storagerouter.heartbeats['celery'] = timestamp
+                try:
+                    storagerouter.save()
+                    return
+                except ConcurrencyException as ex:
+                    StorageRouterController._logger.warning('Failed to save {0}. {1}'.format(storagerouter.name, ex))
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_metadata')
@@ -799,7 +813,7 @@ class StorageRouterController(object):
                 fragment_cache_info = ['alba', {'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm_aa')),
                                                 'bucket_strategy': ['1-to-1', {'prefix': vpool.metadata[storagerouter.guid]['name'],
                                                                                'preset': vpool.metadata[storagerouter.guid]['preset']}],
-                                                'manifest_cache_size': 100000,
+                                                'manifest_cache_size': 16*1024*1024*1024,
                                                 'cache_on_read': fragment_cache_on_read,
                                                 'cache_on_write': fragment_cache_on_write}]
             else:
@@ -812,7 +826,7 @@ class StorageRouterController(object):
                 'log_level': 'info',
                 'port': alba_proxy.service.ports[0],
                 'ips': ['127.0.0.1'],
-                'manifest_cache_size': 100000,
+                'manifest_cache_size': 16*1024*1024*1024,
                 'fragment_cache': fragment_cache_info,
                 'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm'))
             }), raw=True)
