@@ -23,7 +23,7 @@ from backend.serializers.serializers import FullSerializer
 from celery.task.control import revoke
 from ovs.dal.hybrids.backend import Backend
 from ovs.dal.hybrids.domain import Domain
-from ovs.dal.hybrids.j_backendomain import BackendDomain
+from ovs.dal.hybrids.j_backenddomain import BackendDomain
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk

@@ -93,18 +93,29 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
-    @load(StorageRouter)
+    @load(StorageRouter, max_version=1)
     def move_away(self, storagerouter):
         """
-        Moves away all vDisks from all Storage Drivers this Storage Router is serving
+        Marks all StorageDrivers of a given node offline. DO NOT USE ON RUNNING STORAGEROUTERS!
         """
-        return StorageDriverController.move_away.delay(storagerouter.guid)
+        return StorageDriverController.mark_offline.delay(storagerouter.guid)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def mark_offline(self, storagerouter):
+        """
+        Marks all StorageDrivers of a given node offline. DO NOT USE ON RUNNING STORAGEROUTERS!
+        """
+        return StorageDriverController.mark_offline.delay(storagerouter.guid)
 
     @link()
     @log()
     @required_roles(['read'])
     @return_plain()
-    @load(StorageRouter)
+    @load(StorageRouter, max_version=1)
     def get_available_actions(self):
         """
         Gets a list of all available actions

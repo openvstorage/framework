@@ -291,7 +291,19 @@
             "title": "Storage Router",
             "updateserving": "Save changes",
             "edit": "Edit some properties of this StorageRouter",
-            "refreshtt": "Refresh the hardware capabilities of this StorageRouter"
+            "refreshtt": "Refresh the hardware capabilities of this StorageRouter",
+            "offline": {
+                "mark": "Mark this node Offline",
+                "warning": "Marking a node offline while it's still online will cause dataloss. Are you sure this node is offline?",
+                "title": "Warning",
+                "yes": "Yes, it's offline",
+                "no": "No, back to safety",
+                "pending": "Pending",
+                "pendingmsg": "The StorageRouter is being marked offline",
+                "done": "Marked offline",
+                "donemsg": "The StorageRouter was marked offline",
+                "errormsg": "marking the StorageRouter offline: __error__"
+            }
         }
     },
     "storagedrivers": {
@@ -1096,6 +1108,7 @@
         "vpools": "&#xf0c2;",
         "warning": "&#xf071;",
         "clone": "&#xf24d;",
-        "archive": "&#xf187;"
+        "archive": "&#xf187;",
+        "markoffline": "&#xf1cd"
     }
 }

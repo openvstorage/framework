@@ -50,10 +50,10 @@ class StorageDriverController(object):
     _logger = LogHandler.get('lib', name='storagedriver')
 
     @staticmethod
-    @celery.task(name='ovs.storagedriver.move_away')
-    def move_away(storagerouter_guid):
+    @celery.task(name='ovs.storagedriver.mark_offline')
+    def mark_offline(storagerouter_guid):
         """
-        Moves away all vDisks from all Storage Drivers this Storage Router is serving
+        Marks all StorageDrivers on this StorageRouter offline
         :param storagerouter_guid: Guid of the Storage Router
         :type storagerouter_guid: str
 
@@ -80,38 +80,15 @@ class StorageDriverController(object):
         """
         pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-        storagerouter = storagedriver.storagerouter
         if pmachine.mgmtcenter:
             # Update status
             pmachine.invalidate_dynamics(['host_status'])
             host_status = pmachine.host_status
-        else:
-            # No management Center, cannot update status via api
-            StorageDriverController._logger.info('Updating status of pmachine {0} using SSHClient'.format(pmachine.name))
-            path = StorageDriverConfiguration('storagedriver', storagedriver.vpool.guid, storagedriver.storagedriver_id).remote_path
-            host_status = 'RUNNING'
-            try:
-                client = SSHClient(storagerouter, username='root')
-                StorageDriverController._logger.info('SSHClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
-            except UnableToConnectException as ex:
-                StorageDriverController._logger.error('SSHClient connectivity check failed, assuming host {0} is halted. {1}'.format(pmachine.name, ex))
-                host_status = 'HALTED'
-            else:
-                try:
-                    with remote(client.ip, [LocalStorageRouterClient]) as rem:
-                        lsrc = rem.LocalStorageRouterClient(path)
-                        lsrc.server_revision()
-
-                    StorageDriverController._logger.info('LocalStorageRouterClient connected successfully to {0} at {1}'.format(pmachine.name, client.ip))
-                except (EOFError, RuntimeError, ClusterNotReachableException) as ex:
-                    StorageDriverController._logger.error('LocalStorageRouterClient check failed, assuming volumedriver on host {0} {1} is halted. {2}'.format(pmachine.name, client.ip, ex))
-                    host_status = 'HALTED'
-
-        if host_status != 'RUNNING':
-            # Host is stopped
-            storagedriver_client = StorageDriverClient.load(storagedriver.vpool)
-            storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
-            StorageDriverController._logger.warning('Storagedriver {0} marked offline'.format(storagedriver.storagedriver_id))
+            if host_status != 'RUNNING':
+                # Host is stopped
+                storagedriver_client = StorageDriverClient.load(storagedriver.vpool)
+                storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
+                StorageDriverController._logger.warning('Storagedriver {0} marked offline'.format(storagedriver.storagedriver_id))
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.volumedriver_error')

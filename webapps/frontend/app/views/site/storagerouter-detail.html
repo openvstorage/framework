@@ -31,7 +31,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </li>
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
-                <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="buttonEdit"
+                <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="button-edit"
                         data-bind="click: function() { if (edit()) { save(); } else { edit(true); } },
                                    enable: loaded() && $root.shared.user.roles().contains('manage'),
                                    tooltip: 'ovs:storagerouters.detail.edit'">
@@ -39,11 +39,18 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span class="hand fa fa-spin" data-bind="visible: edit() && saving()" data-i18n="[html]ovs:icons.loading"></span>
                     <span class="hand fa" data-bind="visible: !edit()" data-i18n="[html]ovs:icons.edit"></span>
                 </button>
-                <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="buttonRefresh"
+                <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="button-refresh"
                         data-bind="click: $root.refresh,
                                    enable: $root.shared.user.roles().contains('manage'),
                                    tooltip: 'ovs:storagerouters.detail.refreshtt'">
                     <span class="hand fa" data-bind="visible: !$root.refreshing()" data-i18n="[html]ovs:icons.load"></span>
+                    <span class="hand fa fa-spin" data-bind="visible: $root.refreshing()" data-i18n="[html]ovs:icons.loading"></span>
+                </button>
+                <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="button-mark-offline"
+                        data-bind="click: $root.markoffline,
+                                   enable: $root.shared.user.roles().contains('manage'),
+                                   tooltip: 'ovs:storagerouters.detail.offline.mark'">
+                    <span class="hand fa" data-bind="visible: !$root.refreshing()" data-i18n="[html]ovs:icons.markoffline"></span>
                     <span class="hand fa fa-spin" data-bind="visible: $root.refreshing()" data-i18n="[html]ovs:icons.loading"></span>
                 </button>
             </li>

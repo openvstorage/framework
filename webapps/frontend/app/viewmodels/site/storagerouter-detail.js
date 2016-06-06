@@ -15,11 +15,11 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', 'plugins/dialog',
+    'jquery', 'durandal/app', 'knockout', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver', '../containers/domain',
     '../wizards/configurepartition/index'
-], function($, ko, dialog, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver, Domain, ConfigurePartitionWizard) {
+], function($, app, ko, dialog, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver, Domain, ConfigurePartitionWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -76,7 +76,6 @@ define([
                 if (!storageRouter.edit()) {
                     calls.push(storageRouter.load('_dynamics,_relations'))
                 }
-                calls.push(storageRouter.getAvailableActions());
                 calls.push(storageRouter.getDisks());
                 calls.push(self.loadDomains());
                 $.when.apply($, calls)
@@ -219,6 +218,39 @@ define([
                     self.refreshing(false);
                 });
             generic.alertInfo($.t('ovs:storagerouters.detail.refresh.started'), $.t('ovs:storagerouters.detail.refresh.inprogress'));
+        };
+        self.markoffline = function() {
+            app.showMessage(
+                    $.t('ovs:storagerouters.detail.offline.warning'),
+                    $.t('ovs:storagerouters.detail.offline.title'),
+                    [$.t('ovs:storagerouters.detail.offline.no'), $.t('ovs:storagerouters.detail.offline.yes')]
+                )
+                .done(function(answer) {
+                    if (answer === $.t('ovs:storagerouters.detail.offline.yes')) {
+                        api.post('storagerouters/' + self.storageRouter().guid() + '/mark_offline')
+                            .then(self.shared.tasks.wait)
+                            .done(function() {
+                                generic.alertSuccess(
+                                    $.t('ovs:storagerouters.detail.offline.done'),
+                                    $.t('ovs:storagerouters.detail.offline.donemsg')
+                                );
+                            })
+                            .fail(function(error) {
+                                generic.alertError(
+                                    $.t('ovs:generic.error'),
+                                    $.t('ovs:generic.messages.errorwhile', {
+                                        context: 'error',
+                                        what: $.t('ovs:storagerouters.detail.offline.errormsg'),
+                                        error: $('<div/>').text(error.responseText).html()
+                                    })
+                                )
+                            });
+                        generic.alertInfo(
+                            $.t('ovs:storagerouters.detail.offline.pending'),
+                            $.t('ovs:storagerouters.detail.offline.pendingmsg')
+                        );
+                    }
+                });
         };
 
         // Durandal

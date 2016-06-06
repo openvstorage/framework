@@ -590,7 +590,7 @@ class SetupController(object):
                         if storage_router.ip == cluster_ip:
                             online = False
                             unique_id = storage_router.machine_id
-                            StorageDriverController.move_away(storagerouter_guid=storage_router.guid)
+                            StorageDriverController.mark_offline(storagerouter_guid=storage_router.guid)
                         offline_nodes.append(storage_router)
                 if online is True:
                     raise RuntimeError("If the node is online, please use 'ovs setup demote' executed on the node you wish to demote")
@@ -749,7 +749,7 @@ class SetupController(object):
             for storage_router in storage_routers_to_remove:
                 if storage_router in storage_routers_to_remove_offline:
                     SetupController._log(messages='  Marking all Storage Drivers served by Storage Router {0} as offline'.format(storage_router.ip))
-                    StorageDriverController.move_away(storagerouter_guid=storage_router.guid)
+                    StorageDriverController.mark_offline(storagerouter_guid=storage_router.guid)
                     for storagedriver in storage_router.storagedrivers:
                         target_sr = None
                         for sd in storagedriver.vpool.storagedrivers:

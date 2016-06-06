@@ -41,7 +41,6 @@ define([
         self.vMachines       = ko.observableArray([]);
 
         // Observables
-        self.availableActions    = ko.observableArray([]);
         self.backendRead         = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
         self.backendWritten      = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
         self.bandwidthSaved      = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
@@ -163,20 +162,6 @@ define([
                                 return a.name() < b.name() ? -1 : (a.name() > b.name() ? 1 : 0);
                             });
                             self.disksLoaded(true);
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
-        };
-        self.getAvailableActions = function () {
-            return $.Deferred(function (deferred) {
-                if (generic.xhrCompleted(self.loadActions)) {
-                    self.loadActions = api.get('storagerouters/' + self.guid() + '/get_available_actions')
-                        .done(function (data) {
-                            self.availableActions(data);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
