@@ -88,7 +88,7 @@ class StorageRouterController(object):
     def ping(storagerouter_guid, timestamp):
         for _ in xrange(2):
             storagerouter = StorageRouter(storagerouter_guid, datastore_wins=None)
-            if timestamp > storagerouter.heartbeats['celery']:
+            if timestamp > storagerouter.heartbeats.get('celery', 0):
                 storagerouter.heartbeats['celery'] = timestamp
                 try:
                     storagerouter.save()
