@@ -164,7 +164,10 @@ class MDSServices(unittest.TestCase):
             storagedriver.cluster_ip = storagerouters[sr_id].ip
             storagedriver.storage_ip = '127.0.0.1'
             storagedriver.storagedriver_id = str(sd_id)
-            storagedriver.ports = [1, 2, 3]
+            storagedriver.ports = {'management': 1,
+                                   'xmlrpc': 2,
+                                   'dtl': 3,
+                                   'edge': 4}
             storagedriver.save()
             storagedrivers[sd_id] = storagedriver
         for mds_id, sd_id in structure['mds_services']:

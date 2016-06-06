@@ -118,7 +118,7 @@ class OVSClient(object):
             params = '?{0}'.format(urllib.urlencode(kwargs['params']))
         url = '{0}{{0}}{1}'.format(self._url, params)
         if self._volatile_client is not None:
-            self._volatile_client.set(self._key, self._token)
+            self._volatile_client.set(self._key, self._token, 300)
 
         return headers, url
 
@@ -159,11 +159,17 @@ class OVSClient(object):
         try:
             return self._process(function(url=url.format(api), headers=headers, verify=self._verify, **kwargs))
         except ForbiddenException:
+            if self._volatile_client is not None:
+                self._volatile_client.delete(self._key)
             if first_connect is True:  # First connect, so no token was present yet, so no need to try twice without token
                 raise
             self._token = None
             headers, url = self._prepare(params=params)
             return self._process(function(url=url.format(api), headers=headers, verify=self._verify, **kwargs))
+        except Exception:
+            if self._volatile_client is not None:
+                self._volatile_client.delete(self._key)
+            raise
 
     def get(self, api, params=None):
         """

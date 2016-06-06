@@ -33,7 +33,7 @@ define([
         self.loading           = ko.observable(false);
         self.mountpoint        = ko.observable();
         self.name              = ko.observable();
-        self.ports             = ko.observableArray([0, 0, 0]);
+        self.ports             = ko.observableArray([0, 0, 0, 0]);
         self.storageDriverID   = ko.observable();
         self.storageIP         = ko.observable();
         self.storageRouterGuid = ko.observable();
