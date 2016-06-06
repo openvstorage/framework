@@ -32,8 +32,8 @@ define([
         self.widgets          = [];
         self.backendHeaders   = [
             { key: 'name',     value: $.t('ovs:generic.name'),        width: 250       },
-            { key: undefined,  value: $.t('ovs:generic.backendtype'), width: undefined },
-            { key: 'domain',   value: $.t('ovs:generic.domains'),     width: 200       },
+            { key: undefined,  value: $.t('ovs:generic.backendtype'), width: 250       },
+            { key: 'domain',   value: $.t('ovs:generic.domains'),     width: undefined },
             { key: undefined,  value: $.t('ovs:generic.status'),      width: 80        }
         ];
         self.backendTypeCache = {};
