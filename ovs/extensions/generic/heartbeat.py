@@ -15,7 +15,7 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 import time
-from ovs.dal.exceptions import ConcurrencyException
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
@@ -49,14 +49,10 @@ class HeartBeat(object):
         routers = StorageRouterList.get_storagerouters()
         for node in routers:
             if node.machine_id == machine_id:
-                for _ in xrange(2):
+                with volatile_mutex('storagerouter_heartbeat_{0}'.format(node.guid)):
                     node_save = StorageRouter(node.guid, datastore_wins=None)
                     node_save.heartbeats['process'] = current_time
-                    try:
-                        node_save.save()
-                        break
-                    except ConcurrencyException as ex:
-                        logger.warning('Failed to save {0}. {1}'.format(node.name, ex))
+                    node_save.save()
                 StorageRouterController.ping.s(node.guid, current_time).apply_async(routing_key='sr.{0}'.format(machine_id))
             else:
                 try:
