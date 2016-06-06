@@ -891,18 +891,18 @@ class DataObject(object):
                 if cached_data is None:
                     function_info = inspect.getargspec(function)
                     if 'dynamic' in function_info.args:
-                        cached_data = function(dynamic=dynamic)  # Load data from backend
+                        dynamic_data = function(dynamic=dynamic)  # Load data from backend
                     else:
-                        cached_data = function()
-                    if cached_data is not None:
-                        correct, allowed_types, given_type = Toolbox.check_type(cached_data, dynamic.return_type)
-                        if not correct:
-                            raise TypeError('Dynamic property {0} allows types {1}. {2} given'.format(
-                                caller_name, str(allowed_types), given_type
-                            ))
+                        dynamic_data = function()
+                    correct, allowed_types, given_type = Toolbox.check_type(dynamic_data, dynamic.return_type)
+                    if not correct:
+                        raise TypeError('Dynamic property {0} allows types {1}. {2} given'.format(
+                            caller_name, str(allowed_types), given_type
+                        ))
+                    cached_data = {'data': dynamic_data}
                     if dynamic.timeout > 0:
                         self._volatile.set(cache_key, cached_data, dynamic.timeout)
-            return cached_data
+            return cached_data['data']
         finally:
             mutex.release()
 
