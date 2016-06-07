@@ -600,7 +600,7 @@ class DataObject(object):
                         classname = relation.foreign_type.__name__.lower()
                     if original_guid is not None:
                         reverse_key = base_reverse_key.format(classname, original_guid, relation.foreign_key, self.guid)
-                        self._persistent.delete(reverse_key, transaction=transaction)
+                        self._persistent.delete(reverse_key, must_exist=False, transaction=transaction)
                     if new_guid is not None:
                         reverse_key = base_reverse_key.format(classname, new_guid, relation.foreign_key, self.guid)
                         self._persistent.assert_exists('{0}_{1}_{2}'.format(DataObject.NAMESPACE, classname, new_guid))
@@ -634,7 +634,9 @@ class DataObject(object):
                 self._persistent.apply_transaction(transaction)
                 self._volatile.delete(self._key)
                 successful = True
-            except KeyNotFoundException:
+            except KeyNotFoundException as ex:
+                if ex.message != self._key:
+                    raise
                 raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(
                     self.__class__.__name__, self._guid
                 ))
@@ -719,7 +721,7 @@ class DataObject(object):
                     else:
                         classname = relation.foreign_type.__name__.lower()
                     reverse_key = base_reverse_key.format(classname, original_guid, relation.foreign_key, self.guid)
-                    self._persistent.delete(reverse_key, transaction=transaction)
+                    self._persistent.delete(reverse_key, must_exist=False, transaction=transaction)
 
             # Second, invalidate property lists
             list_keys = []
