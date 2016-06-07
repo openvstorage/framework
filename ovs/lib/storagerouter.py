@@ -26,7 +26,6 @@ from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
 from StringIO import StringIO
 from ovs.celery_run import celery
-from ovs.dal.exceptions import ConcurrencyException
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
@@ -50,6 +49,7 @@ from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
@@ -86,15 +86,11 @@ class StorageRouterController(object):
     @staticmethod
     @celery.task(name='ovs.storagerouter.ping')
     def ping(storagerouter_guid, timestamp):
-        for _ in xrange(2):
-            storagerouter = StorageRouter(storagerouter_guid, datastore_wins=None)
+        with volatile_mutex('storagerouter_heartbeat_{0}'.format(storagerouter_guid)):
+            storagerouter = StorageRouter(storagerouter_guid)
             if timestamp > storagerouter.heartbeats.get('celery', 0):
                 storagerouter.heartbeats['celery'] = timestamp
-                try:
-                    storagerouter.save()
-                    return
-                except ConcurrencyException as ex:
-                    StorageRouterController._logger.warning('Failed to save {0}. {1}'.format(storagerouter.name, ex))
+                storagerouter.save()
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_metadata')
