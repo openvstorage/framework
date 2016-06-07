@@ -15,10 +15,11 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 import time
-from celery import Celery
+from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.lib.storagerouter import StorageRouterController
 from ovs.log.log_handler import LogHandler
 from subprocess import check_output, CalledProcessError
 
@@ -38,29 +39,21 @@ class HeartBeat(object):
     @staticmethod
     def pulse():
         """
-        Update the heartbeats for all Storage Routers
+        Update the heartbeats for the Current Routers
         :return: None
         """
         logger = LogHandler.get('extensions', name='heartbeat')
-
-        current_time = int(time.time())
         machine_id = System.get_my_machine_id()
-        amqp = '{0}://{1}:{2}@{3}//'.format(EtcdConfiguration.get('/ovs/framework/messagequeue|protocol'),
-                                            EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
-                                            EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
-                                            EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(machine_id)))
-
-        with Celery(broker=amqp) as celery:
-            worker_states = celery.control.inspect().ping()
+        current_time = int(time.time())
 
         routers = StorageRouterList.get_storagerouters()
         for node in routers:
-            if node.heartbeats is None:
-                node.heartbeats = {}
-            if worker_states.get('celery@{0}'.format(node.name), {}).get('ok') == 'pong':
-                node.heartbeats['celery'] = current_time
             if node.machine_id == machine_id:
-                node.heartbeats['process'] = current_time
+                with volatile_mutex('storagerouter_heartbeat_{0}'.format(node.guid)):
+                    node_save = StorageRouter(node.guid)
+                    node_save.heartbeats['process'] = current_time
+                    node_save.save()
+                StorageRouterController.ping.s(node.guid, current_time).apply_async(routing_key='sr.{0}'.format(machine_id))
             else:
                 try:
                     # check timeout of other nodes and clear arp cache
@@ -69,7 +62,6 @@ class HeartBeat(object):
                             check_output("/usr/sbin/arp -d {0}".format(node.name), shell=True)
                 except CalledProcessError:
                     logger.exception('Error clearing ARP cache')
-            node.save()
 
 if __name__ == '__main__':
     HeartBeat.pulse()

@@ -41,9 +41,6 @@ class KVM(object):
     def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, wait=True):
         """
         create vm from template
-        TODO:
-        storage_ip and mountpoint refer to target Storage Driver
-        but on kvm storagedriver.storage_ip is 127.0.0.1
         """
         _ = ip, wait  # For compatibility purposes only
         return self.sdk.create_vm_from_template(name, source_vm, disks, mountpoint)

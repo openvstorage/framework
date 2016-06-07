@@ -156,7 +156,7 @@ class StorageDriverClient(object):
         if key not in client_vpool_cache:
             cluster_contacts = []
             for storagedriver in vpool.storagedrivers[:3]:
-                cluster_contacts.append(ClusterContact(str(storagedriver.cluster_ip), storagedriver.ports[1]))
+                cluster_contacts.append(ClusterContact(str(storagedriver.cluster_ip), storagedriver.ports['xmlrpc']))
             client = SRClient(str(vpool.guid), cluster_contacts)
             client_vpool_cache[key] = client
         return client_vpool_cache[key]
@@ -208,12 +208,12 @@ class StorageDriverConfiguration(object):
     # DO NOT MAKE MANUAL CHANGES HERE
 
     parameters = {
-        # hg branch: (detached
-        # hg revision: 6a5e6163e1b7d79042f4185993c8befb9ee8b323
-        # buildTime: Fri Feb 26 16:24:28 UTC 2016
+        # hg branch: dev
+        # hg revision: d6c3c04c6e6a938bec87f84c8566a7b5e825e723
+        # buildTime: Thu Jun  2 07:51:33 UTC 2016
         'metadataserver': {
             'backend_connection_manager': {
-                'optional': ['backend_connection_pool_capacity', 'backend_interface_retries_on_error', 'backend_interface_retry_interval_secs', 'backend_interface_retry_backoff_multiplier', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
+                'optional': ['backend_connection_pool_capacity', 'backend_interface_retries_on_error', 'backend_interface_retry_interval_secs', 'backend_interface_retry_backoff_multiplier', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', 'alba_connection_transport', ],
                 'mandatory': ['local_connection_path', ]
             },
             'metadata_server': {
@@ -223,7 +223,7 @@ class StorageDriverConfiguration(object):
         },
         'storagedriver': {
             'backend_connection_manager': {
-                'optional': ['backend_connection_pool_capacity', 'backend_interface_retries_on_error', 'backend_interface_retry_interval_secs', 'backend_interface_retry_backoff_multiplier', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
+                'optional': ['backend_connection_pool_capacity', 'backend_interface_retries_on_error', 'backend_interface_retry_interval_secs', 'backend_interface_retry_backoff_multiplier', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', 'alba_connection_transport', ],
                 'mandatory': ['local_connection_path', ]
             },
             'backend_garbage_collector': {
@@ -251,11 +251,15 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['fd_cache_path', 'fd_namespace', ]
             },
             'filesystem': {
-                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_metadata_backend_mds_timeout_secs', 'fs_cache_dentries', 'fs_dtl_config_mode', 'fs_dtl_host', 'fs_dtl_port', 'fs_dtl_mode', 'fs_enable_shm_interface', ],
+                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_metadata_backend_mds_timeout_secs', 'fs_cache_dentries', 'fs_dtl_config_mode', 'fs_dtl_host', 'fs_dtl_port', 'fs_dtl_mode', 'fs_enable_shm_interface', 'fs_enable_network_interface', ],
                 'mandatory': ['fs_virtual_disk_format', ]
             },
             'metadata_server': {
                 'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_nodes', ],
+                'mandatory': []
+            },
+            'network_interface': {
+                'optional': ['network_uri', 'network_snd_rcv_queue_depth', ],
                 'mandatory': []
             },
             'scocache': {
@@ -266,8 +270,8 @@ class StorageDriverConfiguration(object):
                 'optional': ['scrub_manager_interval', 'scrub_manager_sync_wait_secs', ],
                 'mandatory': []
             },
-            'shm_server': {
-                'optional': [],
+            'shm_interface': {
+                'optional': ['shm_region_size', ],
                 'mandatory': []
             },
             'stats_collector': {
