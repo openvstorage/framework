@@ -85,14 +85,6 @@ INCLUDED AND/OR USED SOFTWARE
 
     jQuery pynotify             MPL 1.1
 
-    jQuery Tag-it               MIT
-        Copyright (c) 2011 Levy Carneiro Jr.
-        http://aehlke.github.io/tag-it/
-
-    jQuery UI                   MIT
-        Copyright 2016 jQuery Foundation and other contributors.
-        http://jqueryui.com
-
     Knockout                    MIT
         Copyright (c) Steven Sanderson, the Knockout.js team, and other contributors.
         http://knockoutjs.com/

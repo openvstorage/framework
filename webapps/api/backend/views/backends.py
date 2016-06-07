@@ -84,12 +84,10 @@ class BackendViewSet(viewsets.ViewSet):
     def set_domains(self, backend, domain_guids):
         """
         Configures the given domains to the StorageRouter.
-        :param storagerouter: The StorageRouter to update
-        :type storagerouter: StorageRouter
+        :param backend: The Backend to update
+        :type backend: Backend
         :param domain_guids: A list of Domain guids
         :type domain_guids: list
-        :param recovery_domain_guids: A list of Domain guids to set as recovery Domain
-        :type recovery_domain_guids: list
         """
         for junction in backend.domains:
             if junction.domain_guid not in domain_guids:
