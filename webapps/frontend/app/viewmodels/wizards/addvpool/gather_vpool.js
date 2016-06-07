@@ -15,22 +15,14 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'require', 'jquery', 'knockout',
+    'jquery', 'knockout',
     'ovs/shared', 'ovs/api', 'ovs/generic',
     '../../containers/storagerouter', '../../containers/storagedriver', '../../containers/vpool', './data'
-], function(require, $, ko, shared, api, generic, StorageRouter, StorageDriver, VPool, data) {
+], function($, ko, shared, api, generic, StorageRouter, StorageDriver, VPool, data) {
     "use strict";
     return function() {
         var self = this;
-        try {
-            require(['../../containers/albabackend'], function(AlbaBackend){
-                self.AlbaBackend = AlbaBackend;
-            })
-        }
-        catch(err) {
-            console.log('Alba not installed');
-            self.AlbaBackend = undefined;
-        }
+
         // Variables
         self.data   = data;
         self.shared = shared;
@@ -254,7 +246,7 @@ define([
                                     generic.crossFiller(
                                         guids, self.data.albaBackends,
                                         function(guid) {
-                                            return new self.AlbaBackend(guid);
+                                            return new self.data.AlbaBackend(guid);
                                         }, 'guid'
                                     );
                                     $.each(self.data.albaBackends(), function(index, albaBackend) {
@@ -378,7 +370,7 @@ define([
                 self.data.cacheStrategy(currentConfig.cache_strategy);
                 self.data.dtlTransportMode({name: currentConfig.dtl_transport});
                 var metadata = self.data.vPool().metadata();
-                if (self.data.vPool().backendType().code() === 'alba' && self.AlbaBackend !== undefined) {
+                if (self.data.vPool().backendType().code() === 'alba') {
                     if (metadata.hasOwnProperty('backend') && metadata.backend.hasOwnProperty('connection')) {
                         // Created in or after 2.7.0
                         self.data.v260Migration(false);
