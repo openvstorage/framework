@@ -230,13 +230,13 @@ class Toolbox(object):
         """
         given_type = type(value)
         if required_type is str:
-            correct = isinstance(value, basestring)
+            correct = isinstance(value, basestring) or value is None
             allowed_types = ['str', 'unicode', 'basestring']
         elif required_type is float:
-            correct = isinstance(value, float) or isinstance(value, int)
+            correct = isinstance(value, float) or isinstance(value, int) or value is None
             allowed_types = ['float', 'int']
         elif required_type is int or required_type is long:
-            correct = isinstance(value, int) or isinstance(value, long)
+            correct = isinstance(value, int) or isinstance(value, long) or value is None
             allowed_types = ['int', 'long']
         elif isinstance(required_type, list):
             # We're in an enum scenario. Field_type isn't a real type, but a list containing
@@ -248,7 +248,7 @@ class Toolbox(object):
             allowed_types = required_type
             given_type = value
         else:
-            correct = isinstance(value, required_type)
+            correct = isinstance(value, required_type) or value is None
             allowed_types = [required_type.__name__]
 
         return correct, allowed_types, given_type

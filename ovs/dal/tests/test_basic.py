@@ -1335,7 +1335,7 @@ class Basic(unittest.TestCase):
 
     def test_object_comparison_on_different_level(self):
         """
-        Verify 2 objects are the same, but when approached from a different level
+        Validates whether 2 objects are the same, but when approached from a different level
         """
         _ = self
         sr = TestStorageRouter()
@@ -1349,25 +1349,17 @@ class Basic(unittest.TestCase):
         sd.vpool = vpool
         sd.storagerouter = sr
         sd.save()
-
-        # http://jira.openvstorage.com/browse/OVS-4413
-        # In [6]: vpool.storagedrivers[0].storagerouter == srs[0]
-        # Out[6]: True
-        #
-        # In [7]: vpool.storagedrivers[0].storagerouter != srs[0]
-        # Out[7]: True
-
         error_message = 'DAL object comparison failure'
-        assert (sr == sr) is True, error_message
-        assert (sr != sr) is False, error_message
-        assert (sd.storagerouter == sr) is True, error_message
-        assert (sd.storagerouter != sr) is False, error_message
-        assert (vpool.storagedrivers[0].storagerouter == sr) is True, error_message
-        assert (vpool.storagedrivers[0].storagerouter != sr) is False, error_message
+        self.assertTrue(sr == sr, error_message)
+        self.assertFalse(sr != sr, error_message)
+        self.assertTrue(sd.storagerouter == sr, error_message)
+        self.assertFalse(sd.storagerouter != sr, error_message)
+        self.assertTrue(vpool.storagedrivers[0].storagerouter == sr, error_message)
+        self.assertFalse(vpool.storagedrivers[0].storagerouter != sr, error_message)
 
     def test_racecondition_datalist_multiget(self):
         """
-        Verify the list can handle objects being deleted by another process
+        Validates whether the list can handle objects being deleted by another process
         """
         disk1 = TestDisk()
         disk1.name = 'disk1'
@@ -1375,13 +1367,36 @@ class Basic(unittest.TestCase):
         disk2 = TestDisk()
         disk2.name = 'disk2'
         disk2.save()
-
         datalist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                        'items': []})
         self.assertEqual(len(datalist), 2, 'Datalist should have two testdisks')
-
         PersistentFactory.store.delete('ovs_data_testdisk_{0}'.format(disk1.guid))
-
         datalist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                        'items': []})
         self.assertEqual(len(datalist), 1, 'Datalist should have one testdisk')
+
+    def test_racecondition_for_reverseindex(self):
+        """
+        Validates whether concurrent delete/saves of different objects can cause race conditions related to reverse index
+        """
+        _ = self
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk = TestDisk()
+        disk.machine = machine
+        disk.name = 'disk'
+        disk.save()
+        PersistentFactory.store.delete('ovs_reverseindex_testemachine_{0}|disks|{1}'.format(machine.guid, disk.guid))
+        disk.delete()
+        disk = TestDisk()
+        disk.machine = machine
+        disk.name = 'disk1'
+        disk.save()
+        machine2 = TestMachine()
+        machine2.name = 'machine2'
+        machine2.save()
+        PersistentFactory.store.delete('ovs_reverseindex_testemachine_{0}|disks|{1}'.format(machine.guid, disk.guid))
+        disk.machine = machine2
+        disk.save()
+

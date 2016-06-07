@@ -145,6 +145,7 @@
         "domains": "Domains",
         "dtl_port": "DTL Port",
         "dtl_status": "DTL",
+        "edge": "Edge",
         "elementsloading": "Items loading...",
         "error": "Error",
         "errorsfound": "Errors were found. Please check the contents of all fields.",

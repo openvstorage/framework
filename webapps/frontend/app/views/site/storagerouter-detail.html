@@ -190,6 +190,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                             <th style="width: 125px;"><span data-i18n="ovs:generic.mgmtport"></span></th>
                                             <th style="width: 125px;"><span data-i18n="ovs:generic.xmlrpcport"></span></th>
                                             <th style="width: 125px;"><span data-i18n="ovs:generic.dtl_port"></span></th>
+                                            <th style="width: 125px;"><span data-i18n="ovs:generic.edge"></span></th>
                                             <th style="width: 125px;"><span data-i18n="ovs:generic.storageip"></span></th>
                                         </tr>
                                     </thead>
@@ -206,9 +207,10 @@ but WITHOUT ANY WARRANTY of any kind.
                                                 <td><span data-bind="text: name()"></span></td>
                                                 <!-- ko foreach: $parents[0].storageDrivers() -->
                                                     <!-- ko if: $parent.storageDriverGuids().contains(guid()) -->
-                                                        <td><span data-bind="text: ports()[0]"></span></td>
-                                                        <td><span data-bind="text: ports()[1]"></span></td>
-                                                        <td><span data-bind="text: ports()[2]"></span></td>
+                                                        <td><span data-bind="text: ports().management"></span></td>
+                                                        <td><span data-bind="text: ports().xmlrpc"></span></td>
+                                                        <td><span data-bind="text: ports().dtl"></span></td>
+                                                        <td><span data-bind="text: ports().edge"></span></td>
                                                         <td><span data-bind="text: storageIP()"></span></td>
                                                     <!--/ko-->
                                                 <!--/ko-->
