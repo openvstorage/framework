@@ -111,7 +111,7 @@ class DummyPersistentStore(object):
         Deletes a given key from the store
         """
         if transaction is not None:
-            return self._sequences[transaction].append([self.delete, {'key': key}])
+            return self._sequences[transaction].append([self.delete, {'key': key, 'must_exist': must_exist}])
         data = self._read()
         if key in data:
             del data[key]
