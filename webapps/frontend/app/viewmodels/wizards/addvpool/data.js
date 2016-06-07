@@ -14,9 +14,7 @@
 // Open vStorage is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
-define([
-    'knockout', 'ovs/generic'
-],  function(ko, generic){
+define(['knockout'], function(ko){
     "use strict";
     var nameRegex, hostRegex, ipRegex, singleton;
     nameRegex = /^[0-9a-z][\-a-z0-9]{1,20}[a-z0-9]$/;
@@ -159,10 +157,10 @@ define([
                 wizardData.albaPreset(undefined);
                 return []
             }
-            if (!wizardData.albaBackend().enhancedPresets().contains(wizardData.albaPreset())){
-                wizardData.albaPreset(wizardData.albaBackend().enhancedPresets()[0]);
+            if (wizardData.albaBackend().presets.indexOf(wizardData.albaPreset()) === -1){
+                wizardData.albaPreset(wizardData.albaBackend().presets[0]);
             }
-            return wizardData.albaBackend().enhancedPresets();
+            return wizardData.albaBackend().presets;
         });
         wizardData.enhancedAAPresets = ko.computed(function(){
             if (wizardData.albaAABackend() === undefined){
@@ -174,83 +172,6 @@ define([
             }
             return wizardData.albaAABackend().enhancedPresets();
         });
-
-        wizardData.AlbaBackend = function(guid) {
-            var self = this;
-
-            self.guid = ko.observable(guid);
-            self.name = ko.observable();
-            self.loaded = ko.observable(false);
-            self.loading = ko.observable(false);
-            self.presets = ko.observableArray([]);
-            self.metadataInformation = ko.observable();
-
-            self.fillData = function(data) {
-                self.name(data.name);
-                generic.trySet(self.presets, data, 'presets');
-                if (data.hasOwnProperty('metadata_information')) {
-                    self.metadataInformation(data.metadata_information);
-                };
-                self.loaded(true);
-                self.loading(false);
-            };
-
-            self.enhancedPresets = ko.computed(function() {
-                var presets = [], policies, newPolicy, isAvailable, isActive, inUse,
-                    policyMapping = ['grey', 'black', 'green'], worstPolicy, replication, policyObject;
-                $.each(self.presets(), function(index, preset) {
-                    worstPolicy = 0;
-                    policies = [];
-                    replication = undefined;
-                    $.each(preset.policies, function(jndex, policy) {
-                        policyObject = JSON.parse(policy.replace('(', '[').replace(')', ']'));
-                        isAvailable = preset.policy_metadata[policy].is_available;
-                        isActive = preset.policy_metadata[policy].is_active;
-                        inUse = preset.policy_metadata[policy].in_use;
-                        newPolicy = {
-                            text: policy,
-                            color: 'grey',
-                            isActive: false,
-                            k: policyObject[0],
-                            m: policyObject[1],
-                            c: policyObject[2],
-                            x: policyObject[3]
-                        };
-                        if (isAvailable) {
-                            newPolicy.color = 'black';
-                        }
-                        if (isActive) {
-                            newPolicy.isActive = true;
-                        }
-                        if (inUse) {
-                            newPolicy.color = 'green';
-                        }
-                        worstPolicy = Math.max(policyMapping.indexOf(newPolicy.color), worstPolicy);
-                        policies.push(newPolicy);
-                    });
-                    if (preset.policies.length === 1) {
-                        policyObject = JSON.parse(preset.policies[0].replace('(', '[').replace(')', ']'));
-                        if (policyObject[0] === 1 && policyObject[0] + policyObject[1] === policyObject[3] && policyObject[2] === 1) {
-                            replication = policyObject[0] + policyObject[1];
-                        }
-                    }
-                    presets.push({
-                        policies: policies,
-                        name: preset.name,
-                        compression: preset.compression,
-                        fragSize: preset.fragment_size,
-                        encryption: preset.fragment_encryption,
-                        color: policyMapping[worstPolicy],
-                        inUse: preset.in_use,
-                        isDefault: preset.is_default,
-                        replication: replication
-                    });
-                });
-                return presets.sort(function(preset1, preset2) {
-                    return preset1.name < preset2.name ? -1 : 1;
-                });
-            });
-        }
         return wizardData;
     };
     return singleton();

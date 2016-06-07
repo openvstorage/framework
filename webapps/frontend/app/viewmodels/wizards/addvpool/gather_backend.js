@@ -146,25 +146,9 @@ define([
                         $.when.apply($, calls)
                             .then(function() {
                                 if (available_backends.length > 0) {
-                                    var guids = [], abData = {};
-                                    $.each(available_backends, function(index, item) {
-                                        guids.push(item.guid);
-                                        abData[item.guid] = item;
-                                    });
-                                    generic.crossFiller(
-                                        guids, self.data.albaAABackends,
-                                        function(guid) {
-                                            return new self.data.AlbaBackend(guid);
-                                        }, 'guid'
-                                    );
-                                    $.each(self.data.albaAABackends(), function(index, albaBackend) {
-                                        albaBackend.fillData(abData[albaBackend.guid()]);
-                                    });
-                                    self.data.albaAABackends.sort(function(backend1, backend2) {
-                                        return backend1.name() < backend2.name() ? -1 : 1;
-                                    });
-                                    self.data.albaAABackend(self.data.albaAABackends()[0]);
-                                    self.data.albaAAPreset(self.data.albaAABackends()[0].enhancedPresets()[0]);
+                                    self.data.albaAABackends(available_backends);
+                                    self.data.albaAABackend(available_backends[0]);
+                                    self.data.albaAAPreset(available_backends[0].presets()[0]);
                                 } else {
                                     self.data.albaAABackends([]);
                                     self.data.albaAABackend(undefined);
