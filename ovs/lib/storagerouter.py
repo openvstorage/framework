@@ -87,7 +87,7 @@ class StorageRouterController(object):
     @celery.task(name='ovs.storagerouter.ping')
     def ping(storagerouter_guid, timestamp):
         with volatile_mutex('storagerouter_heartbeat_{0}'.format(storagerouter_guid)):
-            storagerouter = StorageRouter(storagerouter_guid, datastore_wins=None)
+            storagerouter = StorageRouter(storagerouter_guid)
             if timestamp > storagerouter.heartbeats.get('celery', 0):
                 storagerouter.heartbeats['celery'] = timestamp
                 storagerouter.save()

@@ -50,7 +50,7 @@ class HeartBeat(object):
         for node in routers:
             if node.machine_id == machine_id:
                 with volatile_mutex('storagerouter_heartbeat_{0}'.format(node.guid)):
-                    node_save = StorageRouter(node.guid, datastore_wins=None)
+                    node_save = StorageRouter(node.guid)
                     node_save.heartbeats['process'] = current_time
                     node_save.save()
                 StorageRouterController.ping.s(node.guid, current_time).apply_async(routing_key='sr.{0}'.format(machine_id))
