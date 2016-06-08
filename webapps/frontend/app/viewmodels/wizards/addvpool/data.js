@@ -157,7 +157,7 @@ define(['knockout'], function(ko){
                 wizardData.albaPreset(undefined);
                 return []
             }
-            if (wizardData.albaBackend().presets.indexOf(wizardData.albaPreset()) === -1){
+            if (!wizardData.albaBackend().presets.contains(wizardData.albaPreset())){
                 wizardData.albaPreset(wizardData.albaBackend().presets[0]);
             }
             return wizardData.albaBackend().presets;
@@ -167,7 +167,7 @@ define(['knockout'], function(ko){
                 wizardData.albaAAPreset(undefined);
                 return []
             }
-            if (wizardData.albaAABackend().presets.indexOf(wizardData.albaAAPreset()) === -1){
+            if (!wizardData.albaAABackend().presets.contains(wizardData.albaAAPreset())){
                 wizardData.albaAAPreset(wizardData.albaAABackend().presets[0]);
             }
             return wizardData.albaAABackend().presets;
