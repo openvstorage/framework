@@ -976,7 +976,9 @@ class Sdk(object):
         task = self._client.service.SearchDatastore_Task(datastore.browser, '[{0}]'.format(datastore.name), hdbss)
         result = self.get_task_info(task)
         if result.info.state == 'success':
-            return [file.path for file in result.info.result.file]
+            if hasattr(result.info.result, 'file'):
+                return [f.path for f in result.info.result.file]
+            return []
         self._logger.warning(result.info.error.localizedMessage)
         return []
 

@@ -157,20 +157,20 @@ define(['knockout'], function(ko){
                 wizardData.albaPreset(undefined);
                 return []
             }
-            if (!wizardData.albaBackend().enhancedPresets().contains(wizardData.albaPreset())){
-                wizardData.albaPreset(wizardData.albaBackend().enhancedPresets()[0]);
+            if (!wizardData.albaBackend().presets.contains(wizardData.albaPreset())){
+                wizardData.albaPreset(wizardData.albaBackend().presets[0]);
             }
-            return wizardData.albaBackend().enhancedPresets();
+            return wizardData.albaBackend().presets;
         });
         wizardData.enhancedAAPresets = ko.computed(function(){
             if (wizardData.albaAABackend() === undefined){
                 wizardData.albaAAPreset(undefined);
                 return []
             }
-            if (!wizardData.albaAABackend().enhancedPresets().contains(wizardData.albaAAPreset())){
-                wizardData.albaAAPreset(wizardData.albaAABackend().enhancedPresets()[0]);
+            if (!wizardData.albaAABackend().presets.contains(wizardData.albaAAPreset())){
+                wizardData.albaAAPreset(wizardData.albaAABackend().presets[0]);
             }
-            return wizardData.albaAABackend().enhancedPresets();
+            return wizardData.albaAABackend().presets;
         });
         return wizardData;
     };

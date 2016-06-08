@@ -17,8 +17,8 @@
 define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/api', 'ovs/generic',
-    '../../containers/albabackend', '../../containers/storagerouter', '../../containers/storagedriver', '../../containers/vpool', './data'
-], function($, ko, shared, api, generic, AlbaBackend, StorageRouter, StorageDriver, VPool, data) {
+    '../../containers/storagerouter', '../../containers/storagedriver', '../../containers/vpool', './data'
+], function($, ko, shared, api, generic, StorageRouter, StorageDriver, VPool, data) {
     "use strict";
     return function() {
         var self = this;
@@ -95,7 +95,7 @@ define([
         self.isPresetAvailable = ko.computed(function() {
             var presetAvailable = true;
             if (self.data.albaBackend() !== undefined && self.data.albaPreset() !== undefined) {
-                var guid = self.data.albaBackend().guid(),
+                var guid = self.data.albaBackend().guid,
                     name = self.data.albaPreset().name;
                 if (self.albaPresetMap().hasOwnProperty(guid) && self.albaPresetMap()[guid].hasOwnProperty(name)) {
                     presetAvailable = self.albaPresetMap()[guid][name];
@@ -238,25 +238,9 @@ define([
                         $.when.apply($, calls)
                             .then(function() {
                                 if (available_backends.length > 0) {
-                                    var guids = [], abData = {};
-                                    $.each(available_backends, function(index, item) {
-                                        guids.push(item.guid);
-                                        abData[item.guid] = item;
-                                    });
-                                    generic.crossFiller(
-                                        guids, self.data.albaBackends,
-                                        function(guid) {
-                                            return new AlbaBackend(guid);
-                                        }, 'guid'
-                                    );
-                                    $.each(self.data.albaBackends(), function(index, albaBackend) {
-                                        albaBackend.fillData(abData[albaBackend.guid()]);
-                                    });
-                                    self.data.albaBackends.sort(function(backend1, backend2) {
-                                        return backend1.name() < backend2.name() ? -1 : 1;
-                                    });
-                                    self.data.albaBackend(self.data.albaBackends()[0]);
-                                    self.data.albaPreset(self.data.albaBackends()[0].enhancedPresets()[0]);
+                                    self.data.albaBackends(available_backends);
+                                    self.data.albaBackend(available_backends[0]);
+                                    self.data.albaPreset(available_backends[0].presets[0]);
                                 } else {
                                     self.data.albaBackends([]);
                                     self.data.albaBackend(undefined);
