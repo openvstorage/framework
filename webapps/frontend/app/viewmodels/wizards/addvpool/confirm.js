@@ -78,7 +78,7 @@ define([
                         username: self.data.aaAccesskey(),
                         password: self.data.aaSecretkey(),
                         backend: {
-                            'backend': (self.data.backend() === 'alba' && self.data.albaAABackend() !== undefined ? self.data.albaAABackend().guid() : undefined),
+                            'backend': (self.data.backend() === 'alba' && self.data.albaAABackend() !== undefined ? self.data.albaAABackend().guid : undefined),
                             'metadata': (self.data.backend() === 'alba' && self.data.albaAAPreset() !== undefined ? self.data.albaAAPreset().name : undefined)
                         }
                     }

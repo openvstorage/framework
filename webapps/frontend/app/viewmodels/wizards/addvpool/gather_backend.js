@@ -50,7 +50,7 @@ define([
         self.isPresetAvailable = ko.computed(function() {
             var presetAvailable = true;
             if (self.data.albaAABackend() !== undefined && self.data.albaAAPreset() !== undefined) {
-                var guid = self.data.albaAABackend().guid(),
+                var guid = self.data.albaAABackend().guid,
                     name = self.data.albaAAPreset().name;
                 if (self.albaPresetMap().hasOwnProperty(guid) && self.albaPresetMap()[guid].hasOwnProperty(name)) {
                     presetAvailable = self.albaPresetMap()[guid][name];
@@ -125,7 +125,7 @@ define([
                                 calls.push(
                                     api.get(relay + 'alba/backends/' + item.linked_guid + '/', { queryparams: getData })
                                         .then(function(data) {
-                                            if (data.available === true && data.guid !== self.data.albaBackend().guid()) {
+                                            if (data.available === true && data.guid !== self.data.albaBackend().guid) {
                                                 var asdsFound = false;
                                                 $.each(data.asd_statistics, function(key, value) {  // As soon as we enter loop, we know at least 1 ASD is linked to this backend
                                                     asdsFound = true;
@@ -148,7 +148,7 @@ define([
                                 if (available_backends.length > 0) {
                                     self.data.albaAABackends(available_backends);
                                     self.data.albaAABackend(available_backends[0]);
-                                    self.data.albaAAPreset(available_backends[0].presets()[0]);
+                                    self.data.albaAAPreset(available_backends[0].presets[0]);
                                 } else {
                                     self.data.albaAABackends([]);
                                     self.data.albaAABackend(undefined);
