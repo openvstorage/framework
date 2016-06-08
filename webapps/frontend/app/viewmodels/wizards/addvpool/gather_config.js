@@ -84,7 +84,7 @@ define([
                             dbPartitionGuids = [],
                             readPartitionGuids = [],
                             writePartitionGuids = [],
-                            nsmPartitionGuids = self.data.albaBackend() !== undefined ? self.data.albaBackend().metadataInformation().nsm_partition_guids : [];
+                            nsmPartitionGuids = self.data.albaBackend() !== undefined ? self.data.albaBackend().metadata_information.nsm_partition_guids : [];
                         $.each(self.data.partitions(), function(role, partitions) {
                             if (requiredRoles.contains(role) && partitions.length > 0) {
                                 generic.removeElement(requiredRoles, role);
