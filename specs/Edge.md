@@ -18,9 +18,9 @@ The [Edge](https://github.com/openvstorage/home/wiki/Edge) is a lightweight soft
     - Change IP to Management IP
     - Add new tab (icon)[http://fontawesome.io/icon/link/]
         - Title: Edge Client Connections
-        - Content: table with vdiskname , vpool , ip , type, protocol
+        - Content: table with vdiskname , vpool , ip , type, protocol, Read - Read/Write
     - vDisk detail page
         - Add under Details: Edge Clients: #
         - Add new tab (icon)[http://fontawesome.io/icon/link/]
             - Title: Edge Client Connections
-            - Content:  ip , type, protocol
+            - Content:  ip , type, protocol, Read - Read/Write
