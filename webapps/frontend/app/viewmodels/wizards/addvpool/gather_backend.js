@@ -131,7 +131,7 @@ define([
                                                     asdsFound = true;
                                                     return false;
                                                 });
-                                                if (asdsFound === true) {
+                                                if (asdsFound === true || data.scaling === 'GLOBAL') {
                                                     available_backends.push(data);
                                                     self.albaPresetMap()[data.guid] = {};
                                                     $.each(data.presets, function (_, preset) {
@@ -146,6 +146,9 @@ define([
                         $.when.apply($, calls)
                             .then(function() {
                                 if (available_backends.length > 0) {
+                                    available_backends.sort(function(backend1, backend2) {
+                                        return backend1.name.toLowerCase() < backend2.name.toLowerCase() ? -1 : 1;
+                                    });
                                     self.data.albaAABackends(available_backends);
                                     self.data.albaAABackend(available_backends[0]);
                                     self.data.albaAAPreset(available_backends[0].presets[0]);
@@ -179,7 +182,7 @@ define([
 
         // Durandal
         self.activate = function() {
-            if (self.data.albaBackend() !== undefined && self.data.albaAABackend() !== undefined && self.data.albaBackend().guid() === self.data.albaAABackend().guid()) {
+            if (self.data.albaBackend() !== undefined && self.data.albaAABackend() !== undefined && self.data.albaBackend().guid === self.data.albaAABackend().guid) {
                 self.data.albaAABackends([]);
                 $.each(self.data.albaBackends(), function (_, backend) {
                     if (backend !== self.data.albaBackend() && !self.data.albaAABackends().contains(backend)) {
@@ -191,7 +194,7 @@ define([
                     self.data.albaAAPreset(undefined);
                 } else {
                     self.data.albaAABackend(self.data.albaAABackends()[0]);
-                    self.data.albaAAPreset(self.data.albaAABackends()[0].enhancedPresets()[0]);
+                    self.data.albaAAPreset(self.data.enhancedAAPresets()[0].presets === undefined ? undefined : self.data.enhancedAAPresets()[0].presets[0]);
                 }
             }
         };
