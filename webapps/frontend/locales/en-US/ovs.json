@@ -295,7 +295,7 @@
             "refreshtt": "Refresh the hardware capabilities of this StorageRouter",
             "offline": {
                 "mark": "Mark this node Offline",
-                "warning": "Marking a node offline while it's still online will cause dataloss. Are you sure this node is offline?",
+                "warning": "Please make sure the Storage Router is actually down and unavailable before marking the Storage Router as offline. Marking the Storage Router as offline while it is still available might lead to data corruption.",
                 "title": "Warning",
                 "yes": "Yes, it's offline",
                 "no": "No, back to safety",

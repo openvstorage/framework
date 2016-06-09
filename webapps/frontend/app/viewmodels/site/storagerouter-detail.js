@@ -35,13 +35,14 @@ define([
         self.loadDomainsHandle        = undefined;
 
         // Observables
+        self.checkedVPoolGuids = ko.observableArray([]);
         self.domains           = ko.observableArray([]);
         self.domainsLoaded     = ko.observable(false);
+        self.markingOffline    = ko.observable(false);
         self.refreshing        = ko.observable(false);
         self.storageRouter     = ko.observable();
         self.vPools            = ko.observableArray([]);
         self.vPoolsLoaded      = ko.observable(false);
-        self.checkedVPoolGuids = ko.observableArray([]);
 
         // Computed
         self.domainGuids = ko.computed(function() {
@@ -209,7 +210,7 @@ define([
             api.post('storagerouters/' + self.storageRouter().guid() + '/refresh_hardware')
                 .then(shared.tasks.wait)
                 .done(function() {
-                    generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:storagerouters.detail.refresh.success'));
+                    generic.alertSuccess($.t('ovs:generic.finished'), $.t('ovs:storagerouters.detail.refresh.success'));
                 })
                 .fail(function() {
                     generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:storagerouters.detail.refresh.refreshing') }));
@@ -220,6 +221,7 @@ define([
             generic.alertInfo($.t('ovs:storagerouters.detail.refresh.started'), $.t('ovs:storagerouters.detail.refresh.inprogress'));
         };
         self.markoffline = function() {
+            self.markingOffline(true);
             app.showMessage(
                     $.t('ovs:storagerouters.detail.offline.warning'),
                     $.t('ovs:storagerouters.detail.offline.title'),
@@ -244,11 +246,16 @@ define([
                                         error: $('<div/>').text(error.responseText).html()
                                     })
                                 )
+                            })
+                            .always(function() {
+                                self.markingOffline(false);
                             });
                         generic.alertInfo(
                             $.t('ovs:storagerouters.detail.offline.pending'),
                             $.t('ovs:storagerouters.detail.offline.pendingmsg')
                         );
+                    } else {
+                        self.markingOffline(false);
                     }
                 });
         };

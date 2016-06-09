@@ -304,7 +304,8 @@ class ScheduledTaskController(object):
                         ScheduledTaskController._logger.info('Rescheduled scrub work from node {0} to node {1}.'.format(failed_node, storage_router.ip))
                         result_set[storage_router.ip] = ScheduledTaskController._execute_scrub_work.s(scrub_location=scrub_location,
                                                                                                       vdisk_guids=vdisk_guids_to_scrub).apply_async(
-                                                                                                      routing_key='sr.{0}'.format(storage_router.machine_id))
+                            routing_key='sr.{0}'.format(storage_router.machine_id)
+                        )
                         storage_router_list.append(storage_router)
                         rescheduled_work = True
                         break

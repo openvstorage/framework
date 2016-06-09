@@ -86,6 +86,14 @@ class StorageRouterController(object):
     @staticmethod
     @celery.task(name='ovs.storagerouter.ping')
     def ping(storagerouter_guid, timestamp):
+        """
+        Update a Storage Router's celery heartbeat
+        :param storagerouter_guid: Guid of the Storage Router to update
+        :type storagerouter_guid: str
+
+        :param timestamp: Timestamp to compare to
+        :type timestamp: float
+        """
         with volatile_mutex('storagerouter_heartbeat_{0}'.format(storagerouter_guid)):
             storagerouter = StorageRouter(storagerouter_guid)
             if timestamp > storagerouter.heartbeats.get('celery', 0):
@@ -518,7 +526,7 @@ class StorageRouterController(object):
         if not ipaddresses:
             error_messages.append('No available IP addresses found suitable for Storage Router storage IP')
 
-        # Check storage IP (for VMWARE)
+        # Check storage IP
         storage_ip = parameters['storage_ip']
         if vpool is not None:
             for existing_storagedriver in vpool.storagedrivers:
@@ -810,7 +818,7 @@ class StorageRouterController(object):
                 fragment_cache_info = ['alba', {'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm_aa')),
                                                 'bucket_strategy': ['1-to-1', {'prefix': vpool.metadata[storagerouter.guid]['name'],
                                                                                'preset': vpool.metadata[storagerouter.guid]['preset']}],
-                                                'manifest_cache_size': 16*1024*1024*1024,
+                                                'manifest_cache_size': 16 * 1024 * 1024 * 1024,
                                                 'cache_on_read': fragment_cache_on_read,
                                                 'cache_on_write': fragment_cache_on_write}]
             else:
@@ -823,7 +831,7 @@ class StorageRouterController(object):
                 'log_level': 'info',
                 'port': alba_proxy.service.ports[0],
                 'ips': ['127.0.0.1'],
-                'manifest_cache_size': 16*1024*1024*1024,
+                'manifest_cache_size': 16 * 1024 * 1024 * 1024,
                 'fragment_cache': fragment_cache_info,
                 'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm'))
             }), raw=True)
