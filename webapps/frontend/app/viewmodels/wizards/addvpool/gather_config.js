@@ -126,7 +126,7 @@ define([
                         if (readOverlap || writeOverlap) {
                             var write, max = 0, scoSize = self.data.scoSize() * 1024 * 1024,
                                 fragSize = self.data.albaPreset().fragSize,
-                                totalSize = self.data.albaBackend().totalSize();
+                                totalSize = self.data.albaBackend().ns_statistics.global.size;
                             $.each(self.data.albaPreset().policies, function(index, policy) {
                                 // For more information about below formula: see http://jira.cloudfounders.com/browse/OVS-3553
                                 var sizeToReserve = totalSize / scoSize * (1200 + (policy.k + policy.m) * (25 * scoSize / policy.k / fragSize + 56));
