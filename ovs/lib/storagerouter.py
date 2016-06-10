@@ -89,7 +89,9 @@ class StorageRouterController(object):
         """
         Ping storagerouter
         :param storagerouter_guid: Storage Router guid to ping
+        :type storagerouter_guid: str
         :param timestamp: timestamp
+        :type timestamp: int
         """
         with volatile_mutex('storagerouter_heartbeat_{0}'.format(storagerouter_guid)):
             storagerouter = StorageRouter(storagerouter_guid)
