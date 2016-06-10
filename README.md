@@ -17,6 +17,9 @@ Check our gitbook on [how to get started with an installation](https://openvstor
 ## Releases
 You can find an overview of the release history on our [Releases page](https://github.com/openvstorage/framework/wiki/releases).
 
+## Documentation
+The Framework specific documentation (components, concepts, logs, troubleshooting, ...) can be found  [here](https://www.gitbook.com/book/openvstorage/framework/details). 
+
 ## Contribution & Packaging
 
 We welcome contributions, general contribution info/guidelines can be found [here](https://github.com/openvstorage/home/blob/master/CONTRIBUTING.md).
