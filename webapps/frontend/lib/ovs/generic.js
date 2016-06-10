@@ -417,7 +417,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
     }
     function arrayHasElementWithProperty(array, property, value) {
         var i;
-        for (i = 0; i < array.length; i+= 1) {
+        for (i = 0; i < array.length; i += 1) {
             var element = array[i];
             if (element.hasOwnProperty(property) && element[property] === value) {
                 return true;
@@ -524,8 +524,8 @@ define(['jquery', 'jqp/pnotify'], function($) {
         alertError: alertError,
         alertInfo: alertInfo,
         alertSuccess: alertSuccess,
-        arrayHasElementWithProperty: arrayHasElementWithProperty,
         arrayFilterUnique: arrayFilterUnique,
+        arrayHasElementWithProperty: arrayHasElementWithProperty,
         buildString: buildString,
         ceil: ceil,
         crossFiller: crossFiller,
