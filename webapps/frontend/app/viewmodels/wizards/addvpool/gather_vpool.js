@@ -378,9 +378,9 @@ define([
                         self.loadAlbaBackends()
                             .done(function () {
                                 $.each(self.data.albaBackends(), function (_, albaBackend) {
-                                    if (albaBackend.guid() === metadata.backend.backend_guid) {
+                                    if (albaBackend.guid === metadata.backend.backend_guid) {
                                         self.data.albaBackend(albaBackend);
-                                        $.each(albaBackend.enhancedPresets(), function (_, preset) {
+                                        $.each(albaBackend.presets, function (_, preset) {
                                             if (preset.name === metadata.backend.preset) {
                                                 self.data.albaPreset(preset);
                                             }

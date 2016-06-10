@@ -199,7 +199,8 @@ class StorageRouterController(object):
                 'shared_size': shared_size,
                 'readcache_size': readcache_size,
                 'writecache_size': writecache_size,
-                'scrub_available': StorageRouterController._check_scrub_partition_present()}
+                'scrub_available': StorageRouterController._check_scrub_partition_present(),
+                'hvtype': storagerouter.pmachine.hvtype}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.add_vpool')
@@ -530,6 +531,8 @@ class StorageRouterController(object):
         storage_ip = parameters['storage_ip']
         if vpool is not None:
             for existing_storagedriver in vpool.storagedrivers:
+                if existing_storagedriver.storagerouter.pmachine.hvtype == 'KVM':
+                    continue
                 if existing_storagedriver.storage_ip != storage_ip:
                     error_messages.append('Storage IP {0} is not identical to previously configured storage IPs'.format(storage_ip))
                     break
@@ -1354,7 +1357,7 @@ class StorageRouterController(object):
                         node_configs.append(ClusterNodeConfig(str(sd.storagedriver_id),
                                                               str(sd.cluster_ip),
                                                               sd.ports['management'],
-                                                              sd.ports['xmlprc'],
+                                                              sd.ports['xmlrpc'],
                                                               sd.ports['dtl']))
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Node configs - \n{1}'.format(storage_driver.guid, '\n'.join([str(config) for config in node_configs])))
                 vrouter_clusterregistry.set_node_configs(node_configs)

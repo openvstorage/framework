@@ -75,6 +75,7 @@ define([
                         self.data.scrubAvailable(data.scrub_available);
                         self.data.readCacheAvailableSize(data.readcache_size);
                         self.data.writeCacheAvailableSize(data.writecache_size);
+                        self.data.hvtype(data.hvtype);
                     })
                     .done(function() {
                         var dbOverlap,
@@ -107,7 +108,7 @@ define([
                             self.validationResult.valid = false;
                             self.validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_config.missing_mountpoints'));
                         }
-                        if (self.data.vPool() !== undefined) {
+                        if (self.data.vPool() !== undefined && self.data.hvtype() === 'VMWARE') {
                             var storageIP = self.data.storageDrivers()[0].storageIP();
                             if (self.data.ipAddresses().contains(storageIP)) {
                                 self.data.storageIP(storageIP);
