@@ -54,6 +54,7 @@ define(['knockout'], function(ko){
             fragmentCacheOnWrite:    ko.observable(true),
             hasMgmtCenter:           ko.observable(false),
             host:                    ko.observable('').extend({regex: hostRegex}),
+            hvtype:                  ko.observable(''),
             integratemgmt:           ko.observable(),
             ipAddresses:             ko.observableArray([]),
             localHost:               ko.observable(true),

@@ -86,6 +86,13 @@ class StorageRouterController(object):
     @staticmethod
     @celery.task(name='ovs.storagerouter.ping')
     def ping(storagerouter_guid, timestamp):
+        """
+        Ping storagerouter
+        :param storagerouter_guid: Storage Router guid to ping
+        :type storagerouter_guid: str
+        :param timestamp: timestamp
+        :type timestamp: int
+        """
         with volatile_mutex('storagerouter_heartbeat_{0}'.format(storagerouter_guid)):
             storagerouter = StorageRouter(storagerouter_guid)
             if timestamp > storagerouter.heartbeats.get('celery', 0):
@@ -191,7 +198,8 @@ class StorageRouterController(object):
                 'shared_size': shared_size,
                 'readcache_size': readcache_size,
                 'writecache_size': writecache_size,
-                'scrub_available': StorageRouterController._check_scrub_partition_present()}
+                'scrub_available': StorageRouterController._check_scrub_partition_present(),
+                'hvtype': storagerouter.pmachine.hvtype}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.add_vpool')
@@ -522,6 +530,8 @@ class StorageRouterController(object):
         storage_ip = parameters['storage_ip']
         if vpool is not None:
             for existing_storagedriver in vpool.storagedrivers:
+                if existing_storagedriver.storagerouter.pmachine.hvtype == 'KVM':
+                    continue
                 if existing_storagedriver.storage_ip != storage_ip:
                     error_messages.append('Storage IP {0} is not identical to previously configured storage IPs'.format(storage_ip))
                     break
@@ -810,7 +820,7 @@ class StorageRouterController(object):
                 fragment_cache_info = ['alba', {'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm_aa')),
                                                 'bucket_strategy': ['1-to-1', {'prefix': vpool.metadata[storagerouter.guid]['name'],
                                                                                'preset': vpool.metadata[storagerouter.guid]['preset']}],
-                                                'manifest_cache_size': 16*1024*1024*1024,
+                                                'manifest_cache_size': 16 * 1024 * 1024 * 1024,
                                                 'cache_on_read': fragment_cache_on_read,
                                                 'cache_on_write': fragment_cache_on_write}]
             else:
@@ -823,7 +833,7 @@ class StorageRouterController(object):
                 'log_level': 'info',
                 'port': alba_proxy.service.ports[0],
                 'ips': ['127.0.0.1'],
-                'manifest_cache_size': 16*1024*1024*1024,
+                'manifest_cache_size': 16 * 1024 * 1024 * 1024,
                 'fragment_cache': fragment_cache_info,
                 'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm'))
             }), raw=True)
