@@ -1339,7 +1339,7 @@ class StorageRouterController(object):
                         node_configs.append(ClusterNodeConfig(str(sd.storagedriver_id),
                                                               str(sd.cluster_ip),
                                                               sd.ports['management'],
-                                                              sd.ports['xmlprc'],
+                                                              sd.ports['xmlrpc'],
                                                               sd.ports['dtl']))
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Node configs - \n{1}'.format(storage_driver.guid, '\n'.join([str(config) for config in node_configs])))
                 vrouter_clusterregistry.set_node_configs(node_configs)
