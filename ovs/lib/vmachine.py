@@ -690,6 +690,8 @@ class VMachineController(object):
             # Updating and linking disks
             storagedrivers = StorageDriverList.get_storagedrivers()
             datastores = dict([('{0}:{1}'.format(storagedriver.storage_ip, storagedriver.mountpoint), storagedriver) for storagedriver in storagedrivers])
+            if vmachine.pmachine is not None and vmachine.pmachine.hvtype == 'KVM':
+                datastores.update(dict([('127.0.0.1:{0}'.format(storagedriver.mountpoint), storagedriver) for storagedriver in storagedrivers]))
             vdisk_guids = []
             mutex = volatile_mutex('{0}_{1}'.format(vmachine.name, vmachine.devicename))
             for disk in vm_object['disks']:
