@@ -33,16 +33,18 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
         </div>
         <div data-bind="visible: data.backend() === 'alba' && (data.fragmentCacheOnRead() || data.fragmentCacheOnWrite())">
-            <p data-i18n="ovs:wizards.add_vpool.gather_backend.accelerated_info"></p>
             <div>
                 <div class="form-group">
                     <div class="col-lg-4"></div>
                     <div class="col-lg-7">
-                        <input type="checkbox" id="useAcceleratedAlba" class="autofocus" data-bind="checked: data.useAA" />
-                        <label for="useAcceleratedAlba" data-i18n="ovs:wizards.add_vpool.gather_backend.use_accelerated_alba" style="font-weight: normal;"></label>
+                        <input type="radio" name="aaBackend" id="useAcceleratedAlbaNo" class="autofocus" data-bind="checked: data.useAA, checkedValue: false" />
+                        <label for="useAcceleratedAlbaNo" data-i18n="ovs:wizards.add_vpool.gather_backend.use_local" style="font-weight: normal;"></label><br />
+                        <input type="radio" name="aaBackend" id="useAcceleratedAlbaYes" class="autofocus" data-bind="checked: data.useAA, checkedValue: true" />
+                        <label for="useAcceleratedAlbaYes" data-i18n="ovs:wizards.add_vpool.gather_backend.use_backend_aa" style="font-weight: normal;"></label>
                     </div>
                 </div>
             </div>
+            <p data-bind="visible: data.useAA()" data-i18n="ovs:wizards.add_vpool.gather_backend.accelerated_info"></p>
             <div data-bind="visible: data.useAA() && localBackendsAvailable()">
                 <div class="form-group">
                     <div class="col-lg-4"></div>

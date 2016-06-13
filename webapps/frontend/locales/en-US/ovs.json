@@ -786,7 +786,8 @@
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
                 "re_use_connection_info": "Re-use connection info:",
-                "use_accelerated_alba": "Use accelerated backend"
+                "use_backend_aa": "Use another ALBA backend as Fragment Cache",
+                "use_local": "Place Fragement Cache on disk"
             },
             "gather_config": {
                 "basic_info": "Specify the configurations for the vPool",
