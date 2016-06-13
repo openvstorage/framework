@@ -97,7 +97,7 @@ class VDiskViewSet(viewsets.ViewSet):
             storage_router = StorageRouterList.get_by_ip(new_config_params['dtl_target'])
             if storage_router is None:
                 raise NotAcceptable('API version 1 requires a Storage Router IP')
-            new_config_params['dtl_target'] = storage_router.primary_failure_domain.guid
+            new_config_params['dtl_target'] = [junction.domain_guid for junction in storage_router.domains]
         return VDiskController.set_config_params.delay(vdisk_guid=vdisk.guid, new_config_params=new_config_params)
 
     @link()

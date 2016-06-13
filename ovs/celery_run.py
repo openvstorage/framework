@@ -23,7 +23,6 @@ import sys
 sys.path.append('/opt/OpenvStorage')
 
 import os
-import unittest
 from kombu import Queue
 from celery import Celery
 from celery.signals import task_postrun, worker_process_init, after_setup_logger, after_setup_task_logger
@@ -57,7 +56,7 @@ class CeleryMockup(object):
         return _outer_function
 
 
-if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+if os.environ.get('RUNNING_UNITTESTS') == 'True':
     celery = CeleryMockup()
 else:
     memcache_servers = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')

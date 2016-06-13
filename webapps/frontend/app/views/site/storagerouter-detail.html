@@ -31,20 +31,27 @@ but WITHOUT ANY WARRANTY of any kind.
             </li>
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
-                <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="buttonEdit"
-                        data-bind="click: function() { if (edit()) { save() } else { edit(true); } },
-                                   enable: loaded() && $root.shared.user.roles().contains('manage'),
+                <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="button-edit"
+                        data-bind="click: function() { if (edit()) { save(); } else { edit(true); } },
+                                   enable: loaded() && $root.shared.user.roles().contains('manage') && !$root.markingOffline() && !$root.refreshing(),
                                    tooltip: 'ovs:storagerouters.detail.edit'">
                     <span class="hand fa" data-bind="visible: edit() && !saving()" data-i18n="[html]ovs:icons.save"></span>
                     <span class="hand fa fa-spin" data-bind="visible: edit() && saving()" data-i18n="[html]ovs:icons.loading"></span>
                     <span class="hand fa" data-bind="visible: !edit()" data-i18n="[html]ovs:icons.edit"></span>
                 </button>
-                <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="buttonRefresh"
+                <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="button-refresh"
                         data-bind="click: $root.refresh,
-                                   enable: $root.shared.user.roles().contains('manage'),
+                                   enable: $root.shared.user.roles().contains('manage') && !$root.markingOffline(),
                                    tooltip: 'ovs:storagerouters.detail.refreshtt'">
                     <span class="hand fa" data-bind="visible: !$root.refreshing()" data-i18n="[html]ovs:icons.load"></span>
                     <span class="hand fa fa-spin" data-bind="visible: $root.refreshing()" data-i18n="[html]ovs:icons.loading"></span>
+                </button>
+                <button type="button" class="btn btn-mini btn-default hand" style="color: #428bca;" id="button-mark-offline"
+                        data-bind="click: $root.markoffline,
+                                   enable: $root.shared.user.roles().contains('manage') && !$root.refreshing(),
+                                   tooltip: 'ovs:storagerouters.detail.offline.mark'">
+                    <span class="hand fa" data-bind="visible: !$root.markingOffline()" data-i18n="[html]ovs:icons.markoffline"></span>
+                    <span class="hand fa fa-spin" data-bind="visible: $root.markingOffline()" data-i18n="[html]ovs:icons.loading"></span>
                 </button>
             </li>
         </ul>
@@ -109,53 +116,41 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td><span data-bind="text: cacheRatio"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.failure_domain"></td>
+                            <td data-i18n="ovs:storagerouters.detail.scrub_capable"></td>
                             <td>
-                                <span data-bind="visible: !edit()">
-                                    <span data-bind="lazyloader: { item: primaryFailureDomain, loadedObservable: 'loaded', undefinedLoading: true }">
-                                        <span data-part="lazy-entry" data-bind="text: item().name()"></span>
-                                    </span>
-                                </span>
-                                <span data-bind="visible: edit()">
-                                    <span data-bind="dropdown: {
-                                                         enabled: $root.canChangePFD,
-                                                         items: $root.failureDomains, target: primaryFailureDomain,
-                                                         text: function(item) {
-                                                             if (item !== undefined) {
-                                                                 return item.name();
-                                                             }
-                                                         },
-                                                         key: 'guid', keyisfunction: true, small: true
-                                                     }">
-                                    </span>
-                                </span>
+                                <!-- ko if: scrubCapable() === false -->
+                                    <span class="fa" data-i18n="[html]ovs:icons.cancel_circle" style="color: red;"></span>
+                                <!-- /ko -->
+                                <!-- ko if: scrubCapable() === true -->
+                                    <span class="fa" data-i18n="[html]ovs:icons.check_circle" style="color: green;"></span>
+                                <!-- /ko -->
                             </td>
                             <td data-i18n="ovs:generic.iops"></td>
                             <td><span data-bind="text: iops"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.backup_failure_domain"></td>
+                            <td data-i18n="ovs:generic.domains"></td>
                             <td>
-                                <span data-bind="visible: !edit()">
-                                    <span data-bind="text: secondaryFailureDomain() !== undefined ? secondaryFailureDomain().name() : '-'"></span>
-                                </span>
-                                <span data-bind="visible: edit()">
-                                    <span data-bind="dropdown: {
-                                                         items: $root.availableSecondaryFailureDomains, target: secondaryFailureDomain,
-                                                         text: function(item) {
-                                                             if (item === undefined) { return '-'; }
-                                                             return item.name();
-                                                         },
-                                                         key: 'guid', keyisfunction: true, small: true
-                                                     }">
-                                    </span>
-                                </span>
+                                <span data-bind="dropdown: {
+                                                     items: $root.domainGuids, target: domainGuids,
+                                                     text: function(guid) {
+                                                         return $root.domainCache[guid].name();
+                                                     }, enabled: edit, small: true, emptyisloading: false
+                                                 }"></span>
                             </td>
                             <td data-i18n="ovs:generic.readspeed"></td>
                             <td><span data-bind="text: readSpeed"></span></td>
                         </tr>
                         <tr>
-                            <td colspan="2"></td>
+                            <td data-i18n="ovs:generic.recovery_domains"></td>
+                            <td>
+                                <span data-bind="dropdown: {
+                                                     items: $root.recoveryDomainGuids, target: recoveryDomainGuids,
+                                                     text: function(guid) {
+                                                         return $root.domainCache[guid].name();
+                                                     }, enabled: edit, small: true, emptyisloading: false
+                                                 }"></span>
+                            </td>
                             <td data-i18n="ovs:generic.writespeed"></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
                         </tr>

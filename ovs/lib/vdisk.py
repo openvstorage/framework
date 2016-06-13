@@ -19,14 +19,15 @@ Module for VDiskController
 """
 import os
 import re
-import pickle
-import random
 import time
 import uuid
+import pickle
+import random
 from celery.schedules import crontab
 from ovs.celery_run import celery
 from ovs.dal.exceptions import ObjectNotFoundException
-from ovs.dal.hybrids.failuredomain import FailureDomain
+from ovs.dal.hybrids.domain import Domain
+from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
@@ -39,26 +40,18 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.generic.sshclient import UnableToConnectException
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.volatilemutex import NoLockAvailableException
-from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-from ovs.lib.helpers.decorators import ensure_single
-from ovs.lib.helpers.decorators import log
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
+from ovs.lib.helpers.decorators import ensure_single, log
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
-from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter import VolumeDriverEvents_pb2
-from volumedriver.storagerouter.storagerouterclient import DTLConfig
-from volumedriver.storagerouter.storagerouterclient import DTLConfigMode
-from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig
-from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
+from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
+from volumedriver.storagerouter.storagerouterclient import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig
 
 
 class VDiskController(object):
@@ -799,7 +792,12 @@ class VDiskController(object):
         else:
             metadata_cache_size *= StorageDriverClient.METADATA_CACHE_PAGE_SIZE
 
-        dtl_target = None
+        if len(vdisk.domains_dtl) > 0:
+            dtl_target = [junction.domain_guid for junction in vdisk.domains_dtl]
+        else:
+            storagerouter = StorageRouter(vdisk.storagerouter_guid)
+            dtl_target = [junction.domain_guid for junction in storagerouter.domains if junction.backup is False]
+
         if dtl_config is None:
             dtl_mode = 'no_sync'
         else:
@@ -807,7 +805,6 @@ class VDiskController(object):
                 dtl_mode = 'no_sync'
             else:
                 dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_config.mode]
-                dtl_target = StorageRouterList.get_by_ip(dtl_config.host).primary_failure_domain.guid
 
         if dedupe_mode is None:
             dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_CONTENT_BASED)
@@ -852,7 +849,7 @@ class VDiskController(object):
                            'readcache_limit': (int, {'min': 1, 'max': 10 * 1024}, False)}
 
         if new_config_params.get('dtl_target') is not None:
-            required_params.update({'dtl_target': (str, Toolbox.regex_guid)})
+            required_params.update({'dtl_target': (list, Toolbox.regex_guid)})
 
         if new_config_params.get('metadata_cache_size') is not None:
             required_params.update({'metadata_cache_size': (int, {'min': StorageDriverClient.METADATA_CACHE_PAGE_SIZE})})
@@ -860,7 +857,7 @@ class VDiskController(object):
         Toolbox.verify_required_params(required_params, new_config_params)
 
         if new_config_params['dtl_mode'] != 'no_sync' and new_config_params.get('dtl_target') is None:
-            raise Exception('If DTL mode is Asynchronous or Synchronous, a target Failure Domain guid should always be specified')
+            raise Exception('If DTL mode is Asynchronous or Synchronous, a Domain guid should always be specified')
 
         errors = False
         vdisk = VDisk(vdisk_guid)
@@ -887,36 +884,55 @@ class VDiskController(object):
         # 2nd Check for DTL changes
         new_dtl_mode = new_config_params['dtl_mode']
         old_dtl_mode = old_config_params['dtl_mode']
-        new_dtl_target = new_config_params.get('dtl_target')
-        old_dtl_target = old_config_params['dtl_target']
-        if old_dtl_mode != new_dtl_mode or new_dtl_target != old_dtl_target:
+        new_dtl_targets = set(new_config_params.get('dtl_target', []))  # Domain guids
+        old_dtl_targets = set(old_config_params['dtl_target'])
+        if old_dtl_mode != new_dtl_mode or new_dtl_targets != old_dtl_targets:
             if old_dtl_mode != new_dtl_mode and new_dtl_mode == 'no_sync':
                 VDiskController._logger.info('Disabling DTL for vDisk {0}'.format(vdisk_guid))
                 vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
-            elif (new_dtl_target is not None and new_dtl_target != old_dtl_target or old_dtl_mode != new_dtl_mode) and new_dtl_mode != 'no_sync':
+                for junction in vdisk.domains_dtl:
+                    junction.delete()
+            elif (len(new_dtl_targets) > 0 and new_dtl_targets != old_dtl_targets or old_dtl_mode != new_dtl_mode) and new_dtl_mode != 'no_sync':
                 VDiskController._logger.info('Changing DTL to use global values for vDisk {0}'.format(vdisk_guid))
-                possible_srs = FailureDomain(new_dtl_target).primary_storagerouters
-                if len(possible_srs) is None:
-                    VDiskController._logger.error('Failed to retrieve primary Storage Routers for Failure Domain with guid {0}'.format(new_dtl_target))
-                    errors = True
+                dtl_targets = set()
+                for domain_guid in new_dtl_targets:
+                    domain = Domain(domain_guid)
+                    dtl_targets.update(StorageRouterList.get_primary_storagerouters_for_domain(domain))
 
-                possible_srs.shuffle()
+                storagerouter = StorageRouter(vdisk.storagerouter_guid)
+                if storagerouter in dtl_targets:
+                    dtl_targets.remove(storagerouter)
+
+                if len(dtl_targets) == 0:
+                    raise ValueError('Cannot reconfigure DTL to StorageRouter {0} because the vDisk is hosted on this StorageRouter'.format(vdisk.storagerouter.name))
+
                 dtl_config = None
-                for storagerouter in possible_srs:
-                    if storagerouter.guid == vdisk.storagerouter_guid:
-                        continue
-                    if dtl_config is not None:
-                        break
-                    for sd in storagerouter.storagedrivers:
-                        if sd.vpool == vdisk.vpool:
+                current_dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id)
+                if old_dtl_mode != new_dtl_mode or (current_dtl_config is not None and current_dtl_config.host not in [sr.ip for sr in dtl_targets]):
+                    random.shuffle(dtl_targets)
+                    reconfigured = False
+                    for storagerouter in dtl_targets:
+                        for sd in storagerouter.storagedrivers:  # DTL can reside on any node in the cluster running a volumedriver and having a DTL process running
                             dtl_config = DTLConfig(str(storagerouter.ip), sd.ports['dtl'], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
                             vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
-                            vdisk.has_manual_dtl = True
-                            vdisk.save()
+                            reconfigured = True
+                            break
+                        if reconfigured is True:
                             break
                 if dtl_config is None:
-                    VDiskController._logger.error('Failure Domain with guid {0} has no Storage Routers serving vPool {1}'.format(new_dtl_target, vdisk.vpool.name))
+                    VDiskController._logger.error('No Storage Router found in chosen Domains which have a DTL process running')
                     errors = True
+
+                # Delete all original relations
+                for junction in vdisk.domains_dtl:
+                    junction.delete()
+
+                # Create all new relations
+                for domain_guid in new_dtl_targets:
+                    vdisk_domain = VDiskDomain()
+                    vdisk_domain.vdisk = vdisk
+                    vdisk_domain.domain = Domain(domain_guid)
+                    vdisk_domain.save()
 
         # 2nd update rest
         for key in required_params:
@@ -1008,8 +1024,8 @@ class VDiskController(object):
     @ensure_single(task_name='ovs.vdisk.dtl_checkup', mode='DEDUPED')
     def dtl_checkup(vpool_guid=None, vdisk_guid=None, storagerouters_to_exclude=None):
         """
-        Check DTL for all volumes
-        :param vpool_guid: vPool to check the DTL configuration of all its disks
+        Check DTL for all volumes, for all volumes of a vPool or for 1 specific volume
+        :param vpool_guid: vPool to check the DTL configuration of all its vDisks
         :type vpool_guid: str
 
         :param vdisk_guid: Virtual Disk to check its DTL configuration
@@ -1021,7 +1037,7 @@ class VDiskController(object):
         :return: None
         """
         if vpool_guid is not None and vdisk_guid is not None:
-            raise ValueError('vpool and vdisk are mutually exclusive')
+            raise ValueError('vPool and vDisk are mutually exclusive')
         if storagerouters_to_exclude is None:
             storagerouters_to_exclude = []
 
@@ -1064,6 +1080,7 @@ class VDiskController(object):
                 vdisk.invalidate_dynamics(['storagedriver_client', 'storagerouter_guid'])
                 if vdisk.storagedriver_client is None:
                     vdisks.remove(vdisk)
+                    VDiskController._logger.warning('    VDisk {0} with guid {1} does not have a storagedriver client'.format(vdisk.name, vdisk.guid))
                     continue
 
                 vpool = vdisk.vpool
@@ -1080,7 +1097,7 @@ class VDiskController(object):
                     current_dtl_config_mode = vdisk.storagedriver_client.get_dtl_config_mode(volume_id)
                 except RuntimeError as rte:
                     # Can occur when a volume has not been stolen yet from a dead node
-                    VDiskController._logger.error('Retrieving DTL configuration from storage driver failed with error: {0}'.format(rte))
+                    VDiskController._logger.exception('Retrieving DTL configuration from storage driver failed with error: {0}'.format(rte))
                     errors_found = True
                     vdisks.remove(vdisk)
                     continue
@@ -1101,41 +1118,57 @@ class VDiskController(object):
                     vdisks.remove(vdisk)
                     continue
 
+                # Create a pool of StorageRouters being a part of the primary and secondary domains of this Storage Router
                 this_storage_router = StorageRouter(vdisk.storagerouter_guid)
-                available_primary_storagerouters = []
-                available_secondary_storagerouters = []
-                # 1. Check available storage routers in the backup failure domain
-                for failure_domain in [this_storage_router.secondary_failure_domain, this_storage_router.primary_failure_domain]:
-                    if failure_domain is None:
-                        continue
-                    available_storagerouters = available_primary_storagerouters if failure_domain == this_storage_router.primary_failure_domain else available_secondary_storagerouters
+                if len(vdisk.domains_dtl) > 0:
+                    primary_domains = [junction.domain for junction in vdisk.domains_dtl]
+                else:
+                    primary_domains = [junction.domain for junction in this_storage_router.domains if junction.backup is False]
+                secondary_domains = [junction.domain for junction in this_storage_router.domains if junction.backup is True]
 
-                    primary_storage_routers = failure_domain.primary_storagerouters
-                    primary_storage_routers.shuffle()
-                    for storagerouter in primary_storage_routers:
-                        if len(available_storagerouters) == 3:
+                possible_primary_srs = []
+                available_primary_srs = set()
+                possible_secondary_srs = []
+                available_secondary_srs = set()
+                for domain in primary_domains:
+                    available_primary_srs.update(StorageRouterList.get_primary_storagerouters_for_domain(domain))
+                for domain in secondary_domains:
+                    available_secondary_srs.update(StorageRouterList.get_primary_storagerouters_for_domain(domain))
+
+                # In case no domains have been configured
+                if len(available_primary_srs) == 0:
+                    available_primary_srs = set(StorageRouterList.get_storagerouters())
+
+                # Remove all storagerouters from secondary which are present in primary
+                available_secondary_srs = available_secondary_srs.difference(available_primary_srs)
+
+                for importance, possible_srs in {'secondary': possible_secondary_srs,
+                                                 'primary': possible_primary_srs}.iteritems():
+                    available_srs = list(available_primary_srs) if importance == 'primary' else list(available_secondary_srs)
+                    random.shuffle(available_srs)
+                    for storagerouter in available_srs:
+                        if len(possible_srs) == 3:
                             break
                         if vpool.guid not in storagerouter.vpools_guids or storagerouter == this_storage_router:
                             continue
                         if storagerouter.guid in storagerouters_to_exclude:
                             continue
                         if storagerouter not in root_client_map:
+                            root_client_map[storagerouter] = None
                             try:
                                 root_client = SSHClient(storagerouter, username='root')
                                 service_name = 'dtl_{0}'.format(vpool.name)
                                 if ServiceManager.has_service(service_name, client=root_client) is True and ServiceManager.get_service_status(service_name, client=root_client) is True:
                                     root_client_map[storagerouter] = root_client
-                                    available_storagerouters.append(storagerouter)
+                                    possible_srs.append(storagerouter)
                                 else:
                                     VDiskController._logger.warning('    DTL service on Storage Router with IP {0} is not reachable'.format(storagerouter.ip))
-                                    root_client_map[storagerouter] = None
                             except UnableToConnectException:
                                 VDiskController._logger.warning('    Storage Router with IP {0} of vDisk {1} is not reachable'.format(storagerouter.ip, vdisk.name))
-                                root_client_map[storagerouter] = None
                         elif root_client_map[storagerouter] is not None:
-                            available_storagerouters.append(storagerouter)
+                            possible_srs.append(storagerouter)
 
-                if len(available_primary_storagerouters) == 0 and len(available_secondary_storagerouters) == 0:
+                if (len(possible_primary_srs) == 0 and len(possible_secondary_srs) == 0) or (len(possible_primary_srs) == 0 and len(vdisk.domains_dtl) > 0):
                     VDiskController._logger.info('    No Storage Routers could be found as valid DTL target, setting DTL for vDisk to STANDALONE')
                     try:
                         with volatile_mutex(lock_key, wait=time_to_wait_for_lock):
@@ -1161,16 +1194,16 @@ class VDiskController(object):
 
                     VDiskController._logger.info('        DTL host: {0}'.format(dtl_host or '-'))
                     VDiskController._logger.info('        DTL port: {0}'.format(dtl_port or '-'))
-                    if vdisk.has_manual_dtl is True:
-                        if dtl_host not in [sr.ip for sr in available_secondary_storagerouters + available_primary_storagerouters]:
+                    if len(vdisk.domains_dtl) > 0:
+                        if dtl_host not in [sr.ip for sr in possible_primary_srs]:
                             VDiskController._logger.info('        Host not in available Storage Routers, manual DTL will be overruled')
                             reconfigure_required = True
-                    elif len(available_secondary_storagerouters) > 0:
-                        if dtl_host not in [sr.ip for sr in available_secondary_storagerouters]:
+                    elif len(possible_secondary_srs) > 0:
+                        if dtl_host not in [sr.ip for sr in possible_secondary_srs]:
                             VDiskController._logger.info('        Host not in available secondary Storage Routers')
                             reconfigure_required = True
-                    elif len(available_primary_storagerouters) > 0:
-                        if dtl_host not in [sr.ip for sr in available_primary_storagerouters]:
+                    elif len(possible_primary_srs) > 0:
+                        if dtl_host not in [sr.ip for sr in possible_primary_srs]:
                             VDiskController._logger.info('        Host not in available primary Storage Routers')
                             reconfigure_required = True
                     if dtl_port != storage_drivers[0].ports['dtl']:
@@ -1179,10 +1212,10 @@ class VDiskController(object):
 
                 # Perform the reconfiguration
                 if reconfigure_required is True:
-                    available_storagerouters = available_secondary_storagerouters if len(available_secondary_storagerouters) > 0 else available_primary_storagerouters
-                    VDiskController._logger.info('        Reconfigure required, randomly choosing from {0}'.format(', '.join([sr.ip for sr in available_storagerouters])))
-                    index = random.randint(0, len(available_storagerouters) - 1)
-                    dtl_target = available_storagerouters[index]
+                    possible_srs = possible_primary_srs if len(vdisk.domains_dtl) > 0 else possible_secondary_srs if len(possible_secondary_srs) > 0 else possible_primary_srs
+                    VDiskController._logger.info('        Reconfigure required, randomly choosing from {0}'.format(', '.join([sr.ip for sr in possible_srs])))
+                    index = random.randint(0, len(possible_srs) - 1)
+                    dtl_target = possible_srs[index]
                     storage_drivers = [sd for sd in vpool.storagedrivers if sd.storagerouter == dtl_target]
                     if len(storage_drivers) == 0:
                         VDiskController._logger.error('Could not retrieve related storagedriver')
@@ -1197,9 +1230,6 @@ class VDiskController(object):
                     try:
                         with volatile_mutex(lock_key, wait=time_to_wait_for_lock):
                             vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
-                            if vdisk.has_manual_dtl is True:
-                                vdisk.has_manual_dtl = False
-                                vdisk.save()
                     except NoLockAvailableException:
                         VDiskController._logger.info('    Could not acquire lock, continuing with next Virtual Disk')
                         continue
@@ -1330,4 +1360,3 @@ class VDiskController(object):
         num_pages = int(vdisk.size / (metadata_page_capacity * cluster_size))
         VDiskController._logger.info('Setting metadata pagecache size for vdisk {0} to {1}'.format(vdisk.name, num_pages))
         vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), num_pages)
-

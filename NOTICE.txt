@@ -80,7 +80,8 @@ INCLUDED AND/OR USED SOFTWARE
         Copyright (c) 2011 Jan Mühlemann
 
     jQuery                      MIT
-        Copyright 2014 jQuery Foundation and other contributors. http://jquery.com
+        Copyright 2014 jQuery Foundation and other contributors.
+        http://jquery.com
 
     jQuery pynotify             MPL 1.1
 

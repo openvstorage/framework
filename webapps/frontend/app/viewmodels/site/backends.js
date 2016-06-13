@@ -17,20 +17,23 @@
 define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/backend', '../containers/backendtype', '../wizards/addbackend/index'
-], function($, dialog, ko, shared, generic, Refresher, api, Backend, BackendType, AddBackendWizard) {
+    '../containers/backend', '../containers/backendtype', '../containers/domain',
+    '../wizards/addbackend/index'
+], function($, dialog, ko, shared, generic, Refresher, api, Backend, BackendType, Domain, AddBackendWizard) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
+        self.domainCache      = {};
         self.shared           = shared;
         self.guard            = { authenticated: true };
         self.refresher        = new Refresher();
         self.widgets          = [];
         self.backendHeaders   = [
             { key: 'name',     value: $.t('ovs:generic.name'),        width: 250       },
-            { key: undefined,  value: $.t('ovs:generic.backendtype'), width: undefined },
+            { key: undefined,  value: $.t('ovs:generic.backendtype'), width: 250       },
+            { key: 'domain',   value: $.t('ovs:generic.domains'),     width: undefined },
             { key: undefined,  value: $.t('ovs:generic.status'),      width: 80        }
         ];
         self.backendTypeCache = {};
@@ -46,13 +49,14 @@ define([
         // Handles
         self.loadBackendTypesHandle = undefined;
         self.backendsHandle         = {};
+        self.domainsHandle          = undefined;
 
         // Functions
         self.loadBackends = function(options) {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.backendsHandle[options.page])) {
                     options.sort = 'name';
-                    options.contents = '_relations';
+                    options.contents = '_relations,regular_domains';
                     self.backendsHandle[options.page] = api.get('backends', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
@@ -70,6 +74,20 @@ define([
                                         }
                                         item.backendType(self.backendTypeCache[backendTypeGuid]);
                                     }
+                                    generic.crossFiller(
+                                        item.domainGuids(), item.domains,
+                                        function(guid) {
+                                            if (!self.domainCache.hasOwnProperty(guid)) {
+                                                var domain = new Domain(guid);
+                                                domain.load();
+                                                self.domainCache[guid] = domain;
+                                            }
+                                            return self.domainCache[guid];
+                                        }, 'guid'
+                                    );
+                                    item.domains.sort(function(dom1, dom2) {
+                                        return dom1.name() < dom2.name() ? -1 : 1;
+                                    });
                                 }
                             });
                         })
@@ -127,6 +145,25 @@ define([
             dialog.show(new AddBackendWizard({
                 modal: true
             }));
+        };
+        self.loadDomains = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.domainsHandle)) {
+                    self.domainsHandle = api.get('domains', {queryparams: {contents: ''}})
+                        .done(function(data) {
+                            $.each(data.data, function(index, item) {
+                                if (!self.domainCache.hasOwnProperty(item.guid)) {
+                                    self.domainCache[item.guid] = new Domain(item.guid);
+                                }
+                                self.domainCache[item.guid].fillData(item);
+                            });
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
         };
 
         // Durandal

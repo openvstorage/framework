@@ -17,8 +17,8 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/failuredomain'
-], function($, app, dialog, ko, shared, generic, Refresher, api, FailureDomain) {
+    '../containers/domain'
+], function($, app, dialog, ko, shared, generic, Refresher, api, Domain) {
     "use strict";
     return function () {
         var self = this;
@@ -28,10 +28,7 @@ define([
         self.shared        = shared;
         self.guard         = { authenticated: true };
         self.domainHeaders = [
-            { key: 'name',    value: $.t('ovs:generic.name'),    width: 250       },
-            { key: 'address', value: $.t('ovs:generic.address'), width: 250       },
-            { key: 'city',    value: $.t('ovs:generic.city'),    width: 250       },
-            { key: 'country', value: $.t('ovs:generic.country'), width: undefined },
+            { key: 'name',    value: $.t('ovs:generic.name'),    width: undefined },
             { key: undefined, value: $.t('ovs:generic.actions'), width: 60        }
         ];
 
@@ -43,21 +40,34 @@ define([
         // Handles
         self.domainsHandle = {};
 
+        // Computed
+        self.domainNames = ko.computed(function() {
+            var names = [];
+            $.each(self.domains(), function(i, domain) {
+                names.push(domain.name().toLowerCase());
+            });
+            return names;
+        });
+
         // Functions
         self.buildDomain = function() {
-            return new FailureDomain();
+            var domain = new Domain();
+            domain.existingDomainNames = self.domainNames;
+            return domain;
         };
         self.loadDomains = function(options) {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.domainsHandle[options.page])) {
                     options.sort = 'name';
                     options.contents = '_relations';
-                    self.domainsHandle[options.page] = api.get('failure_domains', { queryparams: options })
+                    self.domainsHandle[options.page] = api.get('domains', { queryparams: options })
                         .then(function(data) {
                             deferred.resolve({
                                 data: data,
                                 loader: function(guid) {
-                                    return new FailureDomain(guid);
+                                    var domain = new Domain(guid);
+                                    domain.existingDomainNames = self.domainNames;
+                                    return domain;
                                 }
                             });
                         })
@@ -70,7 +80,7 @@ define([
         self.createDomain = function() {
             self.newDomain().save()
                 .then(function(guid) {
-                    var domain = new FailureDomain(guid);
+                    var domain = new Domain(guid);
                     domain.load();
                     self.trigger(self.trigger() + 1);
                 })
@@ -78,7 +88,7 @@ define([
                     error = $.parseJSON(error.responseText);
                     generic.alertError(
                         $.t('ovs:generic.error'),
-                        $.t('ovs:failuredomains.new.addfailed', { why: error.detail })
+                        $.t('ovs:domains.new.addfailed', { why: error.detail })
                     );
                 })
                 .always(function() {
@@ -89,17 +99,17 @@ define([
             $.each(self.domains(), function(i, domain) {
                 if (domain.guid() === guid && domain.canDelete()) {
                     app.showMessage(
-                        $.t('ovs:failuredomains.delete.delete', { what: domain.name() }),
+                        $.t('ovs:domains.delete.delete', { what: domain.name() }),
                         $.t('ovs:generic.areyousure'),
                         [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                     )
                     .done(function(answer) {
                         if (answer === $.t('ovs:generic.yes')) {
-                            api.del('failure_domains/' + guid)
+                            api.del('domains/' + guid)
                                 .done(function () {
                                     generic.alertSuccess(
-                                        $.t('ovs:failuredomains.delete.complete'),
-                                        $.t('ovs:failuredomains.delete.deletesuccess')
+                                        $.t('ovs:domains.delete.complete'),
+                                        $.t('ovs:domains.delete.deletesuccess')
                                     );
                                     self.domains.remove(domain);
                                 })
@@ -107,7 +117,7 @@ define([
                                     error = $.parseJSON(error.responseText);
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
-                                        $.t('ovs:failuredomains.clients.deletefailed', { why: error.detail })
+                                        $.t('ovs:domains.delete.deletefailed', { why: error.detail })
                                     );
                                 });
                         }

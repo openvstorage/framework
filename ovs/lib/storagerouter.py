@@ -87,11 +87,12 @@ class StorageRouterController(object):
     @celery.task(name='ovs.storagerouter.ping')
     def ping(storagerouter_guid, timestamp):
         """
-        Ping storagerouter
-        :param storagerouter_guid: Storage Router guid to ping
+        Update a Storage Router's celery heartbeat
+        :param storagerouter_guid: Guid of the Storage Router to update
         :type storagerouter_guid: str
-        :param timestamp: timestamp
-        :type timestamp: int
+
+        :param timestamp: Timestamp to compare to
+        :type timestamp: float
         """
         with volatile_mutex('storagerouter_heartbeat_{0}'.format(storagerouter_guid)):
             storagerouter = StorageRouter(storagerouter_guid)
@@ -526,7 +527,7 @@ class StorageRouterController(object):
         if not ipaddresses:
             error_messages.append('No available IP addresses found suitable for Storage Router storage IP')
 
-        # Check storage IP (for VMWARE)
+        # Check storage IP
         storage_ip = parameters['storage_ip']
         if vpool is not None:
             for existing_storagedriver in vpool.storagedrivers:
@@ -993,6 +994,13 @@ class StorageRouterController(object):
             root_client.run('service nfs-kernel-server start')
 
         if storagerouter.pmachine.hvtype == 'KVM':
+            try:
+                root_client.run('which virsh')
+            except CalledProcessError:
+                vpool.status = VPool.STATUSES.FAILURE
+                vpool.save()
+                raise RuntimeError('Dependency "virsh" is missing on the system.')
+
             vpool_overview = root_client.run('virsh pool-list --all').splitlines()
             if vpool_overview:
                 vpool_overview.pop(1)  # Pop   ---------------

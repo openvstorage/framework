@@ -354,7 +354,7 @@ define([
             entry.append('rect')
                 .attr('width', 16)
                 .attr('height', 16)
-                .style('fill', function(d) { return color(d.name); })
+                .style('fill', function(d) { return color(d.name); });
             entry.append('text')
                 .attr('x', 20)
                 .attr('y', 14)

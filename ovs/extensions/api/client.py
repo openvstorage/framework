@@ -24,11 +24,29 @@ import hashlib
 import requests
 
 
-class ForbiddenException(RuntimeError):
+class HttpException(RuntimeError):
+    """
+    Custom Http Exception class
+    """
+    def __init__(self, status_code, *args, **kwargs):
+        super(HttpException, self).__init__(*args, **kwargs)
+        self.status_code = status_code
+
+
+class ForbiddenException(HttpException):
     """
     Custom exception class
     """
-    pass
+    def __init__(self, *args, **kwargs):
+        super(ForbiddenException, self).__init__(403, *args, **kwargs)
+
+
+class NotFoundException(HttpException):
+    """
+    Custom NotFound Exception
+    """
+    def __init__(self, *args, **kwargs):
+        super(NotFoundException, self).__init__(404, *args, **kwargs)
 
 
 class OVSClient(object):
@@ -114,7 +132,7 @@ class OVSClient(object):
         if response.status_code == 403:
             raise ForbiddenException('No access to the requested API')
         if response.status_code == 404:
-            raise RuntimeError('The requested API could not be located')
+            raise NotFoundException('The requested API could not be located')
         if response.status_code == 405:
             raise RuntimeError('Requested method not allowed')
         if response.status_code == 406:

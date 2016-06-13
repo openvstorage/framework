@@ -87,9 +87,9 @@ class StorageDriverViewSet(viewsets.ViewSet):
     def create_new_disk(self, storagedriver, diskname, size):
         """
         Create a new empty vdisk - including the volume in the backend
+        :param storagedriver: Guid of the storagedriver holding the vdisk
         :param diskname: Name of the new vdisk
         :param size: Size in GB
-        :param storagedriver_guid: Guid of the storagedriver holding the vdisk
         """
         return VDiskController.create_new.delay(diskname=diskname,
                                                 size=size,

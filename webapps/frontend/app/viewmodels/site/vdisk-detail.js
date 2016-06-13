@@ -17,9 +17,9 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter',
+    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter', '../containers/domain',
     '../wizards/rollback/index', '../wizards/clone/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, RollbackWizard, CloneWizard) {
+], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, Domain, RollbackWizard, CloneWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -38,22 +38,24 @@ define([
             { key: 'is_sticky',     value: $.t('ovs:generic.sticky'),      width: 100       },
             { key: undefined,       value: $.t('ovs:generic.actions'),     width: 60        }
         ];
+        self.domainCache     = {};
 
         // Observables
         self.snapshotsInitialLoad = ko.observable(true);
+        self.domains              = ko.observableArray([]);
         self.vDisk                = ko.observable();
 
         // Handles
-        self.loadStorageRoutersHandle = undefined;
+        self.loadDomainHandle = undefined;
 
         // Functions
         self.load = function() {
             return $.Deferred(function (deferred) {
-                var vdisk = self.vDisk();
-                vdisk.load()
+                self.vDisk().load()
+                    .then(self.loadDomains)
                     .then(function() {
                         self.snapshotsInitialLoad(false);
-                        var vm, sr, pool,
+                        var vm, sr, pool, vdisk = self.vDisk(),
                             storageRouterGuid = vdisk.storageRouterGuid(),
                             vMachineGuid = vdisk.vMachineGuid(),
                             vPoolGuid = vdisk.vpoolGuid();
@@ -74,6 +76,40 @@ define([
                         }
                     })
                     .always(deferred.resolve);
+            }).promise();
+        };
+        self.loadDomains = function() {
+            return $.Deferred(function(deferred) {
+                var vdisk = self.vDisk();
+                if (vdisk !== undefined && generic.xhrCompleted(self.loadDomainHandle)) {
+                    self.loadDomainHandle = api.get('domains', { queryparams: { contents: '' }})
+                        .done(function(data) {
+                            var guids = [], ddata = {};
+                            $.each(data.data, function(index, item) {
+                                guids.push(item.guid);
+                                ddata[item.guid] = item;
+                            });
+                            self.vDisk().dtlTargets(guids);
+                            generic.crossFiller(
+                                guids, self.domains,
+                                function(guid) {
+                                    return new Domain(guid);
+                                }, 'guid'
+                            );
+                            $.each(self.domains(), function(index, domain) {
+                                if (!self.domainCache.hasOwnProperty(domain.guid())) {
+                                    self.domainCache[domain.guid()] = domain;
+                                }
+                                if (ddata.hasOwnProperty(domain.guid())) {
+                                    domain.fillData(ddata[domain.guid()]);
+                                }
+                            });
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.resolve();
+                }
             }).promise();
         };
         self.refreshSnapshots = function() {
@@ -104,16 +140,9 @@ define([
         };
         self.saveConfiguration = function() {
             if (self.vDisk() !== undefined) {
-                var vd = self.vDisk(), newConfig = {};
-                $.each(vd.configuration(), function(key, value) {
-                    if (key === 'dtl_target' && value !== null && value !== undefined) {
-                        newConfig[key] = value.guid();
-                    } else {
-                        newConfig[key] = value;
-                    }
-                });
+                var vd = self.vDisk();
                 api.post('vdisks/' + vd.guid() + '/set_config_params', {
-                    data: { new_config_params: newConfig }
+                    data: { new_config_params: vd.configuration() }
                 })
                     .then(self.shared.tasks.wait)
                     .done(function () {

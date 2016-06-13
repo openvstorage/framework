@@ -34,7 +34,8 @@ define(['knockout'], function(ko){
                 roles   : ko.observableArray([])
             },
             hooks          : {
-                dashboards: []
+                dashboards: [],
+                wizards   : {}
             }
         };
     };

@@ -17,8 +17,8 @@
 define([
     'knockout', 'jquery',
     'ovs/shared', 'ovs/generic', 'ovs/api', 'ovs/refresher',
-    '../containers/vmachine', '../containers/vpool', '../containers/storagerouter', '../containers/failuredomain'
-], function(ko, $, shared, generic, api, Refresher, VMachine, VPool, StorageRouter, FailureDomain) {
+    '../containers/vpool', '../containers/storagerouter'
+], function(ko, $, shared, generic, api, Refresher, VPool, StorageRouter) {
     "use strict";
     return function() {
         var self = this;
@@ -27,66 +27,24 @@ define([
         self.shared    = shared;
         self.guard     = { authenticated: true };
         self.refresher = new Refresher();
-        self.topItems  = 10;
-        self.query     = {
-            type: 'AND',
-            items: [['is_vtemplate', 'EQUALS', false],
-                    ['status', 'NOT_EQUALS', 'CREATED']]
-        };
 
         // Handles
         self.loadStorageRoutersHandle = undefined;
         self.loadVPoolsHandle         = undefined;
-        self.loadFailureDomainsHandle = undefined;
 
-        // Observ ables
-        self.storageRoutersLoading = ko.observable(false);
-        self.failureDomainsLoading = ko.observable(false);
-        self.vPoolsLoading         = ko.observable(false);
+        // Observables
         self.storageRouters        = ko.observableArray([]);
+        self.storageRoutersLoading = ko.observable(false);
         self.vPools                = ko.observableArray([]);
-        self.failureDomains        = ko.observableArray([]);
-        self.amountOfVMachines     = ko.observable(0);
-        self.topVMachines          = ko.observableArray([]);
+        self.vPoolsLoading         = ko.observable(false);
 
         // Computed
-        self._cacheRatio = ko.computed(function() {
-            var hits = 0, misses = 0, total, raw;
-            $.each(self.vPools(), function(index, vpool) {
-                hits += (vpool.cacheHits.raw() || 0);
-                misses += (vpool.cacheMisses.raw() || 0);
-            });
-            total = hits + misses;
-            if (total === 0) {
-                total = 1;
-            }
-            raw = hits / total * 100;
-            return {
-                value: generic.formatRatio(raw),
-                raw: raw
-            };
-        });
-        self.cacheRatio = ko.computed(function() {
-            return self._cacheRatio().value;
-        });
-        self.cacheRatio.raw = ko.computed(function() {
-            return self._cacheRatio().raw;
-        });
-        self._iops = ko.computed(function() {
+        self.iops = ko.computed(function() {
             var total = 0;
             $.each(self.vPools(), function(index, vpool) {
                 total += (vpool.iops.raw() || 0);
             });
-            return {
-                value: generic.formatNumber(total),
-                raw: total
-            };
-        });
-        self.iops = ko.computed(function() {
-            return self._iops().value;
-        });
-        self.iops.raw = ko.computed(function() {
-            return self._iops().raw;
+            return generic.formatNumber(total);
         });
         self.readSpeed = ko.computed(function() {
             var total = 0;
@@ -105,9 +63,9 @@ define([
         self.orderedStorageRouters = ko.computed(function() {
             var dataset = {};
             $.each(self.storageRouters(), function(index, storageRouter) {
-                var guid = storageRouter.primaryFailureDomainGuid(),
-                    color = storageRouter.statusColor();
-                if (guid !== undefined) {
+                var color = storageRouter.statusColor(),
+                    vPoolGuids = storageRouter.vPoolGuids();
+                $.each(vPoolGuids, function(_, guid) {
                     if (!dataset.hasOwnProperty(guid)) {
                         dataset[guid] = {
                             green: 0,
@@ -117,7 +75,7 @@ define([
                         };
                     }
                     dataset[guid][color] += 1
-                }
+                });
             });
             return dataset;
         });
@@ -126,53 +84,16 @@ define([
         self.load = function() {
             return $.Deferred(function(deferred) {
                 self.loadStorageRouters()
-                    .then(self.loadFailureDomains)
                     .then(self.loadVPools)
                     .done(deferred.resolve)
                     .fail(deferred.reject);
-            }).promise();
-        };
-        self.loadFailureDomains = function() {
-            return $.Deferred(function(deferred) {
-                self.failureDomainsLoading(true);
-                if (generic.xhrCompleted(self.loadFailureDomainsHandle)) {
-                    self.loadFailureDomainsHandle = api.get('failure_domains', {
-                        queryparams: { contents: 'name', sort: 'name' }
-                    })
-                        .done(function(data) {
-                            var guids = [], fdata = {};
-                            $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                                fdata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.failureDomains,
-                                function(guid) {
-                                    return new FailureDomain(guid);
-                                }, 'guid'
-                            );
-                            $.each(self.failureDomains(), function(index, failureDomain) {
-                                failureDomain.fillData(fdata[failureDomain.guid()]);
-                            });
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject)
-                        .always(function() {
-                            self.failureDomainsLoading(false);
-                        });
-                } else {
-                    deferred.reject();
-                }
             }).promise();
         };
         self.loadVPools = function() {
             return $.Deferred(function(deferred) {
                 self.vPoolsLoading(true);
                 if (generic.xhrCompleted(self.loadVPoolsHandle)) {
-                    var filter = {
-                        contents: 'statistics,stored_data'
-                    };
-                    self.loadVPoolsHandle = api.get('vpools', { queryparams: filter })
+                    self.loadVPoolsHandle = api.get('vpools', {queryparams: {contents: 'statistics,stored_data'}})
                         .done(function(data) {
                             var vpools = [], vpool;
                             $.each(data.data, function(index, vpdata) {
@@ -196,11 +117,7 @@ define([
             return $.Deferred(function(deferred) {
                 self.storageRoutersLoading(true);
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
-                    self.loadStorageRoutersHandle = api.get('storagerouters', {
-                        queryparams: {
-                            contents: 'status,primary_failure_domain'
-                        }
-                    })
+                    self.loadStorageRoutersHandle = api.get('storagerouters', {queryparams: {contents: 'status,vpools_guids'}})
                         .done(function(data) {
                             var guids = [], sadata = {};
                             $.each(data.data, function(index, item) {

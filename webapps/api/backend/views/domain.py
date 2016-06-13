@@ -15,93 +15,95 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-Module for failure domains
+Module for domains
 """
 
-from backend.decorators import load
-from backend.decorators import log
-from backend.decorators import required_roles
-from backend.decorators import return_list
-from backend.decorators import return_object
+from backend.decorators import load, log, required_roles, return_list, return_object, return_plain
 from backend.serializers.serializers import FullSerializer
-from ovs.dal.hybrids.failuredomain import FailureDomain
-from ovs.dal.lists.failuredomainlist import FailureDomainList
-from ovs.dal.lists.storagerouterlist import StorageRouterList
-from rest_framework import status
-from rest_framework import viewsets
+from celery.task.control import revoke
+from ovs.dal.hybrids.backend import Backend
+from ovs.dal.hybrids.domain import Domain
+from ovs.dal.hybrids.j_backenddomain import BackendDomain
+from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
+from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.vdisk import VDisk
+from ovs.dal.lists.domainlist import DomainList
+from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.lib.mdsservice import MDSServiceController
+from ovs.lib.vdisk import VDiskController
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import NotAcceptable
 from rest_framework.response import Response
 
 
-class FailureDomainViewSet(viewsets.ViewSet):
+class DomainViewSet(viewsets.ViewSet):
     """
-    Information about FailureDomains
+    Information about Domains
     """
     permission_classes = (IsAuthenticated,)
-    prefix = r'failure_domains'
-    base_name = 'failure_domains'
+    prefix = r'domains'
+    base_name = 'domains'
 
     @log()
     @required_roles(['read'])
-    @return_list(FailureDomain)
+    @return_list(Domain)
     @load()
     def list(self):
         """
-        Lists all available Failure Domains
+        Lists all available Domains
         """
-        return FailureDomainList.get_failure_domains()
+        return DomainList.get_domains()
 
     @log()
     @required_roles(['read'])
-    @return_object(FailureDomain)
-    @load(FailureDomain)
-    def retrieve(self, failuredomain):
+    @return_object(Domain)
+    @load(Domain)
+    def retrieve(self, domain):
         """
-        Load information about a given Failure Domain
+        Load information about a given Domain
         """
-        return failuredomain
-
-    @log()
-    @required_roles(['read', 'write', 'manage'])
-    @load(FailureDomain)
-    def destroy(self, failuredomain):
-        """
-        Deletes a FailureDomain
-        """
-        if len(failuredomain.primary_storagerouters) > 0 or len(failuredomain.secondary_storagerouters) > 0:
-            raise NotAcceptable('The given FailureDomain is still in use')
-        failuredomain.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return domain
 
     @log()
     @required_roles(['read', 'write', 'manage'])
     @load()
     def create(self, request, contents=None):
         """
-        Creates a new Failure Domain
+        Creates a new Domain
         """
         contents = None if contents is None else contents.split(',')
-        serializer = FullSerializer(FailureDomain, contents=contents, instance=FailureDomain(), data=request.DATA)
+        serializer = FullSerializer(Domain, contents=contents, instance=Domain(), data=request.DATA)
         if serializer.is_valid():
             serializer.save()
-
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @log()
     @required_roles(['read', 'write', 'manage'])
-    @load(FailureDomain)
-    def partial_update(self, failuredomain, request, contents=None):
+    @load(Domain)
+    def destroy(self, domain):
+        """
+        Deletes a Domain
+        """
+        if len(domain.storagerouters) > 0 or len(domain.backends) > 0 or len(domain.vdisks_dtl) > 0:
+            raise NotAcceptable('The given Domain is still in use')
+        domain.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @load(Domain)
+    def partial_update(self, domain, request, contents=None):
         """
         Update a Failure Domain
         """
         contents = None if contents is None else contents.split(',')
-        serializer = FullSerializer(FailureDomain, contents=contents, instance=failuredomain, data=request.DATA)
+        serializer = FullSerializer(Domain, contents=contents, instance=domain, data=request.DATA)
         if serializer.is_valid():
             serializer.save()
-
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

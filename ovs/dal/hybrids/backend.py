@@ -30,7 +30,8 @@ class Backend(DataObject):
                     Property('status', ['NEW', 'INSTALLING', 'RUNNING', 'STOPPED', 'FAILURE', 'UNKNOWN'], default='NEW', doc='State of the backend')]
     __relations = [Relation('backend_type', BackendType, 'backends', doc='Type of the backend.')]
     __dynamics = [Dynamic('linked_guid', str, 3600),
-                  Dynamic('available', bool, 60)]
+                  Dynamic('available', bool, 60),
+                  Dynamic('regular_domains', list, 60)]
 
     def _linked_guid(self):
         """
@@ -52,3 +53,10 @@ class Backend(DataObject):
         if linked_backend is not None:
             return linked_backend.available
         return False
+
+    def _regular_domains(self):
+        """
+        Returns a list of domain guids
+        :return: List of domain guids
+        """
+        return [junction.domain_guid for junction in self.domains]

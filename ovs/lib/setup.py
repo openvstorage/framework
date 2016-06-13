@@ -590,7 +590,7 @@ class SetupController(object):
                         if storage_router.ip == cluster_ip:
                             online = False
                             unique_id = storage_router.machine_id
-                            StorageDriverController.move_away(storagerouter_guid=storage_router.guid)
+                            StorageDriverController.mark_offline(storagerouter_guid=storage_router.guid)
                         offline_nodes.append(storage_router)
                 if online is True:
                     raise RuntimeError("If the node is online, please use 'ovs setup demote' executed on the node you wish to demote")
@@ -749,7 +749,7 @@ class SetupController(object):
             for storage_router in storage_routers_to_remove:
                 if storage_router in storage_routers_to_remove_offline:
                     SetupController._log(messages='  Marking all Storage Drivers served by Storage Router {0} as offline'.format(storage_router.ip))
-                    StorageDriverController.move_away(storagerouter_guid=storage_router.guid)
+                    StorageDriverController.mark_offline(storagerouter_guid=storage_router.guid)
                     for storagedriver in storage_router.storagedrivers:
                         target_sr = None
                         for sd in storagedriver.vpool.storagedrivers:
@@ -1637,7 +1637,6 @@ EOF
         from ovs.lib.storagerouter import StorageRouterController
         from ovs.dal.hybrids.pmachine import PMachine
         from ovs.dal.hybrids.storagerouter import StorageRouter
-        from ovs.dal.lists.failuredomainlist import FailureDomainList
         from ovs.dal.lists.pmachinelist import PMachineList
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
@@ -1662,22 +1661,10 @@ EOF
                 break
 
         if storagerouter is None:
-            failure_domains = FailureDomainList.get_failure_domains()
-            failure_domain_usages = sys.maxint
-            failure_domain = None
-            for current_failure_domain in failure_domains:
-                current_failure_domain_usages = len(current_failure_domain.primary_storagerouters)
-                if current_failure_domain_usages < failure_domain_usages:
-                    failure_domain = current_failure_domain
-                    failure_domain_usages = current_failure_domain_usages
-            if failure_domain is None:
-                failure_domain = failure_domains[0]
-
             storagerouter = StorageRouter()
             storagerouter.name = node_name
             storagerouter.machine_id = unique_id
             storagerouter.ip = cluster_ip
-            storagerouter.primary_failure_domain = failure_domain
             storagerouter.rdma_capable = False
         storagerouter.node_type = node_type
         storagerouter.pmachine = pmachine

@@ -36,6 +36,14 @@ class BackendList(object):
 
     @staticmethod
     def get_by_name(name):
+        """
+        Retrieve a backend based on its name
+        :param name: Name of the backend
+        :type name: str
+
+        :return: Backend or None
+        :rtype: Backend
+        """
         backends = DataList(Backend, {'type': DataList.where_operator.AND,
                                       'items': [('name', DataList.operator.EQUALS, name)]})
         if len(backends) > 1:

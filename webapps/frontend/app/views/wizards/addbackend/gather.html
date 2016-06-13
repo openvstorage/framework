@@ -17,43 +17,29 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
     <form class="form-horizontal">
-        <p data-i18n="ovs:wizards.addbackend.gather.basicinfo"></p>
+        <p data-i18n="ovs:wizards.add_backend.gather.basic_info"></p>
         <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
-            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addbackend.gather.name"></label>
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.add_backend.gather.name"></label>
             <div class="col-lg-7">
                 <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
             </div>
         </div>
         <div class="form-group">
-            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addbackend.gather.backendtype"></label>
+            <label class="col-lg-3 control-label" for="backendtype" data-i18n="ovs:wizards.add_backend.gather.backend_type"></label>
             <div class="col-lg-7">
-                <span data-bind="dropdown: {
-                         items: data.backendTypes, target: data.backendType,
-                         text: function(item) {
-                             return $.t('ovs:generic.backendtypes.' + item.code());
-                         }
-                     }">
+                <span id="backendtype"
+                      data-bind="dropdown: {
+                          items: data.backendTypes, target: data.backendType,
+                          text: function(item) {
+                              return $.t('ovs:generic.backendtypes.' + item.code());
+                          }
+                      }">
                 </span>
             </div>
         </div>
-        <div class="form-group">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addbackend.gather.role_check" style="padding-top: 0;"></label>
-            <div class="col-lg-7" style="margin-left: 5px;">
-                <!-- ko if: data.storageRoutersChecked() !== true -->
-                    <span class="fa fa-1p5x fa-spin" data-i18n="[html]ovs:icons.loading"></span>
-                <!-- /ko -->
-                <!-- ko if: data.storageRoutersChecked() === true && data.validStorageRouterFound() === undefined -->
-                    <span class="fa" data-i18n="[html]ovs:icons.warning" style="color: orange;"></span>
-                    <span data-i18n="ovs:wizards.addbackend.gather.unable_to_determine_roles"></span>
-                <!-- /ko -->
-                <!-- ko if: data.storageRoutersChecked() === true && data.validStorageRouterFound() === false -->
-                    <span class="fa" data-i18n="[html]ovs:icons.cancel_circle" style="color: red;"></span>
-                <!-- /ko -->
-                <!-- ko if: data.storageRoutersChecked() === true && data.validStorageRouterFound() === true -->
-                    <span class="fa" data-i18n="[html]ovs:icons.check_circle" style="color: green;"></span>
-                <!-- /ko -->
-            </div>
-        </div>
+        <!-- ko foreach: modules -->
+            <div data-bind="compose: $data.activator"></div>
+        <!-- /ko -->
     </form>
     <div class="alert alert-danger" data-bind="visible: !canContinue().value" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>

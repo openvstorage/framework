@@ -245,15 +245,13 @@ but WITHOUT ANY WARRANTY of any kind.
                                                         </td>
                                                         <td style="width: 16%; padding: 0;">
                                                             <span data-bind="dropdown: {
-                                                                                 items: dtlTargets,
-                                                                                 target: dtlTarget,
+                                                                                 items: dtlTargets, target: dtlTarget,
                                                                                  text: function(item) {
                                                                                      if (item !== undefined && item !== null) {
-                                                                                         return item.name;
+                                                                                         return $root.domainCache[item].name();
                                                                                      }
                                                                                  },
-                                                                                 small: true,
-                                                                                 emptyisloading: true
+                                                                                 small: true, emptyisloading: true
                                                                              }">
                                                             </span>
                                                         </td>

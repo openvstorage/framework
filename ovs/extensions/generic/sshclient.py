@@ -30,7 +30,6 @@ import types
 import socket
 import logging
 import tempfile
-import unittest
 from ovs.dal.helpers import Descriptor
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.remote import remote
@@ -116,7 +115,7 @@ class SSHClient(object):
         self.local_ips = [lip.strip() for lip in check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()]
         self.is_local = self.ip in self.local_ips
         self.password = password
-        self._unittest_mode = hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True
+        self._unittest_mode = os.environ.get('RUNNING_UNITTESTS') == 'True'
 
         if self.is_local is False and storagerouter is not None and self._unittest_mode is False:
             process_heartbeat = storagerouter.heartbeats.get('process')

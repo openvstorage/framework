@@ -20,15 +20,15 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="row">
         <div class="col-md-4">
             <!-- Left column -->
-            <div id="dashboard.panels.storagerouter" class="panel panel-default">
-                <!-- StorageRouter -->
+            <div id="dashboard.panels.vpools" class="panel panel-default">
+                <!-- vPools -->
                 <div class="panel-heading">
-                    <b data-i18n="ovs:dashboard.panels.storagerouter.title"></b>
+                    <b data-i18n="ovs:dashboard.panels.vpools.title"></b>
                     <div style="float:right;">
-                        <span data-bind="visible: storageRoutersLoading() || failureDomainsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
+                        <span data-bind="visible: storageRoutersLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <a data-bind="popover: {
-                                          title: 'ovs:dashboard.panels.storagerouter.helptitle',
-                                          content: 'ovs:dashboard.panels.storagerouter.helpcontent'
+                                          title: 'ovs:dashboard.panels.vpools.helptitle',
+                                          content: 'ovs:dashboard.panels.vpools.helpcontent'
                                       }" class="hand fa noline" data-i18n="[html]ovs:icons.help"
                            style="margin-left: 5px; color: white;" role="button" tabindex="-1">
                         </a>
@@ -36,68 +36,54 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
                 <div class="panel-body">
                     <div data-bind="lazylist: {
-                                        displaymode: 'table', items: failureDomains,
+                                        displaymode: 'table', items: vPools,
                                         loadedObservable: 'loaded', colspan: 5
                                     }" >
                         <table data-dummy="dummy">
                             <thead data-part="head">
                                 <tr>
-                                    <th data-i18n="ovs:generic.failuredomains"></th>
+                                    <th data-i18n="ovs:generic.vpools"></th>
                                     <th data-i18n="ovs:generic.storagerouters" colspan="4"></th>
                                 </tr>
                             </thead>
                             <tbody data-dummy="dummy">
                                 <tr data-part="table-entry">
-                                        <td data-bind="shortText: name(), maxLength: 20"></td>
-                                        <td style="padding-left: 0; padding-right: 0; width: 35px;">
-                                            <span class="label label-success pointer"
-                                                  data-bind="tooltip: 'ovs:generic.states.storagerouter.ok',
-                                                             text: $root.orderedStorageRouters()[guid()].green"></span>
-                                        </td>
-                                        <td style="padding-left: 0; padding-right: 0; width: 35px;">
-                                            <span class="label label-warning pointer"
-                                                  data-bind="tooltip: 'ovs:generic.states.storagerouter.warning',
-                                                             text: $root.orderedStorageRouters()[guid()].orange"></span>
-                                        </td>
-                                        <td style="padding-left: 0; padding-right: 0; width: 35px;">
-                                            <span class="label label-danger pointer"
-                                                  data-bind="tooltip: 'ovs:generic.states.storagerouter.failure',
-                                                             text: $root.orderedStorageRouters()[guid()].red"></span>
-                                        </td>
-                                        <td style="padding-left: 0; padding-right: 0; width: 35px;">
-                                            <span class="label pointer"
-                                                  data-bind="tooltip: 'ovs:generic.states.storagerouter.unknown',
-                                                             text: $root.orderedStorageRouters()[guid()].lightgrey"
-                                                  style="background-color: #888888;"></span>
-                                        </td>
+                                    <td>
+                                        <a data-bind="shortText: name(), maxLength: 20, attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid() }) }"></a>
+                                    </td>
+                                    <td style="padding-left: 0; padding-right: 0; width: 35px;">
+                                        <span class="label label-success pointer"
+                                              data-bind="tooltip: 'ovs:generic.states.storagerouter.ok',
+                                                         text: $root.orderedStorageRouters()[guid()].green"></span>
+                                    </td>
+                                    <td style="padding-left: 0; padding-right: 0; width: 35px;">
+                                        <span class="label label-warning pointer"
+                                              data-bind="tooltip: 'ovs:generic.states.storagerouter.warning',
+                                                         text: $root.orderedStorageRouters()[guid()].orange"></span>
+                                    </td>
+                                    <td style="padding-left: 0; padding-right: 0; width: 35px;">
+                                        <span class="label label-danger pointer"
+                                              data-bind="tooltip: 'ovs:generic.states.storagerouter.failure',
+                                                         text: $root.orderedStorageRouters()[guid()].red"></span>
+                                    </td>
+                                    <td style="padding-left: 0; padding-right: 0; width: 35px;">
+                                        <span class="label pointer"
+                                              data-bind="tooltip: 'ovs:generic.states.storagerouter.unknown',
+                                                         text: $root.orderedStorageRouters()[guid()].lightgrey"
+                                              style="background-color: #888888;"></span>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                  </div>
             </div>
-            <!-- ko foreach: shared.hooks.dashboards -->
-                <div class="panel panel-default" data-bind="compose: $data.activator"></div>
-            <!-- /ko -->
         </div>
         <div class="col-md-4">
             <!-- Center column -->
-            <div class="panel panel-default">
-                <!-- Cache -->
-                <div class="panel-heading">
-                    <b data-i18n="ovs:dashboard.panels.cache.title"></b>
-                    <div style="float:right;">
-                        <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
-                        <a data-bind="popover: {
-                                          title: 'ovs:dashboard.panels.cache.helptitle',
-                                          content: 'ovs:dashboard.panels.cache.helpcontent'
-                                      }" class="hand fa noline" data-i18n="[html]ovs:icons.help"
-                           style="margin-left: 5px; color: white;" role="button" tabindex="-1">
-                        </a>
-                    </div>
-                </div>
-                <div class="panel-body" data-bind="gauge: { primary: cacheRatio, secondary: iops }"></div>
-            </div>
+            <!-- ko foreach: shared.hooks.dashboards -->
+                <div class="panel panel-default" data-bind="compose: $data.activator"></div>
+            <!-- /ko -->
         </div>
         <div class="col-md-4">
             <!-- Right column -->
@@ -135,10 +121,6 @@ but WITHOUT ANY WARRANTY of any kind.
                             <tr>
                                 <td data-i18n="ovs:generic.writespeed"></td>
                                 <td data-bind="text: writeSpeed"></td>
-                            </tr>
-                            <tr>
-                                <td data-i18n="ovs:generic.cacheratio"></td>
-                                <td data-bind="text: cacheRatio"></td>
                             </tr>
                         </tbody>
                     </table>

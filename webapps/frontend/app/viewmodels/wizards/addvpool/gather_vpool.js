@@ -223,7 +223,7 @@ define([
                                                     asdsFound = true;
                                                     return false;
                                                 });
-                                                if (asdsFound === true) {
+                                                if (asdsFound === true || data.scaling === 'GLOBAL') {
                                                     available_backends.push(data);
                                                     self.albaPresetMap()[data.guid] = {};
                                                     $.each(data.presets, function (_, preset) {
@@ -238,6 +238,9 @@ define([
                         $.when.apply($, calls)
                             .then(function() {
                                 if (available_backends.length > 0) {
+                                    available_backends.sort(function(backend1, backend2) {
+                                        return backend1.name.toLowerCase() < backend2.name.toLowerCase() ? -1 : 1;
+                                    });
                                     self.data.albaBackends(available_backends);
                                     self.data.albaBackend(available_backends[0]);
                                     self.data.albaPreset(available_backends[0].presets[0]);

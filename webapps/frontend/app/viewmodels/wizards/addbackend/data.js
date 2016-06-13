@@ -23,9 +23,7 @@ define(['knockout'], function(ko){
             backends:                ko.observableArray([]),
             backendType:             ko.observable(),
             backendTypes:            ko.observableArray([]),
-            name:                    ko.observable().extend({ regex: nameRegex }),
-            storageRoutersChecked:   ko.observable(false),
-            validStorageRouterFound: ko.observable()
+            name:                    ko.observable().extend({ regex: nameRegex })
         };
     };
     return singleton();

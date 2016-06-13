@@ -284,7 +284,7 @@ class Toolbox(object):
             try:
                 key[index] = float(key[index])
             except ValueError:
-                pass
+                key[index] = key[index].lower()
         return tuple(key)
 
 

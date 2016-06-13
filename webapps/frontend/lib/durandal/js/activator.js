@@ -149,7 +149,7 @@ define(['durandal/system', 'knockout'], function (system, ko) {
                 dfd.resolve(true);
             }
         }).promise();
-    };
+    }
 
     function canActivateItem(newItem, activeItem, settings, activationData) {
         settings.lifecycleData = null;
@@ -186,7 +186,7 @@ define(['durandal/system', 'knockout'], function (system, ko) {
                 dfd.resolve(true);
             }
         }).promise();
-    };
+    }
 
     /**
      * An activator is a read/write computed observable that enforces the activation lifecycle whenever changing values.

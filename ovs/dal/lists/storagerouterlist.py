@@ -88,3 +88,15 @@ class StorageRouterList(object):
         if len(storagerouters) == 1:
             return storagerouters[0]
         raise RuntimeError('There should be only one StorageRouter with name: {0}'.format(name))
+
+    @staticmethod
+    def get_primary_storagerouters_for_domain(domain):
+        """
+        Retrieve a Storage Router pool of Storage Routers using the specified Domain as primary Domain
+        :param domain: Domain to filter on
+        :type domain: Domain
+
+        :return: List of Storage Routers
+        :rtype: list
+        """
+        return [junction.storagerouter for junction in domain.storagerouters if junction.backup is False]

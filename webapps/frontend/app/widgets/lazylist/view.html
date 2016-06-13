@@ -17,10 +17,15 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <section>
     <!-- ko if: displaymode() === 'span' -->
-        <!-- // The crappy layout below is required to make sure there are no spaces before the comma, because that's ugly -->
-        <span data-bind="foreach: items"><span data-bind="visible: $index() > 0">,</span>
-            <span data-bind="visible: !$parent.isLoaded($data)"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
-            <span data-bind="visible: $parent.isLoaded($data)"><span data-part="entry" data-bind="text: $data"></span></span></span>
+        <!-- ko if: items().length === 0 -->
+            <i data-i18n="ovs:generic.null"></i>
+        <!-- /ko -->
+        <!-- ko if: items().length > 0 -->
+            <!-- The crappy layout below is required to make sure there are no spaces before the comma, because that's ugly -->
+            <span data-bind="foreach: items"><span data-bind="visible: $index() > 0">,</span>
+                <span data-bind="visible: !$parent.isLoaded($data)"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
+                <span data-bind="visible: $parent.isLoaded($data)"><span data-part="entry" data-bind="text: $data"></span></span></span>
+        <!-- /ko -->
     <!-- /ko -->
     <!-- ko if: displaymode() === 'table' -->
         <table class="table table-striped table-hover" >

@@ -415,6 +415,16 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return false;
     }
+    function arrayHasElementWithProperty(array, property, value) {
+        var i;
+        for (i = 0; i < array.length; i += 1) {
+            var element = array[i];
+            if (element.hasOwnProperty(property) && element[property] === value) {
+                return true;
+            }
+        }
+        return false;
+    }
     function arrayIsIn(array1, array2) {
         var i;
         for (i = 0; i < array2.length; i += 1) {
@@ -515,6 +525,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         alertInfo: alertInfo,
         alertSuccess: alertSuccess,
         arrayFilterUnique: arrayFilterUnique,
+        arrayHasElementWithProperty: arrayHasElementWithProperty,
         buildString: buildString,
         ceil: ceil,
         crossFiller: crossFiller,

@@ -20,22 +20,23 @@ StorageRouter module
 
 import json
 from celery.task.control import revoke
-from rest_framework import viewsets, status
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action, link
-from rest_framework.exceptions import NotAcceptable
-from rest_framework.response import Response
+from backend.decorators import required_roles, return_list, return_object, return_task, return_plain, load, log
 from backend.serializers.serializers import FullSerializer
-from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.datalist import DataList
+from ovs.dal.hybrids.domain import Domain
+from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
+from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.disk import DiskController
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.storagedriver import StorageDriverController
+from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.vdisk import VDiskController
-from backend.decorators import required_roles, return_list, return_object, return_task, return_plain, load, log
+from rest_framework import viewsets, status
+from rest_framework.decorators import action, link
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 
 class StorageRouterViewSet(viewsets.ViewSet):
@@ -45,6 +46,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
     permission_classes = (IsAuthenticated,)
     prefix = r'storagerouters'
     base_name = 'storagerouters'
+
+    DOMAIN_CHANGE_KEY = 'ovs_dedupe_domain_change'
+    RECOVERY_DOMAIN_CHANGE_KEY = 'ovs_dedupe_recovery_domain_change'
 
     @log()
     @required_roles(['read'])
@@ -78,39 +82,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Update a StorageRouter
         """
         contents = None if contents is None else contents.split(',')
-        previous_primary = storagerouter.primary_failure_domain
-        previous_secondary = storagerouter.secondary_failure_domain
         serializer = FullSerializer(StorageRouter, contents=contents, instance=storagerouter, data=request.DATA)
         if serializer.is_valid():
-            primary = storagerouter.primary_failure_domain
-            secondary = storagerouter.secondary_failure_domain
-            if primary is None:
-                raise NotAcceptable('A StorageRouter must have a primary FD configured')
-            if secondary is not None:
-                if primary.guid == secondary.guid:
-                    raise NotAcceptable('A StorageRouter cannot have the same FD for both primary and secondary')
-                if len(secondary.primary_storagerouters) == 0:
-                    raise NotAcceptable('The secondary FD should be set as primary FD by at least one StorageRouter')
-            if len(previous_primary.secondary_storagerouters) > 0 and len(previous_primary.primary_storagerouters) == 1 and \
-                    previous_primary.primary_storagerouters[0].guid == storagerouter.guid and previous_primary.guid != primary.guid:
-                raise NotAcceptable('Cannot change the primary FD as this StorageRouter is the only one serving it while it is used as secondary FD')
             serializer.save()
-            if previous_primary != primary or previous_secondary != secondary:
-                cache = VolatileFactory.get_client()
-                key_mds = 'ovs_dedupe_fdchange_mds_{0}'.format(storagerouter.guid)
-                key_dtl = 'ovs_dedupe_fdchange_dtl_{0}'.format(storagerouter.guid)
-                task_mds_id = cache.get(key_mds)
-                task_dtl_id = cache.get(key_dtl)
-                if task_mds_id:
-                    # Key exists, task was already scheduled. If task is already running, the revoke message will be ignored
-                    revoke(task_mds_id)
-                if task_dtl_id:
-                    revoke(task_dtl_id)
-                async_mds_result = MDSServiceController.mds_checkup.s().apply_async(countdown=60)
-                async_dtl_result = VDiskController.dtl_checkup.s().apply_async(countdown=60)
-                cache.set(key_mds, async_mds_result.id, 600)  # Store the task id
-                cache.set(key_mds, async_dtl_result.id, 600)  # Store the task id
-
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -119,18 +93,29 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
-    @load(StorageRouter)
+    @load(StorageRouter, max_version=1)
     def move_away(self, storagerouter):
         """
-        Moves away all vDisks from all Storage Drivers this Storage Router is serving
+        Marks all StorageDrivers of a given node offline. DO NOT USE ON RUNNING STORAGEROUTERS!
         """
-        return StorageDriverController.move_away.delay(storagerouter.guid)
+        return StorageDriverController.mark_offline.delay(storagerouter.guid)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def mark_offline(self, storagerouter):
+        """
+        Marks all StorageDrivers of a given node offline. DO NOT USE ON RUNNING STORAGEROUTERS!
+        """
+        return StorageDriverController.mark_offline.delay(storagerouter.guid)
 
     @link()
     @log()
     @required_roles(['read'])
     @return_plain()
-    @load(StorageRouter)
+    @load(StorageRouter, max_version=1)
     def get_available_actions(self):
         """
         Gets a list of all available actions
@@ -357,3 +342,55 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Refreshes all hardware parameters
         """
         return StorageRouterController.refresh_hardware.delay(storagerouter.guid)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_plain()
+    @load(StorageRouter)
+    def set_domains(self, storagerouter, domain_guids, recovery_domain_guids):
+        """
+        Configures the given domains to the StorageRouter.
+        :param storagerouter: The StorageRouter to update
+        :type storagerouter: StorageRouter
+        :param domain_guids: A list of Domain guids
+        :type domain_guids: list
+        :param recovery_domain_guids: A list of Domain guids to set as recovery Domain
+        :type recovery_domain_guids: list
+        """
+        change = False
+        for junction in storagerouter.domains:
+            if junction.backup is False:
+                if junction.domain_guid not in domain_guids:
+                    junction.delete()
+                    change = True
+                else:
+                    domain_guids.remove(junction.domain_guid)
+            else:
+                if junction.domain_guid not in recovery_domain_guids:
+                    junction.delete()
+                    change = True
+                else:
+                    recovery_domain_guids.remove(junction.domain_guid)
+        for domain_guid in domain_guids + recovery_domain_guids:
+            junction = StorageRouterDomain()
+            junction.domain = Domain(domain_guid)
+            junction.backup = domain_guid in recovery_domain_guids
+            junction.storagerouter = storagerouter
+            junction.save()
+            change = True
+
+        # Schedule a task to run after 60 seconds, re-schedule task if another identical task gets triggered
+        if change is True:
+            cache = VolatileFactory.get_client()
+            task_id_domain = cache.get(StorageRouterViewSet.DOMAIN_CHANGE_KEY)
+            task_id_backup = cache.get(StorageRouterViewSet.RECOVERY_DOMAIN_CHANGE_KEY)
+            if task_id_domain:
+                revoke(task_id_domain)  # If key exists, task was already scheduled. If task is already running, the revoke message will be ignored
+            if task_id_backup:
+                revoke(task_id_backup)
+            async_mds_result = MDSServiceController.mds_checkup.s().apply_async(countdown=60)
+            async_dtl_result = VDiskController.dtl_checkup.s().apply_async(countdown=60)
+            cache.set(StorageRouterViewSet.DOMAIN_CHANGE_KEY, async_mds_result.id, 600)  # Store the task id
+            cache.set(StorageRouterViewSet.RECOVERY_DOMAIN_CHANGE_KEY, async_dtl_result.id, 600)  # Store the task id
+            storagerouter.invalidate_dynamics(['regular_domains', 'recovery_domains'])

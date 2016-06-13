@@ -46,6 +46,9 @@ but WITHOUT ANY WARRANTY of any kind.
                               data-bind="translate: 'ovs:generic.backendtypes.' + item().code()"></span>
                     </span>
                 </td>
+                <td data-bind="lazylist: { items: domains, loadedObservable: 'loaded' }">
+                    <span data-part="entry" data-bind="text: name"></span>
+                </td>
                 <td>
                     <div data-bind="status: {
                                         colors: {

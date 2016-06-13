@@ -22,7 +22,6 @@ import time
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
-from ovs.dal.hybrids.failuredomain import FailureDomain
 from ovs.dal.hybrids.pmachine import PMachine
 
 
@@ -38,16 +37,16 @@ class StorageRouter(DataObject):
                     Property('node_type', ['MASTER', 'EXTRA'], default='EXTRA', doc='Indicates the node\'s type'),
                     Property('rdma_capable', bool, doc='Is this StorageRouter RDMA capable'),
                     Property('last_heartbeat', float, mandatory=False, doc='When was the last (external) heartbeat send/received')]
-    __relations = [Relation('pmachine', PMachine, 'storagerouters'),
-                   Relation('primary_failure_domain', FailureDomain, 'primary_storagerouters'),
-                   Relation('secondary_failure_domain', FailureDomain, 'secondary_storagerouters', mandatory=False)]
+    __relations = [Relation('pmachine', PMachine, 'storagerouters')]
     __dynamics = [Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('stored_data', int, 60),
                   Dynamic('vmachines_guids', list, 15),
                   Dynamic('vpools_guids', list, 15),
                   Dynamic('vdisks_guids', list, 15),
                   Dynamic('status', str, 10),
-                  Dynamic('partition_config', dict, 3600)]
+                  Dynamic('partition_config', dict, 3600),
+                  Dynamic('regular_domains', list, 60),
+                  Dynamic('recovery_domains', list, 60)]
 
     def _statistics(self, dynamic):
         """
@@ -135,3 +134,17 @@ class StorageRouter(DataObject):
                 for role in partition.roles:
                     dataset[role].append(partition.guid)
         return dataset
+
+    def _regular_domains(self):
+        """
+        Returns a list of domain guids with backup flag False
+        :return: List of domain guids
+        """
+        return [junction.domain_guid for junction in self.domains if junction.backup is False]
+
+    def _recovery_domains(self):
+        """
+        Returns a list of domain guids with backup flag True
+        :return: List of domain guids
+        """
+        return [junction.domain_guid for junction in self.domains if junction.backup is True]

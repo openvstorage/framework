@@ -17,10 +17,9 @@
 """
 Wrapper class for the storagedriver client of the voldrv team
 """
-
+import os
 import copy
 import json
-import unittest
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
@@ -33,7 +32,7 @@ from volumedriver.storagerouter.storagerouterclient import ReadCacheBehaviour
 from volumedriver.storagerouter.storagerouterclient import ReadCacheMode
 from volumedriver.storagerouter.storagerouterclient import Statistics
 from volumedriver.storagerouter.storagerouterclient import VolumeInfo
-if hasattr(unittest, 'running_tests') and getattr(unittest, 'running_tests') is True:
+if os.environ.get('RUNNING_UNITTESTS') == 'True':
     from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient as SRClient
     from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient as MDSClient
 else:
