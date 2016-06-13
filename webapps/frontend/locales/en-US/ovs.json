@@ -113,6 +113,12 @@
             "tib": "TiB",
             "tibs": "TiB/s"
         },
+        "fragmentcaches": {
+            "rw": "On Read & Write",
+            "read": "On Read",
+            "write": "On Write",
+            "none": "No Caching"
+        },
         "about": "About",
         "accept": "Accept",
         "actions": "Actions",
@@ -772,8 +778,6 @@
                 "client_id": "Client ID:",
                 "client_secret": "Client Secret:",
                 "fragment_cache": "Fragment Cache:",
-                "fragment_cache_on_read": "On Read",
-                "fragment_cache_on_write": "On Write",
                 "host": "Host (FQDN/IP):",
                 "invalid_alba_info": "The entered connection info and credentials are invalid",
                 "invalid_host": "Invalid host (should be a FQDN or IP address)",
@@ -782,7 +786,8 @@
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
                 "re_use_connection_info": "Re-use connection info:",
-                "use_accelerated_alba": "Use accelerated backend"
+                "use_backend_aa": "Use another ALBA Backend as Fragment Cache",
+                "use_local": "Place Fragment Cache on disk"
             },
             "gather_config": {
                 "basic_info": "Specify the configurations for the vPool",
