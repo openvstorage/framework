@@ -30,9 +30,10 @@ define([
         self.fetchAlbaVPoolHandle = undefined;
 
         // Observables
-        self.albaBackendLoading = ko.observable(false);
-        self.albaPresetMap      = ko.observable({});
-        self.invalidAlbaInfo    = ko.observable(false);
+        self.albaBackendLoading    = ko.observable(false);
+        self.albaPresetMap         = ko.observable({});
+        self.invalidAlbaInfo       = ko.observable(false);
+        self.fragmentCacheSettings = ko.observableArray(['write', 'read', 'rw', 'none']);
 
         // Computed
         self.localBackendsAvailable = ko.computed(function() {
@@ -96,6 +97,24 @@ define([
                 }
             }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
+        });
+        self.fragmentCacheSetting = ko.computed({
+            read: function() {
+                if (self.data.fragmentCacheOnRead() && self.data.fragmentCacheOnWrite()) {
+                    return 'rw';
+                }
+                if (self.data.fragmentCacheOnRead() || self.data.fragmentCacheOnWrite()) {
+                    return self.data.fragmentCacheOnRead() ? 'read' : 'write';
+                }
+                return 'none';
+            },
+            write: function(cache) {
+                self.data.fragmentCacheOnRead(['rw', 'read'].contains(cache));
+                self.data.fragmentCacheOnWrite(['rw', 'write'].contains(cache));
+                if (cache === 'none') {
+                    self.data.useAA(false);
+                }
+            }
         });
 
         // Functions

@@ -113,6 +113,12 @@
             "tib": "TiB",
             "tibs": "TiB/s"
         },
+        "fragmentcaches": {
+            "rw": "On read & write",
+            "read": "On read",
+            "write": "On write",
+            "none": "No caching"
+        },
         "about": "About",
         "accept": "Accept",
         "actions": "Actions",
@@ -772,8 +778,6 @@
                 "client_id": "Client ID:",
                 "client_secret": "Client Secret:",
                 "fragment_cache": "Fragment Cache:",
-                "fragment_cache_on_read": "On Read",
-                "fragment_cache_on_write": "On Write",
                 "host": "Host (FQDN/IP):",
                 "invalid_alba_info": "The entered connection info and credentials are invalid",
                 "invalid_host": "Invalid host (should be a FQDN or IP address)",

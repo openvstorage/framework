@@ -817,7 +817,9 @@ class StorageRouterController(object):
 
             fragment_cache_on_read = parameters['fragment_cache_on_read']
             fragment_cache_on_write = parameters['fragment_cache_on_write']
-            if use_accelerated_alba is True:
+            if fragment_cache_on_read is False and fragment_cache_on_write is False:
+                fragment_cache_info = ['none']
+            elif use_accelerated_alba is True:
                 fragment_cache_info = ['alba', {'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm_aa')),
                                                 'bucket_strategy': ['1-to-1', {'prefix': vpool.metadata[storagerouter.guid]['name'],
                                                                                'preset': vpool.metadata[storagerouter.guid]['preset']}],
