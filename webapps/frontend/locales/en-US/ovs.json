@@ -114,10 +114,10 @@
             "tibs": "TiB/s"
         },
         "fragmentcaches": {
-            "rw": "On read & write",
-            "read": "On read",
-            "write": "On write",
-            "none": "No caching"
+            "rw": "On Read & Write",
+            "read": "On Read",
+            "write": "On Write",
+            "none": "No Caching"
         },
         "about": "About",
         "accept": "Accept",
@@ -786,8 +786,8 @@
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
                 "re_use_connection_info": "Re-use connection info:",
-                "use_backend_aa": "Use another ALBA backend as Fragment Cache",
-                "use_local": "Place Fragement Cache on disk"
+                "use_backend_aa": "Use another ALBA Backend as Fragment Cache",
+                "use_local": "Place Fragment Cache on disk"
             },
             "gather_config": {
                 "basic_info": "Specify the configurations for the vPool",
