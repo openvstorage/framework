@@ -50,7 +50,9 @@ class Basic(unittest.TestCase):
         This makes sure the unittests can be executed without those libraries installed
         """
         cls.persistent = PersistentFactory.get_client()
+        cls.persistent._keep_in_memory_only = False
         cls.volatile = VolatileFactory.get_client()
+        cls.volatile._keep_in_memory_only = False
         cls.persistent.clean()
         cls.volatile.clean()
 

@@ -61,7 +61,7 @@ define([
         data.dtlEnabled(true);
         data.dtlMode({name: 'a_sync', disabled: false});
         data.dtlTransportMode({name: 'tcp'});
-        data.fragmentCacheOnRead(false);
+        data.fragmentCacheOnRead(true);
         data.fragmentCacheOnWrite(true);
         data.hasMgmtCenter(false);
         data.host('');

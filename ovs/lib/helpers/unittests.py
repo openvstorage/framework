@@ -33,6 +33,9 @@ class UnitTest(object):
     Class to execute all unit tests or a subset of tests
     """
     _test_info = {}
+    _ERROR = '\033[91mERROR\033[0m'
+    _SUCCESS = '\033[92mSUCCESS\033[0m'
+    _FAILURE = '\033[93mFAILURE\033[0m'
     _OVS_PATH = '/opt/OpenvStorage'
 
     def __init__(self):
@@ -201,28 +204,28 @@ class UnitTest(object):
             result = unittest.TextTestRunner(verbosity=2).run(tests_to_run)
             test_results.append('  - Module: {0}  ({1} test{2})'.format(test.split('.')[0], test_amount, '' if test_amount == 1 else 's'))
             test_results.append('    - DURATION: {0}'.format(UnitTest._sec_to_readable(time.time() - start_test)))
-            test_results.append('    - SUCCESS: {0}'.format(test_amount - len(result.errors) - len(result.failures)))
+            test_results.append('    - {0}: {1}'.format(UnitTest._SUCCESS, test_amount - len(result.errors) - len(result.failures)))
 
             total_tests += test_amount
             total_success += test_amount - len(result.errors) - len(result.failures)
             if len(result.failures) > 0:
                 total_failure += len(result.failures)
-                test_results.append('    - FAILURE: {0}'.format(len(result.failures)))
+                test_results.append('    - {0}: {1}'.format(UnitTest._FAILURE, len(result.failures)))
                 for failure in result.failures:
                     test_results.append('      - Class: {0}, Test: {1}, Message: {2}'.format(failure[0].id().split('.')[-2], failure[0].id().split('.')[-1], failure[1].splitlines()[-1]))
             if len(result.errors) > 0:
                 total_error += len(result.errors)
-                test_results.append('    - ERRORS: {0}'.format(len(result.errors)))
+                test_results.append('    - {0}: {1}'.format(UnitTest._ERROR, len(result.errors)))
                 for error in result.errors:
                     test_results.append('      - Class: {0}, Test: {1}, Message: {2}'.format(error[0].id().split('.')[-2], error[0].id().split('.')[-1], error[1].splitlines()[-1]))
             test_results.append('')
         if len(tests) > 1:
             test_results.insert(4, '')
             if total_error > 0:
-                test_results.insert(4, '    - ERROR: {0} / {1} ({2:.2f} %)'.format(total_error, int(total_tests), total_error / total_tests * 100))
+                test_results.insert(4, '    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._ERROR, total_error, int(total_tests), total_error / total_tests * 100))
             if total_failure > 0:
-                test_results.insert(4, '    - FAILURE: {0} / {1} ({2:.2f} %)'.format(total_failure, int(total_tests), total_failure / total_tests * 100))
-            test_results.insert(4, '    - SUCCESS: {0} / {1} ({2:.2f} %)'.format(total_success, int(total_tests), total_success / total_tests * 100))
+                test_results.insert(4, '    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._FAILURE, total_failure, int(total_tests), total_failure / total_tests * 100))
+            test_results.insert(4, '    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._SUCCESS, total_success, int(total_tests), total_success / total_tests * 100))
             test_results.insert(4, '  - Total amount of tests: {0}'.format(int(total_tests)))
             test_results.insert(4, '  - Total duration: {0}'.format(UnitTest._sec_to_readable(time.time() - start_all)))
         print '\n\n\n{0}'.format('\n'.join(test_results))
