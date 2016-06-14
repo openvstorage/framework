@@ -838,6 +838,7 @@ class StorageRouterController(object):
                 'ips': ['127.0.0.1'],
                 'manifest_cache_size': 16 * 1024 * 1024 * 1024,
                 'fragment_cache': fragment_cache_info,
+                'transport': 'rdma' if EtcdConfiguration.get('/ovs/framework/rdma') else 'tcp',
                 'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm'))
             }), raw=True)
 
@@ -894,11 +895,11 @@ class StorageRouterController(object):
         volume_manager_config['non_disposable_scos_factor'] = sco_factor
 
         queue_urls = []
+        mq_protocol = EtcdConfiguration.get('/ovs/framework/messagequeue|protocol')
+        mq_user = EtcdConfiguration.get('/ovs/framework/messagequeue|user')
+        mq_password = EtcdConfiguration.get('/ovs/framework/messagequeue|password')
         for current_storagerouter in StorageRouterList.get_masters():
-            queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(EtcdConfiguration.get('/ovs/framework/messagequeue|protocol'),
-                                                                      EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
-                                                                      EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
-                                                                      current_storagerouter.ip)})
+            queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(mq_protocol, mq_user, mq_password, current_storagerouter.ip)})
 
         storagedriver_config.clean()  # Clean out obsolete values
         if vpool.backend_type.code == 'alba':
@@ -906,6 +907,7 @@ class StorageRouterController(object):
                                           'alba_connection_port': alba_proxy.service.ports[0],
                                           'alba_connection_preset': vpool.metadata['backend']['preset'],
                                           'alba_connection_timeout': 15,
+                                          'alba_connection_transport': 'RDMA' if EtcdConfiguration.get('/ovs/framework/rdma') else 'TCP',
                                           'backend_type': 'ALBA'}
         elif vpool.backend_type.code in ['local', 'distributed']:
             backend_connection_manager = local_backend_data
@@ -948,7 +950,8 @@ class StorageRouterController(object):
         storagedriver_config.configure_event_publisher(events_amqp_routing_key=EtcdConfiguration.get('/ovs/framework/messagequeue|queues.storagedriver'),
                                                        events_amqp_uris=queue_urls)
         storagedriver_config.configure_threadpool_component(num_threads=16)
-        storagedriver_config.configure_network_interface(network_uri='tcp://{0}:{1}'.format(storagedriver.storage_ip,
+        storagedriver_config.configure_network_interface(network_uri='{0}://{0}:{1}'.format('rdma' if EtcdConfiguration.get('/ovs/framework/rdma') else 'tcp',
+                                                                                            storagedriver.storage_ip,
                                                                                             storagedriver.ports['edge']))
         storagedriver_config.save(client, reload_config=False)
 

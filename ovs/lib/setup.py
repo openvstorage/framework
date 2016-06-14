@@ -74,6 +74,7 @@ class SetupController(object):
         Toolbox.verify_required_params(actual_params={'node_type': node_type},
                                        required_params={'node_type': (str, ['master', 'extra'], False)})
 
+        rdma = None
         master_ip = None
         cluster_ip = None
         external_etcd = None  # Example: 'etcd0123456789=http://1.2.3.4:2380'
@@ -97,6 +98,7 @@ class SetupController(object):
                 master_password = config['master_password']
 
                 # Optional fields
+                rdma = config.get('rdma', False)
                 node_type = config.get('node_type', node_type)
                 cluster_ip = config.get('cluster_ip', master_ip)  # If cluster_ip not provided, we assume 1st node installation
                 external_etcd = config.get('external_etcd')
@@ -450,7 +452,8 @@ class SetupController(object):
                                                           hypervisor_info=hypervisor_info,
                                                           enable_heartbeats=enable_heartbeats,
                                                           external_etcd=external_etcd,
-                                                          logging_target=logging_target)
+                                                          logging_target=logging_target,
+                                                          rdma=rdma)
                     except Exception as ex:
                         SetupController._log(messages=['Failed to setup first node', ex], loglevel='exception')
                         SetupController._rollback_setup(target_client=ip_client_map[cluster_ip],
@@ -820,7 +823,7 @@ class SetupController(object):
         SetupController._log(messages='Remove nodes finished', title=True)
 
     @staticmethod
-    def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats, external_etcd, logging_target):
+    def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats, external_etcd, logging_target, rdma):
         """
         Sets up the first node services. This node is always a master
         """
@@ -848,6 +851,10 @@ class SetupController(object):
 
         EtcdConfiguration.initialize(external_etcd=external_etcd, logging_target=logging_target)
         EtcdConfiguration.initialize_host(machine_id)
+
+        if rdma is None:
+            rdma = Interactive.ask_yesno(message='Enable RDMA?', default_value=False)
+        EtcdConfiguration.set('/ovs/framework/rdma', rdma)
 
         if ServiceManager.has_fleet():
             SetupController._log(messages='Setting up Fleet')
