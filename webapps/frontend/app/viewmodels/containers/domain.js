@@ -43,7 +43,7 @@ define([
             if (self.existingDomainNames !== undefined) {
                 names = self.existingDomainNames().slice();
                 if (self.guid() !== undefined) { // Remove yourself when editing the name
-                    names.remove(self.name());
+                    names.remove(self.name().toLowerCase());
                 }
             }
             return self.name() !== undefined && self.name() !== '' && !names.contains(self.name().toLowerCase()) && self.name().length < 31;

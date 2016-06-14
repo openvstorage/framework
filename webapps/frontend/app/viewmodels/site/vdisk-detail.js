@@ -25,6 +25,7 @@ define([
         var self = this;
 
         // Variables
+        self.domainCache     = {};
         self.shared          = shared;
         self.guard           = { authenticated: true };
         self.refresher       = new Refresher();
@@ -38,7 +39,6 @@ define([
             { key: 'is_sticky',     value: $.t('ovs:generic.sticky'),      width: 100       },
             { key: undefined,       value: $.t('ovs:generic.actions'),     width: 60        }
         ];
-        self.domainCache     = {};
 
         // Observables
         self.snapshotsInitialLoad = ko.observable(true);
@@ -82,12 +82,19 @@ define([
             return $.Deferred(function(deferred) {
                 var vdisk = self.vDisk();
                 if (vdisk !== undefined && generic.xhrCompleted(self.loadDomainHandle)) {
-                    self.loadDomainHandle = api.get('domains', { queryparams: { contents: '' }})
+                    self.loadDomainHandle = api.get('domains', { queryparams: { contents: 'storage_router_layout' }})
                         .done(function(data) {
                             var guids = [], ddata = {};
                             $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                                ddata[item.guid] = item;
+                                if (item.storage_router_layout.regular.contains(self.vDisk().storageRouterGuid())) {
+                                    if (item.storage_router_layout.regular.length > 1) {
+                                        guids.push(item.guid);
+                                        ddata[item.guid] = item;
+                                    }
+                                } else if (item.storage_router_layout.regular.length > 0)  {
+                                    guids.push(item.guid);
+                                    ddata[item.guid] = item;
+                                }
                             });
                             self.vDisk().dtlTargets(guids);
                             generic.crossFiller(
@@ -113,7 +120,7 @@ define([
             }).promise();
         };
         self.refreshSnapshots = function() {
-            // Not un use, for mapping only
+            // Not in use, for mapping only
         };
         self.formatBytes = function(value) {
             return generic.formatBytes(value);

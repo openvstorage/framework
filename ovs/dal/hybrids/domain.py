@@ -18,7 +18,8 @@
 Domain module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Property
+from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.structures import Dynamic, Property
 
 
 class Domain(DataObject):
@@ -49,4 +50,21 @@ class Domain(DataObject):
     """
     __properties = [Property('name', str, doc='The name of the domain')]
     __relations = []
-    __dynamics = []
+    __dynamics = [Dynamic('storage_router_layout', dict, 5)]
+
+    def _storage_router_layout(self):
+        """
+        Creates a dictionary with information about which Storage Routers use this domain as its normal and recovery domain
+        :return: Information about Storage Routers using this domain
+        :rtype: dict
+        """
+        layout = {'regular': [],
+                  'recovery': []}
+        for sr in StorageRouterList.get_storagerouters():
+            for junction in sr.domains:
+                if junction.domain_guid == self.guid:
+                    if junction.backup is True:
+                        layout['recovery'].append(sr.guid)
+                    else:
+                        layout['regular'].append(sr.guid)
+        return layout

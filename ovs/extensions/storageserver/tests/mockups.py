@@ -17,6 +17,7 @@
 """
 Mock wrapper class for the storagedriver client
 """
+from volumedriver.storagerouter.storagerouterclient import DTLConfigMode
 
 
 class MockStorageRouterClient(object):
@@ -24,6 +25,7 @@ class MockStorageRouterClient(object):
     Storage Router Client Mock class
     """
     catch_up = {}
+    dtl_config_cache = {}
     metadata_backend_config = {}
     snapshots = {}
     vrouter_id = {}
@@ -41,6 +43,7 @@ class MockStorageRouterClient(object):
         Clean everything up from previous runs
         """
         MockStorageRouterClient.catch_up = {}
+        MockStorageRouterClient.dtl_config_cache = {}
         MockStorageRouterClient.metadata_backend_config = {}
         MockStorageRouterClient.snapshots = {}
         MockStorageRouterClient.vrouter_id = {}
@@ -99,6 +102,34 @@ class MockStorageRouterClient(object):
         return type('Info', (), {'object_type': property(lambda s: 'BASE'),
                                  'metadata_backend_config': property(lambda s: None),
                                  'vrouter_id': property(lambda s: None)})()
+
+    @staticmethod
+    def get_dtl_config(volume_id):
+        """
+        Retrieve a fake DTL configuration
+        """
+        return MockStorageRouterClient.dtl_config_cache.get(volume_id)
+
+    @staticmethod
+    def get_dtl_config_mode(volume_id):
+        """
+        Retrieve a fake DTL configuration mode
+        """
+        if volume_id in MockStorageRouterClient.dtl_config_cache:
+            return MockStorageRouterClient.dtl_config_cache['volume_id'].dtl_config_mode
+        return DTLConfigMode.AUTOMATIC
+
+    @staticmethod
+    def set_manual_dtl_config(volume_id, config):
+        """
+        Set a fake DTL configuration
+        """
+        if config is None:
+            dtl_config = DTLConfig(host='null', mode='no_sync', port=None)
+        else:
+            dtl_config = DTLConfig(host=config.host, mode=config.mode, port=config.port)
+        MockStorageRouterClient.dtl_config_cache[volume_id] = dtl_config
+
     EMPTY_INFO = empty_info
 
 
@@ -138,3 +169,17 @@ class Snapshot(object):
         self.metadata = metadata
         self.stored = 0
         self.in_backend = True
+
+
+class DTLConfig(object):
+    """
+    Dummy DTL configuration class
+    """
+    def __init__(self, host, mode, port):
+        """
+        Init method
+        """
+        self.host = host
+        self.port = port
+        self.dtl_mode = mode
+        self.dtl_config_mode = DTLConfigMode.MANUAL

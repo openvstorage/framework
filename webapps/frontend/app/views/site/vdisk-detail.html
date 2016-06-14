@@ -243,11 +243,11 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                 </label>:
                                                             </div>
                                                         </td>
-                                                        <td style="width: 16%; padding: 0;">
+                                                        <td style="width: 16%; padding: 0;" colspan="2">
                                                             <span data-bind="dropdown: {
                                                                                  items: dtlTargets, target: dtlTarget,
                                                                                  text: function(item) {
-                                                                                     if (item !== undefined && item !== null) {
+                                                                                     if (item !== undefined && item !== null && $root.domainCache.hasOwnProperty(item)) {
                                                                                          return $root.domainCache[item].name();
                                                                                      }
                                                                                  },

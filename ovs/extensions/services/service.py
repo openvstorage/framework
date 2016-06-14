@@ -17,12 +17,16 @@
 """
 Service Factory module
 """
+import os
 import time
-
 from subprocess import check_output, CalledProcessError
-from ovs.extensions.services.upstart import Upstart
-from ovs.extensions.services.systemd import Systemd
 from ovs.log.log_handler import LogHandler
+if os.environ.get('RUNNING_UNITTESTS') == 'True':
+    from ovs.extensions.services.tests.upstart import MockUpstart as Upstart
+    from ovs.extensions.services.tests.systemd import MockSystemd as Systemd
+else:
+    from ovs.extensions.services.upstart import Upstart
+    from ovs.extensions.services.systemd import Systemd
 
 
 class ServiceManager(object):
