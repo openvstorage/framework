@@ -117,6 +117,16 @@ define([
             }
         });
 
+        self.shouldSkip = function() {
+            return $.Deferred(function(deferred) {
+                if (!self.data.fragmentCacheOnRead() && !self.data.fragmentCacheOnWrite()) {
+                    deferred.resolve(true);
+                } else {
+                    deferred.resolve(false);
+                }
+            }).promise();
+        };
+
         // Functions
         self.loadAlbaBackends = function() {
             return $.Deferred(function(albaDeferred) {

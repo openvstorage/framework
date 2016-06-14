@@ -128,6 +128,8 @@ class VDiskController(object):
                 VDiskController._logger.info('Delete disk {0}'.format(disk.name))
                 for mds_service in disk.mds_services:
                     mds_service.delete()
+                for domain_junction in disk.domains_dtl:
+                    domain_junction.delete()
                 disk.delete()
             finally:
                 mutex.release()
@@ -792,12 +794,7 @@ class VDiskController(object):
         else:
             metadata_cache_size *= StorageDriverClient.METADATA_CACHE_PAGE_SIZE
 
-        if len(vdisk.domains_dtl) > 0:
-            dtl_target = [junction.domain_guid for junction in vdisk.domains_dtl]
-        else:
-            storagerouter = StorageRouter(vdisk.storagerouter_guid)
-            dtl_target = [junction.domain_guid for junction in storagerouter.domains if junction.backup is False]
-
+        dtl_target = []
         if dtl_config is None:
             dtl_mode = 'no_sync'
         else:
@@ -805,6 +802,11 @@ class VDiskController(object):
                 dtl_mode = 'no_sync'
             else:
                 dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_config.mode]
+                if len(vdisk.domains_dtl) > 0:
+                    dtl_target = [junction.domain_guid for junction in vdisk.domains_dtl]
+                else:
+                    storagerouter = StorageRouter(vdisk.storagerouter_guid)
+                    dtl_target = [junction.domain_guid for junction in storagerouter.domains if junction.backup is False]
 
         if dedupe_mode is None:
             dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_CONTENT_BASED)
@@ -886,13 +888,21 @@ class VDiskController(object):
         old_dtl_mode = old_config_params['dtl_mode']
         new_dtl_targets = set(new_config_params.get('dtl_target', []))  # Domain guids
         old_dtl_targets = set(old_config_params['dtl_target'])
-        if old_dtl_mode != new_dtl_mode or new_dtl_targets != old_dtl_targets:
-            if old_dtl_mode != new_dtl_mode and new_dtl_mode == 'no_sync':
+
+        if new_dtl_mode == 'no_sync':
+            if old_dtl_mode != new_dtl_mode:
                 VDiskController._logger.info('Disabling DTL for vDisk {0}'.format(vdisk_guid))
                 vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
                 for junction in vdisk.domains_dtl:
                     junction.delete()
-            elif (len(new_dtl_targets) > 0 and new_dtl_targets != old_dtl_targets or old_dtl_mode != new_dtl_mode) and new_dtl_mode != 'no_sync':
+        else:
+            if len(new_dtl_targets) == 0 and new_dtl_targets != old_dtl_targets:
+                VDiskController._logger.info('Removing specific DTL settings for vDisk {0}'.format(vdisk_guid))
+                for junction in vdisk.domains_dtl:
+                    junction.delete()
+                VDiskController.dtl_checkup(vdisk_guid=vdisk_guid)
+
+            elif len(new_dtl_targets) > 0 and new_dtl_targets != old_dtl_targets or old_dtl_mode != new_dtl_mode:
                 VDiskController._logger.info('Changing DTL to use global values for vDisk {0}'.format(vdisk_guid))
                 dtl_targets = set()
                 for domain_guid in new_dtl_targets:
@@ -904,12 +914,13 @@ class VDiskController(object):
                     dtl_targets.remove(storagerouter)
 
                 if len(dtl_targets) == 0:
-                    raise ValueError('Cannot reconfigure DTL to StorageRouter {0} because the vDisk is hosted on this StorageRouter'.format(vdisk.storagerouter.name))
+                    raise ValueError('Cannot reconfigure DTL to StorageRouter {0} because the vDisk is hosted on this StorageRouter'.format(storagerouter.name))
 
-                dtl_config = None
                 current_dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id)
                 if old_dtl_mode != new_dtl_mode or (current_dtl_config is not None and current_dtl_config.host not in [sr.ip for sr in dtl_targets]):
+                    dtl_targets = list(dtl_targets)
                     random.shuffle(dtl_targets)
+                    dtl_config = None
                     reconfigured = False
                     for storagerouter in dtl_targets:
                         for sd in storagerouter.storagedrivers:  # DTL can reside on any node in the cluster running a volumedriver and having a DTL process running
@@ -918,21 +929,21 @@ class VDiskController(object):
                             reconfigured = True
                             break
                         if reconfigured is True:
+                            # Delete all original relations
+                            for junction in vdisk.domains_dtl:
+                                junction.delete()
+
+                            # Create all new relations
+                            for domain_guid in new_dtl_targets:
+                                vdisk_domain = VDiskDomain()
+                                vdisk_domain.vdisk = vdisk
+                                vdisk_domain.domain = Domain(domain_guid)
+                                vdisk_domain.save()
                             break
-                if dtl_config is None:
-                    VDiskController._logger.error('No Storage Router found in chosen Domains which have a DTL process running')
-                    errors = True
 
-                # Delete all original relations
-                for junction in vdisk.domains_dtl:
-                    junction.delete()
-
-                # Create all new relations
-                for domain_guid in new_dtl_targets:
-                    vdisk_domain = VDiskDomain()
-                    vdisk_domain.vdisk = vdisk
-                    vdisk_domain.domain = Domain(domain_guid)
-                    vdisk_domain.save()
+                    if dtl_config is None:
+                        VDiskController._logger.error('No Storage Routers found in chosen Domains which have a DTL process running')
+                        errors = True
 
         # 2nd update rest
         for key in required_params:
@@ -1122,9 +1133,10 @@ class VDiskController(object):
                 this_storage_router = StorageRouter(vdisk.storagerouter_guid)
                 if len(vdisk.domains_dtl) > 0:
                     primary_domains = [junction.domain for junction in vdisk.domains_dtl]
+                    secondary_domains = []
                 else:
                     primary_domains = [junction.domain for junction in this_storage_router.domains if junction.backup is False]
-                secondary_domains = [junction.domain for junction in this_storage_router.domains if junction.backup is True]
+                    secondary_domains = [junction.domain for junction in this_storage_router.domains if junction.backup is True]
 
                 possible_primary_srs = []
                 available_primary_srs = set()
@@ -1136,16 +1148,25 @@ class VDiskController(object):
                     available_secondary_srs.update(StorageRouterList.get_primary_storagerouters_for_domain(domain))
 
                 # In case no domains have been configured
-                if len(available_primary_srs) == 0:
+                if len(available_primary_srs) == 0 and len(available_secondary_srs) == 0:
                     available_primary_srs = set(StorageRouterList.get_storagerouters())
 
                 # Remove all storagerouters from secondary which are present in primary
+                current_sr = None
                 available_secondary_srs = available_secondary_srs.difference(available_primary_srs)
+                if current_dtl_config is not None and current_dtl_config.host != 'null':
+                    current_sr = StorageRouterList.get_by_ip(current_dtl_config.host)
 
                 for importance, possible_srs in {'secondary': possible_secondary_srs,
                                                  'primary': possible_primary_srs}.iteritems():
                     available_srs = list(available_primary_srs) if importance == 'primary' else list(available_secondary_srs)
                     random.shuffle(available_srs)
+
+                    # Make sure currently configured DTL host is at index 0 of available SRs, so its included in possibilities
+                    if current_sr in available_srs:
+                        available_srs.remove(current_sr)
+                        available_srs.insert(0, current_sr)
+
                     for storagerouter in available_srs:
                         if len(possible_srs) == 3:
                             break
@@ -1284,6 +1305,8 @@ class VDiskController(object):
         VDiskController._logger.info('Cleanup vdisk {0}'.format(vdisk.name))
         for mdss in vdisk.mds_services:
             mdss.delete()
+        for domain_junction in vdisk.domains_dtl:
+            domain_junction.delete()
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
         if storagedriver is not None and vdisk.devicename is not None:
             VDiskController._logger.debug('Removing volume from hypervisor')
