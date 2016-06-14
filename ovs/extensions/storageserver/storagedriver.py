@@ -207,9 +207,9 @@ class StorageDriverConfiguration(object):
     # DO NOT MAKE MANUAL CHANGES HERE
 
     parameters = {
-        # hg branch: (detached
+        # hg branch: dev
         # hg revision: d6c3c04c6e6a938bec87f84c8566a7b5e825e723
-        # buildTime: Thu Jun  2 07:03:35 UTC 2016
+        # buildTime: Thu Jun  2 07:51:33 UTC 2016
         'metadataserver': {
             'backend_connection_manager': {
                 'optional': ['backend_connection_pool_capacity', 'backend_interface_retries_on_error', 'backend_interface_retry_interval_secs', 'backend_interface_retry_backoff_multiplier', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', 'alba_connection_transport', ],
@@ -257,6 +257,10 @@ class StorageDriverConfiguration(object):
                 'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_nodes', ],
                 'mandatory': []
             },
+            'network_interface': {
+                'optional': ['network_uri', 'network_snd_rcv_queue_depth', ],
+                'mandatory': []
+            },
             'scocache': {
                 'optional': [],
                 'mandatory': ['trigger_gap', 'backoff_gap', 'scocache_mount_points', ]
@@ -265,12 +269,8 @@ class StorageDriverConfiguration(object):
                 'optional': ['scrub_manager_interval', 'scrub_manager_sync_wait_secs', ],
                 'mandatory': []
             },
-            'shm_server': {
-                'optional': [],
-                'mandatory': []
-            },
-            'network_server': {
-                'optional': [],
+            'shm_interface': {
+                'optional': ['shm_region_size', ],
                 'mandatory': []
             },
             'stats_collector': {
