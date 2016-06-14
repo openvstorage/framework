@@ -835,7 +835,7 @@ class StorageRouterController(object):
             EtcdConfiguration.set(config_tree.format('main'), json.dumps({
                 'log_level': 'info',
                 'port': alba_proxy.service.ports[0],
-                'ips': ['127.0.0.1'],
+                'ips': [storagedriver.storage_ip],
                 'manifest_cache_size': 16 * 1024 * 1024 * 1024,
                 'fragment_cache': fragment_cache_info,
                 'transport': 'rdma' if EtcdConfiguration.get('/ovs/framework/rdma') else 'tcp',
@@ -903,7 +903,7 @@ class StorageRouterController(object):
 
         storagedriver_config.clean()  # Clean out obsolete values
         if vpool.backend_type.code == 'alba':
-            backend_connection_manager = {'alba_connection_host': '127.0.0.1',
+            backend_connection_manager = {'alba_connection_host': storagedriver.storage_ip,
                                           'alba_connection_port': alba_proxy.service.ports[0],
                                           'alba_connection_preset': vpool.metadata['backend']['preset'],
                                           'alba_connection_timeout': 15,
@@ -950,7 +950,7 @@ class StorageRouterController(object):
         storagedriver_config.configure_event_publisher(events_amqp_routing_key=EtcdConfiguration.get('/ovs/framework/messagequeue|queues.storagedriver'),
                                                        events_amqp_uris=queue_urls)
         storagedriver_config.configure_threadpool_component(num_threads=16)
-        storagedriver_config.configure_network_interface(network_uri='{0}://{0}:{1}'.format('rdma' if EtcdConfiguration.get('/ovs/framework/rdma') else 'tcp',
+        storagedriver_config.configure_network_interface(network_uri='{0}://{1}:{2}'.format('rdma' if EtcdConfiguration.get('/ovs/framework/rdma') else 'tcp',
                                                                                             storagedriver.storage_ip,
                                                                                             storagedriver.ports['edge']))
         storagedriver_config.save(client, reload_config=False)
