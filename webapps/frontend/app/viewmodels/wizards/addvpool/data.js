@@ -50,7 +50,7 @@ define(['knockout'], function(ko){
             dtlModes:                ko.observableArray([{name: 'no_sync', disabled: false}, {name: 'a_sync', disabled: false}, {name: 'sync', disabled: false}]),
             dtlTransportMode:        ko.observable({name: 'tcp'}),
             dtlTransportModes:       ko.observableArray([{name: 'tcp', disabled: false}, {name: 'rdma', disabled: true}]),
-            fragmentCacheOnRead:     ko.observable(false),
+            fragmentCacheOnRead:     ko.observable(true),
             fragmentCacheOnWrite:    ko.observable(true),
             hasMgmtCenter:           ko.observable(false),
             host:                    ko.observable('').extend({regex: hostRegex}),
