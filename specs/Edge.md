@@ -12,7 +12,7 @@ The [Edge](https://github.com/openvstorage/home/wiki/Edge) is a lightweight soft
 
 ## Required changes
 - Implement storage and management IP correctly
-    - DTL and MDS should use the management Ip
+    - DTL and MDS should use the storage Ip
     - Edge/NFS should use the storage IP
 -  Storage Router detail page
     - Change IP to Management IP
