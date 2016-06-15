@@ -1853,7 +1853,8 @@ EOF
                                                         'hypervisor_username': (str, None, False),
                                                         'master_ip': (str, Toolbox.regex_ip),
                                                         'master_password': (str, None),
-                                                        'node_type': (str, ['master', 'extra'], False)})
+                                                        'node_type': (str, ['master', 'extra'], False),
+                                                        'rdma': (bool, None, False)})
         if config['hypervisor_type'] == 'VMWARE':
             ip = config.get('hypervisor_ip')
             username = config.get('hypervisor_username')
