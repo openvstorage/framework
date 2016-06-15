@@ -119,13 +119,14 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td data-i18n="ovs:generic.dtl_status"></td>
                             <td>
                                 <div data-bind="status: {
-                                                     colors: {
-                                                         green: ['ok_standalone', 'ok_sync'].contains(dtlStatus()),
-                                                         orange: dtlStatus() == 'catch_up',
-                                                         red: dtlStatus() == 'degraded'
-                                                     },
-                                                     defaultColor: 'lightgrey'
-                                                 }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
+                                                    colors: {
+                                                        blue: dtlStatus() == 'ok_standalone',
+                                                        green: dtlStatus() == 'ok_sync',
+                                                        orange: dtlStatus() == 'catch_up',
+                                                        red: dtlStatus() == 'degraded'
+                                                    },
+                                                    defaultColor: 'lightgrey'
+                                                }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
                                      style="width: 14px; height: 14px;"></div>
                             </td>
                             <td colspan="2">&nbsp;</td>
@@ -234,7 +235,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                             <!-- /ko -->
                                                         </td>
                                                     </tr>
-                                                    <tr data-bind="visible: dtlMode() !== 'no_sync'">
+                                                    <tr data-bind="visible: dtlMode() !== 'no_sync' && dtlTargets().length > 0">
                                                         <td style="width: 20%; padding: 0;">
                                                             <div style="margin-top: 5px;">
                                                                 <label class="control-label"

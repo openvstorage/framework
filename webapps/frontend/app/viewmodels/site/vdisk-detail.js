@@ -41,12 +41,13 @@ define([
         ];
 
         // Observables
-        self.snapshotsInitialLoad = ko.observable(true);
         self.domains              = ko.observableArray([]);
+        self.snapshotsInitialLoad = ko.observable(true);
         self.vDisk                = ko.observable();
 
         // Handles
-        self.loadDomainHandle = undefined;
+        self.loadDomainHandle         = undefined;
+        self.loadStorageRoutersHandle = undefined;
 
         // Functions
         self.load = function() {
@@ -84,18 +85,21 @@ define([
                 if (vdisk !== undefined && generic.xhrCompleted(self.loadDomainHandle)) {
                     self.loadDomainHandle = api.get('domains', { queryparams: { contents: 'storage_router_layout' }})
                         .done(function(data) {
-                            var guids = [], ddata = {};
+                            var guids = [], ddata = {}, domainsPresent = false;
                             $.each(data.data, function(index, item) {
                                 if (item.storage_router_layout.regular.contains(self.vDisk().storageRouterGuid())) {
+                                    domainsPresent = true;
                                     if (item.storage_router_layout.regular.length > 1) {
                                         guids.push(item.guid);
                                         ddata[item.guid] = item;
                                     }
                                 } else if (item.storage_router_layout.regular.length > 0)  {
+                                    domainsPresent = true;
                                     guids.push(item.guid);
                                     ddata[item.guid] = item;
                                 }
                             });
+                            self.vDisk().domainsPresent(domainsPresent);
                             self.vDisk().dtlTargets(guids);
                             generic.crossFiller(
                                 guids, self.domains,
@@ -111,6 +115,14 @@ define([
                                     domain.fillData(ddata[domain.guid()]);
                                 }
                             });
+                            self.loadStorageRouterHandle = api.get('storagerouters', {queryparams: {contents: ''}})
+                                .done(function(data) {
+                                    var guids = [];
+                                    $.each(data.data, function(index, item) {
+                                        guids.push(item.guid);
+                                    });
+                                    self.vDisk().storageRouterGuids(guids);
+                                });
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
@@ -169,7 +181,6 @@ define([
                     .always(function() {
                         vd.loadConfiguration(true);
                     });
-                vd.oldConfiguration($.extend({}, vd.configuration()));
             }
         };
         self.removeSnapshot = function(snapshotid) {
