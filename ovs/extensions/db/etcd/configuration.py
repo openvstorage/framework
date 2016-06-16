@@ -255,7 +255,7 @@ class EtcdConfiguration(object):
                                  'mds': [mds_port_range],
                                  'arakoon': [arakoon_start_port]},
                        'setupcompleted': False,
-                       'versions': {'ovs': 4},
+                       'versions': {'ovs': 9},
                        'type': 'UNCONFIGURED'}
         for key, value in host_config.iteritems():
             EtcdConfiguration._set('/ovs/framework/hosts/{0}/{1}'.format(host_id, key), value, raw=False)
