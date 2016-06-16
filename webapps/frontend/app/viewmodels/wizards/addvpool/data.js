@@ -42,7 +42,7 @@ define(['knockout'], function(ko){
             cacheStrategy:           ko.observable(''),
             clusterSize:             ko.observable(4),
             clusterSizes:            ko.observableArray([4, 8, 16, 32, 64]),
-            dedupeMode:              ko.observable(''),
+            dedupeMode:              ko.observable('non_dedupe'),
             dedupeModes:             ko.observableArray(['dedupe', 'non_dedupe']),
             distributedMtpt:         ko.observable(),
             dtlEnabled:              ko.observable(true),
