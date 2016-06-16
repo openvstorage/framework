@@ -37,10 +37,10 @@ class OVSMigrator(object):
     @staticmethod
     def migrate(previous_version):
         """
-        Migrates from a given version to the current version. It uses previous_version to be smart
-        wherever possible, but the code should be able migrate any version towards the expected version.
+        Migrates from a given version to the current version. It uses 'previous_version' to be smart
+        wherever possible, but the code should be able to migrate any version towards the expected version.
         When this is not possible, the code can set a minimum version and raise when it is not met.
-        :param previous_version: The previous version from which to start the migration.
+        :param previous_version: The previous version from which to start the migration
         :type previous_version: float
         """
 
