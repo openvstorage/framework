@@ -18,6 +18,7 @@
 Dummy persistent module
 """
 import os
+import copy
 import json
 import uuid
 from ovs.extensions.storage.exceptions import KeyNotFoundException, AssertException
@@ -32,7 +33,7 @@ class DummyPersistentStore(object):
 
     def __init__(self):
         self._sequences = {}
-        self._keep_in_memory_only = False
+        self._keep_in_memory_only = True
 
     def clean(self):
         """
@@ -67,7 +68,7 @@ class DummyPersistentStore(object):
         """
         data = self._read()
         if key in data:
-            return data[key]
+            return copy.deepcopy(data[key])
         else:
             raise KeyNotFoundException(key)
 
@@ -78,7 +79,7 @@ class DummyPersistentStore(object):
         data = self._read()
         for key in keys:
             if key in data:
-                yield data[key]
+                yield copy.deepcopy(data[key])
             else:
                 raise KeyNotFoundException(key)
 
@@ -103,7 +104,7 @@ class DummyPersistentStore(object):
         if transaction is not None:
             return self._sequences[transaction].append([self.set, {'key': key, 'value': value}])
         data = self._read()
-        data[key] = value
+        data[key] = copy.deepcopy(value)
         self._save(data)
 
     def delete(self, key, must_exist=True, transaction=None):
