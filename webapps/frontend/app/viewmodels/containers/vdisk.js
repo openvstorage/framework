@@ -115,7 +115,7 @@ define([
                         $.each(self.dtlModes(), function (index, item) {
                             item.disabled = true;
                         })
-                    } else if (self.dtlManual() === true || (self.dtlTargets().length > 0 && self.dtlManual() === false)) {
+                    } else if (self.dtlManual() === true) {
                         self.dtlTarget(self.dtlTargets());
                     }
                 }
