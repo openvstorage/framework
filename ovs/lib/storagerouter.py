@@ -1774,14 +1774,16 @@ class StorageRouterController(object):
         srs = StorageRouterList.get_storagerouters()
         this_sr = StorageRouterList.get_by_ip(client.ip)
         downtime = []
-        sd_cluster_name = EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv')
-        metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=sd_cluster_name)
-        if metadata is None:
-            raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found None'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
+        key = '/ovs/framework/arakoon_clusters|voldrv'
+        if EtcdConfiguration.exists(key):
+            sd_cluster_name = EtcdConfiguration.get(key)
+            metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=sd_cluster_name)
+            if metadata is None:
+                raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found None'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
 
-        if metadata.internal is True:
-            voldrv_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == ServiceType.SERVICE_TYPES.ARAKOON and ser.name == 'arakoon-voldrv']
-            downtime = [('ovs', 'voldrv', None)] if len(voldrv_cluster) < 3 and this_sr.guid in voldrv_cluster else []
+            if metadata.internal is True:
+                voldrv_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == ServiceType.SERVICE_TYPES.ARAKOON and ser.name == 'arakoon-voldrv']
+                downtime = [('ovs', 'voldrv', None)] if len(voldrv_cluster) < 3 and this_sr.guid in voldrv_cluster else []
 
         alba_proxies = []
         alba_downtime = []
