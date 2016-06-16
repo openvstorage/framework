@@ -16,7 +16,7 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
-    <nav class="navbar navbar-default navbar-fixed-top" data-bind="visible: shared.mode() == 'full'">
+    <nav class="navbar navbar-default navbar-fixed-top" data-bind="visible: shared.mode() === 'full'">
         <div class="noise">
             <div class="container">
                 <div class="navbar-header">
@@ -62,7 +62,7 @@ but WITHOUT ANY WARRANTY of any kind.
         </div>
     </nav>
     <div class="wrapper">
-        <div class="container page-host" data-bind="css: { 'page-host': shared.mode() == 'full' }, router: { cacheViews: true }"></div>
+        <div class="container page-host" data-bind="css: { 'page-host': shared.mode() === 'full' }, router: { cacheViews: true }"></div>
     </div>
     <div class="footer" data-bind="footer: { data: shared.footerData }"></div>
 </div>

@@ -47,11 +47,13 @@ define([
         ];
 
         // Handles
-        self.vDisksHandle = {};
-        self.vPoolsHandle = undefined;
+        self.storageRouterHandle = undefined;
+        self.vDisksHandle        = {};
+        self.vPoolsHandle        = undefined;
 
         // Observables
-        self.vPools = ko.observableArray([]);
+        self.vPools             = ko.observableArray([]);
+        self.storageRouterGuids = ko.observableArray([]);
 
         // Functions
         self.addVDisk = function() {
@@ -136,6 +138,14 @@ define([
                                     item.fillData(vpdata[item.guid()]);
                                 }
                             });
+                        });
+                    self.storageRouterHandle = api.get('storagerouters', {queryparams: {contents: ''}})
+                        .done(function(data) {
+                            var guids = [];
+                            $.each(data.data, function(index, item) {
+                                guids.push(item.guid);
+                            });
+                            self.storageRouterGuids(guids);
                         });
                 }
             }, 60000);
