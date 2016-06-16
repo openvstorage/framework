@@ -803,8 +803,7 @@ class VDiskController(object):
                 dtl_mode = 'no_sync'
             else:
                 dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_config.mode]
-                if len(vdisk.domains_dtl) > 0:
-                    dtl_target = [junction.domain_guid for junction in vdisk.domains_dtl]
+                dtl_target = [junction.domain_guid for junction in vdisk.domains_dtl]
 
         if dedupe_mode is None:
             dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_CONTENT_BASED)

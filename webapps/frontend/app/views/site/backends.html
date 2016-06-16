@@ -52,11 +52,11 @@ but WITHOUT ANY WARRANTY of any kind.
                 <td>
                     <div data-bind="status: {
                                         colors: {
-                                            blue: status() == 'new',
-                                            green: status() == 'running',
-                                            orange: status() == 'installing',
-                                            red: status() == 'failure',
-                                            black: status() == 'stopped'
+                                            blue: status() === 'new',
+                                            green: status() === 'running',
+                                            orange: status() === 'installing',
+                                            red: status() === 'failure',
+                                            black: status() === 'stopped'
                                         },
                                         defaultColor: 'lightgrey'
                                     }, tooltip: 'ovs:generic.states.backend.' + status()"

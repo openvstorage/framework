@@ -121,10 +121,10 @@ class StorageDriverClient(object):
                            128: 1}
 
     DTL_STATUS = {'': 0,
-                  'ok_standalone': 10,
                   'ok_sync': 10,
-                  'catch_up': 20,
-                  'degraded': 30}
+                  'ok_standalone': 20,
+                  'catch_up': 30,
+                  'degraded': 40}
     EMPTY_STATISTICS = staticmethod(lambda: Statistics())
     EMPTY_INFO = staticmethod(lambda: VolumeInfo())
     STAT_SUMS = {'operations': ['write_operations', 'read_operations'],

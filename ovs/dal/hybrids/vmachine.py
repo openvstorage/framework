@@ -23,6 +23,7 @@ from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.hypervisor.factory import Factory
 
@@ -131,6 +132,11 @@ class VMachine(DataObject):
             if current_status_code > status_code:
                 status = mode
                 status_code = current_status_code
+        if status == 'OK_STANDALONE':
+            srs = StorageRouterList.get_storagerouters()
+            if len(srs) > 1 and any(vdisk for vdisk in self.vdisks if vdisk.has_manual_dtl is False):
+                status = 'CATCH_UP'
+
         return status
 
     def _storagerouters_guids(self):

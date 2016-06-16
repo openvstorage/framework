@@ -50,7 +50,7 @@ define([
         self.dedupeMode          = ko.observable();
         self.dedupeModes         = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
         self.dtlEnabled          = ko.observable(true);
-        self.dtlManual           = ko.observable(false);
+        self.dtlManual           = ko.observable();
         self.dtlMode             = ko.observable();
         self.dtlStatus           = ko.observable();
         self.dtlTarget           = ko.observableArray([]);
@@ -151,6 +151,15 @@ define([
                 self.writeBuffer.min = 256;
             }
             self.writeBuffer(self.writeBuffer());
+        });
+        self.dtlTarget.subscribe(function(targets) {
+            if (self.dtlTarget().length !== targets.length) {
+                if (targets.length > 0) {
+                    self.dtlManual(true);
+                } else {
+                    self.dtlManual(false);
+                }
+            }
         });
         self.configChanged = ko.computed(function() {
             var changed = false;

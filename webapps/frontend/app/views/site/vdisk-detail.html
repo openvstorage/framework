@@ -120,10 +120,9 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td>
                                 <div data-bind="status: {
                                                     colors: {
-                                                        blue: dtlStatus() == 'ok_standalone',
-                                                        green: dtlStatus() == 'ok_sync',
-                                                        orange: dtlStatus() == 'catch_up',
-                                                        red: dtlStatus() == 'degraded'
+                                                        green: dtlStatus() === 'ok_sync' || (dtlStatus() === 'ok_standalone' && (storageRouterGuids().length === 1 || dtlManual() === true)),
+                                                        orange: dtlStatus() === 'catch_up' || (dtlStatus() === 'ok_standalone' && storageRouterGuids().length > 1 && dtlManual() === false),
+                                                        red: dtlStatus() === 'degraded'
                                                     },
                                                     defaultColor: 'lightgrey'
                                                 }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
