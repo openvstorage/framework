@@ -24,22 +24,22 @@ import base64
 import hashlib
 import unittest
 from django.http import HttpResponse, HttpResponseBadRequest
+from rest_framework.exceptions import AuthenticationFailed
 from oauth2.toolbox import Toolbox as OAuth2Toolbox
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic import fakesleep
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.dal.lists.userlist import UserList
-from ovs.dal.hybrids.user import User
-from ovs.dal.hybrids.group import Group
-from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.client import Client
-from ovs.dal.hybrids.j_rolegroup import RoleGroup
+from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.j_roleclient import RoleClient
-from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.j_rolegroup import RoleGroup
 from ovs.dal.hybrids.pmachine import PMachine
-from rest_framework.exceptions import AuthenticationFailed
+from ovs.dal.hybrids.role import Role
+from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.user import User
+from ovs.dal.lists.userlist import UserList
 
 
 class Authentication(unittest.TestCase):

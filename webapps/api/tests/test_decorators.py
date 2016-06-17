@@ -24,20 +24,20 @@ import time
 import uuid
 import hashlib
 import unittest
-from backend.toolbox import Toolbox  # Required for the tests
 from django.http import HttpResponse
+from backend.toolbox import Toolbox  # Required for the tests
 from oauth2.toolbox import Toolbox as OAuth2Toolbox
 from ovs.extensions.generic import fakesleep
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.dal.hybrids.user import User
-from ovs.dal.hybrids.group import Group
-from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.client import Client
-from ovs.dal.hybrids.j_rolegroup import RoleGroup
+from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.j_roleclient import RoleClient
-from ovs.dal.lists.userlist import UserList
+from ovs.dal.hybrids.j_rolegroup import RoleGroup
+from ovs.dal.hybrids.role import Role
+from ovs.dal.hybrids.user import User
 from ovs.dal.lists.rolelist import RoleList
+from ovs.dal.lists.userlist import UserList
 from rest_framework.exceptions import Throttled
 
 
