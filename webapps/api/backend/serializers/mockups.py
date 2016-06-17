@@ -32,17 +32,3 @@ class FullSerializer(object):
                      'contents': contents,
                      'instance': instance,
                      'many': many}
-
-
-class Serializers(object):
-    """
-    Dummy class
-    """
-
-    FullSerializer = FullSerializer
-
-    def __init__(self):
-        """
-        Dummy initializer
-        """
-        pass

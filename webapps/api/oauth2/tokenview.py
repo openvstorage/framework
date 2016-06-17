@@ -26,6 +26,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, HttpResponseBadRequest
 from oauth2.decorators import auto_response, limit, log
 from oauth2.toolbox import Toolbox
+from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
@@ -102,6 +103,9 @@ class OAuth2TokenView(View):
                 return HttpResponse, {'access_token': access_token.access_token,
                                       'token_type': 'bearer',
                                       'expires_in': 3600}
+            except ObjectNotFoundException as ex:
+                logger.warning('Error matching client: {0}'.format(ex))
+                return HttpResponseBadRequest, {'error': 'invalid_client'}
             except Exception as ex:
                 logger.exception('Error matching client: {0}'.format(ex))
                 return HttpResponseBadRequest, {'error': 'invalid_client'}

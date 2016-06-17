@@ -178,7 +178,7 @@ class UnitTest(object):
             UnitTest._gather_test_info()
             errors = []
             if isinstance(tests, str):
-                tests = [tests]
+                tests = tests.split(',')
             if not isinstance(tests, list):
                 raise ValueError('Tests should be a list')
 

@@ -18,27 +18,31 @@
 Contains various decorator
 """
 
-import math
+import os
 import re
 import json
-import inspect
+import math
 import time
-from ovs.dal.lists.userlist import UserList
-from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.dal.helpers import Toolbox as DalToolbox
-from rest_framework.response import Response
-from toolbox import Toolbox
-from rest_framework.exceptions import PermissionDenied, NotAuthenticated, NotAcceptable, Throttled
-from rest_framework import status
-from rest_framework.request import Request
+import inspect
+from django.conf import settings
 from django.core.handlers.wsgi import WSGIRequest
 from django.http import Http404
-from django.conf import settings
+from rest_framework import status
+from rest_framework.exceptions import PermissionDenied, NotAuthenticated, NotAcceptable, Throttled
+from rest_framework.response import Response
+from rest_framework.request import Request
 from ovs.dal.exceptions import ObjectNotFoundException
-from backend.serializers.serializers import FullSerializer
-from ovs.log.log_handler import LogHandler
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.dal.helpers import Toolbox as DalToolbox
+from ovs.dal.lists.userlist import UserList
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.log.log_handler import LogHandler
+from toolbox import Toolbox
+if os.environ.get('RUNNING_UNITTESTS') == 'True':
+    from backend.serializers.mockups import FullSerializer
+else:
+    from backend.serializers.serializers import FullSerializer
 
 
 def _find_request(args):
