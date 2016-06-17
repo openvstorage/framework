@@ -33,15 +33,14 @@ class System(object):
     """
 
     OVS_ID_FILE = '/etc/openvstorage_id'
-
-    my_storagerouter_guid = ''
-    my_storagedriver_id = ''
+    _storagerouter = None
+    _machine_id = None
 
     def __init__(self):
         """
         Dummy init method
         """
-        _ = self
+        raise RuntimeError('System is a static class')
 
     @staticmethod
     def get_my_machine_id(client=None):
@@ -53,6 +52,8 @@ class System(object):
         :return: Machine ID
         :rtype: str
         """
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            return System._machine_id
         if client is not None:
             return client.run('cat {0}'.format(System.OVS_ID_FILE)).strip()
         with open(System.OVS_ID_FILE, 'r') as the_file:
@@ -65,15 +66,14 @@ class System(object):
         :return: Storage Router this is executed on
         :rtype: StorageRouter
         """
-
-        from ovs.dal.hybrids.storagerouter import StorageRouter
-        from ovs.dal.lists.storagerouterlist import StorageRouterList
-
-        if not System.my_storagerouter_guid:
-            for storagerouter in StorageRouterList.get_storagerouters():
-                if storagerouter.machine_id == System.get_my_machine_id():
-                    System.my_storagerouter_guid = storagerouter.guid
-        return StorageRouter(System.my_storagerouter_guid)
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            storagerouter = System._storagerouter
+        else:
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
+            storagerouter = StorageRouterList.get_by_machine_id(System.get_my_machine_id())
+        if storagerouter is None:
+            raise RuntimeError('Could not find the local StorageRouter')
+        return storagerouter
 
     @staticmethod
     def update_hosts_file(ip_hostname_map, client):

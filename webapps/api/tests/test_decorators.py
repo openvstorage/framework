@@ -39,7 +39,6 @@ from ovs.dal.hybrids.j_roleclient import RoleClient
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
 from rest_framework.exceptions import Throttled
-from tests.mockups import Serializers
 
 
 class Decorators(unittest.TestCase):
@@ -53,11 +52,8 @@ class Decorators(unittest.TestCase):
         This makes sure the unittests can be executed without those libraries installed
         """
         cls.factory = None
-        cls.initial_data = None
-        cls.persistent = PersistentFactory.get_client()
-        cls.persistent.clean()
-        cls.volatile = VolatileFactory.get_client()
-        cls.volatile.clean()
+        PersistentFactory.get_client().clean()
+        VolatileFactory.get_client().clean()
 
         admin_group = Group()
         admin_group.name = 'administrators'
@@ -155,10 +151,6 @@ class Decorators(unittest.TestCase):
                         roleclient.role = role
                         roleclient.save()
 
-        cls.initial_data = PersistentFactory.store._read(), VolatileFactory.store._read()
-
-        sys.modules['backend.serializers.serializers'] = Serializers
-
         sys.path.append('/opt/OpenvStorage')
         sys.path.append('/opt/OpenvStorage/webapps')
         os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
@@ -168,15 +160,6 @@ class Decorators(unittest.TestCase):
         cls.factory = RequestFactory()
 
         fakesleep.monkey_patch()
-
-    def setUp(self):
-        """
-        (Re)Sets the stores on every test
-        """
-        self.persistent.clean()
-        self.volatile.clean()
-        self.persistent._save(self.initial_data[0])
-        self.volatile._save(self.initial_data[1])
 
     @classmethod
     def tearDownClass(cls):
@@ -236,7 +219,7 @@ class Decorators(unittest.TestCase):
         from rest_framework.exceptions import NotAuthenticated, PermissionDenied
 
         @required_roles(['read', 'write', 'manage'])
-        def the_function(input_value, *args, **kwargs):
+        def the_function_rr(input_value, *args, **kwargs):
             """
             Decorated function
             """
@@ -244,34 +227,41 @@ class Decorators(unittest.TestCase):
             output['value'] = input_value
             return HttpResponse(json.dumps(input_value))
 
+        time.sleep(180)
         output = {'value': None}
-        user = UserList.get_user_by_username('user')
         request = self.factory.get('/')
         with self.assertRaises(NotAuthenticated) as context:
-            the_function(1, request)
+            the_function_rr(1, request)
         self.assertEqual(context.exception.status_code, 401)
+
+        time.sleep(180)
         request.client = type('Client', (), {})
         request.user = type('User', (), {})
         request.user.username = 'foobar'
         with self.assertRaises(NotAuthenticated) as context:
-            the_function(2, request)
+            the_function_rr(2, request)
         self.assertEqual(context.exception.status_code, 401)
+
+        time.sleep(180)
+        user = UserList.get_user_by_username('user')
         access_token, _ = OAuth2Toolbox.generate_tokens(user.clients[0], generate_access=True, scopes=RoleList.get_roles_by_codes(['read']))
         access_token.expiration = int(time.time() + 86400)
         access_token.save()
         request.user.username = 'user'
         request.token = access_token
         with self.assertRaises(PermissionDenied) as context:
-            the_function(3, request)
+            the_function_rr(3, request)
         self.assertEqual(context.exception.status_code, 403)
         self.assertEqual(context.exception.detail, 'This call requires roles: read, write, manage')
+
+        time.sleep(180)
         user = UserList.get_user_by_username('admin')
         access_token, _ = OAuth2Toolbox.generate_tokens(user.clients[0], generate_access=True, scopes=RoleList.get_roles_by_codes(['read', 'write', 'manage']))
         access_token.expiration = int(time.time() + 86400)
         access_token.save()
         request.username = 'admin'
         request.token = access_token
-        response = the_function(4, request)
+        response = the_function_rr(4, request)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, '4')
 
@@ -284,7 +274,7 @@ class Decorators(unittest.TestCase):
         from django.http import Http404
 
         @load(User, min_version=2, max_version=2)
-        def the_function_1(input_value, request, user, version, mandatory, optional='default'):
+        def the_function_tl_1(input_value, request, user, version, mandatory, optional='default'):
             """
             Decorated function
             """
@@ -296,7 +286,7 @@ class Decorators(unittest.TestCase):
             return HttpResponse(json.dumps(input_value))
 
         @load(User)
-        def the_function_2(input_value, request, user, pk, version):
+        def the_function_tl_2(input_value, request, user, pk, version):
             """
             Decorated function
             """
@@ -306,38 +296,47 @@ class Decorators(unittest.TestCase):
                                'version': version}
             return HttpResponse(json.dumps(input_value))
 
+        time.sleep(180)
         output = {'value': None}
         user = UserList.get_user_by_username('user')
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
         with self.assertRaises(NotAcceptable) as context:
-            the_function_1(1, request)
+            the_function_tl_1(1, request)
         self.assertEqual(context.exception.status_code, 406)
         self.assertEqual(context.exception.detail, 'API version requirements: {0} <= <version> <= {1}. Got {2}'.format(2, 2, 1))
+
+        time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         with self.assertRaises(Http404):
-            the_function_1(2, request, pk=str(uuid.uuid4()))
+            the_function_tl_1(2, request, pk=str(uuid.uuid4()))
+
+        time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         request.DATA = {}
         request.QUERY_PARAMS = {}
         with self.assertRaises(NotAcceptable) as context:
-            the_function_1(3, request, pk=user.guid)
+            the_function_tl_1(3, request, pk=user.guid)
         self.assertEqual(context.exception.status_code, 406)
         self.assertEqual(context.exception.detail, 'Invalid data passed: mandatory is missing')
+
+        time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         request.DATA = {'mandatory': 'mandatory'}
         request.QUERY_PARAMS = {}
-        response = the_function_1(4, request, pk=user.guid)
+        response = the_function_tl_1(4, request, pk=user.guid)
         self.assertEqual(response.status_code, 200)
         self.assertDictContainsSubset({'mandatory': 'mandatory',
                                        'optional': 'default',
                                        'user': user}, output['value'])
         self.assertIn('request', output['value'].keys())
         self.assertEqual(json.loads(response.content), 4)
+
+        time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         request.DATA = {}
         request.QUERY_PARAMS = {'mandatory': 'mandatory',
                                 'optional': 'optional'}
-        response = the_function_1(5, request, pk=user.guid)
+        response = the_function_tl_1(5, request, pk=user.guid)
         self.assertEqual(response.status_code, 200)
         self.assertDictContainsSubset({'mandatory': 'mandatory',
                                        'optional': 'optional',
@@ -345,11 +344,13 @@ class Decorators(unittest.TestCase):
                                        'user': user}, output['value'])
         self.assertIn('request', output['value'].keys())
         self.assertEqual(json.loads(response.content), 5)
+
+        time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=*')
         request.DATA = {}
         request.QUERY_PARAMS = {'mandatory': 'mandatory',
                                 'optional': 'optional'}
-        response = the_function_2(6, request, pk=user.guid)
+        response = the_function_tl_2(6, request, pk=user.guid)
         self.assertEqual(response.status_code, 200)
         self.assertDictContainsSubset({'pk': user.guid,
                                        'version': 3,
@@ -364,14 +365,14 @@ class Decorators(unittest.TestCase):
         from backend.decorators import return_task
 
         @return_task()
-        def the_function(input_value, *args, **kwargs):
+        def the_function_rt(input_value, *args, **kwargs):
             """
             Decorated function
             """
             _ = args, kwargs
             return type('Task', (), {'id': input_value})
 
-        response = the_function(1)
+        response = the_function_rt(1)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, 1)
 
@@ -383,21 +384,23 @@ class Decorators(unittest.TestCase):
         from backend.decorators import return_object
 
         @return_object(User)
-        def the_function(input_value, *args, **kwargs):
+        def the_function_ro(input_value, *args, **kwargs):
             """
             Return a fake User object that would be serialized
             """
             _ = args, kwargs
-            return type('User', (), {'input_value': input_value})
+            return type('User', (), {'input_value': input_value,
+                                     'guid': 'foo'})
 
+        time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
         request.QUERY_PARAMS = {}
-        response = the_function(1, request)
+        response = the_function_ro(1, request)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['instance'].input_value, 1)
         self.assertIsNone(response.data['contents'])
         request.QUERY_PARAMS['contents'] = 'foo,bar'
-        response = the_function(2, request)
+        response = the_function_ro(2, request)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['instance'].input_value, 2)
         self.assertEqual(response.data['contents'], ['foo', 'bar'])
@@ -421,7 +424,7 @@ class Decorators(unittest.TestCase):
         from ovs.dal.datalist import DataList
 
         @return_list(User)
-        def the_function_1(*args, **kwargs):
+        def the_function_rl_1(*args, **kwargs):
             """
             Returns a list of all Users.
             """
@@ -430,7 +433,7 @@ class Decorators(unittest.TestCase):
             return data_list_users
 
         @return_list(User, default_sort='username,password')
-        def the_function_2(*args, **kwargs):
+        def the_function_rl_2(*args, **kwargs):
             """
             Returns a guid list of all Users.
             """
@@ -450,14 +453,16 @@ class Decorators(unittest.TestCase):
                 guid_table[user.username] = {}
             guid_table[user.username][user.password] = user.guid
         data_list_userguids = [user.guid for user in data_list_users]
+
+        time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
-        for function in [the_function_1, the_function_2]:
+        for function in [the_function_rl_1, the_function_rl_2]:
             request.QUERY_PARAMS = {}
             response = function(1, request)
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(output_values['kwargs']['hints']['full'], function.__name__ == 'the_function_2')
+            self.assertEqual(output_values['kwargs']['hints']['full'], function.__name__ == 'the_function_rl_2')
             self.assertEqual(len(response.data), len(data_list_users))
-            if function.__name__ == 'the_function_2':
+            if function.__name__ == 'the_function_rl_2':
                 self.assertListEqual(response.data['data'], [guid_table['aa']['bb'],
                                                              guid_table['aa']['cc'],
                                                              guid_table['bb']['aa'],
@@ -494,7 +499,7 @@ class Decorators(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
             self.assertEqual(len(response.data['data']), len(data_list_users))
-            if function.__name__ == 'the_function_1':
+            if function.__name__ == 'the_function_rl_1':
                 self.assertIsInstance(response.data['data']['instance'], DataList)
                 self.assertIsInstance(response.data['data']['instance'][0], User)
                 self.assertIn(response.data['data']['instance'][0].username, ['aa', 'bb'])
