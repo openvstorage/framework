@@ -36,7 +36,6 @@ but WITHOUT ANY WARRANTY of any kind.
                     <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid }) }"></a>
                 </td>
                 <td><span data-bind="text: storedData"></span></td>
-                <td><span data-bind="text: cacheRatio"></span></td>
                 <td><span data-bind="text: iops"></span></td>
                 <td>
                     <span data-bind="lazyloader: { item: backendType, loadedObservable: 'loaded', undefinedLoading: false }">

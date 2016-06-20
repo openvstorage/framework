@@ -68,16 +68,6 @@ define([
         self.templateChildrenGuids = ko.observableArray([]);
 
         // Computed
-        self.cacheRatio = ko.computed(function() {
-            if (self.cacheHits() === undefined || self.cacheMisses() === undefined) {
-                return undefined;
-            }
-            var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
-            if (total === 0) {
-                total = 1;
-            }
-            return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
-        });
         self.isRunning = ko.computed(function() {
             return self.hypervisorStatus() === 'RUNNING';
         });

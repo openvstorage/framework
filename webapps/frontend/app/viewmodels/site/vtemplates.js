@@ -16,9 +16,9 @@
 /*global define */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
-    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
+    'ovs/shared', 'ovs/generic', 'ovs/api',
     '../containers/vmachine', '../containers/vpool', '../wizards/createfromtemplatewizard/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, VPool, CreateFromTemplateWizard) {
+], function($, app, dialog, ko, shared, generic, api, VMachine, VPool, CreateFromTemplateWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -26,7 +26,6 @@ define([
         // Variables
         self.shared           = shared;
         self.guard            = { authenticated: true };
-        self.refresher        = new Refresher();
         self.widgets          = [];
         self.query            = {
             type: 'AND',
@@ -45,7 +44,6 @@ define([
 
         // Observables
         self.vTemplates = ko.observableArray([]);
-        self.vPools     = ko.observableArray([]);
 
         // Functions
         self.loadVTemplates = function(options) {
@@ -120,40 +118,10 @@ define([
         };
 
         // Durandal
-        self.activate = function() {
-            self.refresher.init(function() {
-                if (generic.xhrCompleted(self.vPoolsHandle)) {
-                    self.vPoolsHandle = api.get('vpools', { queryparams: { contents: 'statistics,stored_data' }})
-                        .done(function(data) {
-                            var guids = [], vpdata = {};
-                            $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                                vpdata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.vPools,
-                                function(guid) {
-                                    return new VPool(guid);
-                                }, 'guid'
-                            );
-                            $.each(self.vPools(), function(index, item) {
-                                if (vpdata.hasOwnProperty(item.guid())) {
-                                    item.fillData(vpdata[item.guid()]);
-                                }
-                            });
-                        });
-                }
-            }, 60000);
-            self.refresher.start();
-            self.refresher.run();
-            self.shared.footerData(self.vPools);
-        };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {
                 item.deactivate();
             });
-            self.refresher.stop();
-            self.shared.footerData(ko.observable());
         };
     };
 });

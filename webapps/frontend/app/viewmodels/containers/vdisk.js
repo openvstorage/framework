@@ -79,16 +79,6 @@ define([
         self.writeBuffer         = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
 
         // Computed
-        self.cacheRatio = ko.computed(function() {
-            if (self.cacheHits() === undefined || self.cacheMisses() === undefined) {
-                return undefined;
-            }
-            var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
-            if (total === 0) {
-                total = 1;
-            }
-            return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
-        });
         self.dtlModes = ko.computed(function() {
             return [
                 {name: 'no_sync', disabled: false},
