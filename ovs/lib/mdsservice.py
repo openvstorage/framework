@@ -358,12 +358,12 @@ class MDSServiceController(object):
         for domain in secondary_domains:
             secondary_storagerouters.update(StorageRouterList.get_primary_storagerouters_for_domain(domain))
 
-        if vdisk_storagerouter not in primary_storagerouters or vdisk_storagerouter in secondary_storagerouters:
-            raise ValueError('StorageRouter {0} for vDisk {1} should be part of the primary domains and NOT be part of the secondary domains'.format(vdisk_storagerouter.name, vdisk.name))
-
         # In case no domains have been configured
         if len(primary_storagerouters) == 0:
             primary_storagerouters = set(StorageRouterList.get_storagerouters())
+
+        if vdisk_storagerouter not in primary_storagerouters or vdisk_storagerouter in secondary_storagerouters:
+            raise ValueError('StorageRouter {0} for vDisk {1} should be part of the primary domains and NOT be part of the secondary domains'.format(vdisk_storagerouter.name, vdisk.name))
 
         # Remove all storagerouters from secondary which are present in primary
         secondary_storagerouters = secondary_storagerouters.difference(primary_storagerouters)
