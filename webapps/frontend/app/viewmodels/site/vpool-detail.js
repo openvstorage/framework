@@ -40,21 +40,19 @@ define([
             { key: 'vmachine',   value: $.t('ovs:generic.vmachine'),   width: 110       },
             { key: 'size',       value: $.t('ovs:generic.size'),       width: 100       },
             { key: 'storedData', value: $.t('ovs:generic.storeddata'), width: 110       },
-            { key: 'cacheRatio', value: $.t('ovs:generic.cache'),      width: 100       },
-            { key: 'iops',       value: $.t('ovs:generic.iops'),       width: 55        },
-            { key: 'readSpeed',  value: $.t('ovs:generic.read'),       width: 100       },
-            { key: 'writeSpeed', value: $.t('ovs:generic.write'),      width: 100       },
+            { key: 'iops',       value: $.t('ovs:generic.iops'),       width: 90        },
+            { key: 'readSpeed',  value: $.t('ovs:generic.read'),       width: 125       },
+            { key: 'writeSpeed', value: $.t('ovs:generic.write'),      width: 125       },
             { key: 'dtlStatus',  value: $.t('ovs:generic.dtl_status'), width: 50        }
         ];
         self.vMachineHeaders    = [
             { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
             { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 200       },
             { key: undefined,       value: $.t('ovs:generic.vdisks'),        width: 60        },
-            { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 110       },
-            { key: 'cacheRatio',    value: $.t('ovs:generic.cache'),         width: 100       },
-            { key: 'iops',          value: $.t('ovs:generic.iops'),          width: 55        },
-            { key: 'readSpeed',     value: $.t('ovs:generic.read'),          width: 120       },
-            { key: 'writeSpeed',    value: $.t('ovs:generic.write'),         width: 120       },
+            { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 135       },
+            { key: 'iops',          value: $.t('ovs:generic.iops'),          width: 90        },
+            { key: 'readSpeed',     value: $.t('ovs:generic.read'),          width: 145       },
+            { key: 'writeSpeed',    value: $.t('ovs:generic.write'),         width: 145       },
             { key: 'dtlStatus',     value: $.t('ovs:generic.dtl_status'),    width: 50        }
         ];
 
@@ -411,14 +409,12 @@ define([
             self.refresher.init(self.load, 10000);
             self.refresher.run();
             self.refresher.start();
-            self.shared.footerData(self.vPool);
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {
                 item.deactivate();
             });
             self.refresher.stop();
-            self.shared.footerData(ko.observable());
         };
     };
 });

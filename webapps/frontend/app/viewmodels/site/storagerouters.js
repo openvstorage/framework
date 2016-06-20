@@ -42,9 +42,6 @@ define([
             { key: 'recoveryDomain', value: $.t('ovs:generic.recovery_domains'), width: undefined }
         ];
 
-        // Observables
-        self.vPools = ko.observableArray([]);
-
         // Handles
         self.domainsHandle        = undefined;
         self.storageRoutersHandle = {};
@@ -125,14 +122,12 @@ define([
             self.refresher.init(self.loadDomains, 5000);
             self.refresher.start();
             self.refresher.run();
-            self.shared.footerData(self.vPools);
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {
                 item.deactivate();
             });
             self.refresher.stop();
-            self.shared.footerData(ko.observable());
         };
     };
 });

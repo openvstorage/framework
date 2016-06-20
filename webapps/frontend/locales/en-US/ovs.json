@@ -129,7 +129,6 @@
         "backendtype": "Type",
         "bandwidth": "Bandwidth",
         "cache": "Cache",
-        "cacheratio": "Cache Hit Ratio",
         "cancel": "Cancel",
         "changepassword": "Change password",
         "children": "Children",
@@ -1049,12 +1048,6 @@
                 "inprogress": "The partition is now being configured."
             }
         }
-    },
-    "footer" : {
-        "cachereads": "Reads served from the Cache:",
-        "datawritten": "Data written to the Backend:",
-        "dataread": "Data read from the Backend:",
-        "bandwidthsaved": "Bandwidth Saved:"
     },
     "events": {
         "vmachine_deleted": "vMachine deleted",

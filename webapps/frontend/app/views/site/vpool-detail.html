@@ -87,8 +87,8 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.cache"></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: iops"></span></td>
                             <td data-i18n="ovs:vpools.backendtype"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: backendType, loadedObservable: 'loaded', undefinedLoading: false }">
@@ -106,8 +106,8 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
                             <td data-i18n="ovs:vpools.backendlogin"></td>
                             <td><span data-bind="text: backendLogin() ? backendLogin() : '-'"></span></td>
                             <td data-i18n="ovs:vpools.cluster_size"></td>
@@ -121,8 +121,8 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:generic.writespeed"></td>
+                            <td><span data-bind="text: writeSpeed"></span></td>
                             <td data-i18n="ovs:vpools.backendconnection"></td>
                             <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
                             <td data-i18n="ovs:vpools.write_buffer"></td>
@@ -136,8 +136,8 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.writespeed"></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td data-i18n="ovs:generic.nrofvmachines"></td>
+                            <td><span data-bind="text: vMachines().length"></span></td>
                             <!-- ko if: backendPreset() === undefined -->
                                 <td colspan="2" >&nbsp;</td>
                             <!-- /ko -->
@@ -165,8 +165,8 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.nrofvmachines"></td>
-                            <td><span data-bind="text: vMachines().length"></span></td>
+                            <td data-i18n="ovs:generic.nrofvdisks"></td>
+                            <td><span data-bind="text: vDisks().length"></span></td>
                             <td colspan="2">&nbsp;</td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
@@ -182,11 +182,6 @@ but WITHOUT ANY WARRANTY of any kind.
                                                      translate: 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + item().dtl_transport"></span>
                                 </span>
                             </td>
-                        </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.nrofvdisks"></td>
-                            <td><span data-bind="text: vDisks().length"></span></td>
-                            <td colspan="4">&nbsp;</td>
                         </tr>
                     </tbody>
                 </table>
@@ -225,7 +220,6 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                             <td><span data-bind="text: vDisks().length"></span></td>
                             <td><span data-bind="text: storedData"></span></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
                             <td><span data-bind="text: iops"></span></td>
                             <td><span data-bind="text: readSpeed"></span></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
@@ -265,7 +259,6 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                             <td><span data-bind="text: size"></span></td>
                             <td><span data-bind="text: storedData"></span></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
                             <td><span data-bind="text: iops"></span></td>
                             <td><span data-bind="text: readSpeed"></span></td>
                             <td><span data-bind="text: writeSpeed"></span></td>

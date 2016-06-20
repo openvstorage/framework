@@ -74,8 +74,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                          attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
                                 </span>
                             </td>
-                            <td style="width: 15%;"  data-i18n="ovs:generic.cache"></td>
-                            <td style="width: 35%;"><span data-bind="text: cacheRatio"></span></td>
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: iops"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.vpool"></td>
@@ -85,8 +85,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                          attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.storagerouter"></td>
@@ -96,14 +96,13 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                          attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: item().guid }) }"></a>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:generic.writespeed"></td>
+                            <td><span data-bind="text: writeSpeed"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.size"></td>
                             <td><span data-bind="text: size"></span></td>
-                            <td data-i18n="ovs:generic.writespeed"></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td colspan="2">&nbsp;</td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.storeddata"></td>

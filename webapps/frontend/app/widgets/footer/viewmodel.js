@@ -38,49 +38,6 @@ define([
                 (!self.data()() || (self.data()().hasOwnProperty('length') && self.data()().length === 0))
             );
         }).extend({ rateLimit: 50 });
-        self.totalCacheHits = ko.computed(function() {
-            var total = 0;
-            if (self.hasData()) {
-                total = self._fetchData(self.data()(), 'totalCacheHits');
-            }
-            return generic.formatNumber(total);
-        });
-        self.backendWritten = ko.computed(function() {
-            var total = 0;
-            if (self.hasData()) {
-                total = self._fetchData(self.data()(), 'backendWritten');
-            }
-            return generic.formatBytes(total);
-        });
-        self.backendRead = ko.computed(function() {
-            var total = 0;
-            if (self.hasData()) {
-                total = self._fetchData(self.data()(), 'backendRead');
-            }
-            return generic.formatBytes(total);
-        });
-        self.bandwidthSaved = ko.computed(function() {
-            var total = 0;
-            if (self.hasData()) {
-                total = self._fetchData(self.data()(), 'bandwidthSaved');
-            }
-            return generic.formatBytes(total);
-        });
-
-        // Functions
-        self._fetchData = function(observable, property) {
-            self.dataLoading(true);
-            var total = 0, i;
-            if (observable instanceof Array) {
-                for (i = 0; i < observable.length; i += 1) {
-                    total += (observable[i][property].raw() || 0);
-                }
-            } else if (observable !== undefined) {
-                total = observable[property].raw() || 0;
-            }
-            self.dataLoading(false);
-            return total;
-        };
 
         // Durandal
         self.activate = function(settings) {

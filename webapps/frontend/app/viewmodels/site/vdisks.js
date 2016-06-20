@@ -38,11 +38,10 @@ define([
             { key: 'vpool',         value: $.t('ovs:generic.vpool'),         width: 110       },
             { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 150       },
             { key: 'size',          value: $.t('ovs:generic.size'),          width: 100       },
-            { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 110       },
-            { key: 'cacheRatio',    value: $.t('ovs:generic.cache'),         width: 100       },
-            { key: 'iops',          value: $.t('ovs:generic.iops'),          width: 55        },
-            { key: 'readSpeed',     value: $.t('ovs:generic.read'),          width: 100       },
-            { key: 'writeSpeed',    value: $.t('ovs:generic.write'),         width: 100       },
+            { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 135       },
+            { key: 'iops',          value: $.t('ovs:generic.iops'),          width: 90        },
+            { key: 'readSpeed',     value: $.t('ovs:generic.read'),          width: 125       },
+            { key: 'writeSpeed',    value: $.t('ovs:generic.write'),         width: 125       },
             { key: 'dtlStatus',     value: $.t('ovs:generic.dtl_status'),    width: 50        }
         ];
 
@@ -151,14 +150,12 @@ define([
             }, 60000);
             self.refresher.start();
             self.refresher.run();
-            self.shared.footerData(self.vPools);
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {
                 item.deactivate();
             });
             self.refresher.stop();
-            self.shared.footerData(ko.observable());
         };
     };
 });

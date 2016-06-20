@@ -78,8 +78,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                     <span data-part="lazy-entry" data-bind="text: item().name()"></span>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.cache"></td>
-                            <td><span data-bind="lazyloader: { item: cacheRatio, loadedObservable: 'loaded' }"></span></td>
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="lazyloader: { item: iops, loadedObservable: 'loaded' }"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:storagerouters.detail.hostip"></td>
@@ -88,8 +88,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                     <span data-part="lazy-entry" data-bind="text: item().ipAddress()"></span>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="lazyloader: { item: iops, loadedObservable: 'loaded' }"></span></td>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="lazyloader: { item: readSpeed, loadedObservable: 'loaded' }"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.type"></td>
@@ -99,8 +99,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                           data-bind="text: $.t('ovs:generic.hypervisors.' + item().hvtype())"></span>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="lazyloader: { item: readSpeed, loadedObservable: 'loaded' }"></span></td>
+                            <td data-i18n="ovs:generic.writespeed"></td>
+                            <td><span data-bind="lazyloader: { item: writeSpeed, loadedObservable: 'loaded' }"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.storagerouters"></td>
@@ -109,8 +109,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                    data-bind="text: name,
                                               attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
                             </td>
-                            <td data-i18n="ovs:generic.writespeed"></td>
-                            <td><span data-bind="lazyloader: { item: writeSpeed, loadedObservable: 'loaded' }"></span></td>
+                            <td colspan="2">&nbsp;</td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.vpools"></td>
@@ -170,7 +169,6 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                             <td><span data-bind="text: size"></span></td>
                             <td><span data-bind="text: storedData"></span></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
                             <td><span data-bind="text: iops"></span></td>
                             <td><span data-bind="text: readSpeed"></span></td>
                             <td><span data-bind="text: writeSpeed"></span></td>

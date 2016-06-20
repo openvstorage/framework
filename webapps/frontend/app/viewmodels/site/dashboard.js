@@ -153,14 +153,12 @@ define([
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
-            self.shared.footerData(self.vPools);
         };
         self.deactivate = function() {
             $.each(shared.hooks.dashboards, function(index, dashboard) {
                 dashboard.activator.deactivateItem(dashboard.module);
             });
             self.refresher.stop();
-            self.shared.footerData(ko.observable());
         };
     };
 });
