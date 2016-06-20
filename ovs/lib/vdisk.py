@@ -482,7 +482,7 @@ class VDiskController(object):
             return
         VDiskController._logger.info('Setting vDisk {0} as template'.format(vdisk.name))
         vdisk.storagedriver_client.set_volume_as_template(str(vdisk.volume_id))
-        vdisk.invalidate_dynamics(['is_vtemplate'])
+        vdisk.invalidate_dynamics(['is_vtemplate', 'info'])
 
     @staticmethod
     @celery.task(name='ovs.vdisk.rollback')

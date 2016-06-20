@@ -84,9 +84,10 @@ class VDiskTest(unittest.TestCase):
         vdisk.save()
 
         # Set as template and validate the model
+        self.assertFalse(expr=vdisk.is_vtemplate, msg='Dynamic property "is_vtemplate" should be False')
         VDiskController.set_as_template(vdisk.guid)
-        vdisk.invalidate_dynamics(['info'])
         self.assertTrue(expr=vdisk.is_vtemplate, msg='Dynamic property "is_vtemplate" should be True')
 
         # Try again and verify job succeeds, previously we raised error when setting as template an additional time
         VDiskController.set_as_template(vdisk.guid)
+        self.assertTrue(expr=vdisk.is_vtemplate, msg='Dynamic property "is_vtemplate" should still be True')
