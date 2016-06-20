@@ -433,9 +433,7 @@ class VMachineController(object):
         """
         vmachine = VMachine(machineguid)
         if vmachine.hypervisor_status == 'RUNNING':
-            raise RuntimeError('vMachine {0} may not be running to set it as vTemplate'.format(
-                vmachine.name
-            ))
+            raise RuntimeError('vMachine {0} may not be running to set it as vTemplate'.format(vmachine.name))
 
         snapshots = [snap for snap in vmachine.snapshots if snap['timestamp'] == timestamp]
         if not snapshots:

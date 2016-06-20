@@ -27,15 +27,20 @@ define([
         self.data = data;
 
         // Setup
-        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.createft.title')));
+        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.create_ft.title')));
         self.modal(generic.tryGet(options, 'modal', false));
         self.data.guid(options.vmachineguid);
         self.steps([new Gather()]);
         self.activateStep();
 
         // Cleaning data
+        self.data.amount(0);
+        self.data.description('');
+        self.data.name(undefined);
+        self.data.selectedPMachines([]);
+        self.data.startnr(1);
         self.data.vMachinesNames([]);
-        
+
         // Functions
         self.compositionComplete = function() {
             var i, fields = ['amount', 'startnr'], element;

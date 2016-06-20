@@ -435,16 +435,16 @@
             "donemsg": "Machine __what__ deleted",
             "errormsg": "deleting __what__"
         },
-        "setastemplate": {
-            "title": "Set Virtual Machine __what__ as Template",
-            "warning": "Warning: converting a vMachine into a Template will remove it as active Virtual Machine from the Host. The Virtual Machine can no longer actively be used.",
-            "yes": "Set as Template",
+        "set_as_template": {
+            "done": "vMachine set as vTemplate",
+            "done_msg": "vMachine __what__ set as vTemplate",
+            "error_msg": "setting __what__ as vTemplate: __error__",
+            "marked": "Marked for setting as vTemplate",
+            "marked_msg": "vMachine __what__ is marked for setting as vTemplate...",
             "no": "Close",
-            "marked": "Marked for setting as template",
-            "markedmsg": "Machine __what__ is marked for setting as template...",
-            "done": "Machine set as template",
-            "donemsg": "Machine __what__ set as template",
-            "errormsg": "setting __what__ as template"
+            "title": "Set vMachine __what__ as vTemplate",
+            "warning": "Warning: Converting a vMachine into a vTemplate will remove it as active Virtual Machine from the Host. The Virtual Machine can no longer actively be used.",
+            "yes": "Set as vTemplate"
         },
         "details": "Details",
         "performance": "Performance",
@@ -452,7 +452,7 @@
             "title": "vMachine",
             "snapshots": "Snapshots",
             "rollback": "Rollback",
-            "setastemplate": "Set as vTemplate",
+            "set_as_template": "Set as vTemplate",
             "snapshot": "Take snapshot",
             "configuration": "vDisk configuration defaults",
             "configurationinfo": "Below are the default/fallback values for this vMachine's vDisks. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool."
@@ -856,6 +856,30 @@
                 "success": "Creation of vPool __what__ finished."
             }
         },
+        "create_ft": {
+            "title": "Create from vTemplate",
+            "gather": {
+                "all_failed": "All create actions from vTemplate __what__ failed.",
+                "amount": "# of VMs:",
+                "amount_multiple": "The first vMachine will be __start__ and the last one will be __end__",
+                "amount_one": "The name won't be appended with a number",
+                "complete": "Create completed",
+                "creating": "creating from vTemplate __what__: __error__",
+                "description": "Description:",
+                "duplicate_name": "The name __name__ is already in use",
+                "hosts": "Hosts:",
+                "in_progress": "Creating from vTemplate __what__ in progress...",
+                "name": "Name:",
+                "no_machine": "No vTemplate found",
+                "no_name": "No name was given",
+                "no_pmachines": "No physical machines found.",
+                "no_pmachines_selected": "Please select at least one host.",
+                "some_failed": "Create from __what__ finished. However, some of the vMachines could not be created.",
+                "start_nr": "Start nr.:",
+                "started": "Create started",
+                "success": "Creating from vTemplate __what__ was successful"
+            }
+        },
         "extend_vpool": {
             "title": "Extend vPool",
             "confirm": {
@@ -888,32 +912,6 @@
                 "started": "Removal started",
                 "success_multi": "The vPool was removed from the selected Storage Router with success",
                 "success_single": "The vPool was successfully removed"
-            }
-        },
-        "createft": {
-            "title": "Create from vTemplate",
-            "gather": {
-                "name": "Name:",
-                "description": "Description:",
-                "namehelp": "Will be appended with -{###} in case of multiple vMachines.",
-                "amount": "# of VMs",
-                "startnr": "Start nr.",
-                "hosts": "Hosts:",
-                "Description": "Description",
-                "nopmachinesselected": "Please select at least one host.",
-                "nomachine": "No vTemplate found",
-                "nopmachines": "No pMachines found.",
-                "noname": "No name was given",
-                "amountone": "The name won't be appended with a number",
-                "amountmultiple": "The first machine will be __start__ and the last one will be __end__",
-                "creating": "Creating from vTemplate __what__",
-                "started": "Create started",
-                "inprogress": "Creating from vTemplate __what__ in progress...",
-                "success": "Creating from __what__ successfully",
-                "somefailed": "Create from __what__ finished. However, some of the machines could not be created.",
-                "allfailed": "All create actions from __what__ failed.",
-                "complete": "Create completed",
-                "duplicatename": "The name __name__ is already in use"
             }
         },
         "rollback": {
@@ -1095,7 +1093,7 @@
         "rollback": "&#xf01e;",
         "save": "&#xf0c7;",
         "separator": "&#xf101;",
-        "setastemplate": "&#xf023;",
+        "set_as_template": "&#xf023;",
         "snapshot": "&#xf030;",
         "storagerouter": "&#xf0c2;",
         "storageroutervpoollink": "&#xf07c;",

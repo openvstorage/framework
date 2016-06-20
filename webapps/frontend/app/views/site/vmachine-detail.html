@@ -40,23 +40,23 @@ but WITHOUT ANY WARRANTY of any kind.
                         data-bind="click: function() { $root.snapshot(); },
                                    enable: loaded(),
                                    tooltip: 'ovs:vmachines.detail.snapshot',
-                                   enable: $root.shared.user.roles().contains('write')">
+                                   enable: $root.shared.user.roles().contains('write') && !$root.convertingToTemplate()">
                     <span class="fa" data-i18n="[html]ovs:icons.snapshot"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
                         id="buttonVmachineSetAsTemplate"
                         data-bind="click: function() { $root.setAsTemplate(); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
-                                   enable: $root.shared.user.roles().contains('write'),
-                                   tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.setastemplate'">
-                    <span class="fa" data-i18n="[html]ovs:icons.setastemplate"></span>
+                                   enable: $root.shared.user.roles().contains('write') && !$root.convertingToTemplate(),
+                                   tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.set_as_template'">
+                    <span class="fa" data-i18n="[html]ovs:icons.set_as_template"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
                         id="buttonVmachineRollback"
                         data-bind="click: function() { $root.rollback(); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
                                    tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.rollback',
-                                   enable: $root.shared.user.roles().contains('write')">
+                                   enable: $root.shared.user.roles().contains('write') && !$root.convertingToTemplate()">
                     <span class="fa" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
             </li>
