@@ -72,13 +72,6 @@ class MockStorageRouterClient(object):
         return MockStorageRouterClient.snapshots[volume_id][snapshot_id]
 
     @staticmethod
-    def list_snapshots(volume_id):
-        """
-        Return fake info
-        """
-        return MockStorageRouterClient.snapshots.get(volume_id, {}).keys()
-
-    @staticmethod
     def info_volume(volume_id):
         """
         Info volume mockup
@@ -88,11 +81,11 @@ class MockStorageRouterClient(object):
                                  'vrouter_id': property(lambda s: MockStorageRouterClient.vrouter_id.get(volume_id))})()
 
     @staticmethod
-    def update_metadata_backend_config(volume_id, metadata_backend_config):
+    def list_snapshots(volume_id):
         """
-        Stores the given config
+        Return fake info
         """
-        MockStorageRouterClient.metadata_backend_config[volume_id] = metadata_backend_config
+        return MockStorageRouterClient.snapshots.get(volume_id, {}).keys()
 
     @staticmethod
     def empty_info():
@@ -116,8 +109,64 @@ class MockStorageRouterClient(object):
         Retrieve a fake DTL configuration mode
         """
         if volume_id in MockStorageRouterClient.dtl_config_cache:
-            return MockStorageRouterClient.dtl_config_cache['volume_id'].dtl_config_mode
+            return MockStorageRouterClient.dtl_config_cache[volume_id].dtl_config_mode
         return DTLConfigMode.AUTOMATIC
+
+    @staticmethod
+    def get_metadata_cache_capacity(volume_id):
+        """
+        Retrieve the metadata cache capacity for volume
+        """
+        _ = volume_id
+        return 10240
+
+    @staticmethod
+    def get_readcache_behaviour(volume_id):
+        """
+        Retrieve the read cache behaviour for volume
+        """
+        _ = volume_id
+        return None  # Means the vPool global value is used
+
+    @staticmethod
+    def get_readcache_limit(volume_id):
+        """
+        Retrieve the read cache limit for volume
+        """
+        _ = volume_id
+        return None  # Means the vPool global value is used
+
+    @staticmethod
+    def get_readcache_mode(volume_id):
+        """
+        Retrieve the read cache mode for volume
+        """
+        _ = volume_id
+        return None  # Means the vPool global value is used
+
+    @staticmethod
+    def get_sco_cache_max_non_disposable_factor(volume_id):
+        """
+        Retrieve the SCO cache multiplier for a volume
+        """
+        _ = volume_id
+        return None  # Means the vPool global value is used
+
+    @staticmethod
+    def get_sco_multiplier(volume_id):
+        """
+        Retrieve the SCO multiplier for volume
+        """
+        _ = volume_id
+        return 1024
+
+    @staticmethod
+    def get_tlog_multiplier(volume_id):
+        """
+        Retrieve the TLOG multiplier for volume
+        """
+        _ = volume_id
+        return 16
 
     @staticmethod
     def set_manual_dtl_config(volume_id, config):
@@ -129,6 +178,13 @@ class MockStorageRouterClient(object):
         else:
             dtl_config = DTLConfig(host=config.host, mode=config.mode, port=config.port)
         MockStorageRouterClient.dtl_config_cache[volume_id] = dtl_config
+
+    @staticmethod
+    def update_metadata_backend_config(volume_id, metadata_backend_config):
+        """
+        Stores the given config
+        """
+        MockStorageRouterClient.metadata_backend_config[volume_id] = metadata_backend_config
 
     EMPTY_INFO = empty_info
 
@@ -181,5 +237,5 @@ class DTLConfig(object):
         """
         self.host = host
         self.port = port
-        self.dtl_mode = mode
+        self.mode = mode
         self.dtl_config_mode = DTLConfigMode.MANUAL
