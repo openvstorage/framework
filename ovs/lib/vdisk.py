@@ -1128,32 +1128,33 @@ class VDiskController(object):
                 this_storage_router = StorageRouter(vdisk.storagerouter_guid)
                 if vdisk.has_manual_dtl is True:
                     VDiskController._logger.info('    VDisk {0} with guid {1} has a manual DTL configuration'.format(vdisk.name, vdisk.guid))
-                    if current_dtl_config is None:
+                    if current_dtl_config is None or current_dtl_config.host == 'null':
                         VDiskController._logger.info('    VDisk {0} with guid {1} has a manually disabled DTL'.format(vdisk.name, vdisk.guid))
                         vdisks.remove(vdisk)
                         continue
 
-                    all_domains = DomainList.get_domains()
-                    current_dtl_targets = VDiskController.get_config_params(vdisk.guid)['dtl_target']
-                    manual_reconfig_required = False
-
-                    if len(all_domains) == 0:
-                        manual_reconfig_required = True
-                    else:
-                        for domain in all_domains:
-                            primary_srs = StorageRouterList.get_primary_storagerouters_for_domain(domain)
-                            if this_storage_router in primary_srs:
-                                primary_srs.remove(this_storage_router)
-                            if len(primary_srs) == 0 and domain.guid in current_dtl_targets:
-                                VDiskController._logger.info('    VDisk {0} with guid {1} has a manually DTL, but overruling because some Domains no longer have any Storage Routers linked to it'.format(vdisk.name, vdisk.guid))
-                                manual_reconfig_required = True
-                                vdisk.has_manual_dtl = False
-                                vdisk.save()
-                                break
-                    if manual_reconfig_required is False:
+                    dtl_target = StorageRouterList.get_by_ip(current_dtl_config.host)
+                    sr_domains = set([junction.domain for junction in dtl_target.domains])
+                    vd_domains = set([junction.domain for junction in vdisk.domains_dtl])
+                    if vd_domains.intersection(sr_domains):
                         VDiskController._logger.info('    VDisk {0} with guid {1} manual DTL configuration is valid'.format(vdisk.name, vdisk.guid))
                         vdisks.remove(vdisk)
                         continue
+
+                    VDiskController._logger.info('    vDisk {0} with guid {1} DTL target will be updated'.format(vdisk.name, vdisk.guid))
+                    # Current DTL target for vDisk is not correct anymore --> Check if other vDiskDomains can be used
+                    new_location_found = False
+                    for junction in vdisk.domains_dtl:
+                        primary_srs = StorageRouterList.get_primary_storagerouters_for_domain(junction.domain)
+                        if this_storage_router in primary_srs:
+                            primary_srs.remove(this_storage_router)
+                        if len(primary_srs) > 0:
+                            new_location_found = True
+
+                    if new_location_found is False:
+                        VDiskController._logger.info('    VDisk {0} with guid {1} has a manually DTL, but overruling because some Domains no longer have any Storage Routers linked to it'.format(vdisk.name, vdisk.guid))
+                        vdisk.has_manual_dtl = False
+                        vdisk.save()
 
                 lock_key = 'dtl_checkup_{0}'.format(vdisk.guid)
                 if dtl_vpool_enabled is False and (current_dtl_config is None or current_dtl_config.host == 'null'):
@@ -1192,9 +1193,14 @@ class VDiskController(object):
                 if len(available_primary_srs) == 0 and len(available_secondary_srs) == 0:
                     available_primary_srs = set(StorageRouterList.get_storagerouters())
 
+                if this_storage_router in available_primary_srs:
+                    available_primary_srs.remove(this_storage_router)
+                if this_storage_router in available_secondary_srs:
+                    available_secondary_srs.remove(this_storage_router)
+
                 # Remove all storagerouters from secondary which are present in primary
                 current_sr = None
-                available_secondary_srs = available_secondary_srs.difference(available_primary_srs)
+                available_primary_srs = available_primary_srs.difference(available_secondary_srs)
                 if current_dtl_config is not None and current_dtl_config.host != 'null':
                     current_sr = StorageRouterList.get_by_ip(current_dtl_config.host)
 
@@ -1286,9 +1292,12 @@ class VDiskController(object):
                         continue
 
                     port = storage_drivers[0].ports['dtl']
-                    vpool_dtl_mode = vpool_config.get('dtl_mode', StorageDriverClient.FRAMEWORK_DTL_ASYNC)
-                    VDiskController._logger.info('        DTL config that will be set -->  Host: {0}, Port: {1}, Mode: {2}'.format(dtl_target.ip, port, vpool_dtl_mode))
-                    dtl_config = DTLConfig(str(dtl_target.ip), port, StorageDriverClient.VDISK_DTL_MODE_MAP[vpool_dtl_mode])
+                    if vdisk.has_manual_dtl is True:
+                        dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[current_dtl_config.mode]
+                    else:
+                        dtl_mode = vpool_config.get('dtl_mode', StorageDriverClient.FRAMEWORK_DTL_ASYNC)
+                    VDiskController._logger.info('        DTL config that will be set -->  Host: {0}, Port: {1}, Mode: {2}'.format(dtl_target.ip, port, dtl_mode))
+                    dtl_config = DTLConfig(str(dtl_target.ip), port, StorageDriverClient.VDISK_DTL_MODE_MAP[dtl_mode])
                     try:
                         with volatile_mutex(lock_key, wait=time_to_wait_for_lock):
                             vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
