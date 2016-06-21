@@ -15,12 +15,12 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
+    'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vdisk', '../containers/vmachine', '../containers/pmachine',
     '../containers/vpool', '../containers/storagerouter',
     '../wizards/rollback/index', '../wizards/snapshot/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, PMachine, VPool, StorageRouter, RollbackWizard, SnapshotWizard) {
+], function($, app, dialog, ko, router, shared, generic, Refresher, api, VDisk, VMachine, PMachine, VPool, StorageRouter, RollbackWizard, SnapshotWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -56,6 +56,7 @@ define([
         self.vDisksHandle        = {};
 
         // Observables
+        self.convertingToTemplate = ko.observable(false);
         self.snapshotsInitialLoad = ko.observable(true);
         self.storageRouterGuids   = ko.observableArray([]);
         self.vMachine             = ko.observable();
@@ -167,39 +168,43 @@ define([
         };
         self.setAsTemplate = function() {
             if (self.vMachine() !== undefined) {
+                self.convertingToTemplate(true);
                 var vm = self.vMachine();
                 if (!vm.isRunning()) {
                     app.showMessage(
-                            $.t('ovs:vmachines.setastemplate.warning'),
-                            $.t('ovs:vmachines.setastemplate.title', { what: vm.name() }),
-                            [$.t('ovs:vmachines.setastemplate.no'), $.t('ovs:vmachines.setastemplate.yes')]
+                            $.t('ovs:vmachines.set_as_template.warning'),
+                            $.t('ovs:vmachines.set_as_template.title', { what: vm.name() }),
+                            [$.t('ovs:vmachines.set_as_template.no'), $.t('ovs:vmachines.set_as_template.yes')]
                         )
                         .done(function(answer) {
-                            if (answer === $.t('ovs:vmachines.setastemplate.yes')) {
+                            if (answer === $.t('ovs:vmachines.set_as_template.yes')) {
                                 generic.alertInfo(
-                                    $.t('ovs:vmachines.setastemplate.marked'),
-                                    $.t('ovs:vmachines.setastemplate.markedmsg', { what: vm.name() })
+                                    $.t('ovs:vmachines.set_as_template.marked'),
+                                    $.t('ovs:vmachines.set_as_template.marked_msg', { what: vm.name() })
                                 );
                                 api.post('vmachines/' + vm.guid() + '/set_as_template')
                                     .then(self.shared.tasks.wait)
                                     .done(function() {
                                         generic.alertSuccess(
-                                            $.t('ovs:vmachines.setastemplate.done'),
-                                            $.t('ovs:vmachines.setastemplate.donemsg', { what: vm.name() })
+                                            $.t('ovs:vmachines.set_as_template.done'),
+                                            $.t('ovs:vmachines.set_as_template.done_msg', { what: vm.name() })
                                         );
+                                        router.navigate(shared.routing.loadHash('vtemplates'));
                                     })
                                     .fail(function(error) {
                                         generic.alertError(
                                             $.t('ovs:generic.error'),
-                                            $.t('ovs:generic.messages.errorwhile', {
-                                                context: 'error',
-                                                what: $.t('ovs:vmachines.setastemplate.errormsg', { what: vm.name() }),
-                                                error: error.responseText
-                                            })
-                                        );
+                                            $.t('ovs:generic.messages.errorwhile', {what: $.t('ovs:vmachines.set_as_template.error_msg', {what: vm.name(), error: error})}));
+                                    })
+                                    .always(function() {
+                                        self.convertingToTemplate(false);
                                     });
+                            } else {
+                                self.convertingToTemplate(true);
                             }
                         });
+                } else {
+                    self.convertingToTemplate(true);
                 }
             }
         };

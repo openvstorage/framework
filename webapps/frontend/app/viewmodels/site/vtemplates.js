@@ -17,7 +17,7 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/api',
-    '../containers/vmachine', '../containers/vpool', '../wizards/createfromtemplatewizard/index'
+    '../containers/vmachine', '../containers/vpool', '../wizards/createfromtemplate/index'
 ], function($, app, dialog, ko, shared, generic, api, VMachine, VPool, CreateFromTemplateWizard) {
     "use strict";
     return function() {

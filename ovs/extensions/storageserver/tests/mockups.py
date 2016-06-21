@@ -27,6 +27,7 @@ class MockStorageRouterClient(object):
     catch_up = {}
     dtl_config_cache = {}
     metadata_backend_config = {}
+    object_type = {}
     snapshots = {}
     vrouter_id = {}
 
@@ -45,6 +46,7 @@ class MockStorageRouterClient(object):
         MockStorageRouterClient.catch_up = {}
         MockStorageRouterClient.dtl_config_cache = {}
         MockStorageRouterClient.metadata_backend_config = {}
+        MockStorageRouterClient.object_type = {}
         MockStorageRouterClient.snapshots = {}
         MockStorageRouterClient.vrouter_id = {}
 
@@ -76,7 +78,7 @@ class MockStorageRouterClient(object):
         """
         Info volume mockup
         """
-        return type('Info', (), {'object_type': property(lambda s: 'BASE'),
+        return type('Info', (), {'object_type': property(lambda s: MockStorageRouterClient.object_type.get(volume_id, 'BASE')),
                                  'metadata_backend_config': property(lambda s: MockStorageRouterClient.metadata_backend_config.get(volume_id)),
                                  'vrouter_id': property(lambda s: MockStorageRouterClient.vrouter_id.get(volume_id))})()
 
@@ -178,6 +180,13 @@ class MockStorageRouterClient(object):
         else:
             dtl_config = DTLConfig(host=config.host, mode=config.mode, port=config.port)
         MockStorageRouterClient.dtl_config_cache[volume_id] = dtl_config
+
+    @staticmethod
+    def set_volume_as_template(volume_id):
+        """
+        Set a volume as a template
+        """
+        MockStorageRouterClient.object_type[volume_id] = 'TEMPLATE'
 
     @staticmethod
     def update_metadata_backend_config(volume_id, metadata_backend_config):

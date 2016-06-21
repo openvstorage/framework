@@ -469,18 +469,20 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.set_as_template')
     def set_as_template(diskguid):
         """
-        Set a disk as template
+        Set a vDisk as template
 
-        :param diskguid: Guid of the disk
+        :param diskguid: Guid of the vDisk
         :type diskguid: str
 
         :return: None
         """
-        disk = VDisk(diskguid)
-        if disk.is_vtemplate is True:
-            raise RuntimeError('Disk {0} is already set as template'.format(disk.name))
-        VDiskController._logger.info('Setting disk {0} as template'.format(disk.name))
-        disk.storagedriver_client.set_volume_as_template(str(disk.volume_id))
+        vdisk = VDisk(diskguid)
+        if vdisk.is_vtemplate is True:
+            VDiskController._logger.info('vDisk {0} has already been set as vTemplate'.format(vdisk.name))
+            return
+        VDiskController._logger.info('Setting vDisk {0} as template'.format(vdisk.name))
+        vdisk.storagedriver_client.set_volume_as_template(str(vdisk.volume_id))
+        vdisk.invalidate_dynamics(['is_vtemplate', 'info'])
 
     @staticmethod
     @celery.task(name='ovs.vdisk.rollback')

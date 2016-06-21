@@ -34,12 +34,12 @@ define([
         // Computed
         self.namehelp = ko.computed(function() {
             if (data.name() === undefined || data.name() === '') {
-                return $.t('ovs:wizards.createft.gather.noname');
+                return $.t('ovs:wizards.create_ft.gather.no_name');
             }
             if (data.amount() === 1) {
-                return $.t('ovs:wizards.createft.gather.amountone');
+                return $.t('ovs:wizards.create_ft.gather.amount_one');
             }
-            return $.t('ovs:wizards.createft.gather.amountmultiple', {
+            return $.t('ovs:wizards.create_ft.gather.amount_multiple', {
                 start: data.name() + '-' + data.startnr(),
                 end: data.name() + '-' + (data.startnr() + data.amount() - 1)
             });
@@ -49,12 +49,12 @@ define([
             if (self.data.vm() === undefined) {
                 valid = false;
                 fields.push('vm');
-                reasons.push($.t('ovs:wizards.createft.gather.nomachine'));
+                reasons.push($.t('ovs:wizards.create_ft.gather.no_machine'));
             }
             if (self.data.pMachines().length === 0) {
                 valid = false;
                 fields.push('pmachines');
-                reasons.push($.t('ovs:wizards.createft.gather.nopmachines'));
+                reasons.push($.t('ovs:wizards.create_ft.gather.no_pmachines'));
             }
             return { value: valid, reasons: reasons, fields: fields };
         });
@@ -67,13 +67,13 @@ define([
             if (self.data.name() === undefined || self.data.name() === '') {
                 valid = false;
                 fields.push('name');
-                reasons.push($.t('ovs:wizards.createft.gather.noname'));
+                reasons.push($.t('ovs:wizards.create_ft.gather.no_name'));
             }
             if (self.data.amount() === 1) {
                 if (self.data.vMachinesNames().contains(self.data.name())) {
                     valid = false;
                     fields.push('name');
-                    reasons.push($.t('ovs:wizards.createft.gather.duplicatename', {
+                    reasons.push($.t('ovs:wizards.create_ft.gather.duplicate_name', {
                         name: self.data.name()
                     }));
                 }
@@ -84,7 +84,7 @@ define([
                     if (self.data.vMachinesNames().contains(name)) {
                         valid = false;
                         fields.push('name');
-                        reasons.push($.t('ovs:wizards.createft.gather.duplicatename', {
+                        reasons.push($.t('ovs:wizards.create_ft.gather.duplicate_name', {
                             name: name
                         }));
                     }
@@ -93,7 +93,7 @@ define([
             if (self.data.selectedPMachines().length === 0) {
                 valid = false;
                 fields.push('pmachines');
-                reasons.push($.t('ovs:wizards.createft.gather.nopmachinesselected'));
+                reasons.push($.t('ovs:wizards.create_ft.gather.no_pmachines_selected'));
             }
             return { value: valid, reasons: reasons, fields: fields };
         });
@@ -115,11 +115,7 @@ define([
                     .fail(function(error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:generic.messages.errorwhile', {
-                                context: 'error',
-                                what: $.t('ovs:wizards.createft.gather.creating', { what: self.data.vm().name() }),
-                                error: error.responseText
-                            })
+                            $.t('ovs:generic.messages.errorwhile', {what: $.t('ovs:wizards.create_ft.gather.creating', {what: self.data.vm().name(), error: error})})
                         );
                         deferred.resolve(false);
                     });
@@ -141,8 +137,8 @@ define([
                     }
                 }
                 generic.alertInfo(
-                    $.t('ovs:wizards.createft.gather.started'),
-                    $.t('ovs:wizards.createft.gather.inprogress', { what: self.data.vm().name() })
+                    $.t('ovs:wizards.create_ft.gather.started'),
+                    $.t('ovs:wizards.create_ft.gather.in_progress', { what: self.data.vm().name() })
                 );
                 deferred.resolve();
                 $.when.apply($, calls)
@@ -154,18 +150,18 @@ define([
                         }
                         if (success === args.length) {
                         generic.alertSuccess(
-                            $.t('ovs:wizards.createft.gather.complete'),
-                            $.t('ovs:wizards.createft.gather.success', { what: self.data.vm().name() })
+                            $.t('ovs:wizards.create_ft.gather.complete'),
+                            $.t('ovs:wizards.create_ft.gather.success', { what: self.data.vm().name() })
                         );
                         } else if (success > 0) {
                         generic.alert(
-                            $.t('ovs:wizards.createft.gather.complete'),
-                            $.t('ovs:wizards.createft.gather.somefailed', { what: self.data.vm().name() })
+                            $.t('ovs:wizards.create_ft.gather.complete'),
+                            $.t('ovs:wizards.create_ft.gather.some_failed', { what: self.data.vm().name() })
                         );
                         } else if (self.data.amount() > 2) {
                             generic.alertError(
                                 $.t('ovs:generic.error'),
-                                $.t('ovs:wizards.createft.gather.allfailed', { what: self.data.vm().name() })
+                                $.t('ovs:wizards.create_ft.gather.all_failed', { what: self.data.vm().name() })
                             );
                         }
                     });
