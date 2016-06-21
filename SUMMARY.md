@@ -9,5 +9,6 @@
     * [The scrubber](docs/scrubber.md)
 * [Logs](docs/log.md)
 * [Testing](docs/testing.md)
+    * [Automated Tests](docs/autotests.md)
     * [Unit Tests](docs/unittests.md)
 * [Troubleshooting](docs/troubleshooting.md)
