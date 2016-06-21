@@ -161,6 +161,7 @@ class DTLCheckup(unittest.TestCase):
         if test_phase is not None:
             msg += ' - {0}'.format(test_phase)
 
+        validations.append({'key': 'config_mode', 'value': DTLConfigMode.MANUAL})
         for validation in validations:
             key = validation['key']
             value = validation['value']
@@ -201,8 +202,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=True,
                                            validations=[{'key': 'host', 'value': 'null'},
                                                         {'key': 'port', 'value': None},
-                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC}])
 
         # Create some domains, but do not attach them yet
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain ||     DTL Target    ||
@@ -218,8 +218,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=True,
                                            validations=[{'key': 'host', 'value': 'null'},
                                                         {'key': 'port', 'value': None},
-                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC}])
 
         # Attach a regular Domain to the single Storage Router
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain ||     DTL Target    ||
@@ -234,8 +233,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=True,
                                            validations=[{'key': 'host', 'value': 'null'},
                                                         {'key': 'port', 'value': None},
-                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC}])
 
         # Attach a recovery Domain to the single Storage Router
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain ||     DTL Target    ||
@@ -251,8 +249,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=True,
                                            validations=[{'key': 'host', 'value': 'null'},
                                                         {'key': 'port', 'value': None},
-                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC}])
 
     def test_multi_node_without_domains(self):
         """
@@ -276,8 +273,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[1:]]},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
     def test_multi_node_with_unused_domains(self):
         """
@@ -301,8 +297,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[1:]]},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
     def test_multi_node_with_used_domains_on_local_sr(self):
         """
@@ -328,8 +323,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': 'null'},
                                                         {'key': 'port', 'value': None},
-                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC}])
 
         # Remove the linked Domain and add a recovery Domain instead --> DTL is still disabled at this point --> DTL checkup should not change anything
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain || DTL Target ||
@@ -349,8 +343,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': 'null'},
                                                         {'key': 'port', 'value': None},
-                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC}])
 
     def test_multi_node_with_regular_domains(self):
         """
@@ -375,8 +368,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': storagerouters[2].ip},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
         # Add the regular Domain as regular Domain to additional Storage Routers --> DTL target should remain on same Storage Router
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain || DTL Target ||
@@ -395,8 +387,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': storagerouters[2].ip},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
         # Add recovery Domain to the Storage Router on which the vDisks lives --> nothing should change for now
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain || DTL Target ||
@@ -414,8 +405,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': storagerouters[2].ip},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
         # # Add the recovery Domain as regular Domain to additional StorageRouters --> Recovery Domain should have priority over regular Domain
         # # || StorageRouter || vDisk | Regular Domain    || Recovery Domain || DTL Target ||
@@ -434,8 +424,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[2:]]},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
     def test_multi_node_with_recovery_domains(self):
         """
@@ -460,8 +449,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[1:]]},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
         # Add the recovery domain as regular Domain of the same Storage Router --> nothing should change
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain || DTL Target ||
@@ -479,8 +467,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': storagerouters[2].ip},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
         # Add the recovery domain as regular Domain to the other Storage Routers --> nothing should change
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain || DTL Target ||
@@ -499,8 +486,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': storagerouters[2].ip},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
         # Remove the domain from the Storage Router which is used as DTL target
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain || DTL Target ||
@@ -515,8 +501,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[2:]]},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
         # Add regular domain to the Storage Router serving the vDisk and some other Storage Routers --> recovery Domain should still get priority
         # || StorageRouter || vDisk | Regular Domain    || Recovery Domain || DTL Target ||
@@ -539,8 +524,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': storagerouters[4].ip},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
     def test_dtl_no_unnecessary_reconfiguration(self):
         """
@@ -560,16 +544,14 @@ class DTLCheckup(unittest.TestCase):
                                                     single_node=False,
                                                     validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[1:]]},
                                                                  {'key': 'port', 'value': 3},
-                                                                 {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                                 {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                                 {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
         # Rerun DTL checkup 10 times and validate target does not change even though 9 Storage Routers are potential candidate
         for _ in xrange(10):
             self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
                                                single_node=False,
                                                validations=[{'key': 'host', 'value': config.host},
                                                             {'key': 'port', 'value': 3},
-                                                            {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                            {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                            {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
     def test_manually_overruled_dtl(self):
         """
@@ -593,8 +575,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[1:3]]},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
         # Set DTL manually to node 2 and add 2 vdisk domains to the vdisk
         vdisk_1.storagedriver_client.set_manual_dtl_config(volume_id=vdisk_1.volume_id,
@@ -613,8 +594,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': storagerouters[2].ip},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.SYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.SYNCHRONOUS}])
 
         # Delete the vDiskDomain on which the DTL resides, 1 other vDiskDomain remains
         vdomain1.delete()
@@ -622,8 +602,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': storagerouters[4].ip},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.SYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.SYNCHRONOUS}])
 
         # Delete the last vDiskDomain --> DTL is no longer manual
         vdomain2.delete()
@@ -631,8 +610,7 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[1:3]]},
                                                         {'key': 'port', 'value': 3},
-                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
         vdisk_1.discard()
         self.assertFalse(expr=vdisk_1.has_manual_dtl,
                          msg='vDisk "vdisk_1" should have manual_dtl flag set to False')
@@ -643,5 +621,4 @@ class DTLCheckup(unittest.TestCase):
                                            single_node=False,
                                            validations=[{'key': 'host', 'value': 'null'},
                                                         {'key': 'port', 'value': None},
-                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC},
-                                                        {'key': 'config_mode', 'value': DTLConfigMode.MANUAL}])
+                                                        {'key': 'mode', 'value': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC}])
