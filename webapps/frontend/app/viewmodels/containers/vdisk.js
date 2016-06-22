@@ -174,6 +174,7 @@ define([
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.order, data, 'order');
             generic.trySet(self.dtlManual, data, 'has_manual_dtl');
+            generic.trySet(self.dtlStatus, data, 'dtl_status');
             if (data.hasOwnProperty('snapshots')) {
                 var snapshots = [];
                 $.each(data.snapshots, function(index, snapshot) {
@@ -189,7 +190,6 @@ define([
             generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);
-                self.dtlStatus(data.info.failover_mode.toLowerCase() || 'unknown');
                 self.namespace(data.info.namespace);
             }
             if (data.hasOwnProperty('statistics')) {

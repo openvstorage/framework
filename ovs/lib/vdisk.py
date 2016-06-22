@@ -1169,7 +1169,7 @@ class VDiskController(object):
                         continue
                     vdisks.remove(vdisk)
                     continue
-                elif current_dtl_config_mode == DTLConfigMode.MANUAL and (current_dtl_config is None or current_dtl_config.host == 'null'):
+                elif current_dtl_config_mode == DTLConfigMode.MANUAL and (current_dtl_config is None or current_dtl_config.host == 'null') and vdisk.has_manual_dtl is True:
                     VDiskController._logger.info('    DTL is disabled for virtual disk {0} with guid {1}'.format(vdisk.name, vdisk.guid))
                     vdisks.remove(vdisk)
                     continue

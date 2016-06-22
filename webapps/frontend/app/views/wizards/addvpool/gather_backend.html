@@ -18,7 +18,7 @@ but WITHOUT ANY WARRANTY of any kind.
 <div>
     <form id="form.gather.backend" class="form-horizontal">
         <p data-i18n="ovs:wizards.add_vpool.gather_backend.basic_info"></p>
-        <div data-bind="visible: data.backend() === 'alba' && data.editBackend()">
+        <div data-bind="visible: data.backend() === 'alba' && data.vPoolAdd()">
             <div class="form-group">
                 <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.fragment_cache" style="padding-top: 8px;"></label>
                 <div class="col-lg-8">
@@ -110,7 +110,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     <!-- /ko -->
                     <!-- ko if: data.albaAABackends() !== undefined && data.albaAABackends().length > 0 -->
                         <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaAABackends() === undefined)"></span>
-                        <span data-bind="visible: (data.editBackend() === true || data.albaAABackend() !== undefined),
+                        <span data-bind="visible: (data.vPoolAdd() === true || data.albaAABackend() !== undefined),
                                          dropdown: {
                                              key: 'guid', keyisfunction: false,
                                              items: data.albaAABackends, target: data.albaAABackend,
@@ -135,7 +135,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.alba_preset"></label>
                 <div class="col-lg-7">
                     <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaAAPreset() === undefined)"></span>
-                    <span data-bind="visible: (data.editBackend() === true || data.albaAAPreset() !== undefined),
+                    <span data-bind="visible: (data.vPoolAdd() === true || data.albaAAPreset() !== undefined),
                                      dropdown: {
                                          key: 'name', keyisfunction: false,
                                          items: data.enhancedAAPresets, target: data.albaAAPreset,

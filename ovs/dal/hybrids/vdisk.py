@@ -19,11 +19,12 @@ VDisk module
 """
 import time
 import pickle
-from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.datalist import DataList
+from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
@@ -49,7 +50,8 @@ class VDisk(DataObject):
     __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
                    Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
-    __dynamics = [Dynamic('snapshots', list, 60),
+    __dynamics = [Dynamic('dtl_status', str, 60),
+                  Dynamic('snapshots', list, 60),
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4),
                   Dynamic('storagedriver_id', str, 60),
@@ -75,6 +77,36 @@ class VDisk(DataObject):
         if self._storagedriver_client is None:
             self.reload_client()
         return self._storagedriver_client
+
+    def _dtl_status(self):
+        """
+        Retrieve the DTL status for a vDisk
+        """
+        sd_status = self.info.get('failover_mode', 'OK_STANDALONE').lower()
+        if sd_status != 'ok_standalone':
+            return sd_status
+
+        # Verify whether 'ok_standalone' is the correct status for this vDisk
+        vpool_dtl = self.vpool.configuration['dtl_enabled']
+        if self.has_manual_dtl is True or vpool_dtl is False:
+            return sd_status
+
+        domains = []
+        possible_dtl_targets = set()
+        for sr in StorageRouterList.get_storagerouters():
+            if sr.guid == self.storagerouter_guid:
+                domains = [junction.domain for junction in sr.domains if junction.backup is False]
+            elif len(sr.storagedrivers) > 0:
+                possible_dtl_targets.add(sr)
+
+        if len(domains) > 0:
+            possible_dtl_targets = set()
+            for domain in domains:
+                possible_dtl_targets.update(StorageRouterList.get_primary_storagerouters_for_domain(domain))
+
+        if len(possible_dtl_targets) == 0:
+            return sd_status
+        return 'checkup_required'
 
     def _snapshots(self):
         """

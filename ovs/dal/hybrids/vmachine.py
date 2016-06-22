@@ -45,7 +45,7 @@ class VMachine(DataObject):
                   Dynamic('hypervisor_status', str, 300),
                   Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('stored_data', int, 60),
-                  Dynamic('dtl_mode', str, 60),
+                  Dynamic('dtl_status', str, 60),
                   Dynamic('storagerouters_guids', list, 15),
                   Dynamic('vpools_guids', list, 15)]
 
@@ -120,23 +120,17 @@ class VMachine(DataObject):
         """
         return self.statistics['stored']
 
-    def _dtl_mode(self):
+    def _dtl_status(self):
         """
-        Gets the aggregated DTL mode
+        Gets the aggregated DTL status
         """
-        status = 'UNKNOWN'
+        status = 'unknown'
         status_code = 0
         for vdisk in self.vdisks:
-            mode = vdisk.info['failover_mode']
-            current_status_code = StorageDriverClient.DTL_STATUS[mode.lower()]
+            current_status_code = StorageDriverClient.DTL_STATUS[vdisk.dtl_status]
             if current_status_code > status_code:
-                status = mode
+                status = vdisk.dtl_status
                 status_code = current_status_code
-        if status == 'OK_STANDALONE':
-            srs = StorageRouterList.get_storagerouters()
-            if len(srs) > 1 and any(vdisk for vdisk in self.vdisks if vdisk.has_manual_dtl is False):
-                status = 'CATCH_UP'
-
         return status
 
     def _storagerouters_guids(self):

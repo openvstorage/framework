@@ -19,9 +19,9 @@ VPool module
 """
 import time
 from ovs.dal.dataobject import DataObject
+from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
-from ovs.dal.hybrids.backendtype import BackendType
 
 
 class VPool(DataObject):
@@ -41,7 +41,8 @@ class VPool(DataObject):
                     Property('rdma_enabled', bool, default=False, doc='Has the vpool been configured to use RDMA for DTL transport, which is only possible if all storagerouters are RDMA capable'),
                     Property('status', STATUSES.keys(), doc='Status of the vPool')]
     __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
-    __dynamics = [Dynamic('statistics', dict, 4),
+    __dynamics = [Dynamic('configuration', dict, 3600),
+                  Dynamic('statistics', dict, 4),
                   Dynamic('identifier', str, 120),
                   Dynamic('stored_data', int, 60)]
     _fixed_properties = ['storagedriver_client']
@@ -64,6 +65,13 @@ class VPool(DataObject):
         if self._storagedriver_client is None:
             self.reload_client()
         return self._storagedriver_client
+
+    def _configuration(self):
+        """
+        VPool configuration
+        """
+        from ovs.lib.vpool import VPoolController
+        return VPoolController.get_configuration(self.guid)
 
     def _statistics(self, dynamic):
         """

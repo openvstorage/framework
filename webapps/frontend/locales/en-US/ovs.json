@@ -33,13 +33,14 @@
                 "raw": "Raw disk"
             },
             "dtl": {
-                "ok_standalone": "Healthy (standalone)",
-                "ok_sync": "Healthy (sync)",
                 "catch_up": "Rebuilding",
                 "degraded": "Degraded",
-                "unknown": "Unknown",
+                "null": "Unknown",
+                "ok_standalone": "Healthy (standalone)",
+                "ok_sync": "Healthy (sync)",
+                "checkup_required": "DTL should be configured",
                 "undefined": "Unknown",
-                "null": "Unknown"
+                "unknown": "Unknown"
             },
             "storagerouter": {
                 "ok": "OK",
@@ -894,8 +895,7 @@
             },
             "gather_vpool": {
                 "basic_info": "Basic vPool information",
-                "information": "Extending a vPool does not allow to reconfigure the name and backend information",
-                "migration": "This vPool was created using an old verion of Open vStorage. Please enter all Backend related information again."
+                "information": "Extending a vPool does not allow to reconfigure the name and backend information"
             }
         },
         "shrink_vpool": {

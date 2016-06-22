@@ -38,8 +38,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </span>
             </div>
         </div>
-        <p data-bind="visible: data.v260Migration" data-i18n="ovs:wizards.extend_vpool.gather_vpool.migration"></p>
-        <div data-bind="visible: data.backend() === 'alba' && data.editBackend()">
+        <div data-bind="visible: data.backend() === 'alba' && data.vPoolAdd()">
             <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
                 <div class="col-lg-3"></div>
                 <div class="col-lg-7">
@@ -48,7 +47,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
             </div>
         </div>
-        <div data-bind="visible: data.backend() !== 'local' && data.backend() !== 'distributed' && (data.backend() !== 'alba' || !data.localHost()) && (data.vPoolAdd() || (data.backend() === 'alba' && data.v260Migration()))">
+        <div data-bind="visible: data.backend() !== 'local' && data.backend() !== 'distributed' && (data.backend() !== 'alba' || !data.localHost()) && (data.vPoolAdd() || data.backend() === 'alba')">
             <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('host') }">
                 <label class="col-lg-3 control-label" for="inputVpoolHost" data-i18n="ovs:wizards.add_vpool.gather_vpool.host"></label>
                 <div class="col-lg-4">
@@ -75,7 +74,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
         </div>
         <div data-bind="visible: data.backend() === 'alba'">
-            <div data-bind="visible: !data.localHost() && data.editBackend()">
+            <div data-bind="visible: !data.localHost() && data.vPoolAdd()">
                 <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
                     <label class="col-lg-3 control-label" for="inputVpoolClientId" data-i18n="ovs:wizards.add_vpool.gather_vpool.client_id"></label>
                     <div class="col-lg-7">
@@ -98,9 +97,9 @@ but WITHOUT ANY WARRANTY of any kind.
                     <!-- /ko -->
                     <!-- ko if: data.albaBackends() !== undefined && data.albaBackends().length > 0 -->
                         <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaBackend() === undefined)"></span>
-                        <span data-bind="visible: (data.editBackend() === true || data.albaBackend() !== undefined),
+                        <span data-bind="visible: (data.vPoolAdd() === true || data.albaBackend() !== undefined),
                                          dropdown: {
-                                             enabled: data.editBackend,
+                                             enabled: data.vPoolAdd,
                                              key: 'guid', keyisfunction: false,
                                              items: data.albaBackends, target: data.albaBackend,
                                              text: function(item) {
@@ -114,7 +113,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     <button class="btn btn-default"  style="margin-left: 10px;"
                             data-bind="click: loadAlbaBackends, style: {
                                            'margin-top': (data.albaBackends() !== undefined && data.albaBackends().length > 0 ? '-26px' : '')
-                                       }, enable: !albaBackendLoading(), visible: data.editBackend()">
+                                       }, enable: !albaBackendLoading(), visible: data.vPoolAdd()">
                         <span class="fa fa-" data-bind="css: { 'fa-spin': albaBackendLoading() }" data-i18n="[html]ovs:icons.load"></span>
                         <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
                     </button>
@@ -123,10 +122,10 @@ but WITHOUT ANY WARRANTY of any kind.
             <div class="form-group" data-bind="visible: data.albaBackend() !== undefined">
                 <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset"></label>
                 <div class="col-lg-7">
-                    <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaPreset() === undefined)"></span>
-                    <span data-bind="visible: (data.editBackend() === true || data.albaPreset() !== undefined),
+                    <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPool() !== undefined && data.albaPreset() === undefined)"></span>
+                    <span data-bind="visible: (data.vPoolAdd() === true || data.albaPreset() !== undefined),
                                      dropdown: {
-                                         enabled: data.editBackend,
+                                         enabled: data.vPoolAdd,
                                          key: 'name', keyisfunction: false,
                                          items: data.enhancedPresets, target: data.albaPreset,
                                          text: function(item) {

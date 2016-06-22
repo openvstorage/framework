@@ -52,13 +52,11 @@ define([
         ];
 
         // Handles
-        self.storageRouterHandle = undefined;
-        self.vDisksHandle        = {};
+        self.vDisksHandle = {};
 
         // Observables
         self.convertingToTemplate = ko.observable(false);
         self.snapshotsInitialLoad = ko.observable(true);
-        self.storageRouterGuids   = ko.observableArray([]);
         self.vMachine             = ko.observable();
 
         // Functions
@@ -105,21 +103,6 @@ define([
         };
         self.refreshSnapshots = function() {
             // Not in use, for mapping only
-        };
-        self.loadStorageRouters = function() {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.storageRouterHandle)) {
-                    self.storageRouterHandle = api.get('storagerouters', {queryparams: {contents: ''}})
-                        .done(function (data) {
-                            var guids = [];
-                            $.each(data.data, function (index, item) {
-                                guids.push(item.guid);
-                            });
-                            self.storageRouterGuids(guids);
-                        })
-                        .always(deferred.resolve());
-                }
-            }).promise();
         };
         self.loadVDisks = function(options) {
             return $.Deferred(function(deferred) {
@@ -216,7 +199,6 @@ define([
             self.refresher.start();
             self.load()
                 .then(function() {
-                    self.loadStorageRouters();
                     self.loadVDisks({page: 1});
                 });
         };
