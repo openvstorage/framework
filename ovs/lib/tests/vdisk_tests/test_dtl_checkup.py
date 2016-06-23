@@ -624,7 +624,7 @@ class DTLCheckup(unittest.TestCase):
         # Add a Storage Router
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain || DTL Target ||
         #  |      sr 1      |   1   |                 |                  |             |
-        #  |      sr 1      |   1   |                 |                  |      1      |
+        #  |      sr 2      |       |                 |                  |      1      |
         storagerouter = StorageRouter()
         storagerouter.name = '2'
         storagerouter.ip = '10.0.0.2'

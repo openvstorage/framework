@@ -877,14 +877,15 @@ class StorageRouterController(object):
             tlog_multiplier = StorageDriverClient.TLOG_MULTIPLIER_MAP[sco_size]
             sco_factor = float(write_buffer) / tlog_multiplier / sco_size  # sco_factor = write buffer / tlog multiplier (default 20) / sco size (in MiB)
         else:  # Extend vPool
-            sco_size = vpool.configuration['sco_size']
-            dtl_mode = vpool.configuration['dtl_mode']
-            dedupe_mode = vpool.configuration['dedupe_mode']
-            cluster_size = vpool.configuration['cluster_size']
-            dtl_transport = vpool.configuration['dtl_transport']
-            cache_strategy = vpool.configuration['cache_strategy']
-            tlog_multiplier = vpool.configuration['tlog_multiplier']
-            sco_factor = float(vpool.configuration['write_buffer']) / tlog_multiplier / sco_size
+            current_vpool_configuration = vpool.configuration
+            sco_size = current_vpool_configuration['sco_size']
+            dtl_mode = current_vpool_configuration['dtl_mode']
+            dedupe_mode = current_vpool_configuration['dedupe_mode']
+            cluster_size = current_vpool_configuration['cluster_size']
+            dtl_transport = current_vpool_configuration['dtl_transport']
+            cache_strategy = current_vpool_configuration['cache_strategy']
+            tlog_multiplier = current_vpool_configuration['tlog_multiplier']
+            sco_factor = float(current_vpool_configuration['write_buffer']) / tlog_multiplier / sco_size
 
         if dtl_mode == 'no_sync':
             filesystem_config['fs_dtl_host'] = None
