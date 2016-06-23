@@ -159,7 +159,7 @@ class VPoolViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_task()
     @load(VPool)
-    def get_configuration(self, vpool):
+    def get_configuration(self, vpool, version):
         """
         Retrieve the configuration settings for this vPool
         Currently we are able to configure the following settings (via GUI)
@@ -171,5 +171,11 @@ class VPoolViewSet(viewsets.ViewSet):
           - Write buffer  (Amount of data allowed not immediately being put on backend)
           - Cache strategy  (no cache, cache on read, cache on write)
         :param vpool: vPool to retrieve configuration for
+        :type vpool: Guid of the vPool
+
+        :param version: API version
+        :type version: int
         """
+        if version > 3:
+            raise NotAcceptable('Only available in API versions smaller than 3')
         return VPoolController.get_configuration.delay(vpool_guid=vpool.guid)

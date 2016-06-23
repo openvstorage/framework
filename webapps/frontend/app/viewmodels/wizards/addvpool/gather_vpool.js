@@ -75,11 +75,8 @@ define([
                     reasons = reasons.concat(preValidation.reasons);
                     fields = fields.concat(preValidation.fields);
                 }
-            } else {
-                if (self.data.albaBackend() === undefined) {
-                    valid = false;
-                    reasons.push($.t('ovs:wizards.add_vpool.gather_backend.loading_backend_information'));
-                }
+            } else if (self.data.backend() === 'alba' && self.data.albaBackend() === undefined) {
+                valid = false;
             }
             if (self.data.backend() === 'alba' && self.data.vPoolAdd()) {
                 if (self.data.albaBackend() === undefined) {

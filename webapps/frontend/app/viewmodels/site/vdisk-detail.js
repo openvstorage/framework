@@ -15,11 +15,11 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
+    'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter', '../containers/domain',
     '../wizards/rollback/index', '../wizards/clone/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, Domain, RollbackWizard, CloneWizard) {
+], function($, app, dialog, ko, router, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, Domain, RollbackWizard, CloneWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -71,8 +71,13 @@ define([
                         }
                         if (vPoolGuid && (vdisk.vpool() === undefined || vdisk.vpool().guid() !== vPoolGuid)) {
                             pool = new VPool(vPoolGuid);
-                            pool.load();
+                            pool.load('configuration');
                             vdisk.vpool(pool);
+                        }
+                    })
+                    .fail(function(error) {
+                        if (error !== undefined && error.status === 404) {
+                            router.navigate(shared.routing.loadHash('vdisks'));
                         }
                     })
                     .always(deferred.resolve);
@@ -170,7 +175,7 @@ define([
                         );
                     })
                     .always(function() {
-                        vd.loadConfiguration(true);
+                        vd.loadConfiguration(false);
                     });
                 vd.oldConfiguration($.extend({}, vd.configuration()));
             }

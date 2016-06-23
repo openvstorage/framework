@@ -98,6 +98,11 @@ define([
                             vm.pMachine(self.pMachineCache[pMachineGuid]);
                         }
                     })
+                    .fail(function(error) {
+                        if (error !== undefined && error.status === 404) {
+                            router.navigate(shared.routing.loadHash('vmachines'));
+                        }
+                    })
                     .always(deferred.resolve);
             }).promise();
         };

@@ -82,7 +82,7 @@ class VDisk(DataObject):
         """
         Retrieve the DTL status for a vDisk
         """
-        sd_status = self.info.get('failover_mode', 'OK_STANDALONE').lower()
+        sd_status = self.info.get('failover_mode', 'UNKNOWN').lower()
         if sd_status != 'ok_standalone':
             return sd_status
 
@@ -95,7 +95,7 @@ class VDisk(DataObject):
         possible_dtl_targets = set()
         for sr in StorageRouterList.get_storagerouters():
             if sr.guid == self.storagerouter_guid:
-                domains = [junction.domain for junction in sr.domains if junction.backup is False]
+                domains = [junction.domain for junction in sr.domains]
             elif len(sr.storagedrivers) > 0:
                 possible_dtl_targets.add(sr)
 
