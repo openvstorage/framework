@@ -134,6 +134,9 @@ class ScheduledTaskController(object):
                         'type': 'rest',
                         'snapshots': []})
 
+        # Get a list of all snapshots that are used as parents for clones
+        parent_snapshots = set([vd.parentsnapshot for vd in VDiskList.get_vdisks() if vd.parentsnapshot is not None])
+
         # Place all snapshots in bucket_chains
         bucket_chains = []
         for vmachine in VMachineList.get_customer_vmachines():
@@ -146,7 +149,8 @@ class ScheduledTaskController(object):
                     for bucket in bucket_chain:
                         if bucket['start'] >= timestamp > bucket['end']:
                             for diskguid, snapshotguid in snapshot['snapshots'].iteritems():
-                                if len(VDiskList.get_by_parentsnapshot(snapshotguid)) > 0:
+                                if snapshotguid in parent_snapshots:
+                                    ScheduledTaskController._logger.info('Not deleting snapshot {0} because it has clones'.format(snapshotguid))
                                     continue
                                 bucket['snapshots'].append({'timestamp': timestamp,
                                                             'snapshotid': snapshotguid,
@@ -160,7 +164,8 @@ class ScheduledTaskController(object):
                 for snapshot in vdisk.snapshots:
                     if snapshot.get('is_sticky') is True:
                         continue
-                    if len(VDiskList.get_by_parentsnapshot(snapshot['guid'])) > 0:
+                    if snapshot['guid'] in parent_snapshots:
+                        ScheduledTaskController._logger.info('Not deleting snapshot {0} because it has clones'.format(snapshot['guid']))
                         continue
                     timestamp = int(snapshot['timestamp'])
                     for bucket in bucket_chain:

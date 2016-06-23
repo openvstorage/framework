@@ -24,7 +24,11 @@ import unittest
 from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
+from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.hybrids.pmachine import PMachine
+from ovs.dal.hybrids.service import Service
+from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
@@ -72,6 +76,136 @@ class DeleteSnapshots(unittest.TestCase):
         self.volatile.clean()
         self.persistent.clean()
         MockStorageRouterClient.clean()
+
+    def test_clone_snapshot(self):
+        """
+        Validates that a snapshot that has clones will not be deleted while other snapshots will be deleted
+        """
+        # Setup
+        # There are 2 disks, second one cloned from a snapshot of the first
+        backend_type = BackendType()
+        backend_type.name = 'BackendType'
+        backend_type.code = 'BT'
+        backend_type.save()
+        vpool = VPool()
+        vpool.name = 'vpool'
+        vpool.status = 'RUNNING'
+        vpool.backend_type = backend_type
+        vpool.save()
+        pmachine = PMachine()
+        pmachine.name = 'PMachine'
+        pmachine.username = 'root'
+        pmachine.ip = '127.0.0.1'
+        pmachine.hvtype = 'KVM'
+        pmachine.save()
+        storage_router = StorageRouter()
+        storage_router.name = 'storage_router'
+        storage_router.ip = '127.0.0.1'
+        storage_router.pmachine = pmachine
+        storage_router.machine_id = System.get_my_machine_id()
+        storage_router.rdma_capable = False
+        storage_router.save()
+        disk = Disk()
+        disk.name = 'physical_disk_1'
+        disk.path = '/dev/non-existent'
+        disk.size = 500 * 1024 ** 3
+        disk.state = 'OK'
+        disk.is_ssd = True
+        disk.storagerouter = storage_router
+        disk.save()
+        disk_partition = DiskPartition()
+        disk_partition.id = 'disk_partition_id'
+        disk_partition.disk = disk
+        disk_partition.path = '/dev/disk/non-existent'
+        disk_partition.size = 400 * 1024 ** 3
+        disk_partition.state = 'OK'
+        disk_partition.offset = 1024
+        disk_partition.roles = [DiskPartition.ROLES.SCRUB]
+        disk_partition.mountpoint = '/var/tmp'
+        disk_partition.save()
+        storage_driver = StorageDriver()
+        storage_driver.vpool = vpool
+        storage_driver.storagerouter = storage_router
+        storage_driver.name = 'storage_driver_1'
+        storage_driver.mountpoint = '/'
+        storage_driver.cluster_ip = storage_router.ip
+        storage_driver.storage_ip = '127.0.0.1'
+        storage_driver.storagedriver_id = 'storage_driver_1'
+        storage_driver.ports = {'management': 1,
+                                'xmlrpc': 2,
+                                'dtl': 3,
+                                'edge': 4}
+        storage_driver.save()
+        service_type = ServiceType()
+        service_type.name = 'MetadataServer'
+        service_type.save()
+        service = Service()
+        service.name = 'service_1'
+        service.storagerouter = storage_driver.storagerouter
+        service.ports = [1]
+        service.type = service_type
+        service.save()
+        mds_service = MDSService()
+        mds_service.service = service
+        mds_service.number = 0
+        mds_service.capacity = 10
+        mds_service.vpool = storage_driver.vpool
+        mds_service.save()
+        vdisk_1_1 = VDisk()
+        vdisk_1_1.name = 'vdisk_1_1'
+        vdisk_1_1.volume_id = 'vdisk_1_1'
+        vdisk_1_1.vpool = vpool
+        vdisk_1_1.devicename = 'dummy'
+        vdisk_1_1.size = 0
+        vdisk_1_1.save()
+        vdisk_1_1.reload_client()
+
+        [dynamic for dynamic in vdisk_1_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
+
+        travis = 'TRAVIS' in os.environ and os.environ['TRAVIS'] == 'true'
+        if travis is True:
+            print 'Running in Travis, reducing output.'
+        debug = not travis
+
+        base = datetime.datetime.now().date()
+        day = datetime.timedelta(1)
+        base_timestamp = self._make_timestamp(base, day)
+        minute = 60
+        hour = minute * 60
+        print '- Creating 3 snapshots'
+        for h in [6, 12, 18]:
+            timestamp = base_timestamp + (hour * h)
+            VDiskController.create_snapshot(diskguid=vdisk_1_1.guid,
+                                            metadata={'label': 'snapshot_{0}:30'.format(str(h)),
+                                                      'is_consistent': True,
+                                                      'timestamp': str(timestamp),
+                                                      'machineguid': None})
+
+        base_snapshot_guid = vdisk_1_1.snapshots[0]['guid']  # Oldest
+        print '- Creating clone'
+        clone_vdisk = VDisk()
+        clone_vdisk.name = 'clone_vdisk'
+        clone_vdisk.volume_id = 'clone_vdisk'
+        clone_vdisk.vpool = vpool
+        clone_vdisk.devicename = 'dummy'
+        clone_vdisk.parentsnapshot = base_snapshot_guid
+        clone_vdisk.size = 0
+        clone_vdisk.save()
+        clone_vdisk.reload_client()
+
+        print '- Creating 3 snapshots of clone'
+        for h in [6, 12, 18]:
+            timestamp = base_timestamp + (hour * h)
+            VDiskController.create_snapshot(diskguid=clone_vdisk.guid,
+                                            metadata={'label': 'snapshot_{0}:30'.format(str(h)),
+                                                      'is_consistent': True,
+                                                      'timestamp': str(timestamp),
+                                                      'machineguid': None})
+
+        base_timestamp = self._make_timestamp(base, day * 2)
+        print '- Deleting snapshots'
+        ScheduledTaskController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+        self.assertIn(base_snapshot_guid, [snap['guid'] for snap in vdisk_1_1.snapshots], 'Snapshot was deleted while there are still clones of it')
 
     def test_happypath(self):
         """
