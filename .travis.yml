@@ -11,7 +11,7 @@ before_install:
 before_script:
   - sudo rm -rf /opt/OpenvStorage
   - sudo chmod 777 /opt
-  - sudo chmod 777 /var/log/ovs
+  - sudo chmod -R 777 /var/log/ovs
   - sudo chmod 777 /run
   - mv ../framework /opt/OpenvStorage
   - sudo cp /opt/OpenvStorage/scripts/system/ovs /usr/bin/
