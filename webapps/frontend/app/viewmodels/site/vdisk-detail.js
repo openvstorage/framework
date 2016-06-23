@@ -15,11 +15,11 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
+    'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter', '../containers/domain',
     '../wizards/rollback/index', '../wizards/clone/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, Domain, RollbackWizard, CloneWizard) {
+], function($, app, dialog, ko, router, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, Domain, RollbackWizard, CloneWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -46,14 +46,12 @@ define([
         self.vDisk                = ko.observable();
 
         // Handles
-        self.loadDomainHandle         = undefined;
-        self.loadStorageRoutersHandle = undefined;
+        self.loadDomainHandle = undefined;
 
         // Functions
         self.load = function() {
             return $.Deferred(function (deferred) {
                 self.vDisk().load()
-                    .then(self.loadStorageRouters)
                     .then(self.loadDomains)
                     .then(function() {
                         self.snapshotsInitialLoad(false);
@@ -73,26 +71,16 @@ define([
                         }
                         if (vPoolGuid && (vdisk.vpool() === undefined || vdisk.vpool().guid() !== vPoolGuid)) {
                             pool = new VPool(vPoolGuid);
-                            pool.load();
+                            pool.load('configuration');
                             vdisk.vpool(pool);
                         }
                     })
+                    .fail(function(error) {
+                        if (error !== undefined && error.status === 404) {
+                            router.navigate(shared.routing.loadHash('vdisks'));
+                        }
+                    })
                     .always(deferred.resolve);
-            }).promise();
-        };
-        self.loadStorageRouters = function() {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadStorageRouterHandle)) {
-                    self.loadStorageRouterHandle = api.get('storagerouters', {queryparams: {contents: ''}})
-                        .done(function (data) {
-                            var guids = [];
-                            $.each(data.data, function (index, item) {
-                                guids.push(item.guid);
-                            });
-                            self.vDisk().storageRouterGuids(guids);
-                        })
-                        .always(deferred.resolve());
-                }
             }).promise();
         };
         self.loadDomains = function() {
@@ -187,7 +175,7 @@ define([
                         );
                     })
                     .always(function() {
-                        vd.loadConfiguration(true);
+                        vd.loadConfiguration(false);
                     });
                 vd.oldConfiguration($.extend({}, vd.configuration()));
             }
