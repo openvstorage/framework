@@ -124,6 +124,7 @@ class StorageDriverClient(object):
                   'ok_sync': 10,
                   'ok_standalone': 20,
                   'catch_up': 30,
+                  'checkup_required': 30,
                   'degraded': 40}
     EMPTY_STATISTICS = staticmethod(lambda: Statistics())
     EMPTY_INFO = staticmethod(lambda: VolumeInfo())

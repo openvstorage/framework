@@ -278,7 +278,7 @@ class OVSSNMPServer:
                         self._register_dal_model(0, vm, 'stored_data', "3", atype = int)
                         self._register_dal_model(0, vm, 'description', "4")
                         self._register_dal_model(0, vm, 'devicename', "5")
-                        self._register_dal_model(0, vm, 'dtl_mode', "6")
+                        self._register_dal_model(0, vm, 'dtl_status', "6")
                         self._register_dal_model(0, vm, 'hypervisorid', "7")
                         self._register_dal_model(0, vm, 'ip', "8")
                         self._register_dal_model(0, vm, 'status', "10")

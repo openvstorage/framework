@@ -76,7 +76,6 @@ define([
                 var vpool = self.vPool();
                 $.when.apply($, [
                     vpool.load('storagedrivers,vdisks,_dynamics,backend_type'),
-                    vpool.loadConfiguration(),
                     vpool.loadStorageRouters(),
                     self.loadStorageRouters()
                 ])

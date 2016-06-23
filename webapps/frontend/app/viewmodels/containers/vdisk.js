@@ -28,7 +28,6 @@ define([
         // Handles
         self.loadHandle              = undefined;
         self.loadConfig              = undefined;
-        self.loadParentConfig        = undefined;
         self.loadStorageRouterHandle = undefined;
 
         // External dependencies
@@ -176,6 +175,7 @@ define([
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.order, data, 'order');
             generic.trySet(self.dtlManual, data, 'has_manual_dtl');
+            generic.trySet(self.dtlStatus, data, 'dtl_status');
             if (data.hasOwnProperty('snapshots')) {
                 var snapshots = [];
                 $.each(data.snapshots, function(index, snapshot) {
@@ -192,7 +192,6 @@ define([
             generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);
-                self.dtlStatus(data.info.failover_mode.toLowerCase() || 'unknown');
                 self.namespace(data.info.namespace);
             }
             if (data.hasOwnProperty('statistics')) {
@@ -248,33 +247,10 @@ define([
                 }
             }).promise();
         };
-        self.loadAllConfigurations = function() {
-            self.loadingConfig(true);
-            return $.Deferred(function (deferred) {
-                self.loadParentConfiguration()
-                    .then(function() {
-                        return self.loadConfiguration(false);
-                    })
-                    .always(function() {
-                        self.loadingConfig(false);
-                        deferred.resolve();
-                    });
-            }).promise();
-        };
-        self.loadParentConfiguration = function() {
-            return $.Deferred(function(deferred) {
-                self.loadParentConfig = api.get('vpools/' + self.vpoolGuid() + '/get_configuration')
-                    .then(self.shared.tasks.wait)
-                    .done(function(data) {
-                        if (self.parentConfiguration() === undefined) {
-                            self.parentConfiguration(data);
-                        }
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject);
-            }).promise();
-        };
         self.loadConfiguration = function(reload) {
+            if (reload === true) {
+                self.loadingConfig(true);
+            }
             return $.Deferred(function(deferred) {
                 self.loadConfig = api.get('vdisks/' + self.guid() + '/get_config_params')
                     .then(self.shared.tasks.wait)
@@ -293,7 +269,7 @@ define([
                         }
                         self.configuration(data);
                         data = self.configuration(); // Pass through the getter/setter for possible cleanups
-                        if (self.oldConfiguration() === undefined || reload === true) {
+                        if (self.oldConfiguration() === undefined) {
                             self.oldConfiguration($.extend({}, data)); // Used to make comparison to check for changes
                             $.each(self.oldConfiguration(), function (key, _) {
                                 if (key === 'write_buffer') {
@@ -305,7 +281,10 @@ define([
                         }
                         deferred.resolve();
                     })
-                    .fail(deferred.reject);
+                    .fail(deferred.reject)
+                    .always(function() {
+                        self.loadingConfig(false);
+                    })
             }).promise();
         };
     };

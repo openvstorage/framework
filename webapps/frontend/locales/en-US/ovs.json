@@ -33,13 +33,13 @@
                 "raw": "Raw disk"
             },
             "dtl": {
-                "ok_standalone": "Healthy (standalone)",
-                "ok_sync": "Healthy (sync)",
                 "catch_up": "Rebuilding",
                 "degraded": "Degraded",
-                "unknown": "Unknown",
+                "ok_standalone": "Healthy (standalone)",
+                "ok_sync": "Healthy (sync)",
+                "checkup_required": "DTL should be configured",
                 "undefined": "Unknown",
-                "null": "Unknown"
+                "unknown": "Unknown"
             },
             "storagerouter": {
                 "ok": "OK",
@@ -840,6 +840,7 @@
                 "invalid_host": "Invalid host (should be a FQDN or IP address)",
                 "invalid_name": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
                 "invalid_s3_info": "Could not connect to the given host/port, or wrong credentials.",
+                "loading_backend_information": "Backend information is being loaded",
                 "local_host": "Use local Open vStorage backend",
                 "mtpt_in_use": "The mountpoint /mnt/__what__ for the vPool is already in use.",
                 "name": "Name:",
@@ -922,8 +923,7 @@
             },
             "gather_vpool": {
                 "basic_info": "Basic vPool information",
-                "information": "Extending a vPool does not allow to reconfigure the name and backend information",
-                "migration": "This vPool was created using an old verion of Open vStorage. Please enter all Backend related information again."
+                "information": "Extending a vPool does not allow to reconfigure the name and backend information"
             }
         },
         "shrink_vpool": {

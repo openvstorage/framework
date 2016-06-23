@@ -38,12 +38,12 @@ define([
         // Computed
         self.localBackendsAvailable = ko.computed(function() {
             if (self.data.localHost() && self.data.albaBackends().length < 2) {
-                if (self.data.editBackend()) {
+                if (self.data.vPoolAdd()) {
                     self.data.aaLocalHost(false);
                 }
                 return false;
             }
-            if (self.data.editBackend()) {
+            if (self.data.vPoolAdd()) {
                 self.data.aaLocalHost(true);
             }
             return true;
