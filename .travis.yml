@@ -11,9 +11,12 @@ before_install:
 before_script:
   - sudo rm -rf /opt/OpenvStorage
   - sudo chmod 777 /opt
-  - sudo chmod 777 /var/log/ovs
+  - sudo chmod -R 777 /var/log/ovs
   - sudo chmod 777 /run
   - mv ../framework /opt/OpenvStorage
-  - export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages/:/usr/lib/python2.7/dist-packages
+  - sudo cp /opt/OpenvStorage/scripts/system/ovs /usr/bin/
+  - sudo chmod 777 /usr/bin/ovs
+  - export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python2.7/dist-packages:/usr/lib/python2.7/dist-packages
+  - cd /opt/OpenvStorage/webapps/api; export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH; python manage.py syncdb --noinput
 script:
   - ovs unittest

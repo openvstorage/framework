@@ -966,22 +966,6 @@ class Sdk(object):
         if self.file_exists(ip, mountpoint, disk_path):
             raise RuntimeError('Disk {0} cannot be deleted'.format(disk_path))
 
-    def _get_files_on_datastore(self, ip, mountpoint, host=None):
-        esxhost = self._validate_host(host)
-        datastore = self.get_datastore(ip, mountpoint, host=esxhost)
-        if not datastore:
-            raise RuntimeError('Could not find datastore')
-        hdbss = self._client.factory.create('ns0:HostDatastoreBrowserSearchSpec')
-        hdbss.matchPattern = "*.*"
-        task = self._client.service.SearchDatastore_Task(datastore.browser, '[{0}]'.format(datastore.name), hdbss)
-        result = self.get_task_info(task)
-        if result.info.state == 'success':
-            if hasattr(result.info.result, 'file'):
-                return [f.path for f in result.info.result.file]
-            return []
-        self._logger.warning(result.info.error.localizedMessage)
-        return []
-
     @authenticated()
     def extend_disk(self, ip, mountpoint, disk_path, size, host=None, wait=True):
         """
@@ -1007,20 +991,34 @@ class Sdk(object):
         if wait:
             self.wait_for_task(task)
 
-    def file_exists(self, ip, mountpoint, filename):
+    def file_exists(self, ip, mountpoint, filename, host=None):
         """
         Check if file exists
         :param ip: ip
         :param mountpoint: mountpoint
         :param filename: filename
+        :param host: ESXi host on which to launch the check
         """
-        try:
-            self.get_nfs_datastore_object(ip, mountpoint, filename)
-            return True
-        except Exception as ex:
-            self._logger.debug('Exception in get_nfs_datastore_object: {0}'.format(ex))
-            files_on_datastore = self._get_files_on_datastore(ip, mountpoint)
-            return filename.lstrip('/') in files_on_datastore
+
+        esxhost = self._validate_host(host)
+        datastore = self.get_datastore(ip, mountpoint, host=esxhost)
+        if not datastore:
+            raise RuntimeError('Could not find datastore')
+        if '/' in filename:
+            folder, filename = filename.rsplit('/', 1)
+        else:
+            folder = ''
+        hdbss = self._client.factory.create('ns0:HostDatastoreBrowserSearchSpec')
+        hdbss.matchPattern = filename
+        task = self._client.service.SearchDatastore_Task(datastore.browser, '[{0}]{1}'.format(datastore.name, folder), hdbss)
+        self.wait_for_task(task)
+        result = self.get_task_info(task)
+        if result.info.state == 'success':
+            if hasattr(result.info.result, 'file'):
+                return len(result.info.result.file) > 0
+            return False
+        self._logger.warning(result.info.error.localizedMessage)
+        return False
 
     def _get_vm_datastore_mapping(self, vm):
         """

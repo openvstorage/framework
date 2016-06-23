@@ -17,7 +17,11 @@
 """
 VDisk module
 """
+import json
+import time
 from backend.decorators import required_roles, load, return_list, return_object, return_task, log
+from ovs.dal.datalist import DataList
+from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
@@ -43,18 +47,22 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(VDisk)
     @load()
-    def list(self, vmachineguid=None, vpoolguid=None):
+    def list(self, vmachineguid=None, vpoolguid=None, query=None):
         """
         Overview of all vDisks
         :param vmachineguid: Guid of the virtual machine to retrieve its disks
         :param vpoolguid: Guid of the vPool to retrieve its disks
+        :param query: A query to be executed if required
         """
         if vmachineguid is not None:
             vmachine = VMachine(vmachineguid)
             return vmachine.vdisks
-        elif vpoolguid is not None:
+        if vpoolguid is not None:
             vpool = VPool(vpoolguid)
             return vpool.vdisks
+        if query is not None:
+            query = json.loads(query)
+            return DataList(VDisk, query)
         return VDiskList.get_vdisks()
 
     @log()
@@ -99,6 +107,27 @@ class VDiskViewSet(viewsets.ViewSet):
                 raise NotAcceptable('API version 1 requires a Storage Router IP')
             new_config_params['dtl_target'] = [junction.domain_guid for junction in storage_router.domains]
         return VDiskController.set_config_params.delay(vdisk_guid=vdisk.guid, new_config_params=new_config_params)
+
+    @link()
+    @log()
+    @required_roles(['read'])
+    @return_list(VDisk)
+    @load(VDisk)
+    def get_children(self, vdisk, hints):
+        """
+        Returns a list of vDisk guid(s) of children of a given vDisk
+        """
+        children_vdisk_guids = []
+        children_vdisks = []
+        if vdisk.is_vtemplate is False:
+            raise NotAcceptable('vDisk is not a vTemplate')
+        for cdisk in vdisk.child_vdisks:
+            if cdisk.guid not in children_vdisk_guids:
+                children_vdisk_guids.append(cdisk.guid)
+                if hints['full'] is True:
+                    # Only load full object is required
+                    children_vdisks.append(cdisk)
+        return children_vdisks if hints['full'] is True else children_vdisk_guids
 
     @link()
     @required_roles(['read'])
@@ -184,17 +213,20 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def create_snapshot(self, vdisk, name, timestamp, consistent=False, automatic=False, sticky=False, snapshot_id=None):
+    def create_snapshot(self, vdisk, name, version, timestamp=None, consistent=False, automatic=False, sticky=False, snapshot_id=None):
         """
         Creates a snapshot from the vDisk
         :param vdisk: Guid of the virtual disk to create snapshot from
         :param name: Name of the snapshot (label)
+        :param version: Client version
         :param timestamp: Timestamp of the snapshot - integer
         :param consistent: Flag - is_consistent
         :param automatic: Flag - is_automatic
         :param sticky: Flag - is_sticky
         :param snapshot_id: (optional) id of the snapshot, default will be new uuid
         """
+        if version >= 3:
+            timestamp = str(int(time.time()))
         metadata = {'label': name,
                     'timestamp': timestamp,
                     'is_consistent': True if consistent else False,
@@ -222,6 +254,34 @@ class VDiskViewSet(viewsets.ViewSet):
                                                           pmachineguid=pmachineguid,
                                                           machineguid=machineguid)
 
+    @link()
+    @log()
+    @required_roles(['read'])
+    @return_list(PMachine)
+    @load(VDisk)
+    def get_target_pmachines(self, vdisk, hints):
+        """
+        Gets all possible target pMachines for a given vDisk
+        """
+        if not vdisk.is_vtemplate:
+            raise NotAcceptable('vDisk is not a vTemplate')
+        # Find pMachines which have all above vPools available.
+        pmachine_guids = None
+        pmachines = {}
+        if vdisk.vpool is not None:
+            vpool = vdisk.vpool
+            this_pmachine_guids = set()
+            for storagedriver in vpool.storagedrivers:
+                this_pmachine_guids.add(storagedriver.storagerouter.pmachine_guid)
+                if hints['full'] is True:
+                    pmachines[storagedriver.storagerouter.pmachine_guid] = storagedriver.storagerouter.pmachine
+            if pmachine_guids is None:
+                pmachine_guids = list(this_pmachine_guids)
+            else:
+                pmachine_guids = list(this_pmachine_guids & set(pmachine_guids))
+            return pmachine_guids if hints['full'] is False else [pmachines[guid] for guid in pmachine_guids]
+        return []
+
     @action()
     @log()
     @required_roles(['read', 'write'])
@@ -234,6 +294,19 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         storagerouter = StorageRouter(vdisk.storagerouter_guid)
         return VDiskController.delete.s(diskguid=vdisk.guid).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
+
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VDisk)
+    def delete_vtemplate(self, vdisk):
+        """
+        Deletes a vDisk (template)
+        """
+        if not vdisk.is_vtemplate:
+            raise NotAcceptable('vDisk should be a vTemplate')
+        return VDiskController.delete.delay(diskguid=vdisk.guid)
 
     @action()
     @log()

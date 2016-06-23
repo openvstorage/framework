@@ -158,6 +158,8 @@ class VMware(object):
         Builds the path for the file backing a given device/disk
         """
         _ = self
+        devicename = self.clean_backing_disk_filename(devicename)
+        devicename = devicename.replace('.vmdk', '')
         if machinename is None:
             return '/{0}-flat.vmdk'.format(devicename)
         return '/{0}/{1}-flat.vmdk'.format(machinename.replace(' ', '_'), devicename)
@@ -167,6 +169,8 @@ class VMware(object):
         Builds the path for the file backing a given device/disk
         """
         _ = self
+        devicename = self.clean_backing_disk_filename(devicename)
+        devicename = devicename.replace('.vmdk', '')
         if machinename is None:
             return '/{0}.vmdk'.format(devicename)
         return '/{0}/{1}.vmdk'.format(machinename.replace(' ', '_'), devicename)
@@ -220,7 +224,7 @@ class VMware(object):
         :param diskname: name of the disk
         :param size: size in GB
         """
-        disk_path = self.get_disk_path(None, diskname)
+        disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
         return self.sdk.create_disk(storage_ip, vpool_mountpoint, disk_path, size)
 
     def delete_volume(self, vpool_mountpoint, storage_ip, diskname):
@@ -230,7 +234,7 @@ class VMware(object):
         :param storage_ip: IP of the storagerouter
         :param diskname: name of the disk
         """
-        disk_path = self.get_disk_path(None, diskname)
+        disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
         return self.sdk.delete_disk(storage_ip, vpool_mountpoint, disk_path)
 
     def extend_volume(self, vpool_mountpoint, storage_ip, diskname, size):
@@ -241,5 +245,5 @@ class VMware(object):
         :param diskname: name of the disk
         :param size: size in GB
         """
-        disk_path = self.get_disk_path(None, diskname)
+        disk_path = self.clean_backing_disk_filename(self.get_disk_path(None, diskname))
         return self.sdk.extend_disk(storage_ip, vpool_mountpoint, disk_path, size)
