@@ -146,6 +146,8 @@ class ScheduledTaskController(object):
                     for bucket in bucket_chain:
                         if bucket['start'] >= timestamp > bucket['end']:
                             for diskguid, snapshotguid in snapshot['snapshots'].iteritems():
+                                if len(VDiskList.get_by_parentsnapshot(snapshotguid)) > 0:
+                                    continue
                                 bucket['snapshots'].append({'timestamp': timestamp,
                                                             'snapshotid': snapshotguid,
                                                             'diskguid': diskguid,
@@ -157,6 +159,8 @@ class ScheduledTaskController(object):
                 bucket_chain = copy.deepcopy(buckets)
                 for snapshot in vdisk.snapshots:
                     if snapshot.get('is_sticky') is True:
+                        continue
+                    if len(VDiskList.get_by_parentsnapshot(snapshot['guid'])) > 0:
                         continue
                     timestamp = int(snapshot['timestamp'])
                     for bucket in bucket_chain:
