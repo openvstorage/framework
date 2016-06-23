@@ -63,7 +63,6 @@ define([
         self.namespace             = ko.observable();
         self.oldConfiguration      = ko.observable();
         self.order                 = ko.observable(0);
-        self.parentConfiguration   = ko.observable();
         self.readCacheLimit        = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});
         self.readSpeed             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.scoSize               = ko.observable(4);
