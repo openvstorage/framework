@@ -36,7 +36,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 <span data-i18n="ovs:generic.actions"></span>:
                 <button type="button" class="btn btn-mini btn-default"
                         style="color: #428bca;"
-                        id="buttonVmachineSnapshot"
+                        id="vmachine-snapshot"
                         data-bind="click: function() { $root.snapshot(); },
                                    enable: loaded(),
                                    tooltip: 'ovs:vmachines.detail.snapshot',
@@ -44,7 +44,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span class="fa" data-i18n="[html]ovs:icons.snapshot"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
-                        id="buttonVmachineSetAsTemplate"
+                        id="vmachine-set-as-template"
                         data-bind="click: function() { $root.setAsTemplate(); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
                                    enable: $root.shared.user.roles().contains('write') && !$root.convertingToTemplate(),
@@ -52,7 +52,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span class="fa" data-i18n="[html]ovs:icons.set_as_template"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
-                        id="buttonVmachineRollback"
+                        id="vmachine-rollback"
                         data-bind="click: function() { $root.rollback(); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
                                    tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.rollback',
@@ -164,8 +164,13 @@ but WITHOUT ANY WARRANTY of any kind.
                                 <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
                                    <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                                 </span>
+                                <span data-bind="visible: isVTemplate()">
+                                    <span data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : ''"></span>
+                                    &nbsp; <span class="fa" style="color: lightgrey;" data-bind="tooltip: 'ovs:generic.vtemplate'" data-i18n="[html]ovs:icons.set_as_template"></span>
+                                </span>
                                 <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
-                                              attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) }"></a>
+                                              attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) },
+                                              visible: !isVTemplate()"></a>
                             </td>
                             <td><span data-bind="text: size"></span></td>
                             <td><span data-bind="text: storedData"></span></td>

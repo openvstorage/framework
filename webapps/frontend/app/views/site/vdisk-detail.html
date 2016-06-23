@@ -40,7 +40,24 @@ but WITHOUT ANY WARRANTY of any kind.
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
                 <button type="button" class="btn btn-mini btn-default hand"
-                        id="buttonVDiskRollback"
+                        style="color: #428bca;"
+                        id="vdisk-snapshot"
+                        data-bind="click: function() { $root.snapshot(); },
+                                   enable: loaded(),
+                                   tooltip: 'ovs:vdisks.detail.snapshot',
+                                   enable: $root.shared.user.roles().contains('write') && !$root.convertingToTemplate()">
+                    <span class="fa hand" data-i18n="[html]ovs:icons.snapshot"></span>
+                </button>
+                <button type="button" class="btn btn-mini btn-default hand"
+                        id="vdisk-set-as-template"
+                        data-bind="click: function() { $root.setAsTemplate(); },
+                                   style: { color: vMachine() !== undefined && vMachine().isRunning() ? 'lightgrey' : '#428bca' },
+                                   enable: $root.shared.user.roles().contains('write') && !$root.convertingToTemplate(),
+                                   tooltip: vMachine() !== undefined && vMachine().isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vdisks.detail.set_as_template'">
+                    <span class="fa hand" data-i18n="[html]ovs:icons.set_as_template"></span>
+                </button>
+                <button type="button" class="btn btn-mini btn-default hand"
+                        id="vdisk-rollback"
                         data-bind="click: function() { $root.rollback(); },
                                    style: { color: vMachine() !== undefined && vMachine().isRunning() ? 'lightgrey' : '#428bca' },
                                    tooltip: vMachine() !== undefined && vMachine().isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vdisks.detail.rollback',
@@ -48,7 +65,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span class="fa hand" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
-                        id="buttonVDiskClone" style="color: #428bca;"
+                        id="vdisk-clone" style="color: #428bca;"
                         data-bind="click: function() { $root.clone(); },
                                    tooltip: 'ovs:vdisks.detail.clone',
                                    enable: $root.shared.user.roles().contains('write')">
@@ -163,11 +180,11 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td><span data-bind="translate: (is_sticky ? 'ovs:generic.sticky' : '-')"></span></td>
                             <td>
                                 <button type="button"
-                                        class="btn btn-mini btn-default"
+                                        class="btn btn-mini btn-default hand"
                                         data-bind="click: function(){
                                                         $root.removeSnapshot(guid);
-                                        }, visible: true, tooltip: 'ovs:generic.removesnapshot' ">
-                                    <span class="fa" data-i18n="[html]ovs:icons.delete"></span>
+                                                   }, tooltip: 'ovs:generic.removesnapshot' ">
+                                    <span class="fa hand" data-i18n="[html]ovs:icons.delete"></span>
                                 </button>
                             </td>
                         </tr>

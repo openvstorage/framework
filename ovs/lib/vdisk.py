@@ -149,7 +149,7 @@ class VDiskController(object):
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
         hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
         VDiskController._logger.info('Deleting disk {0}'.format(vdisk.name))
-        hypervisor.delete_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.name)
+        hypervisor.delete_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.devicename)
         VDiskController._logger.info('Deleted disk {0}'.format(vdisk.name))
 
     @staticmethod
@@ -169,7 +169,7 @@ class VDiskController(object):
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
         hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
         VDiskController._logger.info('Extending disk {0}'.format(vdisk.name))
-        hypervisor.extend_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.name, size)
+        hypervisor.extend_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.devicename, size)
         VDiskController._logger.info('Extended disk {0}'.format(vdisk.name))
 
     @staticmethod
@@ -509,22 +509,18 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_from_template')
-    def create_from_template(diskguid, devicename, pmachineguid, machinename='', machineguid=None):
+    def create_from_template(diskguid, devicename, pmachineguid, machinename=None, machineguid=None):
         """
         Create a disk from a template
 
         :param diskguid: Guid of the disk
         :type diskguid: str
-
         :param machinename: Name of the machine
         :type machinename: str
-
         :param devicename: Device file name for the disk (eg: my_disk-flat.vmdk)
         :type devicename: str
-
         :param pmachineguid: Guid of pmachine to create new vdisk on
         :type pmachineguid: str
-
         :param machineguid: Guid of the machine to assign disk to
         :type machineguid: str
 
@@ -544,9 +540,10 @@ class VDiskController(object):
                                'snapshotpolicyid', 'vmachine', 'vpool']
 
         vdisk = VDisk(diskguid)
+        detached = False
         if vdisk.vmachine and not vdisk.vmachine.is_vtemplate:
-            # Disk might not be attached to a vmachine, but still be a template
-            raise RuntimeError('The given vdisk does not belong to a template')
+            # The vDisk is linked to a vMachine but that one is not a vTemplate.
+            detached = True
         if not vdisk.is_vtemplate:
             raise RuntimeError('The given vdisk is not a template')
 
@@ -566,7 +563,10 @@ class VDiskController(object):
         new_vdisk.parent_vdisk = vdisk
         new_vdisk.name = '{0}-clone'.format(vdisk.name)
         new_vdisk.description = description
-        new_vdisk.vmachine = new_vdisk_vmachine if machineguid else vdisk.vmachine
+        if detached is True:
+            new_vdisk.vmachine = None
+        else:
+            new_vdisk.vmachine = new_vdisk_vmachine if machineguid else vdisk.vmachine
         new_vdisk.save()
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, new_vdisk.vpool)[0]
@@ -594,7 +594,7 @@ class VDiskController(object):
                 VDiskController.clean_bad_disk(new_vdisk.guid)
             except Exception as ex2:
                 VDiskController._logger.exception('Exception during exception handling of "create_clone_from_template" : {0}'.format(str(ex2)))
-            raise ex
+            raise
 
         return {'diskguid': new_vdisk.guid,
                 'name': new_vdisk.name,

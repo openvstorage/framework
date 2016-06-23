@@ -16,8 +16,8 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <section>
-    <h2 data-i18n="ovs:vtemplates.title"></h2>
-    <div data-bind="pager: { loadData: loadVTemplates, headers: vTemplateHeaders, refreshInterval: 5000, controls: true }">
+    <h2 data-i18n="ovs:vtemplates.vmachines.title"></h2>
+    <div data-bind="pager: { container: vMachineTemplates, loadData: loadVMachineTemplates, headers: vMachineTemplateHeaders, refreshInterval: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem">
                 <td style="position: relative;">
@@ -29,19 +29,65 @@ but WITHOUT ANY WARRANTY of any kind.
                 <td><span data-bind="text: vDisks().length"></span></td>
                 <td><span data-bind="text: templateChildrenGuids().length"></span></td>
                 <td>
-                    <i data-bind="attr: { id: 'vtemplateDelete_' + guid() },
+                    <i data-bind="attr: { id: 'vm-template-delete-' + guid() },
                                   click: function() {
                                       if ($.inArray('write', $root.shared.user.roles()) !== -1) {
-                                          $root.deleteVT($data.guid());
+                                          $root.deleteVMT($data.guid());
                                       }
                                   },
                                   style: { color: $.inArray('write', $root.shared.user.roles()) !== -1 && templateChildrenGuids().length === 0 ? 'black' : 'lightgrey' },
                                   tooltip: templateChildrenGuids().length > 0 ? 'ovs:generic.templatehaschildren' : ''"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
-                    <i data-bind="attr: { id: 'vtemplateClone_' + guid() },
+                    <i data-bind="attr: { id: 'vm-template-create-' + guid() },
                                   click: function() {
                                       if ($.inArray('write', $root.shared.user.roles()) !== -1) {
-                                          $root.createFromTemplate($data.guid());
+                                          $root.createFromVMT($data.guid());
+                                      }
+                                  },
+                                  tooltip: 'ovs:generic.clone',
+                                  style: { color: $.inArray('write', $root.shared.user.roles()) !== -1 ? 'black' : 'lightgrey' }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.fromtemplate"></i>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <h2 data-i18n="ovs:vtemplates.vdisks.title"></h2>
+    <div data-bind="pager: { container: vDiskTemplates, loadData: loadVDiskTemplates, headers: vDiskTemplateHeaders, refreshInterval: 5000, controls: true }">
+        <table data-dummy="dummy">
+            <tr data-part="vitem">
+                <td style="position: relative;">
+                    <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
+                       <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    </span>
+                    <span data-bind="text: name"></span>
+                </td>
+                <td>
+                    <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
+                        <span data-part="lazy-entry">
+                            <span data-bind="visible: item().isVTemplate()">
+                                <span data-bind="text: item().name"></span>
+                                &nbsp; <span class="fa" style="color: lightgrey;" data-bind="tooltip: 'ovs:generic.vtemplate'" data-i18n="[html]ovs:icons.set_as_template"></span>
+                            </span>
+                            <a data-bind="text: item().name, visible: !item().isVTemplate(),
+                                          attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
+                        </span>
+                    </span>
+                </td>
+                <td><span data-bind="text: templateChildrenGuids().length"></span></td>
+                <td>
+                    <i data-bind="attr: { id: 'vd-template-delete' + guid() },
+                                  click: function() {
+                                      if ($.inArray('write', $root.shared.user.roles()) !== -1) {
+                                          $root.deleteVDT($data.guid());
+                                      }
+                                  },
+                                  style: { color: $.inArray('write', $root.shared.user.roles()) !== -1 && templateChildrenGuids().length === 0 ? 'black' : 'lightgrey' },
+                                  tooltip: templateChildrenGuids().length > 0 ? 'ovs:generic.templatehaschildren' : ''"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
+                    <i data-bind="attr: { id: 'vd-template-create-' + guid() },
+                                  click: function() {
+                                      if ($.inArray('write', $root.shared.user.roles()) !== -1) {
+                                          $root.createFromVDT($data.guid());
                                       }
                                   },
                                   tooltip: 'ovs:generic.clone',

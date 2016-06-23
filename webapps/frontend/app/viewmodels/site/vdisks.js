@@ -32,6 +32,10 @@ define([
         self.vMachineCache       = {};
         self.storageRouterCache  = {};
         self.vPoolCache          = {};
+        self.query               = {
+            type: 'AND',
+            items: [['is_vtemplate', 'EQUALS', false]]
+        };
         self.vDiskHeaders        = [
             { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
             { key: 'vmachine',      value: $.t('ovs:generic.vmachine'),      width: 110       },
@@ -66,6 +70,7 @@ define([
                 if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
                     options.sort = 'devicename';
                     options.contents = '_dynamics,_relations,-snapshots';
+                    options.query = JSON.stringify(self.query);
                     self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
