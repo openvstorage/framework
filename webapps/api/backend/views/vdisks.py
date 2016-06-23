@@ -115,7 +115,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @load(VDisk)
     def get_children(self, vdisk, hints):
         """
-        Returns a list of vMachines guid(s) of children of a given vMachine
+        Returns a list of vDisk guid(s) of children of a given vDisk
         """
         children_vdisk_guids = []
         children_vdisks = []
@@ -225,7 +225,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :param sticky: Flag - is_sticky
         :param snapshot_id: (optional) id of the snapshot, default will be new uuid
         """
-        if version == 3:
+        if version >= 3:
             timestamp = str(int(time.time()))
         metadata = {'label': name,
                     'timestamp': timestamp,
@@ -261,7 +261,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @load(VDisk)
     def get_target_pmachines(self, vdisk, hints):
         """
-        Gets all possible target pMachines for a given vMachine
+        Gets all possible target pMachines for a given vDisk
         """
         if not vdisk.is_vtemplate:
             raise NotAcceptable('vDisk is not a vTemplate')
@@ -279,7 +279,8 @@ class VDiskViewSet(viewsets.ViewSet):
                 pmachine_guids = list(this_pmachine_guids)
             else:
                 pmachine_guids = list(this_pmachine_guids & set(pmachine_guids))
-        return pmachine_guids if hints['full'] is False else [pmachines[guid] for guid in pmachine_guids]
+            return pmachine_guids if hints['full'] is False else [pmachines[guid] for guid in pmachine_guids]
+        return []
 
     @action()
     @log()

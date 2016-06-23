@@ -281,10 +281,10 @@
                 "no": "Cancel",
                 "yes": "Move away",
                 "marked": "Moving away started",
-                "markedmsg": "All vDisks will be moved away from this Storage Router",
+                "marked_msg": "All vDisks will be moved away from this Storage Router",
                 "done": "Move away complete",
-                "donemsg": "All vDisks have been moved away from __what__",
-                "errormsg": "moving away all vDisks from __what__"
+                "done_msg": "All vDisks have been moved away from __what__",
+                "error_msg": "moving away all vDisks from __what__"
             },
             "moveawaymsg": "Move all vDisks away from this Storage Router and start them on other Storage Routers.",
             "moveawaytitle": "Move all vDisks",
@@ -308,8 +308,8 @@
                 "pending": "Pending",
                 "pendingmsg": "The StorageRouter is being marked offline",
                 "done": "Marked offline",
-                "donemsg": "The StorageRouter was marked offline",
-                "errormsg": "marking the StorageRouter offline: __error__"
+                "done_msg": "The StorageRouter was marked offline",
+                "error_msg": "marking the StorageRouter offline: __error__"
             }
         }
     },
@@ -401,15 +401,15 @@
             "yes": "Start sync",
             "no": "Close",
             "marked": "Sync scheduled",
-            "markedmsg": "A sync will be executed",
+            "marked_msg": "A sync will be executed",
             "done": "vPool synced",
-            "donemsg": "All vMachines using vPool __what__ synced",
-            "errormsg": "syncing all vMachines using __what__"
+            "done_msg": "All vMachines using vPool __what__ synced",
+            "error_msg": "syncing all vMachines using __what__"
         },
         "saveconfig": {
             "done": "Save complete",
-            "donemsg": "The configuration details for __what__ are saved.",
-            "errormsg": "saving __what__"
+            "done_msg": "The configuration details for __what__ are saved.",
+            "error_msg": "saving __what__"
         }
     },
     "statistics": {
@@ -431,10 +431,10 @@
         "delete": {
             "warning": "Are you sure you want to delete __what__?",
             "marked": "Marked for deletion",
-            "markedmsg": "vMachine __what__ is marked for deletion...",
+            "marked_msg": "vMachine __what__ is marked for deletion...",
             "done": "vMachine deleted",
-            "donemsg": "vMachine __what__ deleted",
-            "errormsg": "deleting __what__"
+            "done_msg": "vMachine __what__ deleted",
+            "error_msg": "deleting __what__"
         },
         "set_as_template": {
             "done": "vMachine set as vTemplate",
@@ -460,8 +460,8 @@
         },
         "saveconfig": {
             "done": "Save complete",
-            "donemsg": "The configuration details for __what__ are saved.",
-            "errormsg": "saving __what__"
+            "done_msg": "The configuration details for __what__ are saved.",
+            "error_msg": "saving __what__"
         }
     },
     "vdisks": {
@@ -492,22 +492,22 @@
         },
         "saveconfig": {
             "done": "Save complete",
-            "donemsg": "The configuration details for __what__ are saved.",
-            "errormsg": "saving __what__"
+            "done_msg": "The configuration details for __what__ are saved.",
+            "error_msg": "saving __what__"
         },
         "removesnapshot": {
             "delete": "Are you sure you want to remove snapshot __what__?",
             "done": "Snapshot removed",
-            "donemsg": "Snapshot __what__ was removed successfully.",
-            "errormsg": "Failed to remove snapshot __what__."
+            "done_msg": "Snapshot __what__ was removed successfully.",
+            "error_msg": "Failed to remove snapshot __what__."
         },
         "delete": {
             "warning": "Are you sure you want to delete __what__?",
             "marked": "Marked for deletion",
-            "markedmsg": "vDisk __what__ is marked for deletion...",
+            "marked_msg": "vDisk __what__ is marked for deletion...",
             "done": "vDisk deleted",
-            "donemsg": "vDisk __what__ deleted",
-            "errormsg": "deleting __what__"
+            "done_msg": "vDisk __what__ deleted",
+            "error_msg": "deleting __what__"
         }
     },
     "vtemplates": {
@@ -563,10 +563,10 @@
         "delete": {
             "warning": "Are you sure you want to delete __what__?",
             "marked": "Marked for deletion",
-            "markedmsg": "Management center __what__ is marked for deletion...",
+            "marked_msg": "Management center __what__ is marked for deletion...",
             "done": "Deleted",
-            "donemsg": "Management center __what__ deleted",
-            "errormsg": "deleting __what__"
+            "done_msg": "Management center __what__ deleted",
+            "error_msg": "deleting __what__"
         }
     },
     "domains": {

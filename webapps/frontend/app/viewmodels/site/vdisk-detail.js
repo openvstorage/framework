@@ -211,7 +211,7 @@ define([
                                         self.convertingToTemplate(false);
                                     });
                             } else {
-                                self.convertingToTemplate(true);
+                                self.convertingToTemplate(false);
                             }
                         });
                 }
@@ -235,14 +235,14 @@ define([
                     .done(function () {
                         generic.alertSuccess(
                             $.t('ovs:vdisks.saveconfig.done'),
-                            $.t('ovs:vdisks.saveconfig.donemsg', { what: vd.name() })
+                            $.t('ovs:vdisks.saveconfig.done_msg', { what: vd.name() })
                         );
                     })
                     .fail(function (error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
                             $.t('ovs:generic.messages.errorwhile', {
-                                what: $.t('ovs:vdisks.saveconfig.errormsg', { what: vd.name() })
+                                what: $.t('ovs:vdisks.saveconfig.error_msg', { what: vd.name() })
                             })
                         );
                     })
@@ -267,14 +267,14 @@ define([
                         .done(function () {
                             generic.alertSuccess(
                                 $.t('ovs:vdisks.removesnapshot.done'),
-                                $.t('ovs:vdisks.removesnapshot.donemsg', { what: snapshotid })
+                                $.t('ovs:vdisks.removesnapshot.done_msg', { what: snapshotid })
                             );
                         })
                         .fail(function (error) {
                             generic.alertError(
                                 $.t('ovs:generic.error'),
                                 $.t('ovs:generic.messages.errorwhile', {
-                                    what: $.t('ovs:vdisks.removesnapshot.errormsg', { what: snapshotid })
+                                    what: $.t('ovs:vdisks.removesnapshot.error_msg', { what: snapshotid })
                                 })
                             );
                         })

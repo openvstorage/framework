@@ -93,14 +93,14 @@ define([
                             if (answer === $.t('ovs:generic.yes')) {
                                 generic.alertInfo(
                                     $.t('ovs:vmachines.delete.marked'),
-                                    $.t('ovs:vmachines.delete.markedmsg', { what: vm.name() })
+                                    $.t('ovs:vmachines.delete.marked_msg', { what: vm.name() })
                                 );
                                 api.post('vmachines/' + vm.guid() + '/delete_vtemplate')
                                     .then(self.shared.tasks.wait)
                                     .done(function() {
                                         generic.alertSuccess(
                                             $.t('ovs:vmachines.delete.done'),
-                                            $.t('ovs:vmachines.delete.donemsg', { what: vm.name() })
+                                            $.t('ovs:vmachines.delete.done_msg', { what: vm.name() })
                                         );
                                     })
                                     .fail(function(error) {
@@ -108,7 +108,7 @@ define([
                                             $.t('ovs:generic.error'),
                                             $.t('ovs:generic.messages.errorwhile', {
                                                 context: 'error',
-                                                what: $.t('ovs:vmachines.delete.errormsg', { what: vm.name() }),
+                                                what: $.t('ovs:vmachines.delete.error_msg', { what: vm.name() }),
                                                 error: error.responseText
                                             })
                                         );
@@ -170,14 +170,14 @@ define([
                             if (answer === $.t('ovs:generic.yes')) {
                                 generic.alertInfo(
                                     $.t('ovs:vdisks.delete.marked'),
-                                    $.t('ovs:vdisks.delete.markedmsg', { what: vd.name() })
+                                    $.t('ovs:vdisks.delete.marked_msg', { what: vd.name() })
                                 );
                                 api.post('vdisks/' + vd.guid() + '/delete_vtemplate')
                                     .then(self.shared.tasks.wait)
                                     .done(function() {
                                         generic.alertSuccess(
                                             $.t('ovs:vdisks.delete.done'),
-                                            $.t('ovs:vdisks.delete.donemsg', { what: vd.name() })
+                                            $.t('ovs:vdisks.delete.done_msg', { what: vd.name() })
                                         );
                                     })
                                     .fail(function(error) {
@@ -185,7 +185,7 @@ define([
                                             $.t('ovs:generic.error'),
                                             $.t('ovs:generic.messages.errorwhile', {
                                                 context: 'error',
-                                                what: $.t('ovs:vdisks.delete.errormsg', { what: vd.name() }),
+                                                what: $.t('ovs:vdisks.delete.error_msg', { what: vd.name() }),
                                                 error: error.responseText
                                             })
                                         );

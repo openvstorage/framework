@@ -234,7 +234,7 @@ define([
                             .done(function() {
                                 generic.alertSuccess(
                                     $.t('ovs:storagerouters.detail.offline.done'),
-                                    $.t('ovs:storagerouters.detail.offline.donemsg')
+                                    $.t('ovs:storagerouters.detail.offline.done_msg')
                                 );
                             })
                             .fail(function(error) {
@@ -242,7 +242,7 @@ define([
                                     $.t('ovs:generic.error'),
                                     $.t('ovs:generic.messages.errorwhile', {
                                         context: 'error',
-                                        what: $.t('ovs:storagerouters.detail.offline.errormsg'),
+                                        what: $.t('ovs:storagerouters.detail.offline.error_msg'),
                                         error: $('<div/>').text(error.responseText).html()
                                     })
                                 )
