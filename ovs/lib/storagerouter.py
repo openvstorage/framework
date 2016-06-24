@@ -1797,7 +1797,8 @@ class StorageRouterController(object):
                                  for sd in this_sr.storagedrivers]
         volumedriver_services.extend(['ovs-dtl_{0}'.format(sd.vpool.name)
                                       for sd in this_sr.storagedrivers])
-        voldrv_info = PackageManager.verify_update_required(packages=['volumedriver-base', 'volumedriver-server'],
+        voldrv_info = PackageManager.verify_update_required(packages=['volumedriver-base', 'volumedriver-server',
+                                                                      'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server'],
                                                             services=volumedriver_services,
                                                             client=client)
         alba_info = PackageManager.verify_update_required(packages=['alba'],
