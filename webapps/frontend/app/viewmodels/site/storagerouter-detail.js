@@ -17,9 +17,9 @@
 define([
     'jquery', 'durandal/app', 'knockout', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver', '../containers/domain',
+    '../containers/storagerouter', '../containers/vpool', '../containers/storagedriver', '../containers/domain',
     '../wizards/configurepartition/index'
-], function($, app, ko, dialog, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver, Domain, ConfigurePartitionWizard) {
+], function($, app, ko, dialog, shared, generic, Refresher, api, StorageRouter, VPool, StorageDriver, Domain, ConfigurePartitionWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -84,12 +84,8 @@ define([
                     .then(self.loadVPools)
                     .done(function() {
                         self.checkedVPoolGuids(self.storageRouter().vPoolGuids());
-                        if (storageRouter.pMachine() !== undefined && !storageRouter.pMachine().loaded()) {
-                            storageRouter.pMachine().load();
-                        }
                         // Move child guids to the observables for easy display
                         storageRouter.vPools(storageRouter.vPoolGuids());
-                        storageRouter.vMachines(storageRouter.vMachineGuids);
                     })
                     .always(deferred.resolve);
             }).promise();

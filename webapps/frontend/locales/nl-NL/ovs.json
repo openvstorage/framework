@@ -92,14 +92,6 @@
             "rawinfo": "Raw memcached informatie"
         }
     },
-    "vmachines": {
-        "title": "vMachines",
-        "suretodelete": "Bent u zeker dat u __what__ wil verwijderen?",
-        "marked": "Klaar om te verwijderen",
-        "machinemarked": "Machine __what__ zal worden verwijderd ...",
-        "deleted": "Machine verwijdered",
-        "machinedeleted": "Machine __what__ werd verwijderd"
-    },
     "dashboard": {
         "title": "Dashboard",
         "introduction": "Open vStorage is de volgende generatie in Software-Defined Storage."

@@ -20,7 +20,6 @@ define(['knockout'], function(ko){
         return {
             name:         ko.observable(''),
             guid:         ko.observable(),
-            mode:         ko.observable(),
             vObject:      ko.observable(),
             isConsistent: ko.observable(false),
             isSticky:     ko.observable(false)

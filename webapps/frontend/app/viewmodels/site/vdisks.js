@@ -17,9 +17,9 @@
 define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter',
+    '../containers/vdisk', '../containers/vpool', '../containers/storagerouter',
     '../wizards/addvdisk/index'
-], function($, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, AddVDiskWizard) {
+], function($, dialog, ko, shared, generic, Refresher, api, VDisk, VPool, StorageRouter, AddVDiskWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -29,7 +29,6 @@ define([
         self.guard               = { authenticated: true };
         self.refresher           = new Refresher();
         self.widgets             = [];
-        self.vMachineCache       = {};
         self.storageRouterCache  = {};
         self.vPoolCache          = {};
         self.query               = {
@@ -38,7 +37,6 @@ define([
         };
         self.vDiskHeaders        = [
             { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
-            { key: 'vmachine',      value: $.t('ovs:generic.vmachine'),      width: 110       },
             { key: 'vpool',         value: $.t('ovs:generic.vpool'),         width: 110       },
             { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 150       },
             { key: 'size',          value: $.t('ovs:generic.size'),          width: 100       },
@@ -79,7 +77,6 @@ define([
                                 dependencyLoader: function(item) {
                                     var vm, sr, pool,
                                         storageRouterGuid = item.storageRouterGuid(),
-                                        vMachineGuid = item.vMachineGuid(),
                                         vPoolGuid = item.vpoolGuid();
                                     if (storageRouterGuid && (item.storageRouter() === undefined || item.storageRouter().guid() !== storageRouterGuid)) {
                                         if (!self.storageRouterCache.hasOwnProperty(storageRouterGuid)) {
@@ -88,14 +85,6 @@ define([
                                             self.storageRouterCache[storageRouterGuid] = sr;
                                         }
                                         item.storageRouter(self.storageRouterCache[storageRouterGuid]);
-                                    }
-                                    if (vMachineGuid && (item.vMachine() === undefined || item.vMachine().guid() !== vMachineGuid)) {
-                                        if (!self.vMachineCache.hasOwnProperty(vMachineGuid)) {
-                                            vm = new VMachine(vMachineGuid);
-                                            vm.load('');
-                                            self.vMachineCache[vMachineGuid] = vm;
-                                        }
-                                        item.vMachine(self.vMachineCache[vMachineGuid]);
                                     }
                                     if (vPoolGuid && (item.vpool() === undefined || item.vpool().guid() !== vPoolGuid)) {
                                         if (!self.vPoolCache.hasOwnProperty(vPoolGuid)) {

@@ -29,7 +29,6 @@ define([
         // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.create_ft.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.data.mode(options.mode);
         self.data.guid(options.guid);
         self.steps([new Gather()]);
         self.activateStep();
@@ -38,7 +37,7 @@ define([
         self.data.amount(0);
         self.data.description('');
         self.data.name(undefined);
-        self.data.selectedPMachines([]);
+        self.data.selectedStorageRouters([]);
         self.data.startnr(1);
         self.data.names([]);
 

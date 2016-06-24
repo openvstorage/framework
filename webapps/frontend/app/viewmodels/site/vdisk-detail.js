@@ -17,12 +17,11 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter', '../containers/domain',
+    '../containers/vdisk', '../containers/vpool', '../containers/storagerouter', '../containers/domain',
     '../wizards/rollback/index', '../wizards/clone/index', '../wizards/snapshot/index'
 ], function(
     $, app, dialog, ko, router, shared, generic, Refresher, api,
-    VDisk, VMachine, VPool, StorageRouter, Domain,
-    RollbackWizard, CloneWizard, SnapshotWizard
+    VDisk, VPool, StorageRouter, Domain, RollbackWizard, CloneWizard, SnapshotWizard
 ) {
     "use strict";
     return function() {
@@ -70,17 +69,11 @@ define([
                         self.snapshotsInitialLoad(false);
                         var vm, sr, pool, vdisk = self.vDisk(),
                             storageRouterGuid = vdisk.storageRouterGuid(),
-                            vMachineGuid = vdisk.vMachineGuid(),
                             vPoolGuid = vdisk.vpoolGuid();
                         if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {
                             sr = new StorageRouter(storageRouterGuid);
                             sr.load();
                             vdisk.storageRouter(sr);
-                        }
-                        if (vMachineGuid && (vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vMachineGuid)) {
-                            vm = new VMachine(vMachineGuid);
-                            vm.load();
-                            vdisk.vMachine(vm);
                         }
                         if (vPoolGuid && (vdisk.vpool() === undefined || vdisk.vpool().guid() !== vPoolGuid)) {
                             pool = new VPool(vPoolGuid);
@@ -163,21 +156,16 @@ define([
         };
         self.rollback = function() {
             if (self.vDisk() !== undefined) {
-                var vdisk = self.vDisk();
-                if (vdisk.vMachine() === undefined || !vdisk.vMachine().isRunning()) {
-                    dialog.show(new RollbackWizard({
-                        modal: true,
-                        type: 'vdisk',
-                        guid: vdisk.guid()
-                    }));
-                }
+                dialog.show(new RollbackWizard({
+                    modal: true,
+                    guid: self.vDisk().guid()
+                }));
             }
         };
         self.snapshot = function() {
             if (self.vDisk() !== undefined) {
                 dialog.show(new SnapshotWizard({
                     modal: true,
-                    mode: 'vdisk',
                     guid: self.vDisk().guid()
                 }));
             }
@@ -185,41 +173,39 @@ define([
         self.setAsTemplate = function() {
             if (self.vDisk() !== undefined) {
                 var vd = self.vDisk();
-                if (vd.vMachine() !== undefined && !vd.vMachine().isRunning()) {
-                    self.convertingToTemplate(true);
-                    app.showMessage(
-                            $.t('ovs:vdisks.set_as_template.warning'),
-                            $.t('ovs:vdisks.set_as_template.title', { what: vd.name() }),
-                            [$.t('ovs:vdisks.set_as_template.no'), $.t('ovs:vdisks.set_as_template.yes')]
-                        )
-                        .done(function(answer) {
-                            if (answer === $.t('ovs:vdisks.set_as_template.yes')) {
-                                generic.alertInfo(
-                                    $.t('ovs:vdisks.set_as_template.marked'),
-                                    $.t('ovs:vdisks.set_as_template.marked_msg', { what: vd.name() })
-                                );
-                                api.post('vdisks/' + vd.guid() + '/set_as_template')
-                                    .then(self.shared.tasks.wait)
-                                    .done(function() {
-                                        generic.alertSuccess(
-                                            $.t('ovs:vdisks.set_as_template.done'),
-                                            $.t('ovs:vdisks.set_as_template.done_msg', { what: vd.name() })
-                                        );
-                                        router.navigate(shared.routing.loadHash('vtemplates'));
-                                    })
-                                    .fail(function(error) {
-                                        generic.alertError(
-                                            $.t('ovs:generic.error'),
-                                            $.t('ovs:generic.messages.errorwhile', {what: $.t('ovs:vdisks.set_as_template.error_msg', {what: vd.name(), error: error})}));
-                                    })
-                                    .always(function() {
-                                        self.convertingToTemplate(false);
-                                    });
-                            } else {
-                                self.convertingToTemplate(false);
-                            }
-                        });
-                }
+                self.convertingToTemplate(true);
+                app.showMessage(
+                        $.t('ovs:vdisks.set_as_template.warning'),
+                        $.t('ovs:vdisks.set_as_template.title', { what: vd.name() }),
+                        [$.t('ovs:vdisks.set_as_template.no'), $.t('ovs:vdisks.set_as_template.yes')]
+                    )
+                    .done(function(answer) {
+                        if (answer === $.t('ovs:vdisks.set_as_template.yes')) {
+                            generic.alertInfo(
+                                $.t('ovs:vdisks.set_as_template.marked'),
+                                $.t('ovs:vdisks.set_as_template.marked_msg', { what: vd.name() })
+                            );
+                            api.post('vdisks/' + vd.guid() + '/set_as_template')
+                                .then(self.shared.tasks.wait)
+                                .done(function() {
+                                    generic.alertSuccess(
+                                        $.t('ovs:vdisks.set_as_template.done'),
+                                        $.t('ovs:vdisks.set_as_template.done_msg', { what: vd.name() })
+                                    );
+                                    router.navigate(shared.routing.loadHash('vtemplates'));
+                                })
+                                .fail(function(error) {
+                                    generic.alertError(
+                                        $.t('ovs:generic.error'),
+                                        $.t('ovs:generic.messages.errorwhile', {what: $.t('ovs:vdisks.set_as_template.error_msg', {what: vd.name(), error: error})}));
+                                })
+                                .always(function() {
+                                    self.convertingToTemplate(false);
+                                });
+                        } else {
+                            self.convertingToTemplate(false);
+                        }
+                    });
             }
         };
         self.clone = function() {

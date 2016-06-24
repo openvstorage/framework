@@ -22,11 +22,6 @@ but WITHOUT ANY WARRANTY of any kind.
                data-bind="text: item().name,
                           attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
         </li>
-        <li data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-            <a data-part="lazy-entry"
-               data-bind="text: item().name,
-                          attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
-        </li>
         <li class="active" data-bind="text: name"></li>
     </ol>
     <div>
@@ -49,18 +44,18 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span class="fa hand" data-i18n="[html]ovs:icons.snapshot"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
+                        style="color: #428bca;"
                         id="vdisk-set-as-template"
                         data-bind="click: function() { $root.setAsTemplate(); },
-                                   style: { color: vMachine() !== undefined && vMachine().isRunning() ? 'lightgrey' : '#428bca' },
                                    enable: $root.shared.user.roles().contains('write') && !$root.convertingToTemplate(),
-                                   tooltip: vMachine() !== undefined && vMachine().isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vdisks.detail.set_as_template'">
+                                   tooltip: 'ovs:vdisks.detail.set_as_template'">
                     <span class="fa hand" data-i18n="[html]ovs:icons.set_as_template"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
+                        style="color: #428bca;"
                         id="vdisk-rollback"
                         data-bind="click: function() { $root.rollback(); },
-                                   style: { color: vMachine() !== undefined && vMachine().isRunning() ? 'lightgrey' : '#428bca' },
-                                   tooltip: vMachine() !== undefined && vMachine().isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vdisks.detail.rollback',
+                                   tooltip: 'ovs:vdisks.detail.rollback',
                                    enable: $root.shared.user.roles().contains('write')">
                     <span class="fa hand" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
@@ -84,26 +79,15 @@ but WITHOUT ANY WARRANTY of any kind.
                     </thead>
                     <tbody>
                         <tr>
-                            <td style="width: 15%;" data-i18n="ovs:generic.vmachine"></td>
+                            <td style="width: 15%;" data-i18n="ovs:generic.vpool"></td>
                             <td style="width: 35%;">
-                                <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <a data-part="lazy-entry" data-bind="text: item().name(),
-                                                                         attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
-                                </span>
-                            </td>
-                            <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
-                        </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.vpool"></td>
-                            <td>
                                 <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <a data-part="lazy-entry" data-bind="text: item().name(),
                                                                          attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: iops"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.storagerouter"></td>
@@ -113,13 +97,14 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                          attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: item().guid }) }"></a>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.writespeed"></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.size"></td>
                             <td><span data-bind="text: size"></span></td>
-                            <td colspan="2">&nbsp;</td>
+                            <td data-i18n="ovs:generic.writespeed"></td>
+                            <td><span data-bind="text: writeSpeed"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.storeddata"></td>

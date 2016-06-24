@@ -35,7 +35,6 @@ define([
         self.dtlTargets         = ko.observableArray([]);
         self.storageRouter      = ko.observable();
         self.storageRouterGuids = ko.observableArray([]);
-        self.vMachine           = ko.observable();
         self.vpool              = ko.observable();
 
         // Observables
@@ -73,7 +72,6 @@ define([
         self.storedData            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.templateChildrenGuids = ko.observableArray([]);
         self.totalCacheHits        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.vMachineGuid          = ko.observable();
         self.vpoolGuid             = ko.observable();
         self.writeSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.writeBuffer           = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
@@ -187,7 +185,6 @@ define([
             generic.trySet(self.isVTemplate, data, 'is_vtemplate');
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.vpoolGuid, data, 'vpool_guid');
-            generic.trySet(self.vMachineGuid, data, 'vmachine_guid');
             generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);

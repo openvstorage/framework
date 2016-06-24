@@ -17,8 +17,8 @@
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/api', 'ovs/shared',
-    'viewmodels/containers/vdisk', 'viewmodels/containers/disk', 'viewmodels/containers/pmachine'
-], function($, ko, generic, api, shared, VDisk, Disk, PMachine) {
+    'viewmodels/containers/vdisk', 'viewmodels/containers/disk'
+], function($, ko, generic, api, shared, VDisk, Disk) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -26,7 +26,6 @@ define([
         // Variables
         self.shared             = shared;
         self.storageDriverGuids = [];
-        self.vMachineGuids      = [];
 
         // Handles
         self.loadActions = undefined;
@@ -35,10 +34,8 @@ define([
 
         // External dependencies
         self.domains         = ko.observableArray([]);
-        self.pMachine        = ko.observable();
         self.recoveryDomains = ko.observableArray([]);
         self.vPools          = ko.observableArray([]);
-        self.vMachines       = ko.observableArray([]);
 
         // Observables
         self.backendRead         = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
@@ -60,7 +57,6 @@ define([
         self.machineId           = ko.observable();
         self.name                = ko.observable();
         self.nodeType            = ko.observable();
-        self.pMachineGuid        = ko.observable();
         self.recoveryDomainGuids = ko.observableArray([]);
         self.rdmaCapable         = ko.observable(false);
         self.readSpeed           = ko.observable().extend({smooth: {}}).extend({format: generic.formatSpeed});
@@ -195,17 +191,8 @@ define([
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids(data.vpools_guids);
             }
-            if (data.hasOwnProperty('pmachine_guid')) {
-                if (data.pmachine_guid !== self.pMachineGuid()) {
-                    self.pMachineGuid(data.pmachine_guid);
-                    self.pMachine(new PMachine(data.pmachine_guid))
-                }
-            }
             if (data.hasOwnProperty('storagedrivers_guids')) {
                 self.storageDriverGuids = data.storagedrivers_guids;
-            }
-            if (data.hasOwnProperty('vmachine_guids')) {
-                self.vMachineGuids = data.vmachine_guids;
             }
             if (data.hasOwnProperty('vdisks_guids')) {
                 generic.crossFiller(

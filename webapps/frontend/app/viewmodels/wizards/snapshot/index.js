@@ -30,7 +30,6 @@ define([
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.snapshot.title')));
         self.modal(generic.tryGet(options, 'modal', false));
         self.data.guid(options.guid);
-        self.data.mode(options.mode);
         self.steps([new Gather()]);
         self.activateStep();
 

@@ -60,8 +60,7 @@
         "messages": {
             "savesuccessfully": "__what__ saved successfully.",
             "errorwhile": "An error occurred while __what__.",
-            "errorwhile_error": "An error occurred while __what__: __error__",
-            "notrunningrequired": "vMachine should be halted."
+            "errorwhile_error": "An error occurred while __what__: __error__"
         },
         "hypervisors": {
             "VMWARE": "VMware",
@@ -189,7 +188,6 @@
         "nothingselected": "Nothing selected",
         "nrofsnapshots": "# Snapshots",
         "nrofvdisks": "# vDisks",
-        "nrofvmachines": "# vMachines",
         "nrofvpools": "# vPools",
         "null": "-",
         "of": "of",
@@ -242,8 +240,6 @@
         "validuntil": "Valid until",
         "vdisk": "vDisk",
         "vdisks": "vDisks",
-        "vmachine": "vMachine",
-        "vmachines": "vMachines",
         "vpool": "vPool",
         "vpools": "vPools",
         "vtemplate": "vTemplate",
@@ -393,18 +389,7 @@
             "logginginfo2": "Open Kibana",
             "logginginfo3": "to view this vPool's logs.",
             "configuration": "vPool configuration defaults",
-            "configurationinfo": "Below are the default/fallback values for this vPool's vDisks. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine, from its vPool."
-        },
-        "sync": {
-            "title": "Sync all vMachines using __what__",
-            "warning": "Are you sure you want to sync all vMachines using the vPool?",
-            "yes": "Start sync",
-            "no": "Close",
-            "marked": "Sync scheduled",
-            "marked_msg": "A sync will be executed",
-            "done": "vPool synced",
-            "done_msg": "All vMachines using vPool __what__ synced",
-            "error_msg": "syncing all vMachines using __what__"
+            "configurationinfo": "Below are the default/fallback values for this vPool's vDisks. If a vDisk has no specific settings, settings will be inherited from its vPool."
         },
         "saveconfig": {
             "done": "Save complete",
@@ -426,44 +411,6 @@
             "rawinfo": "Raw memcached information"
         }
     },
-    "vmachines": {
-        "title": "vMachines",
-        "delete": {
-            "warning": "Are you sure you want to delete __what__?",
-            "marked": "Marked for deletion",
-            "marked_msg": "vMachine __what__ is marked for deletion...",
-            "done": "vMachine deleted",
-            "done_msg": "vMachine __what__ deleted",
-            "error_msg": "deleting __what__"
-        },
-        "set_as_template": {
-            "done": "vMachine set as vTemplate",
-            "done_msg": "vMachine __what__ set as vTemplate",
-            "error_msg": "setting __what__ as vTemplate: __error__",
-            "marked": "Marked for setting as vTemplate",
-            "marked_msg": "vMachine __what__ is marked for setting as vTemplate...",
-            "no": "Close",
-            "title": "Set vMachine __what__ as vTemplate",
-            "warning": "Warning: Converting a vMachine into a vTemplate will remove it as active Virtual Machine from the Host. The Virtual Machine can no longer actively be used.",
-            "yes": "Set as vTemplate"
-        },
-        "details": "Details",
-        "performance": "Performance",
-        "detail": {
-            "title": "vMachine",
-            "snapshots": "Snapshots",
-            "rollback": "Rollback",
-            "set_as_template": "Set as vTemplate",
-            "snapshot": "Take snapshot",
-            "configuration": "vDisk configuration defaults",
-            "configurationinfo": "Below are the default/fallback values for this vMachine's vDisks. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool."
-        },
-        "saveconfig": {
-            "done": "Save complete",
-            "done_msg": "The configuration details for __what__ are saved.",
-            "error_msg": "saving __what__"
-        }
-    },
     "vdisks": {
         "add": "Add new vDisk",
         "title": "vDisks",
@@ -474,7 +421,7 @@
             "snapshots": "Snapshots",
             "rollback": "Rollback",
             "configuration": "vDisk configuration",
-            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool.",
+            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
             "clone": "Clone",
             "set_as_template": "Set as vTemplate",
             "snapshot": "Take snapshot"
@@ -511,9 +458,6 @@
         }
     },
     "vtemplates": {
-        "vmachines": {
-            "title": "vMachine Templates"
-        },
         "vdisks": {
             "title": "vDisk Templates"
         },
@@ -532,41 +476,6 @@
                 "helptitle": "Help - vPools",
                 "title": "vPools"
             }
-        }
-    },
-    "pmachines": {
-        "title": "Hypervisor Mgmt.",
-        "mgmtcenter": {
-            "title": "Hypervisor Management Center",
-            "add": "Add new Center",
-            "hosts": "OVS Hosts/Total"
-        },
-        "pmachines": {
-            "link": "Link Hosts",
-            "title": "Managed Hosts",
-            "incorrectmgmtcenter": "The selected management center might be incorrect.",
-            "missingmgmtcenter": "Host is not yet linked to the correct management center"
-        },
-        "configure": {
-            "host": {
-                "warning": "Are you sure you want to __what__ __which__?"
-            },
-            "vpool": {
-                "failed": "Failed to __which__ vPool",
-                "started": "Started",
-                "started_msg": "__which__ commenced",
-                "success": "Success",
-                "success_msg": "Successfully __which__ vPool",
-                "warning": "Are you sure you want to __what__ the vPool?"
-            }
-        },
-        "delete": {
-            "warning": "Are you sure you want to delete __what__?",
-            "marked": "Marked for deletion",
-            "marked_msg": "Management center __what__ is marked for deletion...",
-            "done": "Deleted",
-            "done_msg": "Management center __what__ deleted",
-            "error_msg": "deleting __what__"
         }
     },
     "domains": {
@@ -658,8 +567,7 @@
     },
     "prerequisites": {
         "multiple": "The following prerequisites are unmet",
-        "singular": "The following prerequisite is unmet",
-        "vmachine": "Running virtual machines detected"
+        "singular": "The following prerequisite is unmet"
     },
     "login": {
         "title": "Login",
@@ -744,22 +652,6 @@
         "vpool": "vPool"
     },
     "wizards" : {
-        "addlicense": {
-            "title": "Add new License",
-            "gather": {
-                "license": "License",
-                "invalidlicense": "The License code entered is invalid"
-            },
-            "confirm": {
-                "component": "Component",
-                "metadata": "Metadata",
-                "success": "License added successfully",
-                "adding": "adding the License",
-                "started": "Adding License",
-                "inprogress": "The License is being added",
-                "basicinfo": "The entered Lincense contains the following components. Press &quot;Finish&quot; to apply the License."
-            }
-        },
         "add_backend": {
             "title": "Add new Backend",
             "gather": {
@@ -901,8 +793,8 @@
                 "name": "Name:",
                 "no_object": "No vTemplate found",
                 "no_name": "No name was given",
-                "no_pmachines": "No physical machines found.",
-                "no_pmachines_selected": "Please select at least one host.",
+                "no_storagerouters": "No StorageRouters found.",
+                "no_storagerouters_selected": "Please select at least one StorageRouter.",
                 "some_failed": "Create from __what__ finished. However, some could not be created.",
                 "start_nr": "Start nr.:",
                 "started": "Create started",
@@ -947,15 +839,11 @@
             "gather": {
                 "title": "Please provide the required information",
                 "selectsnapshots": "Select the Snapshot to which you want to Rollback:",
-                "novmachine": "No machine loaded",
                 "novdisk": "No disk loaded",
                 "noname": "No name was entered",
                 "nosnapshots": "No Snapshots found",
                 "snapshot": "Snapshots",
                 "rollbackstarted": "Rollback started",
-                "inprogressvmachine": "Machine __what__ rollback in progress...",
-                "failedvmachine": "Machine __what__ rollback failed.",
-                "successvmachine": "Machine __what__ rollback successfully.",
                 "inprogressvdisk": "Disk __what__ rollback in progress...",
                 "failedvdisk": "Disk __what__ rollback failed.",
                 "successvdisk": "Disk __what__ rollback successfully."
@@ -1018,40 +906,6 @@
                 "updatingpassword": "updating the password"
             }
         },
-        "linkhosts": {
-            "title": "Link Hosts",
-            "gather": {
-                "basicinfo": "Select a management center and the hosts which you want to link/unlink",
-                "completed": "__which__ completed",
-                "configure": "Configure",
-                "failed": "__which__ __what__ failed: __why__",
-                "started": "Started",
-                "started_msg": "Linking / configuring started",
-                "success": "Pmachine __what__ __which__",
-                "unconfigure": "Unconfigure"
-            }
-        },
-        "addmgmtcenter": {
-            "title": "Add Hypervisor Management Center",
-            "gather": {
-                "basicinfo": "Enter the required information to add the Hypervisor Management Center",
-                "complete": "Complete",
-                "failed": "Adding __what__ failed: __why__",
-                "inprogress": "Adding Management Center __what__ started.",
-                "invalidip": "The IP Address entered is invalid",
-                "ip": "IP Address:",
-                "name": "Name:",
-                "noname": "No name was given",
-                "nousername": "No username was given",
-                "nopassword": "No password was given",
-                "password": "Password:",
-                "port": "Port:",
-                "started": "Started",
-                "success": "Adding __what__ completed.",
-                "type": "Type:",
-                "username": "Username:"
-            }
-        },
         "update": {
             "title": "Update __what__"
         },
@@ -1076,16 +930,6 @@
         }
     },
     "events": {
-        "vmachine_deleted": "vMachine deleted",
-        "vmachine_deleted_content": "vMachine __name__ was deleted.",
-        "vmachine_created": "vMachine created",
-        "vmachine_created_content": "vMachine __name__ was created.",
-        "vmachine_renamed": "vMachine renamed",
-        "vmachine_renamed_content": "vMachine __old_name__ was renamed to __new_name__.",
-        "vdisk_attached": "vDisk attached",
-        "vdisk_attached_content": "vDisk __vdisk_name__ was attached to __vmachine_name__.",
-        "vdisk_detached": "vDisk detached",
-        "vdisk_detached_content": "vDisk __vdisk_name__ was detached from __vmachine_name__"
     },
     "title": "Open vStorage",
     "icons": {
@@ -1129,7 +973,6 @@
         "unlink": "&#xf127;",
         "up": "&#xf106;",
         "vdisks": "&#xf0a0;",
-        "vmachines": "&#xf0e8;",
         "vpools": "&#xf0c2;",
         "warning": "&#xf071;",
         "clone": "&#xf24d;",

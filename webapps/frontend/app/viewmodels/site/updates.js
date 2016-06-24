@@ -17,8 +17,8 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/pmachine', '../containers/storagerouter'
-], function($, app, dialog, ko, shared, generic, Refresher, api, PMachine, StorageRouter) {
+    '../containers/storagerouter'
+], function($, app, dialog, ko, shared, generic, Refresher, api, StorageRouter) {
     "use strict";
     return function() {
         var self = this;

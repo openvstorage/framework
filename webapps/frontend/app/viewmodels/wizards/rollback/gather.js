@@ -17,8 +17,8 @@
 define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/shared', 'ovs/generic',
-    '../../containers/vmachine', '../../containers/vdisk', './data'
-], function($, ko, api, shared, generic, VMachine, VDisk, data) {
+    '../../containers/vdisk', './data'
+], function($, ko, api, shared, generic, VDisk, data) {
     "use strict";
     return function() {
         var self = this;
@@ -48,7 +48,7 @@ define([
                 var data = {
                     timestamp: self.data.snapshot().timestamp
                 };
-                api.post(self.data.type + 's/' + self.data.velement().guid() + '/rollback', { data: data })
+                api.post('vdisks/' + self.data.velement().guid() + '/rollback', { data: data })
                     .then(function(taskID) {
                         generic.alertInfo(
                             $.t('ovs:wizards.rollback.gather.rollbackstarted'),
@@ -77,13 +77,8 @@ define([
         // Durandal
         self.activate = function() {
             if (self.data.velement() === undefined || self.data.velement().guid() !== self.data.guid()) {
-                if (self.data.type === 'vmachine') {
-                    self.data.velement(new VMachine(self.data.guid()));
-                    self.data.snapshot(undefined);
-                } else {
-                    self.data.velement(new VDisk(self.data.guid()));
-                    self.data.snapshot(undefined);
-                }
+                self.data.velement(new VDisk(self.data.guid()));
+                self.data.snapshot(undefined);
             }
             self.data.velement().load();
         };
