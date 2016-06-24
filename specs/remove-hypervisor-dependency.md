@@ -29,7 +29,7 @@ With th FR we want to break this hypervisor dependency. This means you can now i
 * Administration remove hypervisor mgmt
 
 ## API & DAL
-* remove vmachine and hypervisor mgtm center
+* remove vmachine, pmachine and hypervisor mgtm center
 
 ## OpenStack
 * The Open vStorage Cinder driver should work with the Edge client
