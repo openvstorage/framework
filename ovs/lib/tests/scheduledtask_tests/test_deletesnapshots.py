@@ -24,16 +24,13 @@ import unittest
 from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
-from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
-from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient
-from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.scheduledtask import ScheduledTaskController
 
@@ -89,16 +86,9 @@ class DeleteSnapshots(unittest.TestCase):
         vpool.status = 'RUNNING'
         vpool.backend_type = backend_type
         vpool.save()
-        pmachine = PMachine()
-        pmachine.name = 'PMachine'
-        pmachine.username = 'root'
-        pmachine.ip = '127.0.0.1'
-        pmachine.hvtype = 'VMWARE'
-        pmachine.save()
         storage_router = StorageRouter()
         storage_router.name = 'storage_router'
         storage_router.ip = '127.0.0.1'
-        storage_router.pmachine = pmachine
         storage_router.machine_id = System.get_my_machine_id()
         storage_router.rdma_capable = False
         storage_router.save()
@@ -120,15 +110,9 @@ class DeleteSnapshots(unittest.TestCase):
         disk_partition.roles = [DiskPartition.ROLES.SCRUB]
         disk_partition.mountpoint = '/var/tmp'
         disk_partition.save()
-        vmachine_1 = VMachine()
-        vmachine_1.name = 'vmachine_1'
-        vmachine_1.devicename = 'dummy'
-        vmachine_1.pmachine = pmachine
-        vmachine_1.save()
         vdisk_1_1 = VDisk()
         vdisk_1_1.name = 'vdisk_1_1'
         vdisk_1_1.volume_id = 'vdisk_1_1'
-        vdisk_1_1.vmachine = vmachine_1
         vdisk_1_1.vpool = vpool
         vdisk_1_1.devicename = 'dummy'
         vdisk_1_1.size = 0
@@ -137,21 +121,14 @@ class DeleteSnapshots(unittest.TestCase):
         vdisk_1_2 = VDisk()
         vdisk_1_2.name = 'vdisk_1_2'
         vdisk_1_2.volume_id = 'vdisk_1_2'
-        vdisk_1_2.vmachine = vmachine_1
         vdisk_1_2.vpool = vpool
         vdisk_1_2.devicename = 'dummy'
         vdisk_1_2.size = 0
         vdisk_1_2.save()
         vdisk_1_2.reload_client()
-        vmachine_2 = VMachine()
-        vmachine_2.name = 'vmachine_2'
-        vmachine_2.devicename = 'dummy'
-        vmachine_2.pmachine = pmachine
-        vmachine_2.save()
         vdisk_2_1 = VDisk()
         vdisk_2_1.name = 'vdisk_2_1'
         vdisk_2_1.volume_id = 'vdisk_2_1'
-        vdisk_2_1.vmachine = vmachine_2
         vdisk_2_1.vpool = vpool
         vdisk_2_1.devicename = 'dummy'
         vdisk_2_1.size = 0
@@ -200,18 +177,6 @@ class DeleteSnapshots(unittest.TestCase):
             print '- Creating snapshots'
             for h in xrange(2, 23):
                 timestamp = base_timestamp + (hour * h)
-                for vm in [vmachine_1, vmachine_2]:
-                    VMachineController.snapshot(machineguid=vm.guid,
-                                                label='ss_i_{0}:00'.format(str(h)),
-                                                is_consistent=False,
-                                                timestamp=timestamp)
-                    if h in [6, 12, 18]:
-                        ts = (timestamp + (minute * 30))
-                        VMachineController.snapshot(machineguid=vm.guid,
-                                                    label='ss_c_{0}:30'.format(str(h)),
-                                                    is_consistent=True,
-                                                    timestamp=ts)
-
                 VDiskController.create_snapshot(diskguid=vdisk_3.guid,
                                                 metadata={'label': 'ss_i_{0}:00'.format(str(h)),
                                                           'is_consistent': False,

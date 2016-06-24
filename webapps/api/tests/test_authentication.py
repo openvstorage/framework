@@ -35,7 +35,6 @@ from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.j_roleclient import RoleClient
 from ovs.dal.hybrids.j_rolegroup import RoleGroup
-from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.user import User
@@ -144,16 +143,9 @@ class Authentication(unittest.TestCase):
                         roleclient.role = role
                         roleclient.save()
 
-        pmachine = PMachine()
-        pmachine.hvtype = 'VMWARE'
-        pmachine.name = 'pmachine'
-        pmachine.username = 'root'
-        pmachine.ip = '127.0.1.1'
-        pmachine.save()
         storagerouter = StorageRouter()
         storagerouter.machine_id = 'storagerouter'
         storagerouter.ip = '127.0.0.1'
-        storagerouter.pmachine = pmachine
         storagerouter.rdma_capable = False
         storagerouter.name = 'storagerouter'
         storagerouter.save()

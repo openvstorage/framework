@@ -59,18 +59,6 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         return vpool
 
-    @action()
-    @log()
-    @required_roles(['read', 'write'])
-    @return_task()
-    @load(VPool)
-    def sync_vmachines(self, vpool):
-        """
-        Syncs the vMachine of this vPool
-        :param vpool: vPool to synchronize
-        """
-        return VPoolController.sync_with_hypervisor.delay(vpool.guid)
-
     @link()
     @log()
     @required_roles(['read'])

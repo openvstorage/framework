@@ -46,7 +46,6 @@
         "tib": "TiB",
         "savesuccessfully": "__what__ is succesvol bewaard.",
         "errorwhile": "Een fout deed zich voor tijdens __what__.",
-        "errorwhile_error": "Een fout deed zich voor tijdens __what__: __error__",
         "saved": "Bewaard",
         "error": "Fout",
         "vdisk": "vDisk",

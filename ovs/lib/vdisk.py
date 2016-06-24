@@ -17,7 +17,6 @@
 """
 Module for VDiskController
 """
-import os
 import re
 import time
 import uuid
@@ -28,15 +27,11 @@ from ovs.celery_run import celery
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
-from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
-from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.domainlist import DomainList
-from ovs.dal.lists.mgmtcenterlist import MgmtCenterList
-from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
@@ -44,7 +39,6 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
-from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single, log
@@ -107,25 +101,18 @@ class VDiskController(object):
             mutex = volatile_mutex('{0}_{1}'.format(volumename, disk.devicename))
             try:
                 mutex.acquire(wait=20)
-                pmachine = None
-                try:
-                    pmachine = PMachineList.get_by_storagedriver_id(disk.storagedriver_id)
-                except RuntimeError as ex:
-                    if 'could not be found' not in str(ex):
-                        raise
-                    # else: pmachine can't be loaded, because the volumedriver doesn't know about it anymore
-                if pmachine is not None:
-                    limit = 5
-                    storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-                    hypervisor = Factory.get(pmachine)
+                limit = 5
+                storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+                # @TODO: Hypervisor removal story
+                hypervisor = None
+                exists = hypervisor.file_exists(storagedriver, disk.devicename)
+                while limit > 0 and exists is True:
+                    time.sleep(1)
                     exists = hypervisor.file_exists(storagedriver, disk.devicename)
-                    while limit > 0 and exists is True:
-                        time.sleep(1)
-                        exists = hypervisor.file_exists(storagedriver, disk.devicename)
-                        limit -= 1
-                    if exists is True:
-                        VDiskController._logger.info('Disk {0} still exists, ignoring delete'.format(disk.devicename))
-                        return
+                    limit -= 1
+                if exists is True:
+                    VDiskController._logger.info('Disk {0} still exists, ignoring delete'.format(disk.devicename))
+                    return
                 VDiskController._logger.info('Delete disk {0}'.format(disk.name))
                 for mds_service in disk.mds_services:
                     mds_service.delete()
@@ -147,7 +134,8 @@ class VDiskController(object):
         """
         vdisk = VDisk(diskguid)
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-        hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
+        # @TODO: Hypervisor removal story
+        hypervisor = None
         VDiskController._logger.info('Deleting disk {0}'.format(vdisk.name))
         hypervisor.delete_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.devicename)
         VDiskController._logger.info('Deleted disk {0}'.format(vdisk.name))
@@ -167,7 +155,8 @@ class VDiskController(object):
         """
         vdisk = VDisk(diskguid)
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-        hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
+        # @TODO: Hypervisor removal story
+        hypervisor = None
         VDiskController._logger.info('Extending disk {0}'.format(vdisk.name))
         hypervisor.extend_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.devicename, size)
         VDiskController._logger.info('Extended disk {0}'.format(vdisk.name))
@@ -194,9 +183,9 @@ class VDiskController(object):
 
         :return: None
         """
-        pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-        hypervisor = Factory.get(pmachine)
+        # @TODO: Hypervisor removal story
+        hypervisor = None
         volumepath = hypervisor.clean_backing_disk_filename(volumepath)
         mutex = volatile_mutex('{0}_{1}'.format(volumename, volumepath))
         try:
@@ -217,14 +206,13 @@ class VDiskController(object):
         finally:
             mutex.release()
 
-        VDiskController.sync_with_mgmtcenter(disk, pmachine, storagedriver)
         MDSServiceController.ensure_safety(disk)
         VDiskController.dtl_checkup.delay(vdisk_guid=disk.guid)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.rename_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
-    def rename_from_voldrv(volumename, volume_old_path, volume_new_path, storagedriver_id):
+    def rename_from_voldrv(volumename, volume_old_path, volume_new_path):
         """
         Rename a disk
         Triggered by volumedriver messages
@@ -238,13 +226,10 @@ class VDiskController(object):
         :param volume_new_path: new path on hypervisor to the volume
         :type volume_new_path: str
 
-        :param storagedriver_id: ID of the storagedriver serving the volume to rename
-        :type storagedriver_id: str
-
         :return: None
         """
-        pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
-        hypervisor = Factory.get(pmachine)
+        # @TODO: Hypervisor removal story
+        hypervisor = None
         volume_old_path = hypervisor.clean_backing_disk_filename(volume_old_path)
         volume_new_path = hypervisor.clean_backing_disk_filename(volume_new_path)
         disk = VDiskList.get_vdisk_by_volume_id(volumename)
@@ -282,34 +267,21 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.clone')
-    def clone(diskguid, snapshotid, devicename, pmachineguid, machinename=None, machineguid=None, detached=False):
+    def clone(diskguid, snapshotid, devicename, storagerouter_guid=None):
         """
         Clone a disk
         :param diskguid: Guid of the disk to clone
         :type diskguid: str
-
         :param snapshotid: ID of the snapshot to clone from
         :type snapshotid: str
-
         :param devicename: Name of the device to use in clone's description
         :type devicename: str
-
-        :param pmachineguid: Guid of the physical machine
-        :type pmachineguid: str
-
-        :param machinename: Name of the machine the disk is attached to
-        :type machinename: str
-
-        :param machineguid: Guid of the machine
-        :type machineguid: str
-
-        :param detached: Boolean indicating the disk is attached to a machine or not
-        :type detached: bool
-
-        ;return: Information about the cloned volume
+        :param storagerouter_guid: Guid of the StorageRouter
+        :type storagerouter_guid: str
+        :return: Information about the cloned volume
         :rtype: dict
         """
-        # 1. Validations
+        # Validations
         name_regex = "^[0-9a-zA-Z][-_a-zA-Z0-9]{1,48}[a-zA-Z0-9]$"
         if not re.match(name_regex, devicename):
             raise RuntimeError("Invalid name for virtual disk clone")
@@ -322,16 +294,12 @@ class VDiskController(object):
         if storagedriver is None:
             raise RuntimeError('Could not find StorageDriver with ID {0}'.format(vdisk.storagedriver_id))
 
-        if machineguid is not None and detached is True:
-            raise ValueError('A vMachine GUID was specified while detached is True')
-
-        # 2. Create new snapshot if required
+        # Create new snapshot if required
         if snapshotid is None:
             timestamp = str(int(time.time()))
             metadata = {'label': '',
                         'is_consistent': False,
                         'timestamp': timestamp,
-                        'machineguid': machineguid,
                         'is_automatic': True}
             sd_snapshot_id = VDiskController.create_snapshot(diskguid, metadata)
             tries = 25  # 5 minutes
@@ -353,18 +321,17 @@ class VDiskController(object):
                 raise RuntimeError('Could not find created snapshot in time')
 
         # 3. Model new cloned virtual disk
-        hypervisor = Factory.get(PMachine(pmachineguid))
-        location = hypervisor.get_disk_path(machinename, devicename)
+        # @TODO: Hypervisor removal story
+        hypervisor = None
+        location = hypervisor.get_disk_path(devicename)
 
         new_vdisk = VDisk()
         new_vdisk.copy(vdisk, include=['description', 'size', 'type', 'retentionpolicyguid', 'snapshotpolicyguid', 'autobackup'])
         new_vdisk.parent_vdisk = vdisk
         new_vdisk.name = devicename
-        new_vdisk.description = devicename if machinename is None else '{0} {1}'.format(machinename, devicename)
+        new_vdisk.description = devicename
         new_vdisk.devicename = hypervisor.clean_backing_disk_filename(location)
         new_vdisk.parentsnapshot = snapshotid
-        if detached is False:
-            new_vdisk.vmachine = VMachine(machineguid) if machineguid else vdisk.vmachine
         new_vdisk.vpool = vdisk.vpool
         new_vdisk.save()
 
@@ -509,47 +476,29 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_from_template')
-    def create_from_template(diskguid, devicename, pmachineguid, machinename=None, machineguid=None):
+    def create_from_template(diskguid, devicename, storagerouter_guid):
         """
         Create a disk from a template
 
         :param diskguid: Guid of the disk
         :type diskguid: str
-        :param machinename: Name of the machine
-        :type machinename: str
         :param devicename: Device file name for the disk (eg: my_disk-flat.vmdk)
         :type devicename: str
-        :param pmachineguid: Guid of pmachine to create new vdisk on
-        :type pmachineguid: str
-        :param machineguid: Guid of the machine to assign disk to
-        :type machineguid: str
+        :param storagerouter_guid: Guid of the Storage Router on which the vDisk should be started
+        :type storagerouter_guid: str
 
-        :return diskguid: Information about the new volume
+        :return: Information about the new volume (diskguid, name, backingdevice)
         :rtype: dict
         """
-        pmachine = PMachine(pmachineguid)
-        hypervisor = Factory.get(pmachine)
-        new_vdisk_vmachine = None
-        if machineguid is not None:
-            new_vdisk_vmachine = VMachine(machineguid)
-            machinename = new_vdisk_vmachine.name
-        disk_path = hypervisor.get_disk_path(machinename, devicename)
-
-        description = '{0} {1}'.format(machinename, devicename)
-        properties_to_clone = ['description', 'size', 'type', 'retentionpolicyid',
-                               'snapshotpolicyid', 'vmachine', 'vpool']
-
+        # @TODO: Hypervisor removal story: Clean device name and put in disk_path
+        disk_path = None
         vdisk = VDisk(diskguid)
-        detached = False
-        if vdisk.vmachine and not vdisk.vmachine.is_vtemplate:
-            # The vDisk is linked to a vMachine but that one is not a vTemplate.
-            detached = True
         if not vdisk.is_vtemplate:
-            raise RuntimeError('The given vdisk is not a template')
+            raise RuntimeError('The given vDisk is not a vTemplate')
 
         storagedriver = None
         for sd in vdisk.vpool.storagedrivers:
-            if sd.storagerouter_guid in pmachine.storagerouters_guids:
+            if sd.storagerouter_guid == storagerouter_guid:
                 storagedriver = sd
                 break
 
@@ -557,23 +506,20 @@ class VDiskController(object):
             raise RuntimeError('Could not find Storage Driver')
 
         new_vdisk = VDisk()
-        new_vdisk.copy(vdisk, include=properties_to_clone)
+        new_vdisk.copy(vdisk, include=['description', 'size', 'type', 'retentionpolicyid', 'snapshotpolicyid', 'vpool'])
         new_vdisk.vpool = vdisk.vpool
-        new_vdisk.devicename = hypervisor.clean_backing_disk_filename(disk_path)
+        # @TODO: Hypervisor removal story: clean_backing_disk_filename
+        new_vdisk.devicename = devicename
         new_vdisk.parent_vdisk = vdisk
         new_vdisk.name = '{0}-clone'.format(vdisk.name)
-        new_vdisk.description = description
-        if detached is True:
-            new_vdisk.vmachine = None
-        else:
-            new_vdisk.vmachine = new_vdisk_vmachine if machineguid else vdisk.vmachine
+        new_vdisk.description = devicename
         new_vdisk.save()
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, new_vdisk.vpool)[0]
         if mds_service is None:
             raise RuntimeError('Could not find a MDS service')
 
-        VDiskController._logger.info('Create disk from template {0} to new disk {1} to location {2}'.format(vdisk.name, new_vdisk.name, disk_path))
+        VDiskController._logger.info('Create vDisk from vTemplate {0} to new vDisk {1} to location {2}'.format(vdisk.name, new_vdisk.name, disk_path))
 
         try:
             # noinspection PyArgumentList
@@ -619,7 +565,8 @@ class VDiskController(object):
         """
         VDiskController._logger.info('Creating new empty disk {0} of {1} GB'.format(diskname, size))
         storagedriver = StorageDriver(storagedriver_guid)
-        hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
+        # @TODO: Hypervisor removal story
+        hypervisor = None
         disk_path = hypervisor.create_volume(storagedriver.mountpoint, storagedriver.storage_ip, diskname, size)
         VDiskController._logger.info('Created volume. Location {0}'.format(disk_path))
 
@@ -721,49 +668,6 @@ class VDiskController(object):
                 return VDiskController.extend(disk.guid, size)
 
         raise RuntimeError('Cannot extend volume {0}. No storagedriver found for this location.'.format(location))
-
-    @staticmethod
-    @celery.task(name='ovs.vdisk.update_vdisk_name')
-    def update_vdisk_name(volume_id, old_name, new_name):
-        """
-        Update a vDisk name using Management Center: set new name
-        :param volume_id: ID of the volume to update its name
-        :type volume_id: str
-
-        :param old_name: Old name of the volume
-        :type old_name: str
-
-        :param new_name: New name of the volume
-        :type new_name: str
-
-        :return: None
-        """
-        vdisk = None
-        for mgmt_center in MgmtCenterList.get_mgmtcenters():
-            mgmt = Factory.get_mgmtcenter(mgmt_center = mgmt_center)
-            try:
-                disk_info = mgmt.get_vdisk_device_info(volume_id)
-                device_path = disk_info['device_path']
-                vpool_name = disk_info['vpool_name']
-                vp = VPoolList.get_vpool_by_name(vpool_name)
-                file_name = os.path.basename(device_path)
-                vdisk = VDiskList.get_by_devicename_and_vpool(file_name, vp)
-                if vdisk:
-                    break
-            except Exception as ex:
-                VDiskController._logger.info('Trying to get mgmt center failed for disk {0} with volume_id {1}. {2}'.format(old_name, volume_id, ex))
-        if not vdisk:
-            VDiskController._logger.error('No vdisk found for name {0}'.format(old_name))
-            return
-
-        vpool = vdisk.vpool
-        mutex = volatile_mutex('{0}_{1}'.format(old_name, vpool.guid if vpool is not None else 'none'))
-        try:
-            mutex.acquire(wait=5)
-            vdisk.name = new_name
-            vdisk.save()
-        finally:
-            mutex.release()
 
     @staticmethod
     @celery.task(name='ovs.vdisk.get_config_params')
@@ -993,57 +897,6 @@ class VDiskController(object):
                 errors = True
         if errors is True:
             raise Exception('Failed to update the values for vDisk {0}'.format(vdisk.name))
-
-    @staticmethod
-    def sync_with_mgmtcenter(disk, pmachine, storagedriver):
-        """
-        Update disk info using management center (if available)
-        If no management center, try with hypervisor
-        If no info retrieved, use devicename
-        :param disk: vDisk hybrid (vdisk to be updated)
-        :type disk: VDisk
-
-        :param pmachine: Pmachine hybrid (pmachine running the storagedriver)
-        :type pmachine: PMachine
-
-        :param storagedriver: Storagedriver hybrid (storagedriver serving the vdisk)
-        :type storagedriver: StorageDriver
-
-        :return: None
-        """
-        disk_name = None
-        if pmachine.mgmtcenter is not None:
-            VDiskController._logger.debug('Sync vdisk {0} with management center {1} on storagedriver {2}'.format(disk.name, pmachine.mgmtcenter.name, storagedriver.name))
-            mgmt = Factory.get_mgmtcenter(mgmt_center = pmachine.mgmtcenter)
-            volumepath = disk.devicename
-            mountpoint = storagedriver.mountpoint
-            devicepath = '{0}/{1}'.format(mountpoint, volumepath)
-            try:
-                disk_mgmt_center_info = mgmt.get_vdisk_model_by_devicepath(devicepath)
-                if disk_mgmt_center_info is not None:
-                    disk_name = disk_mgmt_center_info.get('name')
-            except Exception as ex:
-                VDiskController._logger.error('Failed to sync vdisk {0} with mgmt center {1}. {2}'.format(disk.name, pmachine.mgmtcenter.name, str(ex)))
-
-        if disk_name is None and disk.vmachine is not None:
-            VDiskController._logger.info('Sync vdisk with hypervisor on {0}'.format(pmachine.name))
-            try:
-                hv = Factory.get(pmachine)
-                info = hv.get_vm_agnostic_object(disk.vmachine.hypervisor_id)
-                for _disk in info.get('disks', {}):
-                    if _disk.get('filename', '') == disk.devicename:
-                        disk_name = _disk.get('name', None)
-                        break
-            except Exception as ex:
-                VDiskController._logger.error('Failed to get vdisk info from hypervisor. %s' % ex)
-
-        if disk_name is None:
-            VDiskController._logger.info('No info retrieved from hypervisor, using devicename')
-            disk_name = os.path.splitext(disk.devicename)[0]
-
-        if disk_name is not None:
-            disk.name = disk_name
-            disk.save()
 
     @staticmethod
     @celery.task(name='ovs.vdisk.dtl_checkup', schedule=crontab(minute='15', hour='0,4,8,12,16,20'))
@@ -1360,7 +1213,7 @@ class VDiskController(object):
             domain_junction.delete()
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
         if storagedriver is not None and vdisk.devicename is not None:
-            VDiskController._logger.debug('Removing volume from hypervisor')
+            VDiskController._logger.debug('Removing volume from filesystem')
             VDiskController.delete(vdisk.guid)
 
         VDiskController._logger.debug('Deleting vdisk {0} from model'.format(vdisk.name))

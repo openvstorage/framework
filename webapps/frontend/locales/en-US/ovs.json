@@ -59,14 +59,7 @@
         },
         "messages": {
             "savesuccessfully": "__what__ saved successfully.",
-            "errorwhile": "An error occurred while __what__.",
-            "errorwhile_error": "An error occurred while __what__: __error__"
-        },
-        "hypervisors": {
-            "VMWARE": "VMware",
-            "HYPERV": "HyperV",
-            "XEN": "Xen",
-            "KVM": "KVM"
+            "errorwhile": "An error occurred while __what__."
         },
         "backendtypes": {
             "s3": "S3",
@@ -167,8 +160,6 @@
         "iops": "IOPS",
         "ip": "IP",
         "latency": "Latency",
-        "licenselimited": "Unavailable due to License",
-        "licensing": "Licensing",
         "loadingdata": "Loading data...",
         "logging": "Kibana logging",
         "logout": "Log out",
@@ -751,12 +742,6 @@
                 "shared_available": "Shared between Read and Write Cache:",
                 "writecache_size": "Write Cache:"
             },
-            "gather_mgmt_center": {
-                "integrate_mgmt": "Automatically configure the vPool on the Hypervisor.",
-                "loading": "Loading information about available Management Centers.",
-                "mgmt_center": "is managed by Hypervisor Management Center:",
-                "no_mgmt_center": "is not managed by a Hypervisor Management Center. Automatic configuration of the vPool on the Hypervisor will not be possible. Please refer to the documentation for manual instructions."
-            },
             "confirm": {
                 "accelerated_backend": "Accelerated Backend:",
                 "basic_info": "Validate the basic vPool information.",
@@ -953,7 +938,6 @@
         "help": "&#xf059;",
         "inconsistent": "&#xf097;",
         "information": "&#xf05a;",
-        "licensing": "&#xf132;",
         "link": "&#xf0c1;",
         "load": "&#xf021;",
         "loading": "&#xf110;",

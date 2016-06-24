@@ -259,24 +259,6 @@ class StorageRouterViewSet(viewsets.ViewSet):
 
     @link()
     @log()
-    @required_roles(['read'])
-    @return_plain()
-    @load(StorageRouter)
-    def get_mgmtcenter_info(self, storagerouter):
-        """
-        Return mgmtcenter info (ip, username, name, type)
-        """
-        data = {}
-        mgmtcenter = storagerouter.pmachine.mgmtcenter
-        if mgmtcenter:
-            data = {'ip': mgmtcenter.ip,
-                    'username': mgmtcenter.username,
-                    'name': mgmtcenter.name,
-                    'type': mgmtcenter.type}
-        return data
-
-    @link()
-    @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)

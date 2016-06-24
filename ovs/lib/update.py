@@ -420,7 +420,6 @@ class UpdateController(object):
         from ovs.extensions.generic.system import System
         with remote(client.ip, [StorageDriverConfiguration, os, open, json, System], username='ovs') as rem:
             configuration_dir = '{0}/storagedriver/storagedriver'.format(EtcdConfiguration.get('/ovs/framework/paths|cfgdir'))
-            host_id = rem.System.get_my_machine_id()
             if rem.os.path.exists(configuration_dir):
                 for storagedriver in StorageDriverList.get_storagedrivers_by_storagerouter(rem.System.get_my_storagerouter().guid):
                     vpool = storagedriver.vpool
@@ -464,14 +463,12 @@ class UpdateController(object):
                         for mountpoint in config['content_addressed_cache']['clustercache_mount_points']:
                             readcache_size += int(mountpoint['size'].replace('KiB', ''))
                         params = {'VPOOL_MOUNTPOINT': storagedriver.mountpoint,
-                                  'HYPERVISOR_TYPE': storagedriver.storagerouter.pmachine.hvtype,
                                   'VPOOL_NAME': vpool.name,
                                   'CONFIG_PATH': sdc.remote_path,
                                   'UUID': str(uuid.uuid4()),
                                   'OVS_UID': client.run('id -u ovs').strip(),
                                   'OVS_GID': client.run('id -g ovs').strip(),
                                   'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
-                        vmware_mode = EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|vmware_mode'.format(host_id))
                         dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
                         ServiceManager.add_service(name='ovs-dtl', params=params, client=client, target_name=dtl_service)
                         if vpool.backend_type.code == 'alba':
@@ -479,24 +476,6 @@ class UpdateController(object):
                             dependencies = [alba_proxy_service]
                         else:
                             dependencies = None
-                        if vmware_mode == 'ganesha':
-                            template_name = 'ovs-ganesha'
-                        else:
-                            template_name = 'ovs-volumedriver'
                         voldrv_service = 'ovs-volumedriver_{0}'.format(vpool.name)
-                        ServiceManager.add_service(name=template_name, params=params, client=client, target_name=voldrv_service, additional_dependencies=dependencies)
+                        ServiceManager.add_service(name='ovs-volumedriver', params=params, client=client, target_name=voldrv_service, additional_dependencies=dependencies)
                         rem.os.remove(current_file)
-                    # Ganesha config, if available
-                    current_file = '{0}/{1}_ganesha.conf'.format(configuration_dir, vpool.name)
-                    if rem.os.path.exists(current_file):
-                        sdc = rem.StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
-                        contents = ''
-                        for template in ['ganesha-core', 'ganesha-export']:
-                            contents += client.file_read('/opt/OpenvStorage/config/templates/{0}.conf'.format(template))
-                        params = {'VPOOL_NAME': vpool.name,
-                                  'VPOOL_MOUNTPOINT': '/mnt/{0}'.format(vpool.name),
-                                  'CONFIG_PATH': sdc.remote_path,
-                                  'NFS_FILESYSTEM_ID': storagedriver.storagerouter.ip.split('.', 2)[-1]}
-                        for key, value in params.iteritems():
-                            contents = contents.replace('<{0}>'.format(key), value)
-                        client.file_write(current_file, contents)

@@ -249,8 +249,7 @@ class EtcdConfiguration(object):
         arakoon_start_port = port_info.get('arakoon', 26400)
         storagedriver_port_range = port_info.get('storagedriver', [26200, 26299])
 
-        host_config = {'storagedriver': {'rsp': '/var/rsp',
-                                         'vmware_mode': 'ganesha'},
+        host_config = {'storagedriver': {'rsp': '/var/rsp'},
                        'ports': {'storagedriver': [storagedriver_port_range],
                                  'mds': [mds_port_range],
                                  'arakoon': [arakoon_start_port]},

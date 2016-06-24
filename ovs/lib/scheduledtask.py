@@ -30,7 +30,6 @@ from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vdisklist import VDiskList
-from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonAdmin, ArakoonClientConfig
@@ -43,7 +42,6 @@ from ovs.lib.helpers.celery_toolbox import CeleryToolbox
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
-from ovs.lib.vmachine import VMachineController
 from ovs.log.log_handler import LogHandler
 from StringIO import StringIO
 from time import mktime
@@ -57,29 +55,6 @@ class ScheduledTaskController(object):
     executed at certain intervals and should be self-containing
     """
     _logger = LogHandler.get('lib', name='scheduled tasks')
-
-    @staticmethod
-    @celery.task(name='ovs.scheduled.snapshot_all_vms', schedule=crontab(minute='0', hour='2-22'))
-    @ensure_single(task_name='ovs.scheduled.snapshot_all_vms', extra_task_names=['ovs.scheduled.delete_snapshots'])
-    def snapshot_all_vms():
-        """
-        Snapshots all VMachines
-        """
-        ScheduledTaskController._logger.info('[SSA] started')
-        success = []
-        fail = []
-        machines = VMachineList.get_customer_vmachines()
-        for machine in machines:
-            try:
-                VMachineController.snapshot(machineguid=machine.guid,
-                                            label='',
-                                            is_consistent=False,
-                                            is_automatic=True,
-                                            is_sticky=False)
-                success.append(machine.guid)
-            except:
-                fail.append(machine.guid)
-        ScheduledTaskController._logger.info('[SSA] Snapshot has been taken for {0} vMachines, {1} failed.'.format(len(success), len(fail)))
 
     @staticmethod
     @celery.task(name='ovs.scheduled.delete_snapshots', schedule=crontab(minute='1', hour='2'))
@@ -136,23 +111,7 @@ class ScheduledTaskController(object):
 
         # Place all snapshots in bucket_chains
         bucket_chains = []
-        for vmachine in VMachineList.get_customer_vmachines():
-            if any(vd.info['object_type'] in ['BASE'] for vd in vmachine.vdisks):
-                bucket_chain = copy.deepcopy(buckets)
-                for snapshot in vmachine.snapshots:
-                    if snapshot.get('is_sticky') is True:
-                        continue
-                    timestamp = int(snapshot['timestamp'])
-                    for bucket in bucket_chain:
-                        if bucket['start'] >= timestamp > bucket['end']:
-                            for diskguid, snapshotguid in snapshot['snapshots'].iteritems():
-                                bucket['snapshots'].append({'timestamp': timestamp,
-                                                            'snapshotid': snapshotguid,
-                                                            'diskguid': diskguid,
-                                                            'is_consistent': snapshot['is_consistent']})
-                bucket_chains.append(bucket_chain)
-
-        for vdisk in VDiskList.get_without_vmachine():
+        for vdisk in VDiskList.get_vdisks():
             if vdisk.info['object_type'] in ['BASE']:
                 bucket_chain = copy.deepcopy(buckets)
                 for snapshot in vdisk.snapshots:
@@ -236,11 +195,7 @@ class ScheduledTaskController(object):
             raise RuntimeError('No scrub locations found')
 
         vdisk_guids = set()
-        for vmachine in VMachineList.get_customer_vmachines():
-            for vdisk in vmachine.vdisks:
-                if vdisk.info['object_type'] == 'BASE':
-                    vdisk_guids.add(vdisk.guid)
-        for vdisk in VDiskList.get_without_vmachine():
+        for vdisk in VDiskList.get_vdisks():
             if vdisk.info['object_type'] == 'BASE':
                 vdisk_guids.add(vdisk.guid)
 

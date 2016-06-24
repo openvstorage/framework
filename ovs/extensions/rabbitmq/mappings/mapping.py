@@ -17,7 +17,6 @@
 import volumedriver.storagerouter.FileSystemEvents_pb2 as FileSystemEvents
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from ovs.lib.vdisk import VDiskController
-from ovs.lib.vmachine import VMachineController
 from ovs.lib.vpool import VPoolController
 from ovs.lib.storagedriver import StorageDriverController
 
@@ -40,16 +39,11 @@ class Mapping(object):
                                                                'new_path': 'volume_new_path',
                                                                '[NODE_ID]': 'storagedriver_id'}}],
                FileSystemEvents.up_and_running: [{'task': VPoolController.up_and_running,
-                                                  'arguments': {'mountpoint': 'mountpoint',
-                                                                '[NODE_ID]': 'storagedriver_id'},
+                                                  'arguments': {'[NODE_ID]': 'storagedriver_id'},
                                                   'options': {'execonstoragerouter': True}}],
                FileSystemEvents.owner_changed: [{'task': VDiskController.migrate_from_voldrv,
                                                  'arguments': {'name': 'volume_id',
                                                                'new_owner_id': 'new_owner_id'}}],
-               FileSystemEvents.redirect_timeout_while_online: [{'task': StorageDriverController.update_status,
-                                                                 'arguments': {'remote_node_id': 'storagedriver_id'},
-                                                                 'options': {'dedupe': True,
-                                                                             'dedupe_key': '[TASK_NAME]_[storagedriver_id]'}}],
                VolumeDriverEvents.volumedriver_error: [{'task': StorageDriverController.volumedriver_error,
                                                         'arguments': {'code': 'code',
                                                                       'volume_name': 'volumename'}}],

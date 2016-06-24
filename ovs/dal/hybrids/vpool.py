@@ -27,7 +27,7 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverClient, Stor
 class VPool(DataObject):
     """
     The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to
-    deploy vMachines. a vPool can span multiple Storage Drivers and connects to a single Storage BackendType.
+    deploy vDisks. a vPool can span multiple Storage Drivers and connects to a single Storage BackendType.
     """
     STATUSES = DataObject.enumerator('Status', ['DELETING', 'EXTENDING', 'FAILURE', 'INSTALLING', 'RUNNING', 'SHRINKING'])
 

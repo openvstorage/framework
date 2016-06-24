@@ -28,7 +28,6 @@ import volumedriver.storagerouter.FileSystemEvents_pb2 as FileSystemEvents
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from google.protobuf.descriptor import FieldDescriptor
 from ovs.log.log_handler import LogHandler
-from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
 
 CINDER_VOLUME_UPDATE_CACHE = {}

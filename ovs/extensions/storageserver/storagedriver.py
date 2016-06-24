@@ -392,25 +392,6 @@ class StorageDriverConfiguration(object):
                     if param not in entries['mandatory'] and param not in entries['optional']:
                         del self.configuration[section][param]
 
-    @staticmethod
-    def build_filesystem_by_hypervisor(hypervisor_type):
-        """
-        Builds a filesystem configuration dict, based on a given hypervisor
-        :param hypervisor_type: Hypervisor type for which to build a filesystem
-        """
-        if hypervisor_type == 'VMWARE':
-            return {'fs_virtual_disk_format': 'vmdk',
-                    'fs_file_event_rules': [{'fs_file_event_rule_calls': ['Mknod', 'Unlink', 'Rename'],
-                                             'fs_file_event_rule_path_regex': '.*.vmx'},
-                                            {'fs_file_event_rule_calls': ['Rename'],
-                                             'fs_file_event_rule_path_regex': '.*.vmx~'}]}
-        if hypervisor_type == 'KVM':
-            return {'fs_virtual_disk_format': 'raw',
-                    'fs_raw_disk_suffix': '.raw',
-                    'fs_file_event_rules': [{'fs_file_event_rule_calls': ['Mknod', 'Unlink', 'Rename', 'Write'],
-                                             'fs_file_event_rule_path_regex': '(?!vmcasts)(.*.xml)'}]}
-        return {}
-
     def _validate(self):
         """
         Validates the loaded configuration against the mandatory and optional parameters
@@ -455,31 +436,3 @@ class StorageDriverConfiguration(object):
             if item not in self.configuration[section] or self.configuration[section][item] != value:
                 self.dirty_entries.append(item)
             self.configuration[section][item] = value
-
-
-class GaneshaConfiguration(object):
-    """
-    Ganesha Configuration
-    """
-    def __init__(self):
-        config_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
-        self._config_corefile = '/'.join([config_dir, 'templates', 'ganesha-core.conf'])
-        self._config_exportfile = '/'.join([config_dir, 'templates', 'ganesha-export.conf'])
-
-    def generate_config(self, target_file, params):
-        """
-        Generate configuration
-        :param target_file: Configuration file
-        :param params: Parameters
-        """
-        with open(self._config_corefile, 'r') as core_config_file:
-            config = core_config_file.read()
-        with open(self._config_exportfile, 'r') as export_section_file:
-            config += export_section_file.read()
-
-        for key, value in params.iteritems():
-            print 'replacing {0} by {1}'.format(key, value)
-            config = config.replace(key, value)
-
-        with open(target_file, 'wb') as config_out:
-            config_out.write(config)

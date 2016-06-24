@@ -23,8 +23,6 @@ import re
 import sys
 import json
 import time
-import base64
-import urllib2
 from etcd import EtcdConnectionFailed, EtcdException, EtcdKeyError, EtcdKeyNotFound
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
@@ -78,14 +76,9 @@ class SetupController(object):
         master_ip = None
         cluster_ip = None
         external_etcd = None  # Example: 'etcd0123456789=http://1.2.3.4:2380'
-        hypervisor_ip = None
         logging_target = None
-        hypervisor_name = None
-        hypervisor_type = None
         master_password = None
         enable_heartbeats = True
-        hypervisor_password = None
-        hypervisor_username = 'root'
 
         try:
             # Support non-interactive setup
@@ -93,8 +86,6 @@ class SetupController(object):
             if config is not None:
                 # Required fields
                 master_ip = config['master_ip']
-                hypervisor_name = config['hypervisor_name']
-                hypervisor_type = config['hypervisor_type']
                 master_password = config['master_password']
 
                 # Optional fields
@@ -102,11 +93,8 @@ class SetupController(object):
                 node_type = config.get('node_type', node_type)
                 cluster_ip = config.get('cluster_ip', master_ip)  # If cluster_ip not provided, we assume 1st node installation
                 external_etcd = config.get('external_etcd')
-                hypervisor_ip = config.get('hypervisor_ip')
                 logging_target = config.get('logging_target', logging_target)
                 enable_heartbeats = config.get('enable_heartbeats', enable_heartbeats)
-                hypervisor_password = config.get('hypervisor_password')
-                hypervisor_username = config.get('hypervisor_username', hypervisor_username)
 
             # Support resume setup - store entered parameters so when retrying, we have the values
             resume_config = {}
@@ -152,11 +140,7 @@ class SetupController(object):
                 cluster_ip = resume_config.get('cluster_ip', cluster_ip)
                 cluster_name = resume_config.get('cluster_name')
                 external_etcd = resume_config.get('external_etcd', external_etcd)
-                hypervisor_ip = resume_config.get('hypervisor_ip', hypervisor_ip)
-                hypervisor_name = resume_config.get('hypervisor_name', hypervisor_name)
-                hypervisor_type = resume_config.get('hypervisor_type', hypervisor_type)
                 enable_heartbeats = resume_config.get('enable_heartbeats', enable_heartbeats)
-                hypervisor_username = resume_config.get('hypervisor_username', hypervisor_username)
 
                 if cluster_name is not None and master_ip == cluster_ip and external_etcd is None and config is None:  # Failed setup with connectivity issues to the external Etcd
                     external_etcd = SetupController._retrieve_external_etcd_info()
@@ -369,64 +353,6 @@ class SetupController(object):
                     node_client.run(root_command)
                     node_client.run(ovs_command)
 
-                # Collecting hypervisor data
-                SetupController._log(messages='Collecting hypervisor information')
-                possible_hypervisor = None
-                module = local_client.run('lsmod | grep kvm || true').strip()
-                if module != '':
-                    possible_hypervisor = 'KVM'
-                else:
-                    disktypes = local_client.run('dmesg | grep VMware || true').strip()
-                    if disktypes != '':
-                        possible_hypervisor = 'VMWARE'
-
-                hypervisor_info = {'ip': hypervisor_ip,
-                                   'name': hypervisor_name,
-                                   'type': hypervisor_type,
-                                   'username': hypervisor_username,
-                                   'password': hypervisor_password}
-                if hypervisor_type is None:
-                    hypervisor_type = Interactive.ask_choice(choice_options=['VMWARE', 'KVM'],
-                                                             question='Which type of hypervisor is this Storage Router backing?',
-                                                             default_value=possible_hypervisor)
-                    SetupController._logger.debug('Selected hypervisor type {0}'.format(hypervisor_type))
-                if hypervisor_name is None:
-                    default_name = ('esxi{0}' if hypervisor_type == 'VMWARE' else 'kvm{0}').format(cluster_ip.split('.')[-1])
-                    hypervisor_name = Interactive.ask_string('Enter hypervisor hostname', default_value=default_name)
-                if hypervisor_type == 'VMWARE':
-                    first_request = True  # If parameters are wrong, we need to re-ask it
-                    while True:
-                        if hypervisor_ip is None or first_request is False:
-                            hypervisor_ip = Interactive.ask_string(message='Enter hypervisor IP address',
-                                                                   default_value=hypervisor_ip,
-                                                                   regex_info={'regex': SSHClient.IP_REGEX,
-                                                                               'message': 'Invalid hypervisor IP specified'})
-                        if hypervisor_username is None or first_request is False:
-                            hypervisor_username = Interactive.ask_string(message='Enter hypervisor username',
-                                                                         default_value=hypervisor_username)
-                        if hypervisor_password is None or first_request is False:
-                            hypervisor_password = Interactive.ask_password(message='Enter hypervisor {0} password'.format(hypervisor_username))
-                        try:
-                            SetupController._validate_hypervisor_information(ip=hypervisor_ip,
-                                                                             username=hypervisor_username,
-                                                                             password=hypervisor_password)
-                            break
-                        except Exception as ex:
-                            first_request = False
-                            SetupController._log(messages='Could not connect to {0}: {1}'.format(hypervisor_ip, ex))
-                    hypervisor_info['ip'] = hypervisor_ip
-                    hypervisor_info['username'] = hypervisor_username
-                    hypervisor_info['password'] = hypervisor_password
-                elif hypervisor_type == 'KVM':
-                    hypervisor_info['ip'] = cluster_ip
-                    hypervisor_info['password'] = None
-                    hypervisor_info['username'] = 'root'
-
-                hypervisor_info['name'] = hypervisor_name
-                hypervisor_info['type'] = hypervisor_type
-
-                SetupController._logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
-
                 # Write resume config
                 resume_config['node_type'] = node_type
                 resume_config['master_ip'] = master_ip
@@ -434,11 +360,7 @@ class SetupController(object):
                 resume_config['cluster_ip'] = cluster_ip
                 resume_config['cluster_name'] = cluster_name
                 resume_config['external_etcd'] = external_etcd
-                resume_config['hypervisor_ip'] = hypervisor_info['ip']
-                resume_config['hypervisor_type'] = hypervisor_info['type']
-                resume_config['hypervisor_name'] = hypervisor_info['name']
                 resume_config['enable_heartbeats'] = enable_heartbeats
-                resume_config['hypervisor_username'] = hypervisor_info['username']
                 with open(resume_config_file, 'w') as resume_cfg:
                     resume_cfg.write(json.dumps(resume_config))
 
@@ -449,7 +371,6 @@ class SetupController(object):
                                                           unique_id=unique_id,
                                                           cluster_name=cluster_name,
                                                           node_name=node_name,
-                                                          hypervisor_info=hypervisor_info,
                                                           enable_heartbeats=enable_heartbeats,
                                                           external_etcd=external_etcd,
                                                           logging_target=logging_target,
@@ -466,8 +387,7 @@ class SetupController(object):
                                                           master_ip=master_ip,
                                                           cluster_name=cluster_name,
                                                           unique_id=unique_id,
-                                                          ip_client_map=ip_client_map,
-                                                          hypervisor_info=hypervisor_info)
+                                                          ip_client_map=ip_client_map)
                     except Exception as ex:
                         SetupController._log(messages=['Failed to setup extra node', ex], loglevel='exception')
                         SetupController._rollback_setup(target_client=ip_client_map[cluster_ip],
@@ -798,12 +718,7 @@ class SetupController(object):
                         partition.delete()
                     disk.delete()
 
-                pmachine = storage_router.pmachine
-                for vmachine in pmachine.vmachines:
-                    vmachine.delete(abandon=['vdisks'])
                 storage_router.delete()
-                if len(pmachine.storagerouters) == 0:
-                    pmachine.delete()
                 EtcdConfiguration.delete('/ovs/framework/hosts/{0}'.format(storage_router.machine_id))
 
                 master_ips = [sr.ip for sr in storage_router_masters]
@@ -823,7 +738,7 @@ class SetupController(object):
         SetupController._log(messages='Remove nodes finished', title=True)
 
     @staticmethod
-    def _setup_first_node(target_client, unique_id, cluster_name, node_name, hypervisor_info, enable_heartbeats, external_etcd, logging_target, rdma):
+    def _setup_first_node(target_client, unique_id, cluster_name, node_name, enable_heartbeats, external_etcd, logging_target, rdma):
         """
         Sets up the first node services. This node is always a master
         """
@@ -905,7 +820,7 @@ class SetupController(object):
         Migration.migrate()
 
         SetupController._log(messages='Finalizing setup', title=True)
-        storagerouter = SetupController._finalize_setup(target_client, node_name, 'MASTER', hypervisor_info, unique_id)
+        storagerouter = SetupController._finalize_setup(target_client, node_name, 'MASTER', unique_id)
 
         from ovs.dal.lists.servicelist import ServiceList
         if 'arakoon-ovsdb' not in [s.name for s in ServiceList.get_services()]:
@@ -1038,16 +953,14 @@ class SetupController(object):
             SetupController._log(messages='Cleaning up model')
             #  Model is completely cleaned up when the arakoon cluster is destroyed
             memcache_configured = etcd_required_info['/ovs/framework/memcache']
-            pmachine = None
             storagerouter = None
             if memcache_configured is not None:
                 try:
                     storagerouter = System.get_my_storagerouter()
-                    pmachine = storagerouter.pmachine
                 except Exception as ex:
-                    SetupController._log(messages='Retrieving storagerouter and pmachine information failed with error: {0}'.format(ex), loglevel='error')
+                    SetupController._log(messages='Retrieving storagerouter information failed with error: {0}'.format(ex), loglevel='error')
 
-                if pmachine is not None:  # Pmachine will be None if storagerouter not yet modeled
+                if storagerouter is not None:  # StorageRouter will be None if storagerouter not yet modeled
                     try:
                         for service in storagerouter.services:
                             service.delete()
@@ -1058,8 +971,6 @@ class SetupController(object):
                         for alba_node in storagerouter.alba_nodes:
                             alba_node.delete()
                         storagerouter.delete()
-                        if len(pmachine.storagerouters) == 0:
-                            pmachine.delete()
                     except Exception as ex:
                         SetupController._log(messages='Cleaning up model failed with error: {0}'.format(ex), loglevel='error')
                 if first_node is True:
@@ -1124,7 +1035,7 @@ class SetupController(object):
         EtcdInstaller.remove_proxy('config', cluster_ip)
 
     @staticmethod
-    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map, hypervisor_info):
+    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map):
         """
         Sets up an additional node
         """
@@ -1151,7 +1062,7 @@ class SetupController(object):
                 Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
 
         node_name = target_client.run('hostname -s')
-        SetupController._finalize_setup(target_client, node_name, 'EXTRA', hypervisor_info, unique_id)
+        SetupController._finalize_setup(target_client, node_name, 'EXTRA', unique_id)
 
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/ip'.format(machine_id), cluster_ip)
 
@@ -1631,7 +1542,7 @@ EOF
                 ServiceManager.remove_service(service, client=client)
 
     @staticmethod
-    def _finalize_setup(client, node_name, node_type, hypervisor_info, unique_id):
+    def _finalize_setup(client, node_name, node_type, unique_id):
         cluster_ip = client.ip
         client.dir_create('/opt/OpenvStorage/webapps/frontend/logging')
         SetupController._replace_param_in_config(client=client,
@@ -1642,25 +1553,10 @@ EOF
         # Imports, not earlier than here, as all required config files should be in place.
         from ovs.lib.disk import DiskController
         from ovs.lib.storagerouter import StorageRouterController
-        from ovs.dal.hybrids.pmachine import PMachine
         from ovs.dal.hybrids.storagerouter import StorageRouter
-        from ovs.dal.lists.pmachinelist import PMachineList
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
         SetupController._log(messages='Configuring/updating model')
-        pmachine = None
-        for current_pmachine in PMachineList.get_pmachines():
-            if current_pmachine.ip == hypervisor_info['ip'] and current_pmachine.hvtype == hypervisor_info['type']:
-                pmachine = current_pmachine
-                break
-        if pmachine is None:
-            pmachine = PMachine()
-            pmachine.ip = hypervisor_info['ip']
-            pmachine.username = hypervisor_info['username']
-            pmachine.password = hypervisor_info['password']
-            pmachine.hvtype = hypervisor_info['type']
-            pmachine.name = hypervisor_info['name']
-            pmachine.save()
         storagerouter = None
         for current_storagerouter in StorageRouterList.get_storagerouters():
             if current_storagerouter.ip == cluster_ip and current_storagerouter.machine_id == unique_id:
@@ -1674,7 +1570,6 @@ EOF
             storagerouter.ip = cluster_ip
             storagerouter.rdma_capable = False
         storagerouter.node_type = node_type
-        storagerouter.pmachine = pmachine
         storagerouter.save()
 
         StorageRouterController.set_rdma_capability(storagerouter.guid)
@@ -1834,8 +1729,7 @@ EOF
         errors = []
         config = config['setup']
         actual_keys = config.keys()
-        expected_keys = ['cluster_ip', 'enable_heartbeats', 'external_etcd', 'hypervisor_ip', 'hypervisor_name', 'hypervisor_password',
-                         'hypervisor_type', 'hypervisor_username', 'master_ip', 'master_password', 'node_type']
+        expected_keys = ['cluster_ip', 'enable_heartbeats', 'external_etcd', 'master_ip', 'master_password', 'node_type']
         for key in actual_keys:
             if key not in expected_keys:
                 errors.append('Key {0} is not supported by OpenvStorage to be used in the pre-configuration JSON'.format(key))
@@ -1846,27 +1740,10 @@ EOF
                                        required_params={'cluster_ip': (str, Toolbox.regex_ip, False),
                                                         'enable_heartbeats': (bool, None, False),
                                                         'external_etcd': (str, None, False),
-                                                        'hypervisor_ip': (str, Toolbox.regex_ip, False),
-                                                        'hypervisor_name': (str, None),
-                                                        'hypervisor_password': (str, None, False),
-                                                        'hypervisor_type': (str, ['VMWARE', 'KVM']),
-                                                        'hypervisor_username': (str, None, False),
                                                         'master_ip': (str, Toolbox.regex_ip),
                                                         'master_password': (str, None),
                                                         'node_type': (str, ['master', 'extra'], False),
                                                         'rdma': (bool, None, False)})
-        if config['hypervisor_type'] == 'VMWARE':
-            ip = config.get('hypervisor_ip')
-            username = config.get('hypervisor_username')
-            password = config.get('hypervisor_password')
-            if ip is None or username is None or password is None:
-                raise ValueError('Hypervisor credentials and IP are required for VMWARE unattended installation')
-            try:
-                SetupController._validate_hypervisor_information(ip=ip,
-                                                                 username=username,
-                                                                 password=password)
-            except Exception as ex:
-                raise RuntimeError('Could not connect to {0}: {1}'.format(ip, ex))
         return config
 
     @staticmethod
@@ -1918,26 +1795,6 @@ EOF
             if not isinstance(endpoints, list) or len(endpoints) == 0:
                 raise ValueError('The endpoints for {0} cannot be empty and must be a list'.format(service))
         return internal
-
-    @staticmethod
-    def _validate_hypervisor_information(ip, username, password):
-        """
-        Validate the hypervisor information provided either by preconfig or by manually entering it
-        :param ip: IP of the hypervisor
-        :type ip: str
-
-        :param username: Username used to login on hypervisor
-        :type username: str
-
-        :param password: Password used to login on hypervisor
-        :type password: str
-
-        :return: None
-        """
-        request = urllib2.Request('https://{0}/mob'.format(ip))
-        auth = base64.encodestring('{0}:{1}'.format(username, password)).replace('\n', '')
-        request.add_header("Authorization", "Basic %s" % auth)
-        urllib2.urlopen(request).read()
 
     @staticmethod
     def _retrieve_external_etcd_info():

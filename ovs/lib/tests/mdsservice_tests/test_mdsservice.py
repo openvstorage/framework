@@ -24,7 +24,6 @@ from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
-from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
@@ -125,12 +124,6 @@ class MDSServices(unittest.TestCase):
         backend_type.name = 'BackendType'
         backend_type.code = 'BT'
         backend_type.save()
-        pmachine = PMachine()
-        pmachine.name = 'PMachine'
-        pmachine.username = 'root'
-        pmachine.ip = '127.0.0.1'
-        pmachine.hvtype = 'VMWARE'
-        pmachine.save()
         for domain_id in structure['domains']:
             domain = Domain()
             domain.name = 'domain_{0}'.format(domain_id)
@@ -147,7 +140,6 @@ class MDSServices(unittest.TestCase):
             storagerouter = StorageRouter()
             storagerouter.name = str(sr_id)
             storagerouter.ip = '10.0.0.{0}'.format(sr_id)
-            storagerouter.pmachine = pmachine
             storagerouter.rdma_capable = False
             storagerouter.save()
             storagerouters[sr_id] = storagerouter

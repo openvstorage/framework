@@ -21,7 +21,6 @@ import time
 import pickle
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobject import DataObject
-from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.structures import Property, Relation, Dynamic
@@ -33,7 +32,6 @@ from ovs.log.log_handler import LogHandler
 class VDisk(DataObject):
     """
     The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage.
-    vDisks can be part of a vMachine or stand-alone.
     """
     _logger = LogHandler.get('dal', name='hybrid')
 
@@ -41,14 +39,12 @@ class VDisk(DataObject):
                     Property('description', str, mandatory=False, doc='Description of the vDisk.'),
                     Property('size', int, doc='Size of the vDisk in Bytes.'),
                     Property('devicename', str, doc='The name of the container file (e.g. the VMDK-file) describing the vDisk.'),
-                    Property('order', int, mandatory=False, doc='Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
                     Property('volume_id', str, mandatory=False, doc='ID of the vDisk in the Open vStorage Volume Driver.'),
                     Property('parentsnapshot', str, mandatory=False, doc='Points to a parent storage driver parent ID. None if there is no parent Snapshot'),
                     Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder'),
                     Property('has_manual_dtl', bool, default=False, doc='Indicates whether the default DTL location has been overruled by customer'),
                     Property('metadata', dict, default=dict(), doc='Contains fixed metadata about the volume (e.g. lba_size, ...)')]
-    __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
-                   Relation('vpool', VPool, 'vdisks'),
+    __relations = [Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('dtl_status', str, 60),
                   Dynamic('snapshots', list, 60),

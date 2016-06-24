@@ -21,10 +21,8 @@ import json
 import time
 from backend.decorators import required_roles, load, return_list, return_object, return_task, log
 from ovs.dal.datalist import DataList
-from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
-from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
@@ -47,16 +45,12 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(VDisk)
     @load()
-    def list(self, vmachineguid=None, vpoolguid=None, query=None):
+    def list(self, vpoolguid=None, query=None):
         """
         Overview of all vDisks
-        :param vmachineguid: Guid of the virtual machine to retrieve its disks
         :param vpoolguid: Guid of the vPool to retrieve its disks
         :param query: A query to be executed if required
         """
-        if vmachineguid is not None:
-            vmachine = VMachine(vmachineguid)
-            return vmachine.vdisks
         if vpoolguid is not None:
             vpool = VPool(vpoolguid)
             return vpool.vdisks
@@ -156,9 +150,7 @@ class VDiskViewSet(viewsets.ViewSet):
         storagerouter = StorageRouter(storagerouter_guid)
         return VDiskController.clone.delay(diskguid=vdisk.guid,
                                            snapshotid=snapshot_id,
-                                           devicename=name,
-                                           pmachineguid=storagerouter.pmachine_guid,
-                                           detached=True)
+                                           devicename=name)
 
     @action()
     @log()
@@ -241,45 +233,43 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def create_from_template(self, vdisk, devicename, pmachineguid, machineguid=None):
+    def create_from_template(self, vdisk, devicename, storagerouter_guid):
         """
         Create a new vdisk from a template vDisk
         :param vdisk: Guid of the template virtual disk
         :param devicename: Name of the new vdisk
-        :param pmachineguid: Guid of pmachine to create new vdisk on
-        :param machineguid: (optional) Guid of the machine to assign disk to
+        :param storagerouter_guid: Guid of StorageRouter to create new vDisk on
         """
         return VDiskController.create_from_template.delay(diskguid=vdisk.guid,
                                                           devicename=devicename,
-                                                          pmachineguid=pmachineguid,
-                                                          machineguid=machineguid)
+                                                          storagerouter_guid=storagerouter_guid)
 
     @link()
     @log()
     @required_roles(['read'])
-    @return_list(PMachine)
+    @return_list(StorageRouter)
     @load(VDisk)
-    def get_target_pmachines(self, vdisk, hints):
+    def get_target_storagerouters(self, vdisk, hints):
         """
-        Gets all possible target pMachines for a given vDisk
+        Gets all possible target Storage Routers for a given vDisk
         """
         if not vdisk.is_vtemplate:
             raise NotAcceptable('vDisk is not a vTemplate')
-        # Find pMachines which have all above vPools available.
-        pmachine_guids = None
-        pmachines = {}
+        # Find Storage Routers which have all above vPools available.
+        storagerouter_guids = None
+        storagerouters = {}
         if vdisk.vpool is not None:
             vpool = vdisk.vpool
-            this_pmachine_guids = set()
+            this_storagerouter_guids = set()
             for storagedriver in vpool.storagedrivers:
-                this_pmachine_guids.add(storagedriver.storagerouter.pmachine_guid)
+                this_storagerouter_guids.add(storagedriver.storagerouter_guid)
                 if hints['full'] is True:
-                    pmachines[storagedriver.storagerouter.pmachine_guid] = storagedriver.storagerouter.pmachine
-            if pmachine_guids is None:
-                pmachine_guids = list(this_pmachine_guids)
+                    storagerouters[storagedriver.storagerouter_guid] = storagedriver.storagerouter
+            if storagerouter_guids is None:
+                storagerouter_guids = list(this_storagerouter_guids)
             else:
-                pmachine_guids = list(this_pmachine_guids & set(pmachine_guids))
-            return pmachine_guids if hints['full'] is False else [pmachines[guid] for guid in pmachine_guids]
+                storagerouter_guids = list(this_storagerouter_guids & set(storagerouter_guids))
+            return storagerouter_guids if hints['full'] is False else [storagerouters[guid] for guid in storagerouter_guids]
         return []
 
     @action()

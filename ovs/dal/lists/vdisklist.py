@@ -79,14 +79,6 @@ class VDiskList(object):
         return None
 
     @staticmethod
-    def get_without_vmachine():
-        """
-        Gets all vDisks without a vMachine
-        """
-        return DataList(VDisk, {'type': DataList.where_operator.AND,
-                                'items': [('vmachine_guid', DataList.operator.EQUALS, None)]})
-
-    @staticmethod
     def get_by_parentsnapshot(snapshotid):
         """
         Gets all vDisks whose parentsnapshot is snapshotid
