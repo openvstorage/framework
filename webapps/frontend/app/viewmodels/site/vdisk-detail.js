@@ -51,7 +51,8 @@ define([
         self.vDisk                = ko.observable();
 
         // Handles
-        self.loadDomainHandle = undefined;
+        self.loadDomainHandle        = undefined;
+        self.loadStorageRouterHandle = undefined;
 
         // Functions
         self.load = function() {
@@ -63,6 +64,7 @@ define([
                             return deferred.reject();
                         }
                     })
+                    .then(self.loadStorageRouters)
                     .then(self.loadDomains)
                     .then(function() {
                         self.snapshotsInitialLoad(false);
@@ -135,6 +137,21 @@ define([
                         .fail(deferred.reject);
                 } else {
                     deferred.resolve();
+                }
+            }).promise();
+        };
+        self.loadStorageRouters = function() {
+            return $.Deferred(function (deferred) {
+                if (generic.xhrCompleted(self.loadStorageRouterHandle)) {
+                    self.loadStorageRouterHandle = api.get('storagerouters', {queryparams: {contents: ''}})
+                        .done(function (data) {
+                            var guids = [];
+                            $.each(data.data, function (index, item) {
+                                guids.push(item.guid);
+                            });
+                            self.vDisk().storageRouterGuids(guids);
+                        })
+                        .always(deferred.resolve());
                 }
             }).promise();
         };
