@@ -19,21 +19,16 @@
 Consumes messages from rabbitmq, dispatching them to the process method and acknowledges them
 """
 
-import pika
 import os
 import imp
-import inspect
-import time
 import sys
+import pika
+import inspect
 import logging
-import pyinotify
-from ovs.extensions.rabbitmq.processor import process
-from ovs.extensions.generic.system import System
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.system import System
+from ovs.extensions.rabbitmq.processor import process
 from ovs.log.log_handler import LogHandler
-
-KVM_ETC = '/etc/libvirt/qemu/'
-KVM_RUN = '/run/libvirt/qemu/'
 
 mapping = {}
 
@@ -54,48 +49,17 @@ if __name__ == '__main__':
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     import argparse
-    parser = argparse.ArgumentParser(description = 'KVM File Watcher and Rabbitmq Event Processor for OVS',
-                                     formatter_class = argparse.RawDescriptionHelpFormatter)
-
+    parser = argparse.ArgumentParser(description='Rabbitmq Event Processor for OVS',
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('rabbitmq_queue', type=str,
                         help='Rabbitmq queue name')
     parser.add_argument('--durable', dest='queue_durable', action='store_const', default=False, const=True,
                         help='Declare queue as durable')
-    parser.add_argument('--watcher', dest='file_watcher', action='store_const', default=False, const=True,
-                        help='Enable file watcher')
 
     logger = LogHandler.get('extensions', name='consumer')
-    logging.basicConfig()
+
     args = parser.parse_args()
-    print(args.rabbitmq_queue, args.queue_durable, args.file_watcher)
-    notifier = None
-    run_kvm_watcher = System.get_my_storagerouter().pmachine.hvtype == 'KVM'
     try:
-        if args.file_watcher and run_kvm_watcher:
-            from ovs.extensions.rabbitmq.kvm_xml_processor import Kxp
-
-            wm = pyinotify.WatchManager()
-
-            ETC_MASK_EVENTS_TO_WATCH = pyinotify.IN_CLOSE_WRITE | \
-                pyinotify.IN_CREATE | \
-                pyinotify.IN_DELETE | \
-                pyinotify.IN_MODIFY | \
-                pyinotify.IN_MOVED_FROM | \
-                pyinotify.IN_MOVED_TO | \
-                pyinotify.IN_UNMOUNT
-
-            RUN_MASK_EVENTS_TO_WATCH = pyinotify.IN_DELETE | \
-                pyinotify.IN_MOVED_TO
-
-            notifier = pyinotify.ThreadedNotifier(wm, Kxp())
-            notifier.start()
-
-            _ = wm.add_watch(KVM_ETC, ETC_MASK_EVENTS_TO_WATCH, rec=True)
-            logger.info('Watching {0}...'.format(KVM_ETC), print_msg=True)
-            _ = wm.add_watch(KVM_RUN, RUN_MASK_EVENTS_TO_WATCH, rec=True)
-            logger.info('Watching {0}...'.format(KVM_RUN), print_msg=True)
-            logger.info('KVM xml processor active...', print_msg=True)
-
         run_event_consumer = False
         my_ip = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(System.get_my_machine_id()))
         for endpoint in EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints'):
@@ -151,23 +115,17 @@ if __name__ == '__main__':
             queue = args.rabbitmq_queue
             durable = args.queue_durable
             channel.queue_declare(queue=queue, durable=durable)
-            logger.info('Waiting for messages on {0}...'.format(queue), print_msg=True)
+            logger.info('Waiting for messages on {0}...'.format(queue))
             logger.info('To exit press CTRL+C', print_msg=True)
 
             channel.basic_qos(prefetch_count=1)
             channel.basic_consume(callback, queue=queue)
             channel.start_consuming()
         else:
-            # We need to keep the process running
-            logger.info('To exit press CTRL+C', print_msg=True)
-            while True:
-                time.sleep(3600)
+            logger.info('Nothing to do here, kthxbai',)
 
     except KeyboardInterrupt:
-        if run_kvm_watcher and notifier is not None:
-            notifier.stop()
+        pass
     except Exception as exception:
-        logger.error('Unexpected exception: {0}'.format(str(exception)), print_msg=True)
-        if run_kvm_watcher and notifier is not None:
-            notifier.stop()
+        logger.error('Unexpected exception: {0}'.format(str(exception)))
         sys.exit(1)

@@ -139,14 +139,7 @@ def process(queue, body, mapping):
             print(body)
             event_type = body['event_type']
             logger.info('Processing notification for event {0}'.format(event_type))
-            if event_type == 'compute.instance.update':
-                old_display_name = body['payload'].get('old_display_name')
-                instance_id = body['payload']['instance_id']
-                display_name = body['payload'].get('display_name')
-                if old_display_name and old_display_name != display_name:
-                    logger.info('Caught instance rename event')
-                    VMachineController.update_vmachine_name.apply_async(kwargs={'old_name': old_display_name, 'new_name': display_name, 'instance_id': instance_id})
-            elif event_type == 'volume.update.start':
+            if event_type == 'volume.update.start':
                 volume_id = body['payload']['volume_id']
                 display_name = body['payload']['display_name']
                 CINDER_VOLUME_UPDATE_CACHE[volume_id] = display_name
