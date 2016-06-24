@@ -61,7 +61,6 @@ from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.vdisk import VDiskController
-from ovs.lib.vpool import VPoolController
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import ArakoonNodeConfig
@@ -296,7 +295,6 @@ class StorageRouterController(object):
 
         # Check duplicate vPool name
         all_storagerouters = [storagerouter]
-        current_storage_driver_config = {}
         if vpool is not None:
             required_params_sd_config = {'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
                                          'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
@@ -305,9 +303,8 @@ class StorageRouterController(object):
                                          'cache_strategy': (str, StorageDriverClient.VPOOL_CACHE_MAP.keys()),
                                          'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
                                          'tlog_multiplier': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.values())}
-            current_storage_driver_config = VPoolController.get_configuration(vpool.guid)
             Toolbox.verify_required_params(required_params=required_params_sd_config,
-                                           actual_params=current_storage_driver_config)
+                                           actual_params=vpool.configuration)
 
             if vpool.backend_type.code == 'local':
                 # Might be an issue, investigating whether it's on the same Storage Router or not
@@ -360,7 +357,7 @@ class StorageRouterController(object):
         cluster_total_size = 0
         cluster_nsm_part_guids = []
 
-        sco_size = current_storage_driver_config['sco_size'] if current_storage_driver_config else sco_size
+        sco_size = vpool.configuration['sco_size'] if vpool is not None else sco_size
         sco_size *= 1024.0 ** 2
         use_accelerated_alba = False
         backend_connection_info = parameters.get('backend_connection_info', {})
@@ -538,6 +535,14 @@ class StorageRouterController(object):
                     error_messages.append('Storage IP {0} is not identical to previously configured storage IPs'.format(storage_ip))
                     break
 
+        # Check package dependencies
+        root_client = ip_client_map[storagerouter.ip]['root']
+        if storagerouter.pmachine.hvtype == 'KVM':
+            try:
+                root_client.run('which virsh')
+            except CalledProcessError:
+                error_messages.append('Dependency "virsh" is missing on the system.')
+
         if error_messages:
             raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
 
@@ -572,7 +577,6 @@ class StorageRouterController(object):
             StorageDriverController.manual_voldrv_arakoon_checkup()
 
         # Verify SD arakoon cluster is available and 'in_use'
-        root_client = ip_client_map[storagerouter.ip]['root']
         watcher_volumedriver_service = 'watcher-volumedriver'
         if not ServiceManager.has_service(watcher_volumedriver_service, client=root_client):
             ServiceManager.add_service(watcher_volumedriver_service, client=root_client)
@@ -873,14 +877,15 @@ class StorageRouterController(object):
             tlog_multiplier = StorageDriverClient.TLOG_MULTIPLIER_MAP[sco_size]
             sco_factor = float(write_buffer) / tlog_multiplier / sco_size  # sco_factor = write buffer / tlog multiplier (default 20) / sco size (in MiB)
         else:  # Extend vPool
-            sco_size = current_storage_driver_config['sco_size']
-            dtl_mode = current_storage_driver_config['dtl_mode']
-            dedupe_mode = current_storage_driver_config['dedupe_mode']
-            cluster_size = current_storage_driver_config['cluster_size']
-            dtl_transport = current_storage_driver_config['dtl_transport']
-            cache_strategy = current_storage_driver_config['cache_strategy']
-            tlog_multiplier = current_storage_driver_config['tlog_multiplier']
-            sco_factor = float(current_storage_driver_config['write_buffer']) / tlog_multiplier / sco_size
+            current_vpool_configuration = vpool.configuration
+            sco_size = current_vpool_configuration['sco_size']
+            dtl_mode = current_vpool_configuration['dtl_mode']
+            dedupe_mode = current_vpool_configuration['dedupe_mode']
+            cluster_size = current_vpool_configuration['cluster_size']
+            dtl_transport = current_vpool_configuration['dtl_transport']
+            cache_strategy = current_vpool_configuration['cache_strategy']
+            tlog_multiplier = current_vpool_configuration['tlog_multiplier']
+            sco_factor = float(current_vpool_configuration['write_buffer']) / tlog_multiplier / sco_size
 
         if dtl_mode == 'no_sync':
             filesystem_config['fs_dtl_host'] = None
@@ -1000,13 +1005,6 @@ class StorageRouterController(object):
             root_client.run('service nfs-kernel-server start')
 
         if storagerouter.pmachine.hvtype == 'KVM':
-            try:
-                root_client.run('which virsh')
-            except CalledProcessError:
-                vpool.status = VPool.STATUSES.FAILURE
-                vpool.save()
-                raise RuntimeError('Dependency "virsh" is missing on the system.')
-
             vpool_overview = root_client.run('virsh pool-list --all').splitlines()
             if vpool_overview:
                 vpool_overview.pop(1)  # Pop   ---------------
@@ -1072,6 +1070,7 @@ class StorageRouterController(object):
             vpool.status = VPool.STATUSES.RUNNING
             vpool.save()
 
+        vpool.invalidate_dynamics(['configuration'])
         if offline_nodes_detected is True:
             try:
                 VDiskController.dtl_checkup(vpool_guid=vpool.guid, ensure_single_timeout=600)
@@ -1798,7 +1797,8 @@ class StorageRouterController(object):
                                  for sd in this_sr.storagedrivers]
         volumedriver_services.extend(['ovs-dtl_{0}'.format(sd.vpool.name)
                                       for sd in this_sr.storagedrivers])
-        voldrv_info = PackageManager.verify_update_required(packages=['volumedriver-base', 'volumedriver-server'],
+        voldrv_info = PackageManager.verify_update_required(packages=['volumedriver-base', 'volumedriver-server',
+                                                                      'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server'],
                                                             services=volumedriver_services,
                                                             client=client)
         alba_info = PackageManager.verify_update_required(packages=['alba'],

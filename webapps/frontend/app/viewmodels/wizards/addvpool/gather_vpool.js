@@ -75,8 +75,10 @@ define([
                     reasons = reasons.concat(preValidation.reasons);
                     fields = fields.concat(preValidation.fields);
                 }
+            } else if (self.data.backend() === 'alba' && self.data.albaBackend() === undefined) {
+                valid = false;
             }
-            if (self.data.backend() === 'alba' && self.data.editBackend()) {
+            if (self.data.backend() === 'alba' && self.data.vPoolAdd()) {
                 if (self.data.albaBackend() === undefined) {
                     valid = false;
                     reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.choose_backend'));
@@ -360,7 +362,6 @@ define([
                 if (self.data.vPool().backendType().code() === 'alba') {
                     if (metadata.hasOwnProperty('backend') && metadata.backend.hasOwnProperty('connection')) {
                         // Created in or after 2.7.0
-                        self.data.v260Migration(false);
                         self.data.localHost(metadata.backend.connection.local);
                         self.data.fragmentCacheOnRead(metadata.backend.backend_info.fragment_cache_on_read);
                         self.data.fragmentCacheOnWrite(metadata.backend.backend_info.fragment_cache_on_write);
@@ -388,9 +389,6 @@ define([
                                     }
                                 });
                             });
-                    } else {
-                        // Created before 2.7.0
-                        self.data.v260Migration(true);
                     }
                 }
             }

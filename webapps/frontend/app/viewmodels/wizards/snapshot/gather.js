@@ -17,8 +17,8 @@
 define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/generic', 'ovs/shared',
-    '../../containers/vmachine', './data'
-], function($, ko, api, generic, shared, VMachine, data) {
+    '../../containers/vmachine', '../../containers/vdisk', './data'
+], function($, ko, api, generic, shared, VMachine, VDisk, data) {
     "use strict";
     return function() {
         var self = this;
@@ -30,10 +30,9 @@ define([
         // Computed
         self.canContinue = ko.computed(function() {
             var valid = true, reasons = [], fields = [];
-            if (self.data.vm() === undefined) {
+            if (self.data.vObject() === undefined) {
                 valid = false;
-                fields.push('vm');
-                reasons.push($.t('ovs:wizards.snapshot.gather.nomachine'));
+                reasons.push($.t('ovs:wizards.snapshot.gather.noobject'));
             } else if (!self.data.name()) {
                 valid = false;
                 fields.push('name');
@@ -50,11 +49,16 @@ define([
                     consistent: self.data.isConsistent(),
                     sticky: self.data.isSticky()
                 };
-                api.post('vmachines/' + self.data.vm().guid() + '/snapshot', { data: data })
-                    .then(function(taskID) {
+                var call;
+                if (self.data.mode() === 'vmachine') {
+                    call = api.post('vmachines/' + self.data.guid() + '/snapshot', { data: data })
+                } else {
+                    call = api.post('vdisks/' + self.data.guid() + '/create_snapshot', { data: data })
+                }
+                call.then(function(taskID) {
                         generic.alertInfo(
                             $.t('ovs:wizards.snapshot.confirm.snapshotstarted'),
-                            $.t('ovs:wizards.snapshot.confirm.inprogress', { what: self.data.vm().name() })
+                            $.t('ovs:wizards.snapshot.confirm.inprogress')
                         );
                         deferred.resolve();
                         return taskID;
@@ -63,13 +67,13 @@ define([
                     .done(function() {
                         generic.alertSuccess(
                             $.t('ovs:generic.finished'),
-                            $.t('ovs:wizards.snapshot.confirm.success', { what: self.data.vm().name() })
+                            $.t('ovs:wizards.snapshot.confirm.success')
                         );
                     })
                     .fail(function(error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:wizards.snapshot.confirm.failed', { what: self.data.vm().name() })
+                            $.t('ovs:wizards.snapshot.confirm.failed')
                         );
                         deferred.resolve(error);
                     });
@@ -78,12 +82,18 @@ define([
 
         // Durandal
         self.activate = function() {
-            if (self.data.vm() === undefined || self.data.vm().guid() !== self.data.machineGuid()) {
-                self.data.vm(new VMachine(self.data.machineGuid()));
-                self.data.vm()
+            if (self.data.vObject() === undefined || self.data.vObject().guid() !== self.data.guid()) {
+                if (self.data.mode() === 'vmachine') {
+                    self.data.vObject(new VMachine(self.data.guid()));
+                } else {
+                    self.data.vObject(new VDisk(self.data.guid()));
+                }
+                self.data.vObject()
                     .load()
                     .done(function() {
-                        self.data.name(self.data.vm().name() + '-snapshot');
+                        if (self.data.name() === '' && self.data.mode() === 'vmachine') {
+                            self.data.name(self.data.vObject().name() + '-snapshot');
+                        }
                     });
             }
         };

@@ -32,6 +32,10 @@ define([
         self.vMachineCache       = {};
         self.storageRouterCache  = {};
         self.vPoolCache          = {};
+        self.query               = {
+            type: 'AND',
+            items: [['is_vtemplate', 'EQUALS', false]]
+        };
         self.vDiskHeaders        = [
             { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
             { key: 'vmachine',      value: $.t('ovs:generic.vmachine'),      width: 110       },
@@ -46,13 +50,11 @@ define([
         ];
 
         // Handles
-        self.storageRouterHandle = undefined;
-        self.vDisksHandle        = {};
-        self.vPoolsHandle        = undefined;
+        self.vDisksHandle = {};
+        self.vPoolsHandle = undefined;
 
         // Observables
-        self.vPools             = ko.observableArray([]);
-        self.storageRouterGuids = ko.observableArray([]);
+        self.vPools = ko.observableArray([]);
 
         // Functions
         self.addVDisk = function() {
@@ -66,6 +68,7 @@ define([
                 if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
                     options.sort = 'devicename';
                     options.contents = '_dynamics,_relations,-snapshots';
+                    options.query = JSON.stringify(self.query);
                     self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
@@ -137,14 +140,6 @@ define([
                                     item.fillData(vpdata[item.guid()]);
                                 }
                             });
-                        });
-                    self.storageRouterHandle = api.get('storagerouters', {queryparams: {contents: ''}})
-                        .done(function(data) {
-                            var guids = [];
-                            $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                            });
-                            self.storageRouterGuids(guids);
                         });
                 }
             }, 60000);

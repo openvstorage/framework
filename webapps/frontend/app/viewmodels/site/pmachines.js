@@ -293,13 +293,13 @@ define([
                         self.mgmtCenters.destroy(mgmtCenter);
                         generic.alertInfo(
                             $.t('ovs:pmachines.delete.marked'),
-                            $.t('ovs:pmachines.delete.markedmsg', { what: mgmtCenter.name() })
+                            $.t('ovs:pmachines.delete.marked_msg', { what: mgmtCenter.name() })
                         );
                         api.del('mgmtcenters/' + mgmtCenter.guid())
                             .done(function() {
                                 generic.alertSuccess(
                                     $.t('ovs:pmachines.delete.done'),
-                                    $.t('ovs:pmachines.delete.donemsg', { what: mgmtCenter.name() })
+                                    $.t('ovs:pmachines.delete.done_msg', { what: mgmtCenter.name() })
                                 );
                             })
                             .fail(function(error) {
@@ -307,7 +307,7 @@ define([
                                     $.t('ovs:generic.error'),
                                     $.t('ovs:generic.messages.errorwhile', {
                                         context: 'error',
-                                        what: $.t('ovs:pmachines.delete.errormsg', { what: mgmtCenter.name() }),
+                                        what: $.t('ovs:pmachines.delete.error_msg', { what: mgmtCenter.name() }),
                                         error: error.responseText
                                     })
                                 );

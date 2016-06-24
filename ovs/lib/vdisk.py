@@ -149,7 +149,7 @@ class VDiskController(object):
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
         hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
         VDiskController._logger.info('Deleting disk {0}'.format(vdisk.name))
-        hypervisor.delete_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.name)
+        hypervisor.delete_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.devicename)
         VDiskController._logger.info('Deleted disk {0}'.format(vdisk.name))
 
     @staticmethod
@@ -169,7 +169,7 @@ class VDiskController(object):
         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
         hypervisor = Factory.get(storagedriver.storagerouter.pmachine)
         VDiskController._logger.info('Extending disk {0}'.format(vdisk.name))
-        hypervisor.extend_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.name, size)
+        hypervisor.extend_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.devicename, size)
         VDiskController._logger.info('Extended disk {0}'.format(vdisk.name))
 
     @staticmethod
@@ -509,22 +509,18 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_from_template')
-    def create_from_template(diskguid, devicename, pmachineguid, machinename='', machineguid=None):
+    def create_from_template(diskguid, devicename, pmachineguid, machinename=None, machineguid=None):
         """
         Create a disk from a template
 
         :param diskguid: Guid of the disk
         :type diskguid: str
-
         :param machinename: Name of the machine
         :type machinename: str
-
         :param devicename: Device file name for the disk (eg: my_disk-flat.vmdk)
         :type devicename: str
-
         :param pmachineguid: Guid of pmachine to create new vdisk on
         :type pmachineguid: str
-
         :param machineguid: Guid of the machine to assign disk to
         :type machineguid: str
 
@@ -544,9 +540,10 @@ class VDiskController(object):
                                'snapshotpolicyid', 'vmachine', 'vpool']
 
         vdisk = VDisk(diskguid)
+        detached = False
         if vdisk.vmachine and not vdisk.vmachine.is_vtemplate:
-            # Disk might not be attached to a vmachine, but still be a template
-            raise RuntimeError('The given vdisk does not belong to a template')
+            # The vDisk is linked to a vMachine but that one is not a vTemplate.
+            detached = True
         if not vdisk.is_vtemplate:
             raise RuntimeError('The given vdisk is not a template')
 
@@ -566,7 +563,10 @@ class VDiskController(object):
         new_vdisk.parent_vdisk = vdisk
         new_vdisk.name = '{0}-clone'.format(vdisk.name)
         new_vdisk.description = description
-        new_vdisk.vmachine = new_vdisk_vmachine if machineguid else vdisk.vmachine
+        if detached is True:
+            new_vdisk.vmachine = None
+        else:
+            new_vdisk.vmachine = new_vdisk_vmachine if machineguid else vdisk.vmachine
         new_vdisk.save()
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, new_vdisk.vpool)[0]
@@ -594,7 +594,7 @@ class VDiskController(object):
                 VDiskController.clean_bad_disk(new_vdisk.guid)
             except Exception as ex2:
                 VDiskController._logger.exception('Exception during exception handling of "create_clone_from_template" : {0}'.format(str(ex2)))
-            raise ex
+            raise
 
         return {'diskguid': new_vdisk.guid,
                 'name': new_vdisk.name,
@@ -894,6 +894,7 @@ class VDiskController(object):
             if old_dtl_mode != new_dtl_mode:
                 VDiskController._logger.info('Disabling DTL for vDisk {0}'.format(vdisk.name))
                 vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
+                vdisk.invalidate_dynamics(['dtl_status'])
                 for junction in vdisk.domains_dtl:
                     junction.delete()
         elif new_dtl_mode != old_dtl_mode or new_dtl_targets != old_dtl_targets:  # Mode is sync or async and targets changed or DTL mode changed
@@ -950,6 +951,7 @@ class VDiskController(object):
                     for sd in storagerouter.storagedrivers:  # DTL can reside on any node in the cluster running a volumedriver and having a DTL process running
                         dtl_config = DTLConfig(str(storagerouter.ip), sd.ports['dtl'], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
                         vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
+                        vdisk.invalidate_dynamics(['dtl_status'])
                         break
                     if dtl_config is not None:
                         break
@@ -1065,8 +1067,6 @@ class VDiskController(object):
         if storagerouters_to_exclude is None:
             storagerouters_to_exclude = []
 
-        from ovs.lib.vpool import VPoolController
-
         VDiskController._logger.info('DTL checkup started')
         required_params = {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
                            'dtl_enabled': (bool, None)}
@@ -1088,7 +1088,6 @@ class VDiskController(object):
 
         errors_found = False
         root_client_map = {}
-        vpool_dtl_config_cache = {}
         vdisks = VDiskList.get_vdisks() if vdisk is None and vpool is None else vpool.vdisks if vpool is not None else [vdisk]
         iteration = 0
         while len(vdisks) > 0:
@@ -1108,13 +1107,10 @@ class VDiskController(object):
                     continue
 
                 vpool = vdisk.vpool
-                if vpool.guid not in vpool_dtl_config_cache:
-                    vpool_config = VPoolController.get_configuration(vpool.guid)  # Config on vPool is permanent for DTL settings
-                    vpool_dtl_config_cache[vpool.guid] = vpool_config
-                    Toolbox.verify_required_params(required_params, vpool_config)
+                vpool_config = vpool.configuration
+                Toolbox.verify_required_params(required_params, vpool_config)
 
                 volume_id = str(vdisk.volume_id)
-                vpool_config = vpool_dtl_config_cache[vpool.guid]
                 dtl_vpool_enabled = vpool_config['dtl_enabled']
                 try:
                     current_dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id)
@@ -1164,12 +1160,13 @@ class VDiskController(object):
                     try:
                         with volatile_mutex(lock_key, wait=time_to_wait_for_lock):
                             vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
+                            vdisk.invalidate_dynamics(['dtl_status'])
                     except NoLockAvailableException:
                         VDiskController._logger.info('    Could not acquire lock, continuing with next Virtual Disk')
                         continue
                     vdisks.remove(vdisk)
                     continue
-                elif current_dtl_config_mode == DTLConfigMode.MANUAL and (current_dtl_config is None or current_dtl_config.host == 'null'):
+                elif current_dtl_config_mode == DTLConfigMode.MANUAL and (current_dtl_config is None or current_dtl_config.host == 'null') and vdisk.has_manual_dtl is True:
                     VDiskController._logger.info('    DTL is disabled for virtual disk {0} with guid {1}'.format(vdisk.name, vdisk.guid))
                     vdisks.remove(vdisk)
                     continue
@@ -1192,7 +1189,7 @@ class VDiskController(object):
                     available_secondary_srs.update(StorageRouterList.get_primary_storagerouters_for_domain(domain))
 
                 # In case no domains have been configured
-                if len(available_primary_srs) == 0 and len(available_secondary_srs) == 0:
+                if len(available_primary_srs) == 0 and len(available_secondary_srs) == 0 and len(primary_domains) == 0 and len(secondary_domains) == 0:
                     available_primary_srs = set(StorageRouterList.get_storagerouters())
 
                 if this_storage_router in available_primary_srs:
@@ -1243,6 +1240,7 @@ class VDiskController(object):
                     try:
                         with volatile_mutex(lock_key, wait=time_to_wait_for_lock):
                             vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
+                            vdisk.invalidate_dynamics(['dtl_status'])
                     except NoLockAvailableException:
                         VDiskController._logger.info('    Could not acquire lock, continuing with next Virtual Disk')
                         continue
@@ -1251,7 +1249,7 @@ class VDiskController(object):
 
                 # Check whether reconfiguration is required
                 reconfigure_required = False
-                if current_dtl_config is None:
+                if current_dtl_config is None or current_dtl_config.host == 'null':
                     VDiskController._logger.info('        No DTL configuration found, but there are Storage Routers available')
                     reconfigure_required = True
                 elif current_dtl_config_mode == DTLConfigMode.AUTOMATIC:
@@ -1297,12 +1295,13 @@ class VDiskController(object):
                     if vdisk.has_manual_dtl is True:
                         dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[current_dtl_config.mode]
                     else:
-                        dtl_mode = vpool_config.get('dtl_mode', StorageDriverClient.FRAMEWORK_DTL_ASYNC)
+                        dtl_mode = vpool_config['dtl_mode']
                     VDiskController._logger.info('        DTL config that will be set -->  Host: {0}, Port: {1}, Mode: {2}'.format(dtl_target.ip, port, dtl_mode))
                     dtl_config = DTLConfig(str(dtl_target.ip), port, StorageDriverClient.VDISK_DTL_MODE_MAP[dtl_mode])
                     try:
                         with volatile_mutex(lock_key, wait=time_to_wait_for_lock):
                             vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
+                            vdisk.invalidate_dynamics(['dtl_status'])
                     except NoLockAvailableException:
                         VDiskController._logger.info('    Could not acquire lock, continuing with next Virtual Disk')
                         continue

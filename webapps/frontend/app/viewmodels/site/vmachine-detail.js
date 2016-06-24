@@ -52,13 +52,11 @@ define([
         ];
 
         // Handles
-        self.storageRouterHandle = undefined;
-        self.vDisksHandle        = {};
+        self.vDisksHandle = {};
 
         // Observables
         self.convertingToTemplate = ko.observable(false);
         self.snapshotsInitialLoad = ko.observable(true);
-        self.storageRouterGuids   = ko.observableArray([]);
         self.vMachine             = ko.observable();
 
         // Functions
@@ -67,6 +65,10 @@ define([
                 var vm = self.vMachine();
                 vm.load()
                     .then(function() {
+                        if (self.vMachine().isVTemplate()) {
+                            router.navigate(shared.routing.loadHash('vmachines'));
+                            return deferred.reject();
+                        }
                         self.snapshotsInitialLoad(false);
                         generic.crossFiller(
                             vm.vPoolGuids, vm.vPools,
@@ -100,26 +102,16 @@ define([
                             vm.pMachine(self.pMachineCache[pMachineGuid]);
                         }
                     })
+                    .fail(function(error) {
+                        if (error !== undefined && error.status === 404) {
+                            router.navigate(shared.routing.loadHash('vmachines'));
+                        }
+                    })
                     .always(deferred.resolve);
             }).promise();
         };
         self.refreshSnapshots = function() {
             // Not in use, for mapping only
-        };
-        self.loadStorageRouters = function() {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.storageRouterHandle)) {
-                    self.storageRouterHandle = api.get('storagerouters', {queryparams: {contents: ''}})
-                        .done(function (data) {
-                            var guids = [];
-                            $.each(data.data, function (index, item) {
-                                guids.push(item.guid);
-                            });
-                            self.storageRouterGuids(guids);
-                        })
-                        .always(deferred.resolve());
-                }
-            }).promise();
         };
         self.loadVDisks = function(options) {
             return $.Deferred(function(deferred) {
@@ -159,18 +151,18 @@ define([
         };
         self.snapshot = function() {
             if (self.vMachine() !== undefined) {
-                var vm = self.vMachine();
                 dialog.show(new SnapshotWizard({
                     modal: true,
-                    machineguid: vm.guid()
+                    mode: 'vmachine',
+                    guid: self.vMachine().guid()
                 }));
             }
         };
         self.setAsTemplate = function() {
             if (self.vMachine() !== undefined) {
-                self.convertingToTemplate(true);
                 var vm = self.vMachine();
                 if (!vm.isRunning()) {
+                    self.convertingToTemplate(true);
                     app.showMessage(
                             $.t('ovs:vmachines.set_as_template.warning'),
                             $.t('ovs:vmachines.set_as_template.title', { what: vm.name() }),
@@ -203,8 +195,6 @@ define([
                                 self.convertingToTemplate(true);
                             }
                         });
-                } else {
-                    self.convertingToTemplate(true);
                 }
             }
         };
@@ -216,7 +206,6 @@ define([
             self.refresher.start();
             self.load()
                 .then(function() {
-                    self.loadStorageRouters();
                     self.loadVDisks({page: 1});
                 });
         };

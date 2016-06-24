@@ -15,11 +15,15 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
+    'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter', '../containers/domain',
-    '../wizards/rollback/index', '../wizards/clone/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, Domain, RollbackWizard, CloneWizard) {
+    '../wizards/rollback/index', '../wizards/clone/index', '../wizards/snapshot/index'
+], function(
+    $, app, dialog, ko, router, shared, generic, Refresher, api,
+    VDisk, VMachine, VPool, StorageRouter, Domain,
+    RollbackWizard, CloneWizard, SnapshotWizard
+) {
     "use strict";
     return function() {
         var self = this;
@@ -41,18 +45,25 @@ define([
         ];
 
         // Observables
+        self.convertingToTemplate = ko.observable(false);
         self.domains              = ko.observableArray([]);
         self.snapshotsInitialLoad = ko.observable(true);
         self.vDisk                = ko.observable();
 
         // Handles
-        self.loadDomainHandle         = undefined;
-        self.loadStorageRoutersHandle = undefined;
+        self.loadDomainHandle        = undefined;
+        self.loadStorageRouterHandle = undefined;
 
         // Functions
         self.load = function() {
             return $.Deferred(function (deferred) {
                 self.vDisk().load()
+                    .then(function() {
+                        if (self.vDisk().isVTemplate()) {
+                            router.navigate(shared.routing.loadHash('vdisks'));
+                            return deferred.reject();
+                        }
+                    })
                     .then(self.loadStorageRouters)
                     .then(self.loadDomains)
                     .then(function() {
@@ -73,26 +84,16 @@ define([
                         }
                         if (vPoolGuid && (vdisk.vpool() === undefined || vdisk.vpool().guid() !== vPoolGuid)) {
                             pool = new VPool(vPoolGuid);
-                            pool.load();
+                            pool.load('configuration');
                             vdisk.vpool(pool);
                         }
                     })
+                    .fail(function(error) {
+                        if (error !== undefined && error.status === 404) {
+                            router.navigate(shared.routing.loadHash('vdisks'));
+                        }
+                    })
                     .always(deferred.resolve);
-            }).promise();
-        };
-        self.loadStorageRouters = function() {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadStorageRouterHandle)) {
-                    self.loadStorageRouterHandle = api.get('storagerouters', {queryparams: {contents: ''}})
-                        .done(function (data) {
-                            var guids = [];
-                            $.each(data.data, function (index, item) {
-                                guids.push(item.guid);
-                            });
-                            self.vDisk().storageRouterGuids(guids);
-                        })
-                        .always(deferred.resolve());
-                }
             }).promise();
         };
         self.loadDomains = function() {
@@ -139,6 +140,21 @@ define([
                 }
             }).promise();
         };
+        self.loadStorageRouters = function() {
+            return $.Deferred(function (deferred) {
+                if (generic.xhrCompleted(self.loadStorageRouterHandle)) {
+                    self.loadStorageRouterHandle = api.get('storagerouters', {queryparams: {contents: ''}})
+                        .done(function (data) {
+                            var guids = [];
+                            $.each(data.data, function (index, item) {
+                                guids.push(item.guid);
+                            });
+                            self.vDisk().storageRouterGuids(guids);
+                        })
+                        .always(deferred.resolve());
+                }
+            }).promise();
+        };
         self.refreshSnapshots = function() {
             // Not in use, for mapping only
         };
@@ -154,6 +170,55 @@ define([
                         type: 'vdisk',
                         guid: vdisk.guid()
                     }));
+                }
+            }
+        };
+        self.snapshot = function() {
+            if (self.vDisk() !== undefined) {
+                dialog.show(new SnapshotWizard({
+                    modal: true,
+                    mode: 'vdisk',
+                    guid: self.vDisk().guid()
+                }));
+            }
+        };
+        self.setAsTemplate = function() {
+            if (self.vDisk() !== undefined) {
+                var vd = self.vDisk();
+                if (vd.vMachine() !== undefined && !vd.vMachine().isRunning()) {
+                    self.convertingToTemplate(true);
+                    app.showMessage(
+                            $.t('ovs:vdisks.set_as_template.warning'),
+                            $.t('ovs:vdisks.set_as_template.title', { what: vd.name() }),
+                            [$.t('ovs:vdisks.set_as_template.no'), $.t('ovs:vdisks.set_as_template.yes')]
+                        )
+                        .done(function(answer) {
+                            if (answer === $.t('ovs:vdisks.set_as_template.yes')) {
+                                generic.alertInfo(
+                                    $.t('ovs:vdisks.set_as_template.marked'),
+                                    $.t('ovs:vdisks.set_as_template.marked_msg', { what: vd.name() })
+                                );
+                                api.post('vdisks/' + vd.guid() + '/set_as_template')
+                                    .then(self.shared.tasks.wait)
+                                    .done(function() {
+                                        generic.alertSuccess(
+                                            $.t('ovs:vdisks.set_as_template.done'),
+                                            $.t('ovs:vdisks.set_as_template.done_msg', { what: vd.name() })
+                                        );
+                                        router.navigate(shared.routing.loadHash('vtemplates'));
+                                    })
+                                    .fail(function(error) {
+                                        generic.alertError(
+                                            $.t('ovs:generic.error'),
+                                            $.t('ovs:generic.messages.errorwhile', {what: $.t('ovs:vdisks.set_as_template.error_msg', {what: vd.name(), error: error})}));
+                                    })
+                                    .always(function() {
+                                        self.convertingToTemplate(false);
+                                    });
+                            } else {
+                                self.convertingToTemplate(false);
+                            }
+                        });
                 }
             }
         };
@@ -175,19 +240,19 @@ define([
                     .done(function () {
                         generic.alertSuccess(
                             $.t('ovs:vdisks.saveconfig.done'),
-                            $.t('ovs:vdisks.saveconfig.donemsg', { what: vd.name() })
+                            $.t('ovs:vdisks.saveconfig.done_msg', { what: vd.name() })
                         );
                     })
                     .fail(function (error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
                             $.t('ovs:generic.messages.errorwhile', {
-                                what: $.t('ovs:vdisks.saveconfig.errormsg', { what: vd.name() })
+                                what: $.t('ovs:vdisks.saveconfig.error_msg', { what: vd.name() })
                             })
                         );
                     })
                     .always(function() {
-                        vd.loadConfiguration(true);
+                        vd.loadConfiguration(false);
                     });
                 vd.oldConfiguration($.extend({}, vd.configuration()));
             }
@@ -200,21 +265,21 @@ define([
             )
             .done(function(answer) {
                 if (answer === $.t('ovs:generic.yes')) {
-                    api.post('vdisks/' + self.vDisk().guid() + '/removesnapshot', {
+                    api.post('vdisks/' + self.vDisk().guid() + '/remove_snapshot', {
                         data: { snapshot_id: snapshotid }
                     })
                         .then(self.shared.tasks.wait)
                         .done(function () {
                             generic.alertSuccess(
                                 $.t('ovs:vdisks.removesnapshot.done'),
-                                $.t('ovs:vdisks.removesnapshot.donemsg', { what: snapshotid })
+                                $.t('ovs:vdisks.removesnapshot.done_msg', { what: snapshotid })
                             );
                         })
                         .fail(function (error) {
                             generic.alertError(
                                 $.t('ovs:generic.error'),
                                 $.t('ovs:generic.messages.errorwhile', {
-                                    what: $.t('ovs:vdisks.removesnapshot.errormsg', { what: snapshotid })
+                                    what: $.t('ovs:vdisks.removesnapshot.error_msg', { what: snapshotid })
                                 })
                             );
                         })

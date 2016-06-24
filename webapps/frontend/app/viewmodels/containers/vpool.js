@@ -29,7 +29,6 @@ define([
         // Handles
         self.loadHandle          = undefined;
         self.diskHandle          = undefined;
-        self.loadConfig          = undefined;
         self.machineHandle       = undefined;
         self.storageRouterHandle = undefined;
 
@@ -83,13 +82,16 @@ define([
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.metadata, data, 'metadata');
             generic.trySet(self.backendConnection, data, 'connection');
+            generic.trySet(self.backendLogin, data, 'login');
+            generic.trySet(self.rdmaEnabled, data, 'rdma_enabled');
 
+            if (data.hasOwnProperty('configuration')) {
+                self.configuration(data.configuration);
+            }
             if (self.metadata.hasOwnProperty('backend') && self.metadata.backend.hasOwnProperty('preset')) {
                 self.backendPreset(self.metadata.backend.preset);
             }
 
-            generic.trySet(self.backendLogin, data, 'login');
-            generic.trySet(self.rdmaEnabled, data, 'rdma_enabled');
             if (data.hasOwnProperty('backend_type_guid')) {
                 self.backendTypeGuid(data.backend_type_guid);
             } else {
@@ -186,17 +188,6 @@ define([
                     .always(function() {
                         self.loading(false);
                     });
-            }).promise();
-        };
-        self.loadConfiguration = function() {
-            return $.Deferred(function(deferred) {
-                self.loadConfig = api.get('vpools/' + self.guid() + '/get_configuration')
-                    .then(self.shared.tasks.wait)
-                    .done(function(data) {
-                        self.configuration(data);
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject);
             }).promise();
         };
         self.loadStorageRouters = function() {

@@ -76,7 +76,6 @@ define([
                 var vpool = self.vPool();
                 $.when.apply($, [
                     vpool.load('storagedrivers,vdisks,_dynamics,backend_type'),
-                    vpool.loadConfiguration(),
                     vpool.loadStorageRouters(),
                     self.loadStorageRouters()
                 ])
@@ -250,14 +249,14 @@ define([
                         if (answer === $.t('ovs:vpools.sync.yes')) {
                             generic.alertInfo(
                                 $.t('ovs:vpools.sync.marked'),
-                                $.t('ovs:vpools.sync.markedmsg', { what: vp.name() })
+                                $.t('ovs:vpools.sync.marked_msg', { what: vp.name() })
                             );
                             api.post('vpools/' + vp.guid() + '/sync_vmachines')
                                 .then(self.shared.tasks.wait)
                                 .done(function() {
                                     generic.alertSuccess(
                                         $.t('ovs:vpools.sync.done'),
-                                        $.t('ovs:vpools.sync.donemsg', { what: vp.name() })
+                                        $.t('ovs:vpools.sync.done_msg', { what: vp.name() })
                                     );
                                 })
                                 .fail(function(error) {
@@ -265,7 +264,7 @@ define([
                                         $.t('ovs:generic.error'),
                                         $.t('ovs:generic.messages.errorwhile', {
                                             context: 'error',
-                                            what: $.t('ovs:vpools.sync.errormsg', { what: vp.name() }),
+                                            what: $.t('ovs:vpools.sync.error_msg', { what: vp.name() }),
                                             error: error.responseText
                                         })
                                     );

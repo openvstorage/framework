@@ -33,13 +33,13 @@
                 "raw": "Raw disk"
             },
             "dtl": {
-                "ok_standalone": "Healthy (standalone)",
-                "ok_sync": "Healthy (sync)",
                 "catch_up": "Rebuilding",
                 "degraded": "Degraded",
-                "unknown": "Unknown",
+                "ok_standalone": "Healthy (standalone)",
+                "ok_sync": "Healthy (sync)",
+                "checkup_required": "DTL should be configured",
                 "undefined": "Unknown",
-                "null": "Unknown"
+                "unknown": "Unknown"
             },
             "storagerouter": {
                 "ok": "OK",
@@ -246,6 +246,7 @@
         "vmachines": "vMachines",
         "vpool": "vPool",
         "vpools": "vPools",
+        "vtemplate": "vTemplate",
         "warning": "Warning",
         "welcome": "Welcome",
         "write": "Write",
@@ -280,10 +281,10 @@
                 "no": "Cancel",
                 "yes": "Move away",
                 "marked": "Moving away started",
-                "markedmsg": "All vDisks will be moved away from this Storage Router",
+                "marked_msg": "All vDisks will be moved away from this Storage Router",
                 "done": "Move away complete",
-                "donemsg": "All vDisks have been moved away from __what__",
-                "errormsg": "moving away all vDisks from __what__"
+                "done_msg": "All vDisks have been moved away from __what__",
+                "error_msg": "moving away all vDisks from __what__"
             },
             "moveawaymsg": "Move all vDisks away from this Storage Router and start them on other Storage Routers.",
             "moveawaytitle": "Move all vDisks",
@@ -307,8 +308,8 @@
                 "pending": "Pending",
                 "pendingmsg": "The StorageRouter is being marked offline",
                 "done": "Marked offline",
-                "donemsg": "The StorageRouter was marked offline",
-                "errormsg": "marking the StorageRouter offline: __error__"
+                "done_msg": "The StorageRouter was marked offline",
+                "error_msg": "marking the StorageRouter offline: __error__"
             }
         }
     },
@@ -400,15 +401,15 @@
             "yes": "Start sync",
             "no": "Close",
             "marked": "Sync scheduled",
-            "markedmsg": "A sync will be executed",
+            "marked_msg": "A sync will be executed",
             "done": "vPool synced",
-            "donemsg": "All vMachines using vPool __what__ synced",
-            "errormsg": "syncing all vMachines using __what__"
+            "done_msg": "All vMachines using vPool __what__ synced",
+            "error_msg": "syncing all vMachines using __what__"
         },
         "saveconfig": {
             "done": "Save complete",
-            "donemsg": "The configuration details for __what__ are saved.",
-            "errormsg": "saving __what__"
+            "done_msg": "The configuration details for __what__ are saved.",
+            "error_msg": "saving __what__"
         }
     },
     "statistics": {
@@ -430,10 +431,10 @@
         "delete": {
             "warning": "Are you sure you want to delete __what__?",
             "marked": "Marked for deletion",
-            "markedmsg": "Machine __what__ is marked for deletion...",
-            "done": "Machine deleted",
-            "donemsg": "Machine __what__ deleted",
-            "errormsg": "deleting __what__"
+            "marked_msg": "vMachine __what__ is marked for deletion...",
+            "done": "vMachine deleted",
+            "done_msg": "vMachine __what__ deleted",
+            "error_msg": "deleting __what__"
         },
         "set_as_template": {
             "done": "vMachine set as vTemplate",
@@ -459,8 +460,8 @@
         },
         "saveconfig": {
             "done": "Save complete",
-            "donemsg": "The configuration details for __what__ are saved.",
-            "errormsg": "saving __what__"
+            "done_msg": "The configuration details for __what__ are saved.",
+            "error_msg": "saving __what__"
         }
     },
     "vdisks": {
@@ -474,21 +475,48 @@
             "rollback": "Rollback",
             "configuration": "vDisk configuration",
             "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool.",
-            "clone": "Clone"
+            "clone": "Clone",
+            "set_as_template": "Set as vTemplate",
+            "snapshot": "Take snapshot"
+        },
+        "set_as_template": {
+            "done": "vDisk set as vTemplate",
+            "done_msg": "vDisk __what__ set as vTemplate",
+            "error_msg": "setting __what__ as vTemplate: __error__",
+            "marked": "Marked for setting as vTemplate",
+            "marked_msg": "vDisk __what__ is marked for setting as vTemplate...",
+            "no": "Close",
+            "title": "Set vDisk __what__ as vTemplate",
+            "warning": "Warning: After converting a vDisk into a vTemplate, it can no longer actively be used.",
+            "yes": "Set as vTemplate"
         },
         "saveconfig": {
             "done": "Save complete",
-            "donemsg": "The configuration details for __what__ are saved.",
-            "errormsg": "saving __what__"
+            "done_msg": "The configuration details for __what__ are saved.",
+            "error_msg": "saving __what__"
         },
         "removesnapshot": {
             "delete": "Are you sure you want to remove snapshot __what__?",
             "done": "Snapshot removed",
-            "donemsg": "Snapshot __what__ was removed successfully.",
-            "errormsg": "Failed to remove snapshot __what__."
+            "done_msg": "Snapshot __what__ was removed successfully.",
+            "error_msg": "Failed to remove snapshot __what__."
+        },
+        "delete": {
+            "warning": "Are you sure you want to delete __what__?",
+            "marked": "Marked for deletion",
+            "marked_msg": "vDisk __what__ is marked for deletion...",
+            "done": "vDisk deleted",
+            "done_msg": "vDisk __what__ deleted",
+            "error_msg": "deleting __what__"
         }
     },
     "vtemplates": {
+        "vmachines": {
+            "title": "vMachine Templates"
+        },
+        "vdisks": {
+            "title": "vDisk Templates"
+        },
         "title": "vTemplates"
     },
     "dashboard": {
@@ -535,10 +563,10 @@
         "delete": {
             "warning": "Are you sure you want to delete __what__?",
             "marked": "Marked for deletion",
-            "markedmsg": "Management center __what__ is marked for deletion...",
+            "marked_msg": "Management center __what__ is marked for deletion...",
             "done": "Deleted",
-            "donemsg": "Management center __what__ deleted",
-            "errormsg": "deleting __what__"
+            "done_msg": "Management center __what__ deleted",
+            "error_msg": "deleting __what__"
         }
     },
     "domains": {
@@ -812,6 +840,7 @@
                 "invalid_host": "Invalid host (should be a FQDN or IP address)",
                 "invalid_name": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
                 "invalid_s3_info": "Could not connect to the given host/port, or wrong credentials.",
+                "loading_backend_information": "Backend information is being loaded",
                 "local_host": "Use local Open vStorage backend",
                 "mtpt_in_use": "The mountpoint /mnt/__what__ for the vPool is already in use.",
                 "name": "Name:",
@@ -861,7 +890,7 @@
             "gather": {
                 "all_failed": "All create actions from vTemplate __what__ failed.",
                 "amount": "# of VMs:",
-                "amount_multiple": "The first vMachine will be __start__ and the last one will be __end__",
+                "amount_multiple": "The first item will be __start__ and the last one will be __end__",
                 "amount_one": "The name won't be appended with a number",
                 "complete": "Create completed",
                 "creating": "creating from vTemplate __what__: __error__",
@@ -870,11 +899,11 @@
                 "hosts": "Hosts:",
                 "in_progress": "Creating from vTemplate __what__ in progress...",
                 "name": "Name:",
-                "no_machine": "No vTemplate found",
+                "no_object": "No vTemplate found",
                 "no_name": "No name was given",
                 "no_pmachines": "No physical machines found.",
                 "no_pmachines_selected": "Please select at least one host.",
-                "some_failed": "Create from __what__ finished. However, some of the vMachines could not be created.",
+                "some_failed": "Create from __what__ finished. However, some could not be created.",
                 "start_nr": "Start nr.:",
                 "started": "Create started",
                 "success": "Creating from vTemplate __what__ was successful"
@@ -894,8 +923,7 @@
             },
             "gather_vpool": {
                 "basic_info": "Basic vPool information",
-                "information": "Extending a vPool does not allow to reconfigure the name and backend information",
-                "migration": "This vPool was created using an old verion of Open vStorage. Please enter all Backend related information again."
+                "information": "Extending a vPool does not allow to reconfigure the name and backend information"
             }
         },
         "shrink_vpool": {
@@ -965,15 +993,15 @@
                 "consistent": "Label as Consistent Snapshot",
                 "sticky": "Label as Sticky Snapshot",
                 "basicinfo": "Enter basic information",
-                "nomachine": "No machine loaded",
+                "nomachine": "No object loaded",
                 "noname": "No name was entered"
             },
             "confirm": {
                 "title": "Verify the entered information",
                 "snapshotstarted": "Snapshot started",
-                "inprogress": "Machine __what__ Snapshotting in progress...",
-                "failed": "Machine __what__ Snapshot failed.",
-                "success": "Machine __what__ Snapshot successfully.",
+                "inprogress": "Snapshotting in progress...",
+                "failed": "Snapshot failed.",
+                "success": "Snapshot successfully.",
                 "name": "Snapshot name",
                 "consistent": "Label as Consistent Snapshot"
             }
