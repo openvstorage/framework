@@ -146,12 +146,12 @@ class ScheduledTaskController(object):
                     if snapshot.get('is_sticky') is True:
                         continue
                     timestamp = int(snapshot['timestamp'])
-                    for bucket in bucket_chain:
-                        if bucket['start'] >= timestamp > bucket['end']:
-                            for diskguid, snapshotguid in snapshot['snapshots'].iteritems():
-                                if snapshotguid in parent_snapshots:
-                                    ScheduledTaskController._logger.info('Not deleting snapshot {0} because it has clones'.format(snapshotguid))
-                                    continue
+                    for diskguid, snapshotguid in snapshot['snapshots'].iteritems():
+                        if snapshotguid in parent_snapshots:
+                            ScheduledTaskController._logger.info('Not deleting snapshot {0} because it has clones'.format(snapshotguid))
+                            continue
+                        for bucket in bucket_chain:
+                            if bucket['start'] >= timestamp > bucket['end']:
                                 bucket['snapshots'].append({'timestamp': timestamp,
                                                             'snapshotid': snapshotguid,
                                                             'diskguid': diskguid,
