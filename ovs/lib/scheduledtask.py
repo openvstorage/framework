@@ -135,7 +135,7 @@ class ScheduledTaskController(object):
                         'snapshots': []})
 
         # Get a list of all snapshots that are used as parents for clones
-        parent_snapshots = set([vd.parentsnapshot for vd in VDiskList.get_vdisks() if vd.parentsnapshot is not None])
+        parent_snapshots = set([vd.parentsnapshot for vd in VDiskList.get_with_parent_snaphots()])
 
         # Place all snapshots in bucket_chains
         bucket_chains = []

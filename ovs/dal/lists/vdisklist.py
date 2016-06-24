@@ -93,3 +93,11 @@ class VDiskList(object):
         """
         return DataList(VDisk, {'type': DataList.where_operator.AND,
                                 'items': [('parentsnapshot', DataList.operator.EQUALS, snapshotid)]})
+
+    @staticmethod
+    def get_with_parent_snaphots():
+        """
+        Gets all vDisks whose parentsnapshot is not None
+        """
+        return DataList(VDisk, {'type': DataList.where_operator.AND,
+                                'items': [('parentsnapshot', DataList.operator.NOT_EQUALS, None)]})
