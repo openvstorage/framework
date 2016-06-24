@@ -28,7 +28,10 @@ class RpmPackage(object):
     Contains all logic related to Rpm packages (used in e.g. Centos)
     """
     _logger = LogHandler.get('lib', name='packager')
-    OVS_PACKAGE_NAMES = ['openvstorage', 'openvstorage-backend', 'volumedriver-server', 'volumedriver-base', 'alba', 'openvstorage-sdm']
+    OVS_PACKAGE_NAMES = ['openvstorage', 'openvstorage-core', 'openvstorage-webapps', 'openvstorage-sdm',
+                         'openvstorage-backend', 'openvstorage-backend-core', 'openvstorage-backend-webapps', 'openvstorage-cinder-plugin',
+                         'volumedriver-server', 'volumedriver-base', 'volumedriver-no-dedup-server', 'volumedriver-no-dedup-base',
+                         'alba', 'arakoon']
 
     @staticmethod
     def _get_version(package_name):
