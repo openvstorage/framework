@@ -173,7 +173,6 @@ class SetupController(object):
 
                     elif cluster_name == join_manually:  # Join an existing cluster manually
                         first_node = False
-                        cluster_name = None
                         cluster_ip = Interactive.ask_choice(SetupController.host_ips, 'Select the public IP address of {0}'.format(node_name))
                         master_ip = Interactive.ask_string(message='Please enter the IP of one of the cluster\'s master nodes',
                                                            regex_info={'regex': SSHClient.IP_REGEX,
@@ -195,6 +194,13 @@ class SetupController(object):
                         if Interactive.ask_yesno(message='Following StorageRouters were detected:\n  -  {0}\nIs this correct?'.format('\n  -  '.join(current_sr_message)),
                                                  default_value=True) is False:
                             raise Exception('The cluster on the given master node cannot be joined as not all StorageRouters could be loaded')
+
+                        cluster_name = None
+                        for cluster, discovered_info in discovery_result.iteritems():
+                            for node_info in discovered_info.itervalues():
+                                if node_info.get('ip') == master_ip:
+                                    cluster_name = cluster
+                                    break
 
                     else:  # Join an existing cluster automatically
                         SetupController._logger.debug('Cluster {0} selected'.format(cluster_name))
@@ -1687,6 +1693,8 @@ EOF
                 SSHClient(ip, username=username, password=password)
                 return password
             except KeyboardInterrupt:
+                raise
+            except UnableToConnectException:
                 raise
             except:
                 previous = None

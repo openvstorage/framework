@@ -24,14 +24,7 @@ from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import ClusterContact
-from volumedriver.storagerouter.storagerouterclient import DTLMode
-from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient as LSRClient
-from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
-from volumedriver.storagerouter.storagerouterclient import ReadCacheBehaviour
-from volumedriver.storagerouter.storagerouterclient import ReadCacheMode
-from volumedriver.storagerouter.storagerouterclient import Statistics
-from volumedriver.storagerouter.storagerouterclient import VolumeInfo
+from volumedriver.storagerouter.storagerouterclient import ClusterContact, DTLMode, LocalStorageRouterClient, MDSNodeConfig, ReadCacheBehaviour, ReadCacheMode, Statistics, VolumeInfo
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient as SRClient
     from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient as MDSClient
@@ -363,10 +356,10 @@ class StorageDriverConfiguration(object):
             if len(self.dirty_entries) > 0:
                 if client is None:
                     self._logger.info('Applying local storagedriver configuration changes')
-                    changes = LSRClient(self.remote_path).update_configuration(self.remote_path)
+                    changes = LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path)
                 else:
                     self._logger.info('Applying storagedriver configuration changes on {0}'.format(client.ip))
-                    with remote(client.ip, [LSRClient]) as rem:
+                    with remote(client.ip, [LocalStorageRouterClient]) as rem:
                         changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
                 for change in changes:
                     if change['param_name'] not in self.dirty_entries:

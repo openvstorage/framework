@@ -70,10 +70,6 @@
             "distributed": "Distributed FS",
             "alba": "Open vStorage Backend"
         },
-        "mgmtcentertypes": {
-            "VCENTER": "VMware vCenter",
-            "OPENSTACK": "OpenStack Controller Node"
-        },
         "granttypes": {
             "PASSWORD": "Password Credentials",
             "CLIENT_CREDENTIALS": "Client Credentials"

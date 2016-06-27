@@ -219,7 +219,6 @@ class StorageRouterController(object):
                            'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
                            'storagerouter_ip': (str, Toolbox.regex_ip),
-                           'integratemgmt': (bool, None),
                            'readcache_size': (int, {'min': 1, 'max': 10240}),
                            'writecache_size': (int, {'min': 1, 'max': 10240})}
         required_params_new_distributed = {'config_params': sd_config_params}
@@ -973,7 +972,7 @@ class StorageRouterController(object):
         current_startup_counter = storagedriver.startup_counter
         ServiceManager.enable_service(voldrv_service, client=root_client)
         ServiceManager.start_service(voldrv_service, client=root_client)
-        tries = 60
+        tries = 15
         while storagedriver.startup_counter == current_startup_counter and tries > 0:
             StorageRouterController._logger.debug('Waiting for the StorageDriver to start up...')
             running = ServiceManager.get_service_status(voldrv_service, client=root_client)
@@ -982,7 +981,7 @@ class StorageRouterController(object):
                 vpool.save()
                 raise RuntimeError('StorageDriver service failed to start (service not running)')
             tries -= 1
-            time.sleep(60 - tries)
+            time.sleep(15 - tries)
             storagedriver = StorageDriver(storagedriver.guid)
         if storagedriver.startup_counter == current_startup_counter:
             vpool.status = VPool.STATUSES.FAILURE
