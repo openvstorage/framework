@@ -698,8 +698,7 @@
             "gather_config": {
                 "basic_info": "Specify the configurations for the vPool",
                 "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
-                "missing_role": "Missing required partition role: __what__",
-                "missing_storage_ip": "Required Storage IP __what__ could not be found"
+                "missing_role": "Missing required partition role: __what__"
             },
             "gather_vpool": {
                 "access_key": "Access Key:",

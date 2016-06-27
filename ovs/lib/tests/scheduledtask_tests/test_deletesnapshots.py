@@ -201,10 +201,8 @@ class DeleteSnapshots(unittest.TestCase):
     def test_happypath(self):
         """
         Validates the happy path; Hourly snapshots are taken with a few manual consistent
-        every now an then. The delete policy is executed every day
+        every now and then. The delete policy is executed every day
         """
-        # Setup
-        # There are 2 machines; one with two disks, one with one disk and a stand-alone additional disk
         backend_type = BackendType()
         backend_type.name = 'BackendType'
         backend_type.code = 'BT'
@@ -238,41 +236,16 @@ class DeleteSnapshots(unittest.TestCase):
         disk_partition.roles = [DiskPartition.ROLES.SCRUB]
         disk_partition.mountpoint = '/var/tmp'
         disk_partition.save()
-        vdisk_1_1 = VDisk()
-        vdisk_1_1.name = 'vdisk_1_1'
-        vdisk_1_1.volume_id = 'vdisk_1_1'
-        vdisk_1_1.vpool = vpool
-        vdisk_1_1.devicename = 'dummy'
-        vdisk_1_1.size = 0
-        vdisk_1_1.save()
-        vdisk_1_1.reload_client()
-        vdisk_1_2 = VDisk()
-        vdisk_1_2.name = 'vdisk_1_2'
-        vdisk_1_2.volume_id = 'vdisk_1_2'
-        vdisk_1_2.vpool = vpool
-        vdisk_1_2.devicename = 'dummy'
-        vdisk_1_2.size = 0
-        vdisk_1_2.save()
-        vdisk_1_2.reload_client()
-        vdisk_2_1 = VDisk()
-        vdisk_2_1.name = 'vdisk_2_1'
-        vdisk_2_1.volume_id = 'vdisk_2_1'
-        vdisk_2_1.vpool = vpool
-        vdisk_2_1.devicename = 'dummy'
-        vdisk_2_1.size = 0
-        vdisk_2_1.save()
-        vdisk_2_1.reload_client()
-        vdisk_3 = VDisk()
-        vdisk_3.name = 'vdisk_3'
-        vdisk_3.volume_id = 'vdisk_3'
-        vdisk_3.vpool = vpool
-        vdisk_3.devicename = 'dummy'
-        vdisk_3.size = 0
-        vdisk_3.save()
-        vdisk_3.reload_client()
+        vdisk_1 = VDisk()
+        vdisk_1.name = 'vdisk_1'
+        vdisk_1.volume_id = 'vdisk_1'
+        vdisk_1.vpool = vpool
+        vdisk_1.devicename = 'dummy'
+        vdisk_1.size = 0
+        vdisk_1.save()
+        vdisk_1.reload_client()
 
-        for disk in [vdisk_1_1, vdisk_1_2, vdisk_2_1, vdisk_3]:
-            [dynamic for dynamic in disk._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
+        [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         # Run the testing scenario
         travis = 'TRAVIS' in os.environ and os.environ['TRAVIS'] == 'true'
@@ -296,8 +269,7 @@ class DeleteSnapshots(unittest.TestCase):
 
             # Validate snapshots
             self._print_message('- Validating snapshots')
-            for vdisk in [vdisk_1_1, vdisk_1_2, vdisk_2_1, vdisk_3]:
-                self._validate(vdisk, d, base, amount_of_days, debug)
+            self._validate(vdisk_1, d, base, amount_of_days, debug)
 
             # During the day, snapshots are taken
             # - Create non consistent snapshot every hour, between 2:00 and 22:00
@@ -305,14 +277,14 @@ class DeleteSnapshots(unittest.TestCase):
             self._print_message('- Creating snapshots')
             for h in xrange(2, 23):
                 timestamp = base_timestamp + (hour * h)
-                VDiskController.create_snapshot(diskguid=vdisk_3.guid,
+                VDiskController.create_snapshot(diskguid=vdisk_1.guid,
                                                 metadata={'label': 'ss_i_{0}:00'.format(str(h)),
                                                           'is_consistent': False,
                                                           'timestamp': str(timestamp),
                                                           'machineguid': None})
                 if h in [6, 12, 18]:
                     ts = (timestamp + (minute * 30))
-                    VDiskController.create_snapshot(diskguid=vdisk_3.guid,
+                    VDiskController.create_snapshot(diskguid=vdisk_1.guid,
                                                     metadata={'label': 'ss_c_{0}:30'.format(str(h)),
                                                               'is_consistent': True,
                                                               'timestamp': str(ts),

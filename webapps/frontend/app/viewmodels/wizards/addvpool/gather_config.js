@@ -107,15 +107,6 @@ define([
                             self.validationResult.valid = false;
                             self.validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_config.missing_mountpoints'));
                         }
-                        if (self.data.vPool() !== undefined) {
-                            var storageIP = self.data.storageDrivers()[0].storageIP();
-                            if (self.data.ipAddresses().contains(storageIP)) {
-                                self.data.storageIP(storageIP);
-                            } else {
-                                self.validationResult.valid = false;
-                                self.validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_config.missing_storage_ip', {what: storageIP }));
-                            }
-                        }
                         if (self.data.scrubAvailable() === false) {
                             self.validationResult.valid = false;
                             self.validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_config.missing_role', { what: 'SCRUB' }));
