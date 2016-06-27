@@ -184,22 +184,26 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load()
-    def create(self, devicename, size, vpool_guid, storagerouter_guid):
+    def create(self, name, size, vpool_guid, storagerouter_guid):
         """
         Create a new vdisk
-        :param devicename: Name of the new vdisk
-        :param size: size of  virtual disk
+        :param name: Name of the new vdisk
+        :type name: str
+        :param size: Size of  virtual disk
+        :type size: int
         :param vpool_guid: Guid of vPool to create new vdisk on
+        :type vpool_guid: str
         :param storagerouter_guid: Guid of the storagerouter to assign disk to
+        :type storagerouter_guid: str
+        :return: Celery task
         """
         storagerouter = StorageRouter(storagerouter_guid)
         for storagedriver in storagerouter.storagedrivers:
-            if storagedriver.vpool.guid == vpool_guid:
-                return VDiskController.create_new.delay(diskname=devicename,
+            if storagedriver.vpool_guid == vpool_guid:
+                return VDiskController.create_new.delay(name=name,
                                                         size=size,
                                                         storagedriver_guid=storagedriver.guid)
-        raise NotAcceptable('No storagedriver found for vPool: {0} and StorageRouter: {1}'.format(vpool_guid,
-                                                                                                  storagerouter_guid))
+        raise NotAcceptable('No storagedriver found for vPool: {0} and StorageRouter: {1}'.format(vpool_guid, storagerouter_guid))
 
     @action()
     @log()

@@ -1399,4 +1399,3 @@ class Basic(unittest.TestCase):
         PersistentFactory.store.delete('ovs_reverseindex_testemachine_{0}|disks|{1}'.format(machine.guid, disk.guid))
         disk.machine = machine2
         disk.save()
-

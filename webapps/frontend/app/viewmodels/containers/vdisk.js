@@ -61,7 +61,6 @@ define([
         self.name                  = ko.observable();
         self.namespace             = ko.observable();
         self.oldConfiguration      = ko.observable();
-        self.order                 = ko.observable(0);
         self.readCacheLimit        = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});
         self.readSpeed             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.scoSize               = ko.observable(4);
@@ -170,7 +169,6 @@ define([
         // Functions
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');
-            generic.trySet(self.order, data, 'order');
             generic.trySet(self.dtlManual, data, 'has_manual_dtl');
             generic.trySet(self.dtlStatus, data, 'dtl_status');
             if (data.hasOwnProperty('snapshots')) {

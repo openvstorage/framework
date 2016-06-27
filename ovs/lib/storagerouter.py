@@ -521,14 +521,6 @@ class StorageRouterController(object):
         if not ipaddresses:
             error_messages.append('No available IP addresses found suitable for Storage Router storage IP')
 
-        # Check storage IP
-        storage_ip = parameters['storage_ip']
-        if vpool is not None:
-            for existing_storagedriver in vpool.storagedrivers:
-                if existing_storagedriver.storage_ip != storage_ip:
-                    error_messages.append('Storage IP {0} is not identical to previously configured storage IPs'.format(storage_ip))
-                    break
-
         if error_messages:
             raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
 

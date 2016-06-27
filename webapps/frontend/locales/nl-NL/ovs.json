@@ -114,15 +114,15 @@
             "gather": {
                 "complete":"vDisk aangemaakt",
                 "failed":"vDisk aanmaak mislukt",
-                "initial_storagerouter": "Storage Router:",
                 "inprogress":"Bezig met aanmaken vDisk",
                 "invalid_name": "De vDisk name is onjuist. Enkel letters a-z, nummers en - (niet als eerste of laatste karakter). Minimaal 3 en maximaal 50 karakters",
+                "invalid_size": "Maximale grootte van __what__ __unit__ overschreden",
                 "invalid_storagerouter": "Geen geldige storagerouter geselecteerd.",
                 "invalid_vpool": "Geen geldige vPool geselecteerd",
                 "name": "Naam:",
                 "size": "Grootte:",
-                "size_unit": "Eenheid:",
                 "started":"vDisk aanmaak gestart",
+                "storagerouter": "Storage Router:",
                 "success":"vDisk correct aangemaakt",
                 "vpool": "vPool:"
             }

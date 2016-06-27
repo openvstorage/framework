@@ -16,28 +16,19 @@
 /*global define */
 define(['jquery', 'knockout'], function($, ko){
     "use strict";
-    var nameRegex, singleton;
-    nameRegex = /^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$/;
-
-    singleton = function() {
+    var singleton = function() {
         var wizardData = {
-            name:                       ko.observable('').extend({ regex: nameRegex }),
-            size_entry:                 ko.observable(0).extend({ numeric: { min: 1, max: 999 } }),
-            size_unit:                  ko.observable('gib'),
-            size_units:                 ko.observableArray(['gib', 'tib']),
-            storageRouter:              ko.observable(),
-            storageRouters:             ko.observableArray([]),
-            vPool:                      ko.observable(),
-            vPools:                     ko.observableArray([])
+            name:           ko.observable(''),
+            sizeEntry:      ko.observable(0).extend({ numeric: { min: 1, max: 2048 } }),
+            storageRouter:  ko.observable(),
+            storageRouters: ko.observableArray([]),
+            vPool:          ko.observable(),
+            vPools:         ko.observableArray([])
         };
 
         // Computed
         wizardData.size = ko.computed(function () {
-            var size = wizardData.size_entry();
-            if (wizardData.size_unit() === 'tib') {
-                size *= 1024;
-            }
-            return size;
+            return wizardData.sizeEntry() * Math.pow(1024, 3);
         });
 
         wizardData.storageRoutersByVpool = ko.computed(function() {
@@ -54,9 +45,7 @@ define(['jquery', 'knockout'], function($, ko){
             }
             return result;
         });
-
         return wizardData;
     };
-
     return singleton();
 });

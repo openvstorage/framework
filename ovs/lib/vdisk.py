@@ -293,6 +293,7 @@ class VDiskController(object):
                 raise RuntimeError('Could not find a MDS service')
 
             VDiskController._logger.info('Clone snapshot {0} of disk {1} to location {2}'.format(snapshotid, vdisk.name, devicename))
+            # noinspection PyArgumentList
             backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                                                      port=mds_service.service.ports[0])])
             volume_id = vdisk.storagedriver_client.create_clone(target_path=devicename,
@@ -501,7 +502,9 @@ class VDiskController(object):
             raise RuntimeError('A vDisk with this name already exists')
         vpool = storagedriver.vpool
         if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
-            raise RuntimeError('A vDisk with this name already exists')
+            raise RuntimeError('A vDisk with this name already exists on vPool {0}'.format(vpool.name))
+        if size > 2 * 1024 ** 4:
+            raise ValueError('Maximum volume size of 2TiB exceeded')
 
         new_vdisk = VDisk()
         new_vdisk.size = size
@@ -518,11 +521,12 @@ class VDiskController(object):
             mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
             if mds_service is None:
                 raise RuntimeError('Could not find a MDS service')
+            # noinspection PyArgumentList
             backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                                                      port=mds_service.service.ports[0])])
             volume_id = vpool.storagedriver_client.create_volume(target_path=devicename,
                                                                  metadata_backend_config=backend_config,
-                                                                 volume_size=size,
+                                                                 volume_size="{0}B".format(size),
                                                                  node_id=str(storagedriver.storagedriver_id))
         except Exception as ex:
             VDiskController._logger.error('Caught exception during clone, trying to delete the volume. {0}'.format(ex))
@@ -1163,4 +1167,4 @@ class VDiskController(object):
         name = re.compile('[^/\w\-\.]+').sub('', name)
         if re.compile('\w\.[a-zA-Z]{3,4}$').search(name) is None:
             name = '{0}.raw'.format(name)
-        return name
+        return '/{0}'.format(name)
