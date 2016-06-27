@@ -57,6 +57,31 @@ class ScheduledTaskController(object):
     _logger = LogHandler.get('lib', name='scheduled tasks')
 
     @staticmethod
+    @celery.task(name='ovs.scheduled.snapshot_all_vdisks', schedule=crontab(minute='0', hour='2-22'))
+    @ensure_single(task_name='ovs.scheduled.snapshot_all_vdisks', extra_task_names=['ovs.scheduled.delete_snapshots'])
+    def snapshot_all_vdisks():
+        """
+        Snapshots all vDisks
+        """
+        ScheduledTaskController._logger.info('[SSA] started')
+        success = []
+        fail = []
+        for vdisk in VDiskList.get_vdisks():
+            try:
+                metadata = {'label': '',
+                            'is_consistent': False,
+                            'timestamp': str(int(time.time())),
+                            'is_automatic': True,
+                            'is_sticky': False}
+                VDiskController.create_snapshot(diskguid=vdisk.guid,
+                                                metadata=metadata)
+                success.append(vdisk.guid)
+            except Exception:
+                ScheduledTaskController._logger.exception('Error snapshotting vDisk {0}'.format(vdisk.guid))
+                fail.append(vdisk.guid)
+        ScheduledTaskController._logger.info('[SSA] Snapshot has been taken for {0} vDisks, {1} failed.'.format(len(success), len(fail)))
+
+    @staticmethod
     @celery.task(name='ovs.scheduled.delete_snapshots', schedule=crontab(minute='1', hour='2'))
     @ensure_single(task_name='ovs.scheduled.delete_snapshots')
     def delete_snapshots(timestamp=None):
