@@ -26,8 +26,7 @@ class Mapping(object):
     Mapping container
     """
     mapping = {FileSystemEvents.volume_delete: [{'task': VDiskController.delete_from_voldrv,
-                                                 'arguments': {'name': 'volumename',
-                                                               '[NODE_ID]': 'storagedriver_id'}}],
+                                                 'arguments': {'name': 'volumename'}}],
                FileSystemEvents.volume_resize: [{'task': VDiskController.resize_from_voldrv,
                                                  'arguments': {'name': 'volumename',
                                                                'size': 'volumesize',

@@ -66,7 +66,6 @@ class VDiskController(object):
         List all known volumes on a specific vpool or on all
         :param vpool_guid: Guid of the vPool to list the volumes for
         :type vpool_guid: str
-
         :return: Volumes known by the vPool
         :rtype: list
         """
@@ -84,43 +83,17 @@ class VDiskController(object):
     @staticmethod
     @celery.task(name='ovs.vdisk.delete_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
-    def delete_from_voldrv(volumename, storagedriver_id):
+    def delete_from_voldrv(volumename):
         """
         Delete a disk
         Triggered by volumedriver messages on the queue
         :param volumename: volume ID of the disk
         :type volumename: str
-
-        :param storagedriver_id: ID of the storagedriver serving the volume to delete
-        :type storagedriver_id: str
-
         :return: None
         """
-        disk = VDiskList.get_vdisk_by_volume_id(volumename)
-        if disk is not None:
-            mutex = volatile_mutex('{0}_{1}'.format(volumename, disk.devicename))
-            try:
-                mutex.acquire(wait=20)
-                limit = 5
-                storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-                # @TODO: Hypervisor removal story
-                hypervisor = None
-                exists = hypervisor.file_exists(storagedriver, disk.devicename)
-                while limit > 0 and exists is True:
-                    time.sleep(1)
-                    exists = hypervisor.file_exists(storagedriver, disk.devicename)
-                    limit -= 1
-                if exists is True:
-                    VDiskController._logger.info('Disk {0} still exists, ignoring delete'.format(disk.devicename))
-                    return
-                VDiskController._logger.info('Delete disk {0}'.format(disk.name))
-                for mds_service in disk.mds_services:
-                    mds_service.delete()
-                for domain_junction in disk.domains_dtl:
-                    domain_junction.delete()
-                disk.delete()
-            finally:
-                mutex.release()
+        vdisk = VDiskList.get_vdisk_by_volume_id(volumename)
+        if vdisk is not None:
+            VDiskController._cleanup_vdisk(vdisk)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete')
@@ -129,16 +102,20 @@ class VDiskController(object):
         Delete a vdisk through API
         :param diskguid: Guid of the vdisk to delete
         :type diskguid: str
-
-        :return: None
         """
         vdisk = VDisk(diskguid)
-        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-        # @TODO: Hypervisor removal story
-        hypervisor = None
-        VDiskController._logger.info('Deleting disk {0}'.format(vdisk.name))
-        hypervisor.delete_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.devicename)
-        VDiskController._logger.info('Deleted disk {0}'.format(vdisk.name))
+        vdisk.storagedriver_client.unlink(str(vdisk.volume_id))
+        VDiskController._cleanup_vdisk(vdisk)
+
+    @staticmethod
+    def _cleanup_vdisk(vdisk):
+        with volatile_mutex('voldrv_event_disk_{0}'.format(vdisk.volume_id), wait=20):
+            VDiskController._logger.info('Delete disk {0}'.format(vdisk.name))
+            for mds_service in vdisk.mds_services:
+                mds_service.delete()
+            for domain_junction in vdisk.domains_dtl:
+                domain_junction.delete()
+            vdisk.delete()
 
     @staticmethod
     @celery.task(name='ovs.vdisk.extend')
@@ -147,10 +124,8 @@ class VDiskController(object):
         Extend a vdisk through API
         :param diskguid: Guid of the vdisk to extend
         :type diskguid: str
-
         :param size: New size (GB)
         :type size: int
-
         :return: None
         """
         vdisk = VDisk(diskguid)
@@ -168,46 +143,33 @@ class VDiskController(object):
         """
         Resize a disk
         Triggered by volumedriver messages on the queue
-
         :param volumename: volume ID of the disk
         :type volumename: str
-
         :param volumesize: size of the volume
         :type volumesize: int
-
         :param volumepath: path on hypervisor to the volume
         :type volumepath: str
-
         :param storagedriver_id: ID of the storagedriver serving the volume to resize
         :type storagedriver_id: str
-
         :return: None
         """
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-        # @TODO: Hypervisor removal story
-        hypervisor = None
-        volumepath = hypervisor.clean_backing_disk_filename(volumepath)
-        mutex = volatile_mutex('{0}_{1}'.format(volumename, volumepath))
-        try:
-            mutex.acquire(wait=30)
-            disk = VDiskList.get_vdisk_by_volume_id(volumename)
-            if disk is None:
-                disk = VDiskList.get_by_devicename_and_vpool(volumepath, storagedriver.vpool)
-                if disk is None:
-                    disk = VDisk()
-            disk.devicename = volumepath
-            disk.volume_id = volumename
-            disk.size = volumesize
-            disk.vpool = storagedriver.vpool
-            disk.metadata = {'lba_size': disk.info['lba_size'],
-                             'cluster_multiplier': disk.info['cluster_multiplier']}
-            disk.save()
-            VDiskController._set_vdisk_metadata_pagecache_size(disk)
-        finally:
-            mutex.release()
-
-        MDSServiceController.ensure_safety(disk)
-        VDiskController.dtl_checkup.delay(vdisk_guid=disk.guid)
+        with volatile_mutex('voldrv_event_disk_{0}'.format(volumename), wait=30):
+            vdisk = VDiskList.get_vdisk_by_volume_id(volumename)
+            if vdisk is None:
+                vdisk = VDiskList.get_by_devicename_and_vpool(volumepath, storagedriver.vpool)
+                if vdisk is None:
+                    vdisk = VDisk()
+            vdisk.devicename = volumepath
+            vdisk.volume_id = volumename
+            vdisk.size = volumesize
+            vdisk.vpool = storagedriver.vpool
+            vdisk.metadata = {'lba_size': vdisk.info['lba_size'],
+                              'cluster_multiplier': vdisk.info['cluster_multiplier']}
+            vdisk.save()
+            VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
+            MDSServiceController.ensure_safety(vdisk)
+            VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.rename_from_voldrv')
@@ -216,29 +178,21 @@ class VDiskController(object):
         """
         Rename a disk
         Triggered by volumedriver messages
-
         :param volumename: volume ID of the disk
         :type volumename: str
-
         :param volume_old_path: old path on hypervisor to the volume
         :type volume_old_path: str
-
         :param volume_new_path: new path on hypervisor to the volume
         :type volume_new_path: str
-
         :return: None
         """
-        # @TODO: Hypervisor removal story
-        hypervisor = None
-        volume_old_path = hypervisor.clean_backing_disk_filename(volume_old_path)
-        volume_new_path = hypervisor.clean_backing_disk_filename(volume_new_path)
-        disk = VDiskList.get_vdisk_by_volume_id(volumename)
-        if disk:
-            VDiskController._logger.info('Move disk {0} from {1} to {2}'.format(disk.name,
-                                                                                volume_old_path,
-                                                                                volume_new_path))
-            disk.devicename = volume_new_path
-            disk.save()
+        vdisk = VDiskList.get_vdisk_by_volume_id(volumename)
+        if vdisk is not None:
+            VDiskController._logger.info('Move vDisk {0} from {1} to {2}'.format(vdisk.name,
+                                                                                 volume_old_path,
+                                                                                 volume_new_path))
+            vdisk.devicename = volume_new_path
+            vdisk.save()
 
     @staticmethod
     @celery.task(name='ovs.vdisk.migrate_from_voldrv')
@@ -247,13 +201,10 @@ class VDiskController(object):
         """
         Triggered when volume has changed owner (Clean migration or stolen due to other reason)
         Triggered by volumedriver messages
-
         :param volume_id: Volume ID of the disk
         :type volume_id: unicode
-
         :param new_owner_id: ID of the storage driver the volume migrated to
         :type new_owner_id: unicode
-
         :return: None
         """
         sd = StorageDriverList.get_by_storagedriver_id(storagedriver_id=new_owner_id)
@@ -267,32 +218,36 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.clone')
-    def clone(diskguid, snapshotid, devicename, storagerouter_guid=None):
+    def clone(diskguid, snapshotid, name, storagerouter_guid=None):
         """
         Clone a disk
         :param diskguid: Guid of the disk to clone
         :type diskguid: str
         :param snapshotid: ID of the snapshot to clone from
         :type snapshotid: str
-        :param devicename: Name of the device to use in clone's description
-        :type devicename: str
+        :param name: Name of the new clone (can be a path or a user friendly name)
+        :type name: str
         :param storagerouter_guid: Guid of the StorageRouter
         :type storagerouter_guid: str
         :return: Information about the cloned volume
         :rtype: dict
         """
-        # Validations
-        name_regex = "^[0-9a-zA-Z][-_a-zA-Z0-9]{1,48}[a-zA-Z0-9]$"
-        if not re.match(name_regex, devicename):
-            raise RuntimeError("Invalid name for virtual disk clone")
-
-        if VDiskList.get_vdisk_by_name(vdiskname=devicename) is not None:
-            raise RuntimeError("A virtual disk with this name already exists")
-
         vdisk = VDisk(diskguid)
-        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-        if storagedriver is None:
-            raise RuntimeError('Could not find StorageDriver with ID {0}'.format(vdisk.storagedriver_id))
+        # Validations
+        devicename = VDiskController._clean_devicename(name)
+        if VDiskList.get_vdisk_by_name(vdiskname=name) is not None:
+            raise RuntimeError('A vDisk with this name already exists')
+        if VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool) is not None:
+            raise RuntimeError('A vDisk with this name already exists')
+        if storagerouter_guid is not None:
+            storagedrivers = [sd for sd in vdisk.vpool.storagedrivers if sd.storagerouter_guid == storagerouter_guid]
+            if len(storagedrivers) == 0:
+                raise RuntimeError('Could not use the given StorageRouter: {0}'.format(storagerouter_guid))
+            storagedriver = storagedrivers[0]
+        else:
+            storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+            if storagedriver is None:
+                raise RuntimeError('Could not find StorageDriver with ID {0}'.format(vdisk.storagedriver_id))
 
         # Create new snapshot if required
         if snapshotid is None:
@@ -320,40 +275,35 @@ class VDiskController(object):
                     pass
                 raise RuntimeError('Could not find created snapshot in time')
 
-        # 3. Model new cloned virtual disk
-        # @TODO: Hypervisor removal story
-        hypervisor = None
-        location = hypervisor.get_disk_path(devicename)
-
+        # Model new cloned virtual disk
         new_vdisk = VDisk()
-        new_vdisk.copy(vdisk, include=['description', 'size', 'type', 'retentionpolicyguid', 'snapshotpolicyguid', 'autobackup'])
+        new_vdisk.size = vdisk.size
         new_vdisk.parent_vdisk = vdisk
-        new_vdisk.name = devicename
-        new_vdisk.description = devicename
-        new_vdisk.devicename = hypervisor.clean_backing_disk_filename(location)
+        new_vdisk.name = name
+        new_vdisk.description = name
+        new_vdisk.devicename = devicename
         new_vdisk.parentsnapshot = snapshotid
         new_vdisk.vpool = vdisk.vpool
         new_vdisk.save()
 
-        # 4. Configure Storage Driver
+        # Configure StorageDriver
         try:
             mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)[0]
             if mds_service is None:
                 raise RuntimeError('Could not find a MDS service')
 
-            VDiskController._logger.info('Clone snapshot {0} of disk {1} to location {2}'.format(snapshotid, vdisk.name, location))
-            # noinspection PyArgumentList
+            VDiskController._logger.info('Clone snapshot {0} of disk {1} to location {2}'.format(snapshotid, vdisk.name, devicename))
             backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                                                      port=mds_service.service.ports[0])])
-            volume_id = vdisk.storagedriver_client.create_clone(target_path=location,
+            volume_id = vdisk.storagedriver_client.create_clone(target_path=devicename,
                                                                 metadata_backend_config=backend_config,
                                                                 parent_volume_id=str(vdisk.volume_id),
                                                                 parent_snapshot_id=str(snapshotid),
-                                                                node_id=str(vdisk.storagedriver_id))
+                                                                node_id=str(storagedriver.storagedriver_id))
         except Exception as ex:
             VDiskController._logger.error('Caught exception during clone, trying to delete the volume. {0}'.format(ex))
             try:
-                VDiskController.clean_bad_disk(new_vdisk.guid)
+                VDiskController.delete(new_vdisk.guid)
             except Exception as ex2:
                 VDiskController._logger.exception('Exception during exception handling of "create_clone_from_template" : {0}'.format(str(ex2)))
             raise
@@ -362,7 +312,7 @@ class VDiskController(object):
         new_vdisk.save()
         VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
 
-        # 5. Check MDS & DTL for new clone
+        # Check MDS & DTL for new clone
         try:
             MDSServiceController.ensure_safety(new_vdisk)
         except Exception as ex:
@@ -371,23 +321,19 @@ class VDiskController(object):
 
         return {'diskguid': new_vdisk.guid,
                 'name': new_vdisk.name,
-                'backingdevice': location}
+                'backingdevice': devicename}
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_snapshot')
     def create_snapshot(diskguid, metadata, snapshotid=None):
         """
         Create a disk snapshot
-
         :param diskguid: Guid of the disk
         :type diskguid: str
-
         :param metadata: Dictionary of metadata
         :type metadata: dict
-
         :param snapshotid: ID of the snapshot
         :type snapshotid: str
-
         :return: ID of the newly created snapshot
         :rtype: str
         """
@@ -409,39 +355,28 @@ class VDiskController(object):
     def delete_snapshot(diskguid, snapshotid):
         """
         Delete a disk snapshot
-
         :param diskguid: Guid of the disk
         :type diskguid: str
-
         :param snapshotid: ID of the snapshot
         :type snapshotid: str
-
-        :return: None
-
-        @todo: Check if new volumedriver storagedriver upon deletion
-        of a snapshot has built-in protection to block it from being deleted
-        if a clone was created from it.
         """
-        disk = VDisk(diskguid)
-        if snapshotid not in [snap['guid'] for snap in disk.snapshots]:
-            raise RuntimeError('Snapshot {0} does not belong to disk {1}'.format(snapshotid, disk.name))
+        vdisk = VDisk(diskguid)
+        if snapshotid not in [snap['guid'] for snap in vdisk.snapshots]:
+            raise RuntimeError('Snapshot {0} does not belong to vDisk {1}'.format(snapshotid, vdisk.name))
         clones_of_snapshot = VDiskList.get_by_parentsnapshot(snapshotid)
         if len(clones_of_snapshot) > 0:
             raise RuntimeError('Snapshot {0} has {1} volumes cloned from it, cannot remove'.format(snapshotid, len(clones_of_snapshot)))
-        VDiskController._logger.info('Deleting snapshot {0} from disk {1}'.format(snapshotid, disk.name))
-        disk.storagedriver_client.delete_snapshot(str(disk.volume_id), str(snapshotid))
-        disk.invalidate_dynamics(['snapshots'])
+        VDiskController._logger.info('Deleting snapshot {0} from vDisk {1}'.format(snapshotid, vdisk.name))
+        vdisk.storagedriver_client.delete_snapshot(str(vdisk.volume_id), str(snapshotid))
+        vdisk.invalidate_dynamics(['snapshots'])
 
     @staticmethod
     @celery.task(name='ovs.vdisk.set_as_template')
     def set_as_template(diskguid):
         """
         Set a vDisk as template
-
         :param diskguid: Guid of the vDisk
         :type diskguid: str
-
-        :return: None
         """
         vdisk = VDisk(diskguid)
         if vdisk.is_vtemplate is True:
@@ -458,10 +393,8 @@ class VDiskController(object):
         Rolls back a disk based on a given disk snapshot timestamp
         :param diskguid: Guid of the disk to rollback
         :type diskguid: str
-
         :param timestamp: Timestamp of the snapshot to rollback from
         :type timestamp: str
-
         :return: True
         :rtype: bool
         """
@@ -476,56 +409,57 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_from_template')
-    def create_from_template(diskguid, devicename, storagerouter_guid):
+    def create_from_template(diskguid, name, storagerouter_guid):
         """
         Create a disk from a template
-
         :param diskguid: Guid of the disk
         :type diskguid: str
-        :param devicename: Device file name for the disk (eg: my_disk-flat.vmdk)
-        :type devicename: str
+        :param name: Name of the newly created vDisk (can be a filename or a user friendly name)
+        :type name: str
         :param storagerouter_guid: Guid of the Storage Router on which the vDisk should be started
         :type storagerouter_guid: str
-
         :return: Information about the new volume (diskguid, name, backingdevice)
         :rtype: dict
         """
-        # @TODO: Hypervisor removal story: Clean device name and put in disk_path
-        disk_path = None
         vdisk = VDisk(diskguid)
+        # Validations
         if not vdisk.is_vtemplate:
             raise RuntimeError('The given vDisk is not a vTemplate')
-
-        storagedriver = None
-        for sd in vdisk.vpool.storagedrivers:
-            if sd.storagerouter_guid == storagerouter_guid:
-                storagedriver = sd
-                break
-
-        if storagedriver is None:
-            raise RuntimeError('Could not find Storage Driver')
+        devicename = VDiskController._clean_devicename(name)
+        if VDiskList.get_vdisk_by_name(vdiskname=name) is not None:
+            raise RuntimeError('A vDisk with this name already exists')
+        if VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool) is not None:
+            raise RuntimeError('A vDisk with this name already exists')
+        if storagerouter_guid is not None:
+            storagedrivers = [sd for sd in vdisk.vpool.storagedrivers if sd.storagerouter_guid == storagerouter_guid]
+            if len(storagedrivers) == 0:
+                raise RuntimeError('Could not use the given StorageRouter: {0}'.format(storagerouter_guid))
+            storagedriver = storagedrivers[0]
+        else:
+            storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+            if storagedriver is None:
+                raise RuntimeError('Could not find StorageDriver with ID {0}'.format(vdisk.storagedriver_id))
 
         new_vdisk = VDisk()
-        new_vdisk.copy(vdisk, include=['description', 'size', 'type', 'retentionpolicyid', 'snapshotpolicyid', 'vpool'])
+        new_vdisk.size = vdisk.size
         new_vdisk.vpool = vdisk.vpool
-        # @TODO: Hypervisor removal story: clean_backing_disk_filename
         new_vdisk.devicename = devicename
         new_vdisk.parent_vdisk = vdisk
-        new_vdisk.name = '{0}-clone'.format(vdisk.name)
-        new_vdisk.description = devicename
+        new_vdisk.name = name
+        new_vdisk.description = name
         new_vdisk.save()
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, new_vdisk.vpool)[0]
         if mds_service is None:
             raise RuntimeError('Could not find a MDS service')
 
-        VDiskController._logger.info('Create vDisk from vTemplate {0} to new vDisk {1} to location {2}'.format(vdisk.name, new_vdisk.name, disk_path))
+        VDiskController._logger.info('Create vDisk from vTemplate {0} to new vDisk {1} to location {2}'.format(vdisk.name, new_vdisk.name, devicename))
 
         try:
             # noinspection PyArgumentList
             backend_config = MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                            port=mds_service.service.ports[0])
-            volume_id = vdisk.storagedriver_client.create_clone_from_template(target_path=disk_path,
+            volume_id = vdisk.storagedriver_client.create_clone_from_template(target_path=devicename,
                                                                               metadata_backend_config=MDSMetaDataBackendConfig([backend_config]),
                                                                               parent_volume_id=str(vdisk.volume_id),
                                                                               node_id=str(storagedriver.storagedriver_id))
@@ -537,97 +471,78 @@ class VDiskController(object):
         except Exception as ex:
             VDiskController._logger.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
             try:
-                VDiskController.clean_bad_disk(new_vdisk.guid)
+                VDiskController.delete(new_vdisk.guid)
             except Exception as ex2:
                 VDiskController._logger.exception('Exception during exception handling of "create_clone_from_template" : {0}'.format(str(ex2)))
             raise
 
         return {'diskguid': new_vdisk.guid,
                 'name': new_vdisk.name,
-                'backingdevice': disk_path}
+                'backingdevice': devicename}
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_new')
-    def create_new(diskname, size, storagedriver_guid):
+    def create_new(name, size, storagedriver_guid):
         """
         Create a new vdisk/volume using hypervisor calls
-        :param diskname: Name of the disk
-        :type diskname: str
-
-        :param size: Size of the disk (GB)
+        :param name: Name of the disk (can be a filename or a user friendly name)
+        :type name: str
+        :param size: Size of the disk
         :type size: int
-
         :param storagedriver_guid: Guid of the Storagedriver
         :type storagedriver_guid: str
-
         :return: Guid of the new disk
         :rtype: str
         """
-        VDiskController._logger.info('Creating new empty disk {0} of {1} GB'.format(diskname, size))
+        # Validations
         storagedriver = StorageDriver(storagedriver_guid)
-        # @TODO: Hypervisor removal story
-        hypervisor = None
-        disk_path = hypervisor.create_volume(storagedriver.mountpoint, storagedriver.storage_ip, diskname, size)
-        VDiskController._logger.info('Created volume. Location {0}'.format(disk_path))
+        devicename = VDiskController._clean_devicename(name)
+        if VDiskList.get_vdisk_by_name(vdiskname=name) is not None:
+            raise RuntimeError('A vDisk with this name already exists')
+        vpool = storagedriver.vpool
+        if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
+            raise RuntimeError('A vDisk with this name already exists')
 
-        backoff = 1
-        timeout = 30  # seconds
-        start = time.time()
-        while time.time() < start + timeout:
-            vdisk = VDiskList.get_by_devicename_and_vpool(disk_path, storagedriver.vpool)
-            if vdisk is None:
-                VDiskController._logger.debug('Waiting for disk to be picked up by voldrv')
-                time.sleep(backoff)
-                backoff += 1
-            else:
-                return vdisk.guid
-        raise RuntimeError('Disk {0} was not created in {1} seconds.'.format(diskname, timeout))
+        new_vdisk = VDisk()
+        new_vdisk.size = size
+        new_vdisk.vpool = vpool
+        new_vdisk.devicename = devicename
+        new_vdisk.name = name
+        new_vdisk.description = name
+        new_vdisk.save()
 
-    @staticmethod
-    @celery.task(name='ovs.vdisk.create_volume')
-    def create_volume(location, size, storagerouter_guid=None):
-        """
-        Create a volume
-        !! This method is for compatibility with the cinder driver
-        !! Other callers should use VDiskController.create_new
-
-        :param location: Location, filename
-        :type location: str
-
-        :param size: Size of volume (GB)
-        :type size: int
-
-        :param storagerouter_guid: Use SSH client to create file on remote storagerouter
-        :type storagerouter_guid: str
-
-        :return: None
-        """
-        VDiskController._logger.info('Creating volume {0} of {1} GB'.format(location, size))
-
-        if storagerouter_guid is not None:
-            storagerouter = StorageRouter(storagerouter_guid)
-        else:
-            storagerouter = System.get_my_storagerouter()
-        for storagedriver in storagerouter.storagedrivers:
-            if location.startswith('{0}/'.format(storagedriver.mountpoint)):
-                diskname = location.split('/')[-1].split('.')[0]
-                return VDiskController.create_new(diskname, size, storagedriver.guid)
-
-        raise RuntimeError('Cannot create volume {0}. No storagedriver found for this location.'.format(location))
+        VDiskController._logger.info('Creating new empty disk {0} of {1} bytes'.format(name, size))
+        # Configure StorageDriver
+        volume_id = None
+        try:
+            mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
+            if mds_service is None:
+                raise RuntimeError('Could not find a MDS service')
+            backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
+                                                                     port=mds_service.service.ports[0])])
+            volume_id = vpool.storagedriver_client.create_volume(target_path=devicename,
+                                                                 metadata_backend_config=backend_config,
+                                                                 volume_size=size,
+                                                                 node_id=str(storagedriver.storagedriver_id))
+        except Exception as ex:
+            VDiskController._logger.error('Caught exception during clone, trying to delete the volume. {0}'.format(ex))
+            try:
+                if volume_id is not None:
+                    VDiskController.delete_from_voldrv(volume_id)
+            except Exception as ex2:
+                VDiskController._logger.exception('Exception during exception handling of "create_volume" : {0}'.format(str(ex2)))
+            raise
+        VDiskController._logger.info('Created volume. Location {0}'.format(devicename))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete_volume')
     def delete_volume(location):
         """
         Delete a volume
-
         !! This method is for compatibility with the cinder driver
         !! Other callers should use VDiskController.delete
-
         :param location: Location, filename
         :type location: str
-
-        :return: None
         """
         storagerouter = System.get_my_storagerouter()
         for storagedriver in storagerouter.storagedrivers:
@@ -646,16 +561,12 @@ class VDiskController(object):
     def extend_volume(location, size):
         """
         Extend a volume
-
         !! This method is for compatibility with the cinder driver
         !! Other callers should use VDiskController.extend
-
         :param location: Location, filename
         :type location: str
-
         :param size: Size of volume (GB)
         :type size: int
-
         :return: None
         """
         storagerouter = System.get_my_storagerouter()
@@ -676,7 +587,6 @@ class VDiskController(object):
         Retrieve the configuration parameters for the given disk from the storagedriver.
         :param vdisk_guid: Guid of the virtual disk to retrieve the configuration for
         :type vdisk_guid: str
-
         :return: Storage driver configuration information for the vDisk
         :rtype: dict
         """
@@ -740,10 +650,8 @@ class VDiskController(object):
         Sets configuration parameters for a given vdisk.
         :param vdisk_guid: Guid of the virtual disk to set the configuration parameters for
         :type vdisk_guid: str
-
         :param new_config_params: New configuration parameters
         :type new_config_params: dict
-
         :return: None
         """
         required_params = {'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
@@ -906,13 +814,10 @@ class VDiskController(object):
         Check DTL for all volumes, for all volumes of a vPool or for 1 specific volume
         :param vpool_guid: vPool to check the DTL configuration of all its vDisks
         :type vpool_guid: str
-
         :param vdisk_guid: Virtual Disk to check its DTL configuration
         :type vdisk_guid: str
-
         :param storagerouters_to_exclude: Storage Router Guids to exclude from possible targets
         :type storagerouters_to_exclude: list
-
         :return: None
         """
         if vpool_guid is not None and vdisk_guid is not None:
@@ -1172,16 +1077,12 @@ class VDiskController(object):
         Triggered by volumedriver when DTL state changes
         :param volume_name: ID of the volume
         :type volume_name: str
-
         :param old_state: Previous DTL status
         :type old_state: int
-
         :param new_state: New DTL status
         :type new_state: int
-
         :param storagedriver_id: ID of the storagedriver hosting the volume
         :type storagedriver_id: str
-
         :return: None
         """
         if new_state == VolumeDriverEvents_pb2.Degraded and old_state != VolumeDriverEvents_pb2.Standalone:
@@ -1194,47 +1095,18 @@ class VDiskController(object):
                                             ensure_single_timeout=600)
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.clean_bad_disk')
-    def clean_bad_disk(vdiskguid):
-        """
-        Cleanup bad vdisk:
-        - in case create_from_template failed
-        - remove mds_services so the vdisk can be properly cleaned up
-        :param vdiskguid: Guid of vdisk
-        :type vdiskguid: str
-
-        :return: None
-        """
-        vdisk = VDisk(vdiskguid)
-        VDiskController._logger.info('Cleanup vdisk {0}'.format(vdisk.name))
-        for mdss in vdisk.mds_services:
-            mdss.delete()
-        for domain_junction in vdisk.domains_dtl:
-            domain_junction.delete()
-        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-        if storagedriver is not None and vdisk.devicename is not None:
-            VDiskController._logger.debug('Removing volume from filesystem')
-            VDiskController.delete(vdisk.guid)
-
-        VDiskController._logger.debug('Deleting vdisk {0} from model'.format(vdisk.name))
-        vdisk.delete()
-
-    @staticmethod
     @celery.task(name='ovs.vdisk.schedule_backend_sync')
     def schedule_backend_sync(vdisk_guid):
         """
         Schedule a backend sync on a vdisk
         :param vdisk_guid: Guid of vdisk to schedule a backend sync to
         :type vdisk_guid: str
-
         :return: TLogName associated with the data sent off to the backend
         :rtype: str
         """
         vdisk = VDisk(vdisk_guid)
         VDiskController._logger.info('Schedule backend sync for vdisk {0}'.format(vdisk.name))
-        storagedriver_client = StorageDriverClient.load(vdisk.vpool)
-
-        return storagedriver_client.schedule_backend_sync(str(vdisk.volume_id))
+        return vdisk.storagedriver_client.schedule_backend_sync(str(vdisk.volume_id))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.is_volume_synced_up_to_tlog')
@@ -1243,17 +1115,13 @@ class VDiskController(object):
         Verify if a volume is synced up to a specific tlog
         :param vdisk_guid: Guid of vdisk to verify
         :type vdisk_guid: str
-
         :param tlog_name: Tlog_name to verify
         :type tlog_name: str
-
         :return: True or False
         :rtype: bool
         """
         vdisk = VDisk(vdisk_guid)
-        storagedriver_client = StorageDriverClient.load(vdisk.vpool)
-
-        return storagedriver_client.is_volume_synced_up_to_tlog(str(vdisk.volume_id), str(tlog_name))
+        return vdisk.storagedriver_client.is_volume_synced_up_to_tlog(str(vdisk.volume_id), str(tlog_name))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.is_volume_synced_up_to_snapshot')
@@ -1262,17 +1130,13 @@ class VDiskController(object):
         Verify if a volume is synced up to a specific snapshot
         :param vdisk_guid: Guid of vdisk to verify
         :type vdisk_guid: str
-
         :param snapshot_id: Snapshot_id to verify
         :type snapshot_id: str
-
         :return: True or False
         :rtype: bool
         """
         vdisk = VDisk(vdisk_guid)
-        storagedriver_client = StorageDriverClient.load(vdisk.vpool)
-
-        return storagedriver_client.is_volume_synced_up_to_snapshot(str(vdisk.volume_id), str(snapshot_id))
+        return vdisk.storagedriver_client.is_volume_synced_up_to_snapshot(str(vdisk.volume_id), str(snapshot_id))
 
     @staticmethod
     def _set_vdisk_metadata_pagecache_size(vdisk):
@@ -1287,3 +1151,16 @@ class VDiskController(object):
         num_pages = int(vdisk.size / (metadata_page_capacity * cluster_size))
         VDiskController._logger.info('Setting metadata pagecache size for vdisk {0} to {1}'.format(vdisk.name, num_pages))
         vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), num_pages)
+
+    @staticmethod
+    def _clean_devicename(name):
+        """
+        Cleand a name into a usable filename
+        :param name: Name of the device
+        :return: A cleaned devicename
+        """
+        name = name.strip('/').replace(' ', '_').lower()
+        name = re.compile('[^/\w\-\.]+').sub('', name)
+        if re.compile('\w\.[a-zA-Z]{3,4}$').search(name) is None:
+            name = '{0}.raw'.format(name)
+        return name

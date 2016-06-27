@@ -143,14 +143,15 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Clones a vDisk
         :param vdisk: Guid of the virtual disk to clone
-        :param name: Name for the clone
+        :param name: Name for the clone (filename or user friendly name)
         :param storagerouter_guid: Guid of the storagerouter hosting the virtual disk
         :param snapshot_id: ID of the snapshot to clone from
         """
         storagerouter = StorageRouter(storagerouter_guid)
         return VDiskController.clone.delay(diskguid=vdisk.guid,
                                            snapshotid=snapshot_id,
-                                           devicename=name)
+                                           name=name,
+                                           storagerouter_guid=storagerouter.guid)
 
     @action()
     @log()
@@ -197,7 +198,7 @@ class VDiskViewSet(viewsets.ViewSet):
                 return VDiskController.create_new.delay(diskname=devicename,
                                                         size=size,
                                                         storagedriver_guid=storagedriver.guid)
-        raise NotAcceptable('No storagedriver found for vPool: {0} and storageRouter: {1}'.format(vpool_guid,
+        raise NotAcceptable('No storagedriver found for vPool: {0} and StorageRouter: {1}'.format(vpool_guid,
                                                                                                   storagerouter_guid))
 
     @action()
@@ -282,8 +283,7 @@ class VDiskViewSet(viewsets.ViewSet):
         Delete vdisk
         :param vdisk: Guid of the vdisk to delete
         """
-        storagerouter = StorageRouter(vdisk.storagerouter_guid)
-        return VDiskController.delete.s(diskguid=vdisk.guid).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
+        return VDiskController.delete.delay(diskguid=vdisk.guid)
 
     @action()
     @log()
@@ -309,8 +309,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :param vdisk: vdisk to schedule a backend sync to
         :return: TLogName associated with the data sent off to the backend
         """
-        storagerouter = StorageRouter(vdisk.storagerouter_guid)
-        return VDiskController.schedule_backend_sync.s(vdisk_guid=vdisk.guid).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
+        return VDiskController.schedule_backend_sync.delay(vdisk_guid=vdisk.guid)
 
     @action()
     @log()
@@ -323,8 +322,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :param vdisk: vdisk to verify
         :param tlog_name: TLogName to verify
         """
-        storagerouter = StorageRouter(vdisk.storagerouter_guid)
-        return VDiskController.is_volume_synced_up_to_tlog.s(vdisk_guid=vdisk.guid, tlog_name=tlog_name).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
+        return VDiskController.is_volume_synced_up_to_tlog.delay(vdisk_guid=vdisk.guid, tlog_name=tlog_name)
 
     @action()
     @log()
@@ -337,5 +335,4 @@ class VDiskViewSet(viewsets.ViewSet):
         :param vdisk: vdisk to verify
         :param snapshot_id: Snapshot to verify
         """
-        storagerouter = StorageRouter(vdisk.storagerouter_guid)
-        return VDiskController.is_volume_synced_up_to_snapshot.s(vdisk_guid=vdisk.guid, snapshot_id=snapshot_id).apply_async(routing_key="sr.{0}".format(storagerouter.machine_id))
+        return VDiskController.is_volume_synced_up_to_snapshot.delay(vdisk_guid=vdisk.guid, snapshot_id=snapshot_id)
