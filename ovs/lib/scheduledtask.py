@@ -134,6 +134,9 @@ class ScheduledTaskController(object):
                         'type': 'rest',
                         'snapshots': []})
 
+        # Get a list of all snapshots that are used as parents for clones
+        parent_snapshots = set([vd.parentsnapshot for vd in VDiskList.get_with_parent_snaphots()])
+
         # Place all snapshots in bucket_chains
         bucket_chains = []
         for vmachine in VMachineList.get_customer_vmachines():
@@ -143,9 +146,12 @@ class ScheduledTaskController(object):
                     if snapshot.get('is_sticky') is True:
                         continue
                     timestamp = int(snapshot['timestamp'])
-                    for bucket in bucket_chain:
-                        if bucket['start'] >= timestamp > bucket['end']:
-                            for diskguid, snapshotguid in snapshot['snapshots'].iteritems():
+                    for diskguid, snapshotguid in snapshot['snapshots'].iteritems():
+                        if snapshotguid in parent_snapshots:
+                            ScheduledTaskController._logger.info('Not deleting snapshot {0} because it has clones'.format(snapshotguid))
+                            continue
+                        for bucket in bucket_chain:
+                            if bucket['start'] >= timestamp > bucket['end']:
                                 bucket['snapshots'].append({'timestamp': timestamp,
                                                             'snapshotid': snapshotguid,
                                                             'diskguid': diskguid,
@@ -157,6 +163,9 @@ class ScheduledTaskController(object):
                 bucket_chain = copy.deepcopy(buckets)
                 for snapshot in vdisk.snapshots:
                     if snapshot.get('is_sticky') is True:
+                        continue
+                    if snapshot['guid'] in parent_snapshots:
+                        ScheduledTaskController._logger.info('Not deleting snapshot {0} because it has clones'.format(snapshot['guid']))
                         continue
                     timestamp = int(snapshot['timestamp'])
                     for bucket in bucket_chain:
