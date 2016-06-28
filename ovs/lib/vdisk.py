@@ -1168,7 +1168,9 @@ class VDiskController(object):
         :return: A cleaned devicename
         """
         name = name.strip('/').replace(' ', '_').lower()
+        while '//' in name:
+            name = name.replace('//', '/')
         name = re.compile('[^/\w\-\.]+').sub('', name)
         if re.compile('\w\.[a-zA-Z]{3,4}$').search(name) is None:
-            name = '{0}.raw'.format(name)
+            name = '{0}.raw'.format(name.rstrip('.'))
         return '/{0}'.format(name)
