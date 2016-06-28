@@ -23,6 +23,15 @@ but WITHOUT ANY WARRANTY of any kind.
                 <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
             </div>
         </div>
+        <div class="form-group" data-bind="visible: data.name() !== ''">
+            <label class="col-lg-3 control-label"></label>
+            <div class="col-lg-9" style="font-size: smaller; margin-top: -12px;">
+                <p class="help-block">
+                    <span data-i18n="ovs:wizards.add_vdisk.gather.cleaned_name"></span>
+                    <span data-bind="text: cleanedName()"></span>
+                </p>
+            </div>
+        </div>
         <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('size') }">
             <label class="col-lg-3 control-label" for="size-entry" data-i18n="ovs:wizards.add_vdisk.gather.size"></label>
             <div class="col-lg-2">

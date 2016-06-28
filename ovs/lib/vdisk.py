@@ -1163,7 +1163,7 @@ class VDiskController(object):
     @staticmethod
     def _clean_devicename(name):
         """
-        Cleand a name into a usable filename
+        Clean a name into a usable filename
         :param name: Name of the device
         :return: A cleaned devicename
         """

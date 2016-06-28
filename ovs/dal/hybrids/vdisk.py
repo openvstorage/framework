@@ -79,6 +79,8 @@ class VDisk(DataObject):
         Retrieve the DTL status for a vDisk
         """
         sd_status = self.info.get('failover_mode', 'UNKNOWN').lower()
+        if sd_status == '':
+            sd_status = 'unknown'
         if sd_status != 'ok_standalone':
             return sd_status
 

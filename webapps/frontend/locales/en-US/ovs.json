@@ -657,6 +657,7 @@
         "add_vdisk": {
             "title": "Add new vDisk",
             "gather": {
+                "cleaned_name": "On the FUSE mountpoint, the vDisk name will become: ",
                 "complete":"Adding vDisk complete",
                 "failed":"Adding vDisk failed: __why__",
                 "in_progress":"Adding vDisk in progress",

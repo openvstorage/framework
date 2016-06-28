@@ -54,7 +54,26 @@ define([
             }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
+        self.cleanedName = ko.computed(function() {
+            var cleaned, extension='';
+            cleaned = self.data.name().replace(/^(\/)+|(\/)+$/g, '').replace(/ /g,"_").toLowerCase();
+            cleaned = cleaned.replace(/[^a-z0-9-_\.\/]+/g, "");
+            while (cleaned.indexOf('//') > -1) {
+                cleaned = cleaned.replace(/\/\//g, '/');
+            }
+            if (cleaned.indexOf('.') > -1) {
+                extension = cleaned.split('.').pop();
+                if (extension.length == 3 || extension.length == 4) {
+                    return cleaned
+                }
+                if (extension.length === 0) {
+                   return cleaned + 'raw';
+                }
+            }
+            return cleaned + '.raw';
+        });
 
+        // Durandal
         self.activate = function() {
             generic.xhrAbort(self.loadVPoolsHandle);
             if (generic.xhrCompleted(self.loadVPoolsHandle)) {
