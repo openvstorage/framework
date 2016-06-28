@@ -93,13 +93,13 @@ class VDiskTest(unittest.TestCase):
         self.assertTrue(expr=vdisk.is_vtemplate, msg='Dynamic property "is_vtemplate" should still be True')
 
     def test_clean_devicename(self):
-        test = {'Foo Bar': 'foo_bar.raw',
-                '/Foo Bar .raw': 'foo_bar_.raw',
-                'foo-bar.rawtest': 'foo-bar.rawtest.raw',
-                'test/folder': 'test/folder.raw',
-                'foobar-flat.vmdk': 'foobar-flat.vmdk',
-                '//test.raw': 'test.raw',
-                'test/.raw': 'test/.raw.raw'}
+        test = {'Foo Bar': '/foo_bar.raw',
+                '/Foo Bar .raw': '/foo_bar_.raw',
+                'foo-bar.rawtest': '/foo-bar.rawtest.raw',
+                'test/folder': '/test/folder.raw',
+                'foobar-flat.vmdk': '/foobar-flat.vmdk',
+                '//test.raw': '/test.raw',
+                'test/.raw': '/test/.raw.raw'}
         for raw, expected in test.iteritems():
             result = VDiskController._clean_devicename(raw)
             self.assertEqual(result, expected)

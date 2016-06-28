@@ -521,13 +521,17 @@ class VDiskController(object):
             mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
             if mds_service is None:
                 raise RuntimeError('Could not find a MDS service')
-            # noinspection PyArgumentList
             backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                                                      port=mds_service.service.ports[0])])
             volume_id = vpool.storagedriver_client.create_volume(target_path=devicename,
                                                                  metadata_backend_config=backend_config,
                                                                  volume_size="{0}B".format(size),
                                                                  node_id=str(storagedriver.storagedriver_id))
+            new_vdisk.volume_id = volume_id
+            new_vdisk.save()
+            MDSServiceController.ensure_safety(new_vdisk)
+            VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
+            VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
         except Exception as ex:
             VDiskController._logger.error('Caught exception during clone, trying to delete the volume. {0}'.format(ex))
             try:
