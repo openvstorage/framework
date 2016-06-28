@@ -61,7 +61,6 @@ class StorageRouterViewSet(viewsets.ViewSet):
         if query is None:
             return StorageRouterList.get_storagerouters()
         else:
-            query = json.loads(query)
             return DataList(StorageRouter, query)
 
     @log()

@@ -248,14 +248,14 @@
                     "success": "Rescan finished",
                     "scanning": "rescanning",
                     "started": "Rescan started",
-                    "inprogress": "The disks of this StorageRouter are being rescanned"
+                    "inprogress": "The disks of this Storage Router are being rescanned"
                 }
             },
             "refresh": {
                 "success": "Refresh finished",
                 "refreshing": "refreshing",
                 "started": "Refresh started",
-                "inprogress": "The hardware capabilities of this StorageRouter are being refreshed"
+                "inprogress": "The hardware capabilities of this Storage Router are being refreshed"
             },
             "hostip": "Host IP",
             "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
@@ -274,15 +274,15 @@
             "moveawaytitle": "Move all vDisks",
             "rdma_capable": "RDMA Capable",
             "save": {
-                "success": "This StorageRouter was saved.",
-                "failure": "Error saving this StorageRouter."
+                "success": "This Storage Router was saved.",
+                "failure": "Error saving this Storage Router."
             },
             "scrub_capable": "SCRUB Capable",
             "storageroutervpoollink": "vPools served by this Storage Router",
             "title": "Storage Router",
             "updateserving": "Save changes",
-            "edit": "Edit some properties of this StorageRouter",
-            "refreshtt": "Refresh the hardware capabilities of this StorageRouter",
+            "edit": "Edit some properties of this Storage Router",
+            "refreshtt": "Refresh the hardware capabilities of this Storage Router",
             "offline": {
                 "mark": "Mark this node Offline",
                 "warning": "Please make sure the Storage Router is actually down and unavailable before marking the Storage Router as offline. Marking the Storage Router as offline while it is still available might lead to data corruption.",
@@ -290,10 +290,10 @@
                 "yes": "Yes, it's offline",
                 "no": "No, back to safety",
                 "pending": "Pending",
-                "pendingmsg": "The StorageRouter is being marked offline",
+                "pendingmsg": "The Storage Router is being marked offline",
                 "done": "Marked offline",
-                "done_msg": "The StorageRouter was marked offline",
-                "error_msg": "marking the StorageRouter offline: __error__"
+                "done_msg": "The Storage Router was marked offline",
+                "error_msg": "marking the Storage Router offline: __error__"
             }
         }
     },
@@ -591,7 +591,7 @@
         "title": "Support",
         "clusterid": "Cluster ID:",
         "nodeid": "Node ID",
-        "nodes": "StorageRouters:",
+        "nodes": "Storage Routers:",
         "callhome": "Call Home settings",
         "metadata": "Heartbeat data",
         "enable": "Heartbeat enabled",
@@ -658,7 +658,7 @@
         "add_vdisk": {
             "title": "Add new vDisk",
             "gather": {
-                "cleaned_name": "On the FUSE mountpoint, the vDisk name will become: ",
+                "cleaned_name": "Devicename on filesystem: ",
                 "complete":"Adding vDisk complete",
                 "failed":"Adding vDisk failed: __why__",
                 "in_progress":"Adding vDisk in progress",
@@ -667,6 +667,7 @@
                 "invalid_storagerouter": "No valid storagerouter selected",
                 "invalid_vpool": "No valid vPool selected",
                 "name": "Name:",
+                "name_exists": "The devicename already exists",
                 "size": "Size:",
                 "started":"Adding vDisk",
                 "storagerouter": "Storage Router:",
@@ -764,19 +765,19 @@
             "gather": {
                 "all_failed": "All create actions from vTemplate __what__ failed.",
                 "amount": "# of VMs:",
-                "amount_multiple": "The first item will be __start__ and the last one will be __end__",
-                "amount_one": "The name won't be appended with a number",
+                "amount_multiple": "The first item will be __start__ (devicename: __devicestart__) and the last one will be __end__ (devicename: __deviceend__)",
+                "amount_one": "Devicename on filesytem: __devicename__",
                 "complete": "Create completed",
                 "creating": "creating from vTemplate __what__: __error__",
                 "description": "Description:",
-                "duplicate_name": "The name __name__ is already in use",
-                "hosts": "Hosts:",
+                "storagerouters": "Storage Routers:",
                 "in_progress": "Creating from vTemplate __what__ in progress...",
                 "name": "Name:",
+                "name_exists": "One of the devicenames already exists",
                 "no_object": "No vTemplate found",
                 "no_name": "No name was given",
-                "no_storagerouters": "No StorageRouters found.",
-                "no_storagerouters_selected": "Please select at least one StorageRouter.",
+                "no_storagerouters": "No Storage Routers found.",
+                "no_storagerouters_selected": "Please select at least one Storage Router.",
                 "some_failed": "Create from __what__ finished. However, some could not be created.",
                 "start_nr": "Start nr.:",
                 "started": "Create started",
@@ -835,9 +836,11 @@
             "title": "Clone",
             "gather": {
                 "basicinfo": "Enter basic information:",
+                "cleaned_name": "Devicename on filesystem: ",
                 "duplicate_name": "A virtual disk with this name already exists",
                 "invalid_name": "Invalid name",
                 "name": "Name:",
+                "name_exists": "The devicename already exists",
                 "newsnapshot": "Create a new snapshot",
                 "nostoragerouter": "No Storage Router information found",
                 "selectsnapshots": "Select the Snapshot from which you want to clone:",
@@ -850,7 +853,7 @@
                 "inprogress": "vDisk __what__ cloning in progress...",
                 "name": "Name:",
                 "snapshot": "Snapshot:",
-                "storagerouter": "StorageRouter:",
+                "storagerouter": "Storage Router:",
                 "success": "Cloned __what__ successfully",
                 "title": "Verify the entered information"
             }

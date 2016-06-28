@@ -25,8 +25,7 @@ define(['knockout'], function(ko){
             name:                   ko.observable(),
             description:            ko.observable(''),
             selectedStorageRouters: ko.observableArray([]),
-            storageRouters:         ko.observableArray([]),
-            names:                  ko.observableArray([])
+            storageRouters:         ko.observableArray([])
         };
     };
     return singleton();

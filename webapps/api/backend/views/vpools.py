@@ -149,12 +149,26 @@ class VPoolViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_plain()
     @load(VPool)
-    def devicename_exists(self, vpool, name):
+    def devicename_exists(self, vpool, name=None, names=None):
         """
         Checks whether a given name can be created on the vpool
         :param vpool: vPool object
         :param name: Candidate name
+        :param names: Candidate names
         :return: True or False
         """
-        devicename = VDiskController.clean_devicename(name)
-        return VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None
+        if not (name is None) ^ (names is None):
+            raise NotAcceptable('Either the name (string) or the names (list of strings) parameter must be passed')
+        if name is not None and not isinstance(name, basestring):
+            raise NotAcceptable('The name parameter must be a string')
+        if names is not None and not isinstance(names, list):
+            raise NotAcceptable('The names parameter must be a list of strings')
+
+        if name is not None:
+            devicename = VDiskController.clean_devicename(name)
+            return VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None
+        for name in names:
+            devicename = VDiskController.clean_devicename(name)
+            if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
+                return True
+        return False

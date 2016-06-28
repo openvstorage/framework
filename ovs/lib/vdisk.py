@@ -136,6 +136,7 @@ class VDiskController(object):
             try:
                 client = SSHClient(sd.storagerouter)
                 storagedriver = sd
+                break
             except UnableToConnectException:
                 pass
         if client is None:

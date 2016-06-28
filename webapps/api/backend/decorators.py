@@ -100,6 +100,11 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 return True
             if value == 'false' or value == 'False':
                 return False
+            if isinstance(value, basestring):
+                try:
+                    return json.loads(value)
+                except ValueError:
+                    pass
             return value
 
         def new_function(*args, **kwargs):

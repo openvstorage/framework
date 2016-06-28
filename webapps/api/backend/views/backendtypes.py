@@ -44,7 +44,6 @@ class BackendTypeViewSet(viewsets.ViewSet):
         Overview of all backend types
         """
         if query is not None:
-            query = json.loads(query)
             return DataList(BackendType, query)
         return BackendTypeList.get_backend_types()
 

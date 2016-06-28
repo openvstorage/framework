@@ -29,9 +29,18 @@ define([
         self.loadStorageRoutersHandle = undefined;
         self.loadvPoolsHandle         = undefined;
 
+        // Observables
+        self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
+
         // Computed
         self.canContinue = ko.computed(function() {
-            var valid = true, showErrors = false, reasons = [], fields = [], maxSize = self.data.sizeEntry.max * Math.pow(1024, 3);
+            var valid = true, showErrors = false, reasons = [], fields = [], maxSize = self.data.sizeEntry.max * Math.pow(1024, 3),
+                preValidation = self.preValidateResult();
+            if (preValidation.valid === false) {
+                showErrors = true;
+                reasons = reasons.concat(preValidation.reasons);
+                fields = fields.concat(preValidation.fields);
+            }
             if (self.data.name() === '') {
                 valid = false;
                 fields.push('name');
@@ -55,23 +64,32 @@ define([
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
         self.cleanedName = ko.computed(function() {
-            var cleaned, extension='';
-            cleaned = self.data.name().replace(/^(\/)+|(\/)+$/g, '').replace(/ /g,"_").toLowerCase();
-            cleaned = cleaned.replace(/[^a-z0-9-_\.\/]+/g, "");
-            while (cleaned.indexOf('//') > -1) {
-                cleaned = cleaned.replace(/\/\//g, '/');
-            }
-            if (cleaned.indexOf('.') > -1) {
-                extension = cleaned.split('.').pop();
-                if (extension.length == 3 || extension.length == 4) {
-                    return cleaned
-                }
-                if (extension.length === 0) {
-                   return cleaned + 'raw';
-                }
-            }
-            return cleaned + '.raw';
+            return generic.cleanDeviceName(self.data.name());
         });
+
+        // Functions
+        self.preValidate = function() {
+            var validationResult = { valid: true, reasons: [], fields: [] };
+            return $.Deferred(function(deferred) {
+                if (self.data.vPool() === undefined || self.data.name() === undefined) {
+                    deferred.reject();
+                    return;
+                }
+                api.get('vpools/' + self.data.vPool().guid() + '/devicename_exists', { queryparams: { name: self.data.name() }})
+                    .done(function(exists) {
+                        if (exists) {
+                            validationResult.valid = false;
+                            validationResult.reasons.push($.t('ovs:wizards.add_vdisk.gather.name_exists'));
+                            validationResult.fields.push('name');
+                            self.preValidateResult(validationResult);
+                            deferred.reject();
+                        } else {
+                            self.preValidateResult(validationResult);
+                            deferred.resolve();
+                        }
+                    })
+            }).promise();
+        };
 
         // Durandal
         self.activate = function() {

@@ -38,8 +38,8 @@ define([
         self.data.description('');
         self.data.name(undefined);
         self.data.selectedStorageRouters([]);
+        self.data.storageRouters([]);
         self.data.startnr(1);
-        self.data.names([]);
 
         // Functions
         self.compositionComplete = function() {

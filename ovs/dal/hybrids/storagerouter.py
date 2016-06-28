@@ -34,7 +34,7 @@ class StorageRouter(DataObject):
                     Property('ip', str, doc='IP Address of the Storage Router, if available'),
                     Property('heartbeats', dict, default={}, doc='Heartbeat information of various monitors'),
                     Property('node_type', ['MASTER', 'EXTRA'], default='EXTRA', doc='Indicates the node\'s type'),
-                    Property('rdma_capable', bool, doc='Is this StorageRouter RDMA capable'),
+                    Property('rdma_capable', bool, doc='Is this Storage Router RDMA capable'),
                     Property('last_heartbeat', float, mandatory=False, doc='When was the last (external) heartbeat send/received')]
     __relations = []
     __dynamics = [Dynamic('statistics', dict, 4, locked=True),

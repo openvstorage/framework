@@ -55,7 +55,6 @@ class VDiskViewSet(viewsets.ViewSet):
             vpool = VPool(vpoolguid)
             return vpool.vdisks
         if query is not None:
-            query = json.loads(query)
             return DataList(VDisk, query)
         return VDiskList.get_vdisks()
 
@@ -238,15 +237,15 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def create_from_template(self, vdisk, devicename, storagerouter_guid):
+    def create_from_template(self, vdisk, name, storagerouter_guid):
         """
         Create a new vdisk from a template vDisk
         :param vdisk: Guid of the template virtual disk
-        :param devicename: Name of the new vdisk
+        :param name: Name of the new vdisk
         :param storagerouter_guid: Guid of StorageRouter to create new vDisk on
         """
         return VDiskController.create_from_template.delay(diskguid=vdisk.guid,
-                                                          devicename=devicename,
+                                                          name=name,
                                                           storagerouter_guid=storagerouter_guid)
 
     @link()
@@ -256,11 +255,8 @@ class VDiskViewSet(viewsets.ViewSet):
     @load(VDisk)
     def get_target_storagerouters(self, vdisk, hints):
         """
-        Gets all possible target Storage Routers for a given vDisk
+        Gets all possible target Storage Routers for a given vDisk (e.g. when cloning or creating from template)
         """
-        if not vdisk.is_vtemplate:
-            raise NotAcceptable('vDisk is not a vTemplate')
-        # Find Storage Routers which have all above vPools available.
         storagerouter_guids = None
         storagerouters = {}
         if vdisk.vpool is not None:

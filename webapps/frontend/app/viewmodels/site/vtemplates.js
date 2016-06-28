@@ -57,6 +57,9 @@ define([
                                 data: data,
                                 loader: function(guid) {
                                     return new VDisk(guid);
+                                },
+                                dependencyLoader: function(item) {
+                                    item.fetchTemplateChildrenGuids();
                                 }
                             });
                         })
