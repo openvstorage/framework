@@ -160,6 +160,7 @@ class VDiskController(object):
                 vdisk = VDiskList.get_by_devicename_and_vpool(volumepath, storagedriver.vpool)
                 if vdisk is None:
                     vdisk = VDisk()
+                    vdisk.name = volumepath.split('/')[-1].split('.')[0]
             vdisk.devicename = volumepath
             vdisk.volume_id = volumename
             vdisk.size = volumesize

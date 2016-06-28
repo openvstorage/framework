@@ -18,7 +18,6 @@ define(['knockout'], function(ko){
     "use strict";
     var singleton = function() {
         return {
-            mode:                   ko.observable(),
             guid:                   ko.observable(),
             vObject:                ko.observable(),
             amount:                 ko.observable(1).extend({ numeric: { min: 1 } }),

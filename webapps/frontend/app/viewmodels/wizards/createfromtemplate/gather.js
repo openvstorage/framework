@@ -104,7 +104,7 @@ define([
                 api.post('vdisks/' + self.data.guid() + '/create_from_template', {
                         data: {
                             devicename: name,
-                            storagerouterguid: storageRouter.guid()
+                            storagerouter_guid: storageRouter.guid()
                         }
                     })
                     .then(self.shared.tasks.wait)

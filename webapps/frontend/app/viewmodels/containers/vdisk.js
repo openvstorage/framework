@@ -45,6 +45,7 @@ define([
         self.cacheMisses           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.cacheStrategies       = ko.observableArray(['on_read', 'on_write', 'none']);
         self.cacheStrategy         = ko.observable('on_read');
+        self.deviceName            = ko.observable();
         self.dedupeMode            = ko.observable();
         self.dedupeModes           = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
         self.dtlEnabled            = ko.observable(true);
@@ -169,6 +170,9 @@ define([
         // Functions
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');
+            if (data.hasOwnProperty('devicename')) {
+                self.deviceName(data.devicename.replace(/^\//, ''));
+            }
             generic.trySet(self.dtlManual, data, 'has_manual_dtl');
             generic.trySet(self.dtlStatus, data, 'dtl_status');
             if (data.hasOwnProperty('snapshots')) {
