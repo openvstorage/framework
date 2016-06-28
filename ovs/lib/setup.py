@@ -173,6 +173,7 @@ class SetupController(object):
 
                     elif cluster_name == join_manually:  # Join an existing cluster manually
                         first_node = False
+                        cluster_name = None
                         cluster_ip = Interactive.ask_choice(SetupController.host_ips, 'Select the public IP address of {0}'.format(node_name))
                         master_ip = Interactive.ask_string(message='Please enter the IP of one of the cluster\'s master nodes',
                                                            regex_info={'regex': SSHClient.IP_REGEX,
@@ -194,13 +195,6 @@ class SetupController(object):
                         if Interactive.ask_yesno(message='Following StorageRouters were detected:\n  -  {0}\nIs this correct?'.format('\n  -  '.join(current_sr_message)),
                                                  default_value=True) is False:
                             raise Exception('The cluster on the given master node cannot be joined as not all StorageRouters could be loaded')
-
-                        cluster_name = None
-                        for cluster, discovered_info in discovery_result.iteritems():
-                            for node_info in discovered_info.itervalues():
-                                if node_info.get('ip') == master_ip:
-                                    cluster_name = cluster
-                                    break
 
                     else:  # Join an existing cluster automatically
                         SetupController._logger.debug('Cluster {0} selected'.format(cluster_name))
@@ -248,9 +242,6 @@ class SetupController(object):
 
                 if cluster_ip is None or master_ip is None:  # Master IP and cluster IP must be known by now, cluster_ip == master_ip for 1st node
                     raise ValueError('Something must have gone wrong retrieving IP information')
-
-                if avahi_installed is True and cluster_name is None:
-                    raise RuntimeError('The name of the cluster should be known by now.')
 
                 if node_name != fqdn_name:
                     ip_hostname_map = {cluster_ip: [fqdn_name, node_name]}
@@ -776,6 +767,7 @@ class SetupController(object):
         if rdma is None:
             rdma = Interactive.ask_yesno(message='Enable RDMA?', default_value=False)
         EtcdConfiguration.set('/ovs/framework/rdma', rdma)
+        EtcdConfiguration.set('/ovs/framework/cluster_name', cluster_name)
 
         if ServiceManager.has_fleet():
             SetupController._log(messages='Setting up Fleet')
@@ -1058,6 +1050,9 @@ class SetupController(object):
             ServiceManager.setup_fleet()
 
         SetupController._add_services(target_client, unique_id, 'extra')
+
+        if cluster_name is None:
+            cluster_name = EtcdConfiguration.get('/ovs/framework/cluster_name')
 
         enabled = EtcdConfiguration.get('/ovs/framework/support|enabled')
         if enabled is True:
