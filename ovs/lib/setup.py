@@ -382,7 +382,6 @@ class SetupController(object):
                     try:
                         SetupController._setup_extra_node(cluster_ip=cluster_ip,
                                                           master_ip=master_ip,
-                                                          cluster_name=cluster_name,
                                                           unique_id=unique_id,
                                                           ip_client_map=ip_client_map)
                     except Exception as ex:
@@ -403,7 +402,6 @@ class SetupController(object):
                             try:
                                 SetupController._promote_node(cluster_ip=cluster_ip,
                                                               master_ip=master_ip,
-                                                              cluster_name=cluster_name,
                                                               ip_client_map=ip_client_map,
                                                               unique_id=unique_id,
                                                               configure_memcached=configure_memcached,
@@ -412,7 +410,6 @@ class SetupController(object):
                                 SetupController._log(messages=['\nFailed to promote node, rolling back', ex], loglevel='exception')
                                 SetupController._demote_node(cluster_ip=cluster_ip,
                                                              master_ip=master_ip,
-                                                             cluster_name=cluster_name,
                                                              ip_client_map=ip_client_map,
                                                              unique_id=unique_id,
                                                              unconfigure_memcached=configure_memcached,
@@ -488,7 +485,6 @@ class SetupController(object):
                 raise RuntimeError('Incorrect IP provided ({0})'.format(cluster_ip))
 
             master_ip = None
-            cluster_name = None
             offline_nodes = []
 
             if node_action == 'demote' and cluster_ip:  # Demote an offline node
@@ -524,14 +520,6 @@ class SetupController(object):
                 unique_id = System.get_my_machine_id(target_client)
                 ip = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(unique_id))
 
-                if SetupController._avahi_installed(target_client):
-                    with open(SetupController.avahi_filename, 'r') as avahi_file:
-                        avahi_contents = avahi_file.read()
-                    match_groups = re.search('>ovs_cluster_(?P<cluster>[^_]+)_.+?<', avahi_contents).groupdict()
-                    if 'cluster' not in match_groups:
-                        raise RuntimeError('No cluster information found.')
-                    cluster_name = match_groups['cluster']
-
                 storagerouter_info = SetupController._retrieve_storagerouters(ip=target_client.ip, password=target_password)
                 node_ips = [sr_info['ip'] for sr_info in storagerouter_info.itervalues()]
                 master_node_ips = [sr_info['ip'] for sr_info in storagerouter_info.itervalues() if sr_info['type'] == 'master' and sr_info['ip'] != ip]
@@ -549,7 +537,6 @@ class SetupController(object):
             if node_action == 'promote':
                 SetupController._promote_node(cluster_ip=ip,
                                               master_ip=master_ip,
-                                              cluster_name=cluster_name,
                                               ip_client_map=ip_client_map,
                                               unique_id=unique_id,
                                               configure_memcached=configure_memcached,
@@ -557,7 +544,6 @@ class SetupController(object):
             else:
                 SetupController._demote_node(cluster_ip=ip,
                                              master_ip=master_ip,
-                                             cluster_name=cluster_name,
                                              ip_client_map=ip_client_map,
                                              unique_id=unique_id,
                                              unconfigure_memcached=configure_memcached,
@@ -699,7 +685,6 @@ class SetupController(object):
                     unconfigure_memcached = SetupController._is_internally_managed(service='memcached')
                     SetupController._demote_node(cluster_ip=storage_router.ip,
                                                  master_ip=master_ip,
-                                                 cluster_name=None,
                                                  ip_client_map=ip_client_map,
                                                  unique_id=storage_router.machine_id,
                                                  unconfigure_memcached=unconfigure_memcached,
@@ -862,7 +847,7 @@ class SetupController(object):
                 Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
 
         if SetupController._avahi_installed(target_client) is True:
-            SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
+            SetupController._configure_avahi(target_client, node_name, 'master')
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/setupcompleted'.format(machine_id), True)
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/promotecompleted'.format(machine_id), True)
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'MASTER')
@@ -1033,7 +1018,7 @@ class SetupController(object):
         EtcdInstaller.remove_proxy('config', cluster_ip)
 
     @staticmethod
-    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map):
+    def _setup_extra_node(cluster_ip, master_ip, unique_id, ip_client_map):
         """
         Sets up an additional node
         """
@@ -1050,9 +1035,6 @@ class SetupController(object):
             ServiceManager.setup_fleet()
 
         SetupController._add_services(target_client, unique_id, 'extra')
-
-        if cluster_name is None:
-            cluster_name = EtcdConfiguration.get('/ovs/framework/cluster_name')
 
         enabled = EtcdConfiguration.get('/ovs/framework/support|enabled')
         if enabled is True:
@@ -1085,14 +1067,14 @@ class SetupController(object):
         SetupController._run_hooks('extranode', cluster_ip, master_ip)
 
         if SetupController._avahi_installed(target_client) is True:
-            SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
+            SetupController._configure_avahi(target_client, node_name, 'extra')
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/setupcompleted'.format(machine_id), True)
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'EXTRA')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
         SetupController._log(messages='Extra node complete')
 
     @staticmethod
-    def _promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached, configure_rabbitmq):
+    def _promote_node(cluster_ip, master_ip, ip_client_map, unique_id, configure_memcached, configure_rabbitmq):
         """
         Promotes a given node
         """
@@ -1214,14 +1196,14 @@ class SetupController(object):
             SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map)
 
         if SetupController._avahi_installed(target_client) is True:
-            SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
+            SetupController._configure_avahi(target_client, node_name, 'master')
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'MASTER')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/promotecompleted'.format(machine_id), True)
         SetupController._log(messages='Promote complete')
 
     @staticmethod
-    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, unconfigure_memcached, unconfigure_rabbitmq, offline_nodes=None):
+    def _demote_node(cluster_ip, master_ip, ip_client_map, unique_id, unconfigure_memcached, unconfigure_rabbitmq, offline_nodes=None):
         """
         Demotes a given node
         """
@@ -1354,7 +1336,7 @@ class SetupController(object):
             target_client = ip_client_map[cluster_ip]
             node_name = target_client.run('hostname -s')
             if SetupController._avahi_installed(target_client) is True:
-                SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
+                SetupController._configure_avahi(target_client, node_name, 'extra')
         EtcdConfiguration.set('/ovs/framework/hosts/{0}/type'.format(storagerouter.machine_id), 'EXTRA')
         SetupController._log(messages='Demote complete')
 
@@ -1495,7 +1477,8 @@ EOF
             return True
 
     @staticmethod
-    def _configure_avahi(client, cluster_name, node_name, node_type):
+    def _configure_avahi(client, node_name, node_type):
+        cluster_name = EtcdConfiguration.get('/ovs/framework/cluster_name')
         SetupController._log(messages='Announcing service', title=True)
         client.run("""cat > {3} <<EOF
 <?xml version="1.0" standalone='no'?>

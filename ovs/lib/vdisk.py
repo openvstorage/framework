@@ -522,6 +522,7 @@ class VDiskController(object):
             mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
             if mds_service is None:
                 raise RuntimeError('Could not find a MDS service')
+            # noinspection PyArgumentList
             backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                                                      port=mds_service.service.ports[0])])
             volume_id = vpool.storagedriver_client.create_volume(target_path=devicename,
