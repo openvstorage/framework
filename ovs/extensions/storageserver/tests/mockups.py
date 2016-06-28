@@ -17,6 +17,7 @@
 """
 Mock wrapper class for the storagedriver client
 """
+import uuid
 from volumedriver.storagerouter.storagerouterclient import DTLConfigMode
 
 
@@ -29,14 +30,15 @@ class MockStorageRouterClient(object):
     metadata_backend_config = {}
     object_type = {}
     snapshots = {}
+    volumes = {}
     vrouter_id = {}
 
     def __init__(self, vpool_guid, arakoon_contacts):
         """
         Init method
         """
-        _ = vpool_guid
         _ = arakoon_contacts
+        self.vpool_guid = vpool_guid
 
     @staticmethod
     def clean():
@@ -48,6 +50,7 @@ class MockStorageRouterClient(object):
         MockStorageRouterClient.metadata_backend_config = {}
         MockStorageRouterClient.object_type = {}
         MockStorageRouterClient.snapshots = {}
+        MockStorageRouterClient.volumes = {}
         MockStorageRouterClient.vrouter_id = {}
 
     @staticmethod
@@ -60,34 +63,30 @@ class MockStorageRouterClient(object):
         MockStorageRouterClient.snapshots[volume_id] = snapshots
 
     @staticmethod
+    def create_volume(target_path, metadata_backend_config, volume_size, node_id):
+        """
+        Create a mocked volume
+        """
+        from ovs.dal.lists.storagedriverlist import StorageDriverList
+
+        _ = target_path, metadata_backend_config, volume_size
+        volume_id = str(uuid.uuid4())
+        storagedriver = StorageDriverList.get_by_storagedriver_id(node_id)
+        if storagedriver is None:
+            raise ValueError('Failed to retrieve storagedriver with ID {0}'.format(node_id))
+        vpool = storagedriver.vpool
+        MockStorageRouterClient.vrouter_id[volume_id] = node_id
+        if vpool.guid not in MockStorageRouterClient.volumes:
+            MockStorageRouterClient.volumes[vpool.guid] = []
+        MockStorageRouterClient.volumes[vpool.guid].append(volume_id)
+        return volume_id
+
+    @staticmethod
     def delete_snapshot(volume_id, snapshot_id):
         """
         Delete snapshot mockup
         """
         del MockStorageRouterClient.snapshots[volume_id][snapshot_id]
-
-    @staticmethod
-    def info_snapshot(volume_id, snapshot_id):
-        """
-        Info snapshot mockup
-        """
-        return MockStorageRouterClient.snapshots[volume_id][snapshot_id]
-
-    @staticmethod
-    def info_volume(volume_id):
-        """
-        Info volume mockup
-        """
-        return type('Info', (), {'object_type': property(lambda s: MockStorageRouterClient.object_type.get(volume_id, 'BASE')),
-                                 'metadata_backend_config': property(lambda s: MockStorageRouterClient.metadata_backend_config.get(volume_id)),
-                                 'vrouter_id': property(lambda s: MockStorageRouterClient.vrouter_id.get(volume_id))})()
-
-    @staticmethod
-    def list_snapshots(volume_id):
-        """
-        Return fake info
-        """
-        return MockStorageRouterClient.snapshots.get(volume_id, {}).keys()
 
     @staticmethod
     def empty_info():
@@ -171,6 +170,35 @@ class MockStorageRouterClient(object):
         return 16
 
     @staticmethod
+    def info_snapshot(volume_id, snapshot_id):
+        """
+        Info snapshot mockup
+        """
+        return MockStorageRouterClient.snapshots[volume_id][snapshot_id]
+
+    @staticmethod
+    def info_volume(volume_id):
+        """
+        Info volume mockup
+        """
+        return type('Info', (), {'object_type': property(lambda s: MockStorageRouterClient.object_type.get(volume_id, 'BASE')),
+                                 'metadata_backend_config': property(lambda s: MockStorageRouterClient.metadata_backend_config.get(volume_id)),
+                                 'vrouter_id': property(lambda s: MockStorageRouterClient.vrouter_id.get(volume_id))})()
+
+    @staticmethod
+    def list_snapshots(volume_id):
+        """
+        Return fake info
+        """
+        return MockStorageRouterClient.snapshots.get(volume_id, {}).keys()
+
+    def list_volumes(self):
+        """
+        Return a list of volumes
+        """
+        return MockStorageRouterClient.volumes.get(self.vpool_guid)
+
+    @staticmethod
     def set_manual_dtl_config(volume_id, config):
         """
         Set a fake DTL configuration
@@ -182,11 +210,28 @@ class MockStorageRouterClient(object):
         MockStorageRouterClient.dtl_config_cache[volume_id] = dtl_config
 
     @staticmethod
+    def set_metadata_cache_capacity(volume_id, num_pages):
+        """
+        Set the metadata cache capacity
+        """
+        _ = volume_id, num_pages
+
+    @staticmethod
     def set_volume_as_template(volume_id):
         """
         Set a volume as a template
         """
         MockStorageRouterClient.object_type[volume_id] = 'TEMPLATE'
+
+    @staticmethod
+    def unlink(volume_id):
+        """
+        Delete a volume
+        """
+        for vpool_guid, volume_ids in MockStorageRouterClient.volumes.iteritems():
+            if volume_id in volume_ids:
+                MockStorageRouterClient.volumes[vpool_guid].remove(volume_id)
+                break
 
     @staticmethod
     def update_metadata_backend_config(volume_id, metadata_backend_config):

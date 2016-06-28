@@ -66,7 +66,7 @@ class VDiskController(object):
         List all known volumes on a specific vpool or on all
         :param vpool_guid: Guid of the vPool to list the volumes for
         :type vpool_guid: str
-        :return: Volumes known by the vPool
+        :return: Volumes known by the vPool or all volumes if no vpool_guid is provided
         :rtype: list
         """
         if vpool_guid is not None:
@@ -85,15 +85,20 @@ class VDiskController(object):
     @log('VOLUMEDRIVER_TASK')
     def delete_from_voldrv(volumename):
         """
-        Delete a disk
+        Delete a disk from model only since its been deleted on volumedriver
         Triggered by volumedriver messages on the queue
-        :param volumename: volume ID of the disk
+        :param volumename: Volume ID of the disk
         :type volumename: str
-        :return: None
         """
         vdisk = VDiskList.get_vdisk_by_volume_id(volumename)
         if vdisk is not None:
-            VDiskController._cleanup_vdisk(vdisk)
+            with volatile_mutex('voldrv_event_disk_{0}'.format(vdisk.volume_id), wait=20):
+                VDiskController._logger.info('Delete disk {0}'.format(vdisk.name))
+                for mds_service in vdisk.mds_services:
+                    mds_service.delete()
+                for domain_junction in vdisk.domains_dtl:
+                    domain_junction.delete()
+                vdisk.delete()
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete')
@@ -105,17 +110,7 @@ class VDiskController(object):
         """
         vdisk = VDisk(diskguid)
         vdisk.storagedriver_client.unlink(str(vdisk.volume_id))
-        VDiskController._cleanup_vdisk(vdisk)
-
-    @staticmethod
-    def _cleanup_vdisk(vdisk):
-        with volatile_mutex('voldrv_event_disk_{0}'.format(vdisk.volume_id), wait=20):
-            VDiskController._logger.info('Delete disk {0}'.format(vdisk.name))
-            for mds_service in vdisk.mds_services:
-                mds_service.delete()
-            for domain_junction in vdisk.domains_dtl:
-                domain_junction.delete()
-            vdisk.delete()
+        VDiskController.delete_from_voldrv(vdisk.volume_id)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.extend')
@@ -126,7 +121,6 @@ class VDiskController(object):
         :type diskguid: str
         :param size: New size (GB)
         :type size: int
-        :return: None
         """
         vdisk = VDisk(diskguid)
         VDiskController._logger.info('Extending disk {0}'.format(vdisk.name))
@@ -153,13 +147,12 @@ class VDiskController(object):
         Triggered by volumedriver messages on the queue
         :param volumename: volume ID of the disk
         :type volumename: str
-        :param volumesize: size of the volume
+        :param volumesize: Size of the volume
         :type volumesize: int
-        :param volumepath: path on hypervisor to the volume
+        :param volumepath: Path on hypervisor to the volume
         :type volumepath: str
         :param storagedriver_id: ID of the storagedriver serving the volume to resize
         :type storagedriver_id: str
-        :return: None
         """
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         with volatile_mutex('voldrv_event_disk_{0}'.format(volumename), wait=30):
@@ -191,7 +184,6 @@ class VDiskController(object):
         :type volume_id: unicode
         :param new_owner_id: ID of the storage driver the volume migrated to
         :type new_owner_id: unicode
-        :return: None
         """
         sd = StorageDriverList.get_by_storagedriver_id(storagedriver_id=new_owner_id)
         vdisk = VDiskList.get_vdisk_by_volume_id(volume_id=volume_id)
@@ -221,7 +213,7 @@ class VDiskController(object):
         vdisk = VDisk(diskguid)
         # Validations
         devicename = VDiskController.clean_devicename(name)
-        if VDiskList.get_vdisk_by_name(vdiskname=name) is not None:
+        if VDiskList.get_vdisks_by_name(vdiskname=name) is not None:
             raise RuntimeError('A vDisk with this name already exists')
         if VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool) is not None:
             raise RuntimeError('A vDisk with this name already exists')
@@ -413,7 +405,7 @@ class VDiskController(object):
         if not vdisk.is_vtemplate:
             raise RuntimeError('The given vDisk is not a vTemplate')
         devicename = VDiskController.clean_devicename(name)
-        if VDiskList.get_vdisk_by_name(vdiskname=name) is not None:
+        if VDiskList.get_vdisks_by_name(vdiskname=name) is not None:
             raise RuntimeError('A vDisk with this name already exists')
         if VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool) is not None:
             raise RuntimeError('A vDisk with this name already exists')
@@ -484,8 +476,6 @@ class VDiskController(object):
         # Validations
         storagedriver = StorageDriver(storagedriver_guid)
         devicename = VDiskController.clean_devicename(name)
-        if VDiskList.get_vdisk_by_name(vdiskname=name) is not None:
-            raise RuntimeError('A vDisk with this name already exists')
         vpool = storagedriver.vpool
         if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
             raise RuntimeError('A vDisk with this name already exists on vPool {0}'.format(vpool.name))
@@ -528,6 +518,7 @@ class VDiskController(object):
                 VDiskController._logger.exception('Exception during exception handling of "create_volume" : {0}'.format(str(ex2)))
             raise
         VDiskController._logger.info('Created volume. Location {0}'.format(devicename))
+        return new_vdisk.guid
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete_volume')
@@ -547,7 +538,7 @@ class VDiskController(object):
                 if disk is None:
                     VDiskController._logger.info('Disk {0} already deleted'.format(location))
                     return
-                return VDiskController.delete(disk.guid)
+                VDiskController.delete(disk.guid)
 
         raise RuntimeError('Cannot delete volume {0}. No storagedriver found for this location.'.format(location))
 
@@ -562,7 +553,6 @@ class VDiskController(object):
         :type location: str
         :param size: Size of volume (GB)
         :type size: int
-        :return: None
         """
         storagerouter = System.get_my_storagerouter()
         for storagedriver in storagerouter.storagedrivers:
@@ -571,7 +561,7 @@ class VDiskController(object):
                 disk = VDiskList.get_by_devicename_and_vpool(devicename, storagedriver.vpool)
                 if disk is None:
                     raise RuntimeError('Disk {0} does not exist'.format(location))
-                return VDiskController.extend(disk.guid, size * 1024 * 1024 * 1024)
+                VDiskController.extend(disk.guid, size * 1024 * 1024 * 1024)
 
         raise RuntimeError('Cannot extend volume {0}. No storagedriver found for this location.'.format(location))
 
@@ -647,7 +637,6 @@ class VDiskController(object):
         :type vdisk_guid: str
         :param new_config_params: New configuration parameters
         :type new_config_params: dict
-        :return: None
         """
         required_params = {'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
                            'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
@@ -813,7 +802,6 @@ class VDiskController(object):
         :type vdisk_guid: str
         :param storagerouters_to_exclude: Storage Router Guids to exclude from possible targets
         :type storagerouters_to_exclude: list
-        :return: None
         """
         if vpool_guid is not None and vdisk_guid is not None:
             raise ValueError('vPool and vDisk are mutually exclusive')
@@ -1078,7 +1066,6 @@ class VDiskController(object):
         :type new_state: int
         :param storagedriver_id: ID of the storagedriver hosting the volume
         :type storagedriver_id: str
-        :return: None
         """
         if new_state == VolumeDriverEvents_pb2.Degraded and old_state != VolumeDriverEvents_pb2.Standalone:
             vdisk = VDiskList.get_vdisk_by_volume_id(volume_name)
@@ -1138,6 +1125,7 @@ class VDiskController(object):
         """
         Set metadata page cache size to ratio 1:500 of vdisk.size
         :param vdisk: Object VDisk
+        :type vdisk: VDisk
         """
         storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, vdisk.storagedriver_id)
         storagedriver_config.load()
@@ -1152,7 +1140,9 @@ class VDiskController(object):
         """
         Clean a name into a usable filename
         :param name: Name of the device
+        :type name: str
         :return: A cleaned devicename
+        :rtype: str
         """
         name = name.strip('/').replace(' ', '_').lower()
         while '//' in name:

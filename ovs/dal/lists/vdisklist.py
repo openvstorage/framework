@@ -54,7 +54,7 @@ class VDiskList(object):
                                 'items': [('volume_id', DataList.operator.IN, volume_ids)]})
 
     @staticmethod
-    def get_vdisk_by_name(vdiskname):
+    def get_vdisks_by_name(vdiskname):
         """
         Returns all VDisks which have a given name
         """
