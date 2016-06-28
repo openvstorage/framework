@@ -102,5 +102,5 @@ class VDiskTest(unittest.TestCase):
                 'test/.raw': '/test/.raw.raw',
                 '//d\'!@#%xfoo Bar/te_b --asdfS SA AS lolz///f.wrv.': '/dxfoo_bar/te_b_--asdfs_sa_as_lolz/f.wrv.raw'}
         for raw, expected in test.iteritems():
-            result = VDiskController._clean_devicename(raw)
+            result = VDiskController.clean_devicename(raw)
             self.assertEqual(result, expected)

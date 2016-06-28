@@ -283,6 +283,7 @@ class StorageRouterController(object):
                 extra_required_params = required_params_other
             Toolbox.verify_required_params(extra_required_params, parameters)
         has_rdma = EtcdConfiguration.get('/ovs/framework/rdma')
+        storage_ip = parameters['storage_ip']
 
         # Check storagerouter existence
         storagerouter = StorageRouterList.get_by_ip(client.ip)

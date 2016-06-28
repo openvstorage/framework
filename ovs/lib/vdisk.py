@@ -129,11 +129,18 @@ class VDiskController(object):
         :return: None
         """
         vdisk = VDisk(diskguid)
-        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-        # @TODO: Hypervisor removal story
-        hypervisor = None
         VDiskController._logger.info('Extending disk {0}'.format(vdisk.name))
-        hypervisor.extend_volume(storagedriver.mountpoint, storagedriver.storage_ip, vdisk.devicename, size)
+        client = None
+        storagedriver = None
+        for sd in vdisk.vpool.storagedrivers:
+            try:
+                client = SSHClient(sd.storagerouter)
+                storagedriver = sd
+            except UnableToConnectException:
+                pass
+        if client is None:
+            raise RuntimeError('Could not connect to any of the nodes serving vDisk {0}'.format(vdisk.name))
+        client.run('truncate -s {0} {1}/{2}'.format(size, storagedriver.mountpoint, vdisk.devicename.strip('/')))
         VDiskController._logger.info('Extended disk {0}'.format(vdisk.name))
 
     @staticmethod
@@ -171,29 +178,6 @@ class VDiskController(object):
             VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
             MDSServiceController.ensure_safety(vdisk)
             VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
-
-    @staticmethod
-    @celery.task(name='ovs.vdisk.rename_from_voldrv')
-    @log('VOLUMEDRIVER_TASK')
-    def rename_from_voldrv(volumename, volume_old_path, volume_new_path):
-        """
-        Rename a disk
-        Triggered by volumedriver messages
-        :param volumename: volume ID of the disk
-        :type volumename: str
-        :param volume_old_path: old path on hypervisor to the volume
-        :type volume_old_path: str
-        :param volume_new_path: new path on hypervisor to the volume
-        :type volume_new_path: str
-        :return: None
-        """
-        vdisk = VDiskList.get_vdisk_by_volume_id(volumename)
-        if vdisk is not None:
-            VDiskController._logger.info('Move vDisk {0} from {1} to {2}'.format(vdisk.name,
-                                                                                 volume_old_path,
-                                                                                 volume_new_path))
-            vdisk.devicename = volume_new_path
-            vdisk.save()
 
     @staticmethod
     @celery.task(name='ovs.vdisk.migrate_from_voldrv')
@@ -235,7 +219,7 @@ class VDiskController(object):
         """
         vdisk = VDisk(diskguid)
         # Validations
-        devicename = VDiskController._clean_devicename(name)
+        devicename = VDiskController.clean_devicename(name)
         if VDiskList.get_vdisk_by_name(vdiskname=name) is not None:
             raise RuntimeError('A vDisk with this name already exists')
         if VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool) is not None:
@@ -427,7 +411,7 @@ class VDiskController(object):
         # Validations
         if not vdisk.is_vtemplate:
             raise RuntimeError('The given vDisk is not a vTemplate')
-        devicename = VDiskController._clean_devicename(name)
+        devicename = VDiskController.clean_devicename(name)
         if VDiskList.get_vdisk_by_name(vdiskname=name) is not None:
             raise RuntimeError('A vDisk with this name already exists')
         if VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool) is not None:
@@ -498,7 +482,7 @@ class VDiskController(object):
         """
         # Validations
         storagedriver = StorageDriver(storagedriver_guid)
-        devicename = VDiskController._clean_devicename(name)
+        devicename = VDiskController.clean_devicename(name)
         if VDiskList.get_vdisk_by_name(vdiskname=name) is not None:
             raise RuntimeError('A vDisk with this name already exists')
         vpool = storagedriver.vpool
@@ -586,7 +570,7 @@ class VDiskController(object):
                 disk = VDiskList.get_by_devicename_and_vpool(devicename, storagedriver.vpool)
                 if disk is None:
                     raise RuntimeError('Disk {0} does not exist'.format(location))
-                return VDiskController.extend(disk.guid, size)
+                return VDiskController.extend(disk.guid, size * 1024 * 1024 * 1024)
 
         raise RuntimeError('Cannot extend volume {0}. No storagedriver found for this location.'.format(location))
 
@@ -1163,7 +1147,7 @@ class VDiskController(object):
         vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), num_pages)
 
     @staticmethod
-    def _clean_devicename(name):
+    def clean_devicename(name):
         """
         Clean a name into a usable filename
         :param name: Name of the device

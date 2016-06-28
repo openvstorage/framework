@@ -17,13 +17,14 @@
 """
 VPool module
 """
-from backend.decorators import required_roles, load, return_list, return_object, return_task, log
+from backend.decorators import required_roles, load, return_list, return_object, return_task, return_plain, log
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.lib.storagerouter import StorageRouterController
-from ovs.lib.vpool import VPoolController
+from ovs.lib.vdisk import VDiskController
 from rest_framework import viewsets
 from rest_framework.decorators import link, action
 from rest_framework.exceptions import NotAcceptable
@@ -142,3 +143,18 @@ class VPoolViewSet(viewsets.ViewSet):
                 parameters[field] = str(parameters[field])
 
         return StorageRouterController.update_storagedrivers.delay(valid_storagedriver_guids, storagerouters, parameters)
+
+    @link()
+    @log()
+    @required_roles(['read'])
+    @return_plain()
+    @load(VPool)
+    def devicename_exists(self, vpool, name):
+        """
+        Checks whether a given name can be created on the vpool
+        :param vpool: vPool object
+        :param name: Candidate name
+        :return: True or False
+        """
+        devicename = VDiskController.clean_devicename(name)
+        return VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None
