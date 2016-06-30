@@ -764,7 +764,7 @@
             "title": "Create from vTemplate",
             "gather": {
                 "all_failed": "All create actions from vTemplate __what__ failed.",
-                "amount": "# of VMs:",
+                "amount": "# of vDisks:",
                 "amount_multiple": "The first item will be __start__ (devicename: __devicestart__) and the last one will be __end__ (devicename: __deviceend__)",
                 "amount_one": "Devicename on filesytem: __devicename__",
                 "complete": "Create completed",
