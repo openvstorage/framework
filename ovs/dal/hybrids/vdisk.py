@@ -19,6 +19,7 @@ VDisk module
 """
 import time
 import pickle
+from datetime import datetime
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
@@ -47,7 +48,7 @@ class VDisk(DataObject):
     __relations = [Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('dtl_status', str, 60),
-                  Dynamic('snapshots', list, 60),
+                  Dynamic('snapshots', list, 30),
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4),
                   Dynamic('storagedriver_id', str, 60),
@@ -117,13 +118,12 @@ class VDisk(DataObject):
                 voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id)
             except:
                 voldrv_snapshots = []
-            for guid in voldrv_snapshots:
-                snapshot = self.storagedriver_client.info_snapshot(volume_id, guid)
-                # @todo: to be investigated how to handle during set as template
+            for id in voldrv_snapshots:
+                snapshot = self.storagedriver_client.info_snapshot(volume_id, id)
                 if snapshot.metadata:
                     metadata = pickle.loads(snapshot.metadata)
                     if isinstance(metadata, dict):
-                        snapshots.append({'guid': guid,
+                        snapshots.append({'guid': id,
                                           'timestamp': metadata['timestamp'],
                                           'label': metadata['label'],
                                           'is_consistent': metadata['is_consistent'],
@@ -131,6 +131,15 @@ class VDisk(DataObject):
                                           'is_sticky': metadata.get('is_sticky', False),
                                           'in_backend': snapshot.in_backend,
                                           'stored': int(snapshot.stored)})
+                else:
+                    snapshots.append({'guid': id,
+                                      'timestamp': time.mktime(datetime.strptime(snapshot.timestamp.strip(), '%c').timetuple()),
+                                      'label': id,
+                                      'is_consistent': False,
+                                      'is_automatic': False,
+                                      'is_sticky': False,
+                                      'in_backend': snapshot.in_backend,
+                                      'stored': int(snapshot.stored)})
         return snapshots
 
     def _info(self):
