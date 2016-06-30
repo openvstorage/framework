@@ -90,7 +90,7 @@ def process(queue, body, mapping):
                         key = key.replace('[EVENT_NAME]', extension.full_name)
                         key = key.replace('[TASK_NAME]', task.__class__.__name__)
                         for kwarg_key in kwargs:
-                            key = key.replace('[{0}]'.format(kwarg_key), kwargs[kwarg_key])
+                            key = key.replace('[{0}]'.format(kwarg_key), str(kwargs[kwarg_key]))
                         key = key.replace(' ', '_')
                         task_id = cache.get(key)
                         if task_id:
