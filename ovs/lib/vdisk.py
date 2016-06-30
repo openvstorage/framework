@@ -225,6 +225,10 @@ class VDiskController(object):
             if storagedriver is None:
                 raise RuntimeError('Could not find StorageDriver with ID {0}'.format(vdisk.storagedriver_id))
 
+        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)[0]
+        if mds_service is None:
+            raise RuntimeError('Could not find a MDS service')
+
         # Create new snapshot if required
         if snapshot_id is None:
             timestamp = str(int(time.time()))
@@ -259,10 +263,6 @@ class VDiskController(object):
 
         # Configure StorageDriver
         try:
-            mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)[0]
-            if mds_service is None:
-                raise RuntimeError('Could not find a MDS service')
-
             VDiskController._logger.info('Clone snapshot {0} of vDisk {1} to location {2}'.format(snapshot_id, vdisk.name, devicename))
             # noinspection PyArgumentList
             backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
@@ -478,6 +478,10 @@ class VDiskController(object):
         if volume_size > 2 * 1024 ** 4:
             raise ValueError('Maximum volume size of 2TiB exceeded')
 
+        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
+        if mds_service is None:
+            raise RuntimeError('Could not find a MDS service')
+
         new_vdisk = VDisk()
         new_vdisk.size = volume_size
         new_vdisk.vpool = vpool
@@ -490,9 +494,6 @@ class VDiskController(object):
         # Configure StorageDriver
         volume_id = None
         try:
-            mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
-            if mds_service is None:
-                raise RuntimeError('Could not find a MDS service')
             # noinspection PyArgumentList
             backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                                                      port=mds_service.service.ports[0])])

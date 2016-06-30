@@ -32,6 +32,7 @@ class MockStorageRouterClient(object):
     metadata_backend_config = {}
     object_type = {}
     snapshots = {}
+    synced = True
     volumes = {}
     vrouter_id = {}
 
@@ -52,6 +53,7 @@ class MockStorageRouterClient(object):
         MockStorageRouterClient.metadata_backend_config = {}
         MockStorageRouterClient.object_type = {}
         MockStorageRouterClient.snapshots = {}
+        MockStorageRouterClient.synced = True
         MockStorageRouterClient.volumes = {}
         MockStorageRouterClient.vrouter_id = {}
 
@@ -219,6 +221,8 @@ class MockStorageRouterClient(object):
         _ = volume_id, snapshot_id
         snapshot = MockStorageRouterClient.snapshots.get(volume_id, {}).get(snapshot_id)
         if snapshot is not None:
+            if MockStorageRouterClient.synced is False:
+                return False
             return snapshot.in_backend
         return True
 

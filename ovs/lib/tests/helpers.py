@@ -79,26 +79,26 @@ class Helper(object):
         backend_type.name = 'BackendType'
         backend_type.code = 'BT'
         backend_type.save()
-        for domain_id in structure['domains']:
+        for domain_id in structure.get('domains', []):
             domain = Domain()
             domain.name = 'domain_{0}'.format(domain_id)
             domain.save()
             domains[domain_id] = domain
-        for vpool_id in structure['vpools']:
+        for vpool_id in structure.get('vpools', []):
             vpool = VPool()
             vpool.name = str(vpool_id)
             vpool.status = 'RUNNING'
             vpool.backend_type = backend_type
             vpool.save()
             vpools[vpool_id] = vpool
-        for sr_id in structure['storagerouters']:
+        for sr_id in structure.get('storagerouters', []):
             storagerouter = StorageRouter()
             storagerouter.name = str(sr_id)
             storagerouter.ip = '10.0.0.{0}'.format(sr_id)
             storagerouter.rdma_capable = False
             storagerouter.save()
             storagerouters[sr_id] = storagerouter
-        for sd_id, vpool_id, sr_id in structure['storagedrivers']:
+        for sd_id, vpool_id, sr_id in structure.get('storagedrivers', ()):
             storagedriver = StorageDriver()
             storagedriver.vpool = vpools[vpool_id]
             storagedriver.storagerouter = storagerouters[sr_id]
@@ -113,7 +113,7 @@ class Helper(object):
                                    'edge': 4}
             storagedriver.save()
             storagedrivers[sd_id] = storagedriver
-        for mds_id, sd_id in structure['mds_services']:
+        for mds_id, sd_id in structure.get('mds_services', ()):
             sd = storagedrivers[sd_id]
             s_id = '{0}-{1}'.format(sd.storagerouter.name, mds_id)
             service = Service()
@@ -130,7 +130,7 @@ class Helper(object):
             mds_service.vpool = sd.vpool
             mds_service.save()
             mds_services[mds_id] = mds_service
-        for srd_id, sr_id, domain_id, backup in structure['storagerouter_domains']:
+        for srd_id, sr_id, domain_id, backup in structure.get('storagerouter_domains', ()):
             sr_domain = StorageRouterDomain()
             sr_domain.backup = backup
             sr_domain.domain = domains[domain_id]
