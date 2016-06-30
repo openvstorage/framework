@@ -28,7 +28,7 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
-from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient
+from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient, MockStorageRouterClient
 
 
 class Helper(object):
@@ -170,8 +170,8 @@ class Helper(object):
                                'port': Helper.generate_nc_function(False, mds_service)})()
                 mds_backend_config = type('MDSMetaDataBackendConfig', (),
                                           {'node_configs': Helper.generate_bc_function([config])})()
-                MockStorageRouterClient.metadata_backend_config['vdisk_{0}'.format(i)] = mds_backend_config
-                MockStorageRouterClient.catch_up['vdisk_{0}'.format(i)] = 50
-                MockStorageRouterClient.vrouter_id['vdisk_{0}'.format(i)] = storagedriver_id
+                MockStorageRouterClient.metadata_backend_config[vdisk.vpool_guid]['vdisk_{0}'.format(i)] = mds_backend_config
+                MockMetadataServerClient.catchup['vdisk_{0}'.format(i)] = 50
+                MockStorageRouterClient.vrouter_id[vdisk.vpool_guid]['vdisk_{0}'.format(i)] = storagedriver_id
             vdisks[i] = vdisk
         return vdisks

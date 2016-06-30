@@ -575,11 +575,11 @@ class VDiskTest(unittest.TestCase):
         VDiskController.set_as_template(vdisk.guid)
         self.assertTrue(expr=vdisk.is_vtemplate, msg='Dynamic property "is_vtemplate" should still be True')
 
-    @staticmethod
-    def test_event_migrate_from_volumedriver():
+    def test_event_migrate_from_volumedriver(self):
         """
         Test migrate from volumedriver event
         """
+        _ = self
         _, storagerouters, storagedrivers, _, _, _, _, _ = Helper.build_service_structure(
             {'vpools': [1],
              'storagerouters': [1, 2],

@@ -25,8 +25,7 @@ from ovs.dal.hybrids.service import Service
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient
-from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient
+from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient, MockStorageRouterClient
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.tests.helpers import Helper
 
@@ -283,7 +282,7 @@ class MDSServices(unittest.TestCase):
                                                         'port': Helper.generate_nc_function(False, mds_services[mds_id])})()
                     configs.append(config)
                 mds_backend_config = type('MDSMetaDataBackendConfig', (), {'node_configs': Helper.generate_bc_function(configs)})()
-                MockStorageRouterClient.metadata_backend_config[vdisks[disk_id].volume_id] = mds_backend_config
+                MockStorageRouterClient.metadata_backend_config[vpools[1].guid][vdisks[disk_id].volume_id] = mds_backend_config
 
             for vdisk_id in vdisks:
                 MDSServiceController.sync_vdisk_to_reality(vdisks[vdisk_id])
@@ -498,14 +497,14 @@ class MDSServices(unittest.TestCase):
 
         # If the tlogs are not caught up, nothing should be changed
         for vdisk_id in [3, 4]:
-            MockStorageRouterClient.catch_up[vdisks[vdisk_id].volume_id] = 1000
+            MockMetadataServerClient.catchup[vdisks[vdisk_id].volume_id] = 1000
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # The next run, after tlogs are caught up, a master switch should be executed
         for vdisk_id in [3, 4]:
-            MockStorageRouterClient.catch_up[vdisks[vdisk_id].volume_id] = 50
+            MockMetadataServerClient.catchup[vdisks[vdisk_id].volume_id] = 50
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.3', 'port': 3}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
@@ -524,7 +523,7 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 6: Validate whether a volume migration makes the master follow
-        MockStorageRouterClient.vrouter_id[vdisks[1].volume_id] = storagedrivers[3].storagedriver_id
+        MockStorageRouterClient.vrouter_id[vpools[1].guid][vdisks[1].volume_id] = storagedrivers[3].storagedriver_id
         configs = [[{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.2', 'port': 5}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
@@ -968,14 +967,14 @@ class MDSServices(unittest.TestCase):
 
         # If the tlogs are not caught up, nothing should be changed
         for vdisk_id in [3, 4]:
-            MockStorageRouterClient.catch_up[vdisks[vdisk_id].volume_id] = 1000
+            MockMetadataServerClient.catchup[vdisks[vdisk_id].volume_id] = 1000
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # The next run, after tlogs are caught up, a master switch should be executed
         for vdisk_id in [3, 4]:
-            MockStorageRouterClient.catch_up[vdisks[vdisk_id].volume_id] = 50
+            MockMetadataServerClient.catchup[vdisks[vdisk_id].volume_id] = 50
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.3', 'port': 3}],
@@ -994,7 +993,7 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 6: Validate whether a volume migration makes the master follow
-        MockStorageRouterClient.vrouter_id[vdisks[1].volume_id] = storagedrivers[3].storagedriver_id
+        MockStorageRouterClient.vrouter_id[vpools[1].guid][vdisks[1].volume_id] = storagedrivers[3].storagedriver_id
         configs = [[{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.3', 'port': 3}],

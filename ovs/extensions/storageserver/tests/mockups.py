@@ -41,7 +41,6 @@ class MockStorageRouterClient(object):
         """
         _ = arakoon_contacts
         self.vpool_guid = vpool_guid
-        MockStorageRouterClient.synced = True
         for item in [MockStorageRouterClient.dtl_config_cache,
                      MockStorageRouterClient.metadata_backend_config,
                      MockStorageRouterClient.object_type,
