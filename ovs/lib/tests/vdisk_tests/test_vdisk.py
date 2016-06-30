@@ -89,32 +89,57 @@ class VDiskTest(unittest.TestCase):
             - Attempt to create a vDisk with identical devicename
             - Create a vDisk with identical name on another vPool
         """
-        _, _, storagedrivers, _, _, _, _, _ = Helper.build_service_structure(
+        vpools, storagerouters, storagedrivers, _, mds_services, _, _, _ = Helper.build_service_structure(
             {'vpools': [1, 2],
-             'storagerouters': [1],
+             'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 2, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2)]}  # (<id>, <storagedriver_id>)
         )
         two_tib = 2 * 1024 ** 4
 
         # Verify maximum size of 2TiB
+        vdisk_name_1 = 'vdisk_1'
+        vdisk_name_2 = 'vdisk_2'
         with self.assertRaises(ValueError):
-            VDiskController.create_new(volume_name='vdisk_1', volume_size=two_tib + 1, storagedriver_guid=storagedrivers[1].guid)
+            VDiskController.create_new(volume_name=vdisk_name_1, volume_size=two_tib + 1, storagedriver_guid=storagedrivers[1].guid)
+        self.assertTrue(expr=len(VDiskList.get_vdisks()) == 0, msg='Expected to find 0 vDisks after failure 1')
 
         # Create volume of maximum size
-        vdisk_name = 'vdisk_1'
-        VDiskController.create_new(volume_name=vdisk_name, volume_size=two_tib, storagedriver_guid=storagedrivers[1].guid)
+        VDiskController.create_new(volume_name=vdisk_name_1, volume_size=two_tib, storagedriver_guid=storagedrivers[1].guid)
+        vdisks = VDiskList.get_vdisks()
+        self.assertTrue(expr=len(vdisks) == 1, msg='Expected to find 1 vDisk')
+        self.assertTrue(expr=vdisks[0].storagerouter_guid == storagerouters[1].guid, msg='Storage Router does not match expected value')
+        self.assertTrue(expr=vdisks[0].size == two_tib, msg='Size does not match expected value')
+        self.assertTrue(expr=vdisks[0].name == vdisk_name_1, msg='Name does not match expected value')
+        self.assertTrue(expr=vdisks[0].vpool == vpools[1], msg='vPool does not match expected value')
+        self.assertTrue(expr=vdisks[0].devicename == VDiskController.clean_devicename(vdisk_name_1), msg='Devicename does not match expected value')
 
         # Attempt to create same volume on same vPool
         with self.assertRaises(RuntimeError):
-            VDiskController.create_new(volume_name=vdisk_name, volume_size=two_tib, storagedriver_guid=storagedrivers[1].guid)
+            VDiskController.create_new(volume_name=vdisk_name_1, volume_size=two_tib, storagedriver_guid=storagedrivers[1].guid)
+        self.assertTrue(expr=len(VDiskList.get_vdisks()) == 1, msg='Expected to find 1 vDisk after failure 2')
 
         # Attempt to create volume with identical devicename on same vPool
         with self.assertRaises(RuntimeError):
-            VDiskController.create_new(volume_name='{0}%^$'.format(vdisk_name), volume_size=two_tib, storagedriver_guid=storagedrivers[1].guid)
+            VDiskController.create_new(volume_name='{0}%^$'.format(vdisk_name_1), volume_size=two_tib, storagedriver_guid=storagedrivers[1].guid)
+        self.assertTrue(expr=len(VDiskList.get_vdisks()) == 1, msg='Expected to find 1 vDisk after failure 3')
 
-        # Attempt to create same volume on another vPool
-        VDiskController.create_new(volume_name=vdisk_name, volume_size=two_tib, storagedriver_guid=storagedrivers[2].guid)
+        # Create same volume on another vPool
+        vdisk2 = VDisk(VDiskController.create_new(volume_name=vdisk_name_2, volume_size=two_tib, storagedriver_guid=storagedrivers[2].guid))
+        vdisks = VDiskList.get_vdisks()
+        self.assertTrue(expr=len(vdisks) == 2, msg='Expected to find 2 vDisks')
+        self.assertTrue(expr=vdisk2.storagerouter_guid == storagerouters[1].guid, msg='Storage Router does not match expected value')
+        self.assertTrue(expr=vdisk2.size == two_tib, msg='Size does not match expected value')
+        self.assertTrue(expr=vdisk2.name == vdisk_name_2, msg='Name does not match expected value')
+        self.assertTrue(expr=vdisk2.vpool == vpools[2], msg='vPool does not match expected value')
+        self.assertTrue(expr=vdisk2.devicename == VDiskController.clean_devicename(vdisk_name_2), msg='Devicename does not match expected value')
+
+        # Attempt to create vDisk on Storage Driver without MDS service
+        mds_services[1].service.storagerouter = storagerouters[2]
+        mds_services[1].service.save()
+        with self.assertRaises(RuntimeError):
+            VDiskController.create_new(volume_name='vdisk_3', volume_size=two_tib, storagedriver_guid=storagedrivers[1].guid)
+        self.assertTrue(expr=len(VDiskList.get_vdisks()) == 2, msg='Expected to find 2 vDisks after failure 4')
 
     def test_create_from_template(self):
         """
@@ -588,6 +613,7 @@ class VDiskTest(unittest.TestCase):
         )
         vdisk = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 4, storagedriver_guid=storagedrivers[1].guid))
         VDiskController.migrate_from_voldrv(volume_id=vdisk.volume_id, new_owner_id=storagedrivers[2].storagedriver_id)
+        # @TODO: Add validations
 
     def test_event_resize_from_volumedriver(self):
         """

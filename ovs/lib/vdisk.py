@@ -604,7 +604,7 @@ class VDiskController(object):
                 dtl_target = [junction.domain_guid for junction in vdisk.domains_dtl]
 
         if dedupe_mode is None:
-            dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_CONTENT_BASED)
+            dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_LOCATION_BASED)
         if cache_strategy is None:
             cache_strategy = volume_manager.get('read_cache_default_behaviour', StorageDriverClient.VOLDRV_CACHE_ON_READ)
         if tlog_multiplier is None:
@@ -650,8 +650,8 @@ class VDiskController(object):
 
         Toolbox.verify_required_params(required_params, new_config_params)
 
-        if new_config_params['dtl_mode'] != 'no_sync' and new_config_params.get('dtl_target') is None:
-            raise Exception('If DTL mode is Asynchronous or Synchronous, a Domain guid should always be specified')
+        if new_config_params['dtl_mode'] != 'no_sync' and new_config_params.get('dtl_target') in [None, []]:
+            raise ValueError('If DTL mode is Asynchronous or Synchronous, a Domain guid should always be specified')
 
         errors = False
         vdisk = VDisk(vdisk_guid)
@@ -754,7 +754,7 @@ class VDiskController(object):
                     errors = True
 
         # 2nd update rest
-        for key in required_params:
+        for key in new_config_params:
             try:
                 if key in ['sco_size', 'dtl_mode', 'dtl_target']:
                     continue

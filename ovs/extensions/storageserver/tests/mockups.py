@@ -27,6 +27,7 @@ class MockStorageRouterClient(object):
     """
     Storage Router Client Mock class
     """
+    config_cache = {}
     dtl_config_cache = {}
     metadata_backend_config = {}
     object_type = {}
@@ -41,7 +42,8 @@ class MockStorageRouterClient(object):
         """
         _ = arakoon_contacts
         self.vpool_guid = vpool_guid
-        for item in [MockStorageRouterClient.dtl_config_cache,
+        for item in [MockStorageRouterClient.config_cache,
+                     MockStorageRouterClient.dtl_config_cache,
                      MockStorageRouterClient.metadata_backend_config,
                      MockStorageRouterClient.object_type,
                      MockStorageRouterClient.snapshots,
@@ -56,7 +58,8 @@ class MockStorageRouterClient(object):
         Clean everything up from previous runs
         """
         MockStorageRouterClient.synced = True
-        for item in [MockStorageRouterClient.dtl_config_cache,
+        for item in [MockStorageRouterClient.config_cache,
+                     MockStorageRouterClient.dtl_config_cache,
                      MockStorageRouterClient.metadata_backend_config,
                      MockStorageRouterClient.object_type,
                      MockStorageRouterClient.snapshots,
@@ -143,50 +146,50 @@ class MockStorageRouterClient(object):
         """
         Retrieve the metadata cache capacity for volume
         """
-        _ = self, volume_id
-        return 10240
+        _ = self
+        return MockStorageRouterClient.config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('metadata_cache_capacity', 256 * 24)
 
     def get_readcache_behaviour(self, volume_id):
         """
         Retrieve the read cache behaviour for volume
         """
-        _ = self, volume_id
-        return None  # Means the vPool global value is used
+        _ = self
+        return MockStorageRouterClient.config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('readcache_behaviour')
 
     def get_readcache_limit(self, volume_id):
         """
         Retrieve the read cache limit for volume
         """
-        _ = self, volume_id
-        return None  # Means the vPool global value is used
+        _ = self
+        return MockStorageRouterClient.config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('readcache_limit')
 
     def get_readcache_mode(self, volume_id):
         """
         Retrieve the read cache mode for volume
         """
-        _ = self, volume_id
-        return None  # Means the vPool global value is used
+        _ = self
+        return MockStorageRouterClient.config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('readcache_mode')
 
     def get_sco_cache_max_non_disposable_factor(self, volume_id):
         """
         Retrieve the SCO cache multiplier for a volume
         """
-        _ = self, volume_id
-        return None  # Means the vPool global value is used
+        _ = self
+        return MockStorageRouterClient.config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('sco_cache_non_disposable_factor', 12)
 
     def get_sco_multiplier(self, volume_id):
         """
         Retrieve the SCO multiplier for volume
         """
-        _ = self, volume_id
-        return 1024
+        _ = self
+        return MockStorageRouterClient.config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('sco_multiplier', 1024)
 
     def get_tlog_multiplier(self, volume_id):
         """
         Retrieve the TLOG multiplier for volume
         """
-        _ = self, volume_id
-        return 16
+        _ = self
+        return MockStorageRouterClient.config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('tlog_multiplier', 16)
 
     def info_snapshot(self, volume_id, snapshot_id):
         """
@@ -240,9 +243,80 @@ class MockStorageRouterClient(object):
 
     def set_metadata_cache_capacity(self, volume_id, num_pages):
         """
-        Set the metadata cache capacity
+        Set the metadata cache capacity for volume
         """
-        _ = self, volume_id, num_pages
+        _ = self
+        if self.vpool_guid not in MockStorageRouterClient.config_cache:
+            MockStorageRouterClient.config_cache[self.vpool_guid] = {}
+        if volume_id not in MockStorageRouterClient.config_cache[self.vpool_guid]:
+            MockStorageRouterClient.config_cache[self.vpool_guid][volume_id] = {}
+        MockStorageRouterClient.config_cache[self.vpool_guid][volume_id]['metadata_cache_capacity'] = num_pages
+
+    def set_readcache_behaviour(self, volume_id, behaviour):
+        """
+        Retrieve the read cache behaviour for volume
+        """
+        _ = self
+        if self.vpool_guid not in MockStorageRouterClient.config_cache:
+            MockStorageRouterClient.config_cache[self.vpool_guid] = {}
+        if volume_id not in MockStorageRouterClient.config_cache[self.vpool_guid]:
+            MockStorageRouterClient.config_cache[self.vpool_guid][volume_id] = {}
+        MockStorageRouterClient.config_cache[self.vpool_guid][volume_id]['readcache_behaviour'] = behaviour
+
+    def set_readcache_limit(self, volume_id, limit):
+        """
+        Retrieve the read cache limit for volume
+        """
+        _ = self
+        if self.vpool_guid not in MockStorageRouterClient.config_cache:
+            MockStorageRouterClient.config_cache[self.vpool_guid] = {}
+        if volume_id not in MockStorageRouterClient.config_cache[self.vpool_guid]:
+            MockStorageRouterClient.config_cache[self.vpool_guid][volume_id] = {}
+        MockStorageRouterClient.config_cache[self.vpool_guid][volume_id]['readcache_limit'] = limit
+
+    def set_readcache_mode(self, volume_id, mode):
+        """
+        Retrieve the read cache mode for volume
+        """
+        _ = self
+        if self.vpool_guid not in MockStorageRouterClient.config_cache:
+            MockStorageRouterClient.config_cache[self.vpool_guid] = {}
+        if volume_id not in MockStorageRouterClient.config_cache[self.vpool_guid]:
+            MockStorageRouterClient.config_cache[self.vpool_guid][volume_id] = {}
+        MockStorageRouterClient.config_cache[self.vpool_guid][volume_id]['readcache_mode'] = mode
+
+    def set_sco_cache_max_non_disposable_factor(self, volume_id, factor):
+        """
+        Retrieve the SCO cache multiplier for a volume
+        """
+        _ = self
+        if self.vpool_guid not in MockStorageRouterClient.config_cache:
+            MockStorageRouterClient.config_cache[self.vpool_guid] = {}
+        if volume_id not in MockStorageRouterClient.config_cache[self.vpool_guid]:
+            MockStorageRouterClient.config_cache[self.vpool_guid][volume_id] = {}
+        MockStorageRouterClient.config_cache[self.vpool_guid][volume_id]['sco_cache_non_disposable_factor'] = factor
+
+    def set_sco_multiplier(self, volume_id, multiplier):
+        """
+        Set the SCO multiplier for volume
+        """
+        _ = self
+        if self.vpool_guid not in MockStorageRouterClient.config_cache:
+            MockStorageRouterClient.config_cache[self.vpool_guid] = {}
+        if volume_id not in MockStorageRouterClient.config_cache[self.vpool_guid]:
+            MockStorageRouterClient.config_cache[self.vpool_guid][volume_id] = {}
+        MockStorageRouterClient.config_cache[self.vpool_guid][volume_id]['sco_multiplier'] = multiplier
+
+    def set_tlog_multiplier(self, volume_id, multiplier):
+        """
+        Retrieve the TLOG multiplier for volume
+        """
+        _ = self
+        if self.vpool_guid not in MockStorageRouterClient.config_cache:
+            MockStorageRouterClient.config_cache[self.vpool_guid] = {}
+        if volume_id not in MockStorageRouterClient.config_cache[self.vpool_guid]:
+            MockStorageRouterClient.config_cache[self.vpool_guid][volume_id] = {}
+        MockStorageRouterClient.config_cache[self.vpool_guid][volume_id]['tlog_multiplier'] = multiplier
 
     def set_volume_as_template(self, volume_id):
         """
