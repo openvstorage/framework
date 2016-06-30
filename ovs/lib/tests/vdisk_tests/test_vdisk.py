@@ -142,13 +142,13 @@ class VDiskTest(unittest.TestCase):
         self.assertTrue(expr=template.is_vtemplate, msg='Dynamic property "is_vtemplate" should be True')
 
         # Create from vDisk which is not a vTemplate
-        MockStorageRouterClient.object_type[template.volume_id] = 'BASE'
+        MockStorageRouterClient.object_type[template.vpool_guid][template.volume_id] = 'BASE'
         template.invalidate_dynamics(['info', 'is_vtemplate'])
         with self.assertRaises(RuntimeError):
             VDiskController.create_from_template(vdisk_guid=template.guid, name=vdisk_name, storagerouter_guid=storagerouters[1].guid)
 
         # Create from template
-        MockStorageRouterClient.object_type[template.volume_id] = 'TEMPLATE'
+        MockStorageRouterClient.object_type[template.vpool_guid][template.volume_id] = 'TEMPLATE'
         template.invalidate_dynamics(['info', 'is_vtemplate'])
         info = VDiskController.create_from_template(vdisk_guid=template.guid, name=vdisk_name, storagerouter_guid=storagerouters[1].guid)
         expected_keys = ['vdisk_guid', 'name', 'backingdevice']
@@ -347,7 +347,7 @@ class VDiskTest(unittest.TestCase):
         self.assertTrue(expr=len(vdisks) == 2, msg='Expected to find 2 vDisks after failed clone attempt 6')
 
         # Update backend synced flag and retry
-        MockStorageRouterClient.snapshots[vdisk1.volume_id][snapshot_id].in_backend = True
+        MockStorageRouterClient.snapshots[vdisk1.vpool_guid][vdisk1.volume_id][snapshot_id].in_backend = True
         vdisk1.invalidate_dynamics('snapshots')
         VDiskController.clone(vdisk_guid=vdisk1.guid,
                               name='clone2',
@@ -595,7 +595,7 @@ class VDiskTest(unittest.TestCase):
             - Create a vDisk using the resize event
             - Resize the created vDisk using the same resize event
         """
-        _, _, storagedrivers, _, _, _, _, _ = Helper.build_service_structure(
+        vpools, _, storagedrivers, _, _, _, _, _ = Helper.build_service_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
@@ -605,7 +605,8 @@ class VDiskTest(unittest.TestCase):
         # Create volume using resize from voldrv
         volume_id = 'vdisk_1'
         device_name = '/{0}.raw'.format(volume_id)
-        MockStorageRouterClient.vrouter_id[volume_id] = storagedrivers[1].storagedriver_id
+        _ = MockStorageRouterClient(vpools[1].guid, None)  # Initialize the mock client
+        MockStorageRouterClient.vrouter_id[vpools[1].guid][volume_id] = storagedrivers[1].storagedriver_id
         VDiskController.resize_from_voldrv(volume_id=volume_id,
                                            volume_size=1024 ** 4,
                                            volume_path=device_name,

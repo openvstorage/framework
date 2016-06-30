@@ -109,7 +109,7 @@ class VDiskController(object):
         :type vdisk_guid: str
         """
         vdisk = VDisk(vdisk_guid)
-        vdisk.storagedriver_client.unlink(str(vdisk.volume_id))
+        vdisk.storagedriver_client.unlink(str(vdisk.devicename))
         VDiskController.delete_from_voldrv(vdisk.volume_id)
 
     @staticmethod

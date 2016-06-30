@@ -26,6 +26,7 @@ from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient
+from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.tests.helpers import Helper
 
@@ -47,6 +48,7 @@ class MDSServices(unittest.TestCase):
         cls.volatile.clean()
 
         MockStorageRouterClient.clean()
+        MockMetadataServerClient.clean()
 
         EtcdConfiguration.set('/ovs/framework/logging|path', '/var/log/ovs')
         EtcdConfiguration.set('/ovs/framework/logging|level', 'DEBUG')
@@ -73,6 +75,7 @@ class MDSServices(unittest.TestCase):
         self.persistent.clean()
         self.volatile.clean()
         MockStorageRouterClient.clean()
+        MockMetadataServerClient.clean()
 
     def tearDown(self):
         """
@@ -81,6 +84,7 @@ class MDSServices(unittest.TestCase):
         self.persistent.clean()
         self.volatile.clean()
         MockStorageRouterClient.clean()
+        MockMetadataServerClient.clean()
 
     def _check_reality(self, configs, loads, vdisks, mds_services, display=False):
         """
