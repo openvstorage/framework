@@ -74,18 +74,3 @@ class StorageDriverViewSet(viewsets.ViewSet):
         if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id):
             result = False
         return result
-
-    @action()
-    @required_roles(['read', 'write'])
-    @return_task()
-    @load(StorageDriver)
-    def create_new_disk(self, storagedriver, diskname, size):
-        """
-        Create a new empty vdisk - including the volume in the backend
-        :param storagedriver: Guid of the storagedriver holding the vdisk
-        :param diskname: Name of the new vdisk
-        :param size: Size in GB
-        """
-        return VDiskController.create_new.delay(diskname=diskname,
-                                                size=size,
-                                                storagedriver_guid=storagedriver.guid)

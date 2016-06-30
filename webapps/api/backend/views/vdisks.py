@@ -17,7 +17,6 @@
 """
 VDisk module
 """
-import json
 import time
 from backend.decorators import required_roles, load, return_list, return_object, return_task, log
 from ovs.dal.datalist import DataList
@@ -80,7 +79,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :param vdisk: Guid of the virtual disk
         :param timestamp: Timestamp of the snapshot to rollback to
         """
-        return VDiskController.rollback.delay(diskguid=vdisk.guid,
+        return VDiskController.rollback.delay(vdisk_guid=vdisk.guid,
                                               timestamp=timestamp)
 
     @action()
@@ -147,8 +146,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :param snapshot_id: ID of the snapshot to clone from
         """
         storagerouter = StorageRouter(storagerouter_guid)
-        return VDiskController.clone.delay(diskguid=vdisk.guid,
-                                           snapshotid=snapshot_id,
+        return VDiskController.clone.delay(vdisk_guid=vdisk.guid,
+                                           snapshot_id=snapshot_id,
                                            name=name,
                                            storagerouter_guid=storagerouter.guid)
 
@@ -163,8 +162,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :param vdisk: Guid of the virtual disk whose snapshot is to be removed
         :param snapshot_id: ID of the snapshot to remove
         """
-        return VDiskController.delete_snapshot.delay(diskguid=vdisk.guid,
-                                                     snapshotid=snapshot_id)
+        return VDiskController.delete_snapshot.delay(vdisk_guid=vdisk.guid,
+                                                     snapshot_id=snapshot_id)
 
     @action()
     @log()
@@ -176,7 +175,7 @@ class VDiskViewSet(viewsets.ViewSet):
         Sets a vDisk as template
         :param vdisk: Guid of the virtual disk to set as template
         """
-        return VDiskController.set_as_template.delay(diskguid=vdisk.guid)
+        return VDiskController.set_as_template.delay(vdisk_guid=vdisk.guid)
 
     @action()
     @log()
@@ -199,8 +198,8 @@ class VDiskViewSet(viewsets.ViewSet):
         storagerouter = StorageRouter(storagerouter_guid)
         for storagedriver in storagerouter.storagedrivers:
             if storagedriver.vpool_guid == vpool_guid:
-                return VDiskController.create_new.delay(name=name,
-                                                        size=size,
+                return VDiskController.create_new.delay(volume_name=name,
+                                                        volume_size=size,
                                                         storagedriver_guid=storagedriver.guid)
         raise NotAcceptable('No storagedriver found for vPool: {0} and StorageRouter: {1}'.format(vpool_guid, storagerouter_guid))
 
@@ -209,7 +208,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def create_snapshot(self, vdisk, name, version, timestamp=None, consistent=False, automatic=False, sticky=False, snapshot_id=None):
+    def create_snapshot(self, vdisk, name, version, timestamp=None, consistent=False, automatic=False, sticky=False):
         """
         Creates a snapshot from the vDisk
         :param vdisk: Guid of the virtual disk to create snapshot from
@@ -219,7 +218,6 @@ class VDiskViewSet(viewsets.ViewSet):
         :param consistent: Flag - is_consistent
         :param automatic: Flag - is_automatic
         :param sticky: Flag - is_sticky
-        :param snapshot_id: (optional) id of the snapshot, default will be new uuid
         """
         if version >= 3:
             timestamp = str(int(time.time()))
@@ -228,9 +226,8 @@ class VDiskViewSet(viewsets.ViewSet):
                     'is_consistent': True if consistent else False,
                     'is_sticky': True if sticky else False,
                     'is_automatic': True if automatic else False}
-        return VDiskController.create_snapshot.delay(diskguid=vdisk.guid,
-                                                     metadata=metadata,
-                                                     snapshotid=snapshot_id)
+        return VDiskController.create_snapshot.delay(vdisk_guid=vdisk.guid,
+                                                     metadata=metadata)
 
     @action()
     @log()
@@ -244,7 +241,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :param name: Name of the new vdisk
         :param storagerouter_guid: Guid of StorageRouter to create new vDisk on
         """
-        return VDiskController.create_from_template.delay(diskguid=vdisk.guid,
+        return VDiskController.create_from_template.delay(vdisk_guid=vdisk.guid,
                                                           name=name,
                                                           storagerouter_guid=storagerouter_guid)
 
@@ -283,7 +280,7 @@ class VDiskViewSet(viewsets.ViewSet):
         Delete vdisk
         :param vdisk: Guid of the vdisk to delete
         """
-        return VDiskController.delete.delay(diskguid=vdisk.guid)
+        return VDiskController.delete.delay(vdisk_guid=vdisk.guid)
 
     @action()
     @log()
@@ -296,7 +293,7 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         if not vdisk.is_vtemplate:
             raise NotAcceptable('vDisk should be a vTemplate')
-        return VDiskController.delete.delay(diskguid=vdisk.guid)
+        return VDiskController.delete.delay(vdisk_guid=vdisk.guid)
 
     @action()
     @log()

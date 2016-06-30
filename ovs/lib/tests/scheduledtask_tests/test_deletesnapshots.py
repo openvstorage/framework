@@ -169,7 +169,7 @@ class DeleteSnapshots(unittest.TestCase):
         hour = minute * 60
         for h in [6, 12, 18]:
             timestamp = base_timestamp + (hour * h)
-            VDiskController.create_snapshot(diskguid=vdisk_1_1.guid,
+            VDiskController.create_snapshot(vdisk_guid=vdisk_1_1.guid,
                                             metadata={'label': 'snapshot_{0}:30'.format(str(h)),
                                                       'is_consistent': True,
                                                       'timestamp': str(timestamp),
@@ -188,7 +188,7 @@ class DeleteSnapshots(unittest.TestCase):
 
         for h in [6, 12, 18]:
             timestamp = base_timestamp + (hour * h)
-            VDiskController.create_snapshot(diskguid=clone_vdisk.guid,
+            VDiskController.create_snapshot(vdisk_guid=clone_vdisk.guid,
                                             metadata={'label': 'snapshot_{0}:30'.format(str(h)),
                                                       'is_consistent': True,
                                                       'timestamp': str(timestamp),
@@ -277,14 +277,14 @@ class DeleteSnapshots(unittest.TestCase):
             self._print_message('- Creating snapshots')
             for h in xrange(2, 23):
                 timestamp = base_timestamp + (hour * h)
-                VDiskController.create_snapshot(diskguid=vdisk_1.guid,
+                VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
                                                 metadata={'label': 'ss_i_{0}:00'.format(str(h)),
                                                           'is_consistent': False,
                                                           'timestamp': str(timestamp),
                                                           'machineguid': None})
                 if h in [6, 12, 18]:
                     ts = (timestamp + (minute * 30))
-                    VDiskController.create_snapshot(diskguid=vdisk_1.guid,
+                    VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
                                                     metadata={'label': 'ss_c_{0}:30'.format(str(h)),
                                                               'is_consistent': True,
                                                               'timestamp': str(ts),

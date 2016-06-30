@@ -17,7 +17,9 @@
 """
 Mock wrapper class for the storagedriver client
 """
+import copy
 import uuid
+import pickle
 from volumedriver.storagerouter.storagerouterclient import DTLConfigMode
 
 
@@ -52,6 +54,26 @@ class MockStorageRouterClient(object):
         MockStorageRouterClient.snapshots = {}
         MockStorageRouterClient.volumes = {}
         MockStorageRouterClient.vrouter_id = {}
+
+    @staticmethod
+    def create_clone(target_path, metadata_backend_config, parent_volume_id, parent_snapshot_id, node_id):
+        """
+        Create a mocked clone
+        """
+        _ = target_path, metadata_backend_config, parent_volume_id, parent_snapshot_id, node_id
+        volume_id = str(uuid.uuid4())
+        MockStorageRouterClient.vrouter_id[volume_id] = node_id
+        return volume_id
+
+    @staticmethod
+    def create_clone_from_template(target_path, metadata_backend_config, parent_volume_id, node_id):
+        """
+        Create a vDisk from a vTemplate
+        """
+        _ = target_path, metadata_backend_config, parent_volume_id, node_id
+        volume_id = str(uuid.uuid4())
+        MockStorageRouterClient.vrouter_id[volume_id] = node_id
+        return volume_id
 
     @staticmethod
     def create_snapshot(volume_id, snapshot_id, metadata):
@@ -93,8 +115,10 @@ class MockStorageRouterClient(object):
         """
         Returns an empty info object
         """
-        return type('Info', (), {'object_type': property(lambda s: 'BASE'),
+        return type('Info', (), {'cluster_multiplier': 0,
+                                 'lba_size': 0,
                                  'metadata_backend_config': property(lambda s: None),
+                                 'object_type': property(lambda s: 'BASE'),
                                  'vrouter_id': property(lambda s: None)})()
 
     @staticmethod
@@ -181,9 +205,22 @@ class MockStorageRouterClient(object):
         """
         Info volume mockup
         """
-        return type('Info', (), {'object_type': property(lambda s: MockStorageRouterClient.object_type.get(volume_id, 'BASE')),
+        return type('Info', (), {'cluster_multiplier': property(lambda s: 8),
+                                 'lba_size': property(lambda s: 512),
                                  'metadata_backend_config': property(lambda s: MockStorageRouterClient.metadata_backend_config.get(volume_id)),
+                                 'object_type': property(lambda s: MockStorageRouterClient.object_type.get(volume_id, 'BASE')),
                                  'vrouter_id': property(lambda s: MockStorageRouterClient.vrouter_id.get(volume_id))})()
+
+    @staticmethod
+    def is_volume_synced_up_to_snapshot(volume_id, snapshot_id):
+        """
+        Is volume synced up to specified snapshot mockup
+        """
+        _ = volume_id, snapshot_id
+        snapshot = MockStorageRouterClient.snapshots.get(volume_id, {}).get(snapshot_id)
+        if snapshot is not None:
+            return snapshot.in_backend
+        return True
 
     @staticmethod
     def list_snapshots(volume_id):
@@ -221,6 +258,18 @@ class MockStorageRouterClient(object):
         """
         Set a volume as a template
         """
+        # Converting to template results in only latest snapshot to be kept
+        timestamp = 0
+        newest_snap_id = None
+        for snap_id, snap_info in MockStorageRouterClient.snapshots.get(volume_id, {}).iteritems():
+            metadata = pickle.loads(snap_info.metadata)
+            if metadata['timestamp'] > timestamp:
+                timestamp = metadata['timestamp']
+                newest_snap_id = snap_id
+        if newest_snap_id is not None:
+            for snap_id in copy.deepcopy(MockStorageRouterClient.snapshots.get(volume_id, {})).iterkeys():
+                if snap_id != newest_snap_id:
+                    MockStorageRouterClient.snapshots[volume_id].pop(snap_id)
         MockStorageRouterClient.object_type[volume_id] = 'TEMPLATE'
 
     @staticmethod
@@ -276,9 +325,10 @@ class Snapshot(object):
         """
         Init method
         """
+        metadata_dict = pickle.loads(metadata)
         self.metadata = metadata
         self.stored = 0
-        self.in_backend = True
+        self.in_backend = metadata_dict.get('in_backend', True)
 
 
 class DTLConfig(object):

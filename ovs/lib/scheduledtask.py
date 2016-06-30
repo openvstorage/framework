@@ -73,7 +73,7 @@ class ScheduledTaskController(object):
                             'timestamp': str(int(time.time())),
                             'is_automatic': True,
                             'is_sticky': False}
-                VDiskController.create_snapshot(diskguid=vdisk.guid,
+                VDiskController.create_snapshot(vdisk_guid=vdisk.guid,
                                                 metadata=metadata)
                 success.append(vdisk.guid)
             except Exception:
@@ -152,8 +152,8 @@ class ScheduledTaskController(object):
                     for bucket in bucket_chain:
                         if bucket['start'] >= timestamp > bucket['end']:
                             bucket['snapshots'].append({'timestamp': timestamp,
-                                                        'snapshotid': snapshot['guid'],
-                                                        'diskguid': vdisk.guid,
+                                                        'snapshot_id': snapshot['guid'],
+                                                        'vdisk_guid': vdisk.guid,
                                                         'is_consistent': snapshot['is_consistent']})
                 bucket_chains.append(bucket_chain)
 
@@ -192,8 +192,8 @@ class ScheduledTaskController(object):
         for bucket_chain in bucket_chains:
             for bucket in bucket_chain:
                 for snapshot in bucket['snapshots']:
-                    VDiskController.delete_snapshot(diskguid=snapshot['diskguid'],
-                                                    snapshotid=snapshot['snapshotid'])
+                    VDiskController.delete_snapshot(vdisk_guid=snapshot['vdisk_guid'],
+                                                    snapshot_id=snapshot['snapshot_id'])
         ScheduledTaskController._logger.info('Delete snapshots finished')
 
     @staticmethod
