@@ -25,19 +25,16 @@ from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_mdsservice import MDSService
-from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
-from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient
-from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.scheduledtask import ScheduledTaskController
 
@@ -68,6 +65,8 @@ class DeleteSnapshots(unittest.TestCase):
         self.persistent.clean()
         MockStorageRouterClient.clean()
 
+        self.debug = False
+
     def tearDown(self):
         """
         Clean up the unittest
@@ -76,6 +75,10 @@ class DeleteSnapshots(unittest.TestCase):
         self.volatile.clean()
         self.persistent.clean()
         MockStorageRouterClient.clean()
+
+    def _print_message(self, message):
+        if self.debug is True:
+            print message
 
     def test_clone_snapshot(self):
         """
@@ -92,16 +95,9 @@ class DeleteSnapshots(unittest.TestCase):
         vpool.status = 'RUNNING'
         vpool.backend_type = backend_type
         vpool.save()
-        pmachine = PMachine()
-        pmachine.name = 'PMachine'
-        pmachine.username = 'root'
-        pmachine.ip = '127.0.0.1'
-        pmachine.hvtype = 'KVM'
-        pmachine.save()
         storage_router = StorageRouter()
         storage_router.name = 'storage_router'
         storage_router.ip = '127.0.0.1'
-        storage_router.pmachine = pmachine
         storage_router.machine_id = System.get_my_machine_id()
         storage_router.rdma_capable = False
         storage_router.save()
@@ -165,24 +161,21 @@ class DeleteSnapshots(unittest.TestCase):
         travis = 'TRAVIS' in os.environ and os.environ['TRAVIS'] == 'true'
         if travis is True:
             print 'Running in Travis, reducing output.'
-        debug = not travis
 
         base = datetime.datetime.now().date()
         day = datetime.timedelta(1)
         base_timestamp = self._make_timestamp(base, day)
         minute = 60
         hour = minute * 60
-        print '- Creating 3 snapshots'
         for h in [6, 12, 18]:
             timestamp = base_timestamp + (hour * h)
-            VDiskController.create_snapshot(diskguid=vdisk_1_1.guid,
+            VDiskController.create_snapshot(vdisk_guid=vdisk_1_1.guid,
                                             metadata={'label': 'snapshot_{0}:30'.format(str(h)),
                                                       'is_consistent': True,
                                                       'timestamp': str(timestamp),
                                                       'machineguid': None})
 
         base_snapshot_guid = vdisk_1_1.snapshots[0]['guid']  # Oldest
-        print '- Creating clone'
         clone_vdisk = VDisk()
         clone_vdisk.name = 'clone_vdisk'
         clone_vdisk.volume_id = 'clone_vdisk'
@@ -193,27 +186,23 @@ class DeleteSnapshots(unittest.TestCase):
         clone_vdisk.save()
         clone_vdisk.reload_client()
 
-        print '- Creating 3 snapshots of clone'
         for h in [6, 12, 18]:
             timestamp = base_timestamp + (hour * h)
-            VDiskController.create_snapshot(diskguid=clone_vdisk.guid,
+            VDiskController.create_snapshot(vdisk_guid=clone_vdisk.guid,
                                             metadata={'label': 'snapshot_{0}:30'.format(str(h)),
                                                       'is_consistent': True,
                                                       'timestamp': str(timestamp),
                                                       'machineguid': None})
 
         base_timestamp = self._make_timestamp(base, day * 2)
-        print '- Deleting snapshots'
         ScheduledTaskController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
         self.assertIn(base_snapshot_guid, [snap['guid'] for snap in vdisk_1_1.snapshots], 'Snapshot was deleted while there are still clones of it')
 
     def test_happypath(self):
         """
         Validates the happy path; Hourly snapshots are taken with a few manual consistent
-        every now an then. The delete policy is executed every day
+        every now and then. The delete policy is executed every day
         """
-        # Setup
-        # There are 2 machines; one with two disks, one with one disk and a stand-alone additional disk
         backend_type = BackendType()
         backend_type.name = 'BackendType'
         backend_type.code = 'BT'
@@ -223,16 +212,9 @@ class DeleteSnapshots(unittest.TestCase):
         vpool.status = 'RUNNING'
         vpool.backend_type = backend_type
         vpool.save()
-        pmachine = PMachine()
-        pmachine.name = 'PMachine'
-        pmachine.username = 'root'
-        pmachine.ip = '127.0.0.1'
-        pmachine.hvtype = 'VMWARE'
-        pmachine.save()
         storage_router = StorageRouter()
         storage_router.name = 'storage_router'
         storage_router.ip = '127.0.0.1'
-        storage_router.pmachine = pmachine
         storage_router.machine_id = System.get_my_machine_id()
         storage_router.rdma_capable = False
         storage_router.save()
@@ -254,59 +236,21 @@ class DeleteSnapshots(unittest.TestCase):
         disk_partition.roles = [DiskPartition.ROLES.SCRUB]
         disk_partition.mountpoint = '/var/tmp'
         disk_partition.save()
-        vmachine_1 = VMachine()
-        vmachine_1.name = 'vmachine_1'
-        vmachine_1.devicename = 'dummy'
-        vmachine_1.pmachine = pmachine
-        vmachine_1.save()
-        vdisk_1_1 = VDisk()
-        vdisk_1_1.name = 'vdisk_1_1'
-        vdisk_1_1.volume_id = 'vdisk_1_1'
-        vdisk_1_1.vmachine = vmachine_1
-        vdisk_1_1.vpool = vpool
-        vdisk_1_1.devicename = 'dummy'
-        vdisk_1_1.size = 0
-        vdisk_1_1.save()
-        vdisk_1_1.reload_client()
-        vdisk_1_2 = VDisk()
-        vdisk_1_2.name = 'vdisk_1_2'
-        vdisk_1_2.volume_id = 'vdisk_1_2'
-        vdisk_1_2.vmachine = vmachine_1
-        vdisk_1_2.vpool = vpool
-        vdisk_1_2.devicename = 'dummy'
-        vdisk_1_2.size = 0
-        vdisk_1_2.save()
-        vdisk_1_2.reload_client()
-        vmachine_2 = VMachine()
-        vmachine_2.name = 'vmachine_2'
-        vmachine_2.devicename = 'dummy'
-        vmachine_2.pmachine = pmachine
-        vmachine_2.save()
-        vdisk_2_1 = VDisk()
-        vdisk_2_1.name = 'vdisk_2_1'
-        vdisk_2_1.volume_id = 'vdisk_2_1'
-        vdisk_2_1.vmachine = vmachine_2
-        vdisk_2_1.vpool = vpool
-        vdisk_2_1.devicename = 'dummy'
-        vdisk_2_1.size = 0
-        vdisk_2_1.save()
-        vdisk_2_1.reload_client()
-        vdisk_3 = VDisk()
-        vdisk_3.name = 'vdisk_3'
-        vdisk_3.volume_id = 'vdisk_3'
-        vdisk_3.vpool = vpool
-        vdisk_3.devicename = 'dummy'
-        vdisk_3.size = 0
-        vdisk_3.save()
-        vdisk_3.reload_client()
+        vdisk_1 = VDisk()
+        vdisk_1.name = 'vdisk_1'
+        vdisk_1.volume_id = 'vdisk_1'
+        vdisk_1.vpool = vpool
+        vdisk_1.devicename = 'dummy'
+        vdisk_1.size = 0
+        vdisk_1.save()
+        vdisk_1.reload_client()
 
-        for disk in [vdisk_1_1, vdisk_1_2, vdisk_2_1, vdisk_3]:
-            [dynamic for dynamic in disk._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
+        [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         # Run the testing scenario
         travis = 'TRAVIS' in os.environ and os.environ['TRAVIS'] == 'true'
         if travis is True:
-            print 'Running in Travis, reducing output.'
+            self._print_message('Running in Travis, reducing output.')
         debug = not travis
         amount_of_days = 50
         base = datetime.datetime.now().date()
@@ -316,44 +260,31 @@ class DeleteSnapshots(unittest.TestCase):
 
         for d in xrange(0, amount_of_days):
             base_timestamp = self._make_timestamp(base, day * d)
-            print ''
-            print 'Day cycle: {0}: {1}'.format(d, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d'))
+            self._print_message('')
+            self._print_message('Day cycle: {0}: {1}'.format(d, datetime.datetime.fromtimestamp(base_timestamp).strftime('%Y-%m-%d')))
 
             # At the start of the day, delete snapshot policy runs at 00:30
-            print '- Deleting snapshots'
+            self._print_message('- Deleting snapshots')
             ScheduledTaskController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
 
             # Validate snapshots
-            print '- Validating snapshots'
-            for vdisk in [vdisk_1_1, vdisk_1_2, vdisk_2_1, vdisk_3]:
-                self._validate(vdisk, d, base, amount_of_days, debug)
+            self._print_message('- Validating snapshots')
+            self._validate(vdisk_1, d, base, amount_of_days, debug)
 
             # During the day, snapshots are taken
             # - Create non consistent snapshot every hour, between 2:00 and 22:00
             # - Create consistent snapshot at 6:30, 12:30, 18:30
-            print '- Creating snapshots'
+            self._print_message('- Creating snapshots')
             for h in xrange(2, 23):
                 timestamp = base_timestamp + (hour * h)
-                for vm in [vmachine_1, vmachine_2]:
-                    VMachineController.snapshot(machineguid=vm.guid,
-                                                label='ss_i_{0}:00'.format(str(h)),
-                                                is_consistent=False,
-                                                timestamp=timestamp)
-                    if h in [6, 12, 18]:
-                        ts = (timestamp + (minute * 30))
-                        VMachineController.snapshot(machineguid=vm.guid,
-                                                    label='ss_c_{0}:30'.format(str(h)),
-                                                    is_consistent=True,
-                                                    timestamp=ts)
-
-                VDiskController.create_snapshot(diskguid=vdisk_3.guid,
+                VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
                                                 metadata={'label': 'ss_i_{0}:00'.format(str(h)),
                                                           'is_consistent': False,
                                                           'timestamp': str(timestamp),
                                                           'machineguid': None})
                 if h in [6, 12, 18]:
                     ts = (timestamp + (minute * 30))
-                    VDiskController.create_snapshot(diskguid=vdisk_3.guid,
+                    VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid,
                                                     metadata={'label': 'ss_c_{0}:30'.format(str(h)),
                                                               'is_consistent': True,
                                                               'timestamp': str(ts),
@@ -376,7 +307,7 @@ class DeleteSnapshots(unittest.TestCase):
         hour = minute * 60
         day = datetime.timedelta(1)
 
-        print '  - {0}'.format(vdisk.name)
+        self._print_message('  - {0}'.format(vdisk.name))
 
         # Visualisation
         if debug:
@@ -391,11 +322,11 @@ class DeleteSnapshots(unittest.TestCase):
                         visual += 'C' if snapshots[t]['is_consistent'] else 'R'
                     else:
                         visual += '-'
-                print visual
+                self._print_message(visual)
 
         consistent = [int(s['timestamp']) for s in vdisk.snapshots if s['is_consistent'] is True]
         inconsistent = [int(s['timestamp']) for s in vdisk.snapshots if s['is_consistent'] is False]
-        print '    - {0} consistent, {1} inconsistent'.format(len(consistent), len(inconsistent))
+        self._print_message('    - {0} consistent, {1} inconsistent'.format(len(consistent), len(inconsistent)))
 
         # Check for correct amount of snapshots
         amount_consistent = 0

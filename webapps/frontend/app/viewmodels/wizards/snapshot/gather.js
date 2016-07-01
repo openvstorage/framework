@@ -17,8 +17,8 @@
 define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/generic', 'ovs/shared',
-    '../../containers/vmachine', '../../containers/vdisk', './data'
-], function($, ko, api, generic, shared, VMachine, VDisk, data) {
+    '../../containers/vdisk', './data'
+], function($, ko, api, generic, shared, VDisk, data) {
     "use strict";
     return function() {
         var self = this;
@@ -49,13 +49,8 @@ define([
                     consistent: self.data.isConsistent(),
                     sticky: self.data.isSticky()
                 };
-                var call;
-                if (self.data.mode() === 'vmachine') {
-                    call = api.post('vmachines/' + self.data.guid() + '/snapshot', { data: data })
-                } else {
-                    call = api.post('vdisks/' + self.data.guid() + '/create_snapshot', { data: data })
-                }
-                call.then(function(taskID) {
+                api.post('vdisks/' + self.data.guid() + '/create_snapshot', { data: data })
+                    .then(function(taskID) {
                         generic.alertInfo(
                             $.t('ovs:wizards.snapshot.confirm.snapshotstarted'),
                             $.t('ovs:wizards.snapshot.confirm.inprogress')
@@ -83,18 +78,8 @@ define([
         // Durandal
         self.activate = function() {
             if (self.data.vObject() === undefined || self.data.vObject().guid() !== self.data.guid()) {
-                if (self.data.mode() === 'vmachine') {
-                    self.data.vObject(new VMachine(self.data.guid()));
-                } else {
-                    self.data.vObject(new VDisk(self.data.guid()));
-                }
-                self.data.vObject()
-                    .load()
-                    .done(function() {
-                        if (self.data.name() === '' && self.data.mode() === 'vmachine') {
-                            self.data.name(self.data.vObject().name() + '-snapshot');
-                        }
-                    });
+                self.data.vObject(new VDisk(self.data.guid()));
+                self.data.vObject().load();
             }
         };
     };

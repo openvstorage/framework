@@ -46,7 +46,6 @@
         "tib": "TiB",
         "savesuccessfully": "__what__ is succesvol bewaard.",
         "errorwhile": "Een fout deed zich voor tijdens __what__.",
-        "errorwhile_error": "Een fout deed zich voor tijdens __what__: __error__",
         "saved": "Bewaard",
         "error": "Fout",
         "vdisk": "vDisk",
@@ -92,14 +91,6 @@
             "rawinfo": "Raw memcached informatie"
         }
     },
-    "vmachines": {
-        "title": "vMachines",
-        "suretodelete": "Bent u zeker dat u __what__ wil verwijderen?",
-        "marked": "Klaar om te verwijderen",
-        "machinemarked": "Machine __what__ zal worden verwijderd ...",
-        "deleted": "Machine verwijdered",
-        "machinedeleted": "Machine __what__ werd verwijderd"
-    },
     "dashboard": {
         "title": "Dashboard",
         "introduction": "Open vStorage is de volgende generatie in Software-Defined Storage."
@@ -123,15 +114,15 @@
             "gather": {
                 "complete":"vDisk aangemaakt",
                 "failed":"vDisk aanmaak mislukt",
-                "initial_storagerouter": "Storage Router:",
                 "inprogress":"Bezig met aanmaken vDisk",
                 "invalid_name": "De vDisk name is onjuist. Enkel letters a-z, nummers en - (niet als eerste of laatste karakter). Minimaal 3 en maximaal 50 karakters",
+                "invalid_size": "Maximale grootte van __what__ __unit__ overschreden",
                 "invalid_storagerouter": "Geen geldige storagerouter geselecteerd.",
                 "invalid_vpool": "Geen geldige vPool geselecteerd",
                 "name": "Naam:",
                 "size": "Grootte:",
-                "size_unit": "Eenheid:",
                 "started":"vDisk aanmaak gestart",
+                "storagerouter": "Storage Router:",
                 "success":"vDisk correct aangemaakt",
                 "vpool": "vPool:"
             }

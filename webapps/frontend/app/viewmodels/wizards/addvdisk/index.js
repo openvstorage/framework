@@ -36,8 +36,7 @@ define([
 
         // Cleaning data
         data.name('');
-        data.size_entry(1);
-        data.size_unit('gib');
+        data.sizeEntry(1);
         data.storageRouters([]);
     };
 });

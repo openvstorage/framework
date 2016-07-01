@@ -54,17 +54,6 @@ class VDiskList(object):
                                 'items': [('volume_id', DataList.operator.IN, volume_ids)]})
 
     @staticmethod
-    def get_vdisk_by_name(vdiskname):
-        """
-        Returns all VDisks which have a given name
-        """
-        vdisks = DataList(VDisk, {'type': DataList.where_operator.AND,
-                                  'items': [('name', DataList.operator.EQUALS, vdiskname)]})
-        if len(vdisks) > 0:
-            return vdisks
-        return None
-
-    @staticmethod
     def get_by_devicename_and_vpool(devicename, vpool):
         """
         Returns a list of all VDisks based on a given device name and vpool
@@ -77,14 +66,6 @@ class VDiskList(object):
                 raise RuntimeError('Invalid amount of vDisks found: {0}'.format(len(vds)))
             return vds[0]
         return None
-
-    @staticmethod
-    def get_without_vmachine():
-        """
-        Gets all vDisks without a vMachine
-        """
-        return DataList(VDisk, {'type': DataList.where_operator.AND,
-                                'items': [('vmachine_guid', DataList.operator.EQUALS, None)]})
 
     @staticmethod
     def get_by_parentsnapshot(snapshotid):

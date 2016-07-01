@@ -61,7 +61,6 @@ class StorageRouterViewSet(viewsets.ViewSet):
         if query is None:
             return StorageRouterList.get_storagerouters()
         else:
-            query = json.loads(query)
             return DataList(StorageRouter, query)
 
     @log()
@@ -256,24 +255,6 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 call_parameters['backend_connection_info']['backend'] = {'backend': connection_backend.pop('backend') if 'backend' in connection_backend else None,
                                                                          'metadata': connection_backend.pop('metadata') if 'metadata' in connection_backend else None}
         return StorageRouterController.add_vpool.delay(call_parameters)
-
-    @link()
-    @log()
-    @required_roles(['read'])
-    @return_plain()
-    @load(StorageRouter)
-    def get_mgmtcenter_info(self, storagerouter):
-        """
-        Return mgmtcenter info (ip, username, name, type)
-        """
-        data = {}
-        mgmtcenter = storagerouter.pmachine.mgmtcenter
-        if mgmtcenter:
-            data = {'ip': mgmtcenter.ip,
-                    'username': mgmtcenter.username,
-                    'name': mgmtcenter.name,
-                    'type': mgmtcenter.type}
-        return data
 
     @link()
     @log()

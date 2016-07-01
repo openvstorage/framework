@@ -45,15 +45,16 @@ class CeleryMockup(object):
         """
         _ = self, args, kwargs
 
-        def _outer_function(outer_function):
-            def _inner_function(*arguments, **kwarguments):
+        def _wrapper(func):
+            def _wrapped(*arguments, **kwarguments):
                 _ = arguments, kwarguments
-                return outer_function(*arguments, **kwarguments)
+                return func(*arguments, **kwarguments)
+            _wrapped.delay = func
 
-            _inner_function.__name__ = outer_function.__name__
-            _inner_function.__module__ = outer_function.__module__
-            return _inner_function
-        return _outer_function
+            _wrapped.__name__ = func.__name__
+            _wrapped.__module__ = func.__module__
+            return _wrapped
+        return _wrapper
 
 
 if os.environ.get('RUNNING_UNITTESTS') == 'True':

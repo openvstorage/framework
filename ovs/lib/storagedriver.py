@@ -26,21 +26,18 @@ from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagerouter import StorageRouter
-from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import add_hooks, ensure_single, log
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
-from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient, ClusterNotReachableException
 
 
 class StorageDriverController(object):
@@ -66,46 +63,21 @@ class StorageDriverController(object):
                 storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
 
     @staticmethod
-    @celery.task(name='ovs.storagedriver.update_status')
-    @log('VOLUMEDRIVER_TASK')
-    def update_status(storagedriver_id):
-        """
-        Sets Storage Driver offline in case hypervisor management Center
-        reports the hypervisor pmachine related to this Storage Driver
-        as unavailable.
-        :param storagedriver_id: ID of the storagedriver to update its status
-        :type storagedriver_id: str
-
-        :return: None
-        """
-        pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
-        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-        if pmachine.mgmtcenter:
-            # Update status
-            pmachine.invalidate_dynamics(['host_status'])
-            host_status = pmachine.host_status
-            if host_status != 'RUNNING':
-                # Host is stopped
-                storagedriver_client = StorageDriverClient.load(storagedriver.vpool)
-                storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
-                StorageDriverController._logger.warning('Storagedriver {0} marked offline'.format(storagedriver.storagedriver_id))
-
-    @staticmethod
     @celery.task(name='ovs.storagedriver.volumedriver_error')
     @log('VOLUMEDRIVER_TASK')
-    def volumedriver_error(code, volumename):
+    def volumedriver_error(code, volume_id):
         """
         Handles error messages/events from the volumedriver
         :param code: Volumedriver error code
         :type code: int
 
-        :param volumename: Name of the volume throwing the error
-        :type volumename: str
+        :param volume_id: Name of the volume throwing the error
+        :type volume_id: str
 
         :return: None
         """
         if code == VolumeDriverEvents.MDSFailover:
-            disk = VDiskList.get_vdisk_by_volume_id(volumename)
+            disk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if disk is not None:
                 MDSServiceController.ensure_safety(disk)
 

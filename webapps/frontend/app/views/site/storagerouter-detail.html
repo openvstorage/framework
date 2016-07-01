@@ -72,37 +72,6 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td style="width: 30%;"><span data-bind="text: vPools().length"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.host"></td>
-                            <td>
-                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="text: item().name()"></span>
-                                </span>
-                            </td>
-                            <td data-i18n="ovs:generic.nrofvmachines"></td>
-                            <td><span data-bind="text: vMachines().length"></span></td>
-                        </tr>
-                        <tr>
-                            <td data-i18n="ovs:storagerouters.detail.hostip"></td>
-                            <td>
-                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="text: item().ipAddress()"></span>
-                                </span>
-                            </td>
-                            <td data-i18n="ovs:generic.nrofvdisks"></td>
-                            <td><span data-bind="text: vDisks().length"></span></td>
-                        </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.type"></td>
-                            <td>
-                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" class="pointer"
-                                          data-bind="text: $.t('ovs:generic.hypervisors.' + item().hvtype())"></span>
-                                </span>
-                            </td>
-                            <td data-i18n="ovs:generic.storeddata"></td>
-                            <td><span data-bind="text: storedData"></span></td>
-                        </tr>
-                        <tr>
                             <td data-i18n="ovs:storagerouters.detail.rdma_capable"></td>
                             <td>
                                 <!-- ko if: rdmaCapable() === false -->
@@ -112,8 +81,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                     <span class="fa" data-i18n="[html]ovs:icons.check_circle" style="color: green;"></span>
                                 <!-- /ko -->
                             </td>
-                            <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
+                            <td data-i18n="ovs:generic.nrofvdisks"></td>
+                            <td><span data-bind="text: vDisks().length"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:storagerouters.detail.scrub_capable"></td>
@@ -125,8 +94,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                     <span class="fa" data-i18n="[html]ovs:icons.check_circle" style="color: green;"></span>
                                 <!-- /ko -->
                             </td>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:generic.storeddata"></td>
+                            <td><span data-bind="text: storedData"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.domains"></td>
@@ -138,8 +107,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                                      }, enabled: edit, small: true, emptyisloading: false
                                                  }"></span>
                             </td>
-                            <td data-i18n="ovs:generic.writespeed"></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: iops"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.recovery_domains"></td>
@@ -151,7 +120,13 @@ but WITHOUT ANY WARRANTY of any kind.
                                                      }, enabled: edit, small: true, emptyisloading: false
                                                  }"></span>
                             </td>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
+                        </tr>
+                        <tr>
                             <td colspan="2"></td>
+                            <td data-i18n="ovs:generic.writespeed"></td>
+                            <td><span data-bind="text: writeSpeed"></span></td>
                         </tr>
                     </tbody>
                 </table>
@@ -217,7 +192,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                         <!-- /ko -->
                                         <!-- ko if: $root.vPools().length === 0 -->
                                             <tr>
-                                                <td colspan="6">
+                                                <td colspan="7">
                                                     <i data-i18n="ovs:generic.noentries"></i>
                                                 </td>
                                             </tr>

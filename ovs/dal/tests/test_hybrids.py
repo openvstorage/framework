@@ -47,8 +47,13 @@ class Hybrid(unittest.TestCase):
         """
         (Re)Sets the stores on every test
         """
+        self.debug = False
         self.persistent.clean()
         self.volatile.clean()
+
+    def _print_message(self, message):
+        if self.debug is True:
+            print message
 
     def test_objectproperties(self):
         """
@@ -59,11 +64,11 @@ class Hybrid(unittest.TestCase):
         """
         # Some stuff here to dynamically test all hybrid properties
         hybrid_structure = HybridRunner.get_hybrids()
-        print ''
-        print 'Validating hybrids...'
+        self._print_message('')
+        self._print_message('Validating hybrids...')
         for class_descriptor in hybrid_structure.values():
             cls = Descriptor().load(class_descriptor).get_object()
-            print '* {0}'.format(cls.__name__)
+            self._print_message('* {0}'.format(cls.__name__))
             relation_info = RelationMapper.load_foreign_relations(cls)
             remote_properties_n = []
             remote_properties_1 = []

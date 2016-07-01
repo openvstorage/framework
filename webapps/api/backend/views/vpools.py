@@ -17,13 +17,14 @@
 """
 VPool module
 """
-from backend.decorators import required_roles, load, return_list, return_object, return_task, log
+from backend.decorators import required_roles, load, return_list, return_object, return_task, return_plain, log
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.lib.storagerouter import StorageRouterController
-from ovs.lib.vpool import VPoolController
+from ovs.lib.vdisk import VDiskController
 from rest_framework import viewsets
 from rest_framework.decorators import link, action
 from rest_framework.exceptions import NotAcceptable
@@ -58,18 +59,6 @@ class VPoolViewSet(viewsets.ViewSet):
         :param vpool: vPool object to retrieve
         """
         return vpool
-
-    @action()
-    @log()
-    @required_roles(['read', 'write'])
-    @return_task()
-    @load(VPool)
-    def sync_vmachines(self, vpool):
-        """
-        Syncs the vMachine of this vPool
-        :param vpool: vPool to synchronize
-        """
-        return VPoolController.sync_with_hypervisor.delay(vpool.guid)
 
     @link()
     @log()
@@ -156,21 +145,30 @@ class VPoolViewSet(viewsets.ViewSet):
         return StorageRouterController.update_storagedrivers.delay(valid_storagedriver_guids, storagerouters, parameters)
 
     @link()
+    @log()
     @required_roles(['read'])
-    @return_task()
-    @load(VPool, max_version=3)
-    def get_configuration(self, vpool):
+    @return_plain()
+    @load(VPool)
+    def devicename_exists(self, vpool, name=None, names=None):
         """
-        Retrieve the configuration settings for this vPool
-        Currently we are able to configure the following settings (via GUI)
-          - DTL enabled
-          - DTL mode  (no sync, async, sync)
-          - DTL location  (where DTL is configured to)
-          - SCO size  (4MB - 128 MB)
-          - Dedupe mode  (deduped aka ContentBased, non-deduped aka LocationBased)
-          - Write buffer  (Amount of data allowed not immediately being put on backend)
-          - Cache strategy  (no cache, cache on read, cache on write)
-        :param vpool: vPool to retrieve configuration for
-        :type vpool: Guid of the vPool
+        Checks whether a given name can be created on the vpool
+        :param vpool: vPool object
+        :param name: Candidate name
+        :param names: Candidate names
+        :return: True or False
         """
-        return vpool.configuration
+        if not (name is None) ^ (names is None):
+            raise NotAcceptable('Either the name (string) or the names (list of strings) parameter must be passed')
+        if name is not None and not isinstance(name, basestring):
+            raise NotAcceptable('The name parameter must be a string')
+        if names is not None and not isinstance(names, list):
+            raise NotAcceptable('The names parameter must be a list of strings')
+
+        if name is not None:
+            devicename = VDiskController.clean_devicename(name)
+            return VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None
+        for name in names:
+            devicename = VDiskController.clean_devicename(name)
+            if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
+                return True
+        return False

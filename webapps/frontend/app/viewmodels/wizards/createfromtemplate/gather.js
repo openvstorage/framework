@@ -17,8 +17,8 @@
 define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/shared', 'ovs/generic',
-    '../../containers/vmachine', '../../containers/vdisk', '../../containers/pmachine', './data'
-], function($, ko, api, shared, generic, VMachine, VDisk, PMachine, data) {
+    '../../containers/vdisk', '../../containers/storagerouter', './data'
+], function($, ko, api, shared, generic, VDisk, StorageRouter, data) {
     "use strict";
     return function() {
         var self = this;
@@ -28,8 +28,10 @@ define([
         self.shared = shared;
 
         // Handles
-        self.loadPMachinesHandle = undefined;
-        self.loadNamesHandle     = undefined;
+        self.loadStorageRoutersHandle = undefined;
+
+        // Observables
+        self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
 
         // Computed
         self.namehelp = ko.computed(function() {
@@ -37,30 +39,41 @@ define([
                 return $.t('ovs:wizards.create_ft.gather.no_name');
             }
             if (data.amount() === 1) {
-                return $.t('ovs:wizards.create_ft.gather.amount_one');
+                return $.t('ovs:wizards.create_ft.gather.amount_one', {
+                    devicename: generic.cleanDeviceName(data.name())
+                });
             }
+            var start = data.name() + '-' + data.startnr(),
+                end = data.name() + '-' + (data.startnr() + data.amount() - 1);
             return $.t('ovs:wizards.create_ft.gather.amount_multiple', {
-                start: data.name() + '-' + data.startnr(),
-                end: data.name() + '-' + (data.startnr() + data.amount() - 1)
+                start: start,
+                devicestart: generic.cleanDeviceName(start),
+                end: end,
+                deviceend: generic.cleanDeviceName(end)
             });
         });
         self.canStart = ko.computed(function() {
             var valid = true, reasons = [], fields = [];
             if (self.data.vObject() === undefined) {
                 valid = false;
-                fields.push('vm');
+                fields.push('vd');
                 reasons.push($.t('ovs:wizards.create_ft.gather.no_object'));
             }
-            if (self.data.pMachines().length === 0) {
+            if (self.data.storageRouters().length === 0) {
                 valid = false;
-                fields.push('pmachines');
-                reasons.push($.t('ovs:wizards.create_ft.gather.no_pmachines'));
+                fields.push('storagerouters');
+                reasons.push($.t('ovs:wizards.create_ft.gather.no_storagerouters'));
             }
             return { value: valid, reasons: reasons, fields: fields };
         });
         self.canContinue = ko.computed(function() {
-            var valid = true, reasons = [], fields = [],
-                data = self.canStart();
+            var valid = true, reasons = [], fields = [], showErrors = false, data = self.canStart(),
+                preValidation = self.preValidateResult();
+            if (preValidation.valid === false) {
+                showErrors = true;
+                reasons = reasons.concat(preValidation.reasons);
+                fields = fields.concat(preValidation.fields);
+            }
             if (!data.value) {
                 return data;
             }
@@ -69,56 +82,54 @@ define([
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.create_ft.gather.no_name'));
             }
-            if (self.data.amount() === 1) {
-                if (self.data.names().contains(self.data.name())) {
-                    valid = false;
-                    fields.push('name');
-                    reasons.push($.t('ovs:wizards.create_ft.gather.duplicate_name', {
-                        name: self.data.name()
-                    }));
-                }
-            } else {
-                var name, i = self.data.startnr();
-                for (i = self.data.startnr(); i < (self.data.startnr() + self.data.amount()); i++) {
-                    name = self.data.name() + '-' + i;
-                    if (self.data.names().contains(name)) {
-                        valid = false;
-                        fields.push('name');
-                        reasons.push($.t('ovs:wizards.create_ft.gather.duplicate_name', {
-                            name: name
-                        }));
-                    }
-                }
-            }
-            if (self.data.selectedPMachines().length === 0) {
+            if (self.data.selectedStorageRouters().length === 0) {
                 valid = false;
-                fields.push('pmachines');
-                reasons.push($.t('ovs:wizards.create_ft.gather.no_pmachines_selected'));
+                fields.push('storagerouters');
+                reasons.push($.t('ovs:wizards.create_ft.gather.no_storagerouters_selected'));
             }
-            return { value: valid, reasons: reasons, fields: fields };
+            return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
 
         // Functions
-        self._create = function(name, description, pmachine) {
+        self.preValidate = function() {
+            var validationResult = { valid: true, reasons: [], fields: [] };
             return $.Deferred(function(deferred) {
-                var call = undefined;
-                if (self.data.mode() === 'vmachine') {
-                    call = api.post('vmachines/' + self.data.guid() + '/create_from_template', {
-                        data: {
-                            pmachineguid: pmachine.guid(),
-                            name: name,
-                            description: description
-                        }
-                    });
-                } else {
-                    call = api.post('vdisks/' + self.data.guid() + '/create_from_template', {
-                        data: {
-                            devicename: name,
-                            pmachineguid: pmachine.guid()
-                        }
-                    });
+                if (self.data.vObject() === undefined || self.data.vObject().vpoolGuid() === undefined) {
+                    deferred.reject();
+                    return;
                 }
-                call.then(self.shared.tasks.wait)
+                var i, names = [];
+                if (self.data.amount() === 1) {
+                    names.push(self.data.name());
+                } else {
+                    for (i = self.data.startnr(); i < (self.data.startnr() + self.data.amount()); i++) {
+                        names.push(self.data.name() + '-' + i);
+                    }
+                }
+                api.get('vpools/' + self.data.vObject().vpoolGuid() + '/devicename_exists', { queryparams: { names: JSON.stringify(names) }})
+                    .done(function(exists) {
+                        if (exists) {
+                            validationResult.valid = false;
+                            validationResult.reasons.push($.t('ovs:wizards.create_ft.gather.name_exists'));
+                            validationResult.fields.push('name');
+                            self.preValidateResult(validationResult);
+                            deferred.reject();
+                        } else {
+                            self.preValidateResult(validationResult);
+                            deferred.resolve();
+                        }
+                    })
+            }).promise();
+        };
+        self._create = function(name, description, storageRouter) {
+            return $.Deferred(function(deferred) {
+                api.post('vdisks/' + self.data.guid() + '/create_from_template', {
+                        data: {
+                            name: name,
+                            storagerouter_guid: storageRouter.guid()
+                        }
+                    })
+                    .then(self.shared.tasks.wait)
                     .done(function() {
                         deferred.resolve(true);
                     })
@@ -136,16 +147,16 @@ define([
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 var calls = [], i, max = self.data.startnr() + self.data.amount() - 1,
-                    name, pmachinecounter = 0;
+                    name, srcounter = 0;
                 for (i = self.data.startnr(); i <= max; i += 1) {
                     name = self.data.name();
                     if (self.data.amount() > 1) {
                         name += ('-' + i.toString());
                     }
-                    calls.push(self._create(name, self.data.description(), self.data.selectedPMachines()[pmachinecounter]));
-                    pmachinecounter += 1;
-                    if (pmachinecounter >= self.data.selectedPMachines().length) {
-                        pmachinecounter = 0;
+                    calls.push(self._create(name, self.data.description(), self.data.selectedStorageRouters()[srcounter]));
+                    srcounter += 1;
+                    if (srcounter >= self.data.selectedStorageRouters().length) {
+                        srcounter = 0;
                     }
                 }
                 generic.alertInfo(
@@ -183,53 +194,28 @@ define([
         // Durandal
         self.activate = function() {
             if (self.data.vObject() === undefined || self.data.vObject().guid() !== self.data.guid()) {
-                if (self.data.mode() === 'vmachine') {
-                    self.data.vObject(new VMachine(self.data.guid()));
-                } else {
-                    self.data.vObject(new VDisk(self.data.guid()));
-                }
+                self.data.vObject(new VDisk(self.data.guid()));
                 self.data.vObject().load();
-                self.data.selectedPMachines([]);
             }
-            var target;
-            if (self.data.mode() === 'vmachine') {
-                target = 'vmachines';
-                generic.xhrAbort(self.loadNamesHandle);
-                self.loadNamesHandle = api.get('vmachines/', { queryparams: {contents: 'name'}})
-                    .done(function(data) {
-                        $.each(data.data, function(index, item) {
-                            self.data.names.push(item[property]);
-                        });
-                    });
-            } else {
-                target = 'vdisks';
-                generic.xhrAbort(self.loadNamesHandle);
-                self.loadNamesHandle = api.get('vdisks/', { queryparams: {contents: 'devicename'}})
-                    .done(function(data) {
-                        $.each(data.data, function(index, item) {
-                            self.data.names.push(item[property].replace('.vmdk', '').replace('.raw', ''));
-                        });
-                    });
-            }
-            generic.xhrAbort(self.loadPMachinesHandle);
-            self.loadPMachinesHandle = api.get(target + '/' + self.data.guid() + '/get_target_pmachines', {
+            generic.xhrAbort(self.loadStorageRoutersHandle);
+            self.loadStorageRoutersHandle = api.get('vdisks/' + self.data.guid() + '/get_target_storagerouters', {
                 queryparams: {
                     contents: '',
                     sort: 'name'
                 }
             })
                 .done(function(data) {
-                    var guids = [], pmdata = {};
+                    var guids = [], srdata = {};
                     $.each(data.data, function(index, item) {
                         guids.push(item.guid);
-                        pmdata[item.guid] = item;
+                        srdata[item.guid] = item;
                     });
                     generic.crossFiller(
-                        guids, self.data.pMachines,
+                        guids, self.data.storageRouters,
                         function(guid) {
-                            var pm = new PMachine(guid);
-                            pm.fillData(pmdata[guid]);
-                            return pm;
+                            var sr = new StorageRouter(guid);
+                            sr.fillData(srdata[guid]);
+                            return sr;
                         }, 'guid'
                     );
                 });

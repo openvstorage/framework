@@ -22,7 +22,6 @@ from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
-from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
@@ -85,13 +84,6 @@ class DTLCheckup(unittest.TestCase):
         backend_type.code = 'BT'
         backend_type.save()
 
-        pmachine = PMachine()
-        pmachine.name = 'physical_machine'
-        pmachine.username = 'root'
-        pmachine.ip = '127.0.0.1'
-        pmachine.hvtype = 'VMWARE'
-        pmachine.save()
-
         vpool = VPool()
         vpool.name = 'vpool'
         vpool.status = 'RUNNING'
@@ -111,7 +103,6 @@ class DTLCheckup(unittest.TestCase):
             storagerouter = StorageRouter()
             storagerouter.name = str(storage_router_id)
             storagerouter.ip = '10.0.0.{0}'.format(storage_router_id)
-            storagerouter.pmachine = pmachine
             storagerouter.rdma_capable = False
             storagerouter.save()
             storagerouters[storage_router_id] = storagerouter
@@ -146,10 +137,10 @@ class DTLCheckup(unittest.TestCase):
             vdisk.size = 0
             vdisk.save()
             vdisk.reload_client()
-            MockStorageRouterClient.vrouter_id['vdisk_{0}'.format(vdisk_id)] = str(storage_driver_id)
+            MockStorageRouterClient.vrouter_id[vpool.guid]['vdisk_{0}'.format(vdisk_id)] = str(storage_driver_id)
             vdisks[vdisk_id] = vdisk
 
-        return pmachine, vpool, vdisks, storagerouters, domains
+        return vpool, vdisks, storagerouters, domains
 
     def _run_and_validate_dtl_checkup(self, vdisk, validations):
         """
@@ -188,10 +179,10 @@ class DTLCheckup(unittest.TestCase):
         Execute some DTL checkups on a single node installation
         """
         # Create 1 vdisk in single node without domains
-        _, vpool, vdisks, storagerouters, _ = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
-                                                                                     'domains': [],
-                                                                                     'storagerouters': [1],
-                                                                                     'storagerouter_domains': []})
+        vpool, vdisks, storagerouters, _ = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
+                                                                                  'domains': [],
+                                                                                  'storagerouters': [1],
+                                                                                  'storagerouter_domains': []})
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain ||     DTL Target    ||
         #  |       1        |   1   |                 |                  |                    |
         vdisk_1 = vdisks[1]
@@ -257,10 +248,10 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 3      |       |                 |                  |      1      |
         #  |      sr 4      |       |                 |                  |      1      |
         #  |      sr 5      |       |                 |                  |      1      |
-        _, vpool, vdisks, storagerouters, _ = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
-                                                                                     'domains': [],
-                                                                                     'storagerouters': [1, 2, 3, 4, 5],
-                                                                                     'storagerouter_domains': []})
+        vpool, vdisks, storagerouters, _ = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
+                                                                                  'domains': [],
+                                                                                  'storagerouters': [1, 2, 3, 4, 5],
+                                                                                  'storagerouter_domains': []})
         vdisk_1 = vdisks[1]
         service_name = 'dtl_{0}'.format(vpool.name)
         ServiceManager.add_service(name=service_name, client=None)
@@ -280,10 +271,10 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 3      |       |                 |                  |      1      |
         #  |      sr 4      |       |                 |                  |      1      |
         #  |      sr 5      |       |                 |                  |      1      |
-        _, vpool, vdisks, storagerouters, _ = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
-                                                                                     'domains': [1, 2, 3],
-                                                                                     'storagerouters': [1, 2, 3, 4, 5],
-                                                                                     'storagerouter_domains': []})
+        vpool, vdisks, storagerouters, _ = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
+                                                                                  'domains': [1, 2, 3],
+                                                                                  'storagerouters': [1, 2, 3, 4, 5],
+                                                                                  'storagerouter_domains': []})
         vdisk_1 = vdisks[1]
         service_name = 'dtl_{0}'.format(vpool.name)
         ServiceManager.add_service(name=service_name, client=None)
@@ -303,10 +294,10 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 3      |       |                 |                  |             |
         #  |      sr 4      |       |                 |                  |             |
         #  |      sr 5      |       |                 |                  |             |
-        _, vpool, vdisks, storagerouters, domains = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
-                                                                                           'domains': [1, 2, 3],
-                                                                                           'storagerouters': [1, 2, 3, 4, 5],
-                                                                                           'storagerouter_domains': [(1, 1, False)]})  # (<storage_router_id>, <domain_id>, <backup>)
+        vpool, vdisks, storagerouters, domains = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
+                                                                                        'domains': [1, 2, 3],
+                                                                                        'storagerouters': [1, 2, 3, 4, 5],
+                                                                                        'storagerouter_domains': [(1, 1, False)]})  # (<storage_router_id>, <domain_id>, <backup>)
         vdisk_1 = vdisks[1]
         service_name = 'dtl_{0}'.format(vpool.name)
         ServiceManager.add_service(name=service_name, client=None)
@@ -348,10 +339,10 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 3      |       |                 |                  |             |
         #  |      sr 4      |       |                 |                  |             |
         #  |      sr 5      |       |                 |                  |             |
-        _, vpool, vdisks, storagerouters, domains = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
-                                                                                           'domains': [1, 2, 3],
-                                                                                           'storagerouters': [1, 2, 3, 4, 5],
-                                                                                           'storagerouter_domains': [(1, 1, False), (2, 1, False)]})  # (<storage_router_id>, <domain_id>, <backup>)
+        vpool, vdisks, storagerouters, domains = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
+                                                                                        'domains': [1, 2, 3],
+                                                                                        'storagerouters': [1, 2, 3, 4, 5],
+                                                                                        'storagerouter_domains': [(1, 1, False), (2, 1, False)]})  # (<storage_router_id>, <domain_id>, <backup>)
         vdisk_1 = vdisks[1]
         service_name = 'dtl_{0}'.format(vpool.name)
         ServiceManager.add_service(name=service_name, client=None)
@@ -425,10 +416,10 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 3      |       |                 |                  |             |
         #  |      sr 4      |       |                 |                  |             |
         #  |      sr 5      |       |                 |                  |             |
-        _, vpool, vdisks, storagerouters, domains = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
-                                                                                           'domains': [1, 2, 3],
-                                                                                           'storagerouters': [1, 2, 3, 4, 5],
-                                                                                           'storagerouter_domains': [(1, 1, True)]})  # (<storage_router_id>, <domain_id>, <backup>)
+        vpool, vdisks, storagerouters, domains = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
+                                                                                        'domains': [1, 2, 3],
+                                                                                        'storagerouters': [1, 2, 3, 4, 5],
+                                                                                        'storagerouter_domains': [(1, 1, True)]})  # (<storage_router_id>, <domain_id>, <backup>)
         vdisk_1 = vdisks[1]
         service_name = 'dtl_{0}'.format(vpool.name)
         ServiceManager.add_service(name=service_name, client=None)
@@ -513,12 +504,12 @@ class DTLCheckup(unittest.TestCase):
         """
         Verify that when more than 3 Storage Routers are available as possible DTL target, the same target is used over and over again
         """
-        _, vpool, vdisks, storagerouters, _ = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
-                                                                                     'domains': [1],
-                                                                                     'storagerouters': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                                                                                     'storagerouter_domains': [(1, 1, True), (2, 1, False), (3, 1, False), (4, 1, False),
-                                                                                                               (5, 1, False), (6, 1, False), (7, 1, False), (8, 1, False),
-                                                                                                               (9, 1, False), (10, 1, False)]})  # (<storage_router_id>, <domain_id>, <backup>)
+        vpool, vdisks, storagerouters, _ = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
+                                                                                  'domains': [1],
+                                                                                  'storagerouters': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                                                                                  'storagerouter_domains': [(1, 1, True), (2, 1, False), (3, 1, False), (4, 1, False),
+                                                                                                            (5, 1, False), (6, 1, False), (7, 1, False), (8, 1, False),
+                                                                                                            (9, 1, False), (10, 1, False)]})  # (<storage_router_id>, <domain_id>, <backup>)
         vdisk_1 = vdisks[1]
         service_name = 'dtl_{0}'.format(vpool.name)
         ServiceManager.add_service(name=service_name, client=None)
@@ -544,10 +535,10 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 3      |       |      domain 1   |                  |             |
         #  |      sr 4      |       |      domain 2   |                  |             |
         #  |      sr 5      |       |                 |                  |             |
-        _, vpool, vdisks, storagerouters, domains = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
-                                                                                           'domains': [1, 2],
-                                                                                           'storagerouters': [1, 2, 3, 4, 5],
-                                                                                           'storagerouter_domains': [(1, 1, True), (2, 1, False), (3, 1, False), (4, 2, False)]})  # (<storage_router_id>, <domain_id>, <backup>)
+        vpool, vdisks, storagerouters, domains = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
+                                                                                        'domains': [1, 2],
+                                                                                        'storagerouters': [1, 2, 3, 4, 5],
+                                                                                        'storagerouter_domains': [(1, 1, True), (2, 1, False), (3, 1, False), (4, 2, False)]})  # (<storage_router_id>, <domain_id>, <backup>)
         vdisk_1 = vdisks[1]
         service_name = 'dtl_{0}'.format(vpool.name)
         ServiceManager.add_service(name=service_name, client=None)
@@ -608,10 +599,10 @@ class DTLCheckup(unittest.TestCase):
         """
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain || DTL Target ||
         #  |      sr 1      |   1   |                 |                  |             |
-        pmachine, vpool, vdisks, storagerouters, _ = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
-                                                                                            'domains': [],
-                                                                                            'storagerouters': [1],
-                                                                                            'storagerouter_domains': []})
+        vpool, vdisks, storagerouters, _ = self._build_model_structure(structure={'vdisks': [(1, 1)],  # (<id>, <storagedriver_id>)
+                                                                                  'domains': [],
+                                                                                  'storagerouters': [1],
+                                                                                  'storagerouter_domains': []})
         vdisk_1 = vdisks[1]
         service_name = 'dtl_{0}'.format(vpool.name)
         ServiceManager.add_service(name=service_name, client=None)
@@ -628,7 +619,6 @@ class DTLCheckup(unittest.TestCase):
         storagerouter = StorageRouter()
         storagerouter.name = '2'
         storagerouter.ip = '10.0.0.2'
-        storagerouter.pmachine = pmachine
         storagerouter.rdma_capable = False
         storagerouter.save()
         storagerouters[2] = storagerouter

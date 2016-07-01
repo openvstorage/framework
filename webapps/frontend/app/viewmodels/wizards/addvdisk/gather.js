@@ -15,21 +15,33 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'jquery', 'knockout', 'ovs/api', 'ovs/generic', './data', '../../containers/vpool', '../../containers/storagerouter'
-], function($, ko, api, generic, data, VPool, StorageRouter) {
+    'jquery', 'knockout', 'ovs/api', 'ovs/generic', 'ovs/shared', './data', '../../containers/vpool', '../../containers/storagerouter'
+], function($, ko, api, generic, shared, data, VPool, StorageRouter) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.data = data;
+        self.data   = data;
+        self.shared = shared;
+
+        // Handles
         self.loadStorageRoutersHandle = undefined;
-        self.loadvPoolsHandle = undefined;
+        self.loadvPoolsHandle         = undefined;
+
+        // Observables
+        self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
 
         // Computed
         self.canContinue = ko.computed(function() {
-            var valid = true, showErrors = false, reasons = [], fields = [];
-            if (self.data.name() === undefined || self.data.name() === '' || !self.data.name.valid()) {
+            var valid = true, showErrors = false, reasons = [], fields = [], maxSize = self.data.sizeEntry.max * Math.pow(1024, 3),
+                preValidation = self.preValidateResult();
+            if (preValidation.valid === false) {
+                showErrors = true;
+                reasons = reasons.concat(preValidation.reasons);
+                fields = fields.concat(preValidation.fields);
+            }
+            if (self.data.name() === '') {
                 valid = false;
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_name'));
@@ -39,14 +51,47 @@ define([
                 fields.push('vpool');
                 reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_vpool'));
             }
-            if (self.data.name() === undefined) {
+            if (self.data.storageRouter() === undefined) {
                 valid = false;
                 fields.push('storageouter');
                 reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_storagerouter'));
             }
+            if (self.data.size() > maxSize) {
+                valid = false;
+                fields.push('size');
+                reasons.push($.t('ovs:wizards.add_vdisk.gather.invalid_size', {amount: parseInt(self.data.sizeEntry.max / 1024), unit: $.t('ovs:generic.units.tib')}));
+            }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
+        self.cleanedName = ko.computed(function() {
+            return generic.cleanDeviceName(self.data.name());
+        });
 
+        // Functions
+        self.preValidate = function() {
+            var validationResult = { valid: true, reasons: [], fields: [] };
+            return $.Deferred(function(deferred) {
+                if (self.data.vPool() === undefined || self.data.name() === undefined) {
+                    deferred.reject();
+                    return;
+                }
+                api.get('vpools/' + self.data.vPool().guid() + '/devicename_exists', { queryparams: { name: self.data.name() }})
+                    .done(function(exists) {
+                        if (exists) {
+                            validationResult.valid = false;
+                            validationResult.reasons.push($.t('ovs:wizards.add_vdisk.gather.name_exists'));
+                            validationResult.fields.push('name');
+                            self.preValidateResult(validationResult);
+                            deferred.reject();
+                        } else {
+                            self.preValidateResult(validationResult);
+                            deferred.resolve();
+                        }
+                    })
+            }).promise();
+        };
+
+        // Durandal
         self.activate = function() {
             generic.xhrAbort(self.loadVPoolsHandle);
             if (generic.xhrCompleted(self.loadVPoolsHandle)) {
@@ -75,7 +120,7 @@ define([
                     });
                 self.loadStorageRoutersHandle = api.get('storagerouters', {
                     queryparams: {
-                        contents: 'storagedrivers,vpools_guids',
+                        contents: 'vpools_guids',
                         sort: 'name'
                     }
                 })
@@ -103,16 +148,18 @@ define([
             return $.Deferred(function(deferred) {
                 generic.alertInfo(
                     $.t('ovs:wizards.add_vdisk.gather.started'),
-                    $.t('ovs:wizards.add_vdisk.gather.inprogress')
+                    $.t('ovs:wizards.add_vdisk.gather.in_progress')
                 );
+                deferred.resolve();
                 api.post('vdisks', {
                     data: {
-                        devicename: self.data.name(),
+                        name: self.data.name(),
                         size: self.data.size(),
                         vpool_guid: self.data.vPool().guid(),
                         storagerouter_guid: self.data.storageRouter().guid()
                     }
                 })
+                    .then(self.shared.tasks.wait)
                     .done(function() {
                         generic.alertSuccess(
                             $.t('ovs:wizards.add_vdisk.gather.complete'),
@@ -120,13 +167,11 @@ define([
                         );
                     })
                     .fail(function(error) {
-                        error = $.parseJSON(error.responseText);
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:wizards.add_vdisk.gather.failed')
+                            $.t('ovs:wizards.add_vdisk.gather.failed', {why: error})
                         );
                     });
-                deferred.resolve();
             }).promise();
         };
     };

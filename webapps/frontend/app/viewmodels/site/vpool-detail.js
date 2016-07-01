@@ -17,11 +17,11 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vpool', '../containers/vmachine', '../containers/storagedriver', '../containers/storagerouter', '../containers/vdisk',
+    '../containers/vpool', '../containers/storagedriver', '../containers/storagerouter', '../containers/vdisk',
     '../wizards/addvpool/index'
 ], function($, app, dialog, ko, router,
             shared, generic, Refresher, api,
-            VPool, VMachine, StorageDriver, StorageRouter, VDisk,
+            VPool, StorageDriver, StorageRouter, VDisk,
             ExtendVPool) {
     "use strict";
     return function() {
@@ -33,11 +33,9 @@ define([
         self.refresher          = new Refresher();
         self.widgets            = [];
         self.storageRouterCache = {};
-        self.vMachineCache      = {};
         self.vDiskCache         = {};
         self.vDiskHeaders       = [
             { key: 'name',       value: $.t('ovs:generic.name'),       width: undefined },
-            { key: 'vmachine',   value: $.t('ovs:generic.vmachine'),   width: 110       },
             { key: 'size',       value: $.t('ovs:generic.size'),       width: 100       },
             { key: 'storedData', value: $.t('ovs:generic.storeddata'), width: 110       },
             { key: 'iops',       value: $.t('ovs:generic.iops'),       width: 90        },
@@ -45,20 +43,9 @@ define([
             { key: 'writeSpeed', value: $.t('ovs:generic.write'),      width: 125       },
             { key: 'dtlStatus',  value: $.t('ovs:generic.dtl_status'), width: 50        }
         ];
-        self.vMachineHeaders    = [
-            { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
-            { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 200       },
-            { key: undefined,       value: $.t('ovs:generic.vdisks'),        width: 60        },
-            { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 135       },
-            { key: 'iops',          value: $.t('ovs:generic.iops'),          width: 90        },
-            { key: 'readSpeed',     value: $.t('ovs:generic.read'),          width: 145       },
-            { key: 'writeSpeed',    value: $.t('ovs:generic.write'),         width: 145       },
-            { key: 'dtlStatus',     value: $.t('ovs:generic.dtl_status'),    width: 50        }
-        ];
 
         // Handles
         self.vDisksHandle             = {};
-        self.vMachinesHandle          = {};
         self.loadStorageDriversHandle = undefined;
         self.loadStorageRoutersHandle = undefined;
 
@@ -137,7 +124,7 @@ define([
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
                     var options = {
                         sort: 'name',
-                        contents: 'storagedrivers,pmachine'
+                        contents: 'storagedrivers'
                     };
                     self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
@@ -155,10 +142,6 @@ define([
                             $.each(self.storageRouters(), function(index, storageRouter) {
                                 if (sadata.hasOwnProperty(storageRouter.guid())) {
                                     storageRouter.fillData(sadata[storageRouter.guid()]);
-                                    if (storageRouter.pMachine() !== undefined) {
-                                        storageRouter.pMachine().load();
-                                        storageRouter.pMachine().loadVPoolConfigurationState(self.vPool().guid());
-                                    }
                                 }
                             });
                             self.storageRoutersLoaded(true);
@@ -185,12 +168,6 @@ define([
                                         self.vDiskCache[guid] = new VDisk(guid);
                                     }
                                     return self.vDiskCache[guid];
-                                },
-                                dependencyLoader: function(item) {
-                                    var guid = item.vMachineGuid();
-                                    if (self.vMachineCache.hasOwnProperty(guid)) {
-                                        item.vMachine(self.vMachineCache[guid]);
-                                    }
                                 }
                             });
                         })
@@ -199,124 +176,6 @@ define([
                     deferred.resolve();
                 }
             }).promise();
-        };
-        self.loadVMachines = function(options) {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.vMachinesHandle[options.page])) {
-                    options.sort = 'name';
-                    options.contents = 'vdisks,_dynamics,-snapshots,-hypervisor_status';
-                    options.vpoolguid = self.vPool().guid();
-                    self.vMachinesHandle[options.page] = api.get('vmachines', { queryparams: options })
-                        .done(function(data) {
-                            deferred.resolve({
-                                data: data,
-                                loader: function(guid) {
-                                    if (!self.vMachineCache.hasOwnProperty(guid)) {
-                                        self.vMachineCache[guid] = new VMachine(guid);
-                                    }
-                                    return self.vMachineCache[guid];
-                                },
-                                dependencyLoader: function(item) {
-                                    generic.crossFiller(
-                                        item.storageRouterGuids, item.storageRouters,
-                                        function(guid) {
-                                            if (!self.storageRouterCache.hasOwnProperty(guid)) {
-                                                var sr = new StorageRouter(guid);
-                                                sr.load('');
-                                                self.storageRouterCache[guid] = sr;
-                                            }
-                                            return self.storageRouterCache[guid];
-                                        }, 'guid'
-                                    );
-                                }
-                            });
-                        })
-                        .fail(function() { deferred.reject(); });
-                } else {
-                    deferred.resolve();
-                }
-            }).promise();
-        };
-        self.sync = function() {
-            if (self.vPool() !== undefined) {
-                var vp = self.vPool();
-                app.showMessage(
-                        $.t('ovs:vpools.sync.warning'),
-                        $.t('ovs:vpools.sync.title', { what: vp.name() }),
-                        [$.t('ovs:vpools.sync.no'), $.t('ovs:vpools.sync.yes')]
-                    )
-                    .done(function(answer) {
-                        if (answer === $.t('ovs:vpools.sync.yes')) {
-                            generic.alertInfo(
-                                $.t('ovs:vpools.sync.marked'),
-                                $.t('ovs:vpools.sync.marked_msg', { what: vp.name() })
-                            );
-                            api.post('vpools/' + vp.guid() + '/sync_vmachines')
-                                .then(self.shared.tasks.wait)
-                                .done(function() {
-                                    generic.alertSuccess(
-                                        $.t('ovs:vpools.sync.done'),
-                                        $.t('ovs:vpools.sync.done_msg', { what: vp.name() })
-                                    );
-                                })
-                                .fail(function(error) {
-                                    generic.alertError(
-                                        $.t('ovs:generic.error'),
-                                        $.t('ovs:generic.messages.errorwhile', {
-                                            context: 'error',
-                                            what: $.t('ovs:vpools.sync.error_msg', { what: vp.name() }),
-                                            error: error.responseText
-                                        })
-                                    );
-                                });
-                        }
-                    });
-            }
-        };
-        self.reconfigurePmachine = function(sr_guid, configure) {
-            self.updatingStorageRouters(true);
-            var pmachine_guid;
-            $.each(self.storageRouters(), function(index, storagerouter) {
-                if (storagerouter.guid() === sr_guid) {
-                    pmachine_guid = storagerouter.pMachineGuid();
-                }
-            });
-            if (pmachine_guid !== undefined) {
-                app.showMessage(
-                    $.t('ovs:pmachines.configure.vpool.warning', { what: configure === true ? 'configure' : 'unconfigure' }),
-                    $.t('ovs:generic.areyousure'),
-                    [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
-                )
-                .done(function(answer) {
-                    if (answer === $.t('ovs:generic.yes')) {
-                        var action = configure === true ? '/configure_vpool_for_host' : '/unconfigure_vpool_for_host';
-                        generic.alertInfo(
-                            $.t('ovs:pmachines.configure.vpool.started'),
-                            $.t('ovs:pmachines.configure.vpool.started_msg', { which: (action === '/configure_vpool_for_host' ? 'Configuration' : 'Unconfiguration') })
-                        );
-                        api.post('pmachines/' + pmachine_guid + action, {
-                            data: { vpool_guid: self.vPool().guid() }
-                        })
-                        .then(shared.tasks.wait)
-                        .done(function() {
-                            generic.alertSuccess(
-                                $.t('ovs:pmachines.configure.vpool.success'),
-                                $.t('ovs:pmachines.configure.vpool.success_msg', { which: (action === '/configure_vpool_for_host' ? 'configured' : 'unconfigured') })
-                            );
-                        })
-                        .fail(function(error) {
-                            generic.alertError(
-                                $.t('ovs:generic.error'),
-                                $.t('ovs:pmachines.configure.vpool.failed', {
-                                    which: (action === '/configure_vpool_for_host' ? 'configure' : 'unconfigure'),
-                                    why: error
-                                })
-                            );
-                        });
-                    }
-                });
-            }
-            self.updatingStorageRouters(false);
         };
         self.addStorageRouter = function(sr) {
             self.updatingStorageRouters(true);

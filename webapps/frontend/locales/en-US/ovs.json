@@ -59,15 +59,7 @@
         },
         "messages": {
             "savesuccessfully": "__what__ saved successfully.",
-            "errorwhile": "An error occurred while __what__.",
-            "errorwhile_error": "An error occurred while __what__: __error__",
-            "notrunningrequired": "vMachine should be halted."
-        },
-        "hypervisors": {
-            "VMWARE": "VMware",
-            "HYPERV": "HyperV",
-            "XEN": "Xen",
-            "KVM": "KVM"
+            "errorwhile": "An error occurred while __what__."
         },
         "backendtypes": {
             "s3": "S3",
@@ -77,10 +69,6 @@
             "local": "Local FS",
             "distributed": "Distributed FS",
             "alba": "Open vStorage Backend"
-        },
-        "mgmtcentertypes": {
-            "VCENTER": "VMware vCenter",
-            "OPENSTACK": "OpenStack Controller Node"
         },
         "granttypes": {
             "PASSWORD": "Password Credentials",
@@ -144,6 +132,7 @@
         "datetime": "Date / Time",
         "default": "Default",
         "description": "Description",
+        "devicename": "Device Name",
         "disk": "Disk",
         "disks": "Disks",
         "domain": "Domain",
@@ -168,8 +157,6 @@
         "iops": "IOPS",
         "ip": "IP",
         "latency": "Latency",
-        "licenselimited": "Unavailable due to License",
-        "licensing": "Licensing",
         "loadingdata": "Loading data...",
         "logging": "Kibana logging",
         "logout": "Log out",
@@ -181,7 +168,7 @@
         "mgmtport": "Management",
         "mountpoint": "Mountpoint",
         "name": "Name",
-        "namespace": "Backend location",
+        "namespace": "Backend Location",
         "next": "Next &raquo;",
         "no": "No",
         "noelements": "No items available",
@@ -189,7 +176,6 @@
         "nothingselected": "Nothing selected",
         "nrofsnapshots": "# Snapshots",
         "nrofvdisks": "# vDisks",
-        "nrofvmachines": "# vMachines",
         "nrofvpools": "# vPools",
         "null": "-",
         "of": "of",
@@ -242,8 +228,6 @@
         "validuntil": "Valid until",
         "vdisk": "vDisk",
         "vdisks": "vDisks",
-        "vmachine": "vMachine",
-        "vmachines": "vMachines",
         "vpool": "vPool",
         "vpools": "vPools",
         "vtemplate": "vTemplate",
@@ -264,14 +248,14 @@
                     "success": "Rescan finished",
                     "scanning": "rescanning",
                     "started": "Rescan started",
-                    "inprogress": "The disks of this StorageRouter are being rescanned"
+                    "inprogress": "The disks of this Storage Router are being rescanned"
                 }
             },
             "refresh": {
                 "success": "Refresh finished",
                 "refreshing": "refreshing",
                 "started": "Refresh started",
-                "inprogress": "The hardware capabilities of this StorageRouter are being refreshed"
+                "inprogress": "The hardware capabilities of this Storage Router are being refreshed"
             },
             "hostip": "Host IP",
             "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
@@ -290,15 +274,15 @@
             "moveawaytitle": "Move all vDisks",
             "rdma_capable": "RDMA Capable",
             "save": {
-                "success": "This StorageRouter was saved.",
-                "failure": "Error saving this StorageRouter."
+                "success": "This Storage Router was saved.",
+                "failure": "Error saving this Storage Router."
             },
             "scrub_capable": "SCRUB Capable",
             "storageroutervpoollink": "vPools served by this Storage Router",
             "title": "Storage Router",
             "updateserving": "Save changes",
-            "edit": "Edit some properties of this StorageRouter",
-            "refreshtt": "Refresh the hardware capabilities of this StorageRouter",
+            "edit": "Edit some properties of this Storage Router",
+            "refreshtt": "Refresh the hardware capabilities of this Storage Router",
             "offline": {
                 "mark": "Mark this node Offline",
                 "warning": "Please make sure the Storage Router is actually down and unavailable before marking the Storage Router as offline. Marking the Storage Router as offline while it is still available might lead to data corruption.",
@@ -306,10 +290,10 @@
                 "yes": "Yes, it's offline",
                 "no": "No, back to safety",
                 "pending": "Pending",
-                "pendingmsg": "The StorageRouter is being marked offline",
+                "pendingmsg": "The Storage Router is being marked offline",
                 "done": "Marked offline",
-                "done_msg": "The StorageRouter was marked offline",
-                "error_msg": "marking the StorageRouter offline: __error__"
+                "done_msg": "The Storage Router was marked offline",
+                "error_msg": "marking the Storage Router offline: __error__"
             }
         }
     },
@@ -393,18 +377,7 @@
             "logginginfo2": "Open Kibana",
             "logginginfo3": "to view this vPool's logs.",
             "configuration": "vPool configuration defaults",
-            "configurationinfo": "Below are the default/fallback values for this vPool's vDisks. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine, from its vPool."
-        },
-        "sync": {
-            "title": "Sync all vMachines using __what__",
-            "warning": "Are you sure you want to sync all vMachines using the vPool?",
-            "yes": "Start sync",
-            "no": "Close",
-            "marked": "Sync scheduled",
-            "marked_msg": "A sync will be executed",
-            "done": "vPool synced",
-            "done_msg": "All vMachines using vPool __what__ synced",
-            "error_msg": "syncing all vMachines using __what__"
+            "configurationinfo": "Below are the default/fallback values for this vPool's vDisks. If a vDisk has no specific settings, settings will be inherited from its vPool."
         },
         "saveconfig": {
             "done": "Save complete",
@@ -426,44 +399,6 @@
             "rawinfo": "Raw memcached information"
         }
     },
-    "vmachines": {
-        "title": "vMachines",
-        "delete": {
-            "warning": "Are you sure you want to delete __what__?",
-            "marked": "Marked for deletion",
-            "marked_msg": "vMachine __what__ is marked for deletion...",
-            "done": "vMachine deleted",
-            "done_msg": "vMachine __what__ deleted",
-            "error_msg": "deleting __what__"
-        },
-        "set_as_template": {
-            "done": "vMachine set as vTemplate",
-            "done_msg": "vMachine __what__ set as vTemplate",
-            "error_msg": "setting __what__ as vTemplate: __error__",
-            "marked": "Marked for setting as vTemplate",
-            "marked_msg": "vMachine __what__ is marked for setting as vTemplate...",
-            "no": "Close",
-            "title": "Set vMachine __what__ as vTemplate",
-            "warning": "Warning: Converting a vMachine into a vTemplate will remove it as active Virtual Machine from the Host. The Virtual Machine can no longer actively be used.",
-            "yes": "Set as vTemplate"
-        },
-        "details": "Details",
-        "performance": "Performance",
-        "detail": {
-            "title": "vMachine",
-            "snapshots": "Snapshots",
-            "rollback": "Rollback",
-            "set_as_template": "Set as vTemplate",
-            "snapshot": "Take snapshot",
-            "configuration": "vDisk configuration defaults",
-            "configurationinfo": "Below are the default/fallback values for this vMachine's vDisks. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool."
-        },
-        "saveconfig": {
-            "done": "Save complete",
-            "done_msg": "The configuration details for __what__ are saved.",
-            "error_msg": "saving __what__"
-        }
-    },
     "vdisks": {
         "add": "Add new vDisk",
         "title": "vDisks",
@@ -474,7 +409,7 @@
             "snapshots": "Snapshots",
             "rollback": "Rollback",
             "configuration": "vDisk configuration",
-            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool.",
+            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
             "clone": "Clone",
             "set_as_template": "Set as vTemplate",
             "snapshot": "Take snapshot"
@@ -511,9 +446,6 @@
         }
     },
     "vtemplates": {
-        "vmachines": {
-            "title": "vMachine Templates"
-        },
         "vdisks": {
             "title": "vDisk Templates"
         },
@@ -532,41 +464,6 @@
                 "helptitle": "Help - vPools",
                 "title": "vPools"
             }
-        }
-    },
-    "pmachines": {
-        "title": "Hypervisor Mgmt.",
-        "mgmtcenter": {
-            "title": "Hypervisor Management Center",
-            "add": "Add new Center",
-            "hosts": "OVS Hosts/Total"
-        },
-        "pmachines": {
-            "link": "Link Hosts",
-            "title": "Managed Hosts",
-            "incorrectmgmtcenter": "The selected management center might be incorrect.",
-            "missingmgmtcenter": "Host is not yet linked to the correct management center"
-        },
-        "configure": {
-            "host": {
-                "warning": "Are you sure you want to __what__ __which__?"
-            },
-            "vpool": {
-                "failed": "Failed to __which__ vPool",
-                "started": "Started",
-                "started_msg": "__which__ commenced",
-                "success": "Success",
-                "success_msg": "Successfully __which__ vPool",
-                "warning": "Are you sure you want to __what__ the vPool?"
-            }
-        },
-        "delete": {
-            "warning": "Are you sure you want to delete __what__?",
-            "marked": "Marked for deletion",
-            "marked_msg": "Management center __what__ is marked for deletion...",
-            "done": "Deleted",
-            "done_msg": "Management center __what__ deleted",
-            "error_msg": "deleting __what__"
         }
     },
     "domains": {
@@ -658,8 +555,7 @@
     },
     "prerequisites": {
         "multiple": "The following prerequisites are unmet",
-        "singular": "The following prerequisite is unmet",
-        "vmachine": "Running virtual machines detected"
+        "singular": "The following prerequisite is unmet"
     },
     "login": {
         "title": "Login",
@@ -695,7 +591,7 @@
         "title": "Support",
         "clusterid": "Cluster ID:",
         "nodeid": "Node ID",
-        "nodes": "StorageRouters:",
+        "nodes": "Storage Routers:",
         "callhome": "Call Home settings",
         "metadata": "Heartbeat data",
         "enable": "Heartbeat enabled",
@@ -744,22 +640,6 @@
         "vpool": "vPool"
     },
     "wizards" : {
-        "addlicense": {
-            "title": "Add new License",
-            "gather": {
-                "license": "License",
-                "invalidlicense": "The License code entered is invalid"
-            },
-            "confirm": {
-                "component": "Component",
-                "metadata": "Metadata",
-                "success": "License added successfully",
-                "adding": "adding the License",
-                "started": "Adding License",
-                "inprogress": "The License is being added",
-                "basicinfo": "The entered Lincense contains the following components. Press &quot;Finish&quot; to apply the License."
-            }
-        },
         "add_backend": {
             "title": "Add new Backend",
             "gather": {
@@ -778,17 +658,19 @@
         "add_vdisk": {
             "title": "Add new vDisk",
             "gather": {
+                "cleaned_name": "Devicename on filesystem: ",
                 "complete":"Adding vDisk complete",
-                "failed":"Adding vDisk failed",
-                "initial_storagerouter": "Storage Router:",
-                "inprogress":"Adding vDisk in progress",
+                "failed":"Adding vDisk failed: __why__",
+                "in_progress":"Adding vDisk in progress",
                 "invalid_name": "The vDisk name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
+                "invalid_size": "Maximum size of __amount__ __unit__ exceeded",
                 "invalid_storagerouter": "No valid storagerouter selected",
                 "invalid_vpool": "No valid vPool selected",
                 "name": "Name:",
+                "name_exists": "The devicename already exists",
                 "size": "Size:",
-                "size_unit": "Unit:",
                 "started":"Adding vDisk",
+                "storagerouter": "Storage Router:",
                 "success":"vDisk added successfully",
                 "vpool": "vPool:"
             }
@@ -819,8 +701,7 @@
             "gather_config": {
                 "basic_info": "Specify the configurations for the vPool",
                 "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
-                "missing_role": "Missing required partition role: __what__",
-                "missing_storage_ip": "Required Storage IP __what__ could not be found"
+                "missing_role": "Missing required partition role: __what__"
             },
             "gather_vpool": {
                 "access_key": "Access Key:",
@@ -859,12 +740,6 @@
                 "shared_available": "Shared between Read and Write Cache:",
                 "writecache_size": "Write Cache:"
             },
-            "gather_mgmt_center": {
-                "integrate_mgmt": "Automatically configure the vPool on the Hypervisor.",
-                "loading": "Loading information about available Management Centers.",
-                "mgmt_center": "is managed by Hypervisor Management Center:",
-                "no_mgmt_center": "is not managed by a Hypervisor Management Center. Automatic configuration of the vPool on the Hypervisor will not be possible. Please refer to the documentation for manual instructions."
-            },
             "confirm": {
                 "accelerated_backend": "Accelerated Backend:",
                 "basic_info": "Validate the basic vPool information.",
@@ -889,20 +764,20 @@
             "title": "Create from vTemplate",
             "gather": {
                 "all_failed": "All create actions from vTemplate __what__ failed.",
-                "amount": "# of VMs:",
-                "amount_multiple": "The first item will be __start__ and the last one will be __end__",
-                "amount_one": "The name won't be appended with a number",
+                "amount": "# of vDisks:",
+                "amount_multiple": "The first item will be __start__ (devicename: __devicestart__) and the last one will be __end__ (devicename: __deviceend__)",
+                "amount_one": "Devicename on filesytem: __devicename__",
                 "complete": "Create completed",
                 "creating": "creating from vTemplate __what__: __error__",
                 "description": "Description:",
-                "duplicate_name": "The name __name__ is already in use",
-                "hosts": "Hosts:",
+                "storagerouters": "Storage Routers:",
                 "in_progress": "Creating from vTemplate __what__ in progress...",
                 "name": "Name:",
+                "name_exists": "One of the devicenames already exists",
                 "no_object": "No vTemplate found",
                 "no_name": "No name was given",
-                "no_pmachines": "No physical machines found.",
-                "no_pmachines_selected": "Please select at least one host.",
+                "no_storagerouters": "No Storage Routers found.",
+                "no_storagerouters_selected": "Please select at least one Storage Router.",
                 "some_failed": "Create from __what__ finished. However, some could not be created.",
                 "start_nr": "Start nr.:",
                 "started": "Create started",
@@ -947,15 +822,11 @@
             "gather": {
                 "title": "Please provide the required information",
                 "selectsnapshots": "Select the Snapshot to which you want to Rollback:",
-                "novmachine": "No machine loaded",
                 "novdisk": "No disk loaded",
                 "noname": "No name was entered",
                 "nosnapshots": "No Snapshots found",
                 "snapshot": "Snapshots",
                 "rollbackstarted": "Rollback started",
-                "inprogressvmachine": "Machine __what__ rollback in progress...",
-                "failedvmachine": "Machine __what__ rollback failed.",
-                "successvmachine": "Machine __what__ rollback successfully.",
                 "inprogressvdisk": "Disk __what__ rollback in progress...",
                 "failedvdisk": "Disk __what__ rollback failed.",
                 "successvdisk": "Disk __what__ rollback successfully."
@@ -965,9 +836,11 @@
             "title": "Clone",
             "gather": {
                 "basicinfo": "Enter basic information:",
+                "cleaned_name": "Devicename on filesystem: ",
                 "duplicate_name": "A virtual disk with this name already exists",
                 "invalid_name": "Invalid name",
                 "name": "Name:",
+                "name_exists": "The devicename already exists",
                 "newsnapshot": "Create a new snapshot",
                 "nostoragerouter": "No Storage Router information found",
                 "selectsnapshots": "Select the Snapshot from which you want to clone:",
@@ -980,7 +853,7 @@
                 "inprogress": "vDisk __what__ cloning in progress...",
                 "name": "Name:",
                 "snapshot": "Snapshot:",
-                "storagerouter": "StorageRouter:",
+                "storagerouter": "Storage Router:",
                 "success": "Cloned __what__ successfully",
                 "title": "Verify the entered information"
             }
@@ -1018,40 +891,6 @@
                 "updatingpassword": "updating the password"
             }
         },
-        "linkhosts": {
-            "title": "Link Hosts",
-            "gather": {
-                "basicinfo": "Select a management center and the hosts which you want to link/unlink",
-                "completed": "__which__ completed",
-                "configure": "Configure",
-                "failed": "__which__ __what__ failed: __why__",
-                "started": "Started",
-                "started_msg": "Linking / configuring started",
-                "success": "Pmachine __what__ __which__",
-                "unconfigure": "Unconfigure"
-            }
-        },
-        "addmgmtcenter": {
-            "title": "Add Hypervisor Management Center",
-            "gather": {
-                "basicinfo": "Enter the required information to add the Hypervisor Management Center",
-                "complete": "Complete",
-                "failed": "Adding __what__ failed: __why__",
-                "inprogress": "Adding Management Center __what__ started.",
-                "invalidip": "The IP Address entered is invalid",
-                "ip": "IP Address:",
-                "name": "Name:",
-                "noname": "No name was given",
-                "nousername": "No username was given",
-                "nopassword": "No password was given",
-                "password": "Password:",
-                "port": "Port:",
-                "started": "Started",
-                "success": "Adding __what__ completed.",
-                "type": "Type:",
-                "username": "Username:"
-            }
-        },
         "update": {
             "title": "Update __what__"
         },
@@ -1076,16 +915,6 @@
         }
     },
     "events": {
-        "vmachine_deleted": "vMachine deleted",
-        "vmachine_deleted_content": "vMachine __name__ was deleted.",
-        "vmachine_created": "vMachine created",
-        "vmachine_created_content": "vMachine __name__ was created.",
-        "vmachine_renamed": "vMachine renamed",
-        "vmachine_renamed_content": "vMachine __old_name__ was renamed to __new_name__.",
-        "vdisk_attached": "vDisk attached",
-        "vdisk_attached_content": "vDisk __vdisk_name__ was attached to __vmachine_name__.",
-        "vdisk_detached": "vDisk detached",
-        "vdisk_detached_content": "vDisk __vdisk_name__ was detached from __vmachine_name__"
     },
     "title": "Open vStorage",
     "icons": {
@@ -1109,7 +938,6 @@
         "help": "&#xf059;",
         "inconsistent": "&#xf097;",
         "information": "&#xf05a;",
-        "licensing": "&#xf132;",
         "link": "&#xf0c1;",
         "load": "&#xf021;",
         "loading": "&#xf110;",
@@ -1129,7 +957,6 @@
         "unlink": "&#xf127;",
         "up": "&#xf106;",
         "vdisks": "&#xf0a0;",
-        "vmachines": "&#xf0e8;",
         "vpools": "&#xf0c2;",
         "warning": "&#xf071;",
         "clone": "&#xf24d;",

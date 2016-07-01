@@ -17,8 +17,8 @@
 define([
     'jquery', 'knockout', 'ovs/shared',
     'ovs/generic', 'ovs/api',
-    'viewmodels/containers/backendtype', 'viewmodels/containers/vdisk', 'viewmodels/containers/vmachine'
-], function($, ko, shared, generic, api, BackendType, VDisk, VMachine) {
+    'viewmodels/containers/backendtype', 'viewmodels/containers/vdisk'
+], function($, ko, shared, generic, api, BackendType, VDisk) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -29,7 +29,6 @@ define([
         // Handles
         self.loadHandle          = undefined;
         self.diskHandle          = undefined;
-        self.machineHandle       = undefined;
         self.storageRouterHandle = undefined;
 
         // Observables
@@ -61,7 +60,6 @@ define([
         self.storedData         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.totalCacheHits     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.vDisks             = ko.observableArray([]);
-        self.vMachines          = ko.observableArray([]);
         self.writeSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
 
         // Computed
@@ -130,64 +128,24 @@ define([
             options = options || {};
             self.loading(true);
             return $.Deferred(function(deferred) {
-                var calls = [
-                    $.Deferred(function(mainDeferred) {
-                        if (generic.xhrCompleted(self.loadHandle)) {
-                            var listOptions = {};
-                            if (contents !== undefined) {
-                                listOptions.contents = contents;
-                            }
-                            self.loadHandle = api.get('vpools/' + self.guid(), { queryparams: listOptions })
-                                .done(function(data) {
-                                    self.fillData(data, options);
-                                    mainDeferred.resolve();
-                                })
-                                .fail(mainDeferred.reject);
-                        } else {
-                            mainDeferred.resolve();
-                        }
-                    }).promise(),
-                    $.Deferred(function(machineDeferred) {
-                        if (generic.xhrCompleted(self.machineHandle)) {
-                            var options = {
-                                sort: 'name',
-                                vpoolguid: self.guid(),
-                                contents: ''
-                            };
-                            self.machineHandle = api.get('vmachines', { queryparams: options })
-                                .done(function(data) {
-                                    var guids = [], vmdata = {};
-                                    $.each(data.data, function(index, item) {
-                                        guids.push(item.guid);
-                                        vmdata[item.guid] = item;
-                                    });
-                                    generic.crossFiller(
-                                        guids, self.vMachines,
-                                        function(guid) {
-                                            var vmachine = new VMachine(guid);
-                                            if ($.inArray(guid, guids) !== -1) {
-                                                vmachine.fillData(vmdata[guid]);
-                                            }
-                                            vmachine.loading(true);
-                                            return vmachine;
-                                        }, 'guid'
-                                    );
-                                    machineDeferred.resolve();
-                                })
-                                .fail(machineDeferred.reject);
-                        } else {
-                            machineDeferred.resolve();
-                        }
-                    }).promise()];
-                $.when.apply($, calls)
-                    .done(function() {
-                        self.loaded(true);
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject)
-                    .always(function() {
-                        self.loading(false);
-                    });
+                if (generic.xhrCompleted(self.loadHandle)) {
+                    var listOptions = {};
+                    if (contents !== undefined) {
+                        listOptions.contents = contents;
+                    }
+                    self.loadHandle = api.get('vpools/' + self.guid(), {queryparams: listOptions})
+                        .done(function (data) {
+                            self.fillData(data, options);
+                            self.loaded(true);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject)
+                        .always(function () {
+                            self.loading(false);
+                        });
+                } else {
+                    deferred.resolve();
+                }
             }).promise();
         };
         self.loadStorageRouters = function() {

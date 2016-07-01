@@ -35,7 +35,6 @@ define([
         self.dtlTargets         = ko.observableArray([]);
         self.storageRouter      = ko.observable();
         self.storageRouterGuids = ko.observableArray([]);
-        self.vMachine           = ko.observable();
         self.vpool              = ko.observable();
 
         // Observables
@@ -46,6 +45,7 @@ define([
         self.cacheMisses           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.cacheStrategies       = ko.observableArray(['on_read', 'on_write', 'none']);
         self.cacheStrategy         = ko.observable('on_read');
+        self.deviceName            = ko.observable();
         self.dedupeMode            = ko.observable();
         self.dedupeModes           = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
         self.dtlEnabled            = ko.observable(true);
@@ -62,7 +62,6 @@ define([
         self.name                  = ko.observable();
         self.namespace             = ko.observable();
         self.oldConfiguration      = ko.observable();
-        self.order                 = ko.observable(0);
         self.readCacheLimit        = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});
         self.readSpeed             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.scoSize               = ko.observable(4);
@@ -73,7 +72,6 @@ define([
         self.storedData            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.templateChildrenGuids = ko.observableArray([]);
         self.totalCacheHits        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.vMachineGuid          = ko.observable();
         self.vpoolGuid             = ko.observable();
         self.writeSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.writeBuffer           = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
@@ -172,7 +170,9 @@ define([
         // Functions
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');
-            generic.trySet(self.order, data, 'order');
+            if (data.hasOwnProperty('devicename')) {
+                self.deviceName(data.devicename.replace(/^\//, ''));
+            }
             generic.trySet(self.dtlManual, data, 'has_manual_dtl');
             generic.trySet(self.dtlStatus, data, 'dtl_status');
             if (data.hasOwnProperty('snapshots')) {
@@ -187,7 +187,6 @@ define([
             generic.trySet(self.isVTemplate, data, 'is_vtemplate');
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.vpoolGuid, data, 'vpool_guid');
-            generic.trySet(self.vMachineGuid, data, 'vmachine_guid');
             generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);
