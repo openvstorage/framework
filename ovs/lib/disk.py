@@ -211,7 +211,7 @@ class DiskController(object):
                         if partition_id not in partitions:
                             DiskController._create_partition(partition_id, partition_info[partition_id], disk)
             for disk_name in configuration:
-                if disk_name not in disk_names and configuration[disk_name]['state'] not in ['MISSING']:
+                if disk_name not in disk_names and configuration[disk_name].get('state', 'MISSING') not in ['MISSING']:
                     disk = Disk()
                     disk.storagerouter = storagerouter
                     disk.name = disk_name
