@@ -1557,7 +1557,10 @@ EOF
         storagerouter.save()
 
         StorageRouterController.set_rdma_capability(storagerouter.guid)
-        DiskController.sync_with_reality(storagerouter.guid)
+        try:
+            DiskController.sync_with_reality(storagerouter.guid)
+        except Exception as ex:
+            SetupController._logger.exception('Error syncing disks: {0}'.format(ex))
 
         return storagerouter
 
