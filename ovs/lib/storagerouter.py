@@ -799,7 +799,7 @@ class StorageRouterController(object):
                 fragment_cache_info = ['none']
             elif use_accelerated_alba is True:
                 fragment_cache_info = ['alba', {'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm_aa')),
-                                                'bucket_strategy': ['1-to-1', {'prefix': vpool.metadata[storagerouter.guid]['name'],
+                                                'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
                                                                                'preset': vpool.metadata[storagerouter.guid]['preset']}],
                                                 'manifest_cache_size': 16 * 1024 * 1024 * 1024,
                                                 'cache_on_read': fragment_cache_on_read,
@@ -818,7 +818,7 @@ class StorageRouterController(object):
                 'fragment_cache': fragment_cache_info,
                 'transport': 'rdma' if has_rdma else 'tcp',
                 'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm'))
-            }), raw=True)
+            }, indent=4), raw=True)
 
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
         storagedriver_config.load()
