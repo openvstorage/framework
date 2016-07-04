@@ -20,6 +20,8 @@ import json
 class HttpException(Exception):
     def __init__(self, status, error, error_description):
         self.status_code = status
+        self.error = error
+        self.error_description = error_description
         self.data = json.dumps({'error': error,
                                 'error_description': error_description})
 

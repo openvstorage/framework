@@ -164,8 +164,8 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 else:
                     if name not in post_data:
                         if name not in get_data:
-                            return HttpNotAcceptableException(error_description='Invalid data passed: {0} is missing'.format(name),
-                                                              error='invalid_data')
+                            raise HttpNotAcceptableException(error_description='Invalid data passed: {0} is missing'.format(name),
+                                                             error='invalid_data')
                         new_kwargs[name] = _try_parse(get_data[name])
                     else:
                         new_kwargs[name] = _try_parse(post_data[name])

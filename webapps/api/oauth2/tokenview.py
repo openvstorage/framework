@@ -75,9 +75,15 @@ class OAuth2TokenView(View):
                 raise HttpBadRequestException(error='unauthorized_client',
                                               error_description='Client is unautorized')
             client = clients[0]
-            access_token, _ = Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)
-            access_token.expiration = int(time.time() + 86400)
-            access_token.save()
+            try:
+                access_token, _ = Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)
+                access_token.expiration = int(time.time() + 86400)
+                access_token.save()
+            except ValueError as error:
+                if error.message == 'invalid_scope':
+                    raise HttpBadRequestException(error='invalid_scope',
+                                                  error_description='Invalid scope requested')
+                raise
             Toolbox.clean_tokens(client)
             return HttpResponse(json.dumps({'access_token': access_token.access_token,
                                             'token_type': 'bearer',
@@ -101,7 +107,13 @@ class OAuth2TokenView(View):
                 if not client.user.is_active:
                     raise HttpBadRequestException(error='inactive_user',
                                                   error_description='User is inactive')
-                access_token, _ = Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)
+                try:
+                    access_token, _ = Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)
+                except ValueError as error:
+                    if error.message == 'invalid_scope':
+                        raise HttpBadRequestException(error='invalid_scope',
+                                                      error_description='Invalid scope requested')
+                    raise
                 try:
                     Toolbox.clean_tokens(client)
                 except Exception as error:
@@ -110,6 +122,8 @@ class OAuth2TokenView(View):
                                                 'token_type': 'bearer',
                                                 'expires_in': 3600}),
                                     content_type='application/json')
+            except HttpBadRequestException:
+                raise
             except ObjectNotFoundException as ex:
                 logger.warning('Error matching client: {0}'.format(ex))
                 raise HttpBadRequestException(error='invalid_client',
@@ -117,7 +131,7 @@ class OAuth2TokenView(View):
             except Exception as ex:
                 logger.exception('Error matching client: {0}'.format(ex))
                 raise HttpBadRequestException(error='invalid_client',
-                                              error_description='Invalid client')
+                                              error_description='Error loading client')
         else:
             raise HttpBadRequestException(error='unsupported_grant_type',
                                           error_description='Unsupported grant type')
