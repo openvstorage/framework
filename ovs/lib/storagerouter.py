@@ -843,7 +843,7 @@ class StorageRouterController(object):
             tlog_multiplier = current_vpool_configuration['tlog_multiplier']
             sco_factor = float(current_vpool_configuration['write_buffer']) / tlog_multiplier / sco_size
 
-        filesystem_config = {'fs_enable_shm_interface': 1,
+        filesystem_config = {'fs_enable_shm_interface': 0,
                              'fs_metadata_backend_arakoon_cluster_nodes': [],
                              'fs_metadata_backend_mds_nodes': [],
                              'fs_metadata_backend_type': 'MDS',
