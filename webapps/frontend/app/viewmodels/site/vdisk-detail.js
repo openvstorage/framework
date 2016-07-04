@@ -195,9 +195,13 @@ define([
                                     router.navigate(shared.routing.loadHash('vtemplates'));
                                 })
                                 .fail(function(error) {
+                                    error = generic.extractErrorMessage(error);
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
-                                        $.t('ovs:generic.messages.errorwhile', {what: $.t('ovs:vdisks.set_as_template.error_msg', {what: vd.name(), error: error})}));
+                                        $.t('ovs:generic.messages.errorwhile', {
+                                            what: $.t('ovs:vdisks.set_as_template.error_msg', { what: vd.name(), error: error })
+                                        })
+                                    );
                                 })
                                 .always(function() {
                                     self.convertingToTemplate(false);
@@ -229,7 +233,7 @@ define([
                             $.t('ovs:vdisks.saveconfig.done_msg', { what: vd.name() })
                         );
                     })
-                    .fail(function (error) {
+                    .fail(function () {
                         generic.alertError(
                             $.t('ovs:generic.error'),
                             $.t('ovs:generic.messages.errorwhile', {
@@ -261,7 +265,7 @@ define([
                                 $.t('ovs:vdisks.removesnapshot.done_msg', { what: snapshotid })
                             );
                         })
-                        .fail(function (error) {
+                        .fail(function () {
                             generic.alertError(
                                 $.t('ovs:generic.error'),
                                 $.t('ovs:generic.messages.errorwhile', {

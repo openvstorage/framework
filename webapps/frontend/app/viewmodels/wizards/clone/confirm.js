@@ -51,7 +51,7 @@ define([
                             $.t('ovs:wizards.clone.confirm.success',{ what: self.data.vDisk().name() })
                         );
                     })
-                    .fail(function(error) {
+                    .fail(function() {
                         generic.alertError(
                             $.t('ovs:generic.error'),
                             $.t('ovs:wizards.clone.confirm.failed', { what: self.data.vDisk().name() })

@@ -134,6 +134,7 @@ define([
                         deferred.resolve(true);
                     })
                     .fail(function(error) {
+                        error = generic.extractErrorMessage(error);
                         generic.alertError(
                             $.t('ovs:generic.error'),
                             $.t('ovs:generic.messages.errorwhile', {what: $.t('ovs:wizards.create_ft.gather.creating', {

@@ -188,6 +188,7 @@ define([
                                     deferred.resolve();
                                 })
                                 .fail(function(error) {
+                                    error = generic.extractErrorMessage(error);
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
                                         $.t('ovs:updates.failed', { why: error })
@@ -252,6 +253,7 @@ define([
                                     deferred.resolve();
                                 })
                                 .fail(function(error) {
+                                    error = generic.extractErrorMessage(error);
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
                                         $.t('ovs:updates.failed', { why: error })

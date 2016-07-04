@@ -19,6 +19,7 @@ Middleware module
 """
 
 import re
+import json
 from django.http import HttpResponse
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.log.log_handler import LogHandler
@@ -35,7 +36,17 @@ class OVSMiddleware(object):
         """
         _ = self, request
         logger = LogHandler.get('api', 'middleware')
+        if OVSMiddleware._is_own_httpexception(exception):
+            return HttpResponse(exception.data,
+                                status=exception.status_code,
+                                content_type='application/json')
         logger.exception('An unhandled exception occurred: {0}'.format(exception))
+        return HttpResponse(
+            json.dumps({'error': 'internal_server',
+                        'error_description': exception.message}),
+            status=500,
+            content_type='application/json'
+        )
 
     def process_request(self, request):
         """
@@ -50,8 +61,10 @@ class OVSMiddleware(object):
         regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
         if path != '/api/' and '/api/oauth2/' not in path:
             if 'HTTP_ACCEPT' not in request.META or regex.match(request.META['HTTP_ACCEPT']) is None:
-                return HttpResponseNotAcceptable(
-                    '{"error": "The version required by the client should be added to the Accept header. E.g.: \'Accept: application/json; version=1\'"}',
+                return HttpResponse(
+                    json.dumps({'error': 'missing_header',
+                                'error_description': "The version required by the client should be added to the Accept header. E.g.: 'Accept: application/json; version=1'"}),
+                    status=406,
                     content_type='application/json'
                 )
         return None
@@ -71,6 +84,19 @@ class OVSMiddleware(object):
                 response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
         return response
 
-
-class HttpResponseNotAcceptable(HttpResponse):
-    status_code = 406
+    @staticmethod
+    def _is_own_httpexception(exception):
+        """
+        This is some sad, sad code and the only known workaround to ceck whether the given exception
+        is an instance of one of our own exceptions. No, isinstance doesn't work as it somehow is convinced
+        that the same classes imported from relatively a different path are in fact different classes.
+        """
+        bases = exception.__class__.__bases__
+        if len(bases) != 1:
+            return False
+        base = bases[0]
+        if base.__name__ != 'HttpException' and not base.__module__.endswith('backend.exceptions') and not base.__module__.endswith('oauth2.exceptions'):
+            return False
+        if not exception.__class__.__module__.endswith('backend.exceptions') and not exception.__class__.__module__.endswith('oauth2.exceptions'):
+            return False
+        return True

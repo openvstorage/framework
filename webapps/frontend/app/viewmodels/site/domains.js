@@ -85,10 +85,10 @@ define([
                     self.trigger(self.trigger() + 1);
                 })
                 .fail(function(error) {
-                    error = $.parseJSON(error.responseText);
+                    error = generic.extractErrorMessage(error);
                     generic.alertError(
                         $.t('ovs:generic.error'),
-                        $.t('ovs:domains.new.addfailed', { why: error.detail })
+                        $.t('ovs:domains.new.addfailed', { why: error })
                     );
                 })
                 .always(function() {
@@ -114,10 +114,10 @@ define([
                                     self.domains.remove(domain);
                                 })
                                 .fail(function (error) {
-                                    error = $.parseJSON(error.responseText);
+                                    error = generic.extractErrorMessage(error);
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
-                                        $.t('ovs:domains.delete.deletefailed', { why: error.detail })
+                                        $.t('ovs:domains.delete.deletefailed', { why: error })
                                     );
                                 });
                         }

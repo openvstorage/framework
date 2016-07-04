@@ -167,6 +167,7 @@ define([
                         );
                     })
                     .fail(function(error) {
+                        error = generic.extractErrorMessage(error);
                         generic.alertError(
                             $.t('ovs:generic.error'),
                             $.t('ovs:wizards.add_vdisk.gather.failed', {why: error})
