@@ -92,12 +92,13 @@ define([
                                         );
                                     })
                                     .fail(function(error) {
+                                        error = generic.extractErrorMessage(error);
                                         generic.alertError(
                                             $.t('ovs:generic.error'),
                                             $.t('ovs:generic.messages.errorwhile', {
                                                 context: 'error',
                                                 what: $.t('ovs:vdisks.delete.error_msg', { what: vd.name() }),
-                                                error: error.responseText
+                                                error: error
                                             })
                                         );
                                     });

@@ -18,7 +18,11 @@
 VDisk module
 """
 import time
+from rest_framework import viewsets
+from rest_framework.decorators import action, link
+from rest_framework.permissions import IsAuthenticated
 from backend.decorators import required_roles, load, return_list, return_object, return_task, log
+from backend.exceptions import HttpNotAcceptableException
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
@@ -26,10 +30,6 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.lib.vdisk import VDiskController
-from rest_framework import viewsets
-from rest_framework.decorators import action, link
-from rest_framework.exceptions import NotAcceptable
-from rest_framework.permissions import IsAuthenticated
 
 
 class VDiskViewSet(viewsets.ViewSet):
@@ -96,7 +96,8 @@ class VDiskViewSet(viewsets.ViewSet):
         if version == 1 and 'dtl_target' in new_config_params:
             storage_router = StorageRouterList.get_by_ip(new_config_params['dtl_target'])
             if storage_router is None:
-                raise NotAcceptable('API version 1 requires a Storage Router IP')
+                raise HttpNotAcceptableException(error_description='API version 1 requires a Storage Router IP',
+                                                 error='invalid_version')
             new_config_params['dtl_target'] = [junction.domain_guid for junction in storage_router.domains]
         return VDiskController.set_config_params.delay(vdisk_guid=vdisk.guid, new_config_params=new_config_params)
 
@@ -112,7 +113,8 @@ class VDiskViewSet(viewsets.ViewSet):
         children_vdisk_guids = []
         children_vdisks = []
         if vdisk.is_vtemplate is False:
-            raise NotAcceptable('vDisk is not a vTemplate')
+            raise HttpNotAcceptableException(error_description='vDisk is not a vTemplate',
+                                             error='impossible_request')
         for cdisk in vdisk.child_vdisks:
             if cdisk.guid not in children_vdisk_guids:
                 children_vdisk_guids.append(cdisk.guid)
@@ -201,7 +203,8 @@ class VDiskViewSet(viewsets.ViewSet):
                 return VDiskController.create_new.delay(volume_name=name,
                                                         volume_size=size,
                                                         storagedriver_guid=storagedriver.guid)
-        raise NotAcceptable('No storagedriver found for vPool: {0} and StorageRouter: {1}'.format(vpool_guid, storagerouter_guid))
+        raise HttpNotAcceptableException(error_description='No storagedriver found for vPool: {0} and StorageRouter: {1}'.format(vpool_guid, storagerouter_guid),
+                                         error='impossible_request')
 
     @action()
     @log()
@@ -292,7 +295,8 @@ class VDiskViewSet(viewsets.ViewSet):
         Deletes a vDisk (template)
         """
         if not vdisk.is_vtemplate:
-            raise NotAcceptable('vDisk should be a vTemplate')
+            raise HttpNotAcceptableException(error_description='vDisk should be a vTemplate',
+                                             error='impossible_request')
         return VDiskController.delete.delay(vdisk_guid=vdisk.guid)
 
     @action()

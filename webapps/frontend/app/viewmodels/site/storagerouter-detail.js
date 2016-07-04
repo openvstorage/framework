@@ -234,12 +234,13 @@ define([
                                 );
                             })
                             .fail(function(error) {
+                                error = generic.extractErrorMessage(error);
                                 generic.alertError(
                                     $.t('ovs:generic.error'),
                                     $.t('ovs:generic.messages.errorwhile', {
                                         context: 'error',
                                         what: $.t('ovs:storagerouters.detail.offline.error_msg'),
-                                        error: $('<div/>').text(error.responseText).html()
+                                        error: error
                                     })
                                 )
                             })

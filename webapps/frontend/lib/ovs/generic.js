@@ -520,6 +520,28 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return cleaned + '.raw';
     }
+    function extractErrorMessage(error, namespace) {
+        if (error.hasOwnProperty('responseText')) {
+            try {
+                var key, message, obj = $.parseJSON(error.responseText);
+                if (obj.hasOwnProperty('error')) {
+                    key = (namespace === undefined ? 'ovs' : namespace) + ':generic.api_errors.' + obj.error;
+                    message = $.t(key);
+                    if (message === key) {
+                        if (obj.hasOwnProperty('error_description')) {
+                            return obj.error_description;
+                        }
+                        return obj.error;
+                    }
+                    return message;
+                }
+                return error.responseText;
+            } catch(exception) {
+                return error;
+            }
+        }
+        return error;
+    }
 
     Array.prototype.equals = function(array) {
         return arrayEquals(this, array);
@@ -549,6 +571,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         cleanDeviceName: cleanDeviceName,
         crossFiller: crossFiller,
         deg2rad: deg2rad,
+        extractErrorMessage: extractErrorMessage,
         formatBytes: formatBytes,
         formatNumber: formatNumber,
         formatPercentage: formatPercentage,

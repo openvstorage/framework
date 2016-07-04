@@ -107,6 +107,20 @@
             "write": "On Write",
             "none": "No Caching"
         },
+        "api_errors": {
+            "internal_server": "Unknown server exception",
+            "rate_limit_timeout": "Waiting for API rate-limit lock to be released",
+            "rate_limit_reached": "Reached API rate-limit",
+            "not_authenticated": "Not authenticated",
+            "invalid_roles": "Insufficient rights",
+            "object_not_found": "The object could not be located",
+            "invalid_data": "Invalid data entered",
+            "no_ownership": "No access to this object",
+            "in_use": "The object is still in use",
+            "impossible_request": "The request is not possible",
+            "unavailable_call": "The call is unavailable in the relay",
+            "relay_error": "Error while relaying the call"
+        },
         "about": "About",
         "accept": "Accept",
         "actions": "Actions",

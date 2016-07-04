@@ -18,14 +18,14 @@
 Module for clients
 """
 
+from oauth2.toolbox import Toolbox as OAuth2Toolbox
+from rest_framework import status, viewsets
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from backend.exceptions import HttpForbiddenException
 from backend.serializers.serializers import FullSerializer
 from backend.decorators import required_roles, return_object, return_list, load, log
 from backend.toolbox import Toolbox
-from oauth2.toolbox import Toolbox as OAuth2Toolbox
-from rest_framework import status, viewsets
-from rest_framework.exceptions import PermissionDenied
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.j_roleclient import RoleClient
@@ -72,7 +72,8 @@ class ClientViewSet(viewsets.ViewSet):
         _ = format
         if client.guid in request.client.user.clients_guids or Toolbox.is_client_in_roles(request.client, ['manage']):
             return client
-        raise PermissionDenied('Fetching client information not allowed')
+        raise HttpForbiddenException(error_description='Fetching client information not allowed',
+                                     error='no_ownership')
 
     @log()
     @required_roles(['read', 'write'])
@@ -120,4 +121,5 @@ class ClientViewSet(viewsets.ViewSet):
                 junction.delete()
             client.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        raise PermissionDenied('Deleting this client is now allowed')
+        return HttpForbiddenException(error_description='Deleting this client is now allowed',
+                                      error='no_ownership')

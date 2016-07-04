@@ -17,7 +17,12 @@
 """
 VPool module
 """
+
+from rest_framework import viewsets
+from rest_framework.decorators import link, action
+from rest_framework.permissions import IsAuthenticated
 from backend.decorators import required_roles, load, return_list, return_object, return_task, return_plain, log
+from backend.exceptions import HttpNotAcceptableException
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
@@ -25,10 +30,6 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.vdisk import VDiskController
-from rest_framework import viewsets
-from rest_framework.decorators import link, action
-from rest_framework.exceptions import NotAcceptable
-from rest_framework.permissions import IsAuthenticated
 
 
 class VPoolViewSet(viewsets.ViewSet):
@@ -95,7 +96,8 @@ class VPoolViewSet(viewsets.ViewSet):
                 sd_guid = storagedriver.guid
                 break
         if sd_guid is None:
-            raise NotAcceptable('Storage Router {0} is not a member of vPool {1}'.format(sr.name, vpool.name))
+            raise HttpNotAcceptableException(error_description='Storage Router {0} is not a member of vPool {1}'.format(sr.name, vpool.name),
+                                             error='impossible_request')
         return StorageRouterController.remove_storagedriver.s(sd_guid).apply_async(routing_key='sr.{0}'.format(sr.machine_id))
 
     @action()
@@ -114,7 +116,8 @@ class VPoolViewSet(viewsets.ViewSet):
         :return: Celery task
         """
         if version > 1:
-            raise NotAcceptable('Only available in API version 1')
+            raise HttpNotAcceptableException(error_description='Only available in API version 1',
+                                             error='invalid_version')
         storagerouters = []
         if storagerouter_guids is not None:
             if storagerouter_guids.strip() != '':
@@ -127,7 +130,8 @@ class VPoolViewSet(viewsets.ViewSet):
                 for storagedriver_guid in storagedriver_guids.strip().split(','):
                     storagedriver = StorageDriver(storagedriver_guid)
                     if storagedriver.vpool_guid != vpool.guid:
-                        raise NotAcceptable('Given Storage Driver does not belong to this vPool')
+                        raise HttpNotAcceptableException(error_description='Given Storage Driver does not belong to this vPool',
+                                                         error='impossible_request')
                     valid_storagedriver_guids.append(storagedriver.guid)
 
         storagedriver = StorageDriver(storagedriver_guid)
@@ -157,12 +161,16 @@ class VPoolViewSet(viewsets.ViewSet):
         :param names: Candidate names
         :return: True or False
         """
+        error_message = None
         if not (name is None) ^ (names is None):
-            raise NotAcceptable('Either the name (string) or the names (list of strings) parameter must be passed')
+            error_message = 'Either the name (string) or the names (list of strings) parameter must be passed'
         if name is not None and not isinstance(name, basestring):
-            raise NotAcceptable('The name parameter must be a string')
+            error_message = 'The name parameter must be a string'
         if names is not None and not isinstance(names, list):
-            raise NotAcceptable('The names parameter must be a list of strings')
+            error_message = 'The names parameter must be a list of strings'
+        if error_message is not None:
+            raise HttpNotAcceptableException(error_description=error_message,
+                                             error='impossible_request')
 
         if name is not None:
             devicename = VDiskController.clean_devicename(name)

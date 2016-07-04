@@ -20,19 +20,20 @@ Metadata views
 
 import json
 import time
-from ovs.log.log_handler import LogHandler
-from ovs.extensions.generic.system import System
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-from ovs.extensions.api.client import OVSClient
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse
 from django.conf import settings
-from oauth2.decorators import auto_response, limit, authenticated
 from backend.decorators import required_roles, load
+from backend.exceptions import HttpBadRequestException
+from oauth2.decorators import auto_response, limit, authenticated
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
+from ovs.extensions.generic.system import System
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.api.client import OVSClient
+from ovs.log.log_handler import LogHandler
 
 
 class MetadataView(View):
@@ -87,35 +88,35 @@ class MetadataView(View):
 
             # Gather authorization metadata
             if 'HTTP_AUTHORIZATION' not in request.META:
-                return HttpResponse, dict(data.items() + {'authentication_state': 'unauthenticated'}.items())
+                return dict(data.items() + {'authentication_state': 'unauthenticated'}.items())
             authorization_type, access_token = request.META['HTTP_AUTHORIZATION'].split(' ')
             if authorization_type != 'Bearer':
-                return HttpResponse, dict(data.items() + {'authentication_state': 'invalid_authorization_type'}.items())
+                return dict(data.items() + {'authentication_state': 'invalid_authorization_type'}.items())
             tokens = BearerTokenList.get_by_access_token(access_token)
             if len(tokens) != 1:
-                return HttpResponse, dict(data.items() + {'authentication_state': 'invalid_token'}.items())
+                return dict(data.items() + {'authentication_state': 'invalid_token'}.items())
             token = tokens[0]
             if token.expiration < time.time():
                 for junction in token.roles.itersafe():
                     junction.delete()
                 token.delete()
-                return HttpResponse, dict(data.items() + {'authentication_state': 'token_expired'}.items())
+                return dict(data.items() + {'authentication_state': 'token_expired'}.items())
 
             # Gather user metadata
             user = token.client.user
             if not user.is_active:
-                return HttpResponse, dict(data.items() + {'authentication_state': 'inactive_user'}.items())
+                return dict(data.items() + {'authentication_state': 'inactive_user'}.items())
             roles = [j.role.code for j in token.roles]
 
-            return HttpResponse, dict(data.items() + {'authenticated': True,
-                                                      'authentication_state': 'authenticated',
-                                                      'username': user.username,
-                                                      'userguid': user.guid,
-                                                      'roles': roles,
-                                                      'plugins': plugins}.items())
+            return dict(data.items() + {'authenticated': True,
+                                        'authentication_state': 'authenticated',
+                                        'username': user.username,
+                                        'userguid': user.guid,
+                                        'roles': roles,
+                                        'plugins': plugins}.items())
         except Exception as ex:
             MetadataView._logger.exception('Unexpected exception: {0}'.format(ex))
-            return HttpResponse, dict(data.items() + {'authentication_state': 'unexpected_exception'}.items())
+            return dict(data.items() + {'authentication_state': 'unexpected_exception'}.items())
 
     @csrf_exempt
     def dispatch(self, request, *args, **kwargs):
@@ -146,7 +147,8 @@ def relay(*args, **kwargs):
         method = request.META['REQUEST_METHOD'].lower()
         client = OVSClient(ip, port, credentials=(client_id, client_secret), version=version, raw_response=True)
         if not hasattr(client, method):
-            return HttpResponseBadRequest, 'Method not available in relay'
+            raise HttpBadRequestException(error='unavailable_call',
+                                          error_description='Method not available in relay')
         client_kwargs = {'params': request.GET}
         if method != 'get':
             client_kwargs['data'] = request.POST
@@ -169,4 +171,7 @@ def relay(*args, **kwargs):
             status_code = ex.status_code
         logger = LogHandler.get('api', name='metadata')
         logger.exception('Error relaying call: {0}'.format(message))
-        return HttpResponse(json.dumps({'error': message}), content_type='application/json', status=status_code)
+        return HttpResponse(json.dumps({'error_descirption': message,
+                                        'error': 'relay_error'}),
+                            content_type='application/json',
+                            status=status_code)
