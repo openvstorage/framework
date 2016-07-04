@@ -531,12 +531,9 @@ define(['jquery', 'jqp/pnotify'], function($) {
                         if (obj.hasOwnProperty('error_description')) {
                             return obj.error_description;
                         }
-                        return error.responseText
+                        return obj.error;
                     }
                     return message;
-                }
-                if (obj.hasOwnProperty('detail')) {
-                    return obj.detail;
                 }
                 return error.responseText;
             } catch(exception) {
