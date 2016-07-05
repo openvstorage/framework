@@ -1718,7 +1718,7 @@ EOF
         errors = []
         config = config['setup']
         actual_keys = config.keys()
-        expected_keys = ['cluster_ip', 'enable_heartbeats', 'external_etcd', 'master_ip', 'master_password', 'node_type']
+        expected_keys = ['cluster_ip', 'enable_heartbeats', 'external_etcd', 'master_ip', 'master_password', 'node_type', 'rdma']
         for key in actual_keys:
             if key not in expected_keys:
                 errors.append('Key {0} is not supported by OpenvStorage to be used in the pre-configuration JSON'.format(key))
