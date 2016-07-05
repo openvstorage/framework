@@ -202,11 +202,11 @@ class StorageDriverConfiguration(object):
 
     parameters = {
         # hg branch: dev
-        # hg revision: d6c3c04c6e6a938bec87f84c8566a7b5e825e723
-        # buildTime: Thu Jun  2 07:51:33 UTC 2016
+        # hg revision: f07e34adfd519a9ac3f7b005550f631c3dff5264
+        # buildTime: Mon Jul  4 14:08:28 UTC 2016
         'metadataserver': {
             'backend_connection_manager': {
-                'optional': ['backend_connection_pool_capacity', 'backend_interface_retries_on_error', 'backend_interface_retry_interval_secs', 'backend_interface_retry_backoff_multiplier', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', 'alba_connection_transport', ],
+                'optional': ['backend_connection_pool_capacity', 'backend_interface_retries_on_error', 'backend_interface_retry_interval_secs', 'backend_interface_retry_backoff_multiplier', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', 'alba_connection_transport', 'alba_connection_use_rora', 'alba_connection_rora_manifest_cache_capacity', ],
                 'mandatory': ['local_connection_path', ]
             },
             'metadata_server': {
@@ -216,7 +216,7 @@ class StorageDriverConfiguration(object):
         },
         'storagedriver': {
             'backend_connection_manager': {
-                'optional': ['backend_connection_pool_capacity', 'backend_interface_retries_on_error', 'backend_interface_retry_interval_secs', 'backend_interface_retry_backoff_multiplier', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', 'alba_connection_transport', ],
+                'optional': ['backend_connection_pool_capacity', 'backend_interface_retries_on_error', 'backend_interface_retry_interval_secs', 'backend_interface_retry_backoff_multiplier', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', 'alba_connection_transport', 'alba_connection_use_rora', 'alba_connection_rora_manifest_cache_capacity', ],
                 'mandatory': ['local_connection_path', ]
             },
             'backend_garbage_collector': {
@@ -276,7 +276,7 @@ class StorageDriverConfiguration(object):
                 'mandatory': []
             },
             'volume_manager': {
-                'optional': ['open_scos_per_volume', 'dtl_throttle_usecs', 'dtl_queue_depth', 'dtl_write_trigger', 'sap_persist_interval', 'dtl_check_interval_in_seconds', 'read_cache_default_behaviour', 'read_cache_default_mode', 'required_tlog_freespace', 'required_meta_freespace', 'freespace_check_interval', 'number_of_scos_in_tlog', 'non_disposable_scos_factor', 'default_cluster_size', 'metadata_cache_capacity', 'debug_metadata_path', 'arakoon_metadata_sequence_size', ],
+                'optional': ['open_scos_per_volume', 'dtl_throttle_usecs', 'dtl_queue_depth', 'dtl_write_trigger', 'dtl_busy_loop_usecs', 'sap_persist_interval', 'dtl_check_interval_in_seconds', 'read_cache_default_behaviour', 'read_cache_default_mode', 'sco_written_to_backend_action', 'required_tlog_freespace', 'required_meta_freespace', 'freespace_check_interval', 'number_of_scos_in_tlog', 'non_disposable_scos_factor', 'default_cluster_size', 'metadata_cache_capacity', 'debug_metadata_path', 'arakoon_metadata_sequence_size', ],
                 'mandatory': ['metadata_path', 'tlog_path', 'clean_interval', ]
             },
             'volume_registry': {

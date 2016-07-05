@@ -768,6 +768,7 @@ class StorageRouterController(object):
         config_dir = '{0}/storagedriver/storagedriver'.format(EtcdConfiguration.get('/ovs/framework/paths|cfgdir'))
         client.dir_create(config_dir)
         alba_proxy = storagedriver.alba_proxy
+        manifest_cache_size = 16 * 1024 * 1024 * 1024
         if alba_proxy is None and vpool.backend_type.code == 'alba':
             service = DalService()
             service.storagerouter = storagerouter
@@ -814,7 +815,7 @@ class StorageRouterController(object):
                 'log_level': 'info',
                 'port': alba_proxy.service.ports[0],
                 'ips': [storagedriver.storage_ip],
-                'manifest_cache_size': 16 * 1024 * 1024 * 1024,
+                'manifest_cache_size': manifest_cache_size,
                 'fragment_cache': fragment_cache_info,
                 'transport': 'rdma' if has_rdma else 'tcp',
                 'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm'))
@@ -878,6 +879,9 @@ class StorageRouterController(object):
                                           'alba_connection_timeout': 15,
                                           'alba_connection_transport': 'RDMA' if has_rdma else 'TCP',
                                           'backend_type': 'ALBA'}
+            if use_accelerated_alba is False and has_rdma is True:
+                backend_connection_manager['alba_connection_rora_manifest_cache_capacity'] = manifest_cache_size
+                backend_connection_manager['alba_connection_use_rora'] = True
         elif vpool.backend_type.code in ['local', 'distributed']:
             backend_connection_manager = local_backend_data
         else:
