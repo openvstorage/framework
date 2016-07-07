@@ -69,7 +69,7 @@ define([
                                 responseText: xmlHttpRequest.responseText
                             });
                         }, 11000);
-                    } else if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 403) {
+                    } else if (xmlHttpRequest.readyState === 4 && (xmlHttpRequest.status === 403 || xmlHttpRequest.status === 401)) {
                         var data = $.parseJSON(xmlHttpRequest.responseText);
                         if (data.error === 'invalid_token') {
                             shared.authentication.logout();
