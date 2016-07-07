@@ -52,17 +52,9 @@ define(['knockout'], function(ko){
             dtlTransportModes:       ko.observableArray([{name: 'tcp', disabled: false}, {name: 'rdma', disabled: true}]),
             fragmentCacheOnRead:     ko.observable(true),
             fragmentCacheOnWrite:    ko.observable(true),
-            hasMgmtCenter:           ko.observable(false),
             host:                    ko.observable('').extend({regex: hostRegex}),
-            hvtype:                  ko.observable(''),
-            integratemgmt:           ko.observable(),
             ipAddresses:             ko.observableArray([]),
             localHost:               ko.observable(true),
-            mgmtcenterIp:            ko.observable(),
-            mgmtcenterLoaded:        ko.observable(false),
-            mgmtcenterName:          ko.observable(),
-            mgmtcenterType:          ko.observable(),
-            mgmtcenterUser:          ko.observable(),
             mountpoints:             ko.observableArray([]),
             name:                    ko.observable('').extend({regex: nameRegex}),
             partitions:              ko.observable(),
@@ -83,7 +75,6 @@ define(['knockout'], function(ko){
             storageRoutersAvailable: ko.observableArray([]),
             storageRoutersUsed:      ko.observableArray([]),
             useAA:                   ko.observable(false),
-            v260Migration:           ko.observable(false),
             vPool:                   ko.observable(),
             vPools:                  ko.observableArray([]),
             writeBuffer:             ko.observable(128).extend({numeric: {min: 128, max: 10240}}),
@@ -149,9 +140,6 @@ define(['knockout'], function(ko){
         // Computed
         wizardData.vPoolAdd = ko.computed(function() {
             return wizardData.vPool() === undefined;
-        });
-        wizardData.editBackend = ko.computed(function() {
-            return wizardData.vPoolAdd() || wizardData.v260Migration();
         });
         wizardData.enhancedPresets = ko.computed(function(){
             if (wizardData.albaBackend() === undefined){

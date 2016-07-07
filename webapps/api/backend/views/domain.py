@@ -18,23 +18,13 @@
 Module for domains
 """
 
-from backend.decorators import load, log, required_roles, return_list, return_object, return_plain
+from backend.decorators import load, log, required_roles, return_list, return_object
+from backend.exceptions import HttpNotAcceptableException
 from backend.serializers.serializers import FullSerializer
-from celery.task.control import revoke
-from ovs.dal.hybrids.backend import Backend
 from ovs.dal.hybrids.domain import Domain
-from ovs.dal.hybrids.j_backenddomain import BackendDomain
-from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
-from ovs.dal.hybrids.storagerouter import StorageRouter
-from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.domainlist import DomainList
-from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.lib.mdsservice import MDSServiceController
-from ovs.lib.vdisk import VDiskController
 from rest_framework import status, viewsets
-from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import NotAcceptable
 from rest_framework.response import Response
 
 
@@ -89,7 +79,8 @@ class DomainViewSet(viewsets.ViewSet):
         Deletes a Domain
         """
         if len(domain.storagerouters) > 0 or len(domain.backends) > 0 or len(domain.vdisks_dtl) > 0:
-            raise NotAcceptable('The given Domain is still in use')
+            raise HttpNotAcceptableException(error_description='The given Domain is still in use',
+                                             error='in_use')
         domain.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

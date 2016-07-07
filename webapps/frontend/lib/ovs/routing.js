@@ -28,18 +28,14 @@ define(['jquery'], function($) {
         { route: 'storagerouters/:guid', moduleId: 'storagerouter-detail', title: $.t('ovs:storagerouters.detail.title'), titlecode: 'ovs:storagerouters.detail.title', nav: false, main: false },
         { route: 'vpools',               moduleId: 'vpools',               title: $.t('ovs:vpools.title'),                titlecode: 'ovs:vpools.title',                nav: true,  main: true  },
         { route: 'vpool/:guid',          moduleId: 'vpool-detail',         title: $.t('ovs:vpools.detail.title'),         titlecode: 'ovs:vpools.detail.title',         nav: false, main: false },
-        { route: 'vmachines',            moduleId: 'vmachines',            title: $.t('ovs:vmachines.title'),             titlecode: 'ovs:vmachines.title',             nav: true,  main: true  },
-        { route: 'vmachine/:guid',       moduleId: 'vmachine-detail',      title: $.t('ovs:vmachines.detail.title'),      titlecode: 'ovs:vmachines.detail.title',      nav: false, main: false },
         { route: 'vdisks',               moduleId: 'vdisks',               title: $.t('ovs:vdisks.title'),                titlecode: 'ovs:vdisks.title',                nav: true,  main: true  },
         { route: 'vdisk/:guid',          moduleId: 'vdisk-detail',         title: $.t('ovs:vdisks.detail.title'),         titlecode: 'ovs:vdisks.detail.title',         nav: false, main: false },
         { route: 'vtemplates',           moduleId: 'vtemplates',           title: $.t('ovs:vtemplates.title'),            titlecode: 'ovs:vtemplates.title',            nav: true,  main: true  },
         { route: 'login',                moduleId: 'login',                title: $.t('ovs:login.title'),                 titlecode: 'ovs:login.title',                 nav: false, main: false },
-        { route: 'hmc',                  moduleId: 'pmachines',            title: $.t('ovs:pmachines.title'),             titlecode: 'ovs:pmachines.title',             nav: true,  main: false },
         { route: 'domains',              moduleId: 'domains',              title: $.t('ovs:domains.title'),               titlecode: 'ovs:domains.title',               nav: true,  main: false },
         { route: 'users',                moduleId: 'users',                title: $.t('ovs:users.title'),                 titlecode: 'ovs:users.title',                 nav: true,  main: false },
         { route: 'statistics',           moduleId: 'statistics',           title: $.t('ovs:statistics.title'),            titlecode: 'ovs:statistics.title',            nav: true,  main: false },
         { route: 'support',              moduleId: 'support',              title: $.t('ovs:support.title'),               titlecode: 'ovs:support.title',               nav: true,  main: false },
-        { route: 'licenses',             moduleId: 'licenses',             title: $.t('ovs:licenses.title'),              titlecode: 'ovs:licenses.title',              nav: false, main: false },
         { route: 'updates',              moduleId: 'updates',              title: $.t('ovs:updates.title'),               titlecode: 'ovs:updates.title',               nav: true,  main: false }
     ];
     extraRoutes = [];

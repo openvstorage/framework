@@ -18,8 +18,9 @@
 Dummy volatile module
 """
 import os
-import time
+import copy
 import json
+import time
 
 
 class DummyVolatileStore(object):
@@ -35,7 +36,7 @@ class DummyVolatileStore(object):
         """
         Init method
         """
-        self._keep_in_memory_only = False
+        self._keep_in_memory_only = True
 
     def clean(self):
         """
@@ -71,19 +72,15 @@ class DummyVolatileStore(object):
         data = self._read()
         if key in data['t'] and data['t'][key] > time.time():
             value = data['s'].get(key)
-            if 'ovs_primarykeys_' in key:
-                value[0] = set(value[0])
-            return value
+            return copy.deepcopy(value)
         return default
 
     def set(self, key, value, timeout=99999999):
         """
         Sets the value for a key to a given value
         """
-        if 'ovs_primarykeys_' in key:
-            value[0] = list(value[0])
         data = self._read()
-        data['s'][key] = value
+        data['s'][key] = copy.deepcopy(value)
         data['t'][key] = time.time() + timeout
         self._save(data)
 

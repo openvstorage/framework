@@ -19,15 +19,15 @@ VPool module
 """
 import time
 from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Dynamic, Property, Relation
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.dal.hybrids.backendtype import BackendType
+from ovs.dal.structures import Dynamic, Property, Relation
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 
 
 class VPool(DataObject):
     """
     The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to
-    deploy vMachines. a vPool can span multiple Storage Drivers and connects to a single Storage BackendType.
+    deploy vDisks. a vPool can span multiple Storage Drivers and connects to a single Storage BackendType.
     """
     STATUSES = DataObject.enumerator('Status', ['DELETING', 'EXTENDING', 'FAILURE', 'INSTALLING', 'RUNNING', 'SHRINKING'])
 
@@ -41,7 +41,8 @@ class VPool(DataObject):
                     Property('rdma_enabled', bool, default=False, doc='Has the vpool been configured to use RDMA for DTL transport, which is only possible if all storagerouters are RDMA capable'),
                     Property('status', STATUSES.keys(), doc='Status of the vPool')]
     __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
-    __dynamics = [Dynamic('statistics', dict, 4),
+    __dynamics = [Dynamic('configuration', dict, 3600),
+                  Dynamic('statistics', dict, 4),
                   Dynamic('identifier', str, 120),
                   Dynamic('stored_data', int, 60)]
     _fixed_properties = ['storagedriver_client']
@@ -64,6 +65,49 @@ class VPool(DataObject):
         if self._storagedriver_client is None:
             self.reload_client()
         return self._storagedriver_client
+
+    def _configuration(self):
+        """
+        VPool configuration
+        """
+        if not self.storagedrivers or not self.storagedrivers[0].storagerouter:
+            return {}
+
+        storagedriver_config = StorageDriverConfiguration('storagedriver', self.guid, self.storagedrivers[0].storagedriver_id)
+        storagedriver_config.load()
+
+        dtl = storagedriver_config.configuration.get('distributed_transaction_log', {})
+        file_system = storagedriver_config.configuration.get('filesystem', {})
+        volume_router = storagedriver_config.configuration.get('volume_router', {})
+        volume_manager = storagedriver_config.configuration.get('volume_manager', {})
+
+        dtl_mode = file_system.get('fs_dtl_mode', StorageDriverClient.VOLDRV_DTL_ASYNC)
+        dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_CONTENT_BASED)
+        cluster_size = volume_manager.get('default_cluster_size', 4096) / 1024
+        dtl_transport = dtl.get('dtl_transport', StorageDriverClient.VOLDRV_DTL_TRANSPORT_TCP)
+        cache_strategy = volume_manager.get('read_cache_default_behaviour', StorageDriverClient.VOLDRV_CACHE_ON_READ)
+        sco_multiplier = volume_router.get('vrouter_sco_multiplier', 1024)
+        dtl_config_mode = file_system.get('fs_dtl_config_mode', StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE)
+        tlog_multiplier = volume_manager.get('number_of_scos_in_tlog', 20)
+        non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
+
+        sco_size = sco_multiplier * cluster_size / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
+        write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor
+
+        dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_mode]
+        dtl_enabled = dtl_config_mode == StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE
+        if dtl_enabled is False:
+            dtl_mode = StorageDriverClient.FRAMEWORK_DTL_NO_SYNC
+
+        return {'sco_size': sco_size,
+                'dtl_mode': dtl_mode,
+                'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
+                'dtl_enabled': dtl_enabled,
+                'cluster_size': cluster_size,
+                'write_buffer': write_buffer,
+                'dtl_transport': StorageDriverClient.REVERSE_DTL_TRANSPORT_MAP[dtl_transport],
+                'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],
+                'tlog_multiplier': tlog_multiplier}
 
     def _statistics(self, dynamic):
         """

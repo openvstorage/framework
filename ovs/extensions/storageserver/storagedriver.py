@@ -24,14 +24,7 @@ from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import ClusterContact
-from volumedriver.storagerouter.storagerouterclient import DTLMode
-from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient as LSRClient
-from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
-from volumedriver.storagerouter.storagerouterclient import ReadCacheBehaviour
-from volumedriver.storagerouter.storagerouterclient import ReadCacheMode
-from volumedriver.storagerouter.storagerouterclient import Statistics
-from volumedriver.storagerouter.storagerouterclient import VolumeInfo
+from volumedriver.storagerouter.storagerouterclient import ClusterContact, DTLMode, LocalStorageRouterClient, MDSNodeConfig, ReadCacheBehaviour, ReadCacheMode, Statistics, VolumeInfo
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient as SRClient
     from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient as MDSClient
@@ -124,6 +117,7 @@ class StorageDriverClient(object):
                   'ok_sync': 10,
                   'ok_standalone': 20,
                   'catch_up': 30,
+                  'checkup_required': 30,
                   'degraded': 40}
     EMPTY_STATISTICS = staticmethod(lambda: Statistics())
     EMPTY_INFO = staticmethod(lambda: VolumeInfo())
@@ -362,10 +356,10 @@ class StorageDriverConfiguration(object):
             if len(self.dirty_entries) > 0:
                 if client is None:
                     self._logger.info('Applying local storagedriver configuration changes')
-                    changes = LSRClient(self.remote_path).update_configuration(self.remote_path)
+                    changes = LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path)
                 else:
                     self._logger.info('Applying storagedriver configuration changes on {0}'.format(client.ip))
-                    with remote(client.ip, [LSRClient]) as rem:
+                    with remote(client.ip, [LocalStorageRouterClient]) as rem:
                         changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
                 for change in changes:
                     if change['param_name'] not in self.dirty_entries:
@@ -390,25 +384,6 @@ class StorageDriverConfiguration(object):
                 for param in section_configuration:
                     if param not in entries['mandatory'] and param not in entries['optional']:
                         del self.configuration[section][param]
-
-    @staticmethod
-    def build_filesystem_by_hypervisor(hypervisor_type):
-        """
-        Builds a filesystem configuration dict, based on a given hypervisor
-        :param hypervisor_type: Hypervisor type for which to build a filesystem
-        """
-        if hypervisor_type == 'VMWARE':
-            return {'fs_virtual_disk_format': 'vmdk',
-                    'fs_file_event_rules': [{'fs_file_event_rule_calls': ['Mknod', 'Unlink', 'Rename'],
-                                             'fs_file_event_rule_path_regex': '.*.vmx'},
-                                            {'fs_file_event_rule_calls': ['Rename'],
-                                             'fs_file_event_rule_path_regex': '.*.vmx~'}]}
-        if hypervisor_type == 'KVM':
-            return {'fs_virtual_disk_format': 'raw',
-                    'fs_raw_disk_suffix': '.raw',
-                    'fs_file_event_rules': [{'fs_file_event_rule_calls': ['Mknod', 'Unlink', 'Rename', 'Write'],
-                                             'fs_file_event_rule_path_regex': '(?!vmcasts)(.*.xml)'}]}
-        return {}
 
     def _validate(self):
         """
@@ -454,31 +429,3 @@ class StorageDriverConfiguration(object):
             if item not in self.configuration[section] or self.configuration[section][item] != value:
                 self.dirty_entries.append(item)
             self.configuration[section][item] = value
-
-
-class GaneshaConfiguration(object):
-    """
-    Ganesha Configuration
-    """
-    def __init__(self):
-        config_dir = EtcdConfiguration.get('/ovs/framework/paths|cfgdir')
-        self._config_corefile = '/'.join([config_dir, 'templates', 'ganesha-core.conf'])
-        self._config_exportfile = '/'.join([config_dir, 'templates', 'ganesha-export.conf'])
-
-    def generate_config(self, target_file, params):
-        """
-        Generate configuration
-        :param target_file: Configuration file
-        :param params: Parameters
-        """
-        with open(self._config_corefile, 'r') as core_config_file:
-            config = core_config_file.read()
-        with open(self._config_exportfile, 'r') as export_section_file:
-            config += export_section_file.read()
-
-        for key, value in params.iteritems():
-            print 'replacing {0} by {1}'.format(key, value)
-            config = config.replace(key, value)
-
-        with open(target_file, 'wb') as config_out:
-            config_out.write(config)

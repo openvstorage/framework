@@ -17,17 +17,19 @@
 """
 VPool module
 """
-from backend.decorators import required_roles, load, return_list, return_object, return_task, log
+
+from rest_framework import viewsets
+from rest_framework.decorators import link, action
+from rest_framework.permissions import IsAuthenticated
+from backend.decorators import required_roles, load, return_list, return_object, return_task, return_plain, log
+from backend.exceptions import HttpNotAcceptableException
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.lib.storagerouter import StorageRouterController
-from ovs.lib.vpool import VPoolController
-from rest_framework import viewsets
-from rest_framework.decorators import link, action
-from rest_framework.exceptions import NotAcceptable
-from rest_framework.permissions import IsAuthenticated
+from ovs.lib.vdisk import VDiskController
 
 
 class VPoolViewSet(viewsets.ViewSet):
@@ -58,18 +60,6 @@ class VPoolViewSet(viewsets.ViewSet):
         :param vpool: vPool object to retrieve
         """
         return vpool
-
-    @action()
-    @log()
-    @required_roles(['read', 'write'])
-    @return_task()
-    @load(VPool)
-    def sync_vmachines(self, vpool):
-        """
-        Syncs the vMachine of this vPool
-        :param vpool: vPool to synchronize
-        """
-        return VPoolController.sync_with_hypervisor.delay(vpool.guid)
 
     @link()
     @log()
@@ -106,7 +96,8 @@ class VPoolViewSet(viewsets.ViewSet):
                 sd_guid = storagedriver.guid
                 break
         if sd_guid is None:
-            raise NotAcceptable('Storage Router {0} is not a member of vPool {1}'.format(sr.name, vpool.name))
+            raise HttpNotAcceptableException(error_description='Storage Router {0} is not a member of vPool {1}'.format(sr.name, vpool.name),
+                                             error='impossible_request')
         return StorageRouterController.remove_storagedriver.s(sd_guid).apply_async(routing_key='sr.{0}'.format(sr.machine_id))
 
     @action()
@@ -125,7 +116,8 @@ class VPoolViewSet(viewsets.ViewSet):
         :return: Celery task
         """
         if version > 1:
-            raise NotAcceptable('Only available in API version 1')
+            raise HttpNotAcceptableException(error_description='Only available in API version 1',
+                                             error='invalid_version')
         storagerouters = []
         if storagerouter_guids is not None:
             if storagerouter_guids.strip() != '':
@@ -138,7 +130,8 @@ class VPoolViewSet(viewsets.ViewSet):
                 for storagedriver_guid in storagedriver_guids.strip().split(','):
                     storagedriver = StorageDriver(storagedriver_guid)
                     if storagedriver.vpool_guid != vpool.guid:
-                        raise NotAcceptable('Given Storage Driver does not belong to this vPool')
+                        raise HttpNotAcceptableException(error_description='Given Storage Driver does not belong to this vPool',
+                                                         error='impossible_request')
                     valid_storagedriver_guids.append(storagedriver.guid)
 
         storagedriver = StorageDriver(storagedriver_guid)
@@ -156,20 +149,34 @@ class VPoolViewSet(viewsets.ViewSet):
         return StorageRouterController.update_storagedrivers.delay(valid_storagedriver_guids, storagerouters, parameters)
 
     @link()
+    @log()
     @required_roles(['read'])
-    @return_task()
+    @return_plain()
     @load(VPool)
-    def get_configuration(self, vpool):
+    def devicename_exists(self, vpool, name=None, names=None):
         """
-        Retrieve the configuration settings for this vPool
-        Currently we are able to configure the following settings (via GUI)
-          - DTL enabled
-          - DTL mode  (no sync, async, sync)
-          - DTL location  (where DTL is configured to)
-          - SCO size  (4MB - 128 MB)
-          - Dedupe mode  (deduped aka ContentBased, non-deduped aka LocationBased)
-          - Write buffer  (Amount of data allowed not immediately being put on backend)
-          - Cache strategy  (no cache, cache on read, cache on write)
-        :param vpool: vPool to retrieve configuration for
+        Checks whether a given name can be created on the vpool
+        :param vpool: vPool object
+        :param name: Candidate name
+        :param names: Candidate names
+        :return: True or False
         """
-        return VPoolController.get_configuration.delay(vpool_guid=vpool.guid)
+        error_message = None
+        if not (name is None) ^ (names is None):
+            error_message = 'Either the name (string) or the names (list of strings) parameter must be passed'
+        if name is not None and not isinstance(name, basestring):
+            error_message = 'The name parameter must be a string'
+        if names is not None and not isinstance(names, list):
+            error_message = 'The names parameter must be a list of strings'
+        if error_message is not None:
+            raise HttpNotAcceptableException(error_description=error_message,
+                                             error='impossible_request')
+
+        if name is not None:
+            devicename = VDiskController.clean_devicename(name)
+            return VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None
+        for name in names:
+            devicename = VDiskController.clean_devicename(name)
+            if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
+                return True
+        return False

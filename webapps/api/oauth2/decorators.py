@@ -19,11 +19,11 @@ Contains various decorator
 """
 import json
 import time
-from django.http import HttpResponse, HttpResponseServerError
 from django.contrib.auth import authenticate, login
-from rest_framework.request import Request
-from rest_framework.exceptions import PermissionDenied
 from django.core.handlers.wsgi import WSGIRequest
+from django.http import HttpResponse
+from rest_framework.request import Request
+from oauth2.exceptions import HttpForbiddenException, HttpTooManyRequestsException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.log.log_handler import LogHandler
@@ -42,8 +42,6 @@ def auto_response():
     """
     Json response wrapper
     """
-    logger = LogHandler.get('api', 'oauth2')
-
     def wrap(f):
         """
         Wrapper function
@@ -53,22 +51,11 @@ def auto_response():
             Wrapped function
             """
             results = f(*args, **kw)
-            if isinstance(results, tuple) or isinstance(results, list):
-                return_type, data = results[0], results[1]
-                if len(results) == 2:
-                    if isinstance(data, dict):
-                        return return_type(json.dumps(data), content_type='application/json')
-                    return return_type(data)
-                else:
-                    status_code = results[2]
-                    if isinstance(data, dict):
-                        return return_type(json.dumps(data), content_type='application/json', status=status_code)
-                    return return_type(data, status=status_code)
-            elif isinstance(results, HttpResponse):
+            if isinstance(results, HttpResponse):
                 return results
-            else:
-                logger.error('Got invalid function return data in auto_reponse')
-                return HttpResponseServerError()
+            if isinstance(results, dict):
+                return HttpResponse(json.dumps(results), content_type='application/json')
+            return HttpResponse(results)
 
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
@@ -105,8 +92,8 @@ def limit(amount, per, timeout):
                 if active_timeout is not None:
                     if active_timeout > now:
                         logger.warning('Call {0} is being throttled with a wait of {1}'.format(key, active_timeout - now))
-                        return HttpResponse, {'error_code': 'rate_limit_timeout',
-                                              'error': 'Rate limit timeout ({0}s remaining)'.format(round(active_timeout - now, 2))}, 429
+                        raise HttpTooManyRequestsException(error='rate_limit_timeout',
+                                                           error_description='Rate limit timeout ({0}s remaining)'.format(round(active_timeout - now, 2)))
                     else:
                         rate_info['timeout'] = None
                 rate_info['calls'] = [call for call in rate_info['calls'] if call > (now - per)] + [now]
@@ -115,8 +102,8 @@ def limit(amount, per, timeout):
                     rate_info['timeout'] = now + timeout
                     client.set(key, rate_info)
                     logger.warning('Call {0} is being throttled with a wait of {1}'.format(key, timeout))
-                    return HttpResponse, {'error_code': 'rate_limit_reached',
-                                          'error': 'Rate limit reached ({0} in last {1}s)'.format(calls, per)}, 429
+                    raise HttpTooManyRequestsException(error='rate_limit_reached',
+                                                       error_description='Rate limit reached ({0} in last {1}s)'.format(calls, per))
                 client.set(key, rate_info)
             finally:
                 mutex.release()
@@ -183,7 +170,8 @@ def authenticated():
             request = _find_request(args)
             user = authenticate(request=request, native_django=True)
             if user is None:
-                raise PermissionDenied('Authentication credentials were not provided.')
+                raise HttpForbiddenException(error_description='Authentication credentials were not provided.',
+                                             error='not_authenticated')
             login(request, user)
             return f(*args, **kwargs)
 

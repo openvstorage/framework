@@ -31,9 +31,8 @@ define([
         self.widgets      = [];
         self.vPoolHeaders = [
             { key: 'name',              value: $.t('ovs:generic.name'),                   width: 200       },
-            { key: 'storedData',        value: $.t('ovs:generic.storeddata'),             width: 150       },
-            { key: 'cacheRatio',        value: $.t('ovs:generic.cache'),                  width: 100       },
-            { key: 'iops',              value: $.t('ovs:generic.iops'),                   width: 100       },
+            { key: 'storedData',        value: $.t('ovs:generic.storeddata'),             width: 175       },
+            { key: 'iops',              value: $.t('ovs:generic.iops'),                   width: 125       },
             { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),             width: 180       },
             { key: 'backendConnection', value: $.t('ovs:vpools.backendconnectionpreset'), width: 230       },
             { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),            width: undefined },
@@ -110,14 +109,12 @@ define([
             }, 60000);
             self.refresher.start();
             self.refresher.run();
-            self.shared.footerData(self.vPools);
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {
                 item.deactivate();
             });
             self.refresher.stop();
-            self.shared.footerData(ko.observable());
         };
     };
 });

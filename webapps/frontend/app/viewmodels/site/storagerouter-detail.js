@@ -17,9 +17,9 @@
 define([
     'jquery', 'durandal/app', 'knockout', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver', '../containers/domain',
+    '../containers/storagerouter', '../containers/vpool', '../containers/storagedriver', '../containers/domain',
     '../wizards/configurepartition/index'
-], function($, app, ko, dialog, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver, Domain, ConfigurePartitionWizard) {
+], function($, app, ko, dialog, shared, generic, Refresher, api, StorageRouter, VPool, StorageDriver, Domain, ConfigurePartitionWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -84,12 +84,8 @@ define([
                     .then(self.loadVPools)
                     .done(function() {
                         self.checkedVPoolGuids(self.storageRouter().vPoolGuids());
-                        if (storageRouter.pMachine() !== undefined && !storageRouter.pMachine().loaded()) {
-                            storageRouter.pMachine().load();
-                        }
                         // Move child guids to the observables for easy display
                         storageRouter.vPools(storageRouter.vPoolGuids());
-                        storageRouter.vMachines(storageRouter.vMachineGuids);
                     })
                     .always(deferred.resolve);
             }).promise();
@@ -234,16 +230,17 @@ define([
                             .done(function() {
                                 generic.alertSuccess(
                                     $.t('ovs:storagerouters.detail.offline.done'),
-                                    $.t('ovs:storagerouters.detail.offline.donemsg')
+                                    $.t('ovs:storagerouters.detail.offline.done_msg')
                                 );
                             })
                             .fail(function(error) {
+                                error = generic.extractErrorMessage(error);
                                 generic.alertError(
                                     $.t('ovs:generic.error'),
                                     $.t('ovs:generic.messages.errorwhile', {
                                         context: 'error',
-                                        what: $.t('ovs:storagerouters.detail.offline.errormsg'),
-                                        error: $('<div/>').text(error.responseText).html()
+                                        what: $.t('ovs:storagerouters.detail.offline.error_msg'),
+                                        error: error
                                     })
                                 )
                             })
@@ -267,14 +264,12 @@ define([
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
-            self.shared.footerData(self.storageRouter);
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {
                 item.deactivate();
             });
             self.refresher.stop();
-            self.shared.footerData(ko.observable());
         };
     };
 });

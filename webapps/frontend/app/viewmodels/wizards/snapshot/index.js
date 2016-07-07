@@ -29,8 +29,12 @@ define([
         // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.snapshot.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.data.machineGuid(options.machineguid);
+        self.data.guid(options.guid);
         self.steps([new Gather()]);
         self.activateStep();
+
+        self.data.name('');
+        self.data.isSticky(false);
+        self.data.isConsistent(false);
     };
 });

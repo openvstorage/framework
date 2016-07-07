@@ -20,7 +20,7 @@ Contains the OAuth 2 authentication/authorization backends
 import time
 from django.contrib.auth.models import User as DUser
 from rest_framework.authentication import BaseAuthentication
-from rest_framework.exceptions import AuthenticationFailed
+from oauth2.exceptions import HttpUnauthorizedException
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 
 
@@ -38,21 +38,25 @@ class OAuth2Backend(BaseAuthentication):
             return None
         authorization_type, access_token = request.META['HTTP_AUTHORIZATION'].split(' ')
         if authorization_type != 'Bearer':
-            raise AuthenticationFailed('invalid_authorization_type')
+            raise HttpUnauthorizedException(error='invalid_authorization_type',
+                                            error_description='Invalid authorization type specified')
 
         tokens = BearerTokenList.get_by_access_token(access_token)
         if len(tokens) != 1:
-            raise AuthenticationFailed('invalid_token')
+            raise HttpUnauthorizedException(error='invalid_token',
+                                            error_description='Invalid token passed')
         token = tokens[0]
         if token.expiration < time.time():
             for junction in token.roles.itersafe():
                 junction.delete()
             token.delete()
-            raise AuthenticationFailed('token_expired')
+            raise HttpUnauthorizedException(error='token_expired',
+                                            error_description='The token passed is expired')
 
         user = token.client.user
         if not user.is_active:
-            raise AuthenticationFailed('inactive_user')
+            raise HttpUnauthorizedException(error='inactive_user',
+                                            error_description='Inactive user')
         request.client = token.client
         request.token = token
 

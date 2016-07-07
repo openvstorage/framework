@@ -18,18 +18,18 @@
 Module for users
 """
 
-import hashlib
 import random
 import string
-from backend.serializers.user import PasswordSerializer
-from backend.serializers.serializers import FullSerializer
-from backend.decorators import required_roles, load, return_object, return_list, log
-from backend.toolbox import Toolbox
+import hashlib
 from rest_framework import status, viewsets
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from backend.decorators import required_roles, load, return_object, return_list, log
+from backend.exceptions import HttpForbiddenException
+from backend.serializers.user import PasswordSerializer
+from backend.serializers.serializers import FullSerializer
+from backend.toolbox import Toolbox
 from ovs.dal.hybrids.user import User
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.j_roleclient import RoleClient
@@ -69,7 +69,8 @@ class UserViewSet(viewsets.ViewSet):
         """
         if user.guid == request.client.user_guid or Toolbox.is_client_in_roles(request.client, ['manage']):
             return user
-        raise PermissionDenied('Fetching user information not allowed')
+        raise HttpForbiddenException(error_description='Fetching user information not allowed',
+                                     error='no_ownership')
 
     @log()
     @required_roles(['read', 'write', 'manage'])
@@ -117,7 +118,8 @@ class UserViewSet(viewsets.ViewSet):
         Deletes a user
         """
         if request.client.user_guid == user.guid:
-            raise PermissionDenied('A user cannot delete itself')
+            raise HttpForbiddenException(error_description='A user cannot delete itself',
+                                         error='impossible_request')
         for client in user.clients:
             for token in client.tokens:
                 for junction in token.roles.itersafe():
@@ -140,7 +142,8 @@ class UserViewSet(viewsets.ViewSet):
         serializer = FullSerializer(User, contents=contents, instance=user, data=request.DATA)
         if serializer.is_valid():
             if user.guid == request.client.user_guid:
-                raise PermissionDenied('A user cannot update itself')
+                raise HttpForbiddenException(error_description='A user cannot update itself',
+                                             error='impossible_request')
             serializer.save()
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
@@ -168,4 +171,5 @@ class UserViewSet(viewsets.ViewSet):
                         token.delete()
                 return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        raise PermissionDenied('Updating password not allowed')
+        raise HttpForbiddenException(error_description='Updating password not allowed',
+                                     error='impossible_request')

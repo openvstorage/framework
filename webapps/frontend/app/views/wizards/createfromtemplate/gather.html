@@ -1,0 +1,92 @@
+<!--
+Copyright (C) 2016 iNuron NV
+
+This file is part of Open vStorage Open Source Edition (OSE),
+as available from
+
+      http://www.openvstorage.org and
+      http://www.openvstorage.com.
+
+This file is free software; you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+as published by the Free Software Foundation, in version 3 as it comes
+in the LICENSE.txt file of the Open vStorage OSE distribution.
+
+Open vStorage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY of any kind.
+-->
+<div>
+    <form data-bind="visible: canStart().value" class="form-horizontal">
+        <div class="form-group">
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.create_ft.gather.name"></label>
+            <div class="col-lg-8">
+                <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label class="col-lg-3 control-label" for="amount" data-i18n="ovs:wizards.create_ft.gather.amount"></label>
+            <div class="col-lg-3">
+                <div class="input-group">
+                    <span class="input-group-btn">
+                        <button class="btn btn-default" type="button" data-bind="click: function() { data.amount(Math.max(1, parseInt('0' + data.amount(), 10) - 1)); }">
+                            <span class="fa fa-minus"></span>
+                        </button>
+                    </span>
+                    <input type="text" id="amount" class="form-control" data-bind="value: data.amount">
+                    <span class="input-group-btn">
+                        <button class="btn btn-default" type="button" data-bind="click: function() { data.amount(parseInt('0' + data.amount(), 10) + 1); }">
+                            <span class="fa fa-plus"></span>
+                        </button>
+                    </span>
+                </div>
+            </div>
+            <label class="col-lg-2 control-label" for="startnr" data-i18n="ovs:wizards.create_ft.gather.start_nr"></label>
+            <div class="col-lg-3">
+                <div class="input-group">
+                    <span class="input-group-btn">
+                        <button class="btn btn-default" type="button" data-bind="disable: data.amount() === 1, click: function() { data.startnr(Math.max(1, parseInt('0' + data.startnr(), 10) - 1)); }">
+                            <span class="fa fa-minus"></span>
+                        </button>
+                    </span>
+                    <input type="text" id="startnr" class="form-control" data-bind="disable: data.amount() === 1, value: data.startnr, valueUpdate: 'afterkeydown'">
+                    <span class="input-group-btn">
+                        <button class="btn btn-default" type="button" data-bind="disable: data.amount() === 1, click: function() { data.startnr(parseInt('0' + data.startnr(), 10) + 1); }">
+                            <span class="fa fa-plus"></span>
+                        </button>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-3 control-label"></label>
+            <div class="col-lg-8"><p class="help-block" data-bind="text: namehelp"></p></div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.create_ft.gather.storagerouters"></label>
+            <div class="col-lg-8">
+                <span data-bind="dropdown: {
+                                     key: 'guid', keyisfunction: true,
+                                     items: data.storageRouters, target: data.selectedStorageRouters,
+                                     text: function(item) {
+                                         return item.name();
+                                     }
+                                 }">
+                </span>
+            </div>
+        </div>
+    </form>
+    <div class="alert alert-danger" data-bind="visible: (canStart().value && !canContinue().value) || canContinue().showErrors" style="margin-bottom: -10px;">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+    <div class="alert alert-danger" data-bind="visible: !canStart().value" style="margin-bottom: -10px;">
+        <p data-bind="visible: canStart().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canStart().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canStart().reasons.length > 0, foreach: canStart().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>

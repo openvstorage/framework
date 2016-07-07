@@ -82,12 +82,12 @@ define([
                         deferred.resolve();
                     })
                     .fail(function(error) {
-                        error = $.parseJSON(error.responseText);
+                        error = generic.extractErrorMessage(error);
                         generic.alertError(
                             $.t('ovs:generic.error'),
                             $.t('ovs:users.save.failed', {
                                 what: self.username(),
-                                why: error.detail
+                                why: error
                             })
                         );
                         self.loading(false);

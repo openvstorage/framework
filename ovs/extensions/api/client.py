@@ -174,7 +174,7 @@ class OVSClient(object):
     def get(self, api, params=None):
         """
         Executes a GET call
-        :param api: Specification for to fill out in the URL, eg: /vpools/<vpool_guid>/sync_vmachines
+        :param api: Specification for to fill out in the URL, eg: /vpools/<vpool_guid>/shrink_vpool
         :param params: Additional query parameters, eg: _dynamics
         """
         return self._call(api=api, params=params, function=requests.get)
@@ -182,7 +182,7 @@ class OVSClient(object):
     def post(self, api, data=None, params=None):
         """
         Executes a POST call
-        :param api: Specification for to fill out in the URL, eg: /vpools/<vpool_guid>/sync_vmachines
+        :param api: Specification for to fill out in the URL, eg: /vpools/<vpool_guid>/shrink_vpool
         :param data: Data to post
         :param params: Additional query parameters, eg: _dynamics
         """
@@ -191,7 +191,7 @@ class OVSClient(object):
     def put(self, api, data=None, params=None):
         """
         Executes a PUT call
-        :param api: Specification for to fill out in the URL, eg: /vpools/<vpool_guid>/sync_vmachines
+        :param api: Specification for to fill out in the URL, eg: /vpools/<vpool_guid>/shrink_vpool
         :param data: Data to put
         :param params: Additional query parameters, eg: _dynamics
         """
@@ -200,7 +200,7 @@ class OVSClient(object):
     def patch(self, api, data=None, params=None):
         """
         Executes a PATCH call
-        :param api: Specification for to fill out in the URL, eg: /vpools/<vpool_guid>/sync_vmachines
+        :param api: Specification for to fill out in the URL, eg: /vpools/<vpool_guid>/shrink_vpool
         :param data: Data to patch
         :param params: Additional query parameters, eg: _dynamics
         """

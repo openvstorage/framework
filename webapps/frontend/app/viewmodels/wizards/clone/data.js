@@ -21,7 +21,6 @@ define(['jquery', 'knockout'], function($, ko){
         var data = {
             name:           ko.observable('').extend({ regex: nameRegex }),
             vDisk:          ko.observable(),
-            vDisks:         ko.observableArray([]),
             snapshot:       ko.observable(),
             storageRouter:  ko.observable(),
             storageRouters: ko.observableArray([])

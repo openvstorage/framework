@@ -16,8 +16,8 @@
 /*global define */
 define([
     'jquery', 'ovs/generic',
-    '../build', './data', './gather_config', './gather_vpool', './gather_cache_info', './gather_mgmtcenter', './gather_backend', './confirm'
-], function($, generic, build, data, GatherConfig, GatherVPool, GatherCacheInfo, GatherMgmtCenter, GatherBackend, Confirm) {
+    '../build', './data', './gather_config', './gather_vpool', './gather_cache_info', './gather_backend', './confirm'
+], function($, generic, build, data, GatherConfig, GatherVPool, GatherCacheInfo, GatherBackend, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
@@ -35,7 +35,7 @@ define([
             data.vPool(undefined);
             data.storageRouter(undefined);
         }
-        self.steps([new GatherVPool(), new GatherBackend(), new GatherConfig(), new GatherCacheInfo(), new GatherMgmtCenter(), new Confirm()]);
+        self.steps([new GatherVPool(), new GatherBackend(), new GatherConfig(), new GatherCacheInfo(), new Confirm()]);
         data.completed = options.completed;
         self.step(0);
         self.activateStep();
@@ -63,16 +63,9 @@ define([
         data.dtlTransportMode({name: 'tcp'});
         data.fragmentCacheOnRead(true);
         data.fragmentCacheOnWrite(true);
-        data.hasMgmtCenter(false);
         data.host('');
-        data.integratemgmt(false);
         data.ipAddresses([]);
         data.localHost(true);
-        data.mgmtcenterIp(undefined);
-        data.mgmtcenterLoaded(undefined);
-        data.mgmtcenterName(undefined);
-        data.mgmtcenterType(undefined);
-        data.mgmtcenterUser(undefined);
         data.mountpoints([]);
         data.name('');
         data.partitions(undefined);

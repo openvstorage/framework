@@ -52,17 +52,17 @@ class OAuth2RedirectView(View):
         html_endpoint = EtcdConfiguration.get('/ovs/framework/webapps|html_endpoint')
         if 'code' not in request.GET:
             OAuth2RedirectView._logger.error('Got OAuth2 redirection request without code')
-            return HttpResponseRedirect, html_endpoint
+            return HttpResponseRedirect(html_endpoint)
         code = request.GET['code']
         if 'state' not in request.GET:
             OAuth2RedirectView._logger.error('Got OAuth2 redirection request without state')
-            return HttpResponseRedirect, html_endpoint
+            return HttpResponseRedirect(html_endpoint)
         state = request.GET['state']
         if 'error' in request.GET:
             error = request.GET['error']
             description = request.GET['error_description'] if 'error_description' in request.GET else ''
             OAuth2RedirectView._logger.error('Error {0} during OAuth2 redirection request: {1}'.format(error, description))
-            return HttpResponseRedirect, html_endpoint
+            return HttpResponseRedirect(html_endpoint)
 
         base_url = EtcdConfiguration.get('/ovs/framework/webapps|oauth2.token_uri')
         client_id = EtcdConfiguration.get('/ovs/framework/webapps|oauth2.client_id')
@@ -80,7 +80,7 @@ class OAuth2RedirectView(View):
             error = response['error']
             description = response['error_description'] if 'error_description' in response else ''
             OAuth2RedirectView._logger.error('Error {0} during OAuth2 redirection access token: {1}'.format(error, description))
-            return HttpResponseRedirect, html_endpoint
+            return HttpResponseRedirect(html_endpoint)
 
         token = response['access_token']
         expires_in = response['expires_in']
@@ -93,7 +93,7 @@ class OAuth2RedirectView(View):
                 break
         if client is None:
             OAuth2RedirectView._logger.error('Could not find INTERNAL CLIENT_CREDENTIALS client in administrator group.')
-            return HttpResponseRedirect, html_endpoint
+            return HttpResponseRedirect(html_endpoint)
 
         roles = RoleList.get_roles_by_codes(['read', 'write', 'manage'])
         access_token, _ = Toolbox.generate_tokens(client, generate_access=True, scopes=roles)
