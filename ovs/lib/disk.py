@@ -68,7 +68,6 @@ class DiskController(object):
                 dev_name, dev_details = entry.split(': ')
                 if 'UUID' in dev_details:
                     blkids[str(dev_name)] = str(dev_details.split('"')[1])
-                continue
             for mount in mount_data.splitlines():
                 mount = mount.strip()
                 match = re.search('(/dev/(.+?)) on (/.*?) type.*', mount)
