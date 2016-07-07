@@ -869,7 +869,7 @@ class VDiskController(object):
                         vdisks.remove(vdisk)
                         continue
 
-                    dtl_target = [sd for sd in vpool.storagedrivers if sd.storage_ip == current_dtl_config.host][0]
+                    dtl_target = [sd for sd in vpool.storagedrivers if sd.storage_ip == current_dtl_config.host][0].storagerouter
                     sr_domains = set([junction.domain for junction in dtl_target.domains])
                     vd_domains = set([junction.domain for junction in vdisk.domains_dtl])
                     if vd_domains.intersection(sr_domains):
