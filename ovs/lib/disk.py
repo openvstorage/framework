@@ -63,14 +63,19 @@ class DiskController(object):
             # Gather mount data
             mount_mapping = {}
             mount_data = client.run('mount')
+            blkids = dict()
+            for entry in client.run('blkid').splitlines():
+                dev_name, dev_details = entry.split(': ')
+                if 'UUID' in dev_details:
+                    blkids[str(dev_name)] = str(dev_details.split('"')[1])
             for mount in mount_data.splitlines():
                 mount = mount.strip()
                 match = re.search('(/dev/(.+?)) on (/.*?) type.*', mount)
+
                 if match is not None:
                     dev_name = match.groups()[0]
-                    uuid = client.run('blkid -o value -s UUID {0}'.format(dev_name))
-                    if uuid:
-                        mount_mapping[uuid] = match.groups()[2]
+                    if dev_name in blkids:
+                        mount_mapping[blkids[dev_name]] = match.groups()[2]
                     else:
                         mount_mapping[match.groups()[1]] = match.groups()[2]
             # Gather raid information
