@@ -768,6 +768,7 @@ class StorageRouterController(object):
         config_dir = '{0}/storagedriver/storagedriver'.format(EtcdConfiguration.get('/ovs/framework/paths|cfgdir'))
         client.dir_create(config_dir)
         alba_proxy = storagedriver.alba_proxy
+        manifest_cache_size = 16 * 1024 * 1024 * 1024
         if alba_proxy is None and vpool.backend_type.code == 'alba':
             service = DalService()
             service.storagerouter = storagerouter
@@ -814,7 +815,7 @@ class StorageRouterController(object):
                 'log_level': 'info',
                 'port': alba_proxy.service.ports[0],
                 'ips': [storagedriver.storage_ip],
-                'manifest_cache_size': 16 * 1024 * 1024 * 1024,
+                'manifest_cache_size': manifest_cache_size,
                 'fragment_cache': fragment_cache_info,
                 'transport': 'rdma' if has_rdma else 'tcp',
                 'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm'))
@@ -878,6 +879,9 @@ class StorageRouterController(object):
                                           'alba_connection_timeout': 15,
                                           'alba_connection_transport': 'RDMA' if has_rdma else 'TCP',
                                           'backend_type': 'ALBA'}
+            if use_accelerated_alba is False and has_rdma is True:
+                backend_connection_manager['alba_connection_rora_manifest_cache_capacity'] = manifest_cache_size
+                backend_connection_manager['alba_connection_use_rora'] = True
         elif vpool.backend_type.code in ['local', 'distributed']:
             backend_connection_manager = local_backend_data
         else:
@@ -934,29 +938,33 @@ class StorageRouterController(object):
         if sdp_scrub is not None:
             root_client.dir_chmod(sdp_scrub.path, 0777)  # Used by gather_scrub_work which is a celery task executed by 'ovs' user and should be able to write in it
 
-        params = {'VPOOL_MOUNTPOINT': storagedriver.mountpoint,
-                  'VPOOL_NAME': vpool_name,
-                  'VPOOL_GUID': vpool.guid,
-                  'CONFIG_PATH': storagedriver_config.remote_path,
-                  'UUID': str(uuid.uuid4()),
-                  'OVS_UID': check_output('id -u ovs', shell=True).strip(),
-                  'OVS_GID': check_output('id -g ovs', shell=True).strip(),
-                  'LOG_SINK': LogHandler.get_sink_path('storagedriver'),
-                  'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
-
         StorageRouterController._logger.info('backend_type: {0}'.format(vpool.backend_type.code))
+        params = {'DTL_PATH': sdp_dtl.path,
+                  'DTL_ADDRESS': storagedriver.storage_ip,
+                  'DTL_PORT': storagedriver.ports['dtl'],
+                  'DTL_TRANSPORT': 'RSocket' if has_rdma else 'TCP',
+                  'LOG_SINK': LogHandler.get_sink_path('storagedriver')}
         dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
         ServiceManager.add_service(name='ovs-dtl', params=params, client=root_client, target_name=dtl_service)
         ServiceManager.start_service(dtl_service, client=root_client)
         dependencies = None
         if vpool.backend_type.code == 'alba':
+            params = {'VPOOL_NAME': vpool_name,
+                      'VPOOL_GUID': vpool.guid,
+                      'PROXY_ID': storagedriver.alba_proxy_guid,
+                      'LOG_SINK': LogHandler.get_sink_path('alba_proxy')}
             alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
-            params['PROXY_ID'] = storagedriver.alba_proxy_guid
-            params['LOG_SINK'] = LogHandler.get_sink_path('alba_proxy')
             ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name=alba_proxy_service)
             ServiceManager.start_service(alba_proxy_service, client=root_client)
             dependencies = [alba_proxy_service]
 
+        params = {'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30)),
+                  'VPOOL_NAME': vpool_name,
+                  'VPOOL_MOUNTPOINT': storagedriver.mountpoint,
+                  'CONFIG_PATH': storagedriver_config.remote_path,
+                  'OVS_UID': check_output('id -u ovs', shell=True).strip(),
+                  'OVS_GID': check_output('id -g ovs', shell=True).strip(),
+                  'LOG_SINK': LogHandler.get_sink_path('storagedriver')}
         voldrv_service = 'ovs-volumedriver_{0}'.format(vpool.name)
         ServiceManager.add_service(name='ovs-volumedriver', params=params, client=root_client, target_name=voldrv_service, additional_dependencies=dependencies)
 

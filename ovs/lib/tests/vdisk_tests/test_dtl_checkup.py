@@ -113,7 +113,7 @@ class DTLCheckup(unittest.TestCase):
             storagedriver.name = str(storage_router_id)
             storagedriver.mountpoint = '/'
             storagedriver.cluster_ip = storagerouter.ip
-            storagedriver.storage_ip = '127.0.0.1'
+            storagedriver.storage_ip = '10.0.1.{0}'.format(storage_router_id)
             storagedriver.storagedriver_id = str(storage_router_id)
             storagedriver.ports = {'management': 1,
                                    'xmlrpc': 2,
@@ -257,7 +257,7 @@ class DTLCheckup(unittest.TestCase):
         ServiceManager.add_service(name=service_name, client=None)
         ServiceManager.start_service(name=service_name, client=None)
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[1:]]},
+                                           validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()[1:]]},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
@@ -280,7 +280,7 @@ class DTLCheckup(unittest.TestCase):
         ServiceManager.add_service(name=service_name, client=None)
         ServiceManager.start_service(name=service_name, client=None)
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[1:]]},
+                                           validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()[1:]]},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
@@ -348,7 +348,7 @@ class DTLCheckup(unittest.TestCase):
         ServiceManager.add_service(name=service_name, client=None)
         ServiceManager.start_service(name=service_name, client=None)
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': storagerouters[2].ip},
+                                           validations=[{'key': 'host', 'value': storagerouters[2].storagedrivers[0].storage_ip},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
@@ -366,7 +366,7 @@ class DTLCheckup(unittest.TestCase):
             sr_domain.storagerouter = storagerouter
             sr_domain.save()
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': storagerouters[2].ip},
+                                           validations=[{'key': 'host', 'value': storagerouters[2].storagedrivers[0].storage_ip},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
@@ -383,7 +383,7 @@ class DTLCheckup(unittest.TestCase):
         sr_domain.storagerouter = storagerouters[1]
         sr_domain.save()
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': storagerouters[2].ip},
+                                           validations=[{'key': 'host', 'value': storagerouters[2].storagedrivers[0].storage_ip},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
@@ -401,7 +401,7 @@ class DTLCheckup(unittest.TestCase):
             sr_domain.storagerouter = storagerouter
             sr_domain.save()
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[2:]]},
+                                           validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()[2:]]},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
@@ -442,7 +442,7 @@ class DTLCheckup(unittest.TestCase):
         sr_domain.storagerouter = storagerouters[2]
         sr_domain.save()
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': storagerouters[2].ip},
+                                           validations=[{'key': 'host', 'value': storagerouters[2].storagedrivers[0].storage_ip},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
@@ -460,7 +460,7 @@ class DTLCheckup(unittest.TestCase):
             sr_domain.storagerouter = storagerouter
             sr_domain.save()
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': storagerouters[2].ip},
+                                           validations=[{'key': 'host', 'value': storagerouters[2].storagedrivers[0].storage_ip},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
@@ -474,7 +474,7 @@ class DTLCheckup(unittest.TestCase):
         for junction in storagerouters[2].domains:
             junction.delete()
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[2:]]},
+                                           validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()[2:]]},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
@@ -496,7 +496,7 @@ class DTLCheckup(unittest.TestCase):
             sr_domain.storagerouter = storagerouter
             sr_domain.save()
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': storagerouters[4].ip},
+                                           validations=[{'key': 'host', 'value': storagerouters[4].storagedrivers[0].storage_ip},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
@@ -515,7 +515,7 @@ class DTLCheckup(unittest.TestCase):
         ServiceManager.add_service(name=service_name, client=None)
         ServiceManager.start_service(name=service_name, client=None)
         config = self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                                    validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[1:]]},
+                                                    validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()[1:]]},
                                                                  {'key': 'port', 'value': 3},
                                                                  {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
         # Rerun DTL checkup 10 times and validate target does not change even though 9 Storage Routers are potential candidate
@@ -544,13 +544,13 @@ class DTLCheckup(unittest.TestCase):
         ServiceManager.add_service(name=service_name, client=None)
         ServiceManager.start_service(name=service_name, client=None)
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[1:3]]},
+                                           validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()[1:3]]},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
 
         # Set DTL manually to node 2 and add 2 vdisk domains to the vdisk
         vdisk_1.storagedriver_client.set_manual_dtl_config(volume_id=vdisk_1.volume_id,
-                                                           config=DTLConfig(str(storagerouters[2].ip), 3, DTLMode.SYNCHRONOUS))
+                                                           config=DTLConfig(str(storagerouters[2].storagedrivers[0].storage_ip), 3, DTLMode.SYNCHRONOUS))
         vdomain1 = VDiskDomain()
         vdomain2 = VDiskDomain()
         vdomain1.vdisk = vdisk_1
@@ -562,21 +562,20 @@ class DTLCheckup(unittest.TestCase):
         vdisk_1.has_manual_dtl = True
         vdisk_1.save()
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': storagerouters[2].ip},
+                                           validations=[{'key': 'host', 'value': storagerouters[2].storagedrivers[0].storage_ip},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.SYNCHRONOUS}])
-
         # Delete the vDiskDomain on which the DTL resides, 1 other vDiskDomain remains
         vdomain1.delete()
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': storagerouters[4].ip},
+                                           validations=[{'key': 'host', 'value': storagerouters[4].storagedrivers[0].storage_ip},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.SYNCHRONOUS}])
 
         # Delete the last vDiskDomain --> DTL is no longer manual
         vdomain2.delete()
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': [sr.ip for sr in storagerouters.values()[1:3]]},
+                                           validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()[1:3]]},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
         vdisk_1.discard()
@@ -629,7 +628,7 @@ class DTLCheckup(unittest.TestCase):
         storagedriver.name = '2'
         storagedriver.mountpoint = '/'
         storagedriver.cluster_ip = storagerouter.ip
-        storagedriver.storage_ip = '127.0.0.1'
+        storagedriver.storage_ip = '10.0.1.2'
         storagedriver.storagedriver_id = '2'
         storagedriver.ports = {'management': 1,
                                'xmlrpc': 2,
@@ -637,6 +636,6 @@ class DTLCheckup(unittest.TestCase):
                                'edge': 4}
         storagedriver.save()
         self._run_and_validate_dtl_checkup(vdisk=vdisk_1,
-                                           validations=[{'key': 'host', 'value': storagerouters[2].ip},
+                                           validations=[{'key': 'host', 'value': storagerouters[2].storagedrivers[0].storage_ip},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
