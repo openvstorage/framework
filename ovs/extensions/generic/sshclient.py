@@ -207,29 +207,23 @@ class SSHClient(object):
         :param command: Command to execute
         :param debug: Extended logging and stderr output returned
         """
-        if isinstance(command, list):
-            cmd_list = command
-            cmd_string = ' '.join(command)
-        else:
-            cmd_list = command.split(' ')
-            cmd_string = command
         if self.is_local is True:
             try:
                 try:
                     if not hasattr(select, 'poll'):
                         import subprocess
                         subprocess._has_poll = False  # Damn 'monkey patching'
-                    channel = Popen(cmd_list, stdout=PIPE, stderr=PIPE, shell=not isinstance(command, list))
+                    channel = Popen(command, stdout=PIPE, stderr=PIPE, shell=not isinstance(command, list))
                 except OSError as ose:
                     if suppress_logging is False:
                         SSHClient._logger.error('Command: "{0}" failed with output: "{1}"'.format(cmd_string, str(ose)))
-                    raise CalledProcessError(1, cmd_string, str(ose))
+                    raise CalledProcessError(1, command, str(ose))
                 stdout, stderr = channel.communicate()
                 stdout = stdout.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 stderr = stderr.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 exit_code = channel.returncode
                 if exit_code != 0:  # Raise same error as check_output
-                    raise CalledProcessError(exit_code, cmd_string, stdout)
+                    raise CalledProcessError(exit_code, command, stdout)
                 if debug:
                     SSHClient._logger.debug('stdout: {0}'.format(stdout))
                     SSHClient._logger.debug('stderr: {0}'.format(stderr))
@@ -238,17 +232,19 @@ class SSHClient(object):
                     return stdout.strip()
             except CalledProcessError as cpe:
                 if suppress_logging is False:
-                    SSHClient._logger.error('Command: "{0}" failed with output: "{1}"'.format(cmd_string, cpe.output))
+                    SSHClient._logger.error('Command: "{0}" failed with output: "{1}"'.format(command, cpe.output))
                 raise cpe
         else:
-            _, stdout, stderr = self.client.exec_command(cmd_string)  # stdin, stdout, stderr
+            if isinstance(command, list):
+                command = ' '.join(command)
+            _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
                 stderr = ''.join(stderr.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 stdout = ''.join(stdout.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 if suppress_logging is False:
-                    SSHClient._logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(cmd_string, stdout, stderr))
-                raise CalledProcessError(exit_code, cmd_string, stdout)
+                    SSHClient._logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
+                raise CalledProcessError(exit_code, command, stdout)
             if debug:
                 return '\n'.join(line.rstrip() for line in stdout).strip(), stderr
             else:
