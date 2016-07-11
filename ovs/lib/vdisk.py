@@ -742,7 +742,7 @@ class VDiskController(object):
                 dtl_config = None
                 for storagerouter in possible_storagerouters:
                     for sd in storagerouter.storagedrivers:  # DTL can reside on any node in the cluster running a volumedriver and having a DTL process running
-                        dtl_config = DTLConfig(str(sd.storage_ipip), sd.ports['dtl'], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
+                        dtl_config = DTLConfig(str(sd.storage_ip), sd.ports['dtl'], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
                         vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
                         vdisk.invalidate_dynamics(['dtl_status'])
                         break
@@ -949,7 +949,7 @@ class VDiskController(object):
                     # Make sure currently configured DTL host is at index 0 of available SRs, so its included in possibilities
                     if current_sr in available_srs:
                         available_srs.remove(current_sr)
-                        available_srs.insert(0, current_sr)  # @TODO: Shouldn't this code be unindented by one?
+                        available_srs.insert(0, current_sr)
 
                     for storagerouter in available_srs:
                         if len(possible_srs) == 3:
