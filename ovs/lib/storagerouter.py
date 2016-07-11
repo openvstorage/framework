@@ -941,7 +941,7 @@ class StorageRouterController(object):
         StorageRouterController._logger.info('backend_type: {0}'.format(vpool.backend_type.code))
         params = {'DTL_PATH': sdp_dtl.path,
                   'DTL_ADDRESS': storagedriver.storage_ip,
-                  'DTL_PORT': storagedriver.ports['dtl'],
+                  'DTL_PORT': str(storagedriver.ports['dtl']),
                   'DTL_TRANSPORT': 'RSocket' if has_rdma else 'TCP',
                   'LOG_SINK': LogHandler.get_sink_path('storagedriver')}
         dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
