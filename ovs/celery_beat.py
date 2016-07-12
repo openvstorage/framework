@@ -26,6 +26,7 @@ import imp
 from celery.beat import Scheduler
 from celery import current_app
 from celery.schedules import crontab
+from celery.schedules import timedelta
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
@@ -78,7 +79,8 @@ class DistributedScheduler(Scheduler):
                             and member[1].__module__ == name \
                             and 'object' in [base.__name__ for base in member[1].__bases__]:
                         for submember in inspect.getmembers(member[1]):
-                            if hasattr(submember[1], 'schedule') and isinstance(submember[1].schedule, crontab):
+                            if hasattr(submember[1], 'schedule') and (isinstance(submember[1].schedule, crontab) or
+                                                                      isinstance(submember[1].schedule, timedelta)):
                                 schedule[submember[1].name] = {'task': submember[1].name,
                                                                'schedule': submember[1].schedule,
                                                                'args': []}
