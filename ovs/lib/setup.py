@@ -23,6 +23,7 @@ import re
 import sys
 import json
 import time
+import signal
 from etcd import EtcdConnectionFailed, EtcdException, EtcdKeyError, EtcdKeyNotFound
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
@@ -340,6 +341,11 @@ class SetupController(object):
                         local_client.file_write(authorized_keys, keys)
 
                 # Configure /etc/hosts and execute ssh-keyscan
+                def _raise_timeout(*args, **kwargs):
+                    _ = args, kwargs
+                    raise RuntimeError('Timeout during ssh keyscan, please check node interconnectivity')
+                signal.signal(signal.SIGALRM, _raise_timeout)
+                signal.alarm(15)
                 for node_details in SetupController.nodes.itervalues():
                     node_client = node_details.get('client', SSHClient(endpoint=node_details['ip'], username='root'))
                     System.update_hosts_file(ip_hostname_map, node_client)
@@ -349,6 +355,7 @@ class SetupController(object):
                     ovs_command = 'su - ovs -c "{0}"'.format(ovs_command)
                     node_client.run(root_command)
                     node_client.run(ovs_command)
+                signal.alarm(0)
 
                 # Write resume config
                 resume_config['node_type'] = node_type
