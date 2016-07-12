@@ -216,7 +216,7 @@ class SSHClient(object):
                     channel = Popen(command, stdout=PIPE, stderr=PIPE, shell=not isinstance(command, list))
                 except OSError as ose:
                     if suppress_logging is False:
-                        SSHClient._logger.error('Command: "{0}" failed with output: "{1}"'.format(cmd_string, str(ose)))
+                        SSHClient._logger.error('Command: "{0}" failed with output: "{1}"'.format(command, str(ose)))
                     raise CalledProcessError(1, command, str(ose))
                 stdout, stderr = channel.communicate()
                 stdout = stdout.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
