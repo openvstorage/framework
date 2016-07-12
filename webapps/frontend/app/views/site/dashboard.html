@@ -36,7 +36,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
                 <div class="panel-body">
                     <div data-bind="lazylist: {
-                                        displaymode: 'table', items: vPools, itemsLoaded: 'vPoolsLoaded',
+                                        displaymode: 'table', items: vPools, itemsLoaded: vPoolsLoaded(),
                                         loadedObservable: 'loaded', colspan: 5
                                     }" >
                         <table data-dummy="dummy">

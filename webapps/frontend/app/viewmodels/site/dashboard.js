@@ -107,9 +107,7 @@ define([
                         })
                         .fail(deferred.reject)
                         .always(function() {
-                            if (self.vPoolsLoaded() === false) {
-                                self.vPoolsLoaded(true);
-                            }
+                            self.vPoolsLoaded(true);
                             self.vPoolsLoading(false);
                         });
                 } else {
