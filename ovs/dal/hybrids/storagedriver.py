@@ -46,8 +46,7 @@ class StorageDriver(DataObject):
     __relations = [Relation('vpool', VPool, 'storagedrivers'),
                    Relation('storagerouter', StorageRouter, 'storagedrivers')]
     __dynamics = [Dynamic('status', str, 30),
-                  Dynamic('statistics', dict, 0),
-                  Dynamic('stored_data', int, 60)]
+                  Dynamic('statistics', dict, 4)]
 
     def _status(self):
         """
@@ -70,12 +69,6 @@ class StorageDriver(DataObject):
         statistics['timestamp'] = time.time()
         VDisk.calculate_delta(self._key, dynamic, statistics)
         return statistics
-
-    def _stored_data(self):
-        """
-        Aggregates the Stored Data in Bytes of the vDisks connected to the Storage Driver.
-        """
-        return self.statistics['stored']
 
     def fetch_statistics(self):
         """

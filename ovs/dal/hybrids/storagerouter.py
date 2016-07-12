@@ -37,8 +37,7 @@ class StorageRouter(DataObject):
                     Property('rdma_capable', bool, doc='Is this Storage Router RDMA capable'),
                     Property('last_heartbeat', float, mandatory=False, doc='When was the last (external) heartbeat send/received')]
     __relations = []
-    __dynamics = [Dynamic('statistics', dict, 4, locked=True),
-                  Dynamic('stored_data', int, 60),
+    __dynamics = [Dynamic('statistics', dict, 4),
                   Dynamic('vpools_guids', list, 15),
                   Dynamic('vdisks_guids', list, 15),
                   Dynamic('status', str, 10),
@@ -61,12 +60,6 @@ class StorageRouter(DataObject):
         statistics['timestamp'] = time.time()
         VDisk.calculate_delta(self._key, dynamic, statistics)
         return statistics
-
-    def _stored_data(self):
-        """
-        Aggregates the Stored Data of each vDisk.
-        """
-        return self.statistics['stored']
 
     def _vdisks_guids(self):
         """

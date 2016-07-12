@@ -23,6 +23,7 @@ define([
         var self = this;
 
         // Variables
+        self.itemsLoaded = '';
         self.loadedObservable = '';
 
         // Observables
@@ -34,6 +35,12 @@ define([
         self.isLoaded = function(observable) {
             return observable[self.loadedObservable]();
         };
+        self.itemsHaveBeenLoaded = function(observable) {
+            if (observable.hasOwnProperty(self.itemsLoaded)) {
+                return observable[self.itemsLoaded]();
+            }
+            return true;
+        };
 
         // Durandal
         self.activate = function(settings) {
@@ -43,6 +50,7 @@ define([
             self.displaymode(generic.tryGet(settings, 'displaymode', 'span'));
             self.colspan(generic.tryGet(settings, 'colspan', 0));
             self.loadedObservable = generic.tryGet(settings, 'loadedObservable', 'initialized');
+            self.itemsLoaded = generic.tryGet(settings, 'itemsLoaded', undefined);
             self.items = settings.items;
         };
     };

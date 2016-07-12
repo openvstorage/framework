@@ -409,7 +409,7 @@ class StorageRouterController(object):
                                        port=connection_info['port'],
                                        credentials=(connection_info['client_id'], connection_info['client_secret']),
                                        version=1)
-                backend_dict = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': 'metadata_information,name,ns_statistics,presets'})
+                backend_dict = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': 'metadata_information,name,usages,presets'})
                 preset_info = dict((preset['name'], preset) for preset in backend_dict['presets'])
                 if preset_name not in preset_info:
                     raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_guid))
@@ -422,7 +422,7 @@ class StorageRouterController(object):
                     if local_backend is True:
                         cluster_policies.append([policy[0], policy[1]])
 
-                total_size = float(backend_dict['ns_statistics']['global']['size'])
+                total_size = float(backend_dict['usages']['size'])
                 fragment_size = float(preset_info[preset_name]['fragment_size'])
                 nsm_partition_guids = list(set(backend_dict['metadata_information']['nsm_partition_guids']))
                 if local_backend is True:

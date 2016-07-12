@@ -51,7 +51,7 @@ define([
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.storageRoutersHandle[options.page])) {
                     options.sort = 'name';
-                    options.contents = '_relations,statistics,stored_data,vdisks_guids,status,partition_config,regular_domains,recovery_domains';
+                    options.contents = '_relations,statistics,vdisks_guids,status,partition_config,regular_domains,recovery_domains';
                     self.storageRoutersHandle[options.page] = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
