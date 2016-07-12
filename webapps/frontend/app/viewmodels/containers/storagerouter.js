@@ -178,7 +178,6 @@ define([
             generic.trySet(self.nodeType, data, 'node_type');
             generic.trySet(self.rdmaCapable, data, 'rdma_capable');
             generic.trySet(self.status, data, 'status', generic.lower);
-            generic.trySet(self.storedData, data, 'stored_data');
             if (data.hasOwnProperty('recovery_domains')) {
                 self.recoveryDomainGuids(data.recovery_domains);
             }
@@ -216,6 +215,7 @@ define([
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;
+                self.storedData(stats.stored);
                 self.iops(stats['4k_operations_ps']);
                 self.cacheHits(stats.cache_hits_ps);
                 self.cacheMisses(stats.cache_misses_ps);

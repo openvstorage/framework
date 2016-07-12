@@ -36,6 +36,7 @@ define([
         self.storageRouters        = ko.observableArray([]);
         self.storageRoutersLoading = ko.observable(false);
         self.vPools                = ko.observableArray([]);
+        self.vPoolsLoaded          = ko.observable(false);
         self.vPoolsLoading         = ko.observable(false);
 
         // Computed
@@ -93,7 +94,7 @@ define([
             return $.Deferred(function(deferred) {
                 self.vPoolsLoading(true);
                 if (generic.xhrCompleted(self.loadVPoolsHandle)) {
-                    self.loadVPoolsHandle = api.get('vpools', {queryparams: {contents: 'statistics,stored_data'}})
+                    self.loadVPoolsHandle = api.get('vpools', {queryparams: {contents: 'statistics'}})
                         .done(function(data) {
                             var vpools = [], vpool;
                             $.each(data.data, function(index, vpdata) {
@@ -106,6 +107,7 @@ define([
                         })
                         .fail(deferred.reject)
                         .always(function() {
+                            self.vPoolsLoaded(true);
                             self.vPoolsLoading(false);
                         });
                 } else {

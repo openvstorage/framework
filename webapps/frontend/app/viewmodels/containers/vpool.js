@@ -76,7 +76,6 @@ define([
             options = options || {};
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.status, data, 'status');
-            generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.metadata, data, 'metadata');
             generic.trySet(self.backendConnection, data, 'connection');
@@ -108,6 +107,7 @@ define([
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;
+                self.storedData(stats.stored);
                 self.iops(stats['4k_operations_ps']);
                 self.cacheHits(stats.cache_hits_ps);
                 self.cacheMisses(stats.cache_misses_ps);

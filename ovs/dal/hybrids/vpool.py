@@ -43,8 +43,7 @@ class VPool(DataObject):
     __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
     __dynamics = [Dynamic('configuration', dict, 3600),
                   Dynamic('statistics', dict, 4),
-                  Dynamic('identifier', str, 120),
-                  Dynamic('stored_data', int, 60)]
+                  Dynamic('identifier', str, 120)]
     _fixed_properties = ['storagedriver_client']
 
     def __init__(self, *args, **kwargs):
@@ -124,12 +123,6 @@ class VPool(DataObject):
         statistics['timestamp'] = time.time()
         VDisk.calculate_delta(self._key, dynamic, statistics)
         return statistics
-
-    def _stored_data(self):
-        """
-        Aggregates the Stored Data of each vDisk served by the vPool.
-        """
-        return self.statistics['stored']
 
     def _identifier(self):
         """

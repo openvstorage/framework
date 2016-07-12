@@ -205,9 +205,6 @@ class OVSSNMPServer:
                     self._register_dal_model(10, storagerouter, '#vdisks', "8",
                                              func = lambda storagerouter: len([vdisk for vpool_vdisks in [storagedriver.vpool.vdisks for storagedriver in storagerouter.storagedrivers] for vdisk in vpool_vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id]),
                                              atype = int)
-                    self._register_dal_model(10, storagerouter, '#stored_data', "9",
-                                             func = lambda storagerouter: sum([vdisk.statistics['stored'] for vpool_vdisks in [storagedriver.vpool.vdisks for storagedriver in storagerouter.storagedrivers] for vdisk in vpool_vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id]),
-                                             atype = int)
                     self.instance_oid += 1
 
             for vd in VDiskList.get_vdisks():
@@ -305,7 +302,6 @@ class OVSSNMPServer:
                 if not self._check_added(storagedriver):
                     self._register_dal_model(4, storagedriver, 'guid', "0")
                     self._register_dal_model(4, storagedriver, 'name', "1")
-                    self._register_dal_model(4, storagedriver, 'stored_data', "2", atype = int)
                     self.instance_oid += 1
 
             try:
