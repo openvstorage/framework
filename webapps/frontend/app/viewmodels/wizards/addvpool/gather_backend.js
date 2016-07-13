@@ -133,8 +133,7 @@ define([
                 generic.xhrAbort(self.fetchAlbaVPoolHandle);
                 var relay = '', remoteInfo = {},
                     getData = {
-                        backend_type: 'alba',
-                        contents: '_dynamics'
+                        contents: 'available'
                     };
                 if (!self.data.aaLocalHost()) {
                     relay = 'relay/';
@@ -146,20 +145,26 @@ define([
                 $.extend(getData, remoteInfo);
                 self.albaBackendLoading(true);
                 self.invalidAlbaInfo(false);
-                self.fetchAlbaVPoolHandle = api.get(relay + 'backends', { queryparams: getData })
+                self.fetchAlbaVPoolHandle = api.get(relay + 'alba/backends', { queryparams: getData })
                     .done(function(data) {
                         var available_backends = [], calls = [];
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
+                                getData.contents = 'metadata_information,name,ns_statistics,presets';
+                                if (item.scaling === 'LOCAL') {
+                                    getData.contents += ',asd_statistics';
+                                }
                                 calls.push(
-                                    api.get(relay + 'alba/backends/' + item.linked_guid + '/', { queryparams: getData })
+                                    api.get(relay + 'alba/backends/' + item.guid + '/', { queryparams: getData })
                                         .then(function(data) {
-                                            if (data.available === true && data.guid !== self.data.albaBackend().guid) {
+                                            if (data.guid !== self.data.albaBackend().guid) {
                                                 var asdsFound = false;
-                                                $.each(data.asd_statistics, function(key, value) {  // As soon as we enter loop, we know at least 1 ASD is linked to this backend
-                                                    asdsFound = true;
-                                                    return false;
-                                                });
+                                                if (data.scaling === 'LOCAL') {
+                                                    $.each(data.asd_statistics, function(key, value) {  // As soon as we enter loop, we know at least 1 ASD is linked to this backend
+                                                        asdsFound = true;
+                                                        return false;
+                                                    });
+                                                }
                                                 if (asdsFound === true || data.scaling === 'GLOBAL') {
                                                     available_backends.push(data);
                                                     self.albaPresetMap()[data.guid] = {};
