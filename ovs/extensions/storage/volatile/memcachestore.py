@@ -17,9 +17,9 @@
 """
 Memcache store module
 """
-import memcache
 import re
-
+import ujson
+import memcache
 from threading import Lock
 from ovs.log.log_handler import LogHandler
 
@@ -54,6 +54,8 @@ class MemcacheStore(object):
     * stringifies the keys
     """
 
+    COMPRESSION_THRESHOLD = 1 * 1024 * 1024
+
     def __init__(self, nodes):
         """
         Initializes the client
@@ -76,6 +78,7 @@ class MemcacheStore(object):
         if data is None:
             # Cache miss
             return default
+        data = ujson.loads(data)
         if self._validate:
             if data['key'] == key:
                 return data['value']
@@ -109,9 +112,10 @@ class MemcacheStore(object):
                     'key': key}
         else:
             data = value
+        data = ujson.dumps(data)
         if action == 'set':
-            return self._client.set(key, data, time)
-        return self._client.cas(key, data, time)
+            return self._client.set(key, data, time, min_compress_len=MemcacheStore.COMPRESSION_THRESHOLD)
+        return self._client.cas(key, data, time, min_compress_len=MemcacheStore.COMPRESSION_THRESHOLD)
 
     @locked()
     def set(self, key, value, time=0):
@@ -138,6 +142,7 @@ class MemcacheStore(object):
                     'key': key}
         else:
             data = value
+        data = ujson.dumps(data)
         return self._client.add(key, data, time)
 
     @locked()
