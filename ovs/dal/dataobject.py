@@ -932,14 +932,20 @@ class DataObject(object):
         """
         return not self.__eq__(other)
 
-    def _benchmark(self, iterations=100):
+    def _benchmark(self, iterations=100, dynamics=None):
         import time
         begin = time.time()
         stats = {}
         totals = []
+        if dynamics is None:
+            dynamics = self._dynamics
+        else:
+            if isinstance(dynamics, basestring):
+                dynamics = [dynamics]
+            dynamics = [dyn for dyn in self._dynamics if dyn.name in dynamics]
         for _ in range(iterations):
             istart = time.time()
-            for dynamic in self._dynamics:
+            for dynamic in dynamics:
                 start = time.time()
                 function = getattr(self, '_{0}'.format(dynamic.name))
                 function_info = inspect.getargspec(function)
