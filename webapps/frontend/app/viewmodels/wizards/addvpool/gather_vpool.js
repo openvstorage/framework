@@ -215,7 +215,7 @@ define([
                         var available_backends = [], calls = [];
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
-                                getData.contents = 'metadata_information,name,ns_statistics,presets';
+                                getData.contents = 'metadata_information,name,usages,presets';
                                 if (item.scaling === 'LOCAL') {
                                     getData.contents += ',asd_statistics';
                                 }
@@ -248,7 +248,7 @@ define([
                                     });
                                     self.data.albaBackends(available_backends);
                                     self.data.albaBackend(available_backends[0]);
-                                    self.data.albaPreset(available_backends[0].presets[0]);
+                                    self.data.albaPreset(self.data.enhancedPresets()[0]);
                                 } else {
                                     self.data.albaBackends([]);
                                     self.data.albaBackend(undefined);
@@ -384,7 +384,7 @@ define([
                                 $.each(self.data.albaBackends(), function (_, albaBackend) {
                                     if (albaBackend.guid === metadata.backend.backend_guid) {
                                         self.data.albaBackend(albaBackend);
-                                        $.each(albaBackend.presets, function (_, preset) {
+                                        $.each(self.data.enhancedPresets(), function (_, preset) {
                                             if (preset.name === metadata.backend.preset) {
                                                 self.data.albaPreset(preset);
                                             }
