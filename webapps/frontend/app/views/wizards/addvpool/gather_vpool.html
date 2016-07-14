@@ -132,7 +132,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                              var policies = [];
                                              if (item !== undefined) {
                                                  $.each(item.policies, function(index, policy) {
-                                                     policies.push(policy);
+                                                     policies.push(policy.text);
                                                  });
                                                  return item.name + ': ' + policies.join(', ');
                                              }

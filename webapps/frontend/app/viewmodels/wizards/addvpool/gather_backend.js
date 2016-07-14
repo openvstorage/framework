@@ -185,7 +185,7 @@ define([
                                     });
                                     self.data.albaAABackends(available_backends);
                                     self.data.albaAABackend(available_backends[0]);
-                                    self.data.albaAAPreset(available_backends[0].presets[0]);
+                                    self.data.albaAAPreset(self.data.enhancedAAPresets()[0]);
                                 } else {
                                     self.data.albaAABackends([]);
                                     self.data.albaAABackend(undefined);
@@ -228,7 +228,7 @@ define([
                     self.data.albaAAPreset(undefined);
                 } else {
                     self.data.albaAABackend(self.data.albaAABackends()[0]);
-                    self.data.albaAAPreset(self.data.enhancedAAPresets()[0].presets === undefined ? undefined : self.data.enhancedAAPresets()[0].presets[0]);
+                    self.data.albaAAPreset(self.data.enhancedAAPresets()[0]);
                 }
             }
         };
