@@ -358,7 +358,7 @@
             }
         }
     },
-    "vpools" : {
+    "vpools": {
         "add": "Add new vPool",
         "backend": "Backend",
         "backendconnectionpreset": "Connection (Preset)",
@@ -382,7 +382,6 @@
         "detail": {
             "title": "vPool",
             "introduction": "Below an overview of the vPool properties.",
-            "sync": "Sync vPool with reality",
             "storageroutervpoollink": "Storage Routers serving this vPool",
             "updateserving": "Save changes",
             "localvpool": "A vPool on Local Filesystem can not be shared across multiple Storage Routers.",
