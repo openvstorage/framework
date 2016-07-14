@@ -27,17 +27,6 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span style="padding-left: 5px;" data-bind="text: name, visible: name() !== undefined"></span>
                 </a>
             </li>
-            <li class="actions">
-                <span data-i18n="ovs:generic.actions"></span>:
-                <button type="button" class="btn btn-mini btn-default"
-                        id="buttonVpoolSync"
-                        data-bind="click: function() { $root.sync(); },
-                                   style: { color: '#428bca' },
-                                   tooltip: 'ovs:vpools.detail.sync',
-                                   enable: $root.shared.user.roles().contains('write') && status() === 'RUNNING' && $root.updatingStorageRouters() === false">
-                    <span class="fa" data-i18n="[html]ovs:icons.sync"></span>
-                </button>
-            </li>
         </ul>
         <div class="tab-content">
             <div class="tab-pane active" id="information" style="padding: 15px;">
