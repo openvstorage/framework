@@ -16,8 +16,8 @@
 /*global define */
 define([
     'jquery', 'ovs/generic',
-    '../build', './data', './gather_config', './gather_vpool', './gather_cache_info', './gather_backend', './confirm'
-], function($, generic, build, data, GatherConfig, GatherVPool, GatherCacheInfo, GatherBackend, Confirm) {
+    '../build', './data', './gather_config', './gather_vpool', './gather_backend', './confirm'
+], function($, generic, build, data, GatherConfig, GatherVPool, GatherBackend, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
@@ -35,7 +35,7 @@ define([
             data.vPool(undefined);
             data.storageRouter(undefined);
         }
-        self.steps([new GatherVPool(), new GatherBackend(), new GatherConfig(), new GatherCacheInfo(), new Confirm()]);
+        self.steps([new GatherVPool(), new GatherBackend(), new GatherConfig(), new Confirm()]);
         data.completed = options.completed;
         self.step(0);
         self.activateStep();
@@ -54,7 +54,7 @@ define([
         data.albaPreset(undefined);
         data.backend('alba');
         data.backends(['alba', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']);
-        data.cacheStrategy('on_read');
+        data.cacheStrategy('none');
         data.clusterSize(4);
         data.dedupeMode('non_dedupe');
         data.distributedMtpt(undefined);

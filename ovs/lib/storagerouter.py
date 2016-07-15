@@ -20,7 +20,6 @@ StorageRouter module
 import os
 import json
 import time
-import uuid
 import random
 from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError

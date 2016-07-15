@@ -16,7 +16,7 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
-    <form id="form.gather.vpool" class="form-horizontal">
+    <form id="add-vpool-gather-vpool" class="form-horizontal">
         <p data-bind="visible: data.vPoolAdd()" data-i18n="ovs:wizards.add_vpool.gather_vpool.basic_info"></p>
         <p data-bind="visible: !data.vPoolAdd()" data-i18n="ovs:wizards.extend_vpool.gather_vpool.basic_info"></p>
         <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
@@ -27,7 +27,7 @@ but WITHOUT ANY WARRANTY of any kind.
         </div>
         <div class="form-group">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.backend_type"></label>
-            <div class="col-lg-7">
+            <div class="col-lg-7" style="margin-bottom: -5px;">
                 <span data-bind="dropdown: {
                                      enabled: data.vPoolAdd,
                                      items: data.backends, target: data.backend,
@@ -36,6 +36,18 @@ but WITHOUT ANY WARRANTY of any kind.
                                      }
                                  }">
                 </span>
+            </div>
+        </div>
+        <div class="form-group" data-bind="visible: data.backend() === 'distributed'">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.mountpoint"></label>
+            <div class="col-lg-7" style="margin-bottom: -5px;">
+                <span data-bind="visible: metadataLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
+                <span data-bind="visible: !metadataLoading(),
+                                 dropdown: {
+                                     items: mountPoints,
+                                     target: data.distributedMtpt,
+                                     emptyisloading: false
+                                 }"></span>
             </div>
         </div>
         <div data-bind="visible: data.backend() === 'alba' && data.vPoolAdd()">
@@ -90,7 +102,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
             <div class="form-group">
                 <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_backend"></label>
-                <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('backend') }">
+                <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('backend') }" style="margin-bottom: -5px;">
                     <!-- ko if: data.albaBackends() === undefined || data.albaBackends().length === 0 -->
                         <i data-i18n="[html]ovs:wizards.add_vpool.gather_vpool.no_backends"
                            style="display: inline-block; margin-top: 7px;"></i>
@@ -121,7 +133,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
             <div class="form-group" data-bind="visible: data.albaBackend() !== undefined">
                 <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset"></label>
-                <div class="col-lg-7">
+                <div class="col-lg-7" style="margin-bottom: -5px;">
                     <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPool() !== undefined && data.albaPreset() === undefined)"></span>
                     <span data-bind="visible: (data.vPoolAdd() === true || data.albaPreset() !== undefined),
                                      dropdown: {
@@ -145,7 +157,7 @@ but WITHOUT ANY WARRANTY of any kind.
         <p data-i18n="ovs:wizards.add_vpool.gather_vpool.extended_info"></p>
         <div class="form-group">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.initial_storagerouter"></label>
-            <div class="col-lg-7">
+            <div class="col-lg-7" style="margin-bottom: -5px;">
                 <span data-bind="dropdown: {
                                      key: 'guid',
                                      keyisfunction: true,
@@ -158,6 +170,18 @@ but WITHOUT ANY WARRANTY of any kind.
                                      }
                                  }">
                 </span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.ip_address"></label>
+            <div class="col-lg-7" style="margin-bottom: -5px;">
+                <span data-bind="visible: metadataLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
+                <span data-bind="visible: !metadataLoading(),
+                                 dropdown: {
+                                     items: ipAddresses,
+                                     target: data.storageIP,
+                                     emptyisloading: false
+                                 }"></span>
             </div>
         </div>
     </form>

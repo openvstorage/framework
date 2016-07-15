@@ -330,7 +330,6 @@
                     "non_dedupe": "Non-Deduped",
                     "null": "-"
                 },
-                "dedupe_warning": "Non-deduplication cannot be changed again!",
                 "dtl": "Distributed Transaction Log",
                 "dtl_help_message": "Copies unprotected data in the write buffer of a vDisk to another Storage Router",
                 "dtl_help_title": "Distributed Transaction Log",
@@ -704,6 +703,7 @@
                 "invalid_alba_info": "The entered connection info and credentials are invalid",
                 "invalid_host": "Invalid host (should be a FQDN or IP address)",
                 "local_host": "Use local Open vStorage backend",
+                "missing_role": "Missing required partition role: __what__",
                 "no_backends": "No backends found",
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
@@ -713,8 +713,23 @@
             },
             "gather_config": {
                 "basic_info": "Specify the configurations for the vPool",
-                "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
-                "missing_role": "Missing required partition role: __what__"
+                "caching": "StorageDriver Caching Information",
+                "cache_strategy": "Strategy:",
+                "cluster_size": "Cluster Size:",
+                "dedupe": "Deduplication:",
+                "dedupe_information": "Deduplication mode 'Deduped' requires the correct Storage Driver package to be installed",
+                "dtl": "Distributed Transaction Log Information",
+                "dtl_mode": "Mode:",
+                "dtl_transport": "Transport Mode:",
+                "global_write_buffer": "Gloabl Write Buffer:",
+                "information": "Information about the available space for:",
+                "over_allocation": "Over allocation detected",
+                "readcache_size": "Read Cache:",
+                "sco_size": "SCO Size:",
+                "shared_available": "Shared between Read and Write Cache:",
+                "volume": "Volume Information",
+                "volume_write_buffer": "Volume Write Buffer:",
+                "write_buffer_size": "Write Buffer:"
             },
             "gather_vpool": {
                 "access_key": "Access Key:",
@@ -734,8 +749,11 @@
                 "invalid_host": "Invalid host (should be a FQDN or IP address)",
                 "invalid_name": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
                 "invalid_s3_info": "Could not connect to the given host/port, or wrong credentials.",
+                "ip_address": "Storage IP:",
                 "loading_backend_information": "Backend information is being loaded",
                 "local_host": "Use local Open vStorage backend",
+                "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
+                "mountpoint": "Mountpoint:",
                 "mtpt_in_use": "The mountpoint /mnt/__what__ for the vPool is already in use.",
                 "name": "Name:",
                 "no_backends": "No backends found",
@@ -743,20 +761,10 @@
                 "port": "Port:",
                 "secret_key": "Secret Key:"
             },
-            "gather_cache_info": {
-                "basic_info": "Enter/select the requested information.",
-                "information": "Information about the available space for:",
-                "ip_address": "Storage IP:",
-                "mountpoint": "Mountpoint:",
-                "over_allocation": "Over allocation detected",
-                "readcache_size": "Read Cache:",
-                "shared_available": "Shared between Read and Write Cache:",
-                "writecache_size": "Write Cache:"
-            },
             "confirm": {
                 "accelerated_backend": "Accelerated Backend:",
                 "basic_info": "Validate the basic vPool information.",
-                "cache_sizing": "Validate whether the required cache sizes and connection information are correct.",
+                "cache_sizing": "Validate whether the required cache sizes are correct.",
                 "configuration": "Validate the configuration settings.",
                 "creating": "creating the vPool",
                 "dtl_transport": "DTL Transport Mode:",
@@ -769,7 +777,7 @@
                 "fragment_cache_write": "Fragment cache on write:",
                 "in_progress": "Creation of vPool __what__ is started.",
                 "started": "Started creating",
-                "storagerouter_info": "Validate whether the correct Storage Router was selected.",
+                "storagerouter_info": "Validate the Storage Router information.",
                 "success": "Creation of vPool __what__ finished."
             }
         },
@@ -804,10 +812,6 @@
                 "in_progress": "Extending vPool __what__ has started.",
                 "started": "Started extending",
                 "success": "vPool __what__ was successfully extended."
-            },
-            "gather_config": {
-                "basic_info": "Configurations for the vPool",
-                "information": "Extending a vPool does not allow to reconfigure the storagedriver settings"
             },
             "gather_vpool": {
                 "basic_info": "Basic vPool information",
