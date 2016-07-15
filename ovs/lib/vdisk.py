@@ -84,7 +84,7 @@ class VDiskController(object):
     def _clean_vdisk_from_model(vdisk):
         """
         Removes a vDisk from the model
-        :param vdisk_guid: The vDisk to be removed
+        :param vdisk: The vDisk to be removed
         """
         VDiskController._logger.info('Cleaning vDisk {0}'.format(vdisk.name))
         for mds_service in vdisk.mds_services:
