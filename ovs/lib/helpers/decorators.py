@@ -80,14 +80,18 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
     Decorator ensuring a new task cannot be started in case a certain task is
     running, scheduled or reserved.
 
-    The task using this decorator on. Keep also in
-    mind that validation will be executed by the worker itself, so if the task is scheduled on
+    Keep also in mind that validation will be executed by the worker itself, so if the task is scheduled on
     a worker currently processing a "duplicate" task, it will only get validated after the first
     one completes, which will result in the fact that the task will execute normally.
 
     Allowed modes:
-     - DEFAULT: If any of the specified task names is being executed, the calling function will not be executed
-     - CHAINED: If a task is being executed, the new task will be appended for later execution
+     - DEFAULT: Deduplication based on the task's name. If any new task with the same name is scheduled it will be
+                discarded
+     - DEDUPED: Deduplication based on the task's name and arguments. If a new task with the same name and arguments
+                is scheduled while the first one is currently being executed, it will be allowed on the queue (to make
+                sure there will be at least one new execution). All subsequent idential tasks will be discarded.
+                Tasks with different arguments will be executed in parallel
+     - CHAINED: Identical as DEDUPED with the exception that all tasks will be executed in serial.
 
     :param task_name:        Name of the task to ensure its singularity
     :type task_name:         String
