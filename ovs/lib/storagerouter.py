@@ -1230,15 +1230,15 @@ class StorageRouterController(object):
                 except RuntimeError as ex:
                     StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs failed with error: {1}'.format(storage_driver.guid, ex))
                     errors_found = True
-                try:
-                    if ServiceManager.has_service(albaproxy_service, client=client):
-                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Stopping service {1}'.format(storage_driver.guid, albaproxy_service))
-                        ServiceManager.stop_service(albaproxy_service, client=client)
-                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, albaproxy_service))
-                        ServiceManager.remove_service(albaproxy_service, client=client)
-                except Exception as ex:
-                    StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed with error: {2}'.format(storage_driver.guid, albaproxy_service, ex))
-                    errors_found = True
+            try:
+                if ServiceManager.has_service(albaproxy_service, client=client):
+                    StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Stopping service {1}'.format(storage_driver.guid, albaproxy_service))
+                    ServiceManager.stop_service(albaproxy_service, client=client)
+                    StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, albaproxy_service))
+                    ServiceManager.remove_service(albaproxy_service, client=client)
+            except Exception as ex:
+                StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed with error: {2}'.format(storage_driver.guid, albaproxy_service, ex))
+                errors_found = True
 
         # Reconfigure volumedriver arakoon cluster
         try:
