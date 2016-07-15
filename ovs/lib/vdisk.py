@@ -46,7 +46,7 @@ from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
-from volumedriver.storagerouter.storagerouterclient import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig
+from volumedriver.storagerouter.storagerouterclient import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, ObjectNotFoundException as SRCObjectNotFoundException
 
 
 class VDiskController(object):
@@ -81,6 +81,19 @@ class VDiskController(object):
         return response
 
     @staticmethod
+    def _clean_vdisk_from_model(vdisk):
+        """
+        Removes a vDisk from the model
+        :param vdisk_guid: The vDisk to be removed
+        """
+        VDiskController._logger.info('Cleaning vDisk {0}'.format(vdisk.name))
+        for mds_service in vdisk.mds_services:
+            mds_service.delete()
+        for domain_junction in vdisk.domains_dtl:
+            domain_junction.delete()
+        vdisk.delete()
+
+    @staticmethod
     @celery.task(name='ovs.vdisk.delete_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def delete_from_voldrv(volume_id):
@@ -93,12 +106,9 @@ class VDiskController(object):
         vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
         if vdisk is not None:
             with volatile_mutex('voldrv_event_disk_{0}'.format(vdisk.volume_id), wait=20):
-                VDiskController._logger.info('Delete vDisk {0}'.format(vdisk.name))
-                for mds_service in vdisk.mds_services:
-                    mds_service.delete()
-                for domain_junction in vdisk.domains_dtl:
-                    domain_junction.delete()
-                vdisk.delete()
+                VDiskController._clean_vdisk_from_model(vdisk)
+        else:
+            VDiskController._logger.info('Volume {0} does not exist (yet)'.format(volume_id))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete')
@@ -169,9 +179,13 @@ class VDiskController(object):
             vdisk.metadata = {'lba_size': vdisk.info['lba_size'],
                               'cluster_multiplier': vdisk.info['cluster_multiplier']}
             vdisk.save()
-            VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
-            MDSServiceController.ensure_safety(vdisk)
-            VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
+            try:
+                VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
+                MDSServiceController.ensure_safety(vdisk)
+                VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
+            except SRCObjectNotFoundException:
+                VDiskController._logger.warning('vDisk object seems to be removed in the meantime.')
+                VDiskController._clean_vdisk_from_model(vdisk)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.migrate_from_voldrv')
