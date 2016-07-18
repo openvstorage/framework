@@ -44,7 +44,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 <span data-bind="visible: metadataLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                 <span data-bind="visible: !metadataLoading(),
                                  dropdown: {
-                                     items: mountPoints,
+                                     items: data.mountpoints,
                                      target: data.distributedMtpt,
                                      emptyisloading: false
                                  }"></span>
@@ -59,7 +59,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
             </div>
         </div>
-        <div data-bind="visible: data.backend() !== 'local' && data.backend() !== 'distributed' && (data.backend() !== 'alba' || !data.localHost()) && (data.vPoolAdd() || data.backend() === 'alba')">
+        <div data-bind="visible: data.backend() !== 'distributed' && !data.localHost() && data.vPoolAdd()">
             <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('host') }">
                 <label class="col-lg-3 control-label" for="inputVpoolHost" data-i18n="ovs:wizards.add_vpool.gather_vpool.host"></label>
                 <div class="col-lg-4">
@@ -178,7 +178,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 <span data-bind="visible: metadataLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                 <span data-bind="visible: !metadataLoading(),
                                  dropdown: {
-                                     items: ipAddresses,
+                                     items: data.ipAddresses,
                                      target: data.storageIP,
                                      emptyisloading: false
                                  }"></span>

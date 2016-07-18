@@ -44,52 +44,30 @@ define([
         self.srMetadataMap      = ko.observable({});
 
         self.data.storageRouter.subscribe(function(storageRouter) {
-            if (storageRouter !== undefined && !self.srMetadataMap().hasOwnProperty(storageRouter.guid())) {
+            if (storageRouter == undefined) {
+                return;
+            }
+            var map = self.srMetadataMap(), srGuid = storageRouter.guid();
+            if (!map.hasOwnProperty(srGuid)) {
+                self.srMetadataMap()[srGuid] = undefined;
                 self.metadataLoading(true);
                 generic.xhrAbort(self.loadSRMetadataHandle);
-                self.loadSRMetadataHandle = api.post('storagerouters/' + storageRouter.guid() + '/get_metadata')
+                self.loadSRMetadataHandle = api.post('storagerouters/' + srGuid + '/get_metadata')
                     .then(self.shared.tasks.wait)
-                    .done(function(data) {
-                        self.data.ipAddresses(data.ipaddresses);
-                        self.data.mountpoints(data.mountpoints);
-                        self.data.partitions(data.partitions);
-                        self.data.sharedSize(data.shared_size);
-                        self.data.scrubAvailable(data.scrub_available);
-                        self.data.readCacheAvailableSize(data.readcache_size);
-                        self.data.writeCacheAvailableSize(data.writecache_size);
-                        if ((data.ipaddresses.length > 0 && self.data.storageIP() === undefined) || !data.ipaddresses.contains(self.data.storageIP())) {
-                           self.data.storageIP(data.ipaddresses[0]);
-                        }
-                        if ((data.mountpoints.length > 0 && self.data.distributedMtpt() === undefined) || !data.mountpoints.contains(self.data.distributedMtpt())) {
-                            self.data.distributedMtpt(data.mountpoints[0]);
-                        }
-                        var metadataMap = self.srMetadataMap();
-                        metadataMap[storageRouter.guid()] = data;
-                        self.srMetadataMap(metadataMap);
+                    .done(function(srData) {
+                        self.fillSRData(srData);
+                        self.srMetadataMap()[storageRouter.guid()] = srData;
                         self.metadataLoading(false);
                     });
-            } else if (storageRouter !== undefined && self.srMetadataMap().hasOwnProperty(storageRouter.guid())) {
-                var data = self.srMetadataMap()[storageRouter.guid()];
-                self.data.ipAddresses(data.ipaddresses);
-                self.data.mountpoints(data.mountpoints);
-                self.data.partitions(data.partitions);
-                self.data.sharedSize(data.shared_size);
-                self.data.scrubAvailable(data.scrub_available);
-                self.data.readCacheAvailableSize(data.readcache_size);
-                self.data.writeCacheAvailableSize(data.writecache_size);
-            }
-        });
-        self.data.backend.subscribe(function(backendType) {
-            if (backendType !== undefined && backendType === 'alba') {
-                self.data.cacheStrategy('none');
-            } else {
-                self.data.cacheStrategy('on_read');
+            } else if (map[srGuid] !== undefined) {
+                self.fillSRData(map[srGuid]);
             }
         });
 
         // Computed
         self.canContinue = ko.computed(function() {
-            var valid = true, showErrors = false, reasons = [], fields = [], preValidation = self.preValidateResult();
+            var valid = true, showErrors = false, reasons = [], fields = [], preValidation = self.preValidateResult(),
+                requiredRoles = ['WRITE', 'DB'];
             if (self.data.vPool() === undefined) {
                 if (!self.data.name.valid()) {
                     valid = false;
@@ -126,6 +104,19 @@ define([
             } else if (self.data.backend() === 'alba' && self.data.albaBackend() === undefined) {
                 valid = false;
             }
+            if (self.data.scrubAvailable() === false) {
+                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', { what: 'SCRUB' }));
+            }
+            if (self.data.partitions() !== undefined) {
+                $.each(self.data.partitions(), function (role, partitions) {
+                    if (requiredRoles.contains(role) && partitions.length > 0) {
+                        generic.removeElement(requiredRoles, role);
+                    }
+                });
+            }
+            $.each(requiredRoles, function(index, role) {
+                reasons.push($.t('ovs:wizards.add_vpool.gather_backend.missing_role', { what: role }));
+            });
             if (self.data.backend() === 'alba' && self.data.vPoolAdd()) {
                 if (self.data.albaBackend() === undefined) {
                     valid = false;
@@ -157,29 +148,27 @@ define([
             }
             return presetAvailable;
         });
-        self.ipAddresses = ko.computed(function() {
-            if (self.data.storageRouter() === undefined || !self.srMetadataMap().hasOwnProperty(self.data.storageRouter().guid())) {
-                self.data.storageIP(undefined);
-                return [];
-            }
-            var ips = self.srMetadataMap()[self.data.storageRouter().guid()].ipaddresses;
-            if ((ips.length > 0 && self.data.storageIP() === undefined) || !ips.contains(self.data.storageIP())) {
-               self.data.storageIP(ips[0]);
-            }
-            return ips;
-        });
-        self.mountPoints = ko.computed(function() {
-            if (self.data.storageRouter() === undefined || !self.srMetadataMap().hasOwnProperty(self.data.storageRouter().guid())) {
-                return [];
-            }
-            var mtpts = self.srMetadataMap()[self.data.storageRouter().guid()].mountpoints;
-            if ((mtpts.length > 0 && self.data.distributedMtpt() === undefined) || !mtpts.contains(self.data.distributedMtpt())) {
-                self.data.distributedMtpt(mtpts[0]);
-            }
-            return mtpts;
-        });
 
         // Functions
+        self.fillSRData = function(srData) {
+            self.data.ipAddresses(srData.ipaddresses);
+            self.data.mountpoints(srData.mountpoints);
+            self.data.partitions(srData.partitions);
+            self.data.sharedSize(srData.shared_size);
+            self.data.scrubAvailable(srData.scrub_available);
+            self.data.readCacheAvailableSize(srData.readcache_size);
+            self.data.writeCacheAvailableSize(srData.writecache_size);
+            if (srData.ipaddresses.length === 0) {
+                self.data.storageIP(undefined);
+            } else if (self.data.storageIP() === undefined || !srData.ipaddresses.contains(self.data.storageIP())) {
+                self.data.storageIP(srData.ipaddresses[0]);
+            }
+            if (srData.mountpoints.length === 0) {
+                self.data.distributedMtpt(undefined);
+            } else if (self.data.distributedMtpt() === undefined || !srData.mountpoints.contains(self.data.distributedMtpt())) {
+                self.data.distributedMtpt(srData.mountpoints[0]);
+            }
+        };
         self.preValidate = function() {
             var validationResult = { valid: true, reasons: [], fields: [] };
             return $.Deferred(function(deferred) {
@@ -239,6 +228,12 @@ define([
             }).promise();
         };
         self.next = function() {
+            var backendType = self.data.backend();
+            if (backendType !== undefined && backendType === 'alba') {
+                self.data.cacheStrategy('none');
+            } else {
+                self.data.cacheStrategy('on_read');
+            }
             $.each(self.data.storageRoutersAvailable(), function(index, storageRouter) {
                 if (storageRouter === self.data.storageRouter()) {
                     $.each(self.data.dtlTransportModes(), function (i, key) {

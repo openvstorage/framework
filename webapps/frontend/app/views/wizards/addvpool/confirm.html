@@ -50,7 +50,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     </li>
                 </ul>
             </li>
-            <li data-bind="visible: data.useAA()">
+            <li data-bind="visible: data.useAA() && data.backend() === 'alba'">
                 <b data-i18n="ovs:wizards.add_vpool.confirm.accelerated_backend"></b>
                 <span data-bind="text: data.albaAABackend() !== undefined ? data.albaAABackend().name : ''"></span>
                 <ul>

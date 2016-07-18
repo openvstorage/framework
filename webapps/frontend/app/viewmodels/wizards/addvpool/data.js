@@ -116,7 +116,7 @@ define(['jquery', 'knockout'], function($, ko){
             partitions:              ko.observable(),
             port:                    ko.observable(80).extend({ numeric: {min: 1, max: 65536}}),
             rdmaEnabled:             ko.observable(false),
-            readCacheSize:           ko.observable(1).extend({numeric: {min: 1, max: 10240}}),
+            readCacheSize:           ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}}),
             readCacheAvailableSize:  ko.observable(),
             reUsedStorageRouter:     ko.observable(),  // Connection info for this storagerouter will be used for accelerated ALBA
             scrubAvailable:          ko.observable(false),
@@ -134,7 +134,7 @@ define(['jquery', 'knockout'], function($, ko){
             vPool:                   ko.observable(),
             vPools:                  ko.observableArray([]),
             writeBuffer:             ko.observable(128).extend({numeric: {min: 128, max: 10240}}),
-            writeCacheSize:          ko.observable(1).extend({numeric: {min: 1, max: 10240}}),
+            writeCacheSize:          ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}}),
             writeCacheAvailableSize: ko.observable()
         }, resetAlbaBackends = function() {
             wizardData.albaBackends([]);
@@ -178,10 +178,12 @@ define(['jquery', 'knockout'], function($, ko){
             wizardData.writeBuffer(wizardData.writeBuffer());
         });
         wizardData.reUsedStorageRouter.subscribe(function(sr) {
-            wizardData.aaHost('');
-            wizardData.aaPort(80);
-            wizardData.aaAccesskey('');
-            wizardData.aaSecretkey('');
+            if (sr === undefined && !wizardData.localHost()) {
+                wizardData.aaHost('');
+                wizardData.aaPort(80);
+                wizardData.aaAccesskey('');
+                wizardData.aaSecretkey('');
+            }
             if (sr !== undefined && wizardData.vPool() !== undefined && wizardData.vPool().metadata().hasOwnProperty(sr.guid())) {
                 var md = wizardData.vPool().metadata()[sr.guid()];
                 if (md.hasOwnProperty('connection')) {
@@ -191,6 +193,10 @@ define(['jquery', 'knockout'], function($, ko){
                     wizardData.aaSecretkey(md.connection.client_secret);
                 }
             }
+        });
+        wizardData.cacheStrategy.subscribe(function() {
+            wizardData.writeCacheSize(undefined);
+            wizardData.readCacheSize(undefined);
         });
 
         // Computed

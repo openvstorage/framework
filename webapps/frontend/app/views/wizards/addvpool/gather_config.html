@@ -79,7 +79,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <label class="col-lg-4 control-label" for="readCacheSize" data-i18n="ovs:wizards.add_vpool.gather_config.readcache_size"></label>
             <div class="col-lg-2">
                 <input type="text" id="readCacheSize" class="autofocus form-control" style="text-align: center; width: 110px;"
-                       data-bind="value: data.readCacheSize, valueUpdate: 'afterkeydown'" />
+                       data-bind="value: controledReadCacheSize, valueUpdate: 'afterkeydown'" />
             </div>
             <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.gib"></label>
         </div>
@@ -87,22 +87,21 @@ but WITHOUT ANY WARRANTY of any kind.
             <label class="col-lg-4 control-label" for="writeCacheSize" data-i18n="ovs:wizards.add_vpool.gather_config.global_write_buffer"></label>
             <div class="col-lg-2">
                 <input type="text" id="writeCacheSize" class="autofocus form-control" style="text-align: center; width: 110px;"
-                       data-bind="value: data.writeCacheSize, valueUpdate: 'afterkeydown'" />
+                       data-bind="value: controledWriteCacheSize, valueUpdate: 'afterkeydown'" />
             </div>
             <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.gib"></label>
         </div>
         <div class="form-group">
-            <a data-bind="popover: {
-                              title: 'ovs:storagedrivers.configuration.general.dedupe_help_title',
-                              content: 'ovs:storagedrivers.configuration.general.dedupe_help_message'
-                          }"
-               class="hand fa noline"
-               data-i18n="[html]ovs:icons.help"
-               style="margin-left: 5px; color: #377ca8;"
-               role="button"
-               tabindex="-1">
-            </a>
-            <label class="col-lg-4 control-label" for="dedupeMode" data-i18n="ovs:wizards.add_vpool.gather_config.dedupe"></label>
+            <label class="col-lg-4 control-label" for="dedupeMode">
+                <a data-bind="popover: {
+                                  title: 'ovs:storagedrivers.configuration.general.dedupe_help_title',
+                                  content: 'ovs:storagedrivers.configuration.general.dedupe_help_message'
+                              }"
+                   class="hand fa noline" data-i18n="[html]ovs:icons.help"
+                   style="margin-left: 5px; color: #377ca8;" role="button" tabindex="-1">
+                </a>
+                <span data-i18n="ovs:wizards.add_vpool.gather_config.dedupe"></span>
+            </label>
             <div class="col-lg-7" style="margin-bottom: -5px;">
                 <span id="dedupeMode"
                       data-bind="dropdown: {
@@ -168,19 +167,19 @@ but WITHOUT ANY WARRANTY of any kind.
         <div data-i18n="ovs:wizards.add_vpool.gather_config.dedupe_information" data-bind="visible: data.dedupeMode() === 'dedupe'" style="margin-bottom: 10px;"></div>
         <div data-i18n="ovs:wizards.add_vpool.gather_config.information"></div>
         <ul>
-            <li data-bind="visible: data.readCacheAvailableSize() !== undefined && data.cacheStrategy() !== 'none'">
-                <span data-i18n="ovs:wizards.add_vpool.gather_config.readcache_size"></span>
-                <span data-bind="text: Math.floor(data.readCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
+            <li data-bind="visible: correctedReadCacheAvailableSize() !== undefined && data.cacheStrategy() !== 'none'">
+                <span data-i18n="ovs:wizards.add_vpool.gather_config.readcache_size_available"></span>
+                <span data-bind="text: Math.floor(correctedReadCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>
             </li>
-            <li data-bind="visible: data.writeCacheAvailableSize() !== undefined && data.writeCacheAvailableSize() > 0">
-                <span data-i18n="ovs:wizards.add_vpool.gather_config.global_write_buffer"></span>
-                <span data-bind="text: Math.floor(data.writeCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
+            <li data-bind="visible: correctedWriteCacheAvailableSize() !== undefined && correctedWriteCacheAvailableSize() > 0">
+                <span data-i18n="ovs:wizards.add_vpool.gather_config.global_write_buffer_available"></span>
+                <span data-bind="text: Math.floor(correctedWriteCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>
             </li>
-            <li data-bind="visible: data.sharedSize() !== undefined && data.sharedSize() > 0">
+            <li data-bind="visible: correctedSharedSize() !== undefined && correctedSharedSize() > 0">
                 <span data-i18n="ovs:wizards.add_vpool.gather_config.shared_available"></span>
-                <span data-bind="text: Math.floor(data.sharedSize() / 1024 / 1024 / 1024)"></span>
+                <span data-bind="text: Math.floor(correctedSharedSize() / 1024 / 1024 / 1024)"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>
             </li>
         </ul>

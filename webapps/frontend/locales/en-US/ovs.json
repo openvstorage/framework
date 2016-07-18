@@ -722,11 +722,14 @@
                 "dtl_mode": "Mode:",
                 "dtl_transport": "Transport Mode:",
                 "global_write_buffer": "Gloabl Write Buffer:",
-                "information": "Information about the available space for:",
+                "global_write_buffer_available": "Dedicated Write Buffer space:",
+                "information": "Information about the available space:",
+                "missing_role": "Missing required partition role: __what__",
                 "over_allocation": "Over allocation detected",
                 "readcache_size": "Read Cache:",
+                "readcache_size_available": "Dedicated Read Cache space:",
                 "sco_size": "SCO Size:",
-                "shared_available": "Shared between Read and Write Cache:",
+                "shared_available": "Space shared between Read Cache and Global Write Buffer:",
                 "volume": "Volume Information",
                 "volume_write_buffer": "Volume Write Buffer:",
                 "write_buffer_size": "Write Buffer:"
@@ -753,6 +756,7 @@
                 "loading_backend_information": "Backend information is being loaded",
                 "local_host": "Use local Open vStorage backend",
                 "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
+                "missing_role": "Missing required partition role: __what__",
                 "mountpoint": "Mountpoint:",
                 "mtpt_in_use": "The mountpoint /mnt/__what__ for the vPool is already in use.",
                 "name": "Name:",
@@ -768,7 +772,7 @@
                 "configuration": "Validate the configuration settings.",
                 "creating": "creating the vPool",
                 "dtl_transport": "DTL Transport Mode:",
-                "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
+                "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two.",
                 "fragment_cache_info": {
                     "true": "Active",
                     "false": "Inactive"
