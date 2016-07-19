@@ -70,3 +70,7 @@ class HttpInternalServerErrorException(HttpException):
     def __init__(self, error, error_description):
         super(HttpInternalServerErrorException, self).__init__(500, error, error_description)
 
+
+class HttpNotImplementedException(HttpException):
+    def __init__(self, error, error_description):
+        super(HttpNotImplementedException, self).__init__(501, error, error_description)

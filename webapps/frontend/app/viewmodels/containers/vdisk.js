@@ -72,6 +72,7 @@ define([
         self.storedData            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.templateChildrenGuids = ko.observableArray([]);
         self.totalCacheHits        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.volumeId              = ko.observable();
         self.vpoolGuid             = ko.observable();
         self.writeSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.writeBuffer           = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
@@ -170,6 +171,7 @@ define([
         // Functions
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');
+            generic.trySet(self.volumeId, data, 'volume_id');
             if (data.hasOwnProperty('devicename')) {
                 self.deviceName(data.devicename.replace(/^\//, ''));
             }

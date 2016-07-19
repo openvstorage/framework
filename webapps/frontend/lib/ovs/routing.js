@@ -30,6 +30,7 @@ define(['jquery'], function($) {
         { route: 'vpool/:guid',          moduleId: 'vpool-detail',         title: $.t('ovs:vpools.detail.title'),         titlecode: 'ovs:vpools.detail.title',         nav: false, main: false },
         { route: 'vdisks',               moduleId: 'vdisks',               title: $.t('ovs:vdisks.title'),                titlecode: 'ovs:vdisks.title',                nav: true,  main: true  },
         { route: 'vdisk/:guid',          moduleId: 'vdisk-detail',         title: $.t('ovs:vdisks.detail.title'),         titlecode: 'ovs:vdisks.detail.title',         nav: false, main: false },
+        { route: 'edgeclients',          moduleId: 'edgeclients',          title: $.t('ovs:edgeclients.title'),           titlecode: 'ovs:edgeclients.title',           nav: true,  main: true  },
         { route: 'vtemplates',           moduleId: 'vtemplates',           title: $.t('ovs:vtemplates.title'),            titlecode: 'ovs:vtemplates.title',            nav: true,  main: true  },
         { route: 'login',                moduleId: 'login',                title: $.t('ovs:login.title'),                 titlecode: 'ovs:login.title',                 nav: false, main: false },
         { route: 'domains',              moduleId: 'domains',              title: $.t('ovs:domains.title'),               titlecode: 'ovs:domains.title',               nav: true,  main: false },

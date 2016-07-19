@@ -17,23 +17,24 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vdisk', '../containers/vpool', '../containers/storagerouter', '../containers/domain',
+    '../containers/vdisk', '../containers/vpool', '../containers/storagerouter', '../containers/domain', '../containers/edgeclient',
     '../wizards/rollback/index', '../wizards/clone/index', '../wizards/snapshot/index'
 ], function(
     $, app, dialog, ko, router, shared, generic, Refresher, api,
-    VDisk, VPool, StorageRouter, Domain, RollbackWizard, CloneWizard, SnapshotWizard
+    VDisk, VPool, StorageRouter, Domain, EdgeClient,
+    RollbackWizard, CloneWizard, SnapshotWizard
 ) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.domainCache     = {};
-        self.shared          = shared;
-        self.guard           = { authenticated: true };
-        self.refresher       = new Refresher();
-        self.widgets         = [];
-        self.snapshotHeaders = [
+        self.domainCache      = {};
+        self.shared           = shared;
+        self.guard            = { authenticated: true };
+        self.refresher        = new Refresher();
+        self.widgets          = [];
+        self.snapshotHeaders  = [
             { key: 'label',         value: $.t('ovs:generic.description'), width: undefined },
             { key: 'timestamp',     value: $.t('ovs:generic.datetime'),    width: 200       },
             { key: 'stored',        value: $.t('ovs:generic.storeddata'),  width: 110       },
@@ -41,6 +42,10 @@ define([
             { key: 'is_consistent', value: $.t('ovs:generic.consistent'),  width: 100       },
             { key: 'is_sticky',     value: $.t('ovs:generic.sticky'),      width: 100       },
             { key: undefined,       value: $.t('ovs:generic.actions'),     width: 60        }
+        ];
+        self.edgeClientHeaders = [
+            { key: 'ip',    value: $.t('ovs:generic.ip'),    width: 200       },
+            { key: 'port',  value: $.t('ovs:generic.port'),  width: undefined }
         ];
 
         // Observables
@@ -52,6 +57,7 @@ define([
         // Handles
         self.loadDomainHandle        = undefined;
         self.loadStorageRouterHandle = undefined;
+        self.edgeClientHandle        = {};
 
         // Functions
         self.load = function() {
@@ -67,7 +73,7 @@ define([
                     .then(self.loadDomains)
                     .then(function() {
                         self.snapshotsInitialLoad(false);
-                        var vm, sr, pool, vdisk = self.vDisk(),
+                        var sr, pool, vdisk = self.vDisk(),
                             storageRouterGuid = vdisk.storageRouterGuid(),
                             vPoolGuid = vdisk.vpoolGuid();
                         if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {
@@ -87,6 +93,30 @@ define([
                         }
                     })
                     .always(deferred.resolve);
+            }).promise();
+        };
+        self.loadEdgeClients = function(options) {
+            return $.Deferred(function(deferred) {
+                if (self.vDisk() == undefined || !self.vDisk().loaded()) {
+                    deferred.reject();
+                    return;
+                }
+                if (generic.xhrCompleted(self.edgeClientHandle[options.page])) {
+                    options.volume_id = self.vDisk().volumeId();
+                    options.contents = 'object_id';
+                    self.edgeClientHandle[options.page] = api.get('edgeclients', { queryparams: options })
+                        .done(function(data) {
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
+                                    return new EdgeClient(guid);
+                                }
+                            });
+                        })
+                        .fail(function() { deferred.reject(); });
+                } else {
+                    deferred.resolve();
+                }
             }).promise();
         };
         self.loadDomains = function() {
