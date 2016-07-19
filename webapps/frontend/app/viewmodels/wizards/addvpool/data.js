@@ -131,6 +131,7 @@ define(['jquery', 'knockout'], function($, ko){
             storageRoutersAvailable: ko.observableArray([]),
             storageRoutersUsed:      ko.observableArray([]),
             useAA:                   ko.observable(false),
+            volumedriverEdition:     ko.observable(),
             vPool:                   ko.observable(),
             vPools:                  ko.observableArray([]),
             writeBuffer:             ko.observable(128).extend({numeric: {min: 128, max: 10240}}),

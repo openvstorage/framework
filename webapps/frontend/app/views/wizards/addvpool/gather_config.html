@@ -172,12 +172,12 @@ but WITHOUT ANY WARRANTY of any kind.
                 <span data-bind="text: Math.floor(correctedReadCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>
             </li>
-            <li data-bind="visible: correctedWriteCacheAvailableSize() !== undefined && correctedWriteCacheAvailableSize() > 0">
+            <li data-bind="visible: correctedWriteCacheAvailableSize() !== undefined">
                 <span data-i18n="ovs:wizards.add_vpool.gather_config.global_write_buffer_available"></span>
                 <span data-bind="text: Math.floor(correctedWriteCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>
             </li>
-            <li data-bind="visible: correctedSharedSize() !== undefined && correctedSharedSize() > 0">
+            <li data-bind="visible: correctedSharedSize() !== undefined">
                 <span data-i18n="ovs:wizards.add_vpool.gather_config.shared_available"></span>
                 <span data-bind="text: Math.floor(correctedSharedSize() / 1024 / 1024 / 1024)"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>

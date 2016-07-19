@@ -151,6 +151,12 @@ define([
 
         // Functions
         self.fillSRData = function(srData) {
+            self.data.volumedriverEdition(srData.voldrv_edition);
+            if (self.data.volumedriverEdition() == 'no-dedup') {
+                self.data.dedupeModes(['non_dedupe']);
+            } else {
+                self.data.dedupeModes(['dedupe', 'non_dedupe']);
+            }
             self.data.ipAddresses(srData.ipaddresses);
             self.data.mountpoints(srData.mountpoints);
             self.data.partitions(srData.partitions);

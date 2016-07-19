@@ -74,7 +74,7 @@ but WITHOUT ANY WARRANTY of any kind.
         </ul>
         <p data-i18n="ovs:wizards.add_vpool.confirm.storagerouter_info"></p>
         <ul>
-            <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.initial_storagerouter"></b> <span data-bind="text: data.storageRouter().name()"></span></li>
+            <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.initial_storagerouter"></b> <span data-bind="text: data.storageRouter() === undefined ? '-' : data.storageRouter().name()"></span></li>
             <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.ip_address"></b> <span data-bind="text: data.storageIP"></span></li>
             <li data-bind="visible: data.backend() === 'distributed'">
                 <b data-i18n="ovs:wizards.add_vpool.gather_vpool.mountpoint"></b> <span data-bind="text: data.distributedMtpt()"></span>

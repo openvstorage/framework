@@ -83,6 +83,7 @@ define([
         data.storageRoutersAvailable([]);
         data.storageRoutersUsed([]);
         data.useAA(false);
+        data.volumedriverEdition(undefined);
         data.writeBuffer(undefined);
         data.writeCacheSize(undefined);
     };

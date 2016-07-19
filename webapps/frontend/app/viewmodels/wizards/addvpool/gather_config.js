@@ -64,6 +64,9 @@ define([
             };
         });
         self.nsmReserved = ko.computed(function() {
+            if (self.data.albaPreset() === undefined || self.data.albaBackend() === undefined) {
+                return 0;
+            }
             var overlap = self.overlaps();
             if (overlap.read || overlap.write) {
                 var max = 0, scoSize = self.data.scoSize() * 1024 * 1024,
