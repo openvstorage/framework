@@ -757,6 +757,7 @@
                 "local_host": "Use local Open vStorage backend",
                 "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
                 "missing_role": "Missing required partition role: __what__",
+                "missing_storageip": "A Storage IP must be selected",
                 "mountpoint": "Mountpoint:",
                 "mtpt_in_use": "The mountpoint /mnt/__what__ for the vPool is already in use.",
                 "name": "Name:",

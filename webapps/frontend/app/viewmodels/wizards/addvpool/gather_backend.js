@@ -117,7 +117,7 @@ define([
 
         self.shouldSkip = function() {
             return $.Deferred(function(deferred) {
-                if (self.data.backend() !== 'alba') {
+                if (self.data.backend() !== 'alba' || (!self.data.vPoolAdd() && !self.data.fragmentCacheOnRead() && !self.data.fragmentCacheOnWrite())) {
                     deferred.resolve(true);
                 } else {
                     deferred.resolve(false);

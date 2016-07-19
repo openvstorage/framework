@@ -135,6 +135,11 @@ define([
                 valid = false;
                 reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_mountpoints'));
             }
+            if (self.data.storageIP() === undefined || self.metadataLoading()) {
+                valid = false;
+                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_storageip'));
+                fields.push('storageip');
+            }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
         self.isPresetAvailable = ko.computed(function() {
@@ -235,10 +240,12 @@ define([
         };
         self.next = function() {
             var backendType = self.data.backend();
-            if (backendType !== undefined && backendType === 'alba') {
-                self.data.cacheStrategy('none');
-            } else {
-                self.data.cacheStrategy('on_read');
+            if (self.data.vPoolAdd()) {
+                if (backendType !== undefined && backendType === 'alba') {
+                    self.data.cacheStrategy('none');
+                } else {
+                    self.data.cacheStrategy('on_read');
+                }
             }
             $.each(self.data.storageRoutersAvailable(), function(index, storageRouter) {
                 if (storageRouter === self.data.storageRouter()) {
