@@ -134,9 +134,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Returns a list of mountpoints on the given Storage Router
         """
-        return StorageRouterController.get_metadata.s(storagerouter.guid).apply_async(
-            routing_key='sr.{0}'.format(storagerouter.machine_id)
-        )
+        return StorageRouterController.get_metadata.delay(storagerouter.guid)
 
     @link()
     @log()

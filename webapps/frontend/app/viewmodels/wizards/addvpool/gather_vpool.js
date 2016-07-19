@@ -30,18 +30,44 @@ define([
         // Handles
         self.checkS3Handle            = undefined;
         self.checkMtptHandle          = undefined;
+        self.checkMetadataHandle      = undefined;
         self.fetchAlbaVPoolHandle     = undefined;
+        self.loadSRMetadataHandle     = undefined;
         self.loadStorageRoutersHandle = undefined;
 
         // Observables
         self.albaBackendLoading = ko.observable(false);
         self.albaPresetMap      = ko.observable({});
         self.invalidAlbaInfo    = ko.observable(false);
+        self.metadataLoading    = ko.observable(false);
         self.preValidateResult  = ko.observable({ valid: true, reasons: [], fields: [] });
+        self.srMetadataMap      = ko.observable({});
+
+        self.data.storageRouter.subscribe(function(storageRouter) {
+            if (storageRouter == undefined) {
+                return;
+            }
+            var map = self.srMetadataMap(), srGuid = storageRouter.guid();
+            if (!map.hasOwnProperty(srGuid)) {
+                self.srMetadataMap()[srGuid] = undefined;
+                self.metadataLoading(true);
+                generic.xhrAbort(self.loadSRMetadataHandle);
+                self.loadSRMetadataHandle = api.post('storagerouters/' + srGuid + '/get_metadata')
+                    .then(self.shared.tasks.wait)
+                    .done(function(srData) {
+                        self.fillSRData(srData);
+                        self.srMetadataMap()[storageRouter.guid()] = srData;
+                        self.metadataLoading(false);
+                    });
+            } else if (map[srGuid] !== undefined) {
+                self.fillSRData(map[srGuid]);
+            }
+        });
 
         // Computed
         self.canContinue = ko.computed(function() {
-            var valid = true, showErrors = false, reasons = [], fields = [], preValidation = self.preValidateResult();
+            var valid = true, showErrors = false, reasons = [], fields = [], preValidation = self.preValidateResult(),
+                requiredRoles = ['WRITE', 'DB'];
             if (self.data.vPool() === undefined) {
                 if (!self.data.name.valid()) {
                     valid = false;
@@ -78,6 +104,19 @@ define([
             } else if (self.data.backend() === 'alba' && self.data.albaBackend() === undefined) {
                 valid = false;
             }
+            if (self.data.scrubAvailable() === false) {
+                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', { what: 'SCRUB' }));
+            }
+            if (self.data.partitions() !== undefined) {
+                $.each(self.data.partitions(), function (role, partitions) {
+                    if (requiredRoles.contains(role) && partitions.length > 0) {
+                        generic.removeElement(requiredRoles, role);
+                    }
+                });
+            }
+            $.each(requiredRoles, function(index, role) {
+                reasons.push($.t('ovs:wizards.add_vpool.gather_backend.missing_role', { what: role }));
+            });
             if (self.data.backend() === 'alba' && self.data.vPoolAdd()) {
                 if (self.data.albaBackend() === undefined) {
                     valid = false;
@@ -91,6 +130,15 @@ define([
                     fields.push('clientsecret');
                     fields.push('host');
                 }
+            }
+            if (self.data.backend() === 'distributed' && self.data.mountpoints().length === 0) {
+                valid = false;
+                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_mountpoints'));
+            }
+            if (self.data.storageIP() === undefined || self.metadataLoading()) {
+                valid = false;
+                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_storageip'));
+                fields.push('storageip');
             }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
@@ -107,6 +155,31 @@ define([
         });
 
         // Functions
+        self.fillSRData = function(srData) {
+            self.data.volumedriverEdition(srData.voldrv_edition);
+            if (self.data.volumedriverEdition() == 'no-dedup') {
+                self.data.dedupeModes(['non_dedupe']);
+            } else {
+                self.data.dedupeModes(['dedupe', 'non_dedupe']);
+            }
+            self.data.ipAddresses(srData.ipaddresses);
+            self.data.mountpoints(srData.mountpoints);
+            self.data.partitions(srData.partitions);
+            self.data.sharedSize(srData.shared_size);
+            self.data.scrubAvailable(srData.scrub_available);
+            self.data.readCacheAvailableSize(srData.readcache_size);
+            self.data.writeCacheAvailableSize(srData.writecache_size);
+            if (srData.ipaddresses.length === 0) {
+                self.data.storageIP(undefined);
+            } else if (self.data.storageIP() === undefined || !srData.ipaddresses.contains(self.data.storageIP())) {
+                self.data.storageIP(srData.ipaddresses[0]);
+            }
+            if (srData.mountpoints.length === 0) {
+                self.data.distributedMtpt(undefined);
+            } else if (self.data.distributedMtpt() === undefined || !srData.mountpoints.contains(self.data.distributedMtpt())) {
+                self.data.distributedMtpt(srData.mountpoints[0]);
+            }
+        };
         self.preValidate = function() {
             var validationResult = { valid: true, reasons: [], fields: [] };
             return $.Deferred(function(deferred) {
@@ -166,6 +239,14 @@ define([
             }).promise();
         };
         self.next = function() {
+            var backendType = self.data.backend();
+            if (self.data.vPoolAdd()) {
+                if (backendType !== undefined && backendType === 'alba') {
+                    self.data.cacheStrategy('none');
+                } else {
+                    self.data.cacheStrategy('on_read');
+                }
+            }
             $.each(self.data.storageRoutersAvailable(), function(index, storageRouter) {
                 if (storageRouter === self.data.storageRouter()) {
                     $.each(self.data.dtlTransportModes(), function (i, key) {

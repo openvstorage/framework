@@ -16,18 +16,20 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/api', 'ovs/generic',
+    'ovs/api', 'ovs/generic', 'ovs/shared',
     './data'
-], function($, ko, api, generic, data) {
+], function($, ko, api, generic, shared, data) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.data = data;
+        self.data   = data;
+        self.shared = shared;
 
         // Handles
         self.fetchAlbaVPoolHandle = undefined;
+        self.loadSRMetadataHandle = undefined;
 
         // Observables
         self.albaBackendLoading    = ko.observable(false);
@@ -65,30 +67,23 @@ define([
             return temp;
         });
         self.canContinue = ko.computed(function() {
-            var valid = true, showErrors = false, reasons = [], fields = [];
-            if (!self.data.useAA()) {
-                return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
-            }
+            var showErrors = false, reasons = [], fields = [];
             if (self.data.backend() === 'alba') {
-                if (self.data.albaAABackend() === undefined) {
-                    valid = false;
+                if (self.data.albaAABackend() === undefined && self.data.useAA()) {
                     reasons.push($.t('ovs:wizards.add_vpool.gather_backend.choose_backend'));
                     fields.push('backend');
                 }
                 if (!self.data.aaLocalHost()) {
                     if (!self.data.aaHost.valid()) {
-                        valid = false;
                         fields.push('host');
                         reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_host'));
                     }
                     if (self.data.aaAccesskey() === '' || self.data.aaSecretkey() === '') {
-                        valid = false;
                         fields.push('clientid');
                         fields.push('clientsecret');
                         reasons.push($.t('ovs:wizards.add_vpool.gather_backend.no_credentials'));
                     }
                     if (self.invalidAlbaInfo()) {
-                        valid = false;
                         reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_alba_info'));
                         fields.push('clientid');
                         fields.push('clientsecret');
@@ -96,7 +91,7 @@ define([
                     }
                 }
             }
-            return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
+            return { value: reasons.length === 0, showErrors: showErrors, reasons: reasons, fields: fields };
         });
         self.fragmentCacheSetting = ko.computed({
             read: function() {
@@ -112,14 +107,17 @@ define([
                 self.data.fragmentCacheOnRead(['rw', 'read'].contains(cache));
                 self.data.fragmentCacheOnWrite(['rw', 'write'].contains(cache));
                 if (cache === 'none') {
+                    self.data.cacheStrategy('on_read');
                     self.data.useAA(false);
+                } else {
+                    self.data.cacheStrategy('none');
                 }
             }
         });
 
         self.shouldSkip = function() {
             return $.Deferred(function(deferred) {
-                if (!self.data.fragmentCacheOnRead() && !self.data.fragmentCacheOnWrite()) {
+                if (self.data.backend() !== 'alba' || (!self.data.vPoolAdd() && !self.data.fragmentCacheOnRead() && !self.data.fragmentCacheOnWrite())) {
                     deferred.resolve(true);
                 } else {
                     deferred.resolve(false);
