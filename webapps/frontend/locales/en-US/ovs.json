@@ -721,7 +721,7 @@
                 "dtl": "Distributed Transaction Log Information",
                 "dtl_mode": "Mode:",
                 "dtl_transport": "Transport Mode:",
-                "global_write_buffer": "Gloabl Write Buffer:",
+                "global_write_buffer": "Global Write Buffer:",
                 "global_write_buffer_available": "Dedicated Write Buffer space:",
                 "information": "Information about the available space:",
                 "missing_role": "Missing required partition role: __what__",
