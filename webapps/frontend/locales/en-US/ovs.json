@@ -538,7 +538,7 @@
                     "volumedriver": "Update Storage Driver"},
         "failed": "Update failed: __why__",
         "framework": {
-            "gui_unavailable": "The GUI will become unavailable. If the GUI is not available after 10 minutes, please contact support or check the logs (/var/log/ovs/lib.log)",
+            "gui_unavailable": "The GUI will become unavailable. If the GUI is not available after 10 minutes, please contact support or check the logs",
             "start_update_question": "Are you sure you want to start the __what__ update?__guidown____downtime____prerequisites__",
             "title": "Framework"
         },

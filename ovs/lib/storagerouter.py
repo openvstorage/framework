@@ -1363,7 +1363,7 @@ class StorageRouterController(object):
             if storage_drivers_left is True:
                 vpool.status = VPool.STATUSES.FAILURE
                 vpool.save()
-            raise RuntimeError('1 or more errors occurred while trying to remove the storage driver. Please check /var/log/ovs/lib.log for more information')
+            raise RuntimeError('1 or more errors occurred while trying to remove the storage driver. Please check the logs for more information')
         if storage_drivers_left is True:
             vpool.status = VPool.STATUSES.RUNNING
             vpool.save()
