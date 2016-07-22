@@ -68,8 +68,8 @@ define([
         });
         self.canContinue = ko.computed(function() {
             var showErrors = false, reasons = [], fields = [];
-            if (self.data.backend() === 'alba') {
-                if (self.data.albaAABackend() === undefined && self.data.useAA()) {
+            if (self.data.backend() === 'alba' && self.data.useAA()) {
+                if (self.data.albaAABackend() === undefined) {
                     reasons.push($.t('ovs:wizards.add_vpool.gather_backend.choose_backend'));
                     fields.push('backend');
                 }
