@@ -145,7 +145,7 @@ class UpdateController(object):
                 UpdateController._change_services_state(services=services_to_restart,
                                                         ssh_clients=ssh_clients,
                                                         action='start')
-                UpdateController._log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients]), this_client.ip),
+                UpdateController._log_message('Failed to upgrade following nodes:\n - {0}\nPlease check the logs on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients]), this_client.ip),
                                               this_client.ip,
                                               'error')
                 return

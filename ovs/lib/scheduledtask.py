@@ -46,8 +46,6 @@ from ovs.log.log_handler import LogHandler
 from StringIO import StringIO
 from time import mktime
 
-SCRUBBER_LOGFILE_LOCATION = '/var/log/upstart/ovs-scrubber.log'
-
 
 class ScheduledTaskController(object):
     """
@@ -336,6 +334,7 @@ class ScheduledTaskController(object):
         skipped = 0
         storagedrivers = {}
         failures = []
+        sink = LogHandler.get_sink_path('scrubber', allow_override=True)
         for vdisk_guid in vdisk_guids:
             vdisk = VDisk(vdisk_guid)
             try:
@@ -362,7 +361,7 @@ class ScheduledTaskController(object):
                     ScheduledTaskController._logger.info('Execute Scrub - Virtual disk {0} - {1} - Retrieve and apply scrub work'.format(vdisk.guid, vdisk.name))
                     work_units = locked_client.get_scrubbing_workunits()
                     for work_unit in work_units:
-                        scrubbing_result = locked_client.scrub(work_unit, scrub_location, log_sinks=[SCRUBBER_LOGFILE_LOCATION])
+                        scrubbing_result = locked_client.scrub(work_unit, scrub_location, log_sinks=[sink])
                         locked_client.apply_scrubbing_result(scrubbing_result)
                     if work_units:
                         ScheduledTaskController._logger.info('Execute Scrub - Virtual disk {0} - {1} - Scrub successfully applied'.format(vdisk.guid, vdisk.name))

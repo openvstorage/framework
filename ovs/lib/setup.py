@@ -583,7 +583,7 @@ class SetupController(object):
         from ovs.dal.lists.vdisklist import VDiskList
 
         SetupController._log(messages='Remove nodes started', title=True)
-        SetupController._log(messages='\nWARNING: Some of these steps may take a very long time, please check /var/log/ovs/lib.log on this node for more logging information\n\n')
+        SetupController._log(messages='\nWARNING: Some of these steps may take a very long time, please check the logs for more logging information\n\n')
 
         ###############
         # VALIDATIONS #
