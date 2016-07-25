@@ -33,7 +33,6 @@ import logging
 import tempfile
 from subprocess import check_output, CalledProcessError, PIPE, Popen
 from ovs.dal.helpers import Descriptor
-from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
 
@@ -99,6 +98,7 @@ class SSHClient(object):
         """
         Initializes an SSHClient
         """
+        from ovs.dal.hybrids.storagerouter import StorageRouter
         storagerouter = None
         if isinstance(endpoint, basestring):
             ip = endpoint

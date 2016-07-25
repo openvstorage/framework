@@ -21,7 +21,7 @@ import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.structures import Dynamic, Property, Relation
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration
 
 
 class VPool(DataObject):
@@ -44,7 +44,7 @@ class VPool(DataObject):
     __dynamics = [Dynamic('configuration', dict, 3600),
                   Dynamic('statistics', dict, 4),
                   Dynamic('identifier', str, 120)]
-    _fixed_properties = ['storagedriver_client']
+    _fixed_properties = ['storagedriver_client', 'objectregistry_client']
 
     def __init__(self, *args, **kwargs):
         """
@@ -53,6 +53,7 @@ class VPool(DataObject):
         DataObject.__init__(self, *args, **kwargs)
         self._frozen = False
         self._storagedriver_client = None
+        self._objectregistry_client = None
         self._frozen = True
 
     @property
@@ -62,8 +63,18 @@ class VPool(DataObject):
         :return: StorageDriverClient
         """
         if self._storagedriver_client is None:
-            self.reload_client()
+            self.reload_clients('storagedriver')
         return self._storagedriver_client
+
+    @property
+    def objectregistry_client(self):
+        """
+        Client used for communication between Storage Driver OR and framework
+        :return: ObjectRegistryClient
+        """
+        if self._objectregistry_client is None:
+            self.reload_clients('objectregistry')
+        return self._objectregistry_client
 
     def _configuration(self):
         """
@@ -130,10 +141,13 @@ class VPool(DataObject):
         """
         return '{0}_{1}'.format(self.guid, '_'.join(self.storagedrivers_guids))
 
-    def reload_client(self):
+    def reload_clients(self, client):
         """
-        Reloads the StorageDriver Client
+        Reloads the StorageDriverClient and ObjectRegistryClient
         """
         self._frozen = False
-        self._storagedriver_client = StorageDriverClient.load(self)
+        if client == 'storagedriver':
+            self._storagedriver_client = StorageDriverClient.load(self)
+        if client == 'objectregistry':
+            self._objectregistry_client = ObjectRegistryClient.load(self)
         self._frozen = True

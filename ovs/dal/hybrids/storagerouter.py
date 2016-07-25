@@ -66,11 +66,17 @@ class StorageRouter(DataObject):
         Gets the vDisk guids served by this StorageRouter.
         """
         from ovs.dal.lists.vdisklist import VDiskList
-        vdisk_guids = []
+        volume_ids = []
+        vpools = set()
+        storagedriver_ids = []
         for storagedriver in self.storagedrivers:
-            storagedriver_client = storagedriver.vpool.storagedriver_client
-            vdisk_guids += VDiskList.get_in_volume_ids(storagedriver_client.list_volumes(str(storagedriver.storagedriver_id))).guids
-        return vdisk_guids
+            vpools.add(storagedriver.vpool)
+            storagedriver_ids.append(storagedriver.storagedriver_id)
+        for vpool in vpools:
+            for entry in vpool.objectregistry_client.get_all_registrations():
+                if entry.node_id() in storagedriver_ids:
+                    volume_ids.append(entry.object_id())
+        return VDiskList.get_in_volume_ids(volume_ids).guids
 
     def _vpools_guids(self):
         """

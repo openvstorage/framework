@@ -354,6 +354,25 @@ class MockStorageRouterClient(object):
     EMPTY_INFO = empty_info
 
 
+class MockObjectRegistryClient(object):
+    """
+    Mocks the ObjectRegistryClient
+    """
+
+    def __init__(self, vrouter_cluster_id, arakoon_cluster_id, arakoon_node_configs):
+        """
+        Initializes a Mocked ObjectRegistryClient
+        """
+        self.vpool_guid = vrouter_cluster_id
+        _ = arakoon_cluster_id, arakoon_node_configs
+
+    def get_all_registrations(self):
+        registrations = []
+        for volume_id in MockStorageRouterClient.volumes[self.vpool_guid].iterkeys():
+            registrations.append(ObjectRegistration(MockStorageRouterClient.vrouter_id[self.vpool_guid][volume_id], volume_id))
+        return registrations
+
+
 class MockMetadataServerClient(object):
     """
     Mocks the Metadata Server Client
@@ -414,3 +433,26 @@ class DTLConfig(object):
         self.port = port
         self.mode = mode
         self.dtl_config_mode = DTLConfigMode.MANUAL
+
+
+class ObjectRegistration(object):
+    """
+    Mocked ObjectRegistration
+    """
+    def __init__(self, node_id, object_id):
+        self._node_id = node_id
+        self._object_id = object_id
+
+    def node_id(self):
+        return self._node_id
+
+    def object_id(self):
+        return self._object_id
+
+
+class ArakoonNodeConfig(object):
+    """
+    Mocked ArakoonNodeConfig
+    """
+    def __init__(self, *args, **kwargs):
+        _ = args, kwargs
