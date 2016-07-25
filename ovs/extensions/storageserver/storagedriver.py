@@ -20,19 +20,19 @@ Wrapper class for the storagedriver client of the voldrv team
 import os
 import copy
 import json
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import ClusterContact, DTLMode, LocalStorageRouterClient, MDSNodeConfig, ReadCacheBehaviour, ReadCacheMode, Statistics, VolumeInfo
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
-    from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient as SRClient
-    from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient as MDSClient
+    from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient as MDSClient, MockStorageRouterClient as SRClient, MockObjectRegistryClient as ORClient, ArakoonNodeConfig
 else:
-    from volumedriver.storagerouter.storagerouterclient import MDSClient
-    from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient
+    from volumedriver.storagerouter.storagerouterclient import MDSClient, StorageRouterClient as SRClient, ObjectRegistryClient as ORClient, ArakoonNodeConfig
 
 client_vpool_cache = {}
+oclient_vpool_cache = {}
 mdsclient_service_cache = {}
 
 
@@ -141,8 +141,7 @@ class StorageDriverClient(object):
     @staticmethod
     def load(vpool):
         """
-        Initializes the wrapper given a vpool name for which it finds the corresponding Storage Driver
-        Loads and returns the client
+        Initializes the wrapper for a given vpool
         :param vpool: vPool for which the StorageRouterClient needs to be loaded
         """
         key = vpool.identifier
@@ -153,6 +152,35 @@ class StorageDriverClient(object):
             client = SRClient(str(vpool.guid), cluster_contacts)
             client_vpool_cache[key] = client
         return client_vpool_cache[key]
+
+
+class ObjectRegistryClient(object):
+    """
+    Client to access the object registry
+    """
+    def __init__(self):
+        """
+        Dummy init method
+        """
+        pass
+
+    @staticmethod
+    def load(vpool):
+        """
+        Initializes the wrapper for a given vpool
+        :param vpool: vPool for which the ObjectRegistryClient needs to be loaded
+        """
+        key = vpool.identifier
+        if key not in oclient_vpool_cache:
+            arakoon_node_configs = []
+            arakoon_cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
+            config = ArakoonClusterConfig(arakoon_cluster_name)
+            config.load_config()
+            for node in config.nodes:
+                arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
+            client = ORClient(str(vpool.guid), str(arakoon_cluster_name), arakoon_node_configs)
+            oclient_vpool_cache[key] = client
+        return oclient_vpool_cache[key]
 
 
 class MetadataServerClient(object):
