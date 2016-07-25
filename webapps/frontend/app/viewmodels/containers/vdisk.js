@@ -210,7 +210,7 @@ define([
                     }
                 });
                 self.edgeClients.sort(function (a, b) {
-                    return a.ip() < b.ip() ? -1 : (a.ip() > b.ip() ? 1 : a.port() - b.port());
+                    return a.key() < b.key() ? -1 : (a.key() > b.key() ? 1 : 0);
                 });
             }
             if (data.hasOwnProperty('snapshots')) {
