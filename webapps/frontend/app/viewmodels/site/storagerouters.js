@@ -30,7 +30,7 @@ define([
         self.refresher             = new Refresher();
         self.widgets               = [];
         self.storageRoutersHeaders = [
-            { key: 'status',         value: $.t('ovs:generic.status'),           width: 60        },
+            { key: 'status',         value: '',                                  width: 30        },
             { key: 'name',           value: $.t('ovs:generic.name'),             width: 125       },
             { key: 'ip',             value: $.t('ovs:generic.ip'),               width: 125       },
             { key: 'vdisks',         value: $.t('ovs:generic.vdisks'),           width: 60        },

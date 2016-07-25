@@ -17,11 +17,11 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vdisk', '../containers/vpool', '../containers/storagerouter', '../containers/domain', '../containers/edgeclient',
+    '../containers/vdisk', '../containers/vpool', '../containers/storagerouter', '../containers/domain',
     '../wizards/rollback/index', '../wizards/clone/index', '../wizards/snapshot/index'
 ], function(
     $, app, dialog, ko, router, shared, generic, Refresher, api,
-    VDisk, VPool, StorageRouter, Domain, EdgeClient,
+    VDisk, VPool, StorageRouter, Domain,
     RollbackWizard, CloneWizard, SnapshotWizard
 ) {
     "use strict";
@@ -57,7 +57,6 @@ define([
         // Handles
         self.loadDomainHandle        = undefined;
         self.loadStorageRouterHandle = undefined;
-        self.edgeClientHandle        = {};
 
         // Functions
         self.load = function() {
@@ -93,30 +92,6 @@ define([
                         }
                     })
                     .always(deferred.resolve);
-            }).promise();
-        };
-        self.loadEdgeClients = function(options) {
-            return $.Deferred(function(deferred) {
-                if (self.vDisk() == undefined || !self.vDisk().loaded()) {
-                    deferred.reject();
-                    return;
-                }
-                if (generic.xhrCompleted(self.edgeClientHandle[options.page])) {
-                    options.volume_id = self.vDisk().volumeId();
-                    options.contents = 'object_id';
-                    self.edgeClientHandle[options.page] = api.get('edgeclients', { queryparams: options })
-                        .done(function(data) {
-                            deferred.resolve({
-                                data: data,
-                                loader: function(guid) {
-                                    return new EdgeClient(guid);
-                                }
-                            });
-                        })
-                        .fail(function() { deferred.reject(); });
-                } else {
-                    deferred.resolve();
-                }
             }).promise();
         };
         self.loadDomains = function() {

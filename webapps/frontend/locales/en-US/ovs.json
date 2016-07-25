@@ -187,6 +187,7 @@
         "namespace": "Backend Location",
         "next": "Next &raquo;",
         "no": "No",
+        "noclients": "No Edge Clients connected",
         "noelements": "No items available",
         "noentries": "No entries available",
         "nothingselected": "Nothing selected",
@@ -252,6 +253,7 @@
         "write": "Write",
         "writespeed": "Write Speed",
         "xmlrpcport": "XML-RPC",
+        "xmore": "__amount__ more...",
         "yes": "Yes"
     },
     "storagerouters": {

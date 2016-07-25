@@ -18,7 +18,7 @@ define([
     'jquery', 'knockout'
 ], function($, ko) {
     "use strict";
-    return function (guid) {
+    return function (key) {
         var self = this;
 
         // Handles
@@ -30,7 +30,7 @@ define([
         // Observables
         self.loading  = ko.observable(false);
         self.loaded   = ko.observable(false);
-        self.guid     = ko.observable(guid);
+        self.key      = ko.observable(key);
         self.objectId = ko.observable();
         self.ip       = ko.observable();
         self.port     = ko.observable();

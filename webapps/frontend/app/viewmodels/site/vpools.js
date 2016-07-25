@@ -30,13 +30,13 @@ define([
         self.refresher    = new Refresher();
         self.widgets      = [];
         self.vPoolHeaders = [
+            { key: 'status',            value: '',                                        width: 30        },
             { key: 'name',              value: $.t('ovs:generic.name'),                   width: 200       },
             { key: 'storedData',        value: $.t('ovs:generic.storeddata'),             width: 175       },
             { key: 'iops',              value: $.t('ovs:generic.iops'),                   width: 125       },
             { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),             width: 180       },
             { key: 'backendConnection', value: $.t('ovs:vpools.backendconnectionpreset'), width: 230       },
-            { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),            width: undefined },
-            { key: 'status',            value: $.t('ovs:generic.status'),                 width: 80        }
+            { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),            width: undefined }
         ];
         self.vPoolCache = {};
 

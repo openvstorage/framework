@@ -190,7 +190,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
             <div class="tab-pane" id="edgeclients" style="padding: 15px;">
                 <h4 data-i18n="ovs:vdisks.detail.edgeclients"></h4>
-                <div data-bind="pager: { loadData: $parent.loadEdgeClients, headers: $parent.edgeClientHeaders, refreshInterval: 5000, controls: true }" style="clear: both;">
+                <div data-bind="pager: { items: edgeClients, headers: $parent.edgeClientHeaders, refreshInterval: 5000, controls: true }" style="clear: both;">
                     <table data-dummy="dummy">
                         <tr data-part="vitem">
                             <td style="position: relative;">

@@ -53,7 +53,8 @@ class VDisk(DataObject):
                   Dynamic('statistics', dict, 4),
                   Dynamic('storagedriver_id', str, 60),
                   Dynamic('storagerouter_guid', str, 15),
-                  Dynamic('is_vtemplate', bool, 60)]
+                  Dynamic('is_vtemplate', bool, 60),
+                  Dynamic('edge_clients', list, 30)]
     _fixed_properties = ['storagedriver_client']
 
     def __init__(self, *args, **kwargs):
@@ -209,6 +210,17 @@ class VDisk(DataObject):
         Returns whether the vdisk is a template
         """
         return self.info.get('object_type') == 'TEMPLATE'
+
+    def _edge_clients(self):
+        """
+        Retrieves all edge clients
+        """
+        clients = {}
+        for storagedriver in self.vpool.storagedrivers:
+            for client in storagedriver.edge_clients:
+                if client['object_id'] == self.volume_id:
+                    clients[client['key']] = client
+        return clients.values()
 
     def reload_client(self):
         """

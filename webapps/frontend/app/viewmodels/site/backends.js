@@ -31,10 +31,10 @@ define([
         self.refresher        = new Refresher();
         self.widgets          = [];
         self.backendHeaders   = [
+            { key: undefined,  value: '',                             width: 30        },
             { key: 'name',     value: $.t('ovs:generic.name'),        width: 250       },
             { key: undefined,  value: $.t('ovs:generic.backendtype'), width: 250       },
-            { key: 'domain',   value: $.t('ovs:generic.domains'),     width: undefined },
-            { key: undefined,  value: $.t('ovs:generic.status'),      width: 80        }
+            { key: 'domain',   value: $.t('ovs:generic.domains'),     width: undefined }
         ];
         self.backendTypeCache = {};
 
