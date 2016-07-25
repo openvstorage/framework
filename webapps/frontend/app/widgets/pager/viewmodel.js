@@ -337,7 +337,7 @@ define([
             } else {
                 self.container(ko.observableArray([]));
             }
-            self.loadData = generic.tryGet(settings, 'loadData');
+            self.loadData = generic.tryGet(settings, 'loadData', function() {});
             self.refresh = parseInt(generic.tryGet(settings, 'refreshInterval', '5000'), 10);
             self.key = generic.tryGet(settings, 'key', 'guid');
             self.skipOn = generic.tryGet(settings, 'skipon', undefined);

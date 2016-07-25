@@ -21,19 +21,20 @@ define([
     '../wizards/rollback/index', '../wizards/clone/index', '../wizards/snapshot/index'
 ], function(
     $, app, dialog, ko, router, shared, generic, Refresher, api,
-    VDisk, VPool, StorageRouter, Domain, RollbackWizard, CloneWizard, SnapshotWizard
+    VDisk, VPool, StorageRouter, Domain,
+    RollbackWizard, CloneWizard, SnapshotWizard
 ) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.domainCache     = {};
-        self.shared          = shared;
-        self.guard           = { authenticated: true };
-        self.refresher       = new Refresher();
-        self.widgets         = [];
-        self.snapshotHeaders = [
+        self.domainCache      = {};
+        self.shared           = shared;
+        self.guard            = { authenticated: true };
+        self.refresher        = new Refresher();
+        self.widgets          = [];
+        self.snapshotHeaders  = [
             { key: 'label',         value: $.t('ovs:generic.description'), width: undefined },
             { key: 'timestamp',     value: $.t('ovs:generic.datetime'),    width: 200       },
             { key: 'stored',        value: $.t('ovs:generic.storeddata'),  width: 110       },
@@ -41,6 +42,10 @@ define([
             { key: 'is_consistent', value: $.t('ovs:generic.consistent'),  width: 100       },
             { key: 'is_sticky',     value: $.t('ovs:generic.sticky'),      width: 100       },
             { key: undefined,       value: $.t('ovs:generic.actions'),     width: 60        }
+        ];
+        self.edgeClientHeaders = [
+            { key: 'ip',    value: $.t('ovs:generic.ip'),    width: 200       },
+            { key: 'port',  value: $.t('ovs:generic.port'),  width: undefined }
         ];
 
         // Observables
@@ -67,7 +72,7 @@ define([
                     .then(self.loadDomains)
                     .then(function() {
                         self.snapshotsInitialLoad(false);
-                        var vm, sr, pool, vdisk = self.vDisk(),
+                        var sr, pool, vdisk = self.vDisk(),
                             storageRouterGuid = vdisk.storageRouterGuid(),
                             vPoolGuid = vdisk.vpoolGuid();
                         if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {

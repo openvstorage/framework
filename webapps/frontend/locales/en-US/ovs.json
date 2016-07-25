@@ -119,7 +119,8 @@
             "in_use": "The object is still in use",
             "impossible_request": "The request is not possible",
             "unavailable_call": "The call is unavailable in the relay",
-            "relay_error": "Error while relaying the call"
+            "relay_error": "Error while relaying the call",
+            "unavailable": "The call is unavailable"
         },
         "about": "About",
         "accept": "Accept",
@@ -154,6 +155,7 @@
         "dtl_port": "DTL Port",
         "dtl_status": "DTL",
         "edge": "Edge",
+        "edgeclients": "Edge Clients",
         "elementsloading": "Items loading...",
         "error": "Error",
         "errorsfound": "Errors were found. Please check the contents of all fields.",
@@ -185,6 +187,7 @@
         "namespace": "Backend Location",
         "next": "Next &raquo;",
         "no": "No",
+        "noclients": "No Edge Clients connected",
         "noelements": "No items available",
         "noentries": "No entries available",
         "nothingselected": "Nothing selected",
@@ -250,6 +253,7 @@
         "write": "Write",
         "writespeed": "Write Speed",
         "xmlrpcport": "XML-RPC",
+        "xmore": "__amount__ more...",
         "yes": "Yes"
     },
     "storagerouters": {
@@ -419,6 +423,7 @@
         "detail": {
             "title": "vDisk",
             "snapshots": "Snapshots",
+            "edgeclients": "Edge Clients",
             "rollback": "Rollback",
             "configuration": "vDisk configuration",
             "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
@@ -456,6 +461,9 @@
             "done_msg": "vDisk __what__ deleted",
             "error_msg": "deleting __what__"
         }
+    },
+    "edgeclients": {
+        "title": "Edge Clients"
     },
     "vtemplates": {
         "vdisks": {

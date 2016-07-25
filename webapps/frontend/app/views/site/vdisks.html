@@ -32,6 +32,11 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
                        <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     </span>
+                    <span class="fa pointer" data-i18n="[html]ovs:icons.link" style="margin-top: 1px;"
+                          data-bind="tooltip: connectedECText(),
+                                     style: { color: edgeClients().length > 0 ? '#333' : 'lightgrey' }"></span>
+                </td>
+                <td>
                     <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
                                   attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) }"></a>
                 </td>

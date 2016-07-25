@@ -16,8 +16,8 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/generic', 'ovs/api', 'ovs/shared'
-], function($, ko, generic, api, shared) {
+    'ovs/generic', 'ovs/api', 'ovs/shared', '../containers/edgeclient'
+], function($, ko, generic, api, shared, EdgeClient) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -53,6 +53,7 @@ define([
         self.dtlMode               = ko.observable();
         self.dtlStatus             = ko.observable();
         self.dtlTarget             = ko.observableArray([]);
+        self.edgeClients           = ko.observableArray([]);
         self.guid                  = ko.observable(guid);
         self.iops                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.isVTemplate           = ko.observable();
@@ -72,6 +73,7 @@ define([
         self.storedData            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.templateChildrenGuids = ko.observableArray([]);
         self.totalCacheHits        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.volumeId              = ko.observable();
         self.vpoolGuid             = ko.observable();
         self.writeSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.writeBuffer           = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
@@ -166,15 +168,51 @@ define([
             }
             return changed;
         });
+        self.connectedECText = ko.computed(function() {
+            if (self.edgeClients().length === 0) {
+                return $.t('ovs:generic.noclients');
+            }
+            var clients = [];
+            $.each(self.edgeClients(), function(index, client) {
+                if (clients.length >= 5) {
+                    clients.push($.t('ovs:generic.xmore', { amount: self.edgeClients().length - 5 }));
+                    return false;
+                }
+                clients.push(client.ip() + ':' + client.port());
+            });
+            return clients.join(', ')
+        });
 
         // Functions
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');
+            generic.trySet(self.volumeId, data, 'volume_id');
             if (data.hasOwnProperty('devicename')) {
                 self.deviceName(data.devicename.replace(/^\//, ''));
             }
             generic.trySet(self.dtlManual, data, 'has_manual_dtl');
             generic.trySet(self.dtlStatus, data, 'dtl_status');
+            if (data.hasOwnProperty('edge_clients')) {
+                var keys = [], cdata = {};
+                $.each(data.edge_clients, function (index, item) {
+                    keys.push(item.key);
+                    cdata[item.key] = item;
+                });
+                generic.crossFiller(
+                    keys, self.edgeClients,
+                    function (key) {
+                        return new EdgeClient(key);
+                    }, 'key'
+                );
+                $.each(self.edgeClients(), function (index, client) {
+                    if (cdata.hasOwnProperty(client.key())) {
+                        client.fillData(cdata[client.key()]);
+                    }
+                });
+                self.edgeClients.sort(function (a, b) {
+                    return a.key() < b.key() ? -1 : (a.key() > b.key() ? 1 : 0);
+                });
+            }
             if (data.hasOwnProperty('snapshots')) {
                 var snapshots = [];
                 $.each(data.snapshots, function(index, snapshot) {

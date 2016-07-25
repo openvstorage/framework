@@ -32,6 +32,19 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
                        <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     </span>
+                    <div data-bind="status: {
+                                        colors: {
+                                            blue: status() === 'new',
+                                            green: status() === 'running',
+                                            orange: status() === 'installing',
+                                            red: status() === 'failure',
+                                            black: status() === 'stopped'
+                                        },
+                                        defaultColor: 'lightgrey'
+                                    }, tooltip: 'ovs:generic.states.backend.' + status()"
+                         style="width: 14px; height: 14px; margin-top: 1px;"></div>
+                </td>
+                <td>
                     <!-- ko if: backendType() !== undefined -->
                         <a data-bind="text: name,
                                       attr: { href: $root.shared.routing.loadHash('backend-' + backendType().code() + '-detail', { guid: guid }) }"></a>
@@ -48,19 +61,6 @@ but WITHOUT ANY WARRANTY of any kind.
                 </td>
                 <td data-bind="lazylist: { items: domains, loadedObservable: 'loaded' }">
                     <span data-part="entry" data-bind="text: name"></span>
-                </td>
-                <td>
-                    <div data-bind="status: {
-                                        colors: {
-                                            blue: status() === 'new',
-                                            green: status() === 'running',
-                                            orange: status() === 'installing',
-                                            red: status() === 'failure',
-                                            black: status() === 'stopped'
-                                        },
-                                        defaultColor: 'lightgrey'
-                                    }, tooltip: 'ovs:generic.states.backend.' + status()"
-                         style="width: 14px; height: 14px;"></div>
                 </td>
             </tr>
         </table>

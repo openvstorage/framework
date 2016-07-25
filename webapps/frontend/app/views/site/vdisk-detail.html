@@ -151,6 +151,9 @@ but WITHOUT ANY WARRANTY of any kind.
             <li class="active" data-bind="tooltip: 'ovs:generic.snapshots'">
                 <a href="#snapshots" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.snapshot"></a>
             </li>
+            <li data-bind="tooltip: 'ovs:generic.edgeclients'">
+                <a href="#edgeclients" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.link"></a>
+            </li>
             <li data-bind="tooltip: 'ovs:generic.management', visible: $root.shared.user.roles().contains('manage'), click: function() { loadConfiguration(true); }">
                 <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
             </li>
@@ -183,6 +186,22 @@ but WITHOUT ANY WARRANTY of any kind.
                 <div>
                     <span data-i18n="[html]ovs:icons.consistent" class="fa"></span> &nbsp;<span data-i18n="ovs:generic.consistentss"></span><br />
                     <span data-i18n="[html]ovs:icons.inconsistent" class="fa"></span> &nbsp;<span data-i18n="ovs:generic.inconsistentss"></span>
+                </div>
+            </div>
+            <div class="tab-pane" id="edgeclients" style="padding: 15px;">
+                <h4 data-i18n="ovs:vdisks.detail.edgeclients"></h4>
+                <div data-bind="pager: { items: edgeClients, headers: $parent.edgeClientHeaders, refreshInterval: 5000, controls: true }" style="clear: both;">
+                    <table data-dummy="dummy">
+                        <tr data-part="vitem">
+                            <td style="position: relative;">
+                                <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
+                                   <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                                </span>
+                                <span data-bind="text: ip"></span>
+                            </td>
+                            <td><span data-bind="text: port"></span></td>
+                        </tr>
+                    </table>
                 </div>
             </div>
             <div class="tab-pane" id="management" style="padding: 15px;" data-bind="visible: $root.shared.user.roles().contains('manage')">

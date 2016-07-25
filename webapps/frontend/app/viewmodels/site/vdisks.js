@@ -36,6 +36,7 @@ define([
             items: [['is_vtemplate', 'EQUALS', false]]
         };
         self.vDiskHeaders        = [
+            { key: 'edge-clients',  value: '',                               width: 30        },
             { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
             { key: 'vpool',         value: $.t('ovs:generic.vpool'),         width: 110       },
             { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 150       },

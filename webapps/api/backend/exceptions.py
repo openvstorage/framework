@@ -69,4 +69,3 @@ class HttpTooManyRequestsException(HttpException):
 class HttpInternalServerErrorException(HttpException):
     def __init__(self, error, error_description):
         super(HttpInternalServerErrorException, self).__init__(500, error, error_description)
-
