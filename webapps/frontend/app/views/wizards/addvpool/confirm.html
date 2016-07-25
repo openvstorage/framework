@@ -16,7 +16,7 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
-    <form class="form-horizontal">
+    <form id="add-vpool-confirm" class="form-horizontal">
         <p data-i18n="ovs:wizards.add_vpool.confirm.basic_info"></p>
         <ul>
             <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.name"></b> <span data-bind="text: data.name"></span></li>
@@ -50,7 +50,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     </li>
                 </ul>
             </li>
-            <li data-bind="visible: data.useAA()">
+            <li data-bind="visible: data.useAA() && data.backend() === 'alba'">
                 <b data-i18n="ovs:wizards.add_vpool.confirm.accelerated_backend"></b>
                 <span data-bind="text: data.albaAABackend() !== undefined ? data.albaAABackend().name : ''"></span>
                 <ul>
@@ -74,16 +74,18 @@ but WITHOUT ANY WARRANTY of any kind.
         </ul>
         <p data-i18n="ovs:wizards.add_vpool.confirm.storagerouter_info"></p>
         <ul>
-            <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.initial_storagerouter"></b> <span data-bind="text: data.storageRouter() !== undefined ? data.storageRouter().name() : ''"></span></li>
+            <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.initial_storagerouter"></b> <span data-bind="text: data.storageRouter() === undefined ? '-' : data.storageRouter().name()"></span></li>
+            <li><b data-i18n="ovs:wizards.add_vpool.gather_vpool.ip_address"></b> <span data-bind="text: data.storageIP"></span></li>
+            <li data-bind="visible: data.backend() === 'distributed'">
+                <b data-i18n="ovs:wizards.add_vpool.gather_vpool.mountpoint"></b> <span data-bind="text: data.distributedMtpt()"></span>
+            </li>
         </ul>
         <p data-i18n="ovs:wizards.add_vpool.confirm.cache_sizing"></p>
         <ul>
-            <li data-bind="visible: data.backend() === 'distributed'">
-                <b data-i18n="ovs:wizards.add_vpool.gather_cache_info.mountpoint"></b> <span data-bind="text: data.distributedMtpt()"></span>
+            <li data-bind="visible: data.cacheStrategy() !== 'none'">
+                <b data-i18n="ovs:wizards.add_vpool.gather_config.readcache_size"></b> <span data-bind="text: data.readCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span>
             </li>
-            <li><b data-i18n="ovs:wizards.add_vpool.gather_cache_info.readcache_size"></b> <span data-bind="text: data.readCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span></li>
-            <li><b data-i18n="ovs:wizards.add_vpool.gather_cache_info.writecache_size"></b> <span data-bind="text: data.writeCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span></li>
-            <li><b data-i18n="ovs:wizards.add_vpool.gather_cache_info.ip_address"></b> <span data-bind="text: data.storageIP"></span></li>
+            <li><b data-i18n="ovs:wizards.add_vpool.gather_config.write_buffer_size"></b> <span data-bind="text: data.writeCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span></li>
         </ul>
         <div>
             <p data-i18n="ovs:wizards.add_vpool.confirm.configuration"></p>

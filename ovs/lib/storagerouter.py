@@ -20,7 +20,6 @@ StorageRouter module
 import os
 import json
 import time
-import uuid
 import random
 from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
@@ -190,13 +189,16 @@ class StorageRouterController(object):
                 if service.storagerouter_guid == partition['storagerouter_guid']:
                     partition['in_use'] = True
 
+        voldrv_edition = 'dedup' if 'volumedriver-base' in PackageManager.get_versions(client) else 'no-dedup'
+
         return {'partitions': partitions,
                 'mountpoints': mountpoints,
                 'ipaddresses': ipaddresses,
                 'shared_size': shared_size,
                 'readcache_size': readcache_size,
                 'writecache_size': writecache_size,
-                'scrub_available': StorageRouterController._check_scrub_partition_present()}
+                'scrub_available': StorageRouterController._check_scrub_partition_present(),
+                'voldrv_edition': voldrv_edition}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.add_vpool')
@@ -219,8 +221,8 @@ class StorageRouterController(object):
                            'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
                            'storagerouter_ip': (str, Toolbox.regex_ip),
-                           'readcache_size': (int, {'min': 1, 'max': 10240}),
-                           'writecache_size': (int, {'min': 1, 'max': 10240})}
+                           'readcache_size': (int, {'min': 0, 'max': 10240}),
+                           'writecache_size': (int, {'min': 0, 'max': 10240})}
         required_params_new_distributed = {'config_params': sd_config_params}
         required_params_new_alba = {'config_params': sd_config_params,
                                     'fragment_cache_on_read': (bool, None),
@@ -284,6 +286,10 @@ class StorageRouterController(object):
             Toolbox.verify_required_params(extra_required_params, parameters)
         has_rdma = EtcdConfiguration.get('/ovs/framework/rdma')
         storage_ip = parameters['storage_ip']
+
+        # Verify READ caches
+        if sd_config_params['cache_strategy'] != StorageDriverClient.FRAMEWORK_NO_CACHE and parameters['readcache_size'] < 1:
+            raise RuntimeError('When a caching strategy is selected, there should be at least 1 GiB of readcache.')
 
         # Check storagerouter existence
         storagerouter = StorageRouterList.get_by_ip(client.ip)
@@ -696,21 +702,22 @@ class StorageRouterController(object):
         readcaches = list()
         files2create = list()
         readcache_size = 0
-        readcache_information = partition_info[DiskPartition.ROLES.READ]
-        total_available = sum([part['available'] for part in readcache_information])
-        for readcache_info in readcache_information:
-            available = readcache_info['available']
-            proportion = available * 100.0 / total_available
-            size_to_be_used = proportion * readcache_size_requested / 100
-            r_size = int(size_to_be_used * 0.98 / 1024 / 4096) * 4096  # KiB
-            readcache_size += r_size
+        if readcache_size_requested > 0:
+            readcache_information = partition_info[DiskPartition.ROLES.READ]
+            total_available = sum([part['available'] for part in readcache_information])
+            for readcache_info in readcache_information:
+                available = readcache_info['available']
+                proportion = available * 100.0 / total_available
+                size_to_be_used = proportion * readcache_size_requested / 100
+                r_size = int(size_to_be_used * 0.98 / 1024 / 4096) * 4096  # KiB
+                readcache_size += r_size
 
-            sdp_read = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
-                                                                                          'role': DiskPartition.ROLES.READ,
-                                                                                          'partition': DiskPartition(readcache_info['guid'])})
-            readcaches.append({'path': '{0}/read.dat'.format(sdp_read.path),
-                               'size': '{0}KiB'.format(r_size)})
-            files2create.append('{0}/read.dat'.format(sdp_read.path))
+                sdp_read = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
+                                                                                              'role': DiskPartition.ROLES.READ,
+                                                                                              'partition': DiskPartition(readcache_info['guid'])})
+                readcaches.append({'path': '{0}/read.dat'.format(sdp_read.path),
+                                   'size': '{0}KiB'.format(r_size)})
+                files2create.append('{0}/read.dat'.format(sdp_read.path))
 
         # 4. Assign DB
         db_info = partition_info[DiskPartition.ROLES.DB][0]
@@ -1356,7 +1363,7 @@ class StorageRouterController(object):
             if storage_drivers_left is True:
                 vpool.status = VPool.STATUSES.FAILURE
                 vpool.save()
-            raise RuntimeError('1 or more errors occurred while trying to remove the storage driver. Please check /var/log/ovs/lib.log for more information')
+            raise RuntimeError('1 or more errors occurred while trying to remove the storage driver. Please check the logs for more information')
         if storage_drivers_left is True:
             vpool.status = VPool.STATUSES.RUNNING
             vpool.save()
@@ -1372,8 +1379,9 @@ class StorageRouterController(object):
         :return: Version information
         :rtype: dict
         """
+        client = SSHClient(StorageRouter(storagerouter_guid))
         return {'storagerouter_guid': storagerouter_guid,
-                'versions': PackageManager.get_versions()}
+                'versions': PackageManager.get_versions(client)}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_support_info')

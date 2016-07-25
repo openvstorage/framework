@@ -28,6 +28,7 @@ from subprocess import check_output
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.packages.package import PackageManager
 from ovs.log.log_handler import LogHandler
 
@@ -69,7 +70,7 @@ class SupportAgent(object):
 
         try:
             # Versions
-            data['metadata']['versions'] = PackageManager.get_versions()
+            data['metadata']['versions'] = PackageManager.get_versions(None)  # Fallback to check_output
         except Exception, ex:
             data['errors'].append(str(ex))
         try:

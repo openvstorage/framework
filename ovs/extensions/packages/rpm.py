@@ -34,14 +34,17 @@ class RpmPackage(object):
                          'alba', 'arakoon']
 
     @staticmethod
-    def _get_version(package_name):
-        return check_output("yum info {0} | grep Version | cut -d ':' -f 2 || true".format(package_name), shell=True).strip()
+    def _get_version(package_name, client):
+        command = "yum info {0} | grep Version | cut -d ':' -f 2 || true".format(package_name)
+        if client is None:
+            return check_output(command, shell=True).strip()
+        return client.run(command).strip()
 
     @staticmethod
-    def get_versions():
+    def get_versions(client):
         versions = {}
         for package_name in RpmPackage.OVS_PACKAGE_NAMES:
-            version_info = RpmPackage._get_version(package_name)
+            version_info = RpmPackage._get_version(package_name, client)
             if version_info:
                 versions[package_name] = version_info
         return versions
