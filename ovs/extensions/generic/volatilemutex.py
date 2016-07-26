@@ -74,7 +74,7 @@ class volatile_mutex(object):
             passed = time.time() - self._start
             if wait is not None and passed > wait:
                 self._logger.error('Lock for {0} could not be acquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
-                raise NoLockAvailableException('Could not acquire lock %s' % self.key())
+                raise NoLockAvailableException('Could not acquire lock {0}'.format(self.key()))
         passed = time.time() - self._start
         if passed > 0.1:  # More than 100 ms is a long time to wait!
             self._logger.warning('Waited {0} sec for lock {1}'.format(passed, self.key()))

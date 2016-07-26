@@ -1077,11 +1077,23 @@ class Basic(unittest.TestCase):
         Validates whether concurrent save/loads won't result in outdated structures being cached
         """
         guid = None
+        preloaded_machine = None
 
         def _update():
             local_machine = TestMachine(guid)
             local_machine.name = 'updated'
             local_machine.save()
+
+        def _update2():
+            preloaded_machine.name = 'updated2'
+            with self.assertRaises(NoLockAvailableException):
+                preloaded_machine.save()
+            raw_data = preloaded_machine._persistent.get(preloaded_machine._key)
+            version = raw_data['_version']
+            self.assertEqual(version, 2, 'Version should be 2 instead of {0}'.format(version))
+            raw_data['_version'] = version + 1
+            raw_data['name'] = 'updated3'
+            preloaded_machine._persistent.set(preloaded_machine._key, raw_data)
 
         machine = TestMachine()
         self.assertIsNone(machine._metadata['cache'], "A new object shouldn't imply caching")
@@ -1089,14 +1101,16 @@ class Basic(unittest.TestCase):
         machine.save()
         guid = machine.guid
 
-        machine = TestMachine(machine.guid, _hook=_update)
-        self.assertEqual(machine.name, 'one', 'The machine\'s name should still be one')
-        self.assertFalse(machine._metadata['cache'], 'The machine should be loaded from persistent store')
-        machine = TestMachine(machine.guid)
+        preloaded_machine = TestMachine(machine.guid, _hook={'before_cache': _update})
+        self.assertEqual(preloaded_machine.name, 'one', 'The machine\'s name should still be one')
+        self.assertFalse(preloaded_machine._metadata['cache'], 'The machine should be loaded from persistent store')
+        machine = TestMachine(machine.guid, _hook={'during_cache': _update2})
         self.assertFalse(machine._metadata['cache'], 'Race condition should have prevented caching')
         self.assertEqual(machine.name, 'updated', 'The machine\'s name should be updated')
         machine = TestMachine(machine.guid)
-        self.assertTrue(machine._metadata['cache'], 'The machine should be loaded from cache')
+        self.assertFalse(machine._metadata['cache'], 'Version check should have prevented caching')
+        self.assertEqual(machine.name, 'updated3', 'The machine\'s name should be updated3')
+        self.assertEqual(machine._data['_version'], 3, 'The machine\'s version should be 3 instead of {0}'.format(machine._data['_version']))
 
     def test_delete_during_object_load(self):
         """
@@ -1114,7 +1128,7 @@ class Basic(unittest.TestCase):
         guid = machine.guid
 
         with self.assertRaises(ObjectNotFoundException):
-            _ = TestMachine(guid, _hook=_delete)
+            _ = TestMachine(guid, _hook={'before_cache': _delete})
 
     def test_object_save_reverseindex_build(self):
         """
