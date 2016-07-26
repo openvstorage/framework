@@ -132,14 +132,18 @@ define([
                             generic.crossFiller(
                                 guids, self.domains,
                                 function(guid) {
-                                    return new Domain(guid);
+                                    var domain = new Domain(guid);
+                                    self.domainCache[guid] = domain;
+                                    if (ddata.hasOwnProperty(guid)) {
+                                        domain.fillData(ddata[guid]);
+                                    }
+                                    return domain;
                                 }, 'guid'
                             );
                             $.each(self.domains(), function(index, domain) {
                                 if (ddata.hasOwnProperty(domain.guid())) {
                                     domain.fillData(ddata[domain.guid()]);
                                 }
-                                self.domainCache[domain.guid()] = domain;
                             });
                             self.domains.sort(function(dom1, dom2) {
                                 return dom1.name() < dom2.name() ? -1 : 1;
