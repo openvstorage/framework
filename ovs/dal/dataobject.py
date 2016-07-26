@@ -650,7 +650,6 @@ class DataObject(object):
                 time.sleep(randint(0, 25) / 100.0)
             finally:
                 self._mutex_version.release()
-                pass
 
         self.invalidate_dynamics()
         self._original = copy.deepcopy(self._data)
