@@ -262,8 +262,8 @@ class DataObject(object):
                                       'data': None}
                 self._add_list_property(key, info['list'])
 
-        if _hook is not None and hasattr(_hook, '__call__'):
-            _hook()
+        if _hook is not None and 'before_cache' in _hook:
+            _hook['before_cache']()
 
         if not self._new:
             # Re-cache the object, if required
@@ -272,6 +272,8 @@ class DataObject(object):
                 try:
                     self._mutex_version.acquire(30)
                     this_version = self._data['_version']
+                    if _hook is not None and 'during_cache' in _hook:
+                        _hook['during_cache']()
                     store_version = self._persistent.get(self._key)['_version']
                     if this_version == store_version:
                         self._volatile.set(self._key, self._data)
@@ -624,12 +626,13 @@ class DataObject(object):
                     for key in cache_keys[list_key][1]:
                         self._persistent.delete(key, must_exist=False, transaction=transaction)
 
-            if _hook is not None and hasattr(_hook, '__call__'):
+            if _hook is not None:
                 _hook()
 
             # Save the data
             self._data['_version'] += 1
             try:
+                self._mutex_version.acquire(30)
                 self._persistent.set(self._key, self._data, transaction=transaction)
                 self._persistent.apply_transaction(transaction)
                 self._volatile.delete(self._key)
@@ -643,7 +646,11 @@ class DataObject(object):
             except AssertException as ex:
                 last_assert = ex
                 optimistic = False
+                self._mutex_version.release()  # Make sure it's released before a sleep
                 time.sleep(randint(0, 25) / 100.0)
+            finally:
+                self._mutex_version.release()
+                pass
 
         self.invalidate_dynamics()
         self._original = copy.deepcopy(self._data)
@@ -733,7 +740,7 @@ class DataObject(object):
                     self._volatile.delete(list_key)
                 self._persistent.delete(key, must_exist=False, transaction=transaction)
 
-            if _hook is not None and hasattr(_hook, '__call__'):
+            if _hook is not None:
                 _hook()
 
             try:
