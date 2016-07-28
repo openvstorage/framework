@@ -208,6 +208,7 @@ class SSHClient(object):
         :param debug: Extended logging and stderr output returned
         """
         if self.is_local is True:
+            stderr = None
             try:
                 try:
                     if not hasattr(select, 'poll'):
@@ -215,8 +216,6 @@ class SSHClient(object):
                         subprocess._has_poll = False  # Damn 'monkey patching'
                     channel = Popen(command, stdout=PIPE, stderr=PIPE, shell=not isinstance(command, list))
                 except OSError as ose:
-                    if suppress_logging is False:
-                        SSHClient._logger.error('Command: "{0}" failed with output: "{1}"'.format(command, str(ose)))
                     raise CalledProcessError(1, command, str(ose))
                 stdout, stderr = channel.communicate()
                 stdout = stdout.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
@@ -232,7 +231,9 @@ class SSHClient(object):
                     return stdout.strip()
             except CalledProcessError as cpe:
                 if suppress_logging is False:
-                    SSHClient._logger.error('Command: "{0}" failed with output: "{1}"'.format(command, cpe.output))
+                    SSHClient._logger.error('Command "{0}" failed with output "{1}"{2}'.format(
+                        command, cpe.output, '' if stderr is None else ' and error "{0}"'.format(stderr)
+                    ))
                 raise cpe
         else:
             if isinstance(command, list):
@@ -243,7 +244,7 @@ class SSHClient(object):
                 stderr = ''.join(stderr.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 stdout = ''.join(stdout.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 if suppress_logging is False:
-                    SSHClient._logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
+                    SSHClient._logger.error('Command "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
                 raise CalledProcessError(exit_code, command, stdout)
             if debug:
                 return '\n'.join(line.rstrip() for line in stdout).strip(), stderr
