@@ -219,8 +219,9 @@ class EtcdInstaller(object):
             if client_port != EtcdInstaller.DEFAULT_CLIENT_PORT:
                 remove_command = 'etcdctl --peers={0}:{1} member remove {2}'.format(remaining_node_ip, client_port, node_id)
             current_client.run(remove_command)
+            EtcdInstaller.wait_for_cluster(cluster_name, current_client, client_port=client_port)
         if ip_to_remove not in offline_node_ips:
-            EtcdInstaller.deploy_to_slave(remaining_node_ip, ip_to_remove, cluster_name)
+            EtcdInstaller.deploy_to_slave(remaining_node_ip, ip_to_remove, cluster_name, client_port=client_port)
         EtcdInstaller.wait_for_cluster(cluster_name, current_client, client_port=client_port)
 
         EtcdInstaller._logger.debug('Shrinking cluster "{0}" from {1} completed'.format(cluster_name, ip_to_remove))
@@ -246,18 +247,17 @@ class EtcdInstaller(object):
             return False
 
     @staticmethod
-    def deploy_to_slave(master_ip, slave_ip, cluster_name):
+    def deploy_to_slave(master_ip, slave_ip, cluster_name, client_port=DEFAULT_CLIENT_PORT):
         """
         Deploys the configuration file to a slave
         :param master_ip: IP of the node to deploy from
         :type master_ip: str
-
         :param slave_ip: IP of the slave to deploy to
         :type slave_ip: str
-
         :param cluster_name: Name of the cluster of which to deploy the configuration file
         :type cluster_name: str
-
+        :param client_port: Port to be used by client
+        :type client_port: int
         :return: None
         """
         EtcdInstaller._logger.debug('  Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, master_ip, slave_ip))
@@ -265,7 +265,10 @@ class EtcdInstaller(object):
         slave_client = SSHClient(slave_ip, username='root')
 
         current_cluster = []
-        for item in master_client.run('etcdctl member list').splitlines():
+        list_command = 'etcdctl member list'
+        if client_port != EtcdInstaller.DEFAULT_CLIENT_PORT:
+            list_command = 'etcdctl --peers={0}:{1} member list'.format(master_ip, client_port)
+        for item in master_client.run(list_command).splitlines():
             info = re.search(EtcdInstaller.MEMBER_REGEX, item).groupdict()
             current_cluster.append('{0}={1}'.format(info['name'], info['peer']))
 
@@ -424,7 +427,7 @@ class EtcdInstaller(object):
             command = 'etcdctl cluster-health'
             if client_port != EtcdInstaller.DEFAULT_CLIENT_PORT:
                 command = 'etcdctl --peers={0}:{1} cluster-health'.format(client.ip, client_port)
-            output = client.run(command)
+            output = client.run(command, suppress_logging=True)
             if 'cluster is healthy' not in output:
                 EtcdInstaller._logger.debug('  Cluster "{0}" is not healthy: {1}'.format(cluster_name, ' - '.join(output.splitlines())))
                 return False
