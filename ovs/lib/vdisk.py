@@ -664,7 +664,10 @@ class VDiskController(object):
 
         Toolbox.verify_required_params(required_params, new_config_params)
 
-        if new_config_params['dtl_mode'] != 'no_sync' and new_config_params.get('dtl_target') in [None, []]:
+        all_domains = DomainList.get_domains()
+        if new_config_params['dtl_mode'] != 'no_sync' and new_config_params.get('dtl_target') in [None, []] and len(all_domains) > 0:
+            # If domains present, GUI does not allow to click 'Save' unless at least 1 domain is available
+            # If no domains present, the GUI does allow to click 'Save', which means all available StorageRouters are valid
             raise ValueError('If DTL mode is Asynchronous or Synchronous, a Domain guid should always be specified')
 
         errors = False
@@ -727,7 +730,7 @@ class VDiskController(object):
                     possible_storagerouters = list(StorageRouterList.get_storagerouters())
                 else:  # Find out which Storage Routers have a regular domain configured
                     possible_storagerouter_guids = set()
-                    for domain in DomainList.get_domains():
+                    for domain in all_domains:
                         if storagerouter.guid in domain.storage_router_layout['regular']:
                             if len(domain.storage_router_layout['regular']) > 1:
                                 possible_storagerouter_guids.update(domain.storage_router_layout['regular'])
@@ -1170,7 +1173,7 @@ class VDiskController(object):
         name = name.strip('/').replace(' ', '_').lower()
         while '//' in name:
             name = name.replace('//', '/')
-        name = re.compile('[^/\w\-\.]+').sub('', name)
+        name = re.compile('[^/\w\-.]+').sub('', name)
         if re.compile('\w\.[a-zA-Z]{3,4}$').search(name) is None:
             name = '{0}.raw'.format(name.rstrip('.'))
         return '/{0}'.format(name)
