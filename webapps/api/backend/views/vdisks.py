@@ -44,15 +44,20 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(VDisk)
     @load()
-    def list(self, vpoolguid=None, query=None):
+    def list(self, vpoolguid=None, storagerouterguid=None, query=None):
         """
         Overview of all vDisks
         :param vpoolguid: Guid of the vPool to retrieve its disks
+        :param storagerouterguid: Guid of the StorageRouter to retrieve its disks
         :param query: A query to be executed if required
         """
         if vpoolguid is not None:
             vpool = VPool(vpoolguid)
             return vpool.vdisks
+        if storagerouterguid is not None:
+            storagerouter = StorageRouter(storagerouterguid)
+            return DataList(VDisk, {'type': DataList.where_operator.AND,
+                                    'items': [('guid', DataList.operator.IN, storagerouter.vdisks_guids)]})
         if query is not None:
             return DataList(VDisk, query)
         return VDiskList.get_vdisks()

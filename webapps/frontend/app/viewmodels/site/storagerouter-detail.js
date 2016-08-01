@@ -17,9 +17,13 @@
 define([
     'jquery', 'durandal/app', 'knockout', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/storagerouter', '../containers/vpool', '../containers/storagedriver', '../containers/domain',
+    '../containers/storagerouter', '../containers/vpool', '../containers/storagedriver', '../containers/domain', '../containers/vdisk',
     '../wizards/configurepartition/index'
-], function($, app, ko, dialog, shared, generic, Refresher, api, StorageRouter, VPool, StorageDriver, Domain, ConfigurePartitionWizard) {
+], function(
+    $, app, ko, dialog, shared, generic, Refresher, api,
+    StorageRouter, VPool, StorageDriver, Domain, VDisk,
+    ConfigurePartitionWizard
+) {
     "use strict";
     return function() {
         var self = this;
@@ -33,6 +37,17 @@ define([
         self.loadVPoolsHandle         = undefined;
         self.loadStorageDriversHandle = {};
         self.loadDomainsHandle        = undefined;
+        self.vDiskCache               = {};
+        self.vDisksHandle             = {};
+        self.vDiskHeaders             = [
+            { key: 'name',       value: $.t('ovs:generic.name'),       width: undefined },
+            { key: 'size',       value: $.t('ovs:generic.size'),       width: 100       },
+            { key: 'storedData', value: $.t('ovs:generic.storeddata'), width: 110       },
+            { key: 'iops',       value: $.t('ovs:generic.iops'),       width: 90        },
+            { key: 'readSpeed',  value: $.t('ovs:generic.read'),       width: 125       },
+            { key: 'writeSpeed', value: $.t('ovs:generic.write'),      width: 125       },
+            { key: 'dtlStatus',  value: $.t('ovs:generic.dtl_status'), width: 50        }
+        ];
 
         // Observables
         self.checkedVPoolGuids = ko.observableArray([]);
@@ -181,6 +196,30 @@ define([
                     }
                 });
                 deferred.resolve();
+            }).promise();
+        };
+        self.loadVDisks = function(options) {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
+                    options.sort = 'devicename';
+                    options.contents = '_dynamics,_relations,-snapshots';
+                    options.storagerouterguid = self.storageRouter().guid();
+                    self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
+                        .done(function(data) {
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
+                                    if (!self.vDiskCache.hasOwnProperty(guid)) {
+                                        self.vDiskCache[guid] = new VDisk(guid);
+                                    }
+                                    return self.vDiskCache[guid];
+                                }
+                            });
+                        })
+                        .fail(function() { deferred.reject(); });
+                } else {
+                    deferred.resolve();
+                }
             }).promise();
         };
         self.isEmpty = generic.isEmpty;
