@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import time
 from subprocess import check_output, CalledProcessError
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -32,12 +33,20 @@ amqp = '{0}://{1}:{2}@{3}//'.format(Configuration.get('ovs.core.broker.protocol'
 
 celery_path = OSManager.get_path('celery')
 worker_states = check_output("{0} inspect ping -b {1} --timeout=5 2> /dev/null | grep OK | perl -pe 's/\x1b\[[0-9;]*m//g' || true".format(celery_path, amqp), shell=True)
+domain = check_output("hostname -d", shell=True).strip()
 routers = StorageRouterList.get_storagerouters()
 for node in routers:
     if node.heartbeats is None:
         node.heartbeats = {}
-    if 'celery@{0}: OK'.format(node.name) in worker_states:
-        node.heartbeats['celery'] = current_time
+    for worker_state in worker_states.splitlines():
+        if re.match("^-> celery@{0}:".format(node.name), worker_state):
+            if re.match("^-> celery@{0}: OK$".format(node.name), worker_state):
+                node.heartbeats['celery'] = current_time
+                break
+            break
+        elif domain != '' and re.match("^-> celery@{0}.{1}: OK$".format(node.name, domain), worker_state):
+            node.heartbeats['celery'] = current_time
+            break
     if node.machine_id == machine_id:
         node.heartbeats['process'] = current_time
     else:
