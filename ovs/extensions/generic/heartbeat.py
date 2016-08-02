@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import time
 from subprocess import check_output, CalledProcessError
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -36,7 +37,7 @@ routers = StorageRouterList.get_storagerouters()
 for node in routers:
     if node.heartbeats is None:
         node.heartbeats = {}
-    if 'celery@{0}: OK'.format(node.name) in worker_states:
+    if re.search(".*celery@{0}.*: OK.*".format(node.name), worker_states):
         node.heartbeats['celery'] = current_time
     if node.machine_id == machine_id:
         node.heartbeats['process'] = current_time
