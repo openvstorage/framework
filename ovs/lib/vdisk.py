@@ -611,11 +611,8 @@ class VDiskController(object):
         if dtl_config is None:
             dtl_mode = 'no_sync'
         else:
-            if dtl_config.host == 'null':
-                dtl_mode = 'no_sync'
-            else:
-                dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_config.mode]
-                dtl_target = [junction.domain_guid for junction in vdisk.domains_dtl]
+            dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_config.mode]
+            dtl_target = [junction.domain_guid for junction in vdisk.domains_dtl]
 
         if dedupe_mode is None:
             dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_LOCATION_BASED)
@@ -881,7 +878,7 @@ class VDiskController(object):
                 this_storage_router = StorageRouter(vdisk.storagerouter_guid)
                 if vdisk.has_manual_dtl is True:
                     VDiskController._logger.info('    VDisk {0} with guid {1} has a manual DTL configuration'.format(vdisk.name, vdisk.guid))
-                    if current_dtl_config is None or current_dtl_config.host == 'null':
+                    if current_dtl_config is None:
                         VDiskController._logger.info('    VDisk {0} with guid {1} has a manually disabled DTL'.format(vdisk.name, vdisk.guid))
                         vdisks.remove(vdisk)
                         continue
@@ -910,7 +907,7 @@ class VDiskController(object):
                         vdisk.save()
 
                 lock_key = 'dtl_checkup_{0}'.format(vdisk.guid)
-                if dtl_vpool_enabled is False and (current_dtl_config is None or current_dtl_config.host == 'null'):
+                if dtl_vpool_enabled is False and current_dtl_config is None:
                     VDiskController._logger.info('    DTL is globally disabled for vPool {0} with guid {1}'.format(vpool.name, vpool.guid))
                     try:
                         with volatile_mutex(lock_key, wait=time_to_wait_for_lock):
@@ -921,7 +918,7 @@ class VDiskController(object):
                         continue
                     vdisks.remove(vdisk)
                     continue
-                elif current_dtl_config_mode == DTLConfigMode.MANUAL and (current_dtl_config is None or current_dtl_config.host == 'null') and vdisk.has_manual_dtl is True:
+                elif current_dtl_config_mode == DTLConfigMode.MANUAL and current_dtl_config is None and vdisk.has_manual_dtl is True:
                     VDiskController._logger.info('    DTL is disabled for vDisk {0} with guid {1}'.format(vdisk.name, vdisk.guid))
                     vdisks.remove(vdisk)
                     continue
@@ -955,7 +952,7 @@ class VDiskController(object):
                 # Remove all storagerouters from secondary which are present in primary
                 current_sr = None
                 available_primary_srs = available_primary_srs.difference(available_secondary_srs)
-                if current_dtl_config is not None and current_dtl_config.host != 'null':
+                if current_dtl_config is not None:
                     current_sr = [sd for sd in vpool.storagedrivers if sd.storage_ip == current_dtl_config.host][0].storagerouter
 
                 for importance, possible_srs in {'secondary': possible_secondary_srs,
@@ -1004,7 +1001,7 @@ class VDiskController(object):
 
                 # Check whether reconfiguration is required
                 reconfigure_required = False
-                if current_dtl_config is None or current_dtl_config.host == 'null':
+                if current_dtl_config is None:
                     VDiskController._logger.info('        No DTL configuration found, but there are Storage Routers available')
                     reconfigure_required = True
                 elif current_dtl_config_mode == DTLConfigMode.AUTOMATIC:
