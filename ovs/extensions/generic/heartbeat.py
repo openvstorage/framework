@@ -33,25 +33,23 @@ amqp = '{0}://{1}:{2}@{3}//'.format(Configuration.get('ovs.core.broker.protocol'
 
 celery_path = OSManager.get_path('celery')
 worker_states = check_output("{0} inspect ping -b {1} --timeout=5 2> /dev/null | grep OK | perl -pe 's/\x1b\[[0-9;]*m//g' || true".format(celery_path, amqp), shell=True)
-domain = check_output(["hostname", "-d"]).splitlines()[0]
+domain = check_output("hostname -d", shell=True).strip()
 routers = StorageRouterList.get_storagerouters()
 for node in routers:
     if node.heartbeats is None:
         node.heartbeats = {}
-    for s in worker_states.splitlines():
-        found = False
-        if re.match("^-> celery@{0}:".format(node.name), s):
-            if re.match("^-> celery@{0}: OK$".format(node.name), s):
-                found = True
-        if found:
-            node.heartbeats['celery'] = current_time
-            continue
+    for worker_state in worker_states.splitlines():
+        if re.match("^-> celery@{0}:".format(node.name), worker_state):
+            if re.match("^-> celery@{0}: OK$".format(node.name), worker_state):
+                node.heartbeats['celery'] = current_time
+                break
+            break
         else:
             if len(domain) == 0:
                 continue
-
-            if re.match("^-> celery@{0}.{1}:".format(node.name, domain), s):
+            if re.match("^-> celery@{0}.{1}: OK$".format(node.name, domain), worker_state):
                 node.heartbeats['celery'] = current_time
+                break
 
     if node.machine_id == machine_id:
         node.heartbeats['process'] = current_time
