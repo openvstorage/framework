@@ -44,13 +44,9 @@ for node in routers:
                 node.heartbeats['celery'] = current_time
                 break
             break
-        else:
-            if len(domain) == 0:
-                continue
-            if re.match("^-> celery@{0}.{1}: OK$".format(node.name, domain), worker_state):
-                node.heartbeats['celery'] = current_time
-                break
-
+        elif domain != '' and re.match("^-> celery@{0}.{1}: OK$".format(node.name, domain), worker_state):
+            node.heartbeats['celery'] = current_time
+            break
     if node.machine_id == machine_id:
         node.heartbeats['process'] = current_time
     else:
