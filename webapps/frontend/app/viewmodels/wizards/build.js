@@ -142,8 +142,33 @@ define([
         };
         parent.finish = function() {
             parent.running(true);
-            var step = parent.steps()[parent.step()];
-            step.finish()
+            var step = parent.steps()[parent.step()],
+                chainDeferred = $.Deferred(), chainPromise = chainDeferred.promise();
+            $.Deferred(function(deferred) {
+                chainDeferred.resolve();
+                if (step.hasOwnProperty('preValidate') && step.preValidate && step.preValidate.call) {
+                    chainPromise = chainPromise.then(function() {
+                        return $.Deferred(function (prevalidateDeferred) {
+                            step.preValidate()
+                                .fail(function() {
+                                    prevalidateDeferred.reject({ abort: true, data: undefined });
+                                })
+                                .done(prevalidateDeferred.resolve);
+                        }).promise();
+                    });
+                }
+                chainPromise.then(function() {
+                        return $.Deferred(function (finishDeferred) {
+                            step.finish()
+                                .fail(function(data) {
+                                    finishDeferred.reject({ abort: false, data: data });
+                                })
+                                .done(finishDeferred.resolve);
+                        }).promise();
+                    })
+                    .done(deferred.resolve)
+                    .fail(deferred.reject);
+            }).promise()
                 .done(function(data) {
                     dialog.close(parent, {
                         success: true,
@@ -152,11 +177,13 @@ define([
                     parent.finishing.resolve(true);
                 })
                 .fail(function(data) {
-                    dialog.close(parent, {
-                        success: false,
-                        data: data
-                    });
-                    parent.finishing.resolve(false);
+                    if (data.abort === false) {
+                        dialog.close(parent, {
+                            success: false,
+                            data: data.data
+                        });
+                        parent.finishing.resolve(false);
+                    }
                 })
                 .always(function() {
                     window.setTimeout(function() { parent.running(false); }, 500);

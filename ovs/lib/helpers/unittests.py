@@ -93,7 +93,7 @@ class UnitTest(object):
 
                 if root.endswith('tests'):
                     for filename in files:
-                        if not filename.endswith('.py'):
+                        if not filename.endswith('.py') or filename == '__init__.py':
                             continue
                         name = filename.replace('.py', '')
                         filepath = os.path.join(root, filename)
@@ -173,20 +173,41 @@ class UnitTest(object):
         :return: None
         """
         if tests is None:  # Put all test files and their classes in custom dict
-            tests = UnitTest.list_tests()
+            tests_to_execute = UnitTest.list_tests()
         else:  # Validate the specified tests
             UnitTest._gather_test_info()
             errors = []
             if isinstance(tests, str):
-                tests = [tests]
+                tests = tests.split(',')
             if not isinstance(tests, list):
                 raise ValueError('Tests should be a list')
 
+            sorted_tests = sorted(UnitTest._test_info.keys())
+            tests_to_execute = []
             for test in tests:
-                if test not in UnitTest._test_info:
+                found_tests = False
+                if test in sorted_tests:
+                    found_tests = True
+                    tests_to_execute.append(test)
+                else:
+                    for sorted_test in sorted_tests:
+                        if '.' in sorted_test:
+                            continue
+                        if sorted_test.startswith(test) and os.path.isdir(test):
+                            found_tests = True
+                            tests_to_execute.append(sorted_test)
+                if found_tests is False:
                     errors.append('Test {0} is not a valid test file, class or case'.format(test))
             if len(errors) > 0:
                 raise ValueError('Following errors found:\n - {0}'.format('\n - '.join(errors)))
+
+        # Removing tests which might be a subset of another 'test_to_execute'
+        tests_to_execute = sorted(list(set(tests_to_execute)))
+        for test in list(tests_to_execute):
+            if '.' in test and test.split('.')[0] in tests_to_execute:
+                tests_to_execute.remove(test)
+            if ':' in test and test.split(':')[0] in tests_to_execute:
+                tests_to_execute.remove(test)
 
         # Execute the tests
         test_results = ['############', '# OVERVIEW #', '############', '']
@@ -195,14 +216,15 @@ class UnitTest(object):
         total_error = 0
         total_success = 0
         total_failure = 0
-        for test in tests:
+        for test in tests_to_execute:
             start_test = time.time()
             text_string = '# Processing {0} {1} #'.format(UnitTest._test_info[test]['use_case'], test)
             print '\n\n\n{0}\n{1}\n{0}\n'.format(len(text_string) * '#', text_string, len(text_string) * '#')
             tests_to_run = UnitTest._test_info[test]['tests']
             test_amount = tests_to_run.countTestCases()
             result = unittest.TextTestRunner(verbosity=2).run(tests_to_run)
-            test_results.append('  - Module: {0}  ({1} test{2})'.format(test.split('.')[0], test_amount, '' if test_amount == 1 else 's'))
+            specification = 'TestCase' if ':' in test else 'TestClass' if '.' in test else 'TestModule'
+            test_results.append('  - {0}: {1}  ({2} test{3})'.format(specification, test, test_amount, '' if test_amount == 1 else 's'))
             test_results.append('    - DURATION: {0}'.format(UnitTest._sec_to_readable(time.time() - start_test)))
             test_results.append('    - {0}: {1}'.format(UnitTest._SUCCESS, test_amount - len(result.errors) - len(result.failures)))
 
@@ -219,15 +241,21 @@ class UnitTest(object):
                 for error in result.errors:
                     test_results.append('      - Class: {0}, Test: {1}, Message: {2}'.format(error[0].id().split('.')[-2], error[0].id().split('.')[-1], error[1].splitlines()[-1]))
             test_results.append('')
-        if len(tests) > 1:
-            test_results.insert(4, '')
-            if total_error > 0:
-                test_results.insert(4, '    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._ERROR, total_error, int(total_tests), total_error / total_tests * 100))
+
+        if len(tests_to_execute) > 1:
+            test_results.append('')
+            test_results.append('###########')
+            test_results.append('# SUMMARY #')
+            test_results.append('###########')
+            test_results.append('')
+            test_results.append('  - Total amount of tests: {0}'.format(int(total_tests)))
+            test_results.append('  - Total duration: {0}'.format(UnitTest._sec_to_readable(time.time() - start_all)))
+            test_results.append('    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._SUCCESS, total_success, int(total_tests), total_success / total_tests * 100))
             if total_failure > 0:
-                test_results.insert(4, '    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._FAILURE, total_failure, int(total_tests), total_failure / total_tests * 100))
-            test_results.insert(4, '    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._SUCCESS, total_success, int(total_tests), total_success / total_tests * 100))
-            test_results.insert(4, '  - Total amount of tests: {0}'.format(int(total_tests)))
-            test_results.insert(4, '  - Total duration: {0}'.format(UnitTest._sec_to_readable(time.time() - start_all)))
+                test_results.append('    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._FAILURE, total_failure, int(total_tests), total_failure / total_tests * 100))
+            if total_error > 0:
+                test_results.append('    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._ERROR, total_error, int(total_tests), total_error / total_tests * 100))
+            test_results.append('')
         print '\n\n\n{0}'.format('\n'.join(test_results))
         os.environ['RUNNING_UNITTESTS'] = 'False'
         sys.exit(0 if total_tests == total_success else 1)

@@ -17,9 +17,9 @@
 define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter',
+    '../containers/vdisk', '../containers/vpool', '../containers/storagerouter',
     '../wizards/addvdisk/index'
-], function($, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, AddVDiskWizard) {
+], function($, dialog, ko, shared, generic, Refresher, api, VDisk, VPool, StorageRouter, AddVDiskWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -29,31 +29,31 @@ define([
         self.guard               = { authenticated: true };
         self.refresher           = new Refresher();
         self.widgets             = [];
-        self.vMachineCache       = {};
         self.storageRouterCache  = {};
         self.vPoolCache          = {};
+        self.query               = {
+            type: 'AND',
+            items: [['is_vtemplate', 'EQUALS', false]]
+        };
         self.vDiskHeaders        = [
+            { key: 'edge-clients',  value: '',                               width: 30        },
             { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
-            { key: 'vmachine',      value: $.t('ovs:generic.vmachine'),      width: 110       },
             { key: 'vpool',         value: $.t('ovs:generic.vpool'),         width: 110       },
             { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 150       },
             { key: 'size',          value: $.t('ovs:generic.size'),          width: 100       },
-            { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 110       },
-            { key: 'cacheRatio',    value: $.t('ovs:generic.cache'),         width: 100       },
-            { key: 'iops',          value: $.t('ovs:generic.iops'),          width: 55        },
-            { key: 'readSpeed',     value: $.t('ovs:generic.read'),          width: 100       },
-            { key: 'writeSpeed',    value: $.t('ovs:generic.write'),         width: 100       },
+            { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 135       },
+            { key: 'iops',          value: $.t('ovs:generic.iops'),          width: 90        },
+            { key: 'readSpeed',     value: $.t('ovs:generic.read'),          width: 125       },
+            { key: 'writeSpeed',    value: $.t('ovs:generic.write'),         width: 125       },
             { key: 'dtlStatus',     value: $.t('ovs:generic.dtl_status'),    width: 50        }
         ];
 
         // Handles
-        self.storageRouterHandle = undefined;
-        self.vDisksHandle        = {};
-        self.vPoolsHandle        = undefined;
+        self.vDisksHandle = {};
+        self.vPoolsHandle = undefined;
 
         // Observables
-        self.vPools             = ko.observableArray([]);
-        self.storageRouterGuids = ko.observableArray([]);
+        self.vPools = ko.observableArray([]);
 
         // Functions
         self.addVDisk = function() {
@@ -67,6 +67,7 @@ define([
                 if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
                     options.sort = 'devicename';
                     options.contents = '_dynamics,_relations,-snapshots';
+                    options.query = JSON.stringify(self.query);
                     self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
@@ -77,7 +78,6 @@ define([
                                 dependencyLoader: function(item) {
                                     var vm, sr, pool,
                                         storageRouterGuid = item.storageRouterGuid(),
-                                        vMachineGuid = item.vMachineGuid(),
                                         vPoolGuid = item.vpoolGuid();
                                     if (storageRouterGuid && (item.storageRouter() === undefined || item.storageRouter().guid() !== storageRouterGuid)) {
                                         if (!self.storageRouterCache.hasOwnProperty(storageRouterGuid)) {
@@ -86,14 +86,6 @@ define([
                                             self.storageRouterCache[storageRouterGuid] = sr;
                                         }
                                         item.storageRouter(self.storageRouterCache[storageRouterGuid]);
-                                    }
-                                    if (vMachineGuid && (item.vMachine() === undefined || item.vMachine().guid() !== vMachineGuid)) {
-                                        if (!self.vMachineCache.hasOwnProperty(vMachineGuid)) {
-                                            vm = new VMachine(vMachineGuid);
-                                            vm.load('');
-                                            self.vMachineCache[vMachineGuid] = vm;
-                                        }
-                                        item.vMachine(self.vMachineCache[vMachineGuid]);
                                     }
                                     if (vPoolGuid && (item.vpool() === undefined || item.vpool().guid() !== vPoolGuid)) {
                                         if (!self.vPoolCache.hasOwnProperty(vPoolGuid)) {
@@ -139,26 +131,16 @@ define([
                                 }
                             });
                         });
-                    self.storageRouterHandle = api.get('storagerouters', {queryparams: {contents: ''}})
-                        .done(function(data) {
-                            var guids = [];
-                            $.each(data.data, function(index, item) {
-                                guids.push(item.guid);
-                            });
-                            self.storageRouterGuids(guids);
-                        });
                 }
             }, 60000);
             self.refresher.start();
             self.refresher.run();
-            self.shared.footerData(self.vPools);
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {
                 item.deactivate();
             });
             self.refresher.stop();
-            self.shared.footerData(ko.observable());
         };
     };
 });

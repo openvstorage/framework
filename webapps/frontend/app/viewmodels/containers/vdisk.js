@@ -16,8 +16,8 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/generic', 'ovs/api', 'ovs/shared'
-], function($, ko, generic, api, shared) {
+    'ovs/generic', 'ovs/api', 'ovs/shared', '../containers/edgeclient'
+], function($, ko, generic, api, shared, EdgeClient) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -28,7 +28,6 @@ define([
         // Handles
         self.loadHandle              = undefined;
         self.loadConfig              = undefined;
-        self.loadParentConfig        = undefined;
         self.loadStorageRouterHandle = undefined;
 
         // External dependencies
@@ -36,59 +35,50 @@ define([
         self.dtlTargets         = ko.observableArray([]);
         self.storageRouter      = ko.observable();
         self.storageRouterGuids = ko.observableArray([]);
-        self.vMachine           = ko.observable();
         self.vpool              = ko.observable();
 
         // Observables
-        self.backendRead         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.backendWritten      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.bandwidthSaved      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.cacheHits           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheMisses         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheStrategies     = ko.observableArray(['on_read', 'on_write', 'none']);
-        self.cacheStrategy       = ko.observable('on_read');
-        self.dedupeMode          = ko.observable();
-        self.dedupeModes         = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
-        self.dtlEnabled          = ko.observable(true);
-        self.dtlManual           = ko.observable();
-        self.dtlMode             = ko.observable();
-        self.dtlStatus           = ko.observable();
-        self.dtlTarget           = ko.observableArray([]);
-        self.guid                = ko.observable(guid);
-        self.iops                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.loaded              = ko.observable(false);
-        self.loading             = ko.observable(false);
-        self.loadingConfig       = ko.observable(false);
-        self.name                = ko.observable();
-        self.namespace           = ko.observable();
-        self.oldConfiguration    = ko.observable();
-        self.order               = ko.observable(0);
-        self.parentConfiguration = ko.observable();
-        self.readCacheLimit      = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});
-        self.readSpeed           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.scoSize             = ko.observable(4);
-        self.scoSizes            = ko.observableArray([4, 8, 16, 32, 64, 128]);
-        self.size                = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.snapshots           = ko.observableArray([]);
-        self.storageRouterGuid   = ko.observable();
-        self.storedData          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.totalCacheHits      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.vMachineGuid        = ko.observable();
-        self.vpoolGuid           = ko.observable();
-        self.writeSpeed          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.writeBuffer         = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
+        self.backendRead           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendWritten        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.cacheHits             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheMisses           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheStrategies       = ko.observableArray(['on_read', 'on_write', 'none']);
+        self.cacheStrategy         = ko.observable('on_read');
+        self.deviceName            = ko.observable();
+        self.dedupeMode            = ko.observable();
+        self.dedupeModes           = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
+        self.dtlEnabled            = ko.observable(true);
+        self.dtlManual             = ko.observable();
+        self.dtlMode               = ko.observable();
+        self.dtlStatus             = ko.observable();
+        self.dtlTarget             = ko.observableArray([]);
+        self.edgeClients           = ko.observableArray([]);
+        self.guid                  = ko.observable(guid);
+        self.iops                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.isVTemplate           = ko.observable();
+        self.loaded                = ko.observable(false);
+        self.loading               = ko.observable(false);
+        self.loadingConfig         = ko.observable(false);
+        self.name                  = ko.observable();
+        self.namespace             = ko.observable();
+        self.oldConfiguration      = ko.observable();
+        self.readCacheLimit        = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});
+        self.readSpeed             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.scoSize               = ko.observable(4);
+        self.scoSizes              = ko.observableArray([4, 8, 16, 32, 64, 128]);
+        self.size                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.snapshots             = ko.observableArray([]);
+        self.storageRouterGuid     = ko.observable();
+        self.storedData            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.templateChildrenGuids = ko.observableArray([]);
+        self.totalCacheHits        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.volumeId              = ko.observable();
+        self.vpoolGuid             = ko.observable();
+        self.writeSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.writeBuffer           = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
 
         // Computed
-        self.cacheRatio = ko.computed(function() {
-            if (self.cacheHits() === undefined || self.cacheMisses() === undefined) {
-                return undefined;
-            }
-            var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
-            if (total === 0) {
-                total = 1;
-            }
-            return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
-        });
         self.dtlModes = ko.computed(function() {
             return [
                 {name: 'no_sync', disabled: false},
@@ -178,12 +168,51 @@ define([
             }
             return changed;
         });
+        self.connectedECText = ko.computed(function() {
+            if (self.edgeClients().length === 0) {
+                return $.t('ovs:generic.noclients');
+            }
+            var clients = [];
+            $.each(self.edgeClients(), function(index, client) {
+                if (clients.length >= 5) {
+                    clients.push($.t('ovs:generic.xmore', { amount: self.edgeClients().length - 5 }));
+                    return false;
+                }
+                clients.push(client.ip() + ':' + client.port());
+            });
+            return clients.join(', ')
+        });
 
         // Functions
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');
-            generic.trySet(self.order, data, 'order');
+            generic.trySet(self.volumeId, data, 'volume_id');
+            if (data.hasOwnProperty('devicename')) {
+                self.deviceName(data.devicename.replace(/^\//, ''));
+            }
             generic.trySet(self.dtlManual, data, 'has_manual_dtl');
+            generic.trySet(self.dtlStatus, data, 'dtl_status');
+            if (data.hasOwnProperty('edge_clients')) {
+                var keys = [], cdata = {};
+                $.each(data.edge_clients, function (index, item) {
+                    keys.push(item.key);
+                    cdata[item.key] = item;
+                });
+                generic.crossFiller(
+                    keys, self.edgeClients,
+                    function (key) {
+                        return new EdgeClient(key);
+                    }, 'key'
+                );
+                $.each(self.edgeClients(), function (index, client) {
+                    if (cdata.hasOwnProperty(client.key())) {
+                        client.fillData(cdata[client.key()]);
+                    }
+                });
+                self.edgeClients.sort(function (a, b) {
+                    return a.key() < b.key() ? -1 : (a.key() > b.key() ? 1 : 0);
+                });
+            }
             if (data.hasOwnProperty('snapshots')) {
                 var snapshots = [];
                 $.each(data.snapshots, function(index, snapshot) {
@@ -193,13 +222,12 @@ define([
                 });
                 self.snapshots(snapshots);
             }
+            generic.trySet(self.isVTemplate, data, 'is_vtemplate');
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.vpoolGuid, data, 'vpool_guid');
-            generic.trySet(self.vMachineGuid, data, 'vmachine_guid');
             generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);
-                self.dtlStatus(data.info.failover_mode.toLowerCase() || 'unknown');
                 self.namespace(data.info.namespace);
             }
             if (data.hasOwnProperty('statistics')) {
@@ -223,6 +251,20 @@ define([
             self.loaded(true);
             self.loading(false);
         };
+        self.fetchTemplateChildrenGuids = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadChildrenGuid)) {
+                    self.loadChildrenGuid = api.get('vdisks/' + self.guid() + '/get_children')
+                        .done(function(data) {
+                            self.templateChildrenGuids(data.data);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
         self.load = function() {
             return $.Deferred(function(deferred) {
                 self.loading(true);
@@ -241,33 +283,10 @@ define([
                 }
             }).promise();
         };
-        self.loadAllConfigurations = function() {
-            self.loadingConfig(true);
-            return $.Deferred(function (deferred) {
-                self.loadParentConfiguration()
-                    .then(function() {
-                        return self.loadConfiguration(false);
-                    })
-                    .always(function() {
-                        self.loadingConfig(false);
-                        deferred.resolve();
-                    });
-            }).promise();
-        };
-        self.loadParentConfiguration = function() {
-            return $.Deferred(function(deferred) {
-                self.loadParentConfig = api.get('vpools/' + self.vpoolGuid() + '/get_configuration')
-                    .then(self.shared.tasks.wait)
-                    .done(function(data) {
-                        if (self.parentConfiguration() === undefined) {
-                            self.parentConfiguration(data);
-                        }
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject);
-            }).promise();
-        };
         self.loadConfiguration = function(reload) {
+            if (reload === true) {
+                self.loadingConfig(true);
+            }
             return $.Deferred(function(deferred) {
                 self.loadConfig = api.get('vdisks/' + self.guid() + '/get_config_params')
                     .then(self.shared.tasks.wait)
@@ -286,7 +305,7 @@ define([
                         }
                         self.configuration(data);
                         data = self.configuration(); // Pass through the getter/setter for possible cleanups
-                        if (self.oldConfiguration() === undefined || reload === true) {
+                        if (self.oldConfiguration() === undefined) {
                             self.oldConfiguration($.extend({}, data)); // Used to make comparison to check for changes
                             $.each(self.oldConfiguration(), function (key, _) {
                                 if (key === 'write_buffer') {
@@ -298,7 +317,10 @@ define([
                         }
                         deferred.resolve();
                     })
-                    .fail(deferred.reject);
+                    .fail(deferred.reject)
+                    .always(function() {
+                        self.loadingConfig(false);
+                    })
             }).promise();
         };
     };

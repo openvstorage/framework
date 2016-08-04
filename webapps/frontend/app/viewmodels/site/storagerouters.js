@@ -30,7 +30,7 @@ define([
         self.refresher             = new Refresher();
         self.widgets               = [];
         self.storageRoutersHeaders = [
-            { key: 'status',         value: $.t('ovs:generic.status'),           width: 60        },
+            { key: 'status',         value: '',                                  width: 30        },
             { key: 'name',           value: $.t('ovs:generic.name'),             width: 125       },
             { key: 'ip',             value: $.t('ovs:generic.ip'),               width: 125       },
             { key: 'vdisks',         value: $.t('ovs:generic.vdisks'),           width: 60        },
@@ -42,9 +42,6 @@ define([
             { key: 'recoveryDomain', value: $.t('ovs:generic.recovery_domains'), width: undefined }
         ];
 
-        // Observables
-        self.vPools = ko.observableArray([]);
-
         // Handles
         self.domainsHandle        = undefined;
         self.storageRoutersHandle = {};
@@ -54,7 +51,7 @@ define([
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.storageRoutersHandle[options.page])) {
                     options.sort = 'name';
-                    options.contents = '_relations,statistics,stored_data,vdisks_guids,status,partition_config,regular_domains,recovery_domains';
+                    options.contents = '_relations,statistics,vdisks_guids,status,partition_config,regular_domains,recovery_domains';
                     self.storageRoutersHandle[options.page] = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
@@ -125,14 +122,12 @@ define([
             self.refresher.init(self.loadDomains, 5000);
             self.refresher.start();
             self.refresher.run();
-            self.shared.footerData(self.vPools);
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {
                 item.deactivate();
             });
             self.refresher.stop();
-            self.shared.footerData(ko.observable());
         };
     };
 });

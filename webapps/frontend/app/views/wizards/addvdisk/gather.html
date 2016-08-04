@@ -18,27 +18,25 @@ but WITHOUT ANY WARRANTY of any kind.
 <div>
     <form class="form-horizontal">
         <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
-            <label class="col-lg-3 control-label" for="addVdisk" data-i18n="ovs:wizards.add_vdisk.gather.name"></label>
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.add_vdisk.gather.name"></label>
             <div class="col-lg-7">
                 <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
+                <p class="help-block" data-bind="visible: data.name() !== ''">
+                    <span data-i18n="ovs:wizards.add_vdisk.gather.cleaned_name"></span>
+                    <span data-bind="text: cleanedName()"></span>
+                </p>
             </div>
         </div>
-        <div class="form-group">
-            <label class="col-lg-3 control-label" for="addVdisk" data-i18n="ovs:wizards.add_vdisk.gather.size"></label>
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('size') }">
+            <label class="col-lg-3 control-label" for="size-entry" data-i18n="ovs:wizards.add_vdisk.gather.size"></label>
             <div class="col-lg-2">
-                <input type="text" id="size_entry" class="autofocus form-control" data-bind="value: data.size_entry, valueUpdate: 'afterkeydown'" style="text-align:right;">
+                <input type="text" id="size-entry" class="autofocus form-control" data-bind="value: data.sizeEntry, valueUpdate: 'afterkeydown'" style="text-align:right;">
             </div>
-            <div class="col-lg-2">
-                <span data-bind="dropdown: {
-                         items: data.size_units, target: data.size_unit,
-                         text: function(item) {
-                             return $.t('ovs:generic.units.' + item);
-                         }
-                     }">
-                </span>
+            <div class="col-lg-2" style="padding-top: 8px; padding-left: 0;">
+                <span data-i18n='ovs:generic.units.gib' style=""></span>
             </div>
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('vpool') }">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.vpool"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: {
@@ -55,8 +53,8 @@ but WITHOUT ANY WARRANTY of any kind.
                 </span>
             </div>
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.initial_storagerouter"></label>
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('storageouter') }">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.storagerouter"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: {
                                     key: 'guid',

@@ -30,7 +30,6 @@ from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vdisklist import VDiskList
-from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonAdmin, ArakoonClientConfig
@@ -43,12 +42,9 @@ from ovs.lib.helpers.celery_toolbox import CeleryToolbox
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
-from ovs.lib.vmachine import VMachineController
 from ovs.log.log_handler import LogHandler
 from StringIO import StringIO
 from time import mktime
-
-SCRUBBER_LOGFILE_LOCATION = '/var/log/upstart/ovs-scrubber.log'
 
 
 class ScheduledTaskController(object):
@@ -59,27 +55,29 @@ class ScheduledTaskController(object):
     _logger = LogHandler.get('lib', name='scheduled tasks')
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.snapshot_all_vms', schedule=crontab(minute='0', hour='2-22'))
-    @ensure_single(task_name='ovs.scheduled.snapshot_all_vms', extra_task_names=['ovs.scheduled.delete_snapshots'])
-    def snapshot_all_vms():
+    @celery.task(name='ovs.scheduled.snapshot_all_vdisks', schedule=crontab(minute='0', hour='2-22'))
+    @ensure_single(task_name='ovs.scheduled.snapshot_all_vdisks', extra_task_names=['ovs.scheduled.delete_snapshots'])
+    def snapshot_all_vdisks():
         """
-        Snapshots all VMachines
+        Snapshots all vDisks
         """
         ScheduledTaskController._logger.info('[SSA] started')
         success = []
         fail = []
-        machines = VMachineList.get_customer_vmachines()
-        for machine in machines:
+        for vdisk in VDiskList.get_vdisks():
             try:
-                VMachineController.snapshot(machineguid=machine.guid,
-                                            label='',
-                                            is_consistent=False,
-                                            is_automatic=True,
-                                            is_sticky=False)
-                success.append(machine.guid)
-            except:
-                fail.append(machine.guid)
-        ScheduledTaskController._logger.info('[SSA] Snapshot has been taken for {0} vMachines, {1} failed.'.format(len(success), len(fail)))
+                metadata = {'label': '',
+                            'is_consistent': False,
+                            'timestamp': str(int(time.time())),
+                            'is_automatic': True,
+                            'is_sticky': False}
+                VDiskController.create_snapshot(vdisk_guid=vdisk.guid,
+                                                metadata=metadata)
+                success.append(vdisk.guid)
+            except Exception:
+                ScheduledTaskController._logger.exception('Error snapshotting vDisk {0}'.format(vdisk.guid))
+                fail.append(vdisk.guid)
+        ScheduledTaskController._logger.info('[SSA] Snapshot has been taken for {0} vDisks, {1} failed.'.format(len(success), len(fail)))
 
     @staticmethod
     @celery.task(name='ovs.scheduled.delete_snapshots', schedule=crontab(minute='1', hour='2'))
@@ -134,36 +132,26 @@ class ScheduledTaskController(object):
                         'type': 'rest',
                         'snapshots': []})
 
+        # Get a list of all snapshots that are used as parents for clones
+        parent_snapshots = set([vd.parentsnapshot for vd in VDiskList.get_with_parent_snaphots()])
+
         # Place all snapshots in bucket_chains
         bucket_chains = []
-        for vmachine in VMachineList.get_customer_vmachines():
-            if any(vd.info['object_type'] in ['BASE'] for vd in vmachine.vdisks):
-                bucket_chain = copy.deepcopy(buckets)
-                for snapshot in vmachine.snapshots:
-                    if snapshot.get('is_sticky') is True:
-                        continue
-                    timestamp = int(snapshot['timestamp'])
-                    for bucket in bucket_chain:
-                        if bucket['start'] >= timestamp > bucket['end']:
-                            for diskguid, snapshotguid in snapshot['snapshots'].iteritems():
-                                bucket['snapshots'].append({'timestamp': timestamp,
-                                                            'snapshotid': snapshotguid,
-                                                            'diskguid': diskguid,
-                                                            'is_consistent': snapshot['is_consistent']})
-                bucket_chains.append(bucket_chain)
-
-        for vdisk in VDiskList.get_without_vmachine():
+        for vdisk in VDiskList.get_vdisks():
             if vdisk.info['object_type'] in ['BASE']:
                 bucket_chain = copy.deepcopy(buckets)
                 for snapshot in vdisk.snapshots:
                     if snapshot.get('is_sticky') is True:
                         continue
+                    if snapshot['guid'] in parent_snapshots:
+                        ScheduledTaskController._logger.info('Not deleting snapshot {0} because it has clones'.format(snapshot['guid']))
+                        continue
                     timestamp = int(snapshot['timestamp'])
                     for bucket in bucket_chain:
                         if bucket['start'] >= timestamp > bucket['end']:
                             bucket['snapshots'].append({'timestamp': timestamp,
-                                                        'snapshotid': snapshot['guid'],
-                                                        'diskguid': vdisk.guid,
+                                                        'snapshot_id': snapshot['guid'],
+                                                        'vdisk_guid': vdisk.guid,
                                                         'is_consistent': snapshot['is_consistent']})
                 bucket_chains.append(bucket_chain)
 
@@ -202,8 +190,8 @@ class ScheduledTaskController(object):
         for bucket_chain in bucket_chains:
             for bucket in bucket_chain:
                 for snapshot in bucket['snapshots']:
-                    VDiskController.delete_snapshot(diskguid=snapshot['diskguid'],
-                                                    snapshotid=snapshot['snapshotid'])
+                    VDiskController.delete_snapshot(vdisk_guid=snapshot['vdisk_guid'],
+                                                    snapshot_id=snapshot['snapshot_id'])
         ScheduledTaskController._logger.info('Delete snapshots finished')
 
     @staticmethod
@@ -236,11 +224,7 @@ class ScheduledTaskController(object):
             raise RuntimeError('No scrub locations found')
 
         vdisk_guids = set()
-        for vmachine in VMachineList.get_customer_vmachines():
-            for vdisk in vmachine.vdisks:
-                if vdisk.info['object_type'] == 'BASE':
-                    vdisk_guids.add(vdisk.guid)
-        for vdisk in VDiskList.get_without_vmachine():
+        for vdisk in VDiskList.get_vdisks():
             if vdisk.info['object_type'] == 'BASE':
                 vdisk_guids.add(vdisk.guid)
 
@@ -350,6 +334,7 @@ class ScheduledTaskController(object):
         skipped = 0
         storagedrivers = {}
         failures = []
+        sink = LogHandler.get_sink_path('scrubber', allow_override=True)
         for vdisk_guid in vdisk_guids:
             vdisk = VDisk(vdisk_guid)
             try:
@@ -376,7 +361,7 @@ class ScheduledTaskController(object):
                     ScheduledTaskController._logger.info('Execute Scrub - Virtual disk {0} - {1} - Retrieve and apply scrub work'.format(vdisk.guid, vdisk.name))
                     work_units = locked_client.get_scrubbing_workunits()
                     for work_unit in work_units:
-                        scrubbing_result = locked_client.scrub(work_unit, scrub_location, log_sinks=[SCRUBBER_LOGFILE_LOCATION])
+                        scrubbing_result = locked_client.scrub(work_unit, scrub_location, log_sinks=[sink])
                         locked_client.apply_scrubbing_result(scrubbing_result)
                     if work_units:
                         ScheduledTaskController._logger.info('Execute Scrub - Virtual disk {0} - {1} - Scrub successfully applied'.format(vdisk.guid, vdisk.name))

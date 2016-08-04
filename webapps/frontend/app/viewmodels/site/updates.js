@@ -17,8 +17,8 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/pmachine', '../containers/storagerouter'
-], function($, app, dialog, ko, shared, generic, Refresher, api, PMachine, StorageRouter) {
+    '../containers/storagerouter'
+], function($, app, dialog, ko, shared, generic, Refresher, api, StorageRouter) {
     "use strict";
     return function() {
         var self = this;
@@ -188,6 +188,7 @@ define([
                                     deferred.resolve();
                                 })
                                 .fail(function(error) {
+                                    error = generic.extractErrorMessage(error);
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
                                         $.t('ovs:updates.failed', { why: error })
@@ -252,6 +253,7 @@ define([
                                     deferred.resolve();
                                 })
                                 .fail(function(error) {
+                                    error = generic.extractErrorMessage(error);
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
                                         $.t('ovs:updates.failed', { why: error })

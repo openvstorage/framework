@@ -17,8 +17,8 @@
 define([
     'jquery', 'knockout', 'ovs/shared',
     'ovs/generic', 'ovs/api',
-    'viewmodels/containers/backendtype', 'viewmodels/containers/vdisk', 'viewmodels/containers/vmachine'
-], function($, ko, shared, generic, api, BackendType, VDisk, VMachine) {
+    'viewmodels/containers/backendtype', 'viewmodels/containers/vdisk'
+], function($, ko, shared, generic, api, BackendType, VDisk) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -29,8 +29,6 @@ define([
         // Handles
         self.loadHandle          = undefined;
         self.diskHandle          = undefined;
-        self.loadConfig          = undefined;
-        self.machineHandle       = undefined;
         self.storageRouterHandle = undefined;
 
         // Observables
@@ -62,20 +60,9 @@ define([
         self.storedData         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.totalCacheHits     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.vDisks             = ko.observableArray([]);
-        self.vMachines          = ko.observableArray([]);
         self.writeSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
 
         // Computed
-        self.cacheRatio = ko.computed(function() {
-            if (self.cacheHits() === undefined || self.cacheMisses() === undefined) {
-                return undefined;
-            }
-            var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
-            if (total === 0) {
-                total = 1;
-            }
-            return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
-        });
         self.bandwidth = ko.computed(function() {
             if (self.readSpeed() === undefined || self.writeSpeed() === undefined) {
                 return undefined;
@@ -89,17 +76,19 @@ define([
             options = options || {};
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.status, data, 'status');
-            generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.metadata, data, 'metadata');
             generic.trySet(self.backendConnection, data, 'connection');
+            generic.trySet(self.backendLogin, data, 'login');
+            generic.trySet(self.rdmaEnabled, data, 'rdma_enabled');
 
+            if (data.hasOwnProperty('configuration')) {
+                self.configuration(data.configuration);
+            }
             if (self.metadata.hasOwnProperty('backend') && self.metadata.backend.hasOwnProperty('preset')) {
                 self.backendPreset(self.metadata.backend.preset);
             }
 
-            generic.trySet(self.backendLogin, data, 'login');
-            generic.trySet(self.rdmaEnabled, data, 'rdma_enabled');
             if (data.hasOwnProperty('backend_type_guid')) {
                 self.backendTypeGuid(data.backend_type_guid);
             } else {
@@ -118,6 +107,7 @@ define([
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;
+                self.storedData(stats.stored);
                 self.iops(stats['4k_operations_ps']);
                 self.cacheHits(stats.cache_hits_ps);
                 self.cacheMisses(stats.cache_misses_ps);
@@ -138,75 +128,24 @@ define([
             options = options || {};
             self.loading(true);
             return $.Deferred(function(deferred) {
-                var calls = [
-                    $.Deferred(function(mainDeferred) {
-                        if (generic.xhrCompleted(self.loadHandle)) {
-                            var listOptions = {};
-                            if (contents !== undefined) {
-                                listOptions.contents = contents;
-                            }
-                            self.loadHandle = api.get('vpools/' + self.guid(), { queryparams: listOptions })
-                                .done(function(data) {
-                                    self.fillData(data, options);
-                                    mainDeferred.resolve();
-                                })
-                                .fail(mainDeferred.reject);
-                        } else {
-                            mainDeferred.resolve();
-                        }
-                    }).promise(),
-                    $.Deferred(function(machineDeferred) {
-                        if (generic.xhrCompleted(self.machineHandle)) {
-                            var options = {
-                                sort: 'name',
-                                vpoolguid: self.guid(),
-                                contents: ''
-                            };
-                            self.machineHandle = api.get('vmachines', { queryparams: options })
-                                .done(function(data) {
-                                    var guids = [], vmdata = {};
-                                    $.each(data.data, function(index, item) {
-                                        guids.push(item.guid);
-                                        vmdata[item.guid] = item;
-                                    });
-                                    generic.crossFiller(
-                                        guids, self.vMachines,
-                                        function(guid) {
-                                            var vmachine = new VMachine(guid);
-                                            if ($.inArray(guid, guids) !== -1) {
-                                                vmachine.fillData(vmdata[guid]);
-                                            }
-                                            vmachine.loading(true);
-                                            return vmachine;
-                                        }, 'guid'
-                                    );
-                                    machineDeferred.resolve();
-                                })
-                                .fail(machineDeferred.reject);
-                        } else {
-                            machineDeferred.resolve();
-                        }
-                    }).promise()];
-                $.when.apply($, calls)
-                    .done(function() {
-                        self.loaded(true);
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject)
-                    .always(function() {
-                        self.loading(false);
-                    });
-            }).promise();
-        };
-        self.loadConfiguration = function() {
-            return $.Deferred(function(deferred) {
-                self.loadConfig = api.get('vpools/' + self.guid() + '/get_configuration')
-                    .then(self.shared.tasks.wait)
-                    .done(function(data) {
-                        self.configuration(data);
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject);
+                if (generic.xhrCompleted(self.loadHandle)) {
+                    var listOptions = {};
+                    if (contents !== undefined) {
+                        listOptions.contents = contents;
+                    }
+                    self.loadHandle = api.get('vpools/' + self.guid(), {queryparams: listOptions})
+                        .done(function (data) {
+                            self.fillData(data, options);
+                            self.loaded(true);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject)
+                        .always(function () {
+                            self.loading(false);
+                        });
+                } else {
+                    deferred.resolve();
+                }
             }).promise();
         };
         self.loadStorageRouters = function() {

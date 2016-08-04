@@ -46,8 +46,8 @@ class StorageDriver(DataObject):
     __relations = [Relation('vpool', VPool, 'storagedrivers'),
                    Relation('storagerouter', StorageRouter, 'storagedrivers')]
     __dynamics = [Dynamic('status', str, 30),
-                  Dynamic('statistics', dict, 0),
-                  Dynamic('stored_data', int, 60)]
+                  Dynamic('statistics', dict, 4),
+                  Dynamic('edge_clients', list, 30)]
 
     def _status(self):
         """
@@ -71,11 +71,21 @@ class StorageDriver(DataObject):
         VDisk.calculate_delta(self._key, dynamic, statistics)
         return statistics
 
-    def _stored_data(self):
+    def _edge_clients(self):
         """
-        Aggregates the Stored Data in Bytes of the vDisks connected to the Storage Driver.
+        Retrieves all edge clients
         """
-        return self.statistics['stored']
+        clients = []
+        try:
+            for item in self.vpool.storagedriver_client.list_client_connections(str(self.storagedriver_id)):
+                clients.append({'key': '{0}:{1}'.format(item.ip, item.port),
+                                'object_id': item.object_id,
+                                'ip': item.ip,
+                                'port': item.port})
+        except Exception as ex:
+                StorageDriver._logger.error('Error loading edge clients from {0}: {1}'.format(self.storagedriver_id, ex))
+        clients.sort(key=lambda e: (e['ip'], e['port']))
+        return clients
 
     def fetch_statistics(self):
         """

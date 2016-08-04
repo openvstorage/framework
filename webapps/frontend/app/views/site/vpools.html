@@ -33,10 +33,22 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
                        <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     </span>
+                    <div data-bind="tooltip: 'ovs:generic.states.vpool.' + status(),
+                                    status: {
+                                        colors: {
+                                            green: status() === 'RUNNING',
+                                            blue: status() === 'INSTALLING' || status() === 'EXTENDING' || status() === 'SHRINKING' || status() === 'DELETING',
+                                            red: status() === 'FAILURE'
+                                        },
+                                        defaultColor: 'lightgrey'
+                                    }"
+                         style="width: 14px; height: 14px; margin-top: 1px;">
+                    </div>
+                </td>
+                <td>
                     <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid }) }"></a>
                 </td>
                 <td><span data-bind="text: storedData"></span></td>
-                <td><span data-bind="text: cacheRatio"></span></td>
                 <td><span data-bind="text: iops"></span></td>
                 <td>
                     <span data-bind="lazyloader: { item: backendType, loadedObservable: 'loaded', undefinedLoading: false }">
@@ -50,19 +62,6 @@ but WITHOUT ANY WARRANTY of any kind.
                     </span>
                 </td>
                 <td><span data-bind="shortText: backendLogin() !== undefined ? backendLogin() : '', maxLength: 25"></span></td>
-                <td>
-                    <div data-bind="tooltip: 'ovs:generic.states.vpool.' + status(),
-                                    status: {
-                                        colors: {
-                                            green: status() === 'RUNNING',
-                                            blue: status() === 'INSTALLING' || status() === 'EXTENDING' || status() === 'SHRINKING' || status() === 'DELETING',
-                                            red: status() === 'FAILURE'
-                                        },
-                                        defaultColor: 'lightgrey'
-                                    }"
-                         style="width: 14px; height: 14px;">
-                    </div>
-                </td>
             </tr>
         </table>
     </div>

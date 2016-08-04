@@ -72,37 +72,6 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td style="width: 30%;"><span data-bind="text: vPools().length"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.host"></td>
-                            <td>
-                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="text: item().name()"></span>
-                                </span>
-                            </td>
-                            <td data-i18n="ovs:generic.nrofvmachines"></td>
-                            <td><span data-bind="text: vMachines().length"></span></td>
-                        </tr>
-                        <tr>
-                            <td data-i18n="ovs:storagerouters.detail.hostip"></td>
-                            <td>
-                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="text: item().ipAddress()"></span>
-                                </span>
-                            </td>
-                            <td data-i18n="ovs:generic.nrofvdisks"></td>
-                            <td><span data-bind="text: vDisks().length"></span></td>
-                        </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.type"></td>
-                            <td>
-                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" class="pointer"
-                                          data-bind="text: $.t('ovs:generic.hypervisors.' + item().hvtype())"></span>
-                                </span>
-                            </td>
-                            <td data-i18n="ovs:generic.storeddata"></td>
-                            <td><span data-bind="text: storedData"></span></td>
-                        </tr>
-                        <tr>
                             <td data-i18n="ovs:storagerouters.detail.rdma_capable"></td>
                             <td>
                                 <!-- ko if: rdmaCapable() === false -->
@@ -112,8 +81,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                     <span class="fa" data-i18n="[html]ovs:icons.check_circle" style="color: green;"></span>
                                 <!-- /ko -->
                             </td>
-                            <td data-i18n="ovs:generic.cache"></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
+                            <td data-i18n="ovs:generic.nrofvdisks"></td>
+                            <td><span data-bind="text: vDisks().length"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:storagerouters.detail.scrub_capable"></td>
@@ -125,8 +94,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                     <span class="fa" data-i18n="[html]ovs:icons.check_circle" style="color: green;"></span>
                                 <!-- /ko -->
                             </td>
-                            <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
+                            <td data-i18n="ovs:generic.storeddata"></td>
+                            <td><span data-bind="text: storedData"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.domains"></td>
@@ -138,8 +107,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                                      }, enabled: edit, small: true, emptyisloading: false
                                                  }"></span>
                             </td>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: iops"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.recovery_domains"></td>
@@ -151,6 +120,11 @@ but WITHOUT ANY WARRANTY of any kind.
                                                      }, enabled: edit, small: true, emptyisloading: false
                                                  }"></span>
                             </td>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2"></td>
                             <td data-i18n="ovs:generic.writespeed"></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
                         </tr>
@@ -166,6 +140,9 @@ but WITHOUT ANY WARRANTY of any kind.
             </li>
             <li data-bind="tooltip: 'ovs:generic.disks', visible: $root.shared.user.roles().contains('manage')">
                 <a href="#disks" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.disks"></a>
+            </li>
+            <li data-bind="tooltip: 'ovs:generic.vdisks'">
+                <a href="#vdisks" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.vdisks"></a>
             </li>
         </ul>
         <div class="tab-content">
@@ -218,7 +195,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                         <!-- /ko -->
                                         <!-- ko if: $root.vPools().length === 0 -->
                                             <tr>
-                                                <td colspan="6">
+                                                <td colspan="7">
                                                     <i data-i18n="ovs:generic.noentries"></i>
                                                 </td>
                                             </tr>
@@ -315,6 +292,38 @@ but WITHOUT ANY WARRANTY of any kind.
                         <!-- /ko -->
                     </tbody>
                 </table>
+            </div>
+            <div class="tab-pane" id="vdisks" style="padding: 15px;">
+                <h4 data-i18n="ovs:vdisks.title"></h4>
+                <div data-bind="pager: { loadData: $parent.loadVDisks, headers: $parent.vDiskHeaders, refreshInterval: 5000, controls: true }">
+                    <table data-dummy="dummy">
+                        <tr data-part="vitem" data-bind="attr: { id: 'vdisk_' + guid() }">
+                            <td style="position: relative;">
+                                <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
+                                   <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                                </span>
+                                <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
+                                              attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) }"></a>
+                            </td>
+                            <td><span data-bind="text: size"></span></td>
+                            <td><span data-bind="text: storedData"></span></td>
+                            <td><span data-bind="text: iops"></span></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td>
+                                <div data-bind="status: {
+                                                    colors: {
+                                                        green: ['ok_standalone', 'ok_sync'].contains(dtlStatus()),
+                                                        orange: ['catch_up', 'checkup_required'].contains(dtlStatus()),
+                                                        red: dtlStatus() === 'degraded'
+                                                    },
+                                                    defaultColor: 'lightgrey'
+                                                }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
+                                     style="width: 14px; height: 14px;"></div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

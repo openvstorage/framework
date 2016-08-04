@@ -36,8 +36,10 @@ define([
 
         // Cleaning data
         data.name('');
-        data.size_entry(1);
-        data.size_unit('gib');
+        data.sizeEntry(1);
+        data.storageRouter(undefined);
         data.storageRouters([]);
+        data.vPool(undefined);
+        data.vPools([]);
     };
 });

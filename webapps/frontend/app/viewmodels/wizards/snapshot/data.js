@@ -18,9 +18,9 @@ define(['knockout'], function(ko){
     "use strict";
     var singleton = function() {
         return {
-            name:         ko.observable(),
-            machineGuid:  ko.observable(),
-            vm:           ko.observable(),
+            name:         ko.observable(''),
+            guid:         ko.observable(),
+            vObject:      ko.observable(),
             isConsistent: ko.observable(false),
             isSticky:     ko.observable(false)
         };

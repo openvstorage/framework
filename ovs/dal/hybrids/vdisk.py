@@ -19,11 +19,12 @@ VDisk module
 """
 import time
 import pickle
-from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Property, Relation, Dynamic
+from datetime import datetime
 from ovs.dal.datalist import DataList
-from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
@@ -32,7 +33,6 @@ from ovs.log.log_handler import LogHandler
 class VDisk(DataObject):
     """
     The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage.
-    vDisks can be part of a vMachine or stand-alone.
     """
     _logger = LogHandler.get('dal', name='hybrid')
 
@@ -40,21 +40,21 @@ class VDisk(DataObject):
                     Property('description', str, mandatory=False, doc='Description of the vDisk.'),
                     Property('size', int, doc='Size of the vDisk in Bytes.'),
                     Property('devicename', str, doc='The name of the container file (e.g. the VMDK-file) describing the vDisk.'),
-                    Property('order', int, mandatory=False, doc='Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
                     Property('volume_id', str, mandatory=False, doc='ID of the vDisk in the Open vStorage Volume Driver.'),
                     Property('parentsnapshot', str, mandatory=False, doc='Points to a parent storage driver parent ID. None if there is no parent Snapshot'),
                     Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder'),
                     Property('has_manual_dtl', bool, default=False, doc='Indicates whether the default DTL location has been overruled by customer'),
                     Property('metadata', dict, default=dict(), doc='Contains fixed metadata about the volume (e.g. lba_size, ...)')]
-    __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
-                   Relation('vpool', VPool, 'vdisks'),
+    __relations = [Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
-    __dynamics = [Dynamic('snapshots', list, 60),
+    __dynamics = [Dynamic('dtl_status', str, 60),
+                  Dynamic('snapshots', list, 30),
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4),
                   Dynamic('storagedriver_id', str, 60),
                   Dynamic('storagerouter_guid', str, 15),
-                  Dynamic('is_vtemplate', bool, 60)]
+                  Dynamic('is_vtemplate', bool, 60),
+                  Dynamic('edge_clients', list, 30)]
     _fixed_properties = ['storagedriver_client']
 
     def __init__(self, *args, **kwargs):
@@ -76,6 +76,38 @@ class VDisk(DataObject):
             self.reload_client()
         return self._storagedriver_client
 
+    def _dtl_status(self):
+        """
+        Retrieve the DTL status for a vDisk
+        """
+        sd_status = self.info.get('failover_mode', 'UNKNOWN').lower()
+        if sd_status == '':
+            sd_status = 'unknown'
+        if sd_status != 'ok_standalone':
+            return sd_status
+
+        # Verify whether 'ok_standalone' is the correct status for this vDisk
+        vpool_dtl = self.vpool.configuration['dtl_enabled']
+        if self.has_manual_dtl is True or vpool_dtl is False:
+            return sd_status
+
+        domains = []
+        possible_dtl_targets = set()
+        for sr in StorageRouterList.get_storagerouters():
+            if sr.guid == self.storagerouter_guid:
+                domains = [junction.domain for junction in sr.domains]
+            elif len(sr.storagedrivers) > 0:
+                possible_dtl_targets.add(sr)
+
+        if len(domains) > 0:
+            possible_dtl_targets = set()
+            for domain in domains:
+                possible_dtl_targets.update(StorageRouterList.get_primary_storagerouters_for_domain(domain))
+
+        if len(possible_dtl_targets) == 0:
+            return sd_status
+        return 'checkup_required'
+
     def _snapshots(self):
         """
         Fetches a list of Snapshots for the vDisk
@@ -87,13 +119,12 @@ class VDisk(DataObject):
                 voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id)
             except:
                 voldrv_snapshots = []
-            for guid in voldrv_snapshots:
-                snapshot = self.storagedriver_client.info_snapshot(volume_id, guid)
-                # @todo: to be investigated how to handle during set as template
+            for id in voldrv_snapshots:
+                snapshot = self.storagedriver_client.info_snapshot(volume_id, id)
                 if snapshot.metadata:
                     metadata = pickle.loads(snapshot.metadata)
                     if isinstance(metadata, dict):
-                        snapshots.append({'guid': guid,
+                        snapshots.append({'guid': id,
                                           'timestamp': metadata['timestamp'],
                                           'label': metadata['label'],
                                           'is_consistent': metadata['is_consistent'],
@@ -101,6 +132,15 @@ class VDisk(DataObject):
                                           'is_sticky': metadata.get('is_sticky', False),
                                           'in_backend': snapshot.in_backend,
                                           'stored': int(snapshot.stored)})
+                else:
+                    snapshots.append({'guid': id,
+                                      'timestamp': time.mktime(datetime.strptime(snapshot.timestamp.strip(), '%c').timetuple()),
+                                      'label': id,
+                                      'is_consistent': False,
+                                      'is_automatic': False,
+                                      'is_sticky': False,
+                                      'in_backend': snapshot.in_backend,
+                                      'stored': int(snapshot.stored)})
         return snapshots
 
     def _info(self):
@@ -170,6 +210,17 @@ class VDisk(DataObject):
         Returns whether the vdisk is a template
         """
         return self.info.get('object_type') == 'TEMPLATE'
+
+    def _edge_clients(self):
+        """
+        Retrieves all edge clients
+        """
+        clients = {}
+        for storagedriver in self.vpool.storagedrivers:
+            for client in storagedriver.edge_clients:
+                if client['object_id'] == self.volume_id:
+                    clients[client['key']] = client
+        return clients.values()
 
     def reload_client(self):
         """

@@ -16,18 +16,20 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/api', 'ovs/generic',
+    'ovs/api', 'ovs/generic', 'ovs/shared',
     './data'
-], function($, ko, api, generic, data) {
+], function($, ko, api, generic, shared, data) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.data = data;
+        self.data   = data;
+        self.shared = shared;
 
         // Handles
         self.fetchAlbaVPoolHandle = undefined;
+        self.loadSRMetadataHandle = undefined;
 
         // Observables
         self.albaBackendLoading    = ko.observable(false);
@@ -38,12 +40,12 @@ define([
         // Computed
         self.localBackendsAvailable = ko.computed(function() {
             if (self.data.localHost() && self.data.albaBackends().length < 2) {
-                if (self.data.editBackend()) {
+                if (self.data.vPoolAdd()) {
                     self.data.aaLocalHost(false);
                 }
                 return false;
             }
-            if (self.data.editBackend()) {
+            if (self.data.vPoolAdd()) {
                 self.data.aaLocalHost(true);
             }
             return true;
@@ -65,30 +67,23 @@ define([
             return temp;
         });
         self.canContinue = ko.computed(function() {
-            var valid = true, showErrors = false, reasons = [], fields = [];
-            if (!self.data.useAA()) {
-                return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
-            }
-            if (self.data.backend() === 'alba') {
+            var showErrors = false, reasons = [], fields = [];
+            if (self.data.backend() === 'alba' && self.data.useAA()) {
                 if (self.data.albaAABackend() === undefined) {
-                    valid = false;
                     reasons.push($.t('ovs:wizards.add_vpool.gather_backend.choose_backend'));
                     fields.push('backend');
                 }
                 if (!self.data.aaLocalHost()) {
                     if (!self.data.aaHost.valid()) {
-                        valid = false;
                         fields.push('host');
                         reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_host'));
                     }
                     if (self.data.aaAccesskey() === '' || self.data.aaSecretkey() === '') {
-                        valid = false;
                         fields.push('clientid');
                         fields.push('clientsecret');
                         reasons.push($.t('ovs:wizards.add_vpool.gather_backend.no_credentials'));
                     }
                     if (self.invalidAlbaInfo()) {
-                        valid = false;
                         reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_alba_info'));
                         fields.push('clientid');
                         fields.push('clientsecret');
@@ -96,7 +91,7 @@ define([
                     }
                 }
             }
-            return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
+            return { value: reasons.length === 0, showErrors: showErrors, reasons: reasons, fields: fields };
         });
         self.fragmentCacheSetting = ko.computed({
             read: function() {
@@ -112,14 +107,17 @@ define([
                 self.data.fragmentCacheOnRead(['rw', 'read'].contains(cache));
                 self.data.fragmentCacheOnWrite(['rw', 'write'].contains(cache));
                 if (cache === 'none') {
+                    self.data.cacheStrategy('on_read');
                     self.data.useAA(false);
+                } else {
+                    self.data.cacheStrategy('none');
                 }
             }
         });
 
         self.shouldSkip = function() {
             return $.Deferred(function(deferred) {
-                if (!self.data.fragmentCacheOnRead() && !self.data.fragmentCacheOnWrite()) {
+                if (self.data.backend() !== 'alba' || (!self.data.vPoolAdd() && !self.data.fragmentCacheOnRead() && !self.data.fragmentCacheOnWrite())) {
                     deferred.resolve(true);
                 } else {
                     deferred.resolve(false);
@@ -133,8 +131,7 @@ define([
                 generic.xhrAbort(self.fetchAlbaVPoolHandle);
                 var relay = '', remoteInfo = {},
                     getData = {
-                        backend_type: 'alba',
-                        contents: '_dynamics'
+                        contents: 'available'
                     };
                 if (!self.data.aaLocalHost()) {
                     relay = 'relay/';
@@ -146,20 +143,26 @@ define([
                 $.extend(getData, remoteInfo);
                 self.albaBackendLoading(true);
                 self.invalidAlbaInfo(false);
-                self.fetchAlbaVPoolHandle = api.get(relay + 'backends', { queryparams: getData })
+                self.fetchAlbaVPoolHandle = api.get(relay + 'alba/backends', { queryparams: getData })
                     .done(function(data) {
                         var available_backends = [], calls = [];
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
+                                getData.contents = 'metadata_information,name,ns_statistics,presets';
+                                if (item.scaling === 'LOCAL') {
+                                    getData.contents += ',asd_statistics';
+                                }
                                 calls.push(
-                                    api.get(relay + 'alba/backends/' + item.linked_guid + '/', { queryparams: getData })
+                                    api.get(relay + 'alba/backends/' + item.guid + '/', { queryparams: getData })
                                         .then(function(data) {
-                                            if (data.available === true && data.guid !== self.data.albaBackend().guid) {
+                                            if (data.guid !== self.data.albaBackend().guid) {
                                                 var asdsFound = false;
-                                                $.each(data.asd_statistics, function(key, value) {  // As soon as we enter loop, we know at least 1 ASD is linked to this backend
-                                                    asdsFound = true;
-                                                    return false;
-                                                });
+                                                if (data.scaling === 'LOCAL') {
+                                                    $.each(data.asd_statistics, function(key, value) {  // As soon as we enter loop, we know at least 1 ASD is linked to this backend
+                                                        asdsFound = true;
+                                                        return false;
+                                                    });
+                                                }
                                                 if (asdsFound === true || data.scaling === 'GLOBAL') {
                                                     available_backends.push(data);
                                                     self.albaPresetMap()[data.guid] = {};
@@ -180,7 +183,7 @@ define([
                                     });
                                     self.data.albaAABackends(available_backends);
                                     self.data.albaAABackend(available_backends[0]);
-                                    self.data.albaAAPreset(available_backends[0].presets[0]);
+                                    self.data.albaAAPreset(self.data.enhancedAAPresets()[0]);
                                 } else {
                                     self.data.albaAABackends([]);
                                     self.data.albaAABackend(undefined);
@@ -223,7 +226,7 @@ define([
                     self.data.albaAAPreset(undefined);
                 } else {
                     self.data.albaAABackend(self.data.albaAABackends()[0]);
-                    self.data.albaAAPreset(self.data.enhancedAAPresets()[0].presets === undefined ? undefined : self.data.enhancedAAPresets()[0].presets[0]);
+                    self.data.albaAAPreset(self.data.enhancedAAPresets()[0]);
                 }
             }
         };

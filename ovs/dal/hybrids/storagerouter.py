@@ -19,28 +19,25 @@ StorageRouter module
 """
 
 import time
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Property, Relation, Dynamic
-from ovs.dal.hybrids.pmachine import PMachine
+from ovs.dal.structures import Dynamic, Property
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 
 
 class StorageRouter(DataObject):
     """
     A StorageRouter represents the Open vStorage software stack, any (v)machine on which it is installed
     """
-    __properties = [Property('name', str, doc='Name of the vMachine.'),
-                    Property('description', str, mandatory=False, doc='Description of the vMachine.'),
-                    Property('machine_id', str, mandatory=False, doc='The hardware identifier of the vMachine'),
-                    Property('ip', str, doc='IP Address of the vMachine, if available'),
+    __properties = [Property('name', str, doc='Name of the Storage Router.'),
+                    Property('description', str, mandatory=False, doc='Description of the Storage Router.'),
+                    Property('machine_id', str, mandatory=False, doc='The hardware identifier of the Storage Router'),
+                    Property('ip', str, doc='IP Address of the Storage Router, if available'),
                     Property('heartbeats', dict, default={}, doc='Heartbeat information of various monitors'),
                     Property('node_type', ['MASTER', 'EXTRA'], default='EXTRA', doc='Indicates the node\'s type'),
-                    Property('rdma_capable', bool, doc='Is this StorageRouter RDMA capable'),
+                    Property('rdma_capable', bool, doc='Is this Storage Router RDMA capable'),
                     Property('last_heartbeat', float, mandatory=False, doc='When was the last (external) heartbeat send/received')]
-    __relations = [Relation('pmachine', PMachine, 'storagerouters')]
-    __dynamics = [Dynamic('statistics', dict, 4, locked=True),
-                  Dynamic('stored_data', int, 60),
-                  Dynamic('vmachines_guids', list, 15),
+    __relations = []
+    __dynamics = [Dynamic('statistics', dict, 4),
                   Dynamic('vpools_guids', list, 15),
                   Dynamic('vdisks_guids', list, 15),
                   Dynamic('status', str, 10),
@@ -50,7 +47,7 @@ class StorageRouter(DataObject):
 
     def _statistics(self, dynamic):
         """
-        Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
+        Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk.
         """
         from ovs.dal.hybrids.vdisk import VDisk
         statistics = {}
@@ -64,36 +61,22 @@ class StorageRouter(DataObject):
         VDisk.calculate_delta(self._key, dynamic, statistics)
         return statistics
 
-    def _stored_data(self):
-        """
-        Aggregates the Stored Data of each vDisk of the vMachine.
-        """
-        return self.statistics['stored']
-
-    def _vmachines_guids(self):
-        """
-        Gets the vMachine guids served by this StorageRouter.
-        Definition of "served by": vMachine whose disks are served by a given StorageRouter
-        """
-        from ovs.dal.lists.vdisklist import VDiskList
-        vmachine_guids = set()
-        for storagedriver in self.storagedrivers:
-            storagedriver_client = storagedriver.vpool.storagedriver_client
-            for vdisk in VDiskList.get_in_volume_ids(storagedriver_client.list_volumes(str(storagedriver.storagedriver_id))):
-                if vdisk.vmachine_guid is not None:
-                    vmachine_guids.add(vdisk.vmachine_guid)
-        return list(vmachine_guids)
-
     def _vdisks_guids(self):
         """
         Gets the vDisk guids served by this StorageRouter.
         """
         from ovs.dal.lists.vdisklist import VDiskList
-        vdisk_guids = []
+        volume_ids = []
+        vpools = set()
+        storagedriver_ids = []
         for storagedriver in self.storagedrivers:
-            storagedriver_client = storagedriver.vpool.storagedriver_client
-            vdisk_guids += VDiskList.get_in_volume_ids(storagedriver_client.list_volumes(str(storagedriver.storagedriver_id))).guids
-        return vdisk_guids
+            vpools.add(storagedriver.vpool)
+            storagedriver_ids.append(storagedriver.storagedriver_id)
+        for vpool in vpools:
+            for entry in vpool.objectregistry_client.get_all_registrations():
+                if entry.node_id() in storagedriver_ids:
+                    volume_ids.append(entry.object_id())
+        return VDiskList.get_in_volume_ids(volume_ids).guids
 
     def _vpools_guids(self):
         """

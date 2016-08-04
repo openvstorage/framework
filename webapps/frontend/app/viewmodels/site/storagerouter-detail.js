@@ -17,9 +17,13 @@
 define([
     'jquery', 'durandal/app', 'knockout', 'plugins/dialog',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver', '../containers/domain',
+    '../containers/storagerouter', '../containers/vpool', '../containers/storagedriver', '../containers/domain', '../containers/vdisk',
     '../wizards/configurepartition/index'
-], function($, app, ko, dialog, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver, Domain, ConfigurePartitionWizard) {
+], function(
+    $, app, ko, dialog, shared, generic, Refresher, api,
+    StorageRouter, VPool, StorageDriver, Domain, VDisk,
+    ConfigurePartitionWizard
+) {
     "use strict";
     return function() {
         var self = this;
@@ -33,6 +37,17 @@ define([
         self.loadVPoolsHandle         = undefined;
         self.loadStorageDriversHandle = {};
         self.loadDomainsHandle        = undefined;
+        self.vDiskCache               = {};
+        self.vDisksHandle             = {};
+        self.vDiskHeaders             = [
+            { key: 'name',       value: $.t('ovs:generic.name'),       width: undefined },
+            { key: 'size',       value: $.t('ovs:generic.size'),       width: 100       },
+            { key: 'storedData', value: $.t('ovs:generic.storeddata'), width: 110       },
+            { key: 'iops',       value: $.t('ovs:generic.iops'),       width: 90        },
+            { key: 'readSpeed',  value: $.t('ovs:generic.read'),       width: 125       },
+            { key: 'writeSpeed', value: $.t('ovs:generic.write'),      width: 125       },
+            { key: 'dtlStatus',  value: $.t('ovs:generic.dtl_status'), width: 50        }
+        ];
 
         // Observables
         self.checkedVPoolGuids = ko.observableArray([]);
@@ -84,12 +99,8 @@ define([
                     .then(self.loadVPools)
                     .done(function() {
                         self.checkedVPoolGuids(self.storageRouter().vPoolGuids());
-                        if (storageRouter.pMachine() !== undefined && !storageRouter.pMachine().loaded()) {
-                            storageRouter.pMachine().load();
-                        }
                         // Move child guids to the observables for easy display
                         storageRouter.vPools(storageRouter.vPoolGuids());
-                        storageRouter.vMachines(storageRouter.vMachineGuids);
                     })
                     .always(deferred.resolve);
             }).promise();
@@ -136,14 +147,18 @@ define([
                             generic.crossFiller(
                                 guids, self.domains,
                                 function(guid) {
-                                    return new Domain(guid);
+                                    var domain = new Domain(guid);
+                                    self.domainCache[guid] = domain;
+                                    if (ddata.hasOwnProperty(guid)) {
+                                        domain.fillData(ddata[guid]);
+                                    }
+                                    return domain;
                                 }, 'guid'
                             );
                             $.each(self.domains(), function(index, domain) {
                                 if (ddata.hasOwnProperty(domain.guid())) {
                                     domain.fillData(ddata[domain.guid()]);
                                 }
-                                self.domainCache[domain.guid()] = domain;
                             });
                             self.domains.sort(function(dom1, dom2) {
                                 return dom1.name() < dom2.name() ? -1 : 1;
@@ -181,6 +196,30 @@ define([
                     }
                 });
                 deferred.resolve();
+            }).promise();
+        };
+        self.loadVDisks = function(options) {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.vDisksHandle[options.page])) {
+                    options.sort = 'devicename';
+                    options.contents = '_dynamics,_relations,-snapshots';
+                    options.storagerouterguid = self.storageRouter().guid();
+                    self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
+                        .done(function(data) {
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
+                                    if (!self.vDiskCache.hasOwnProperty(guid)) {
+                                        self.vDiskCache[guid] = new VDisk(guid);
+                                    }
+                                    return self.vDiskCache[guid];
+                                }
+                            });
+                        })
+                        .fail(function() { deferred.reject(); });
+                } else {
+                    deferred.resolve();
+                }
             }).promise();
         };
         self.isEmpty = generic.isEmpty;
@@ -234,16 +273,17 @@ define([
                             .done(function() {
                                 generic.alertSuccess(
                                     $.t('ovs:storagerouters.detail.offline.done'),
-                                    $.t('ovs:storagerouters.detail.offline.donemsg')
+                                    $.t('ovs:storagerouters.detail.offline.done_msg')
                                 );
                             })
                             .fail(function(error) {
+                                error = generic.extractErrorMessage(error);
                                 generic.alertError(
                                     $.t('ovs:generic.error'),
                                     $.t('ovs:generic.messages.errorwhile', {
                                         context: 'error',
-                                        what: $.t('ovs:storagerouters.detail.offline.errormsg'),
-                                        error: $('<div/>').text(error.responseText).html()
+                                        what: $.t('ovs:storagerouters.detail.offline.error_msg'),
+                                        error: error
                                     })
                                 )
                             })
@@ -267,14 +307,12 @@ define([
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
-            self.shared.footerData(self.storageRouter);
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {
                 item.deactivate();
             });
             self.refresher.stop();
-            self.shared.footerData(ko.observable());
         };
     };
 });

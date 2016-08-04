@@ -18,27 +18,30 @@
 Contains various decorator
 """
 
-import math
+import os
 import re
 import json
-import inspect
+import math
 import time
+import inspect
+from django.conf import settings
+from django.core.handlers.wsgi import WSGIRequest
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.request import Request
+from backend.exceptions import HttpUnauthorizedException, HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException
+from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.dal.helpers import Toolbox as DalToolbox
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.dal.helpers import Toolbox as DalToolbox
-from rest_framework.response import Response
-from toolbox import Toolbox
-from rest_framework.exceptions import PermissionDenied, NotAuthenticated, NotAcceptable, Throttled
-from rest_framework import status
-from rest_framework.request import Request
-from django.core.handlers.wsgi import WSGIRequest
-from django.http import Http404
-from django.conf import settings
-from ovs.dal.exceptions import ObjectNotFoundException
-from backend.serializers.serializers import FullSerializer
-from ovs.log.log_handler import LogHandler
-from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.log.log_handler import LogHandler
+from toolbox import Toolbox
+if os.environ.get('RUNNING_UNITTESTS') == 'True':
+    from backend.serializers.mockups import FullSerializer
+else:
+    from backend.serializers.serializers import FullSerializer
 
 
 def _find_request(args):
@@ -64,12 +67,15 @@ def required_roles(roles):
             """
             request = _find_request(args)
             if not hasattr(request, 'user') or not hasattr(request, 'client'):
-                raise NotAuthenticated()
+                raise HttpUnauthorizedException(error_description='Not authenticated',
+                                                error='not_authenticated')
             user = UserList.get_user_by_username(request.user.username)
             if user is None:
-                raise NotAuthenticated()
+                raise HttpUnauthorizedException(error_description='Not authenticated',
+                                                error='not_authenticated')
             if not Toolbox.is_token_in_roles(request.token, roles):
-                raise PermissionDenied('This call requires roles: %s' % (', '.join(roles)))
+                raise HttpForbiddenException(error_description='This call requires roles: {0}'.format(', '.join(roles)),
+                                             error='invalid_roles')
             return f(*args, **kw)
 
         new_function.__name__ = f.__name__
@@ -96,6 +102,11 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 return True
             if value == 'false' or value == 'False':
                 return False
+            if isinstance(value, basestring):
+                try:
+                    return json.loads(value)
+                except ValueError:
+                    pass
             return value
 
         def new_function(*args, **kwargs):
@@ -119,7 +130,8 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 version = versions[1]
             version = int(version)
             if version < versions[0] or version > versions[1]:
-                raise NotAcceptable('API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0], versions[1], version))
+                raise HttpNotAcceptableException(error_description='API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0], versions[1], version),
+                                                 error='invalid_version')
             if 'version' in mandatory_vars:
                 new_kwargs['version'] = version
                 mandatory_vars.remove('version')
@@ -136,7 +148,8 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                         new_kwargs[typename] = instance
                         mandatory_vars.remove(typename)
                 except ObjectNotFoundException:
-                    raise Http404()
+                    raise HttpNotFoundException(error_description='The requested object could not be found',
+                                                error='object_not_found')
             # Fill local storagerouter, if requested
             if 'local_storagerouter' in mandatory_vars:
                 storagerouter = StorageRouterList.get_by_machine_id(settings.UNIQUE_ID)
@@ -151,7 +164,8 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 else:
                     if name not in post_data:
                         if name not in get_data:
-                            raise NotAcceptable('Invalid data passed: {0} is missing'.format(name))
+                            raise HttpNotAcceptableException(error_description='Invalid data passed: {0} is missing'.format(name),
+                                                             error='invalid_data')
                         new_kwargs[name] = _try_parse(get_data[name])
                     else:
                         new_kwargs[name] = _try_parse(post_data[name])
@@ -369,7 +383,8 @@ def limit(amount, per, timeout):
                 if active_timeout is not None:
                     if active_timeout > now:
                         logger.warning('Call {0} is being throttled with a wait of {1}'.format(key, active_timeout - now))
-                        raise Throttled(wait=active_timeout - now)
+                        raise HttpTooManyRequestsException(error='rate_limit_timeout',
+                                                           error_description='Rate limit timeout ({0}s remaining)'.format(round(active_timeout - now, 2)))
                     else:
                         rate_info['timeout'] = None
                 rate_info['calls'] = [call for call in rate_info['calls'] if call > (now - per)] + [now]
@@ -378,7 +393,8 @@ def limit(amount, per, timeout):
                     rate_info['timeout'] = now + timeout
                     client.set(key, rate_info)
                     logger.warning('Call {0} is being throttled with a wait of {1}'.format(key, timeout))
-                    raise Throttled(wait=timeout)
+                    raise HttpTooManyRequestsException(error='rate_limit_reached',
+                                                       error_description='Rate limit reached ({0} in last {1}s)'.format(calls, per))
                 client.set(key, rate_info)
             return f(*args, **kwargs)
 

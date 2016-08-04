@@ -16,9 +16,9 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
-    <form id="form.gather.backend" class="form-horizontal">
+    <form id="add-vpool-gather-backend" class="form-horizontal">
         <p data-i18n="ovs:wizards.add_vpool.gather_backend.basic_info"></p>
-        <div data-bind="visible: data.backend() === 'alba' && data.editBackend()">
+        <div data-bind="visible: data.backend() === 'alba' && data.vPoolAdd()">
             <div class="form-group">
                 <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.fragment_cache" style="padding-top: 8px;"></label>
                 <div class="col-lg-8">
@@ -110,7 +110,7 @@ but WITHOUT ANY WARRANTY of any kind.
                     <!-- /ko -->
                     <!-- ko if: data.albaAABackends() !== undefined && data.albaAABackends().length > 0 -->
                         <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaAABackends() === undefined)"></span>
-                        <span data-bind="visible: (data.editBackend() === true || data.albaAABackend() !== undefined),
+                        <span data-bind="visible: (data.vPoolAdd() === true || data.albaAABackend() !== undefined),
                                          dropdown: {
                                              key: 'guid', keyisfunction: false,
                                              items: data.albaAABackends, target: data.albaAABackend,
@@ -135,7 +135,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.alba_preset"></label>
                 <div class="col-lg-7">
                     <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaAAPreset() === undefined)"></span>
-                    <span data-bind="visible: (data.editBackend() === true || data.albaAAPreset() !== undefined),
+                    <span data-bind="visible: (data.vPoolAdd() === true || data.albaAAPreset() !== undefined),
                                      dropdown: {
                                          key: 'name', keyisfunction: false,
                                          items: data.enhancedAAPresets, target: data.albaAAPreset,
@@ -143,7 +143,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                              var policies = [];
                                              if (item !== undefined) {
                                                  $.each(item.policies, function(index, policy) {
-                                                     policies.push(policy);
+                                                     policies.push(policy.text);
                                                  });
                                                  return item.name + ': ' + policies.join(', ');
                                              }
@@ -156,7 +156,10 @@ but WITHOUT ANY WARRANTY of any kind.
     <div class="alert alert-warning" data-bind="visible: !isPresetAvailable()" style="margin-top: 20px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset_unavailable"></span>
     </div>
-    <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors" style="margin-bottom: -10px;">
+    <div class="alert alert-info" data-bind="visible: data.useAA() && albaBackendLoading()" style="margin-top: 20px;">
+        <span data-bind="translate: 'ovs:wizards.add_vpool.gather_vpool.loading_backend_information'"></span>
+    </div>
+    <div class="alert alert-danger" data-bind="visible: (!data.useAA() || (data.useAA() && !albaBackendLoading())) && (!canContinue().value || canContinue().showErrors)" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
         <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
         <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">

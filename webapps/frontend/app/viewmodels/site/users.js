@@ -317,10 +317,10 @@ define([
                                     self.clients.remove(client);
                                 })
                                 .fail(function (error) {
-                                    error = $.parseJSON(error.responseText);
+                                    error = generic.extractErrorMessage(error);
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
-                                        $.t('ovs:users.clients.deletefailed', { why: error.detail })
+                                        $.t('ovs:users.clients.deletefailed', { why: error })
                                     );
                                 });
                         }
@@ -344,10 +344,10 @@ define([
                     );
                 })
                 .fail(function(error) {
-                    error = $.parseJSON(error.responseText);
+                    error = generic.extractErrorMessage(error);
                     generic.alertError(
                         $.t('ovs:generic.error'),
-                        $.t('ovs:users.clients.addfailed', { why: error.detail })
+                        $.t('ovs:users.clients.addfailed', { why: error })
                     );
                 })
                 .always(function() {
@@ -387,10 +387,10 @@ define([
                         });
                 })
                 .fail(function(error) {
-                    error = $.parseJSON(error.responseText);
+                    error = generic.extractErrorMessage(error);
                     generic.alertError(
                         $.t('ovs:generic.error'),
-                        $.t('ovs:users.new.addfailed', { why: error.detail })
+                        $.t('ovs:users.new.addfailed', { why: error })
                     );
                 })
                 .always(function() {
@@ -416,10 +416,10 @@ define([
                                     self.users.remove(user);
                                 })
                                 .fail(function (error) {
-                                    error = $.parseJSON(error.responseText);
+                                    error = generic.extractErrorMessage(error);
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
-                                        $.t('ovs:users.clients.deletefailed', { why: error.detail })
+                                        $.t('ovs:users.clients.deletefailed', { why: error })
                                     );
                                 });
                         }

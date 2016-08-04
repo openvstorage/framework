@@ -7,7 +7,7 @@ After=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
 Type=simple
 Environment=PYTHONPATH=/opt/OpenvStorage
 WorkingDirectory=/opt/OpenvStorage
-ExecStart=/usr/bin/python2 /opt/OpenvStorage/ovs/extensions/rabbitmq/consumer.py volumerouter --durable --watcher
+ExecStart=/usr/bin/python2 /opt/OpenvStorage/ovs/extensions/rabbitmq/consumer.py volumerouter --durable
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=60

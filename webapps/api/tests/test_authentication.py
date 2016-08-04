@@ -23,19 +23,23 @@ import time
 import base64
 import hashlib
 import unittest
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse
+from middleware import OVSMiddleware
+from oauth2.exceptions import HttpBadRequestException, HttpUnauthorizedException, HttpTooManyRequestsException
 from oauth2.toolbox import Toolbox as OAuth2Toolbox
+from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic import fakesleep
+from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.dal.lists.userlist import UserList
-from ovs.dal.hybrids.user import User
-from ovs.dal.hybrids.group import Group
-from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.client import Client
-from ovs.dal.hybrids.j_rolegroup import RoleGroup
+from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.j_roleclient import RoleClient
-from rest_framework.exceptions import AuthenticationFailed
+from ovs.dal.hybrids.j_rolegroup import RoleGroup
+from ovs.dal.hybrids.role import Role
+from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.user import User
+from ovs.dal.lists.userlist import UserList
 
 
 class Authentication(unittest.TestCase):
@@ -49,11 +53,8 @@ class Authentication(unittest.TestCase):
         This makes sure the unittests can be executed without those libraries installed
         """
         cls.factory = None
-        cls.initial_data = None
-        cls.persistent = PersistentFactory.get_client()
-        cls.persistent.clean()
-        cls.volatile = VolatileFactory.get_client()
-        cls.volatile.clean()
+        PersistentFactory.get_client().clean()
+        VolatileFactory.get_client().clean()
 
         admin_group = Group()
         admin_group.name = 'administrators'
@@ -143,7 +144,13 @@ class Authentication(unittest.TestCase):
                         roleclient.role = role
                         roleclient.save()
 
-        cls.initial_data = PersistentFactory.store._read(), VolatileFactory.store._read()
+        storagerouter = StorageRouter()
+        storagerouter.machine_id = 'storagerouter'
+        storagerouter.ip = '127.0.0.1'
+        storagerouter.rdma_capable = False
+        storagerouter.name = 'storagerouter'
+        storagerouter.save()
+        System._storagerouter = storagerouter
 
         os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
         from django.test import RequestFactory
@@ -151,14 +158,9 @@ class Authentication(unittest.TestCase):
 
         fakesleep.monkey_patch()
 
-    def setUp(self):
-        """
-        (Re)Sets the stores on every test
-        """
-        self.persistent.clean()
-        self.volatile.clean()
-        self.persistent._save(self.initial_data[0])
-        self.volatile._save(self.initial_data[1])
+        EtcdConfiguration.set('/ovs/framework/plugins/installed', {'generic': [],
+                                                                   'backends': []})
+        EtcdConfiguration.set('/ovs/framework/cluster_id', 'cluster_id')
 
     @classmethod
     def tearDownClass(cls):
@@ -167,6 +169,16 @@ class Authentication(unittest.TestCase):
         """
         fakesleep.monkey_restore()
 
+    def _assert_failure(self, view, request, status_code, error_code, exception):
+        middleware = OVSMiddleware()
+        with self.assertRaises(exception) as context:
+            view(request)
+        response = middleware.process_exception(request, context.exception)
+        self.assertEqual(response.status_code, status_code)
+        data = json.loads(response.content)
+        self.assertIn('error', data)
+        self.assertEqual(data['error'], error_code)
+
     def test_jsonresponse(self):
         """
         Validates whether the json response behave correctly
@@ -174,23 +186,20 @@ class Authentication(unittest.TestCase):
         from oauth2.decorators import auto_response
 
         @auto_response()
-        def the_function(return_type, return_value, return_code=None):
+        def the_function(return_value):
             """
             Decorated function
             """
-            if return_code is None:
-                return return_type, return_value
-            else:
-                return return_type, return_value, return_code
+            return return_value
 
-        response = the_function(HttpResponse, {'test': 0})
+        response = the_function({'test': 0})
         self.assertIsInstance(response, HttpResponse)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, '{"test": 0}')
-        response = the_function(HttpResponseBadRequest, {'error': ['invalid']}, 429)
-        self.assertIsInstance(response, HttpResponseBadRequest)
-        self.assertEqual(response.status_code, 429)
-        self.assertEqual(response.content, '{"error": ["invalid"]}')
+        response = the_function(0)
+        self.assertIsInstance(response, HttpResponse)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, '0')
 
     def test_ratelimit(self):
         """
@@ -206,7 +215,7 @@ class Authentication(unittest.TestCase):
             """
             _ = args, kwargs
             output['value'] = input_value
-            return HttpResponse, input_value
+            return input_value
 
         output = {'value': None}
         request = self.factory.post('/')
@@ -222,14 +231,18 @@ class Authentication(unittest.TestCase):
         self.assertEqual(output['value'], 3)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, '3')
-        response = the_function(4, request)
+        with self.assertRaises(HttpTooManyRequestsException) as context:
+            the_function(4, request)
+        response = OVSMiddleware().process_exception(request, context.exception)
         self.assertEqual(output['value'], 3)
         self.assertEqual(response.status_code, 429)
-        self.assertEqual(json.loads(response.content)['error_code'], 'rate_limit_reached')
-        response = the_function(5, request)
+        self.assertEqual(json.loads(response.content)['error'], 'rate_limit_reached')
+        with self.assertRaises(HttpTooManyRequestsException) as context:
+            the_function(5, request)
+        response = OVSMiddleware().process_exception(request, context.exception)
         self.assertEqual(output['value'], 3)
         self.assertEqual(response.status_code, 429)
-        self.assertEqual(json.loads(response.content)['error_code'], 'rate_limit_timeout')
+        self.assertEqual(json.loads(response.content)['error'], 'rate_limit_timeout')
         time.sleep(5)
         response = the_function(6, request)
         self.assertEqual(output['value'], 6)
@@ -242,15 +255,14 @@ class Authentication(unittest.TestCase):
         """
         from oauth2.tokenview import OAuth2TokenView
 
+        time.sleep(180)
         request = self.factory.post('/', HTTP_X_REAL_IP='127.0.0.1')
-        response = OAuth2TokenView.as_view()(request)
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.content, json.dumps({'error': 'invalid_request'}))
+        self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'invalid_request', HttpBadRequestException)
+
+        time.sleep(180)
         data = {'grant_type': 'foobar'}
         request = self.factory.post('/', HTTP_X_REAL_IP='127.0.0.1', data=data)
-        response = OAuth2TokenView.as_view()(request)
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.content, json.dumps({'error': 'unsupported_grant_type'}))
+        self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'unsupported_grant_type', HttpBadRequestException)
 
     def test_resource_owner_password_credentials(self):
         """
@@ -258,38 +270,34 @@ class Authentication(unittest.TestCase):
         """
         from oauth2.tokenview import OAuth2TokenView
 
+        time.sleep(180)
         data = {'grant_type': 'password'}
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1')
-        response = OAuth2TokenView.as_view()(request)
-        # Fails because there's no username & password
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.content, json.dumps({'error': 'invalid_request'}))
+        self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'invalid_request', HttpBadRequestException)
+
+        time.sleep(180)
         data.update({'username': 'admin_npg',
                      'password': 'foobar'})
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1')
-        response = OAuth2TokenView.as_view()(request)
-        # Fails because the password is wrong
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.content, json.dumps({'error': 'invalid_client'}))
+        self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'invalid_client', HttpBadRequestException)
+
+        time.sleep(180)
         data.update({'username': 'admin_na',
                      'password': 'admin_na'})
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1')
-        response = OAuth2TokenView.as_view()(request)
-        # Fails because the user is inactive
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.content, json.dumps({'error': 'inactive_user'}))
+        self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'inactive_user', HttpBadRequestException)
+
+        time.sleep(180)
         data.update({'username': 'admin_npg',
                      'password': 'admin_npg'})
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1')
-        response = OAuth2TokenView.as_view()(request)
-        # Fails because there's no password grant
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.content, json.dumps({'error': 'unauthorized_client'}))
+        self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'unauthorized_client', HttpBadRequestException)
+
+        time.sleep(180)
         data.update({'username': 'admin',
                      'password': 'admin'})
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1')
         response = OAuth2TokenView.as_view()(request)
-        # Succeeds
         self.assertEqual(response.status_code, 200)
         response_content = json.loads(response.content)
         self.assertIn('access_token', response_content)
@@ -304,18 +312,17 @@ class Authentication(unittest.TestCase):
         """
         from oauth2.tokenview import OAuth2TokenView
 
+        time.sleep(180)
         data = {'grant_type': 'client_credentials'}
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1')
-        response = OAuth2TokenView.as_view()(request)
-        # Fails because the HTTP_AUTHORIZATION header is missing
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.content, json.dumps({'error': 'missing_header'}))
+        self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'missing_header', HttpBadRequestException)
+
+        time.sleep(180)
         header = 'Basic {0}'.format(base64.encodestring('{0}:{1}'.format('foo', 'bar')))
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.2', HTTP_AUTHORIZATION=header)
-        response = OAuth2TokenView.as_view()(request)
-        # Fails because there is no such client
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.content, json.dumps({'error': 'invalid_client'}))
+        self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'invalid_client', HttpBadRequestException)
+
+        time.sleep(180)
         admin_na = UserList.get_user_by_username('admin_na')
         admin_na_client = Client()
         admin_na_client.ovs_type = 'USER'
@@ -325,17 +332,15 @@ class Authentication(unittest.TestCase):
         admin_na_client.save()
         header = 'Basic {0}'.format(base64.encodestring('{0}:{1}'.format(admin_na_client.guid, admin_na_client.client_secret)))
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.3', HTTP_AUTHORIZATION=header)
-        response = OAuth2TokenView.as_view()(request)
-        # Fails because the grant is of type Resource Owner Password Credentials
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.content, json.dumps({'error': 'invalid_grant'}))
+        self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'invalid_grant', HttpBadRequestException)
+
+        time.sleep(180)
         admin_na_client.grant_type = 'CLIENT_CREDENTIALS'
         admin_na_client.save()
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.4', HTTP_AUTHORIZATION=header)
-        response = OAuth2TokenView.as_view()(request)
-        # Fails because the grant is of type Resource Owner Password Credentials
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.content, json.dumps({'error': 'inactive_user'}))
+        self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'inactive_user', HttpBadRequestException)
+
+        time.sleep(180)
         admin = UserList.get_user_by_username('admin')
         admin_client = Client()
         admin_client.ovs_type = 'USER'
@@ -345,14 +350,12 @@ class Authentication(unittest.TestCase):
         admin_client.save()
         header = 'Basic {0}'.format(base64.encodestring('{0}:foobar'.format(admin_client.guid)))
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.5', HTTP_AUTHORIZATION=header)
-        response = OAuth2TokenView.as_view()(request)
-        # Fails because it's an invalid secret
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.content, json.dumps({'error': 'invalid_client'}))
+        self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'invalid_client', HttpBadRequestException)
+
+        time.sleep(180)
         header = 'Basic {0}'.format(base64.encodestring('{0}:{1}'.format(admin_client.guid, admin_client.client_secret)))
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.6', HTTP_AUTHORIZATION=header)
         response = OAuth2TokenView.as_view()(request)
-        # Succeeds
         self.assertEqual(response.status_code, 200)
         response_content = json.loads(response.content)
         self.assertIn('access_token', response_content)
@@ -368,34 +371,45 @@ class Authentication(unittest.TestCase):
         from oauth2.tokenview import OAuth2TokenView
         from view import MetadataView
 
+        time.sleep(180)
         data = {'grant_type': 'password',
                 'username': 'admin',
                 'password': 'admin'}
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1')
         response = OAuth2TokenView.as_view()(request)
+        self.assertIn('access_token', json.loads(response.content))
         access_token = json.loads(response.content)['access_token']
+
+        time.sleep(180)
         header = 'Bearer {0}'.format(access_token)
         request = self.factory.get('/', HTTP_X_REAL_IP='127.0.0.1', HTTP_AUTHORIZATION=header)
         response = MetadataView.as_view()(request)
         response_content = json.loads(response.content)
-        self.assertListEqual(response_content['roles'], ['read', 'write', 'manage'])
+        self.assertListEqual(sorted(response_content['roles']), ['manage', 'read', 'write'])
+
+        time.sleep(180)
         data['scope'] = 'read write'
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1')
         response = OAuth2TokenView.as_view()(request)
-        access_token = json.loads(response.content)['access_token']
+        response_content = json.loads(response.content)
+        self.assertIn('access_token', response_content)
+        access_token = response_content['access_token']
+
+        time.sleep(180)
         header = 'Bearer {0}'.format(access_token)
         request = self.factory.get('/', HTTP_X_REAL_IP='127.0.0.1', HTTP_AUTHORIZATION=header)
         response = MetadataView.as_view()(request)
         response_content = json.loads(response.content)
+        self.assertIn('roles', response_content)
         self.assertListEqual(sorted(response_content['roles']), ['read', 'write'])
+
+        time.sleep(180)
         data = {'grant_type': 'password',
                 'username': 'user',
                 'password': 'user',
                 'scope': 'read write manage'}
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1')
-        response = OAuth2TokenView.as_view()(request)
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.content, json.dumps({'error': 'invalid_scope'}))
+        self._assert_failure(OAuth2TokenView.as_view(), request, 400, 'invalid_scope', HttpBadRequestException)
 
     def test_authentication_backend(self):
         """
@@ -405,6 +419,7 @@ class Authentication(unittest.TestCase):
         from oauth2.tokenview import OAuth2TokenView
         from oauth2.backend import OAuth2Backend
 
+        time.sleep(180)
         backend = OAuth2Backend()
         data = {'grant_type': 'password',
                 'username': 'admin',
@@ -416,12 +431,16 @@ class Authentication(unittest.TestCase):
         request = self.factory.get('/')
         response = backend.authenticate(request)
         self.assertIsNone(response)
+
+        time.sleep(180)
         header = 'Bearer foobar'
         request = self.factory.get('/', HTTP_AUTHORIZATION=header)
-        with self.assertRaises(AuthenticationFailed) as context:
+        with self.assertRaises(HttpUnauthorizedException) as context:
             backend.authenticate(request)
         self.assertEqual(context.exception.status_code, 401)
-        self.assertEqual(str(context.exception.detail), 'invalid_token')
+        self.assertEqual(str(context.exception.error), 'invalid_token')
+
+        time.sleep(180)
         header = 'Bearer {0}'.format(access_token)
         request = self.factory.get('/', HTTP_AUTHORIZATION=header)
         user, extra = backend.authenticate(request)
@@ -429,20 +448,25 @@ class Authentication(unittest.TestCase):
         self.assertIsNone(extra)
         self.assertEqual(request.token.access_token, access_token)
         self.assertEqual(request.client.user.username, 'admin')
+
+        time.sleep(180)
         user = UserList.get_user_by_username('admin')
         user.is_active = False
         user.save()
         request = self.factory.get('/', HTTP_AUTHORIZATION=header)
-        with self.assertRaises(AuthenticationFailed) as context:
+        with self.assertRaises(HttpUnauthorizedException) as context:
             backend.authenticate(request)
         self.assertEqual(context.exception.status_code, 401)
-        self.assertEqual(str(context.exception.detail), 'inactive_user')
+        self.assertEqual(str(context.exception.error), 'inactive_user')
+        user.is_active = True
+        user.save()
+
         time.sleep(int(response_content['expires_in']))
         request = self.factory.get('/', HTTP_AUTHORIZATION=header)
-        with self.assertRaises(AuthenticationFailed) as context:
+        with self.assertRaises(HttpUnauthorizedException) as context:
             backend.authenticate(request)
         self.assertEqual(context.exception.status_code, 401)
-        self.assertEqual(str(context.exception.detail), 'token_expired')
+        self.assertEqual(str(context.exception.error), 'token_expired')
 
     def test_metadata(self):
         """
@@ -461,28 +485,40 @@ class Authentication(unittest.TestCase):
                        'authentication_state': None,
                        'username': None,
                        'userguid': None}
+
+        time.sleep(180)
         data = {'grant_type': 'password',
                 'username': 'admin',
                 'password': 'admin'}
         request = self.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1')
         response = OAuth2TokenView.as_view()(request)
         response_content = json.loads(response.content)
+        self.assertIn('expires_in', response_content)
+        self.assertIn('access_token', response_content)
+
+        time.sleep(180)
         expiry = int(response_content['expires_in'])
         access_token = response_content['access_token']
         request = self.factory.get('/', HTTP_X_REAL_IP='127.0.0.1')
         response = MetadataView.as_view()(request)
         response_content = json.loads(response.content)
         self.assertDictContainsSubset(dict(result_data.items() + {'authentication_state': 'unauthenticated'}.items()), response_content)
+
+        time.sleep(180)
         header = 'Basic foobar'
         request = self.factory.get('/', HTTP_X_REAL_IP='127.0.0.1', HTTP_AUTHORIZATION=header)
         response = MetadataView.as_view()(request)
         response_content = json.loads(response.content)
         self.assertDictContainsSubset(dict(result_data.items() + {'authentication_state': 'invalid_authorization_type'}.items()), response_content)
+
+        time.sleep(180)
         header = 'Bearer foobar'
         request = self.factory.get('/', HTTP_X_REAL_IP='127.0.0.1', HTTP_AUTHORIZATION=header)
         response = MetadataView.as_view()(request)
         response_content = json.loads(response.content)
         self.assertDictContainsSubset(dict(result_data.items() + {'authentication_state': 'invalid_token'}.items()), response_content)
+
+        time.sleep(180)
         user = UserList.get_user_by_username('admin')
         header = 'Bearer {0}'.format(access_token)
         request = self.factory.get('/', HTTP_X_REAL_IP='127.0.0.1', HTTP_AUTHORIZATION=header)
@@ -492,19 +528,26 @@ class Authentication(unittest.TestCase):
                                                                   'authentication_state': 'authenticated',
                                                                   'username': user.username,
                                                                   'userguid': user.guid}.items()), response_content)
-        time.sleep(180)  # Make sure to not hit the rate limit
+
+        time.sleep(180)
         user.is_active = False
         user.save()
         request = self.factory.get('/', HTTP_X_REAL_IP='127.0.0.1', HTTP_AUTHORIZATION=header)
         response = MetadataView.as_view()(request)
         response_content = json.loads(response.content)
         self.assertDictContainsSubset(dict(result_data.items() + {'authentication_state': 'inactive_user'}.items()), response_content)
+        user.is_active = True
+        user.save()
+
+        time.sleep(180)
         original_method = BearerTokenList.get_by_access_token
         BearerTokenList.get_by_access_token = staticmethod(_raise_exception)
         request = self.factory.get('/', HTTP_X_REAL_IP='127.0.0.1', HTTP_AUTHORIZATION=header)
         response = MetadataView.as_view()(request)
         response_content = json.loads(response.content)
         self.assertDictContainsSubset(dict(result_data.items() + {'authentication_state': 'unexpected_exception'}.items()), response_content)
+
+        time.sleep(180)
         BearerTokenList.get_by_access_token = staticmethod(original_method)
         time.sleep(expiry)
         request = self.factory.get('/', HTTP_X_REAL_IP='127.0.0.1', HTTP_AUTHORIZATION=header)

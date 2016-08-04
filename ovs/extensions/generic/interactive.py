@@ -186,8 +186,11 @@ class Interactive(object):
         :param maxlength: Maximum length of a line
         :return:
         """
-        corrected_lines = []
+        split_lines = []
         for line in lines:
+            split_lines.extend(line.splitlines())
+        corrected_lines = []
+        for line in split_lines:
             if len(line) > maxlength:
                 linepart = ''
                 for word in line.split(' '):

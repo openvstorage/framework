@@ -51,9 +51,8 @@ define([
                         },
                         storage_ip: self.data.storageIP(),
                         storagerouter_ip: self.data.storageRouter().ipAddress(),
-                        integratemgmt: self.data.integratemgmt(),
-                        readcache_size: self.data.readCacheSize(),
-                        writecache_size: self.data.writeCacheSize(),
+                        readcache_size: self.data.readCacheSize() === undefined ? 0 : self.data.readCacheSize(),
+                        writecache_size: self.data.writeCacheSize() === undefined ? 0 : self.data.writeCacheSize(),
                         fragment_cache_on_read: self.data.fragmentCacheOnRead(),
                         fragment_cache_on_write: self.data.fragmentCacheOnWrite(),
                         config_params: {

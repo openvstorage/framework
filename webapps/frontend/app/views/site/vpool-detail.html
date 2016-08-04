@@ -27,17 +27,6 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span style="padding-left: 5px;" data-bind="text: name, visible: name() !== undefined"></span>
                 </a>
             </li>
-            <li class="actions">
-                <span data-i18n="ovs:generic.actions"></span>:
-                <button type="button" class="btn btn-mini btn-default"
-                        id="buttonVpoolSync"
-                        data-bind="click: function() { $root.sync(); },
-                                   style: { color: '#428bca' },
-                                   tooltip: 'ovs:vpools.detail.sync',
-                                   enable: $root.shared.user.roles().contains('write') && status() === 'RUNNING' && $root.updatingStorageRouters() === false">
-                    <span class="fa" data-i18n="[html]ovs:icons.sync"></span>
-                </button>
-            </li>
         </ul>
         <div class="tab-content">
             <div class="tab-pane active" id="information" style="padding: 15px;">
@@ -87,8 +76,8 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.cache"></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: iops"></span></td>
                             <td data-i18n="ovs:vpools.backendtype"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: backendType, loadedObservable: 'loaded', undefinedLoading: false }">
@@ -106,8 +95,8 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
                             <td data-i18n="ovs:vpools.backendlogin"></td>
                             <td><span data-bind="text: backendLogin() ? backendLogin() : '-'"></span></td>
                             <td data-i18n="ovs:vpools.cluster_size"></td>
@@ -121,8 +110,8 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:generic.writespeed"></td>
+                            <td><span data-bind="text: writeSpeed"></span></td>
                             <td data-i18n="ovs:vpools.backendconnection"></td>
                             <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
                             <td data-i18n="ovs:vpools.write_buffer"></td>
@@ -136,8 +125,8 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.writespeed"></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td data-i18n="ovs:generic.nrofvdisks"></td>
+                            <td><span data-bind="text: vDisks().length"></span></td>
                             <!-- ko if: backendPreset() === undefined -->
                                 <td colspan="2" >&nbsp;</td>
                             <!-- /ko -->
@@ -165,9 +154,7 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.nrofvmachines"></td>
-                            <td><span data-bind="text: vMachines().length"></span></td>
-                            <td colspan="2">&nbsp;</td>
+                            <td colspan="4">&nbsp;</td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry"
@@ -183,11 +170,6 @@ but WITHOUT ANY WARRANTY of any kind.
                                 </span>
                             </td>
                         </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.nrofvdisks"></td>
-                            <td><span data-bind="text: vDisks().length"></span></td>
-                            <td colspan="4">&nbsp;</td>
-                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -195,10 +177,7 @@ but WITHOUT ANY WARRANTY of any kind.
     </div>
     <div>
         <ul class="nav nav-tabs">
-            <li class="active" data-bind="tooltip: 'ovs:generic.vmachines'">
-                <a href="#vmachines" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.vmachines"></a>
-            </li>
-            <li data-bind="tooltip: 'ovs:generic.vdisks'">
+            <li class="active"  data-bind="tooltip: 'ovs:generic.vdisks'">
                 <a href="#vdisks" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.vdisks"></a>
             </li>
             <li data-bind="tooltip: 'ovs:generic.management', visible: $root.shared.user.roles().contains('manage')">
@@ -206,45 +185,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </li>
         </ul>
         <div class="tab-content">
-            <div class="tab-pane active" id="vmachines" style="padding: 15px;">
-                <h4 data-i18n="ovs:vmachines.title"></h4>
-                <div data-bind="pager: { loadData: $parent.loadVMachines, headers: $parent.vMachineHeaders, refreshInterval: 5000, controls: true }">
-                    <table data-dummy="dummy">
-                        <tr data-part="vitem" data-bind="attr: { id: 'vmachine_' + guid() }">
-                            <td style="position: relative;">
-                                <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
-                                   <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
-                                </span>
-                                <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
-                                              attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: guid }) }"></a>
-                            </td>
-                            <td data-bind="lazylist: { items: storageRouters, loadedObservable: 'loaded' }">
-                                <a data-part="entry"
-                                   data-bind="text: name,
-                                              attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
-                            </td>
-                            <td><span data-bind="text: vDisks().length"></span></td>
-                            <td><span data-bind="text: storedData"></span></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
-                            <td><span data-bind="text: iops"></span></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
-                            <td>
-                                <div data-bind="status: {
-                                                    colors: {
-                                                        green: dtlStatus() === 'ok_sync' || (dtlStatus() === 'ok_standalone' && (storageRouterGuids().length === 1 || dtlManual() === true)),
-                                                        orange: dtlStatus() === 'catch_up' || (dtlStatus() === 'ok_standalone' && storageRouterGuids().length > 1 && dtlManual() === false),
-                                                        red: dtlStatus() === 'degraded'
-                                                    },
-                                                    defaultColor: 'lightgrey'
-                                                }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
-                                     style="width: 14px; height: 14px;"></div>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
-            <div class="tab-pane" id="vdisks" style="padding: 15px;">
+            <div class="tab-pane active" id="vdisks" style="padding: 15px;">
                 <h4 data-i18n="ovs:vdisks.title"></h4>
                 <div data-bind="pager: { loadData: $parent.loadVDisks, headers: $parent.vDiskHeaders, refreshInterval: 5000, controls: true }">
                     <table data-dummy="dummy">
@@ -256,24 +197,16 @@ but WITHOUT ANY WARRANTY of any kind.
                                 <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
                                               attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) }"></a>
                             </td>
-                            <td>
-                                <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <a data-part="lazy-entry"
-                                       data-bind="text: item().name,
-                                                  attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
-                                </span>
-                            </td>
                             <td><span data-bind="text: size"></span></td>
                             <td><span data-bind="text: storedData"></span></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
                             <td><span data-bind="text: iops"></span></td>
                             <td><span data-bind="text: readSpeed"></span></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
                             <td>
                                 <div data-bind="status: {
                                                     colors: {
-                                                        green: dtlStatus() === 'ok_sync' || (dtlStatus() === 'ok_standalone' && ($root.storageRouters().length === 1 || dtlManual() === true)),
-                                                        orange: dtlStatus() === 'catch_up' || (dtlStatus() === 'ok_standalone' && $root.storageRouters().length > 1 && dtlManual() === false),
+                                                        green: ['ok_standalone', 'ok_sync'].contains(dtlStatus()),
+                                                        orange: ['catch_up', 'checkup_required'].contains(dtlStatus()),
                                                         red: dtlStatus() === 'degraded'
                                                     },
                                                     defaultColor: 'lightgrey'
@@ -331,26 +264,6 @@ but WITHOUT ANY WARRANTY of any kind.
                                                         <span class="fa" data-i18n="[html]ovs:icons.delete" data-bind="css: {hand: ($root.srCanDeleteMap() !== undefined && $root.srCanDeleteMap()[guid()] === true)}"></span>
 
                                                     </button>
-                                                    <span class="fa-stack">
-                                                        <i data-bind="click: function() { $root.reconfigurePmachine(guid(), true); },
-                                                                      tooltip: (pMachine() !== undefined && pMachine().isVPoolConfigured()[$root.vPool().guid()]) ? '' : 'ovs:wizards.linkhosts.gather.configure',
-                                                                      visible: $root.srCanDeleteMap() !== undefined &&
-                                                                               $root.updatingStorageRouters() === false &&
-                                                                               pMachine() !== undefined &&
-                                                                               !(pMachine().mgmtCenterGuid() === undefined || pMachine().mgmtCenterGuid() === null)"
-                                                           class="hand fa fa-fw fa-stack-1x" data-i18n="[html]ovs:icons.cog">
-                                                        </i>
-                                                        <i data-bind="click: function() { $root.reconfigurePmachine(guid(), false); },
-                                                                      tooltip: 'ovs:wizards.linkhosts.gather.unconfigure',
-                                                                      style: { color: 'red' },
-                                                                      visible: $root.srCanDeleteMap() !== undefined &&
-                                                                               $root.updatingStorageRouters() === false &&
-                                                                               pMachine() !== undefined &&
-                                                                               !(pMachine().mgmtCenterGuid() === undefined || pMachine().mgmtCenterGuid() === null) &&
-                                                                               pMachine().isVPoolConfigured()[$root.vPool().guid()]"
-                                                           class="hand fa fa-fw fa-stack-1px6" data-i18n="[html]ovs:icons.ban">
-                                                        </i>
-                                                    </span>
                                                 </td>
                                                 <!-- /ko -->
                                             </tr>

@@ -31,13 +31,17 @@ class DebianPackage(object):
 
     OVS_PACKAGE_NAMES = ['openvstorage', 'openvstorage-core', 'openvstorage-webapps', 'openvstorage-sdm',
                          'openvstorage-backend', 'openvstorage-backend-core', 'openvstorage-backend-webapps', 'openvstorage-cinder-plugin',
-                         'volumedriver-server', 'volumedriver-base', 'alba', 'arakoon']
+                         'volumedriver-server', 'volumedriver-base', 'volumedriver-no-dedup-server', 'volumedriver-no-dedup-base',
+                         'alba', 'arakoon']
     APT_CONFIG_STRING = '-o Dir::Etc::sourcelist="sources.list.d/ovsaptrepo.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"'
     _logger = LogHandler.get('lib', name='packager')
 
     @staticmethod
-    def _get_version(package_name):
-        return check_output("dpkg -s {0} | grep Version | cut -d ' ' -f 2".format(package_name), shell=True).strip()
+    def _get_version(package_name, client):
+        command = "dpkg -s {0} | grep Version | cut -d ' ' -f 2".format(package_name)
+        if client is None:
+            return check_output(command, shell=True).strip()
+        return client.run(command).strip()
 
     @staticmethod
     def _get_installed_candidate_version(package_name, client):
@@ -54,10 +58,10 @@ class DebianPackage(object):
         return installed if installed != '(none)' else None, candidate if candidate != '(none)' else None
 
     @staticmethod
-    def get_versions():
+    def get_versions(client):
         versions = {}
         for package_name in DebianPackage.OVS_PACKAGE_NAMES:
-            version_info = DebianPackage._get_version(package_name)
+            version_info = DebianPackage._get_version(package_name, client)
             if version_info:
                 versions[package_name] = version_info
         return versions
