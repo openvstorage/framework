@@ -1,1 +1,11 @@
+# By default, all files are text with a LF eol
 *.* text eol=lf
+
+# Except a bunch of known binary files
+*.png binary
+*.pdf binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.otf binary
