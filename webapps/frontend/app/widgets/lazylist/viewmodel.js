@@ -29,7 +29,7 @@ define([
         self.colspan     = ko.observable(0);
         self.displaymode = ko.observable('span');
         self.items       = ko.observableArray([]);
-        self.itemsLoaded = ko.observable();
+        self.itemsLoaded = ko.observable(ko.observable(true));
 
         // Functions
         self.isLoaded = function(observable) {
@@ -44,7 +44,7 @@ define([
             self.displaymode(generic.tryGet(settings, 'displaymode', 'span'));
             self.colspan(generic.tryGet(settings, 'colspan', 0));
             self.loadedObservable = generic.tryGet(settings, 'loadedObservable', 'initialized');
-            self.itemsLoaded(generic.tryGet(settings, 'itemsLoaded', undefined));
+            self.itemsLoaded(generic.tryGet(settings, 'itemsLoaded', ko.observable(true)));
             self.items = settings.items;
         };
     };

@@ -41,7 +41,7 @@ class VPoolViewSet(viewsets.ViewSet):
     base_name = 'vpools'
 
     @log()
-    @required_roles(['read'])
+    @required_roles(['read', 'manage'])
     @return_list(VPool, 'name')
     @load()
     def list(self):
@@ -51,7 +51,7 @@ class VPoolViewSet(viewsets.ViewSet):
         return VPoolList.get_vpools()
 
     @log()
-    @required_roles(['read'])
+    @required_roles(['read', 'manage'])
     @return_object(VPool)
     @load(VPool)
     def retrieve(self, vpool):

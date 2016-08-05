@@ -21,6 +21,7 @@ StorageRouter module
 import json
 from celery.task.control import revoke
 from backend.decorators import required_roles, return_list, return_object, return_task, return_plain, load, log
+from backend.exceptions import HttpNotAcceptableException
 from backend.serializers.serializers import FullSerializer
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.domain import Domain
@@ -51,7 +52,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     RECOVERY_DOMAIN_CHANGE_KEY = 'ovs_dedupe_recovery_domain_change'
 
     @log()
-    @required_roles(['read'])
+    @required_roles(['read', 'manage'])
     @return_list(StorageRouter, 'name')
     @load()
     def list(self, query=None):
@@ -64,7 +65,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
             return DataList(StorageRouter, query)
 
     @log()
-    @required_roles(['read'])
+    @required_roles(['read', 'manage'])
     @return_object(StorageRouter)
     @load(StorageRouter)
     def retrieve(self, storagerouter):
@@ -236,10 +237,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def add_vpool(self, storagerouter, call_parameters, version):
+    def add_vpool(self, storagerouter, call_parameters, version, local_storagerouter, request):
         """
         Adds a vPool to a given Storage Router
         """
+        # API backwards compatibility
         if version <= 2:
             call_parameters['storagerouter_ip'] = storagerouter.ip
             call_parameters['fragment_cache_on_read'] = True
@@ -252,6 +254,33 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 connection_backend = call_parameters.pop('connection_backend')
                 call_parameters['backend_connection_info']['backend'] = {'backend': connection_backend.pop('backend') if 'backend' in connection_backend else None,
                                                                          'metadata': connection_backend.pop('metadata') if 'metadata' in connection_backend else None}
+        # API client translation (cover "local backend" selection in GUI)
+        if 'backend_connection_info' not in call_parameters:
+            raise HttpNotAcceptableException(error_description='Invalid call_parameters passed',
+                                             error='invalid_data')
+        connection_info = call_parameters['backend_connection_info']
+        connection_info_aa = call_parameters.get('backend_connection_info_aa')
+        if connection_info['host'] == '' or (connection_info_aa is not None and connection_info_aa['host'] == ''):
+            client = None
+            for _client in request.client.user.clients:
+                if _client.ovs_type == 'INTERNAL' and _client.grant_type == 'CLIENT_CREDENTIALS':
+                    client = _client
+            if client is None:
+                raise HttpNotAcceptableException(error_description='Invalid call_parameters passed',
+                                                 error='invalid_data')
+            if connection_info['host'] == '':
+                connection_info['username'] = client.client_id
+                connection_info['password'] = client.client_secret
+                connection_info['host'] = local_storagerouter.ip
+                connection_info['port'] = 443
+                connection_info['local'] = True
+            if connection_info_aa is not None and connection_info_aa['host'] == '':
+                connection_info_aa['username'] = client.client_id
+                connection_info_aa['password'] = client.client_secret
+                connection_info_aa['host'] = local_storagerouter.ip
+                connection_info_aa['port'] = 443
+                connection_info_aa['local'] = True
+        # Finally, launching the add_vpool task
         return StorageRouterController.add_vpool.delay(call_parameters)
 
     @link()

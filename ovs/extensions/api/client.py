@@ -93,7 +93,7 @@ class OVSClient(object):
             if self._raw_response is True:
                 return raw_response
             raise
-        if len(response.keys()) == 1 and 'error' in response:
+        if len(response.keys()) in [1, 2] and 'error' in response:
             error = RuntimeError(response['error'])
             error.status_code = raw_response.status_code
             raise error

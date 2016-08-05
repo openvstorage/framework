@@ -281,6 +281,9 @@ define([
                             }
                         }
                         self.pageLoading(false);
+                    })
+                    .fail(function() {
+                        self.pageLoading(false);
                     });
                 if (preload) {
                     self.preloadHandle = promise;

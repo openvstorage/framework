@@ -84,11 +84,12 @@ class Toolbox(object):
                         # Explicit deny
                         return False
                     granted = True
-        if client_rights is not None:
-            for right in client_rights:
-                if right.client_guid == client.guid:
-                    if right.grant is False:
-                        # Explicit deny
-                        return False
-                    granted = True
+        if client.ovs_type != 'INTERNAL':
+            if client_rights is not None:
+                for right in client_rights:
+                    if right.client_guid == client.guid:
+                        if right.grant is False:
+                            # Explicit deny
+                            return False
+                        granted = True
         return granted
