@@ -139,6 +139,8 @@ class MockStorageRouterClient(object):
         Retrieve a fake DTL configuration mode
         """
         if volume_id in MockStorageRouterClient.dtl_config_cache[self.vpool_guid]:
+            if MockStorageRouterClient.dtl_config_cache[self.vpool_guid][volume_id] is None:
+                return DTLConfigMode.MANUAL
             return MockStorageRouterClient.dtl_config_cache[self.vpool_guid][volume_id].dtl_config_mode
         return DTLConfigMode.AUTOMATIC
 
@@ -236,7 +238,7 @@ class MockStorageRouterClient(object):
         Set a fake DTL configuration
         """
         if config is None:
-            dtl_config = DTLConfig(host='null', mode='no_sync', port=None)
+            dtl_config = None
         else:
             dtl_config = DTLConfig(host=config.host, mode=config.mode, port=config.port)
         MockStorageRouterClient.dtl_config_cache[self.vpool_guid][volume_id] = dtl_config
@@ -367,6 +369,9 @@ class MockObjectRegistryClient(object):
         _ = arakoon_cluster_id, arakoon_node_configs
 
     def get_all_registrations(self):
+        """
+        Retrieve all Object Registration objects for all volumes
+        """
         registrations = []
         for volume_id in MockStorageRouterClient.volumes[self.vpool_guid].iterkeys():
             registrations.append(ObjectRegistration(MockStorageRouterClient.vrouter_id[self.vpool_guid][volume_id], volume_id))
@@ -444,9 +449,15 @@ class ObjectRegistration(object):
         self._object_id = object_id
 
     def node_id(self):
+        """
+        Node ID
+        """
         return self._node_id
 
     def object_id(self):
+        """
+        Object ID
+        """
         return self._object_id
 
 

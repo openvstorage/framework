@@ -865,7 +865,7 @@ class StorageRouterController(object):
                              'fs_virtual_disk_format': 'raw',
                              'fs_raw_disk_suffix': '.raw'}
         if dtl_mode == 'no_sync':
-            filesystem_config['fs_dtl_host'] = None
+            filesystem_config['fs_dtl_host'] = ''
             filesystem_config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_MANUAL_MODE
         else:
             filesystem_config['fs_dtl_mode'] = StorageDriverClient.VPOOL_DTL_MODE_MAP[dtl_mode]
