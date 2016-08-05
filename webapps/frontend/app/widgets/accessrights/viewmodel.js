@@ -24,24 +24,40 @@ define([
 
         // Variables
         self.shared        = shared;
-        self.save          = undefined;
+        self.parentSave    = undefined;
         self.refresh       = 0;
         self.usersHandle   = undefined;
         self.clientsHandle = undefined;
+        self.usersLoaded   = false;
+        self.clientsLoaded = false;
+        self.subscription  = undefined;
 
         // Observables
         self.dataLoading     = ko.observable(false);
         self.widgetActivated = ko.observable(false);
-        self.rights          = ko.observable();
-        self.originalRights  = ko.observable();
+        self.liveRights      = ko.observable();
+        self.workingRights   = ko.observable();
         self.users           = ko.observableArray([]);
         self.clients         = ko.observableArray([]);
         self.userMap         = ko.observable({});
         self.clientMap       = ko.observable({});
         self.userClientMap   = ko.observable({});
+        self.editMode        = ko.observable(false);
 
         // Computed
-
+        self.rights = ko.computed(function() {
+            var rights = self.editMode() ? self.workingRights() : self.liveRights();
+            return rights === undefined ? {} : rights;
+        });
+        self.dirty = ko.computed(function() {
+            return generic.objectEquals(self.workingRights(), self.liveRights());
+        });
+        self.userRights = ko.computed(function() {
+            return self.rights()['users'];
+        });
+        self.clientRights = ko.computed(function() {
+            return self.rights()['clients'];
+        });
 
         // Functions
         self.loadUsers = function() {
@@ -79,10 +95,10 @@ define([
         };
         self.loadClients = function() {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.usersHandle)) {
+                if (generic.xhrCompleted(self.clientsHandle)) {
                     var options = {sort: 'name',
                                    contents: '_relations'};
-                    self.usersHandle = api.get('clients', { queryparams: options })
+                    self.clientsHandle = api.get('clients', { queryparams: options })
                         .done(function(data) {
                             var guids = [], cdata = {}, map = self.userClientMap();
                             $.each(data.data, function(index, item) {
@@ -106,6 +122,7 @@ define([
                                     return client;
                                 }, 'guid'
                             );
+                            self.userClientMap.notifySubscribers();
                             $.each(self.clients(), function(index, client) {
                                 if ($.inArray(client.guid(), guids) !== -1) {
                                     client.fillData(cdata[client.guid()]);
@@ -119,6 +136,47 @@ define([
                 }
             }).promise();
         };
+        self.startEdit = function() {
+            self.workingRights($.extend(true, {}, self.liveRights()));
+            self.editMode(true);
+        };
+        self.cancelEdit = function() {
+            self.editMode(false);
+        };
+        self.save = function() {
+            self.parentSave(self.workingRights())
+                .then(function() {
+                    self.liveRights(self.workingRights());
+                })
+                .always(function() {
+                    self.editMode(false);
+                })
+        };
+        self.swap = function(type, guid, grant) {
+            if (self.editMode() === false) {
+                return;
+            }
+            var rights = self.rights();
+            if (type === 'clients' && grant === true) {
+                var userGuid = self.clientMap()[guid].userGuid();
+                if (rights['users'][userGuid] === false) {
+                    return;
+                }
+            }
+            if (rights[type][guid] === grant) {
+                delete rights[type][guid];
+            } else {
+                rights[type][guid] = grant;
+            }
+            if (type === 'users' && grant === false) {
+                $.each(self.userClientMap()[guid](), function(index, clientGuid) {
+                    if (rights['clients'][clientGuid] === true) {
+                        delete rights['clients'][clientGuid];
+                    }
+                });
+            }
+            self.rights.notifySubscribers();
+        };
 
         // Durandal
         self.activate = function(settings) {
@@ -128,23 +186,25 @@ define([
             if (!settings.hasOwnProperty('save')) {
                 throw 'A save function should be specified'
             }
-            self.rights = settings.rights;
-            self.originalRights($.extend(true, {}, settings.rights()));
-            self.save = settings.save;
+
+            self.subscription = self.liveRights.subscribe(function() {
+                if (self.liveRights() !== undefined) {
+                    if (self.liveRights().hasOwnProperty('users')) {
+                        self.loadUsers();
+                    }
+                    if (self.liveRights().hasOwnProperty('clients')) {
+                        self.loadClients();
+                    }
+                    self.subscription.dispose();
+                }
+            });
+
+            self.liveRights(settings.rights);
+            self.parentSave = settings.save;
             self.refresh = parseInt(generic.tryGet(settings, 'refreshInterval', '5000'), 10);
 
             self.userClientMap({});
-            var calls = [];
-            if (self.rights().hasOwnProperty('users')) {
-                calls.push(self.loadUsers());
-            }
-            if (self.rights().hasOwnProperty('clients')) {
-                calls.push(self.loadClients());
-            }
-            return $.when.apply($, calls)
-                .then(function() {
-                    self.widgetActivated(true);
-                });
+            self.widgetActivated(true);
         };
     };
 });
