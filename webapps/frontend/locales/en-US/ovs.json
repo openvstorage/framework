@@ -81,6 +81,13 @@
             "write": "Write",
             "backend": "Backend"
         },
+        "rights": {
+            "started": "Applying",
+            "msgstarted": "The Access Rights are begin applied",
+            "complete": "Applied",
+            "success": "The Access Rights were succesfully applied",
+            "failed": "Error applying Access Rights: __why__"
+        },
         "units": {
             "b": "B",
             "bs": "B/s",
@@ -124,6 +131,7 @@
         },
         "about": "About",
         "accept": "Accept",
+        "access_rights": "Access Rights",
         "access_right_resolution": "Access is implicitly <b>denied</b>. However, if the logged in client has an active <b>manage</b> role, access is implicitly <b>granted</b>. An explicit <b>deny</b> wins over any <b>grant</b>.",
         "actions": "Actions",
         "address": "Address",
@@ -982,6 +990,7 @@
         "moveaway": "&#xf074;",
         "notchecked": "&#xf096;",
         "password": "&#xf084;",
+        "rights": "&#xf132;",
         "rollback": "&#xf01e;",
         "save": "&#xf0c7;",
         "separator": "&#xf101;",

@@ -31,7 +31,8 @@ class Backend(DataObject):
     __relations = [Relation('backend_type', BackendType, 'backends', doc='Type of the backend.')]
     __dynamics = [Dynamic('linked_guid', str, 3600),
                   Dynamic('available', bool, 60),
-                  Dynamic('regular_domains', list, 60)]
+                  Dynamic('regular_domains', list, 60),
+                  Dynamic('access_rights', dict, 3600)]
 
     def _linked_guid(self):
         """
@@ -60,3 +61,16 @@ class Backend(DataObject):
         :return: List of domain guids
         """
         return [junction.domain_guid for junction in self.domains]
+
+    def _access_rights(self):
+        """
+        A condensed extract from the user_rights and access_rights
+        :return: dict
+        """
+        data = {'users': {},
+                'clients': {}}
+        for user_right in self.user_rights:
+            data['users'][user_right.user_guid] = user_right.grant
+        for client_right in self.client_rights:
+            data['clients'][client_right.client_guid] = client_right.grant
+        return data
