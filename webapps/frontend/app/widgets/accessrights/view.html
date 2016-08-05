@@ -117,6 +117,7 @@ but WITHOUT ANY WARRANTY of any kind.
         </tbody>
     </table>
     <button data-bind="visible: editMode(), click: save" class="btn btn-primary">Save</button>
-    <button data-bind="visible: !editMode(), click: startEdit" class="btn btn-default">Edit</button>
+    <button data-bind="visible: !editMode(), click: startEdit,
+                       enable: $root.shared.user.roles().contains('manage')" class="btn btn-default">Edit</button>
     <button data-bind="visible: editMode(), click: cancelEdit" class="btn btn-default">Cancel</button>
 </section>

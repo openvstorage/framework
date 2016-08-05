@@ -32,7 +32,9 @@ but WITHOUT ANY WARRANTY of any kind.
                     <ul data-bind="foreach: storageRouters">
                         <li>
                             <span data-bind="text: name"></span>: <span data-bind="text: nodeid"></span>
-                            &nbsp; &nbsp; (<a href="#" data-bind="click: downloadLogfiles, text: downloadLogState"></a>)
+                            <span data-bind="visible: $root.shared.user.roles().contains('manage')">
+                                &nbsp; &nbsp; (<a href="#" data-bind="click: downloadLogfiles, text: downloadLogState"></a>)
+                            </span>
                         </li>
                     </ul>
                 </div>
@@ -48,7 +50,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 <div class="panel-body">
                     <input type="checkbox" data-bind="checked: enable" id="enable"/> <label for="enable" data-i18n="ovs:support.enable"></label><br />
                     <input type="checkbox" data-bind="checked: enableSupport, enable: enable" id="enable-support" /> <label for="enable-support" data-i18n="ovs:support.enablesupport"></label><br />
-                    <button data-bind="click: save, enable: dirty" class="btn" data-i18n="ovs:support.save"></button>
+                    <button data-bind="click: save, enable: dirty && $root.shared.user.roles().contains('manage')" class="btn" data-i18n="ovs:support.save"></button>
                 </div>
             </div>
         </div>

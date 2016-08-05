@@ -84,7 +84,7 @@ def required_roles(roles):
     return wrap
 
 
-def load(object_type=None, min_version=settings.VERSION[0], max_version=settings.VERSION[-1]):
+def load(object_type=None, min_version=settings.VERSION[0], max_version=settings.VERSION[-1], validator=None):
     """
     Parameter discovery decorator
     """
@@ -115,6 +115,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             """
             request = _find_request(args)
             new_kwargs = {}
+            validation_new_kwargs = {}
             # Find out the arguments of the decorated function
             function_info = inspect.getargspec(f)
             if function_info.defaults is None:
@@ -123,6 +124,18 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             else:
                 mandatory_vars = function_info.args[1:-len(function_info.defaults)]
                 optional_vars = function_info.args[len(mandatory_vars) + 1:]
+            if validator is not None:
+                print validator
+                function_info = inspect.getargspec(validator)
+                if function_info.defaults is None:
+                    validation_mandatory_vars = function_info.args[1:]
+                    validation_optional_vars = []
+                else:
+                    validation_mandatory_vars = function_info.args[1:-len(function_info.defaults)]
+                    validation_optional_vars = function_info.args[len(validation_mandatory_vars) + 1:]
+            else:
+                validation_mandatory_vars = []
+                validation_optional_vars = []
             # Check versioning
             version = regex.match(request.META['HTTP_ACCEPT']).groupdict()['version']
             versions = (max(min_version, settings.VERSION[0]), min(max_version, settings.VERSION[-1]))
@@ -132,52 +145,58 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             if version < versions[0] or version > versions[1]:
                 raise HttpNotAcceptableException(error_description='API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0], versions[1], version),
                                                  error='invalid_version')
-            if 'version' in mandatory_vars:
-                new_kwargs['version'] = version
-                mandatory_vars.remove('version')
-            # Fill request parameter, if available
-            if 'request' in mandatory_vars:
-                new_kwargs['request'] = request
-                mandatory_vars.remove('request')
-            # Fill main object, if required
+            # Load some information
+            instance = None
             if 'pk' in kwargs and object_type is not None:
-                typename = object_type.__name__.lower()
                 try:
                     instance = object_type(kwargs['pk'])
-                    if typename in mandatory_vars:
-                        new_kwargs[typename] = instance
-                        mandatory_vars.remove(typename)
                 except ObjectNotFoundException:
                     raise HttpNotFoundException(error_description='The requested object could not be found',
                                                 error='object_not_found')
-            # Fill local storagerouter, if requested
-            if 'local_storagerouter' in mandatory_vars:
-                storagerouter = StorageRouterList.get_by_machine_id(settings.UNIQUE_ID)
-                new_kwargs['local_storagerouter'] = storagerouter
-                mandatory_vars.remove('local_storagerouter')
-            # Fill mandatory parameters
-            post_data = request.DATA if hasattr(request, 'DATA') else request.POST
-            get_data = request.QUERY_PARAMS if hasattr(request, 'QUERY_PARAMS') else request.GET
-            for name in mandatory_vars:
-                if name in kwargs:
-                    new_kwargs[name] = kwargs[name]
-                else:
-                    if name not in post_data:
-                        if name not in get_data:
-                            raise HttpNotAcceptableException(error_description='Invalid data passed: {0} is missing'.format(name),
-                                                             error='invalid_data')
-                        new_kwargs[name] = _try_parse(get_data[name])
+            # Build new kwargs
+            for _mandatory_vars, _optional_vars, _new_kwargs in [(mandatory_vars, optional_vars, new_kwargs),
+                                                                 (validation_mandatory_vars, validation_optional_vars, validation_new_kwargs)]:
+                if 'version' in _mandatory_vars:
+                    _new_kwargs['version'] = version
+                    _mandatory_vars.remove('version')
+                if 'request' in _mandatory_vars:
+                    _new_kwargs['request'] = request
+                    _mandatory_vars.remove('request')
+                if instance is not None:
+                    typename = object_type.__name__.lower()
+                    if typename in _mandatory_vars:
+                        _new_kwargs[typename] = instance
+                        _mandatory_vars.remove(typename)
+                if 'local_storagerouter' in _mandatory_vars:
+                    storagerouter = StorageRouterList.get_by_machine_id(settings.UNIQUE_ID)
+                    _new_kwargs['local_storagerouter'] = storagerouter
+                    _mandatory_vars.remove('local_storagerouter')
+                # The rest of the mandatory parameters
+                post_data = request.DATA if hasattr(request, 'DATA') else request.POST
+                get_data = request.QUERY_PARAMS if hasattr(request, 'QUERY_PARAMS') else request.GET
+                for name in _mandatory_vars:
+                    if name in kwargs:
+                        _new_kwargs[name] = kwargs[name]
                     else:
-                        new_kwargs[name] = _try_parse(post_data[name])
-            # Try to fill optional parameters
-            for name in optional_vars:
-                if name in kwargs:
-                    new_kwargs[name] = kwargs[name]
-                else:
-                    if name in post_data:
-                        new_kwargs[name] = _try_parse(post_data[name])
-                    elif name in get_data:
-                        new_kwargs[name] = _try_parse(get_data[name])
+                        if name not in post_data:
+                            if name not in get_data:
+                                raise HttpNotAcceptableException(error_description='Invalid data passed: {0} is missing'.format(name),
+                                                                 error='invalid_data')
+                            _new_kwargs[name] = _try_parse(get_data[name])
+                        else:
+                            _new_kwargs[name] = _try_parse(post_data[name])
+                # Try to fill optional parameters
+                for name in _optional_vars:
+                    if name in kwargs:
+                        _new_kwargs[name] = kwargs[name]
+                    else:
+                        if name in post_data:
+                            _new_kwargs[name] = _try_parse(post_data[name])
+                        elif name in get_data:
+                            _new_kwargs[name] = _try_parse(get_data[name])
+            # Execute validator
+            if validator is not None:
+                validator(args[0], **validation_new_kwargs)
             # Call the function
             return f(args[0], **new_kwargs)
 

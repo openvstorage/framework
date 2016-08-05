@@ -45,6 +45,18 @@ class BackendViewSet(viewsets.ViewSet):
     prefix = r'backends'
     base_name = 'backends'
 
+    def validate_access(self, backend, request):
+        """
+        :param backend: The Backend to validate
+        :param request: The raw request
+        """
+        _ = self
+        if not Toolbox.access_granted(request.client,
+                                      user_rights=backend.user_rights,
+                                      client_rights=backend.client_rights):
+            raise HttpForbiddenException(error_description='The requesting client has no access to this Backend',
+                                         error='no_ownership')
+
     @log()
     @required_roles(['read'])
     @return_list(Backend)
@@ -68,17 +80,12 @@ class BackendViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read'])
     @return_object(Backend)
-    @load(Backend)
-    def retrieve(self, backend, request):
+    @load(Backend, validator=validate_access)
+    def retrieve(self, backend):
         """
         Load information about a given backend
         """
-        if Toolbox.access_granted(request.client,
-                                  user_rights=backend.user_rights,
-                                  client_rights=backend.client_rights):
-            return backend
-        raise HttpForbiddenException(error_description='The requesting client has no access to this Backend',
-                                     error='no_ownership')
+        return backend
 
     @log()
     @required_roles(['read', 'write', 'manage'])
@@ -99,7 +106,7 @@ class BackendViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_plain()
-    @load(Backend)
+    @load(Backend, validator=validate_access)
     def set_domains(self, backend, domain_guids):
         """
         Configures the given domains to the StorageRouter.
@@ -122,9 +129,9 @@ class BackendViewSet(viewsets.ViewSet):
 
     @action()
     @log()
-    @required_roles(['manage'])
+    @required_roles(['read', 'write', 'manage'])
     @return_plain()
-    @load(Backend)
+    @load(Backend, validator=validate_access)
     def configure_rights(self, backend, new_rights):
         """
         Configures the access rights for this backend

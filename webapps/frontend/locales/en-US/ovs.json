@@ -132,7 +132,7 @@
         "about": "About",
         "accept": "Accept",
         "access_rights": "Access Rights",
-        "access_right_resolution": "Access is implicitly <b>denied</b>. However, if the logged in client has an active <b>manage</b> role, access is implicitly <b>granted</b>. An explicit <b>deny</b> wins over any <b>grant</b>.",
+        "access_right_resolution": "Access is implicitly <b>denied</b>. However, if the logged in client has an active <b>manage</b> role, access is implicitly <b>granted</b>. An explicit <b>deny</b> wins over any <b>grant</b>. Users logging in into the GUI always use the access rights of the user.",
         "actions": "Actions",
         "address": "Address",
         "administration": "Administration",

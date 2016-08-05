@@ -168,7 +168,7 @@ define([
             } else {
                 rights[type][guid] = grant;
             }
-            if (type === 'users' && grant === false) {
+            if (type === 'users' && grant === false && self.userClientMap()[guid] !== undefined) {
                 $.each(self.userClientMap()[guid](), function(index, clientGuid) {
                     if (rights['clients'][clientGuid] === true) {
                         delete rights['clients'][clientGuid];
