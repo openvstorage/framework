@@ -82,11 +82,11 @@
             "backend": "Backend"
         },
         "rights": {
-            "started": "Applying",
-            "msgstarted": "The Access Rights are begin applied",
             "complete": "Applied",
-            "success": "The Access Rights were succesfully applied",
-            "failed": "Error applying Access Rights: __why__"
+            "failed": "Error applying Access Rights: __why__",
+            "started_msg": "The Access Rights are being applied",
+            "success": "The Access Rights were succesfully applied"
+            "started": "Applying",
         },
         "units": {
             "b": "B",
@@ -132,7 +132,7 @@
         "about": "About",
         "accept": "Accept",
         "access_rights": "Access Rights",
-        "access_right_resolution": "Access is implicitly <b>denied</b>. However, if the logged in client has an active <b>manage</b> role, access is implicitly <b>granted</b>. An explicit <b>deny</b> wins over any <b>grant</b>. Users logging in into the GUI always use the access rights of the user. A grey tick indicates implicit rights, a dark tick indicates explicit rights.",
+        "access_right_resolution": "Access is implicitly <b>denied</b>. However, if the logged in client has an active <b>manage</b> role, access is implicitly <b>granted</b>. An explicit <b>deny</b> wins over any <b>grant</b>. Users logging in into the GUI always use the Access Rights of the user. A grey tick indicates implicit rights, a dark tick indicates explicit rights.",
         "actions": "Actions",
         "address": "Address",
         "administration": "Administration",

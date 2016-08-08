@@ -105,7 +105,7 @@ define([
             return $.Deferred(function(deferred) {
                 generic.alertInfo(
                     $.t('ovs:generic.rights.started'),
-                    $.t('ovs:generic.rights.msgstarted')
+                    $.t('ovs:generic.rights.started_msg')
                 );
                 api.post('backends/' + self.guid() + '/configure_rights', {
                     queryparams: {new_rights: JSON.stringify(newRights)}
