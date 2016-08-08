@@ -85,8 +85,8 @@
             "complete": "Applied",
             "failed": "Error applying Access Rights: __why__",
             "started_msg": "The Access Rights are being applied",
-            "success": "The Access Rights were succesfully applied"
-            "started": "Applying",
+            "success": "The Access Rights were succesfully applied",
+            "started": "Applying"
         },
         "units": {
             "b": "B",
