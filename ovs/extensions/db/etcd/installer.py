@@ -400,7 +400,7 @@ class EtcdInstaller(object):
         :return: None
         """
         EtcdInstaller._logger.debug('Waiting for cluster "{0}"'.format(cluster_name))
-        tries = 5
+        tries = 10
         healthy = EtcdInstaller._is_healty(cluster_name, client, client_port=client_port)
         while healthy is False and tries > 0:
             tries -= 1
