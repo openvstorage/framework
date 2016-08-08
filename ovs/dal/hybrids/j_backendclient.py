@@ -30,7 +30,7 @@ class BackendClient(DataObject):
     * my_backend.client_rights[0].client
     * my_client.backend_rights[0].backend
     """
-    __properties = [Property('grant', bool, doc='Whether the rights is granted (True) or denied (False)')]
+    __properties = [Property('grant', bool, doc='Whether the rights are granted (True) or denied (False)')]
     __relations = [Relation('backend', Backend, 'client_rights'),
                    Relation('client', Client, 'backend_rights')]
     __dynamics = []
