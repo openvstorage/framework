@@ -83,12 +83,11 @@ define([
 
         // Functions
         self.load = function() {
-            return $.Deferred(function(deferred) {
-                self.loadStorageRouters()
-                    .then(self.loadVPools)
-                    .done(deferred.resolve)
-                    .fail(deferred.reject);
-            }).promise();
+            var calls = [
+                self.loadStorageRouters(),
+                self.loadVPools()
+            ];
+            return $.when.apply($, calls);
         };
         self.loadVPools = function() {
             return $.Deferred(function(deferred) {

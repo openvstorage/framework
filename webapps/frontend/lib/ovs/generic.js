@@ -542,6 +542,50 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return error;
     }
+    function objectEquals(object1, object2) {
+        if (object1 === object2) {
+            // If both object1 and object2 are null or undefined and exactly the same
+            return true;
+        }
+        if (!(object1 instanceof Object) || !(object2 instanceof Object)) {
+            // If they are not strictly equal, they both need to be Objects
+            return false;
+        }
+        if (object1.constructor !== object2.constructor) {
+            // They must have the exact same prototype chain, the closest we can do is
+            // test there constructor.
+            return false;
+        }
+        for (var p in object1) {
+            if (!object1.hasOwnProperty(p)) {
+                // Other properties were tested using object1.constructor === object2.constructor
+                continue;
+            }
+            if (!object2.hasOwnProperty(p)) {
+                // Allows to compare object1[p] and object2[p] when set to undefined
+                return false;
+            }
+            if (object1[p] === object2[p]) {
+                // If they have the same strict value or identity then they are equal
+                continue;
+            }
+            if (typeof(object1[p]) !== "object") {
+                // Numbers, Strings, Functions, Booleans must be strictly equal
+                return false;
+            }
+            if (!objectEquals(object1[p], object2[p])) {
+                // Objects and Arrays must be tested recursively
+                return false;
+            }
+        }
+        for (p in object2) {
+            if (object2.hasOwnProperty(p) && !object1.hasOwnProperty(p)) {
+                // Allows object1[p] to be set to undefined
+                return false;
+            }
+        }
+        return true;
+    }
 
     Array.prototype.equals = function(array) {
         return arrayEquals(this, array);
@@ -558,6 +602,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
     String.prototype.startsWith = function(searchString) {
         return stringStartsWith(this, searchString);
     };
+
     return {
         advancedSort: advancedSort,
         alert: alert,
@@ -604,6 +649,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         xhrCompleted: xhrCompleted,
         isEmpty: isEmpty,
         extract: extract,
-        log: log
+        log: log,
+        objectEquals: objectEquals
     };
 });

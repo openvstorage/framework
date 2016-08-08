@@ -31,7 +31,7 @@ define([
         self.widgets      = [];
         self.vPoolHeaders = [
             { key: 'status',            value: '',                                        width: 30        },
-            { key: 'name',              value: $.t('ovs:generic.name'),                   width: 200       },
+            { key: 'name',              value: $.t('ovs:generic.name'),                   width: 150       },
             { key: 'storedData',        value: $.t('ovs:generic.storeddata'),             width: 175       },
             { key: 'iops',              value: $.t('ovs:generic.iops'),                   width: 125       },
             { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),             width: 180       },
