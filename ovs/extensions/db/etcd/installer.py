@@ -404,7 +404,7 @@ class EtcdInstaller(object):
         healthy = EtcdInstaller._is_healty(cluster_name, client, client_port=client_port)
         while healthy is False and tries > 0:
             tries -= 1
-            time.sleep(5 - tries)
+            time.sleep(10 - tries)
             healthy = EtcdInstaller._is_healty(cluster_name, client, client_port=client_port)
         if healthy is False:
             raise etcd.EtcdConnectionFailed('Etcd cluster "{0}" could not be started correctly'.format(cluster_name))
