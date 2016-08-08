@@ -227,7 +227,7 @@ class StorageRouterController(object):
         required_params_new_alba = {'config_params': sd_config_params,
                                     'fragment_cache_on_read': (bool, None),
                                     'fragment_cache_on_write': (bool, None),
-                                    'backend_connection_info': (dict, {'host': (str, Toolbox.regex_ip, False),
+                                    'backend_connection_info': (dict, {'host': (str, Toolbox.regex_ip),
                                                                        'port': (int, None),
                                                                        'username': (str, None),
                                                                        'password': (str, None),

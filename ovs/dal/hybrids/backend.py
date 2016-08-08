@@ -64,7 +64,7 @@ class Backend(DataObject):
 
     def _access_rights(self):
         """
-        A condensed extract from the user_rights and access_rights
+        A condensed extract from the user_rights and client_rights
         :return: dict
         """
         data = {'users': {},

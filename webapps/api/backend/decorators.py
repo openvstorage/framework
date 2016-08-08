@@ -125,7 +125,6 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 mandatory_vars = function_info.args[1:-len(function_info.defaults)]
                 optional_vars = function_info.args[len(mandatory_vars) + 1:]
             if validator is not None:
-                print validator
                 function_info = inspect.getargspec(validator)
                 if function_info.defaults is None:
                     validation_mandatory_vars = function_info.args[1:]
