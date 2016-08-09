@@ -23,7 +23,7 @@ import json
 from celery.task.control import revoke
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.config.configuration import Configuration
 import volumedriver.storagerouter.FileSystemEvents_pb2 as FileSystemEvents
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from google.protobuf.descriptor import FieldDescriptor
@@ -41,7 +41,7 @@ def process(queue, body, mapping):
     :param mapping:
     """
     logger = LogHandler.get('extensions', name='processor')
-    if queue == EtcdConfiguration.get('/ovs/framework/messagequeue|queues.storagedriver'):
+    if queue == Configuration.get('/ovs/framework/messagequeue|queues.storagedriver'):
         cache = VolatileFactory.get_client()
         all_extensions = None
 

@@ -26,7 +26,7 @@ import base64
 import requests
 from subprocess import check_output
 from ConfigParser import RawConfigParser
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.packages.package import PackageManager
@@ -43,8 +43,8 @@ class SupportAgent(object):
         """
         Initializes the client
         """
-        self._enable_support = EtcdConfiguration.get('/ovs/framework/support|enablesupport')
-        self.interval = EtcdConfiguration.get('/ovs/framework/support|interval')
+        self._enable_support = Configuration.get('/ovs/framework/support|enablesupport')
+        self.interval = Configuration.get('/ovs/framework/support|interval')
         self._url = 'https://monitoring.openvstorage.com/api/support/heartbeat/'
         init_info = check_output('cat /proc/1/comm', shell=True)
         # All service classes used in below code should share the exact same interface!
@@ -63,7 +63,7 @@ class SupportAgent(object):
         """
         Returns heartbeat data
         """
-        data = {'cid': EtcdConfiguration.get('/ovs/framework/cluster_id'),
+        data = {'cid': Configuration.get('/ovs/framework/cluster_id'),
                 'nid': System.get_my_machine_id(),
                 'metadata': {},
                 'errors': []}
@@ -114,7 +114,7 @@ class SupportAgent(object):
         """
         try:
             SupportAgent._logger.debug('Processing: {0}'.format(task))
-            cid = EtcdConfiguration.get('/ovs/framework/cluster_id')
+            cid = Configuration.get('/ovs/framework/cluster_id')
             nid = System.get_my_machine_id()
 
             if task == 'OPEN_TUNNEL':
@@ -194,7 +194,7 @@ class SupportAgent(object):
 if __name__ == '__main__':
     logger = LogHandler.get('support', name='agent')
     try:
-        if EtcdConfiguration.get('/ovs/framework/support|enabled') is False:
+        if Configuration.get('/ovs/framework/support|enabled') is False:
             print 'Support not enabled'
             sys.exit(0)
         logger.info('Starting up')

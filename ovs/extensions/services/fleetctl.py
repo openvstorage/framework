@@ -262,7 +262,7 @@ class FleetCtl(object):
 
     @staticmethod
     def _create_unit(fleet_name, template_file):
-        from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+        from ovs.extensions.generic.configuration import Configuration
         start = time.time()
         while time.time() - start < 60:
             try:
@@ -272,8 +272,8 @@ class FleetCtl(object):
                 if ae.code == 500:
                     FleetCtl._logger.warning('API Error in fleet, most likely caused by etcd, retrying. {0}'.format(ae))
                     key = '/_coreos.com/fleet/job/{0}/object'.format(fleet_name)
-                    if EtcdConfiguration.exists(key):
-                        EtcdConfiguration.delete(key)
+                    if Configuration.exists(key):
+                        Configuration.delete(key)
                     time.sleep(1)
                 else:
                     raise

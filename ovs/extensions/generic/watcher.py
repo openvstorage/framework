@@ -117,9 +117,9 @@ class Watcher(object):
                 tries = 0
                 while tries < max_tries:
                     try:
-                        from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+                        from ovs.extensions.generic.configuration import Configuration
                         from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
-                        cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
+                        cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
                         client = PyrakoonStore(cluster=cluster_name)
                         client.set(key, value)
                         if client.get(key) == value:
@@ -140,8 +140,8 @@ class Watcher(object):
                 # RabbitMQ
                 self.log_message(target, 'Test rabbitMQ...', 0)
                 import pika
-                from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-                messagequeue = EtcdConfiguration.get('/ovs/framework/messagequeue')
+                from ovs.extensions.generic.configuration import Configuration
+                messagequeue = Configuration.get('/ovs/framework/messagequeue')
                 rmq_servers = messagequeue['endpoints']
                 good_node = False
                 for server in rmq_servers:

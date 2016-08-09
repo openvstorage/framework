@@ -21,7 +21,7 @@ import os
 import copy
 import json
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
@@ -173,7 +173,7 @@ class ObjectRegistryClient(object):
         key = vpool.identifier
         if key not in oclient_vpool_cache:
             arakoon_node_configs = []
-            arakoon_cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
+            arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
             config = ArakoonClusterConfig(arakoon_cluster_name)
             config.load_config()
             for node in config.nodes:
@@ -361,11 +361,11 @@ class StorageDriverConfiguration(object):
         Loads the configuration from a given file, optionally a remote one
         """
         self.configuration = {}
-        if EtcdConfiguration.dir_exists(self.path.format('')):
+        if Configuration.dir_exists(self.path.format('')):
             self.is_new = False
             for key in self.params[self.config_type]:
-                if EtcdConfiguration.exists(self.path.format(key)):
-                    self.configuration[key] = json.loads(EtcdConfiguration.get(self.path.format(key), raw=True))
+                if Configuration.exists(self.path.format(key)):
+                    self.configuration[key] = json.loads(Configuration.get(self.path.format(key), raw=True))
         else:
             self._logger.debug('Could not find config {0}, a new one will be created'.format(self.path.format('')))
         self.dirty_entries = []
@@ -379,7 +379,7 @@ class StorageDriverConfiguration(object):
         self._validate()
         for key in self.configuration:
             contents = json.dumps(self.configuration[key], indent=4)
-            EtcdConfiguration.set(self.path.format(key), contents, raw=True)
+            Configuration.set(self.path.format(key), contents, raw=True)
         if self.config_type == 'storagedriver' and reload_config is True:
             if len(self.dirty_entries) > 0:
                 if client is None:

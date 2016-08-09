@@ -31,7 +31,7 @@ from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.extensions.generic.system import System
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.api.client import OVSClient
 from ovs.log.log_handler import LogHandler
 
@@ -69,7 +69,7 @@ class MetadataView(View):
                         plugins[backend_type.code] = []
                     plugins[backend_type.code] += ['backend', 'gui']
             # - Generic plugins, as added to the configuration file(s)
-            generic_plugins = EtcdConfiguration.get('/ovs/framework/plugins/installed|generic')
+            generic_plugins = Configuration.get('/ovs/framework/plugins/installed|generic')
             for plugin_name in generic_plugins:
                 if plugin_name not in plugins:
                     plugins[plugin_name] = []
@@ -77,13 +77,13 @@ class MetadataView(View):
             data['plugins'] = plugins
 
             # Fill identification
-            data['identification'] = {'cluster_id': EtcdConfiguration.get('/ovs/framework/cluster_id')}
+            data['identification'] = {'cluster_id': Configuration.get('/ovs/framework/cluster_id')}
 
             # Get authentication metadata
             authentication_metadata = {'ip': System.get_my_storagerouter().ip}
             for key in ['mode', 'authorize_uri', 'client_id', 'scope']:
-                if EtcdConfiguration.exists('/ovs/framework/webapps|oauth2.{0}'.format(key)):
-                    authentication_metadata[key] = EtcdConfiguration.get('/ovs/framework/webapps|oauth2.{0}'.format(key))
+                if Configuration.exists('/ovs/framework/webapps|oauth2.{0}'.format(key)):
+                    authentication_metadata[key] = Configuration.get('/ovs/framework/webapps|oauth2.{0}'.format(key))
             data['authentication_metadata'] = authentication_metadata
 
             # Gather authorization metadata

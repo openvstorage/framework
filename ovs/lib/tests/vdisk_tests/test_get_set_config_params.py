@@ -20,7 +20,7 @@ Test module for vDisk set and get configuration params functionality
 import copy
 import unittest
 from ovs.dal.hybrids.vdisk import VDisk
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic import fakesleep
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -47,9 +47,9 @@ class VDiskTest(unittest.TestCase):
         MockStorageRouterClient.clean()
 
         fakesleep.monkey_patch()
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_maxload', 75)
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 2)
+        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        Configuration.set('/ovs/framework/storagedriver|mds_maxload', 75)
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
 
     def setUp(self):
         """

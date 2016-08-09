@@ -22,7 +22,7 @@ import unittest
 from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.hybrids.service import Service
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient, MockStorageRouterClient
@@ -49,17 +49,17 @@ class MDSServices(unittest.TestCase):
         MockStorageRouterClient.clean()
         MockMetadataServerClient.clean()
 
-        EtcdConfiguration.set('/ovs/framework/logging|path', '/var/log/ovs')
-        EtcdConfiguration.set('/ovs/framework/logging|level', 'DEBUG')
-        EtcdConfiguration.set('/ovs/framework/logging|default_file', 'generic')
-        EtcdConfiguration.set('/ovs/framework/logging|default_name', 'logger')
+        Configuration.set('/ovs/framework/logging|path', '/var/log/ovs')
+        Configuration.set('/ovs/framework/logging|level', 'DEBUG')
+        Configuration.set('/ovs/framework/logging|default_file', 'generic')
+        Configuration.set('/ovs/framework/logging|default_name', 'logger')
 
     @classmethod
     def tearDownClass(cls):
         """
         Tear down changes made during setUpClass
         """
-        EtcdConfiguration._unittest_data = {}
+        Configuration._unittest_data = {}
 
         cls.persistent = PersistentFactory.get_client()
         cls.persistent.clean()
@@ -188,7 +188,7 @@ class MDSServices(unittest.TestCase):
             * Retrieve and validate preferred storage driver config for vpool2
             * Update capacity for 1 MDS service in vpool1 and validate changes in preferred storage driver config
         """
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 3)
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
         vpools, storagerouters, storagedrivers, services, mds_services, _, _, _ = Helper.build_service_structure(
             {'vpools': [1, 2],
              'domains': [1, 2],
@@ -358,8 +358,8 @@ class MDSServices(unittest.TestCase):
             * Sub-Test 11: Increase safety and some more vDisks
             * Sub-Test 12: Decrease safety
         """
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 3)
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
+        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
         vpools, storagerouters, storagedrivers, _, mds_services, service_type, domains, _ = Helper.build_service_structure(
             {'vpools': [1],
              'domains': [1, 2],
@@ -371,7 +371,7 @@ class MDSServices(unittest.TestCase):
         )
         vdisks = {}
         for sr in storagerouters.values():
-            EtcdConfiguration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
+            Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
         for mds_service in mds_services.itervalues():
             vdisks.update(Helper.create_vdisks_for_mds_service(amount=2, start_id=len(vdisks) + 1, mds_service=mds_service))
 
@@ -550,8 +550,8 @@ class MDSServices(unittest.TestCase):
         PersistentFactory.store.clean()
         VolatileFactory.store.clean()
 
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 3)
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
+        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
 
         vpools, storagerouters, storagedrivers, _, mds_services, service_type, domains, storagerouter_domains = Helper.build_service_structure(
             {'vpools': [1],
@@ -564,7 +564,7 @@ class MDSServices(unittest.TestCase):
                                        (9, 5, 3, True), (10, 6, 3, False), (11, 7, 3, False), (12, 7, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
         for sr in storagerouters.values():
-            EtcdConfiguration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
+            Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(Helper.create_vdisks_for_mds_service(amount=1, start_id=len(vdisks) + 1, mds_service=mds_service))
@@ -719,7 +719,7 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 11: Add some more vDisks and increase safety
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 5)
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 5)
         for mds_service in mds_services.itervalues():
             vdisks.update(Helper.create_vdisks_for_mds_service(amount=1, start_id=len(vdisks) + 1, mds_service=mds_service))
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
@@ -754,7 +754,7 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 12: Reduce safety
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 3)
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.6', 'port': 8}, {'ip': '10.0.0.5', 'port': 6}],
                    [{'ip': '10.0.0.2', 'port': 3}, {'ip': '10.0.0.7', 'port': 9}, {'ip': '10.0.0.5', 'port': 6}],
@@ -828,8 +828,8 @@ class MDSServices(unittest.TestCase):
             * Sub-Test 9: Add backup failure domain
             * Sub-Test 10: Remove backup failure domain
         """
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 2)
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
+        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
 
         vpools, storagerouters, storagedrivers, _, mds_services, service_type, domains, _ = Helper.build_service_structure(
             {'vpools': [1],
@@ -841,7 +841,7 @@ class MDSServices(unittest.TestCase):
                                        (5, 3, 2, False), (6, 3, 1, True), (7, 4, 2, False), (8, 4, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
         for sr in storagerouters.values():
-            EtcdConfiguration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 55)
+            Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 55)
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(Helper.create_vdisks_for_mds_service(amount=2, start_id=len(vdisks) + 1, mds_service=mds_service))
@@ -1015,8 +1015,8 @@ class MDSServices(unittest.TestCase):
         PersistentFactory.store.clean()
         VolatileFactory.store.clean()
 
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 2)
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
+        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
 
         vpools, storagerouters, storagedrivers, _, mds_services, service_type, domains, storagerouter_domains = Helper.build_service_structure(
             {'vpools': [1],
@@ -1029,7 +1029,7 @@ class MDSServices(unittest.TestCase):
                                        (9, 5, 3, True), (10, 6, 3, False), (11, 7, 3, False), (12, 7, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
         for sr in storagerouters.values():
-            EtcdConfiguration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 35)
+            Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 35)
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(Helper.create_vdisks_for_mds_service(amount=1, start_id=len(vdisks) + 1, mds_service=mds_service))

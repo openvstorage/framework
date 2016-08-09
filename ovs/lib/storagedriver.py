@@ -31,7 +31,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
@@ -112,7 +112,7 @@ class StorageDriverController(object):
                     remaining_ips.append(service.storagerouter.ip)
         if current_service is not None:
             StorageDriverController._logger.debug('* Shrink StorageDriver cluster')
-            cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
+            cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
             ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip,
                                             cluster_name=cluster_name,
                                             offline_nodes=offline_node_ips)
@@ -197,12 +197,12 @@ class StorageDriverController(object):
                 storagerouter = None
 
             cluster_name = metadata.cluster_id
-            EtcdConfiguration.set('/ovs/framework/arakoon_clusters|voldrv', cluster_name)
+            Configuration.set('/ovs/framework/arakoon_clusters|voldrv', cluster_name)
             StorageDriverController._logger.info('Claiming {0} managed arakoon cluster: {1}'.format('externally' if storagerouter is None else 'internally', cluster_name))
             StorageDriverController._configure_arakoon_to_volumedriver(cluster_name=cluster_name)
             current_services.append(add_service(service_storagerouter=storagerouter, arakoon_ports=ports))
 
-        cluster_name = EtcdConfiguration.get('/ovs/framework/arakoon_clusters').get('voldrv')
+        cluster_name = Configuration.get('/ovs/framework/arakoon_clusters').get('voldrv')
         if cluster_name is None:
             return
         metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
@@ -230,9 +230,9 @@ class StorageDriverController(object):
             arakoon_nodes.append({'host': node.ip,
                                   'port': node.client_port,
                                   'node_id': node.name})
-        if EtcdConfiguration.dir_exists('/ovs/vpools'):
-            for vpool_guid in EtcdConfiguration.list('/ovs/vpools'):
-                for storagedriver_id in EtcdConfiguration.list('/ovs/vpools/{0}/hosts'.format(vpool_guid)):
+        if Configuration.dir_exists('/ovs/vpools'):
+            for vpool_guid in Configuration.list('/ovs/vpools'):
+                for storagedriver_id in Configuration.list('/ovs/vpools/{0}/hosts'.format(vpool_guid)):
                     storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_guid, storagedriver_id)
                     storagedriver_config.load()
                     storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=cluster_name,
