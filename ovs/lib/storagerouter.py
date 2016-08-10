@@ -393,13 +393,14 @@ class StorageRouterController(object):
             if vpool is not None:
                 backend_info_map = {}
                 for key, info in vpool.metadata.iteritems():
-                    local = info['connection']['local']
+                    connection = info['connection']
                     backend_info_map[key] = {'backend': {'backend': info['backend_guid'],
                                                          'metadata': info['preset']},
-                                             'host': info['connection']['host'] if local is False else '',
-                                             'port': info['connection']['port'] if local is False else '',
-                                             'username': info['connection']['client_id'] if local is False else '',
-                                             'password': info['connection']['client_secret'] if local is False else ''}
+                                             'host': connection['host'],
+                                             'port': connection['port'],
+                                             'username': connection['client_id'],
+                                             'password': connection['client_secret'],
+                                             'local': connection['local']}
             else:
                 backend_info_map = {'backend': backend_connection_info}
             if use_accelerated_alba is True:
