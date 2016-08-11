@@ -706,6 +706,8 @@ class SetupController(object):
                     for partition in disk.partitions:
                         partition.delete()
                     disk.delete()
+                for j_domain in storage_router.domains:
+                    j_domain.delete()
 
                 storage_router.delete()
                 EtcdConfiguration.delete('/ovs/framework/hosts/{0}'.format(storage_router.machine_id))
