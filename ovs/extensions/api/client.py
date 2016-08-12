@@ -129,23 +129,43 @@ class OVSClient(object):
         if self._raw_response is True and overrule_raw is False:
             return response
 
-        if response.status_code == 403:
-            raise ForbiddenException('No access to the requested API')
-        if response.status_code == 404:
-            raise NotFoundException('The requested API could not be located')
-        if response.status_code == 405:
-            raise RuntimeError('Requested method not allowed')
-        if response.status_code == 406:
-            raise RuntimeError('The request was unacceptable: {0}'.format(response.text))
-        if response.status_code == 429:
-            raise RuntimeError('The requested API has rate limiting: {0}'.format(response.text))
-        if response.status_code == 500:
-            raise RuntimeError('Received internal server error: {0}'.format(response.text))
+        status_code = response.status_code
+        parsed_output = None
         try:
-            return_data = response.json()
-            return return_data
+            parsed_output = response.json()
         except:
-            raise RuntimeError('Could not parse returned data: {0}: {1}'.format(response.status_code, response.text))
+            pass
+
+        if 200 <= status_code < 300:
+            if parsed_output is not None:
+                return parsed_output
+            raise RuntimeError('Could not parse returned data: {0}: {1}'.format(status_code, response.text))
+        else:
+            if status_code in [401, 403]:
+                exception = ForbiddenException
+            else:
+                exception = RuntimeError
+            if parsed_output is not None:
+                message = None
+                if 'error_description' in parsed_output:
+                    message = parsed_output['error_description']
+                if 'error' in parsed_output:
+                    if message is None:
+                        message = parsed_output['error']
+                    else:
+                        message += ' ({0})'.format(parsed_output['error'])
+                raise exception(message or 'Unknown error')
+            messages = {401: 'No access to the requested API',
+                        403: 'No access to the requested API',
+                        404: 'The requested API could not be found',
+                        405: 'Requested method not allowed',
+                        406: 'The request was unacceptable',
+                        429: 'Rate limit was hit',
+                        500: 'Internal server error'}
+            if status_code in messages:
+                raise exception(messages[status_code])
+            else:
+                raise exception('Unknown error')
 
     def _call(self, api, params, function, **kwargs):
         if not api.endswith('/'):
