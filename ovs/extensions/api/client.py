@@ -136,7 +136,7 @@ class OVSClient(object):
         except:
             pass
 
-        if 200 <= response.status_code < 300:
+        if 200 <= status_code < 300:
             if parsed_output is not None:
                 return parsed_output
             raise RuntimeError('Could not parse returned data: {0}: {1}'.format(status_code, response.text))
