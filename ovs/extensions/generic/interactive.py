@@ -95,6 +95,13 @@ class Interactive(object):
         return choice_options[result - 1]
 
     @staticmethod
+    def ask_continue():
+        """
+        Wait for the user's confirmation to continue
+        """
+        raw_input('Press enter to continue')
+
+    @staticmethod
     def ask_string(message='', default_value=None, regex_info=None):
         """
         Asks the user a question

@@ -45,7 +45,7 @@ class ArakoonConfiguration(object):
     Helper for configuration management in Arakoon
     """
 
-    CACC_LOCATION = '/opt/OpenvStorage/config/cacc.ini'
+    CACC_LOCATION = '/opt/OpenvStorage/config/arakoon_cacc.ini'
     _client = None
     _lock = Lock()
 

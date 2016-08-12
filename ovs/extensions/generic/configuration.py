@@ -84,6 +84,7 @@ class Configuration(object):
 
     @staticmethod
     def get_configuration_path(key):
+        _ = Configuration.get(key)
         return Configuration._passthrough(method='get_configuration_path',
                                           key=key)
 
@@ -373,7 +374,7 @@ class Configuration(object):
 
     @staticmethod
     def _passthrough(method, *args, **kwargs):
-        store = Configuration._get_store()
+        store = Configuration.get_store()
         if store == 'etcd':
             import etcd
             from ovs.extensions.db.etcd.configuration import EtcdConfiguration
@@ -393,7 +394,7 @@ class Configuration(object):
         raise NotImplementedError('Store {0} is not implemented'.format(store))
 
     @staticmethod
-    def _get_store():
+    def get_store():
         if Configuration._store is None:
             with open(Configuration.BOOSTRAP_CONFIG_LOCATION) as config_file:
                 contents = json.load(config_file)

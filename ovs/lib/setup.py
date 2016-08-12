@@ -141,9 +141,6 @@ class SetupController(object):
                 external_config = resume_config.get('external_config', external_config)
                 enable_heartbeats = resume_config.get('enable_heartbeats', enable_heartbeats)
 
-                if cluster_name is not None and master_ip == cluster_ip and external_config is None and config is None:  # Failed setup with connectivity issues to the external Etcd
-                    external_etcd = SetupController._retrieve_external_etcd_info()
-
                 if config is None:  # Non-automated install
                     SetupController._logger.debug('Cluster selection')
                     new_cluster = 'Create a new cluster'
@@ -167,8 +164,6 @@ class SetupController(object):
                         cluster_ip = master_ip
                         SetupController.nodes = {node_name: {'ip': master_ip,
                                                              'type': 'master'}}
-                        if external_etcd is None:
-                            external_etcd = SetupController._retrieve_external_etcd_info()
 
                     elif cluster_name == join_manually:  # Join an existing cluster manually
                         first_node = False
@@ -361,7 +356,7 @@ class SetupController(object):
                 resume_config['unique_id'] = unique_id
                 resume_config['cluster_ip'] = cluster_ip
                 resume_config['cluster_name'] = cluster_name
-                resume_config['external_etcd'] = external_etcd
+                resume_config['external_config'] = external_config
                 resume_config['enable_heartbeats'] = enable_heartbeats
                 with open(resume_config_file, 'w') as resume_cfg:
                     resume_cfg.write(json.dumps(resume_config))
@@ -374,7 +369,7 @@ class SetupController(object):
                                                           cluster_name=cluster_name,
                                                           node_name=node_name,
                                                           enable_heartbeats=enable_heartbeats,
-                                                          external_etcd=external_etcd,
+                                                          external_config=external_config,
                                                           logging_target=logging_target,
                                                           rdma=rdma)
                     except Exception as ex:
@@ -734,22 +729,57 @@ class SetupController(object):
         machine_id = System.get_my_machine_id(target_client)
 
         SetupController._log(messages='Setting up configration management')
-        configuration_store = Interactive.ask_choice(['Arakoon', 'Etcd'],
-                                                     question='Select the configuration management system',
-                                                     default_value='Arakoon')
-        if configuration_store == 'Arakoon':
-            SetupController._log(messages='Setting up configuration Arakoon')
-            if external_config is None:
-                ArakoonInstaller.create_cluster('config', 'CFG', cluster_ip)
+        if external_config is None:
+            store = Interactive.ask_choice(['Arakoon', 'Etcd'],
+                                           question='Select the configuration management system',
+                                           default_value='Arakoon')
+            external = None
+            if Interactive.ask_yesno(message='Use an external cluster?', default_value=False) is True:
+                if store == 'arakoon':
+                    from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+                    file_location = ArakoonConfiguration.CACC_LOCATION
+                    while not target_client.file_exists(file_location):
+                        SetupController._log(messages='Please place a copy of the Arakoon\'s client configuration file at: {0}'.format(file_location))
+                        Interactive.ask_continue()
+                    external = True
+                else:
+                    SetupController._log(messages='Provide the connection information to 1 of the Etcd servers (Can be requested by executing "etcdctl member list")')
+                    etcd_ip = Interactive.ask_string(message='Provide the peer IP address of that member',
+                                                     regex_info={'regex': SSHClient.IP_REGEX,
+                                                                 'message': 'Incorrect Etcd IP provided'})
+                    etcd_port = Interactive.ask_integer(question='Provide the port for the given IP address of that member',
+                                                        min_value=1025, max_value=65535, default_value=2380)
+                    external = 'config=http://{0}:{1}'.format(etcd_ip, etcd_port)
+            config = {'type': store,
+                      'external': external}
         else:
+            config = external_config
+        if config['type'] == 'arakoon':
+            SetupController._log(messages='Setting up configuration Arakoon')
+            from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+            if config['exernal'] is None:
+                ArakoonInstaller.create_cluster(cluster_name='config',
+                                                cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
+                                                ip=cluster_ip,
+                                                base_dir='/opt/OpenvStorage/db',
+                                                locked=False,
+                                                claim=True,
+                                                filesystem=True)
+                contents = target_client.file_read(ArakoonClusterConfig.CONFIG_FILE.format('config'))
+                target_client.file_write(ArakoonConfiguration.CACC_LOCATION, contents)
+            else:
+                arakoon_config = ArakoonClusterConfig('cacc', True)
+                arakoon_config.load_config(cluster_ip)
+                ArakoonConfiguration.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, json.dumps(arakoon_config.export(), indent=4))
+        else:
+            SetupController._log(messages='Setting up Etcd')
             from etcd import EtcdConnectionFailed, EtcdException, EtcdKeyError
             from ovs.extensions.db.etcd.installer import EtcdInstaller
-            SetupController._log(messages='Setting up Etcd')
-            if external_config is None:
+            if config['exernal'] is None:
                 EtcdInstaller.create_cluster('config', cluster_ip)
             else:
                 try:
-                    EtcdInstaller.use_external(external_config, cluster_ip, 'config')
+                    EtcdInstaller.use_external(config['external'], cluster_ip, 'config')
                 except (EtcdConnectionFailed, EtcdException, EtcdKeyError):
                     SetupController._log(messages='Failed to set up Etcd proxy')
                     resume_config_file = '/opt/OpenvStorage/config/openvstorage_resumeconfig.json'
@@ -761,6 +791,7 @@ class SetupController(object):
                         with open(resume_config_file, 'w') as resume_cfg:
                             resume_cfg.write(json.dumps(resume_config))
                     raise
+        target_client.file_write(Configuration.BOOSTRAP_CONFIG_LOCATION, json.dumps({'configuration_store': config['type']}, indent=4))
 
         Configuration.initialize(external_config=external_config, logging_target=logging_target)
         Configuration.initialize_host(machine_id)
@@ -1040,10 +1071,23 @@ class SetupController(object):
         """
         SetupController._log(messages='Adding extra node', title=True)
         target_client = ip_client_map[cluster_ip]
+        master_client = ip_client_map[master_ip]
         machine_id = System.get_my_machine_id(target_client)
 
-        SetupController._log(messages='Extending Etcd cluster to this node')
-        EtcdInstaller.deploy_to_slave(master_ip, cluster_ip, 'config')
+        target_client.file_write(Configuration.BOOSTRAP_CONFIG_LOCATION,
+                                 master_client.file_read(Configuration.BOOSTRAP_CONFIG_LOCATION))
+        config_store = Configuration.get_store()
+        if config_store == 'etcd':
+            from ovs.extensions.db.etcd.installer import EtcdInstaller
+            SetupController._log(messages='Extending Etcd cluster')
+            EtcdInstaller.deploy_to_slave(master_ip, cluster_ip, 'config')
+        else:
+            SetupController._log(messages='Joining Arakoon cluster')
+            ArakoonInstaller.extend_cluster(master_ip=master_ip,
+                                            new_ip=cluster_ip,
+                                            cluster_name='config',
+                                            base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
+
         Configuration.initialize_host(machine_id)
 
         if ServiceManager.has_fleet():
@@ -1800,23 +1844,6 @@ EOF
             if not isinstance(endpoints, list) or len(endpoints) == 0:
                 raise ValueError('The endpoints for {0} cannot be empty and must be a list'.format(service))
         return internal
-
-    @staticmethod
-    def _retrieve_external_etcd_info():
-        """
-        Retrieve external Etcd information interactively
-        :return: External Etcd or None
-        """
-        external_etcd = None
-        if Interactive.ask_yesno(message='Use an external Etcd cluster?', default_value=False) is True:
-            SetupController._log(messages='Provide the connection information to 1 of the external Etcd servers (Can be requested by executing "etcdctl member list")')
-            etcd_ip = Interactive.ask_string(message='Provide the peer IP address of that member',
-                                             regex_info={'regex': SSHClient.IP_REGEX,
-                                                         'message': 'Incorrect Etcd IP provided'})
-            etcd_port = Interactive.ask_integer(question='Provide the port for the given IP address of that member',
-                                                min_value=1025, max_value=65535, default_value=2380)
-            external_etcd = 'config=http://{0}:{1}'.format(etcd_ip, etcd_port)
-        return external_etcd
 
     @staticmethod
     def _log(messages, title=False, boxed=False, loglevel='info'):
