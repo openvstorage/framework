@@ -141,7 +141,7 @@ class OVSClient(object):
                 return parsed_output
             raise RuntimeError('Could not parse returned data: {0}: {1}'.format(status_code, response.text))
         else:
-            if response.status_code in [401, 403]:
+            if status_code in [401, 403]:
                 exception = ForbiddenException
             else:
                 exception = RuntimeError
