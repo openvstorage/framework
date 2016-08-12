@@ -295,7 +295,7 @@ class SetupController(object):
 
                 missing_files = set()
                 for required_file in [known_hosts_ovs, known_hosts_root, ssh_public_key_ovs, ssh_public_key_root]:
-                    if not local_client.file_exists(ssh_public_key_ovs):
+                    if not local_client.file_exists(required_file):
                         missing_files.add('Could not find file {0} on node with IP {1}'.format(required_file, local_client.ip))
                 if missing_files:
                     raise ValueError('Missing files:\n - {0}'.format('\n - '.join(sorted(list(missing_files)))))
