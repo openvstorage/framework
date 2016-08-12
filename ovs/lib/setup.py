@@ -1081,12 +1081,6 @@ class SetupController(object):
             from ovs.extensions.db.etcd.installer import EtcdInstaller
             SetupController._log(messages='Extending Etcd cluster')
             EtcdInstaller.deploy_to_slave(master_ip, cluster_ip, 'config')
-        else:
-            SetupController._log(messages='Joining Arakoon cluster')
-            ArakoonInstaller.extend_cluster(master_ip=master_ip,
-                                            new_ip=cluster_ip,
-                                            cluster_name='config',
-                                            base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
 
         Configuration.initialize_host(machine_id)
 
@@ -1157,6 +1151,20 @@ class SetupController(object):
         storagerouter.node_type = 'MASTER'
         storagerouter.save()
 
+        config_store = Configuration.get_store()
+        if config_store == 'arakoon':
+            SetupController._log(messages='Joining Arakoon cluster')
+            ArakoonInstaller.extend_cluster(master_ip=master_ip,
+                                            new_ip=cluster_ip,
+                                            cluster_name='config',
+                                            base_dir='/opt/OpenvStorage/db')
+        else:
+            external_config = Configuration.get('/ovs/framework/external_config')
+            if external_config is None:
+                from ovs.extensions.db.etcd.installer import EtcdInstaller
+                SetupController._log(messages='Joining Etcd cluster')
+                EtcdInstaller.extend_cluster(master_ip, cluster_ip, 'config')
+
         # Find other (arakoon) master nodes
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|ovsdb'))
         arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=arakoon_cluster_name)
@@ -1168,25 +1176,21 @@ class SetupController(object):
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
-        if configure_memcached:
-            SetupController._configure_memcached(target_client)
-        SetupController._configure_redis(target_client)
-        Toolbox.change_service_state(target_client, 'redis-server', 'restart', SetupController._logger)
-        SetupController._add_services(target_client, unique_id, 'master')
-
         arakoon_ports = []
         if arakoon_metadata.internal is True:
-            SetupController._log(messages='Joining Arakoon cluster')
+            if config_store != 'arakoon':
+                SetupController._log(messages='Joining Arakoon cluster')
             result = ArakoonInstaller.extend_cluster(master_ip=master_ip,
                                                      new_ip=cluster_ip,
                                                      cluster_name=arakoon_cluster_name,
                                                      base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
             arakoon_ports = [result['client_port'], result['messaging_port']]
 
-        external_etcd = Configuration.get('/ovs/framework/external_etcd')
-        if external_etcd is None:
-            SetupController._log(messages='Joining Etcd cluster')
-            EtcdInstaller.extend_cluster(master_ip, cluster_ip, 'config')
+        if configure_memcached:
+            SetupController._configure_memcached(target_client)
+        SetupController._configure_redis(target_client)
+        Toolbox.change_service_state(target_client, 'redis-server', 'restart', SetupController._logger)
+        SetupController._add_services(target_client, unique_id, 'master')
 
         SetupController._log(messages='Update configurations')
         if configure_memcached is True:
