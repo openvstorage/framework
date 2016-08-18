@@ -515,6 +515,7 @@ if os.path.islink('{0}'):
         else:
             sftp = self.client.open_sftp()
             sftp.put(local_filename, remote_filename)
+            sftp.close()
 
     def file_exists(self, filename):
         """
