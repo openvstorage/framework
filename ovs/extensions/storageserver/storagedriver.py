@@ -174,7 +174,7 @@ class ObjectRegistryClient(object):
         if key not in oclient_vpool_cache:
             arakoon_node_configs = []
             arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-            config = ArakoonClusterConfig(arakoon_cluster_name)
+            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
             config.load_config()
             for node in config.nodes:
                 arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))

@@ -28,7 +28,6 @@ from subprocess import check_output
 from ConfigParser import RawConfigParser
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.packages.package import PackageManager
 from ovs.log.log_handler import LogHandler
 

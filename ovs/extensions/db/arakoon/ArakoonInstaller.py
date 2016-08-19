@@ -17,7 +17,6 @@
 """
 ArakoonNodeConfig class
 ArakoonClusterConfig class
-ArakoonClusterMetadata class
 ArakoonInstaller class
 """
 
@@ -101,6 +100,10 @@ class ArakoonClusterConfig(object):
 
     @property
     def config_path(self):
+        """
+        Retrieve the configuration path
+        :return: Configuration path
+        """
         if self.filesystem is False:
             return ArakoonClusterConfig.CONFIG_KEY.format(self.cluster_id)
         return ArakoonClusterConfig.CONFIG_FILE.format(self.cluster_id)
@@ -108,7 +111,7 @@ class ArakoonClusterConfig(object):
     def _load_client(self, ip):
         if self.filesystem is True:
             if ip is None:
-                raise RuntimeError('An ip should be passed for filesystem configuration')
+                raise RuntimeError('An IP should be passed for filesystem configuration')
             return SSHClient(ip, username=ArakoonInstaller.SSHCLIENT_USER)
 
     def load_config(self, ip=None):
@@ -325,6 +328,7 @@ class ArakoonInstaller(object):
                                                   home=home_dir,
                                                   tlog_dir=tlog_dir))
             metadata = {'internal': internal,
+                        'cluster_name': cluster_name,
                         'cluster_type': cluster_type.upper(),
                         'in_use': claim}
             ArakoonInstaller._deploy(config)
@@ -417,7 +421,10 @@ class ArakoonInstaller(object):
         finally:
             if port_mutex is not None:
                 port_mutex.release()
-        ArakoonInstaller.restart_cluster_add(cluster_name, current_ips, new_ip, filesystem)
+        ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
+                                             current_ips=current_ips,
+                                             new_ip=new_ip,
+                                             filesystem=filesystem)
         arakoon_client = ArakoonInstaller._build_client(config)
         arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, json.dumps(config.export(), indent=4))
 
@@ -487,8 +494,8 @@ class ArakoonInstaller(object):
         :type cluster_type: str
         :param locked: Execute this in a locked context
         :type locked: bool
-        :return: List of ArakoonClusterMetadata objects
-        :rtype: ArakoonClusterMetadata
+        :return: Metadata of the arakoon cluster
+        :rtype: dict
         """
         cluster_type = cluster_type.upper()
         if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
@@ -525,7 +532,7 @@ class ArakoonInstaller(object):
         :param ip: The ip address of one of the nodes containing the configuration file, if on filesystem
         :type ip: str
         :return: Arakoon cluster metadata information
-        :rtype: ArakoonClusterMetadata
+        :rtype: dict
         """
         config = ArakoonClusterConfig(cluster_name, filesystem)
         config.load_config(ip)
@@ -803,6 +810,20 @@ class ArakoonInstaller(object):
             if len(remaining_ips) > 2:  # A two node cluster needs all nodes running
                 ArakoonInstaller.wait_for_cluster(cluster_name, client)
         ArakoonInstaller._logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))
+
+    @staticmethod
+    def unclaim_externally_managed_cluster(cluster_name):
+        """
+        Tag the arakoon cluster's in_use as False, so it can be re-used
+        :param cluster_name: Name of the arakoon cluster
+        :return: None
+        """
+        config = ArakoonClusterConfig(cluster_id=cluster_name, filesystem=False)
+        config.load_config()
+        arakoon_client = ArakoonInstaller._build_client(config=config)
+        metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
+        metadata['in_use'] = False
+        arakoon_client.set(ArakoonInstaller.METADATA_KEY, json.dumps(metadata, indent=4))
 
     @staticmethod
     def _build_client(config):

@@ -25,10 +25,12 @@ import string
 
 
 class NotFoundException(Exception):
+    """Not found exception."""
     pass
 
 
 class ConnectionException(Exception):
+    """Connection exception."""
     pass
 
 
@@ -58,7 +60,7 @@ class Configuration(object):
 
     _unittest_data = {}
     _store = None
-    BOOSTRAP_CONFIG_LOCATION = '/opt/OpenvStorage/config/framework.json'
+    BOOTSTRAP_CONFIG_LOCATION = '/opt/OpenvStorage/config/framework.json'
 
     base_config = {'cluster_id': None,
                    'external_config': None,
@@ -84,6 +86,15 @@ class Configuration(object):
 
     @staticmethod
     def get_configuration_path(key):
+        """
+        Retrieve the configuration path
+        For etcd: 'etcd://127.0.0.1:2379{0}'.format(key)
+        For arakoon: 'arakoon:///opt/OpenvStorage/config/arakoon_cacc.ini:{0}'.format(key)
+        :param key: Key to retrieve the full configuration path for
+        :type key: str
+        :return: Configuration path
+        :rtype: str
+        """
         _ = Configuration.get(key)
         return Configuration._passthrough(method='get_configuration_path',
                                           key=key)
@@ -395,8 +406,13 @@ class Configuration(object):
 
     @staticmethod
     def get_store():
+        """
+        Retrieve the configuration store method. This can either be 'etcd' or 'arakoon'
+        :return: Store method
+        :rtype: str
+        """
         if Configuration._store is None:
-            with open(Configuration.BOOSTRAP_CONFIG_LOCATION) as config_file:
+            with open(Configuration.BOOTSTRAP_CONFIG_LOCATION) as config_file:
                 contents = json.load(config_file)
                 Configuration._store = contents['configuration_store']
         return Configuration._store

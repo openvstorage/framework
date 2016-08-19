@@ -395,7 +395,7 @@ class ScheduledTaskController(object):
 
         for cluster in arakoon_clusters:
             ScheduledTaskController._logger.info('  Collapsing cluster {0}'.format(cluster))
-            contents = Configuration.get(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(cluster), raw=True)
+            contents = Configuration.get(ArakoonClusterConfig.CONFIG_KEY.format(cluster), raw=True)
             parser = RawConfigParser()
             parser.readfp(StringIO(contents))
             nodes = {}

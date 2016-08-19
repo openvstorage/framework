@@ -15,7 +15,7 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-Generic module for managing configuration in Etcd
+Generic module for managing configuration in Arakoon
 """
 from ConfigParser import RawConfigParser
 from threading import Lock
@@ -57,17 +57,38 @@ class ArakoonConfiguration(object):
 
     @staticmethod
     def get_configuration_path(key):
+        """
+        Retrieve the full configuration path for specified key
+        :param key: Key to retrieve full configuration path for
+        :type key: str
+        :return: Configuration path
+        :rtype: str
+        """
         return 'arakoon://{0}:{1}'.format(ArakoonConfiguration.CACC_LOCATION, key)
 
     @staticmethod
     @locked()
     def dir_exists(key):
+        """
+        Verify whether the directory exists
+        :param key: Directory to check for existence
+        :type key: str
+        :return: True if directory exists, false otherwise
+        :rtype: bool
+        """
         client = ArakoonConfiguration._get_client()
         return any(client.prefix(key))
 
     @staticmethod
     @locked()
     def list(key):
+        """
+        List all keys starting with specified key
+        :param key: Key to list
+        :type key: str
+        :return: Generator with all keys
+        :rtype: generator
+        """
         client = ArakoonConfiguration._get_client()
         for entry in client.prefix(key):
             yield entry.replace(key, '')
@@ -75,6 +96,14 @@ class ArakoonConfiguration(object):
     @staticmethod
     @locked()
     def delete(key, recursive):
+        """
+        Delete the specified key
+        :param key: Key to delete
+        :type key: str
+        :param recursive: Delete the specified key recursively
+        :type recursive: bool
+        :return: None
+        """
         client = ArakoonConfiguration._get_client()
         if recursive is True:
             client.deletePrefix(key)
@@ -84,12 +113,27 @@ class ArakoonConfiguration(object):
     @staticmethod
     @locked()
     def get(key):
+        """
+        Retrieve the value for specified key
+        :param key: Key to retrieve
+        :type key: str
+        :return: Value of key
+        :rtype: str
+        """
         client = ArakoonConfiguration._get_client()
         return client.get(key)
 
     @staticmethod
     @locked()
     def set(key, value):
+        """
+        Set a value for specified key
+        :param key: Key to set
+        :type key: str
+        :param value: Value to set for key
+        :type value: str
+        :return: None
+        """
         client = ArakoonConfiguration._get_client()
         client.set(key, value)
 

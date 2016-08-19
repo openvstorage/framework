@@ -84,11 +84,25 @@ class EtcdConfiguration(object):
 
     @staticmethod
     def get_configuration_path(key):
+        """
+        Retrieve the full configuration path for specified key
+        :param key: Key to retrieve full configuration path for
+        :type key: str
+        :return: Configuration path
+        :rtype: str
+        """
         return 'etcd://127.0.0.1:2379{0}'.format(key)
 
     @staticmethod
     @log_slow_calls
     def dir_exists(key):
+        """
+        Verify whether the directory exists
+        :param key: Directory to check for existence
+        :type key: str
+        :return: True if directory exists, false otherwise
+        :rtype: bool
+        """
         key = EtcdConfiguration._coalesce_dashes(key=key)
         try:
             client = EtcdConfiguration._get_client()
@@ -99,6 +113,13 @@ class EtcdConfiguration(object):
     @staticmethod
     @log_slow_calls
     def list(key):
+        """
+        List all keys starting with specified key
+        :param key: Key to list
+        :type key: str
+        :return: Generator with all keys
+        :rtype: generator
+        """
         key = EtcdConfiguration._coalesce_dashes(key=key)
         client = EtcdConfiguration._get_client()
         for child in client.get(key).children:
@@ -108,6 +129,14 @@ class EtcdConfiguration(object):
     @staticmethod
     @log_slow_calls
     def delete(key, recursive):
+        """
+        Delete the specified key
+        :param key: Key to delete
+        :type key: str
+        :param recursive: Delete the specified key recursively
+        :type recursive: bool
+        :return: None
+        """
         key = EtcdConfiguration._coalesce_dashes(key=key)
         client = EtcdConfiguration._get_client()
         client.delete(key, recursive=recursive)
@@ -115,13 +144,28 @@ class EtcdConfiguration(object):
     @staticmethod
     @log_slow_calls
     def get(key):
+        """
+        Retrieve the value for specified key
+        :param key: Key to retrieve
+        :type key: str
+        :return: Value of key
+        :rtype: str
+        """
         key = EtcdConfiguration._coalesce_dashes(key=key)
         client = EtcdConfiguration._get_client()
         return client.read(key, quorum=True).value
 
     @staticmethod
     @log_slow_calls
-    def _set(key, value):
+    def set(key, value):
+        """
+        Set a value for specified key
+        :param key: Key to set
+        :type key: str
+        :param value: Value to set for key
+        :type value: str
+        :return: None
+        """
         key = EtcdConfiguration._coalesce_dashes(key=key)
         client = EtcdConfiguration._get_client()
         client.write(key, value)

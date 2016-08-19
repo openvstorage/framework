@@ -35,7 +35,6 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.backendtypelist import BackendTypeList
-from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -594,7 +593,7 @@ class StorageRouterController(object):
 
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-        config = ArakoonClusterConfig(arakoon_cluster_name)
+        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
         config.load_config()
         arakoon_nodes = []
         arakoon_node_configs = []
@@ -1174,7 +1173,7 @@ class StorageRouterController(object):
                         StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed with error: {3}'.format(storage_driver.guid, vdisk.guid, vdisk.name, ex))
 
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-        config = ArakoonClusterConfig(arakoon_cluster_name)
+        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
         config.load_config()
         arakoon_node_configs = []
         offline_node_ips = [sr.ip for sr in storage_routers_offline]
@@ -1609,7 +1608,7 @@ class StorageRouterController(object):
         if metadata is None:
             raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found None'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
 
-        if metadata.internal is True:
+        if metadata['internal'] is True:
             ovsdb_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == ServiceType.SERVICE_TYPES.ARAKOON and ser.name == 'arakoon-ovsdb']
             downtime = [('ovs', 'ovsdb', None)] if len(ovsdb_cluster) < 3 and this_sr.guid in ovsdb_cluster else []
 
@@ -1659,7 +1658,7 @@ class StorageRouterController(object):
             if metadata is None:
                 raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found None'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
 
-            if metadata.internal is True:
+            if metadata['internal'] is True:
                 voldrv_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == ServiceType.SERVICE_TYPES.ARAKOON and ser.name == 'arakoon-voldrv']
                 downtime = [('ovs', 'voldrv', None)] if len(voldrv_cluster) < 3 and this_sr.guid in voldrv_cluster else []
 
