@@ -74,9 +74,10 @@ class SetupController(object):
         rdma = None
         master_ip = None
         cluster_ip = None
-        external_config = None
         logging_target = None
+        external_config = None
         master_password = None
+        config_mgmt_type = None
         enable_heartbeats = True
 
         try:
@@ -91,8 +92,9 @@ class SetupController(object):
                 rdma = config.get('rdma', False)
                 node_type = config.get('node_type', node_type)
                 cluster_ip = config.get('cluster_ip', master_ip)  # If cluster_ip not provided, we assume 1st node installation
-                external_config = config.get('external_config')
+                config_mgmt_type = config.get('config_mgmt_type')
                 logging_target = config.get('logging_target', logging_target)
+                external_config = config.get('external_config')
                 enable_heartbeats = config.get('enable_heartbeats', enable_heartbeats)
 
             # Support resume setup - store entered parameters so when retrying, we have the values
@@ -120,7 +122,7 @@ class SetupController(object):
                     promote_completed = Configuration.get('/ovs/framework/hosts/{0}/promotecompleted'.format(unique_id))
                 if setup_completed is True and (promote_completed is True or type_node == 'EXTRA'):
                     raise RuntimeError('This node has already been configured for Open vStorage. Re-running the setup is not supported.')
-            except (NotFoundException, ConnectionException):
+            except (IOError, NotFoundException, ConnectionException):
                 pass
 
             if setup_completed is False:
@@ -138,6 +140,7 @@ class SetupController(object):
                 master_ip = resume_config.get('master_ip', master_ip)
                 cluster_ip = resume_config.get('cluster_ip', cluster_ip)
                 external_config = resume_config.get('external_config', external_config)
+                config_mgmt_type = resume_config.get('config_mgmt_type', config_mgmt_type)
                 enable_heartbeats = resume_config.get('enable_heartbeats', enable_heartbeats)
 
                 if config is None:  # Non-automated install
@@ -356,6 +359,7 @@ class SetupController(object):
                 resume_config['cluster_ip'] = cluster_ip
                 resume_config['cluster_name'] = cluster_name
                 resume_config['external_config'] = external_config
+                resume_config['config_mgmt_type'] = config_mgmt_type
                 resume_config['enable_heartbeats'] = enable_heartbeats
                 with open(resume_config_file, 'w') as resume_cfg:
                     resume_cfg.write(json.dumps(resume_config))
@@ -368,7 +372,8 @@ class SetupController(object):
                                                           cluster_name=cluster_name,
                                                           node_name=node_name,
                                                           enable_heartbeats=enable_heartbeats,
-                                                          external_config=external_config,
+                                                          external_config={'type': config_mgmt_type,
+                                                                           'external': external_config},
                                                           logging_target=logging_target,
                                                           rdma=rdma)
                     except Exception as ex:
@@ -727,8 +732,8 @@ class SetupController(object):
         cluster_ip = target_client.ip
         machine_id = System.get_my_machine_id(target_client)
 
-        SetupController._log(messages='Setting up configration management')
-        if external_config is None:
+        SetupController._log(messages='Setting up configuration management')
+        if external_config['type'] is None:
             store = Interactive.ask_choice(['Arakoon', 'Etcd'],
                                            question='Select the configuration management system',
                                            default_value='Arakoon').lower()
@@ -792,7 +797,7 @@ class SetupController(object):
                     raise
         target_client.file_write(Configuration.BOOTSTRAP_CONFIG_LOCATION, json.dumps({'configuration_store': config['type']}, indent=4))
 
-        Configuration.initialize(external_config=external_config, logging_target=logging_target)
+        Configuration.initialize(external_config=external_config['external'], logging_target=logging_target)
         Configuration.initialize_host(machine_id)
 
         if rdma is None:
@@ -1144,7 +1149,7 @@ class SetupController(object):
         from ovs.dal.hybrids.service import Service
 
         SetupController._log(messages='Promoting node', title=True)
-        if configure_memcached:
+        if configure_memcached is True:
             if SetupController._validate_local_memcache_servers(ip_client_map) is False:
                 raise RuntimeError('Not all memcache nodes can be reached which is required for promoting a node.')
 
@@ -1159,11 +1164,11 @@ class SetupController(object):
 
         config_store = Configuration.get_store()
         if config_store == 'arakoon':
-            SetupController._log(messages='Joining Arakoon cluster')
+            SetupController._log(messages='Joining Arakoon configuration cluster')
             ArakoonInstaller.extend_cluster(master_ip=master_ip,
                                             new_ip=cluster_ip,
                                             cluster_name='config',
-                                            base_dir='/opt/OpenvStorage/db')
+                                            base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
         else:
             external_config = Configuration.get('/ovs/framework/external_config')
             if external_config is None:
@@ -1176,23 +1181,22 @@ class SetupController(object):
         arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=arakoon_cluster_name)
         config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
         config.load_config()
-        master_nodes = [node.ip for node in config.nodes]
-        if cluster_ip in master_nodes:
-            master_nodes.remove(cluster_ip)
-        if len(master_nodes) == 0:
+        master_node_ips = [node.ip for node in config.nodes]
+        if cluster_ip in master_node_ips:
+            master_node_ips.remove(cluster_ip)
+        if len(master_node_ips) == 0:
             raise RuntimeError('There should be at least one other master node')
 
         arakoon_ports = []
         if arakoon_metadata['internal'] is True:
-            if config_store != 'arakoon':
-                SetupController._log(messages='Joining Arakoon cluster')
+            SetupController._log(messages='Joining Arakoon OVS DB cluster')
             result = ArakoonInstaller.extend_cluster(master_ip=master_ip,
                                                      new_ip=cluster_ip,
                                                      cluster_name=arakoon_cluster_name,
                                                      base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
             arakoon_ports = [result['client_port'], result['messaging_port']]
 
-        if configure_memcached:
+        if configure_memcached is True:
             SetupController._configure_memcached(target_client)
         SetupController._configure_redis(target_client)
         Toolbox.change_service_state(target_client, 'redis-server', 'restart', SetupController._logger)
@@ -1215,7 +1219,7 @@ class SetupController(object):
         if arakoon_metadata['internal'] is True:
             SetupController._log(messages='Restarting master node services')
             ArakoonInstaller.restart_cluster_add(cluster_name=arakoon_cluster_name,
-                                                 current_ips=master_nodes,
+                                                 current_ips=master_node_ips,
                                                  new_ip=cluster_ip,
                                                  filesystem=False)
             PersistentFactory.store = None
@@ -1229,7 +1233,7 @@ class SetupController(object):
                 service.storagerouter = storagerouter
                 service.save()
 
-        if configure_rabbitmq:
+        if configure_rabbitmq is True:
             SetupController._configure_rabbitmq(target_client)
             # Copy rabbitmq cookie
             rabbitmq_cookie_file = '/var/lib/rabbitmq/.erlang.cookie'
@@ -1796,7 +1800,7 @@ EOF
         errors = []
         config = config['setup']
         actual_keys = config.keys()
-        expected_keys = ['cluster_ip', 'enable_heartbeats', 'external_config', 'master_ip', 'master_password', 'node_type', 'rdma']
+        expected_keys = ['cluster_ip', 'config_mgmt_type', 'enable_heartbeats', 'external_config', 'master_ip', 'master_password', 'node_type', 'rdma']
         for key in actual_keys:
             if key not in expected_keys:
                 errors.append('Key {0} is not supported by OpenvStorage to be used in the pre-configuration JSON'.format(key))
@@ -1811,6 +1815,10 @@ EOF
                                                         'master_password': (str, None),
                                                         'node_type': (str, ['master', 'extra'], False),
                                                         'rdma': (bool, None, False)})
+        # Parameters only required for 1st node
+        if 'cluster_ip' not in config or config['master_ip'] == config['cluster_ip']:
+            Toolbox.verify_required_params(actual_params=config,
+                                           required_params={'config_mgmt_type': (str, ['arakoon', 'etcd'])})
         return config
 
     @staticmethod

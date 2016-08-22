@@ -95,7 +95,8 @@ class Configuration(object):
         :return: Configuration path
         :rtype: str
         """
-        _ = Configuration.get(key)
+        # @TODO: Why is this required?
+        # _ = Configuration.get(key)
         return Configuration._passthrough(method='get_configuration_path',
                                           key=key)
 
@@ -381,7 +382,8 @@ class Configuration(object):
             return
         # Forward call to used configuration store
         return Configuration._passthrough(method='set',
-                                          key=key, value=value)
+                                          key=key,
+                                          value=data)
 
     @staticmethod
     def _passthrough(method, *args, **kwargs):

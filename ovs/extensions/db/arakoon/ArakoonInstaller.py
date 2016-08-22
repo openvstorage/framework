@@ -509,7 +509,7 @@ class ArakoonInstaller(object):
                 mutex.acquire()
 
             for cluster_name in Configuration.list(ArakoonInstaller.CONFIG_ROOT):
-                config = ArakoonClusterConfig(cluster_name, False)
+                config = ArakoonClusterConfig(cluster_id=cluster_name, filesystem=False)
                 config.load_config()
                 arakoon_client = ArakoonInstaller._build_client(config)
                 metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
