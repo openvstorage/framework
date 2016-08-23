@@ -346,7 +346,7 @@ class SetupController(object):
                     raise RuntimeError('Timeout during ssh keyscan, please check node interconnectivity')
                 signal.signal(signal.SIGALRM, _raise_timeout)
                 for node_details in SetupController.nodes.itervalues():
-                    signal.alarm(10)
+                    signal.alarm(30)
                     node_client = node_details.get('client', SSHClient(endpoint=node_details['ip'], username='root'))
                     System.update_hosts_file(ip_hostname_map, node_client)
                     cmd = 'cp {{0}} {{0}}.tmp; ssh-keyscan -t rsa {0} {1} 2> /dev/null >> {{0}}.tmp; cat {{0}}.tmp | sort -u - > {{0}}'.format(' '.join(all_ips), ' '.join(SetupController.nodes.keys()))
