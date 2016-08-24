@@ -265,15 +265,17 @@ class SSHClient(object):
                     break  # exit as remote side is finished and our buffers are empty
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
-                error_output = ''.join(stderr.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
-                exec_output = ''.join(stdout.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
-                if suppress_logging is False:
-                    SSHClient._logger.error('Command "{0}" failed with output "{1}" and error "{2}"'
-                                            .format(command, exec_output, error_output))
-                raise CalledProcessError(exit_code, command, exec_output)
-            # close all the pseudofiles
-            stdout.close()
-            stderr.close()
+                try:
+                    error_output = ''.join(stderr.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+                    exec_output = ''.join(stdout_chunks).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+                    if suppress_logging is False:
+                        SSHClient._logger.error('Command "{0}" failed with output "{1}" and error "{2}"'
+                                                .format(command, exec_output, error_output))
+                    raise CalledProcessError(exit_code, command, exec_output)
+                finally:
+                # close all the pseudofiles
+                stdout.close()
+                stderr.close()
             if debug:
                 return ''.join(stdout_chunks).strip(), stderr
             else:
