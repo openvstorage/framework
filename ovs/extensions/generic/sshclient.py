@@ -273,9 +273,9 @@ class SSHClient(object):
                                                 .format(command, exec_output, error_output))
                     raise CalledProcessError(exit_code, command, exec_output)
                 finally:
-                # close all the pseudofiles
-                stdout.close()
-                stderr.close()
+                    # close all the pseudofiles
+                    stdout.close()
+                    stderr.close()
             if debug:
                 return ''.join(stdout_chunks).strip(), stderr
             else:
