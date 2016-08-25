@@ -199,6 +199,11 @@ class SSHClient(object):
         """
         return "".join([("\\" + _) if _ in " '\";`|" else _ for _ in path_to_check])
 
+    @staticmethod
+    def _clean_lines(lines):
+        cleaned_text = ''.join(lines).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+        return '\n'.join(line.rstrip() for line in cleaned_text).strip()
+
     @connected()
     def run(self, command, debug=False, suppress_logging=False):
         """
@@ -218,17 +223,17 @@ class SSHClient(object):
                 except OSError as ose:
                     raise CalledProcessError(1, command, str(ose))
                 stdout, stderr = channel.communicate()
-                stdout = stdout.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
-                stderr = stderr.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+                stdout = self._clean_lines(stdout.split())
+                stderr = self._clean_lines(stderr.split())
                 exit_code = channel.returncode
                 if exit_code != 0:  # Raise same error as check_output
                     raise CalledProcessError(exit_code, command, stdout)
                 if debug:
                     SSHClient._logger.debug('stdout: {0}'.format(stdout))
                     SSHClient._logger.debug('stderr: {0}'.format(stderr))
-                    return stdout.strip(), stderr
+                    return stdout, stderr
                 else:
-                    return stdout.strip()
+                    return stdout
             except CalledProcessError as cpe:
                 if suppress_logging is False:
                     SSHClient._logger.error('Command "{0}" failed with output "{1}"{2}'.format(
@@ -239,20 +244,18 @@ class SSHClient(object):
             if isinstance(command, list):
                 command = ' '.join(command)
             _, stdout, stderr = self._client.exec_command(command)  # stdin, stdout, stderr
-            output = stdout.readlines()
-            error = stderr.readlines()
+            stdout = self._clean_lines(stdout.readlines())
+            stderr = self._clean_lines(stderr.readlines())
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
-                stderr = ''.join(output).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
-                stdout = ''.join(output).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 if suppress_logging is False:
                     SSHClient._logger.error('Command "{0}" failed with output "{1}" and error "{2}"'
                                             .format(command, stdout, stderr))
                 raise CalledProcessError(exit_code, command, stdout)
             if debug:
-                return '\n'.join(output).join(error).strip()
+                return stdout, stderr
             else:
-                return '\n'.join(output).strip()
+                return stdout
 
     def dir_create(self, directories):
         """
