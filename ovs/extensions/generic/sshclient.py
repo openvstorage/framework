@@ -112,7 +112,7 @@ class SSHClient(object):
             raise ValueError('The endpoint parameter should be either an ip address or a StorageRouter')
 
         self.ip = ip
-        self_client = None
+        self._client = None
         self.local_ips = [lip.strip() for lip in check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()]
         self.is_local = self.ip in self.local_ips
         self.password = password
@@ -146,7 +146,7 @@ class SSHClient(object):
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.is_connected = types.MethodType(is_connected, client)
                 SSHClient.client_cache[key] = client
-            self_client = SSHClient.client_cache[key]
+            self._client = SSHClient.client_cache[key]
         self._connect()
 
     def __del__(self):
@@ -168,10 +168,10 @@ class SSHClient(object):
 
         try:
             try:
-                self_client.connect(self.ip, username=self.username, password=self.password)
+                self._client.connect(self.ip, username=self.username, password=self.password)
             except:
                 try:
-                    self_client.close()
+                    self._client.close()
                 except:
                     pass
                 raise
@@ -189,7 +189,7 @@ class SSHClient(object):
         if self.is_local is True:
             return
 
-        self_client.close()
+        self._client.close()
 
     @staticmethod
     def shell_safe(path_to_check):
@@ -505,7 +505,7 @@ if os.path.islink('{0}'):
                 the_file.write(contents)
             os.close(handle)
             try:
-                sftp = self_client.open_sftp()
+                sftp = self._client.open_sftp()
                 sftp.put(temp_filename, filename)
                 sftp.close()
             finally:
@@ -521,7 +521,7 @@ if os.path.islink('{0}'):
         if self.is_local is True:
             check_output('cp -f "{0}" "{1}"'.format(local_filename, remote_filename), shell=True)
         else:
-            sftp = self_client.open_sftp()
+            sftp = self._client.open_sftp()
             sftp.put(local_filename, remote_filename)
             sftp.close()
 
