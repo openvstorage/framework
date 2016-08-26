@@ -54,7 +54,7 @@ def connected():
             :param self
             """
             try:
-                if self._client is not None and not self._client.is_connected():
+                if self.client is not None and not self.client.is_connected():
                     self._connect()
                 return outer_function(self, *args, **kwargs)
             except AttributeError as ex:
@@ -112,7 +112,7 @@ class SSHClient(object):
             raise ValueError('The endpoint parameter should be either an ip address or a StorageRouter')
 
         self.ip = ip
-        self._client = None
+        self.client = None
         self.local_ips = [lip.strip() for lip in check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()]
         self.is_local = self.ip in self.local_ips
         self.password = password
@@ -146,7 +146,7 @@ class SSHClient(object):
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.is_connected = types.MethodType(is_connected, client)
                 SSHClient.client_cache[key] = client
-            self._client = SSHClient.client_cache[key]
+            self.client = SSHClient.client_cache[key]
         self._connect()
 
     def __del__(self):
@@ -168,10 +168,10 @@ class SSHClient(object):
 
         try:
             try:
-                self._client.connect(self.ip, username=self.username, password=self.password)
+                self.client.connect(self.ip, username=self.username, password=self.password)
             except:
                 try:
-                    self._client.close()
+                    self.client.close()
                 except:
                     pass
                 raise
@@ -189,7 +189,7 @@ class SSHClient(object):
         if self.is_local is True:
             return
 
-        self._client.close()
+        self.client.close()
 
     @staticmethod
     def shell_safe(path_to_check):
@@ -200,14 +200,11 @@ class SSHClient(object):
         return "".join([("\\" + _) if _ in " '\";`|" else _ for _ in path_to_check])
 
     @staticmethod
-    def _clean_lines(text):
+    def _clean_text(text):
         if type(text) is list:
-            cleaned_text = [x.replace(u'\u2018', u'"').replace(u'\u2019', u'"') for x in text]
-            return '\n'.join(line.rstrip() for line in cleaned_text).strip()
-        elif type(text) is str:
-            cleaned_text = text.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
-            return cleaned_text
-        raise ValueError('Type {0} not supported for cleaning'.format(type(text)))
+            text = '\n'.join(line.rstrip() for line in text)
+        # This strip is absolutely necessary. Without it, channel.communicate() is never executed (odd but true)
+        return text.strip().replace(u'\u2018', u'"').replace(u'\u2019', u'"')
 
     @connected()
     def run(self, command, debug=False, suppress_logging=False):
@@ -228,8 +225,8 @@ class SSHClient(object):
                 except OSError as ose:
                     raise CalledProcessError(1, command, str(ose))
                 stdout, stderr = channel.communicate()
-                stdout = self._clean_lines(stdout)
-                stderr = self._clean_lines(stderr)
+                stdout = self._clean_text(stdout)
+                stderr = self._clean_text(stderr)
                 exit_code = channel.returncode
                 if exit_code != 0:  # Raise same error as check_output
                     raise CalledProcessError(exit_code, command, stdout)
@@ -249,8 +246,8 @@ class SSHClient(object):
             if isinstance(command, list):
                 command = ' '.join(command)
             _, stdout, stderr = self._client.exec_command(command)  # stdin, stdout, stderr
-            output = self._clean_lines(stdout.readlines())
-            error = self._clean_lines(stderr.readlines())
+            output = self._clean_text(stdout.readlines())
+            error = self._clean_text(stderr.readlines())
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
                 if suppress_logging is False:
@@ -507,14 +504,12 @@ if os.path.islink('{0}'):
             with open(temp_filename, mode) as the_file:
                 the_file.write(contents)
             os.close(handle)
-            sftp = None
             try:
-                sftp = self._client.open_sftp()
+                sftp = self.client.open_sftp()
                 sftp.put(temp_filename, filename)
+                sftp.close()
             finally:
                 os.remove(temp_filename)
-                if sftp:
-                    sftp.close()
 
     @connected()
     def file_upload(self, remote_filename, local_filename):
@@ -526,13 +521,9 @@ if os.path.islink('{0}'):
         if self.is_local is True:
             check_output('cp -f "{0}" "{1}"'.format(local_filename, remote_filename), shell=True)
         else:
-            sftp = None
-            try:
-                sftp = self._client.open_sftp()
-                sftp.put(local_filename, remote_filename)
-            finally:
-                if sftp:
-                    sftp.close()
+            sftp = self.client.open_sftp()
+            sftp.put(local_filename, remote_filename)
+            sftp.close()
 
     def file_exists(self, filename):
         """
