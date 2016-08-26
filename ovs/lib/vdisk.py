@@ -394,7 +394,7 @@ class VDiskController(object):
             raise ValueError('No snapshot found for timestamp {0}'.format(timestamp))
         snapshotguid = snapshots[0]['guid']
         VDiskController._wait_for_snapshot_to_be_synced_to_backend(vdisk_guid=vdisk.guid, snapshot_id=snapshotguid)
-        vdisk.storagedriver_client.rollback_volume(str(vdisk.volume_id), snapshotguid)
+        vdisk.storagedriver_client.rollback_volume(str(vdisk.volume_id), str(snapshotguid))
         vdisk.invalidate_dynamics(['snapshots'])
         return True
 
