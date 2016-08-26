@@ -202,7 +202,7 @@ class SSHClient(object):
     @staticmethod
     def _clean_lines(text):
         if type(text) is list:
-            cleaned_text = ''.join(text).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+            cleaned_text = [x.replace(u'\u2018', u'"').replace(u'\u2019', u'"') for x in text]
             return '\n'.join(line.rstrip() for line in cleaned_text).strip()
         elif type(text) is str:
             cleaned_text = text.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
@@ -249,18 +249,18 @@ class SSHClient(object):
             if isinstance(command, list):
                 command = ' '.join(command)
             _, stdout, stderr = self._client.exec_command(command)  # stdin, stdout, stderr
-            stdout = self._clean_lines(stdout.readlines())
-            stderr = self._clean_lines(stderr.readlines())
+            output = self._clean_lines(stdout.readlines())
+            error = self._clean_lines(stderr.readlines())
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
                 if suppress_logging is False:
                     SSHClient._logger.error('Command "{0}" failed with output "{1}" and error "{2}"'
-                                            .format(command, stdout, stderr))
-                raise CalledProcessError(exit_code, command, stdout)
+                                            .format(command, output, error))
+                raise CalledProcessError(exit_code, command, output)
             if debug:
-                return stdout, stderr
+                return output, error
             else:
-                return stdout
+                return output
 
     def dir_create(self, directories):
         """
