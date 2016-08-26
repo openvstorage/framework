@@ -200,9 +200,14 @@ class SSHClient(object):
         return "".join([("\\" + _) if _ in " '\";`|" else _ for _ in path_to_check])
 
     @staticmethod
-    def _clean_lines(lines):
-        cleaned_text = ''.join(lines).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
-        return '\n'.join(line.rstrip() for line in cleaned_text).strip()
+    def _clean_lines(text):
+        if type(text) is list:
+            cleaned_text = ''.join(text).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+            return '\n'.join(line.rstrip() for line in cleaned_text).strip()
+        elif type(text) is str:
+            cleaned_text = text.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+            return cleaned_text
+        raise ValueError('Type {0} not supported for cleaning'.format(type(text)))
 
     @connected()
     def run(self, command, debug=False, suppress_logging=False):
@@ -223,8 +228,8 @@ class SSHClient(object):
                 except OSError as ose:
                     raise CalledProcessError(1, command, str(ose))
                 stdout, stderr = channel.communicate()
-                stdout = self._clean_lines(stdout.split())
-                stderr = self._clean_lines(stderr.split())
+                stdout = self._clean_lines(stdout)
+                stderr = self._clean_lines(stderr)
                 exit_code = channel.returncode
                 if exit_code != 0:  # Raise same error as check_output
                     raise CalledProcessError(exit_code, command, stdout)
