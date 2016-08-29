@@ -49,7 +49,7 @@ class VDiskTest(unittest.TestCase):
         fakesleep.monkey_patch()
         EtcdConfiguration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
         EtcdConfiguration.set('/ovs/framework/storagedriver|mds_maxload', 75)
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 2)
+        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 3)
 
     def setUp(self):
         """
