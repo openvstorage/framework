@@ -95,6 +95,8 @@ class Configuration(object):
         :return: Configuration path
         :rtype: str
         """
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            return 'file://opt/OpenvStorage/config/framework.json?key={0}'.format(key)
         return Configuration._passthrough(method='get_configuration_path',
                                           key=key)
 
@@ -411,6 +413,8 @@ class Configuration(object):
         :return: Store method
         :rtype: str
         """
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            return 'unittest'
         if Configuration._store is None:
             with open(Configuration.BOOTSTRAP_CONFIG_LOCATION) as config_file:
                 contents = json.load(config_file)
