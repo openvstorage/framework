@@ -17,7 +17,6 @@
 """
 Generic module for managing configuration in Arakoon
 """
-import ujson
 from ConfigParser import RawConfigParser
 from threading import Lock
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
@@ -69,9 +68,9 @@ class ArakoonConfiguration(object):
         from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
         config = ArakoonClusterConfig('cacc', filesystem=True)
         config.load_config('127.0.0.1')
-        return 'arakoon://{0}{1}?{2}'.format(
+        return 'arakoon://{0}/{1}?{2}'.format(
             config.cluster_id,
-            key,
+            ArakoonConfiguration._clean_key(key),
             urllib.urlencode({'ini': ArakoonConfiguration.CACC_LOCATION})
         )
 
@@ -85,6 +84,7 @@ class ArakoonConfiguration(object):
         :return: True if directory exists, false otherwise
         :rtype: bool
         """
+        key = ArakoonConfiguration._clean_key(key)
         client = ArakoonConfiguration._get_client()
         return any(client.prefix(key))
 
@@ -98,6 +98,7 @@ class ArakoonConfiguration(object):
         :return: Generator with all keys
         :rtype: generator
         """
+        key = ArakoonConfiguration._clean_key(key)
         client = ArakoonConfiguration._get_client()
         for entry in client.prefix(key):
             yield entry.replace(key, '').strip('/').split('/')[0]
@@ -113,6 +114,7 @@ class ArakoonConfiguration(object):
         :type recursive: bool
         :return: None
         """
+        key = ArakoonConfiguration._clean_key(key)
         client = ArakoonConfiguration._get_client()
         if recursive is True:
             client.deletePrefix(key)
@@ -129,6 +131,7 @@ class ArakoonConfiguration(object):
         :return: Value of key
         :rtype: str
         """
+        key = ArakoonConfiguration._clean_key(key)
         client = ArakoonConfiguration._get_client()
         return client.get(key)
 
@@ -145,6 +148,7 @@ class ArakoonConfiguration(object):
         """
         if isinstance(value, basestring):
             value = str(value)
+        key = ArakoonConfiguration._clean_key(key)
         client = ArakoonConfiguration._get_client()
         client.set(key, value)
 
@@ -161,3 +165,7 @@ class ArakoonConfiguration(object):
             config = ArakoonClientConfig(str(parser.get('global', 'cluster_id')), nodes)
             ArakoonConfiguration._client = ArakoonClient(config)
         return ArakoonConfiguration._client
+
+    @staticmethod
+    def _clean_key(key):
+        return key.lstrip('/')
