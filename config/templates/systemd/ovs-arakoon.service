@@ -1,6 +1,6 @@
 [Unit]
 Description=Arakoon service for cluster <CLUSTER>
-After=local-fs.target network.target
+After=ovs-watcher-config<_SERVICE_SUFFIX_>.service
 
 [Service]
 Type=simple

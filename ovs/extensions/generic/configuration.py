@@ -89,14 +89,12 @@ class Configuration(object):
         """
         Retrieve the configuration path
         For etcd: 'etcd://127.0.0.1:2379{0}'.format(key)
-        For arakoon: 'arakoon:///opt/OpenvStorage/config/arakoon_cacc.ini:{0}'.format(key)
+        For arakoon: 'arakoon://cluster_id/{0}?ini=/path/to/arakoon_cacc.ini:{0}'.format(key)
         :param key: Key to retrieve the full configuration path for
         :type key: str
         :return: Configuration path
         :rtype: str
         """
-        # @TODO: Why is this required?
-        # _ = Configuration.get(key)
         return Configuration._passthrough(method='get_configuration_path',
                                           key=key)
 
@@ -224,7 +222,7 @@ class Configuration(object):
             port_info = {}
 
         mds_port_range = port_info.get('mds', [26300, 26399])
-        arakoon_start_port = port_info.get('arakoon', 26400)
+        arakoon_start_port = port_info.get('arakoon', 26402)
         storagedriver_port_range = port_info.get('storagedriver', [26200, 26299])
 
         host_config = {'storagedriver': {'rsp': '/var/rsp'},

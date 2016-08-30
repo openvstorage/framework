@@ -345,7 +345,7 @@ class StorageDriverConfiguration(object):
         self.config_type = config_type
         self.configuration = {}
         self.path = '/ovs/vpools/{0}/hosts/{1}/config/{{0}}'.format(vpool_guid, storagedriver_id)
-        self.remote_path = 'etcd://127.0.0.1:2379{0}'.format(self.path.format('')).strip('/')
+        self.remote_path = Configuration.get_configuration_path(self.path.format('')).strip('/')
         self.is_new = True
         self.dirty_entries = []
         self.params = copy.deepcopy(StorageDriverConfiguration.parameters)  # Never use parameters directly

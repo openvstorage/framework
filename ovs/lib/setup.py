@@ -762,19 +762,35 @@ class SetupController(object):
             SetupController._log(messages='Setting up configuration Arakoon')
             from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
             if config['external'] is None:
-                ArakoonInstaller.create_cluster(cluster_name='config',
-                                                cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
-                                                ip=cluster_ip,
-                                                base_dir='/opt/OpenvStorage/db',
-                                                locked=False,
-                                                claim=True,
-                                                filesystem=True)
+                info = ArakoonInstaller.create_cluster(cluster_name='config',
+                                                       cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
+                                                       ip=cluster_ip,
+                                                       base_dir='/opt/OpenvStorage/db',
+                                                       locked=False,
+                                                       filesystem=True,
+                                                       ports=[26400, 26401])
+                ArakoonInstaller.start_cluster(cluster_name='config',
+                                               master_ip=cluster_ip,
+                                               filesystem=True)
+                ArakoonInstaller.claim_cluster(cluster_name='config',
+                                               master_ip=cluster_ip,
+                                               filesystem=True,
+                                               metadata=info['metadata'])
                 contents = target_client.file_read(ArakoonClusterConfig.CONFIG_FILE.format('config'))
                 target_client.file_write(ArakoonConfiguration.CACC_LOCATION, contents)
             else:
+                ArakoonInstaller.claim_cluster(cluster_name='cacc',
+                                               master_ip=cluster_ip,
+                                               filesystem=True,
+                                               metadata={'internal': False,
+                                                         'cluster_name': 'cacc',
+                                                         'cluster_type': ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
+                                                         'in_use': True})
                 arakoon_config = ArakoonClusterConfig('cacc', True)
                 arakoon_config.load_config(cluster_ip)
-                ArakoonConfiguration.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, json.dumps(arakoon_config.export(), indent=4))
+                arakoon_client = ArakoonInstaller.build_client(arakoon_config)
+                arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, arakoon_config.export_ini())
+
         else:
             SetupController._log(messages='Setting up Etcd')
             from etcd import EtcdConnectionFailed, EtcdException, EtcdKeyError
@@ -795,7 +811,10 @@ class SetupController(object):
                         with open(resume_config_file, 'w') as resume_cfg:
                             resume_cfg.write(json.dumps(resume_config))
                     raise
-        target_client.file_write(Configuration.BOOTSTRAP_CONFIG_LOCATION, json.dumps({'configuration_store': config['type']}, indent=4))
+        bootstrap_location = Configuration.BOOTSTRAP_CONFIG_LOCATION
+        if not target_client.file_exists(bootstrap_location):
+            target_client.file_create(bootstrap_location)
+        target_client.file_write(bootstrap_location, json.dumps({'configuration_store': config['type']}, indent=4))
 
         Configuration.initialize(external_config=external_config['external'], logging_target=logging_target)
         Configuration.initialize_host(machine_id)
@@ -818,8 +837,14 @@ class SetupController(object):
                                                      cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK,
                                                      ip=cluster_ip,
                                                      base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
-                                                     locked=False,
-                                                     claim=True)
+                                                     locked=False)
+            ArakoonInstaller.start_cluster(cluster_name='ovsdb',
+                                           master_ip=cluster_ip,
+                                           filesystem=False)
+            ArakoonInstaller.claim_cluster(cluster_name='ovsdb',
+                                           master_ip=cluster_ip,
+                                           filesystem=False,
+                                           metadata=result['metadata'])
             arakoon_ports = [result['client_port'], result['messaging_port']]
             metadata = result['metadata']
         else:
@@ -878,8 +903,9 @@ class SetupController(object):
         # Enable HA for the rabbitMQ queues
         SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
-        ServiceManager.enable_service('watcher-framework', client=target_client)
-        Toolbox.change_service_state(target_client, 'watcher-framework', 'start', SetupController._logger)
+        for service in ['watcher-framework', 'watcher-config']:
+            ServiceManager.enable_service(service, client=target_client)
+            Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
 
         SetupController._log(messages='Check ovs-workers', loglevel='debug')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
@@ -948,7 +974,7 @@ class SetupController(object):
         target_client.dir_delete('/opt/OpenvStorage/webapps/frontend/logging')
 
         SetupController._log(messages='Stopping services', loglevel='debug')
-        for service in ['watcher-framework', 'workers', 'support-agent']:
+        for service in ['watcher-framework', 'watcher-config', 'workers', 'support-agent']:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.disable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'stop', SetupController._logger)
@@ -1115,9 +1141,10 @@ class SetupController(object):
         Configuration.set('/ovs/framework/hosts/{0}/ip'.format(machine_id), cluster_ip)
 
         SetupController._log(messages='Starting services')
-        if ServiceManager.get_service_status('watcher-framework', target_client) is False:
-            ServiceManager.enable_service('watcher-framework', client=target_client)
-            Toolbox.change_service_state(target_client, 'watcher-framework', 'start', SetupController._logger)
+        for service in ['watcher-framework', 'watcher-config']:
+            if ServiceManager.get_service_status(service, target_client) is False:
+                ServiceManager.enable_service(service, client=target_client)
+                Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
 
         SetupController._log(messages='Check ovs-workers')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
@@ -1168,7 +1195,8 @@ class SetupController(object):
             ArakoonInstaller.extend_cluster(master_ip=master_ip,
                                             new_ip=cluster_ip,
                                             cluster_name='config',
-                                            base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
+                                            base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
+                                            ports=[26400, 26401])
         else:
             external_config = Configuration.get('/ovs/framework/external_config')
             if external_config is None:
@@ -1581,7 +1609,7 @@ EOF
     @staticmethod
     def _add_services(client, unique_id, node_type):
         SetupController._log(messages='Adding services')
-        services = ['workers', 'watcher-framework']
+        services = ['workers', 'watcher-framework', 'watcher-config']
         worker_queue = unique_id
         if node_type == 'master':
             services += ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'snmp', 'webapp-api', 'volumerouter-consumer']
@@ -1597,7 +1625,7 @@ EOF
     @staticmethod
     def _remove_services(client, node_type):
         SetupController._log(messages='Removing services')
-        services = ['workers', 'support-agent', 'watcher-framework']
+        services = ['workers', 'support-agent', 'watcher-framework', 'watcher-config']
         if node_type == 'master':
             services += ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'snmp', 'webapp-api', 'volumerouter-consumer']
 

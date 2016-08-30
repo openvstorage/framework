@@ -17,6 +17,7 @@
 """
 Generic module for managing configuration in Arakoon
 """
+import ujson
 from ConfigParser import RawConfigParser
 from threading import Lock
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
@@ -30,12 +31,12 @@ def locked():
         """
         Returns a wrapped function
         """
-        def new_function(self, *args, **kw):
+        def new_function(*args, **kw):
             """
             Executes the decorated function in a locked context
             """
-            with self._lock:
-                return f(self, *args, **kw)
+            with ArakoonConfiguration.lock:
+                return f(*args, **kw)
         return new_function
     return wrap
 
@@ -47,7 +48,7 @@ class ArakoonConfiguration(object):
 
     CACC_LOCATION = '/opt/OpenvStorage/config/arakoon_cacc.ini'
     _client = None
-    _lock = Lock()
+    lock = Lock()
 
     def __init__(self):
         """
@@ -64,7 +65,15 @@ class ArakoonConfiguration(object):
         :return: Configuration path
         :rtype: str
         """
-        return 'arakoon://{0}:{1}'.format(ArakoonConfiguration.CACC_LOCATION, key)
+        import urllib
+        from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
+        config = ArakoonClusterConfig('cacc', filesystem=True)
+        config.load_config('127.0.0.1')
+        return 'arakoon://{0}{1}?{2}'.format(
+            config.cluster_id,
+            key,
+            urllib.urlencode({'ini': ArakoonConfiguration.CACC_LOCATION})
+        )
 
     @staticmethod
     @locked()
@@ -91,7 +100,7 @@ class ArakoonConfiguration(object):
         """
         client = ArakoonConfiguration._get_client()
         for entry in client.prefix(key):
-            yield entry.replace(key, '')
+            yield entry.replace(key, '').strip('/').split('/')[0]
 
     @staticmethod
     @locked()
@@ -134,6 +143,8 @@ class ArakoonConfiguration(object):
         :type value: str
         :return: None
         """
+        if isinstance(value, basestring):
+            value = str(value)
         client = ArakoonConfiguration._get_client()
         client.set(key, value)
 

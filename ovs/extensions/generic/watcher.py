@@ -20,6 +20,7 @@ Watcher module for framework and volumedriver
 """
 
 import sys
+import json
 import time
 import uuid
 import logging
@@ -54,6 +55,26 @@ class Watcher(object):
         try:
             key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))
             value = str(time.time())
+
+            if target == 'config':
+                self.log_message(target, 'Testing configuration store...', 0)
+                from ovs.extensions.generic.configuration import Configuration
+                try:
+                    Configuration.list('/')
+                except Exception as ex:
+                    self.log_message(target, '  Error during configuration store test: {0}'.format(ex), 2)
+                    return False
+                if Configuration.get_store() == 'arakoon':
+                    from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+                    from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
+                    config = ArakoonClusterConfig(cluster_id='cacc', filesystem=True)
+                    config.load_config('127.0.0.1')
+                    client = ArakoonInstaller.build_client(config)
+                    contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY)
+                    with open(ArakoonConfiguration.CACC_LOCATION, 'w') as config_file:
+                        config_file.write(contents)
+                self.log_message(target, '  Configuration store OK', 0)
+                return True
 
             if target == 'framework':
                 # Volatile

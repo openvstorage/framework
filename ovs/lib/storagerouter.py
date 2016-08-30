@@ -811,7 +811,7 @@ class StorageRouterController(object):
             if fragment_cache_on_read is False and fragment_cache_on_write is False:
                 fragment_cache_info = ['none']
             elif use_accelerated_alba is True:
-                fragment_cache_info = ['alba', {'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm_aa')),
+                fragment_cache_info = ['alba', {'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_aa')),
                                                 'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
                                                                                'preset': vpool.metadata[storagerouter.guid]['preset']}],
                                                 'manifest_cache_size': 16 * 1024 * 1024 * 1024,
@@ -830,7 +830,7 @@ class StorageRouterController(object):
                 'manifest_cache_size': manifest_cache_size,
                 'fragment_cache': fragment_cache_info,
                 'transport': 'rdma' if has_rdma else 'tcp',
-                'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm'))
+                'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
             }, indent=4), raw=True)
 
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
@@ -964,7 +964,9 @@ class StorageRouterController(object):
             params = {'VPOOL_NAME': vpool_name,
                       'VPOOL_GUID': vpool.guid,
                       'PROXY_ID': storagedriver.alba_proxy_guid,
-                      'LOG_SINK': LogHandler.get_sink_path('alba_proxy')}
+                      'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
+                      'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid,
+                                                                                                                           storagedriver.alba_proxy_guid))}
             alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
             ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name=alba_proxy_service)
             ServiceManager.start_service(alba_proxy_service, client=root_client)
@@ -1090,7 +1092,7 @@ class StorageRouterController(object):
             try:
                 temp_client = SSHClient(sr, username='root')
                 with remote(temp_client.ip, [LocalStorageRouterClient]) as rem:
-                    path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
+                    path = Configuration.get_configuration_path('/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id))
                     lsrc = rem.LocalStorageRouterClient(path)
                     lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
                 client = temp_client
@@ -1227,7 +1229,7 @@ class StorageRouterController(object):
 
                     StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs'.format(storage_driver.guid))
                     with remote(client.ip, [LocalStorageRouterClient], username='root') as rem:
-                        path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id)
+                        path = Configuration.get_configuration_path('/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id))
                         storagedriver_client = rem.LocalStorageRouterClient(path)
                         try:
                             storagedriver_client.destroy_filesystem()
