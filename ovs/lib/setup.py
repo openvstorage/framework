@@ -1118,6 +1118,10 @@ class SetupController(object):
             from ovs.extensions.db.etcd.installer import EtcdInstaller
             SetupController._log(messages='Extending Etcd cluster')
             EtcdInstaller.deploy_to_slave(master_ip, cluster_ip, 'config')
+        else:
+            from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+            target_client.file_write(ArakoonConfiguration.CACC_LOCATION,
+                                     master_client.file_read(ArakoonConfiguration.CACC_LOCATION))
 
         Configuration.initialize_host(machine_id)
 
@@ -1189,17 +1193,19 @@ class SetupController(object):
         storagerouter.node_type = 'MASTER'
         storagerouter.save()
 
-        config_store = Configuration.get_store()
-        if config_store == 'arakoon':
-            SetupController._log(messages='Joining Arakoon configuration cluster')
-            ArakoonInstaller.extend_cluster(master_ip=master_ip,
-                                            new_ip=cluster_ip,
-                                            cluster_name='config',
-                                            base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
-                                            ports=[26400, 26401])
-        else:
-            external_config = Configuration.get('/ovs/framework/external_config')
-            if external_config is None:
+        external_config = Configuration.get('/ovs/framework/external_config')
+        if external_config is None:
+            config_store = Configuration.get_store()
+            if config_store == 'arakoon':
+                SetupController._log(messages='Joining Arakoon configuration cluster')
+                metadata = ArakoonInstaller.extend_cluster(master_ip=master_ip,
+                                                           new_ip=cluster_ip,
+                                                           cluster_name='config',
+                                                           base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
+                                                           ports=[26400, 26401],
+                                                           filesystem=True)
+                ArakoonInstaller.restart_cluster_add('config', metadata['ips'], cluster_ip, filesystem=True)
+            else:
                 from ovs.extensions.db.etcd.installer import EtcdInstaller
                 SetupController._log(messages='Joining Etcd cluster')
                 EtcdInstaller.extend_cluster(master_ip, cluster_ip, 'config')
@@ -1222,6 +1228,7 @@ class SetupController(object):
                                                      new_ip=cluster_ip,
                                                      cluster_name=arakoon_cluster_name,
                                                      base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
+            ArakoonInstaller.restart_cluster_add(arakoon_cluster_name, result['ips'], cluster_ip)
             arakoon_ports = [result['client_port'], result['messaging_port']]
 
         if configure_memcached is True:
@@ -1340,20 +1347,31 @@ class SetupController(object):
         offline_node_ips = [node.ip for node in offline_nodes]
         if arakoon_metadata['internal'] is True:
             SetupController._log(messages='Leaving Arakoon {0} cluster'.format(arakoon_cluster_name))
-            ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip,
-                                            remaining_node_ip=master_nodes[0],
-                                            cluster_name=arakoon_cluster_name,
-                                            offline_nodes=offline_node_ips)
+            remaining_ips = ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip,
+                                                            remaining_node_ip=master_nodes[0],
+                                                            cluster_name=arakoon_cluster_name,
+                                                            offline_nodes=offline_node_ips)
+            ArakoonInstaller.restart_cluster_remove(arakoon_cluster_name, remaining_ips)
 
         try:
             external_config = Configuration.get('/ovs/framework/external_config')
             if external_config is None:
-                if Configuration.get_store() == 'etcd':
+                config_store = Configuration.get_store()
+                if config_store == 'arakoon':
+                    SetupController._log(messages='Leaving Arakoon config cluster')
+                    remaining_ips = ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip,
+                                                                    remaining_node_ip=master_nodes[0],
+                                                                    cluster_name='config',
+                                                                    offline_nodes=offline_node_ips,
+                                                                    filesystem=True)
+                    ArakoonInstaller.restart_cluster_remove(arakoon_cluster_name, remaining_ips, filesystem=True)
+
+                else:
                     from ovs.extensions.db.etcd.installer import EtcdInstaller
                     SetupController._log(messages='Leaving Etcd cluster')
                     EtcdInstaller.shrink_cluster(master_ip, cluster_ip, 'config', offline_node_ips)
         except Exception as ex:
-            SetupController._log(messages=['\nFailed to leave Etcd cluster', ex], loglevel='exception')
+            SetupController._log(messages=['\nFailed to leave configuration cluster', ex], loglevel='exception')
 
         SetupController._log(messages='Update configurations')
         try:

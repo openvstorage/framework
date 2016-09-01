@@ -397,7 +397,6 @@ class ArakoonInstaller(object):
 
         config = ArakoonClusterConfig(cluster_name, filesystem)
         config.load_config(master_ip)
-        current_ips = [node.ip for node in config.nodes]
 
         client = SSHClient(new_ip, username=ArakoonInstaller.SSHCLIENT_USER)
         node_name = System.get_my_machine_id(client)
@@ -427,14 +426,11 @@ class ArakoonInstaller(object):
         finally:
             if port_mutex is not None:
                 port_mutex.release()
-        ArakoonInstaller.restart_cluster_add(cluster_name=cluster_name,
-                                             current_ips=current_ips,
-                                             new_ip=new_ip,
-                                             filesystem=filesystem)
 
         ArakoonInstaller._logger.debug('Extending cluster {0} from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
         return {'client_port': ports[0],
-                'messaging_port': ports[1]}
+                'messaging_port': ports[1],
+                'ips': [node.ip for node in config.nodes]}
 
     @staticmethod
     def shrink_cluster(deleted_node_ip, remaining_node_ip, cluster_name, offline_nodes=None, filesystem=False):
@@ -467,9 +463,9 @@ class ArakoonInstaller(object):
                     config.delete_config(node.ip)
         ArakoonInstaller._deploy(config, offline_nodes)
         restart_ips = [node.ip for node in config.nodes if node.ip != deleted_node_ip and node.ip not in offline_nodes]
-        ArakoonInstaller.restart_cluster_remove(cluster_name, restart_ips)
 
         ArakoonInstaller._logger.debug('Shrinking cluster {0} from {1} completed'.format(cluster_name, deleted_node_ip))
+        return restart_ips
 
     @staticmethod
     def deploy_cluster(cluster_name, node_ip, filesystem=False):
