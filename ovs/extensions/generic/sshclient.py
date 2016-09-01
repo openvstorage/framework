@@ -234,7 +234,7 @@ class SSHClient(object):
                     SSHClient._logger.error('Command "{0}" failed with output "{1}"{2}'.format(
                         command, cpe.output, '' if stderr is None else ' and error "{0}"'.format(stderr)
                     ))
-                raise cpe
+                raise
         else:
             if isinstance(command, list):
                 command = ' '.join(command)
@@ -515,6 +515,7 @@ if os.path.islink('{0}'):
         else:
             sftp = self.client.open_sftp()
             sftp.put(local_filename, remote_filename)
+            sftp.close()
 
     def file_exists(self, filename):
         """

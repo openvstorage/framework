@@ -2,7 +2,7 @@
 
 ## Scope
 We want to make Open vStorage a real storage product which no longer depends on a hypervisor. In previous versions we always assumed that the Volume Driver ran together with a hypervisor (VMware/KVM). With the Edge this no longer the case as the edge client runs on the compute nodes (hypervisor) and the volume driver runs separately on a different node.
-With th FR we want to break this hypervisor dependency. This means you can now install Open vStorage and create a vdisk and add the hypervisor later.
+With the feature request we want to break this hypervisor dependency. This means you can now install Open vStorage and create a vdisk and add the hypervisor later.
 
 ## OVS setup
 * Remove the question(s) and code about the hypervisor (VMware and ESXi)
@@ -24,12 +24,12 @@ With th FR we want to break this hypervisor dependency. This means you can now i
 * vMachines: remove ity completely
 * vDisks
  * Overview: remove vMachine column add Edge column
- * Detail: update breadcrum to remove vMachine, remove vMachine
+ * Detail: update breadcrumb to remove vMachine, remove vMachine
 * Remove vMachine Templates 
-* Administration remove hypervisor mgmt
+* Administration remove hypervisor management
 
 ## API & DAL
-* remove vmachine, pmachine and hypervisor mgtm center
+* remove vmachine, pmachine and hypervisor management center
 
 ## OpenStack
 * The Open vStorage Cinder driver should work with the Edge client

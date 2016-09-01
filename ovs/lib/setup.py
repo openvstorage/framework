@@ -290,7 +290,7 @@ class SetupController(object):
 
                 missing_files = set()
                 for required_file in [known_hosts_ovs, known_hosts_root, ssh_public_key_ovs, ssh_public_key_root]:
-                    if not local_client.file_exists(ssh_public_key_ovs):
+                    if not local_client.file_exists(required_file):
                         missing_files.add('Could not find file {0} on node with IP {1}'.format(required_file, local_client.ip))
                 if missing_files:
                     raise ValueError('Missing files:\n - {0}'.format('\n - '.join(sorted(list(missing_files)))))
@@ -341,7 +341,7 @@ class SetupController(object):
                     raise RuntimeError('Timeout during ssh keyscan, please check node inter-connectivity')
                 signal.signal(signal.SIGALRM, _raise_timeout)
                 for node_details in SetupController.nodes.itervalues():
-                    signal.alarm(10)
+                    signal.alarm(30)
                     node_client = node_details.get('client', SSHClient(endpoint=node_details['ip'], username='root'))
                     System.update_hosts_file(ip_hostname_map, node_client)
                     cmd = 'cp {{0}} {{0}}.tmp; ssh-keyscan -t rsa {0} {1} 2> /dev/null >> {{0}}.tmp; cat {{0}}.tmp | sort -u - > {{0}}'.format(' '.join(all_ips), ' '.join(SetupController.nodes.keys()))
@@ -703,6 +703,8 @@ class SetupController(object):
                     for partition in disk.partitions:
                         partition.delete()
                     disk.delete()
+                for j_domain in storage_router.domains:
+                    j_domain.delete()
 
                 storage_router.delete()
                 Configuration.delete('/ovs/framework/hosts/{0}'.format(storage_router.machine_id))
