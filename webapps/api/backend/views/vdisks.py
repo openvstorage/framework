@@ -41,7 +41,7 @@ class VDiskViewSet(viewsets.ViewSet):
     base_name = 'vdisks'
 
     @log()
-    @required_roles(['read'])
+    @required_roles(['read', 'manage'])
     @return_list(VDisk)
     @load()
     def list(self, vpoolguid=None, storagerouterguid=None, query=None):
@@ -63,7 +63,7 @@ class VDiskViewSet(viewsets.ViewSet):
         return VDiskList.get_vdisks()
 
     @log()
-    @required_roles(['read'])
+    @required_roles(['read', 'manage'])
     @return_object(VDisk)
     @load(VDisk)
     def retrieve(self, vdisk):

@@ -74,6 +74,12 @@ define([
                         if (data.error === 'invalid_token') {
                             shared.authentication.logout();
                         }
+                        deferred.reject({
+                            status: xmlHttpRequest.status,
+                            statusText: xmlHttpRequest.statusText,
+                            readyState: xmlHttpRequest.readyState,
+                            responseText: xmlHttpRequest.responseText
+                        });
                     } else if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
                         deferred.reject({
                             status: xmlHttpRequest.status,

@@ -25,36 +25,40 @@ function show_help {
     echo "--------------------------"
     echo "Usage:"
     echo "  * Miscellaneous options:"
-    echo "    - ovs                       Launch Open vStorage shell (ipython)"
-    echo "    - ovs help                  Show this help section"
-    echo "    - ovs collect logs          Collect all Open vStorage logs to a tarball (for support purposes)"
+    echo "    - ovs                          Launch Open vStorage shell (ipython)"
+    echo "    - ovs help                     Show this help section"
+    echo "    - ovs collect logs             Collect all Open vStorage logs to a tarball (for support purposes)"
     echo ""
     echo "  * Setup options:"
-    echo "    - ovs setup                 Launch Open vStorage setup and autodetect required node role (master/extra)"
-    echo "    - ovs setup master          Launch Open vStorage setup and install master node"
-    echo "    - ovs setup extra           Launch Open vStorage setup and install extra node"
-    echo "    - ovs setup promote         Promote this node (extra -> master)"
-    echo "    - ovs setup demote          Demote this node (master -> extra)"
+    echo "    - ovs setup                    Launch Open vStorage setup and autodetect required node role (master/extra)"
+    echo "    - ovs setup master             Launch Open vStorage setup and install master node"
+    echo "    - ovs setup extra              Launch Open vStorage setup and install extra node"
+    echo "    - ovs setup promote            Promote this node (extra -> master)"
+    echo "    - ovs setup demote             Demote this node (master -> extra)"
     echo ""
     echo "  * Update options:"
-    echo "    - ovs update framework      Update framework components on all nodes in cluster"
-    echo "    - ovs update volumedriver   Update volumedriver components on all nodes in cluster"
+    echo "    - ovs update framework         Update framework components on all nodes in cluster"
+    echo "    - ovs update volumedriver      Update volumedriver components on all nodes in cluster"
     echo ""
     echo "  * Remove options:"
-    echo "    - ovs remove nodes <ips>    Remove nodes from cluster (comma separated list of IPs)"
+    echo "    - ovs remove nodes <ips>       Remove nodes from cluster (comma separated list of IPs)"
     echo ""
     echo "  * Monitor options:"
-    echo "    - ovs monitor services      Watch Open vStorage services"
-    echo "    - ovs monitor heartbeat     Send an internal heartbeat"
+    echo "    - ovs monitor services         Watch Open vStorage services"
+    echo "    - ovs monitor heartbeat        Send an internal heartbeat"
     echo ""
     echo "  * Services options:"
-    echo "    - ovs stop services         Try to stop all Open vStorage services"
-    echo "    - ovs start services        Try to start all Open vStorage services"
+    echo "    - ovs stop services            Try to stop all Open vStorage services"
+    echo "    - ovs start services           Try to start all Open vStorage services"
     echo ""
     echo "  * Unit tests:"
-    echo "    - ovs unittest              Execute all unittests"
-    echo "    - ovs unittest list         List all unittests"
-    echo "    - ovs unittest <filepath>   Run the unittests in <filepath>"
+    echo "    - ovs unittest                 Execute all unittests"
+    echo "    - ovs unittest list            List all unittests"
+    echo "    - ovs unittest <filepath>      Run the unittests in <filepath>"
+    echo ""
+    echo "  * Custom Open vStorage modules:"
+    echo "    - ovs <modulename> <arguments> Execute a custom Open vStorage module in /opt/OpenvStorage/scripts/"
+    echo ""
 }
 
 if [ "$1" = "help" ] ; then
@@ -163,7 +167,13 @@ elif [ "$1" = "unittest" ] ; then
         python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.run_tests('$filename')"
     fi
 elif [ "$#" -ge 1 ] ; then
-    show_help
+    module=${1}
+    if [ -f /opt/OpenvStorage/scripts/${module}.sh ] ; then
+        shift
+        /opt/OpenvStorage/scripts/${module}.sh $@
+    else
+        show_help
+    fi
 else
     ipython
 fi

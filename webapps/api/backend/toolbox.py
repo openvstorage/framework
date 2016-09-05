@@ -69,3 +69,27 @@ class Toolbox(object):
             if n_1 != n_2:
                 return n_1 - n_2
         return 0
+
+    @staticmethod
+    def access_granted(client, client_rights=None, user_rights=None):
+        granted = False
+        # Implicitly denied access
+        if Toolbox.is_client_in_roles(client, ['manage']):
+            # Implicitly granted access
+            granted = True
+        if user_rights is not None:
+            for right in user_rights:
+                if right.user_guid == client.user_guid:
+                    if right.grant is False:
+                        # Explicit deny
+                        return False
+                    granted = True
+        if client.ovs_type != 'INTERNAL':
+            if client_rights is not None:
+                for right in client_rights:
+                    if right.client_guid == client.guid:
+                        if right.grant is False:
+                            # Explicit deny
+                            return False
+                        granted = True
+        return granted

@@ -227,16 +227,18 @@ class StorageRouterController(object):
         required_params_new_alba = {'config_params': sd_config_params,
                                     'fragment_cache_on_read': (bool, None),
                                     'fragment_cache_on_write': (bool, None),
-                                    'backend_connection_info': (dict, {'host': (str, Toolbox.regex_ip, False),
+                                    'backend_connection_info': (dict, {'host': (str, Toolbox.regex_ip),
                                                                        'port': (int, None),
                                                                        'username': (str, None),
                                                                        'password': (str, None),
+                                                                       'local': (bool, None, False),
                                                                        'backend': (dict, {'backend': (str, Toolbox.regex_guid),
                                                                                           'metadata': (str, Toolbox.regex_preset)})}),
                                     'backend_connection_info_aa': (dict, {'host': (str, Toolbox.regex_ip, False),
                                                                           'port': (int, None),
                                                                           'username': (str, None),
                                                                           'password': (str, None),
+                                                                          'local': (bool, None, False),
                                                                           'backend': (dict, {'backend': (str, Toolbox.regex_guid),
                                                                                              'metadata': (str, Toolbox.regex_preset)})},
                                                                    False)}
@@ -391,13 +393,14 @@ class StorageRouterController(object):
             if vpool is not None:
                 backend_info_map = {}
                 for key, info in vpool.metadata.iteritems():
-                    local = info['connection']['local']
+                    connection = info['connection']
                     backend_info_map[key] = {'backend': {'backend': info['backend_guid'],
                                                          'metadata': info['preset']},
-                                             'host': info['connection']['host'] if local is False else '',
-                                             'port': info['connection']['port'] if local is False else '',
-                                             'username': info['connection']['client_id'] if local is False else '',
-                                             'password': info['connection']['client_secret'] if local is False else ''}
+                                             'host': connection['host'],
+                                             'port': connection['port'],
+                                             'username': connection['client_id'],
+                                             'password': connection['client_secret'],
+                                             'local': connection['local']}
             else:
                 backend_info_map = {'backend': backend_connection_info}
             if use_accelerated_alba is True:
@@ -407,7 +410,11 @@ class StorageRouterController(object):
             for key, backend_info in backend_info_map.iteritems():
                 preset_name = backend_info['backend']['metadata']
                 backend_guid = backend_info['backend']['backend']
-                connection_info = StorageRouterController._retrieve_alba_connection_info(backend_info=backend_info)
+                connection_info = {'host': backend_info['host'],
+                                   'port': backend_info['port'],
+                                   'client_id': backend_info['username'],
+                                   'client_secret': backend_info['password'],
+                                   'local': backend_info.get('local', False)}
                 fragment_cache_on_read = parameters['fragment_cache_on_read']
                 fragment_cache_on_write = parameters['fragment_cache_on_write']
 
@@ -1899,44 +1906,6 @@ class StorageRouterController(object):
             if mp and not mp.startswith('/dev') and not mp.startswith('/proc') and not mp.startswith('/sys') and not mp.startswith('/run') and not mp.startswith('/mnt/alba-asd') and mp != '/':
                 mountpoints.append(mp)
         return mountpoints
-
-    @staticmethod
-    def _retrieve_alba_connection_info(backend_info):
-        """
-        Retrieve the backend connection information
-        :param backend_info: ALBA backend connection information
-        :type backend_info: dict
-
-        :return: ALBA backend connection information
-        :rtype: dict
-        """
-        connection_host = backend_info['host']
-        if connection_host == '':
-            clients = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')
-            oauth_client = None
-            for current_client in clients:
-                if current_client.user.group.name == 'administrators':
-                    oauth_client = current_client
-                    break
-            if oauth_client is None:
-                raise RuntimeError('Could not find INTERNAL CLIENT_CREDENTIALS client in administrator group.')
-
-            local = True
-            connection_host = StorageRouterList.get_masters()[0].ip
-            connection_port = 443
-            connection_username = oauth_client.client_id
-            connection_password = oauth_client.client_secret
-        else:
-            local = False
-            connection_port = backend_info['port']
-            connection_username = backend_info['username']
-            connection_password = backend_info['password']
-
-        return {'host': connection_host,
-                'port': connection_port,
-                'client_id': connection_username,
-                'client_secret': connection_password,
-                'local': local}
 
     @staticmethod
     def _retrieve_alba_arakoon_config(backend_guid, ovs_client):

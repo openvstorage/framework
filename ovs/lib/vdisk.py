@@ -394,7 +394,7 @@ class VDiskController(object):
             raise ValueError('No snapshot found for timestamp {0}'.format(timestamp))
         snapshotguid = snapshots[0]['guid']
         VDiskController._wait_for_snapshot_to_be_synced_to_backend(vdisk_guid=vdisk.guid, snapshot_id=snapshotguid)
-        vdisk.storagedriver_client.rollback_volume(str(vdisk.volume_id), snapshotguid)
+        vdisk.storagedriver_client.rollback_volume(str(vdisk.volume_id), str(snapshotguid))
         vdisk.invalidate_dynamics(['snapshots'])
         return True
 
@@ -530,51 +530,6 @@ class VDiskController(object):
             raise
         VDiskController._logger.info('Created volume. Location {0}'.format(devicename))
         return new_vdisk.guid
-
-    @staticmethod
-    @celery.task(name='ovs.vdisk.delete_volume')
-    def delete_volume(location):
-        """
-        Delete a volume
-        !! This method is for compatibility with the cinder driver
-        !! Other callers should use VDiskController.delete
-        :param location: Location, filename
-        :type location: str
-        """
-        storagerouter = System.get_my_storagerouter()
-        for storagedriver in storagerouter.storagedrivers:
-            if location.startswith('{0}/'.format(storagedriver.mountpoint)):
-                devicename = location.split('/')[-1]
-                vdisk = VDiskList.get_by_devicename_and_vpool(devicename, storagedriver.vpool)
-                if vdisk is None:
-                    VDiskController._logger.info('vDisk {0} already deleted'.format(location))
-                    return
-                VDiskController.delete(vdisk.guid)
-
-        raise RuntimeError('Cannot delete volume {0}. No storagedriver found for this location.'.format(location))
-
-    @staticmethod
-    @celery.task(name='ovs.vdisk.extend_volume')
-    def extend_volume(location, volume_size):
-        """
-        Extend a volume
-        !! This method is for compatibility with the cinder driver
-        !! Other callers should use VDiskController.extend
-        :param location: Location, filename
-        :type location: str
-        :param volume_size: Size of volume (GB)
-        :type volume_size: int
-        """
-        storagerouter = System.get_my_storagerouter()
-        for storagedriver in storagerouter.storagedrivers:
-            if location.startswith('{0}/'.format(storagedriver.mountpoint)):
-                devicename = location.split('/')[-1]
-                vdisk = VDiskList.get_by_devicename_and_vpool(devicename, storagedriver.vpool)
-                if vdisk is None:
-                    raise RuntimeError('vDisk {0} does not exist'.format(location))
-                VDiskController.extend(vdisk.guid, volume_size * 1024 * 1024 * 1024)
-
-        raise RuntimeError('Cannot extend volume. No storagedriver found for location: {0}'.format(location))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.get_config_params')
@@ -1171,6 +1126,6 @@ class VDiskController(object):
         while '//' in name:
             name = name.replace('//', '/')
         name = re.compile('[^/\w\-.]+').sub('', name)
-        if re.compile('\w\.[a-zA-Z]{3,4}$').search(name) is None:
+        if re.compile('\w\.[a-z]{3,4}$').search(name) is None:
             name = '{0}.raw'.format(name.rstrip('.'))
         return '/{0}'.format(name)

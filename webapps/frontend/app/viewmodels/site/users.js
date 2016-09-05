@@ -364,7 +364,27 @@ define([
                 }
             })
                 .done(function(data) {
-                    var user = new User(data.guid);
+                    var user = new User(data.guid), group;
+                    user.group = ko.computed({
+                        write: function (group) {
+                            if (group === undefined) {
+                                this.groupGuid(undefined);
+                            } else {
+                                this.groupGuid(group.guid());
+                            }
+                        },
+                        read: function () {
+                            if (self.groupMapping().hasOwnProperty(this.groupGuid())) {
+                                return self.groupMapping()[this.groupGuid()];
+                            }
+                            return undefined;
+                        },
+                        owner: user
+                    });
+                    if (self.groupMapping().hasOwnProperty(data.group_guid)) {
+                        group = self.groupMapping()[data.group_guid];
+                    }
+                    user.group(group);
                     self.users.push(user);
                     dialog.show(new ChangePasswordWizard({
                         modal: true,

@@ -85,8 +85,8 @@ define([
             if (data.hasOwnProperty('configuration')) {
                 self.configuration(data.configuration);
             }
-            if (self.metadata.hasOwnProperty('backend') && self.metadata.backend.hasOwnProperty('preset')) {
-                self.backendPreset(self.metadata.backend.preset);
+            if (data.metadata !== undefined && data.metadata.hasOwnProperty('backend') && data.metadata.backend.hasOwnProperty('preset')) {
+                self.backendPreset(data.metadata.backend.preset);
             }
 
             if (data.hasOwnProperty('backend_type_guid')) {

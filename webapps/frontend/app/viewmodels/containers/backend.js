@@ -30,6 +30,7 @@ define([
         self.domains     = ko.observableArray([]);
 
         // Observables
+        self.accessRights    = ko.observable();
         self.backendTypeGuid = ko.observable();
         self.domainGuids     = ko.observableArray([]);
         self.edit            = ko.observable(false);
@@ -52,6 +53,11 @@ define([
             if (data.hasOwnProperty('regular_domains')) {
                 self.domainGuids(data.regular_domains);
             }
+            if (data.hasOwnProperty('access_rights')) {
+                if (!generic.objectEquals(data.access_rights, self.accessRights())) {
+                    self.accessRights(data.access_rights);
+                }
+            }
 
             self.loaded(true);
             self.loading(false);
@@ -60,7 +66,7 @@ define([
             return $.Deferred(function(deferred) {
                 self.loading(true);
                 if (generic.xhrCompleted(self.loadHandle)) {
-                    self.loadHandle = api.get('backends/' + self.guid(), { queryparams: { contents: '_relations,regular_domains' } })
+                    self.loadHandle = api.get('backends/' + self.guid(), { queryparams: { contents: '_relations,regular_domains,access_rights' } })
                         .done(function(data) {
                             self.fillData(data);
                             deferred.resolve(data);
@@ -93,6 +99,32 @@ define([
                         self.edit(false);
                         self.saving(false);
                     });
+            }).promise();
+        };
+        self.saveAccessRights = function(newRights) {
+            return $.Deferred(function(deferred) {
+                generic.alertInfo(
+                    $.t('ovs:generic.rights.started'),
+                    $.t('ovs:generic.rights.started_msg')
+                );
+                api.post('backends/' + self.guid() + '/configure_rights', {
+                    queryparams: {new_rights: JSON.stringify(newRights)}
+                })
+                    .done(function() {
+                        generic.alertSuccess(
+                            $.t('ovs:generic.rights.complete'),
+                            $.t('ovs:generic.rights.success')
+                        );
+                        deferred.resolve();
+                    })
+                    .fail(function(error) {
+                        error = generic.extractErrorMessage(error);
+                        generic.alertError(
+                            $.t('ovs:generic.error'),
+                            $.t('ovs:generic.rights.failed', { why: error })
+                        );
+                        deferred.reject();
+                    })
             }).promise();
         };
     };

@@ -54,7 +54,7 @@ def connected():
             :param self
             """
             try:
-                if self.client is not None and not self.client.is_connected():
+                if self._client is not None and not self._client.is_connected():
                     self._connect()
                 return outer_function(self, *args, **kwargs)
             except AttributeError as ex:
@@ -112,7 +112,7 @@ class SSHClient(object):
             raise ValueError('The endpoint parameter should be either an ip address or a StorageRouter')
 
         self.ip = ip
-        self.client = None
+        self._client = None
         self.local_ips = [lip.strip() for lip in check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()]
         self.is_local = self.ip in self.local_ips
         self.password = password
@@ -146,7 +146,7 @@ class SSHClient(object):
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.is_connected = types.MethodType(is_connected, client)
                 SSHClient.client_cache[key] = client
-            self.client = SSHClient.client_cache[key]
+            self._client = SSHClient.client_cache[key]
         self._connect()
 
     def __del__(self):
@@ -168,10 +168,10 @@ class SSHClient(object):
 
         try:
             try:
-                self.client.connect(self.ip, username=self.username, password=self.password)
+                self._client.connect(self.ip, username=self.username, password=self.password)
             except:
                 try:
-                    self.client.close()
+                    self._client.close()
                 except:
                     pass
                 raise
@@ -189,7 +189,7 @@ class SSHClient(object):
         if self.is_local is True:
             return
 
-        self.client.close()
+        self._client.close()
 
     @staticmethod
     def shell_safe(path_to_check):
@@ -198,6 +198,13 @@ class SSHClient(object):
         :param path_to_check: Path to make safe for shell
         """
         return "".join([("\\" + _) if _ in " '\";`|" else _ for _ in path_to_check])
+
+    @staticmethod
+    def _clean_text(text):
+        if type(text) is list:
+            text = '\n'.join(line.rstrip() for line in text)
+        # This strip is absolutely necessary. Without it, channel.communicate() is never executed (odd but true)
+        return text.strip().replace(u'\u2018', u'"').replace(u'\u2019', u'"')
 
     @connected()
     def run(self, command, debug=False, suppress_logging=False):
@@ -218,38 +225,39 @@ class SSHClient(object):
                 except OSError as ose:
                     raise CalledProcessError(1, command, str(ose))
                 stdout, stderr = channel.communicate()
-                stdout = stdout.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
-                stderr = stderr.replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+                stdout = self._clean_text(stdout)
+                stderr = self._clean_text(stderr)
                 exit_code = channel.returncode
                 if exit_code != 0:  # Raise same error as check_output
                     raise CalledProcessError(exit_code, command, stdout)
                 if debug:
                     SSHClient._logger.debug('stdout: {0}'.format(stdout))
                     SSHClient._logger.debug('stderr: {0}'.format(stderr))
-                    return stdout.strip(), stderr
+                    return stdout, stderr
                 else:
-                    return stdout.strip()
+                    return stdout
             except CalledProcessError as cpe:
                 if suppress_logging is False:
                     SSHClient._logger.error('Command "{0}" failed with output "{1}"{2}'.format(
                         command, cpe.output, '' if stderr is None else ' and error "{0}"'.format(stderr)
                     ))
-                raise cpe
+                raise
         else:
             if isinstance(command, list):
                 command = ' '.join(command)
-            _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
+            _, stdout, stderr = self._client.exec_command(command)  # stdin, stdout, stderr
+            output = self._clean_text(stdout.readlines())
+            error = self._clean_text(stderr.readlines())
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
-                stderr = ''.join(stderr.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
-                stdout = ''.join(stdout.readlines()).replace(u'\u2018', u'"').replace(u'\u2019', u'"')
                 if suppress_logging is False:
-                    SSHClient._logger.error('Command "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
-                raise CalledProcessError(exit_code, command, stdout)
+                    SSHClient._logger.error('Command "{0}" failed with output "{1}" and error "{2}"'
+                                            .format(command, output, error))
+                raise CalledProcessError(exit_code, command, output)
             if debug:
-                return '\n'.join(line.rstrip() for line in stdout).strip(), stderr
+                return output, error
             else:
-                return '\n'.join(line.rstrip() for line in stdout).strip()
+                return output
 
     def dir_create(self, directories):
         """
@@ -497,7 +505,7 @@ if os.path.islink('{0}'):
                 the_file.write(contents)
             os.close(handle)
             try:
-                sftp = self.client.open_sftp()
+                sftp = self._client.open_sftp()
                 sftp.put(temp_filename, filename)
                 sftp.close()
             finally:
@@ -513,8 +521,9 @@ if os.path.islink('{0}'):
         if self.is_local is True:
             check_output('cp -f "{0}" "{1}"'.format(local_filename, remote_filename), shell=True)
         else:
-            sftp = self.client.open_sftp()
+            sftp = self._client.open_sftp()
             sftp.put(local_filename, remote_filename)
+            sftp.close()
 
     def file_exists(self, filename):
         """

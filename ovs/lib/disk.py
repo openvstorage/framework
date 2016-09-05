@@ -87,11 +87,12 @@ class DiskController(object):
             for member in re.findall('(?: +[0-9]+){4} +[^/]+/dev/([a-z0-9]+)', md_information):
                 raid_members.append(member)
             # Gather disk information
-            with remote(storagerouter.ip, [Context, os]) as rem:
+            with remote(storagerouter.ip, [Context, DiskTools, os]) as rem:
                 context = rem.Context()
                 devices = [device for device in context.list_devices(subsystem='block')
                            if ('ID_TYPE' in device and device['ID_TYPE'] == 'disk') or
-                              ('DEVNAME' in device and ('loop' in device['DEVNAME'] or 'nvme' in device['DEVNAME'] or 'md' in device['DEVNAME']))]
+                              ('DEVNAME' in device and ('loop' in device['DEVNAME'] or 'nvme' in device['DEVNAME']
+                                                        or 'md' in device['DEVNAME'] or 'vd' in device['DEVNAME']))]
                 for device in devices:
                     is_partition = device['DEVTYPE'] == 'partition'
                     device_path = device['DEVNAME']
@@ -150,7 +151,7 @@ class DiskController(object):
                             if match is None:
                                 DiskController._logger.debug('Could not handle disk/partition {0}'.format(device_path))
                                 continue  # Unable to handle this disk/partition
-                            partitions_info = DiskTools.get_partitions_info(match.groups()[0])
+                            partitions_info = rem.DiskTools.get_partitions_info(match.groups()[0])
                             if device_path in partitions_info:
                                 partition_info = partitions_info[device_path]
                                 offset = int(partition_info['start'])
