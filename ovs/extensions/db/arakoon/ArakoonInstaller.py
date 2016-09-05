@@ -183,7 +183,7 @@ class ArakoonClusterConfig(object):
                 contents.set(section, item, data[section][item])
         config_io = StringIO()
         contents.write(config_io)
-        return config_io.getvalue()
+        return str(config_io.getvalue())
 
     def write_config(self, ip=None):
         """
