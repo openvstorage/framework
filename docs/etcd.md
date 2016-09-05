@@ -27,7 +27,7 @@ plugins/installed = {"backends": ["$plugin_a"],
                      "generic": ["$plugin_b", "$plugin_c"]},
 plugins/$plugin_a/config = {"nsm": {"safety": 3,
                                     "maxload": 75}}
-storagedriver = {"mds_safety": 2,
+storagedriver = {"mds_safety": 3,
                  "mds_tlogs": 100,
                  "mds_maxload": 75}
 stores = {"persistent": "pyrakoon",

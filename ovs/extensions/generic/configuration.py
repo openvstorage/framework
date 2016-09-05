@@ -72,7 +72,7 @@ class Configuration(object):
                    'support': {'enablesupport': False,
                                'enabled': True,
                                'interval': 60},
-                   'storagedriver': {'mds_safety': 2,
+                   'storagedriver': {'mds_safety': 3,
                                      'mds_tlogs': 100,
                                      'mds_maxload': 75},
                    'webapps': {'html_endpoint': '/',
