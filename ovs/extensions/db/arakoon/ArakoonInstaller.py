@@ -338,7 +338,7 @@ class ArakoonInstaller(object):
                         'cluster_name': cluster_name,
                         'cluster_type': cluster_type.upper(),
                         'in_use': False}
-            ArakoonInstaller._deploy(config)
+            ArakoonInstaller._deploy(config, filesystem=filesystem)
         finally:
             if port_mutex is not None:
                 port_mutex.release()
@@ -422,7 +422,7 @@ class ArakoonInstaller(object):
                                                       crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'),
                                                       home=home_dir,
                                                       tlog_dir=tlog_dir))
-            ArakoonInstaller._deploy(config)
+            ArakoonInstaller._deploy(config, filesystem=filesystem)
         finally:
             if port_mutex is not None:
                 port_mutex.release()
@@ -460,8 +460,9 @@ class ArakoonInstaller(object):
                 config.nodes.remove(node)
                 if node.ip not in offline_nodes:
                     ArakoonInstaller._destroy_node(config, node)
-                    config.delete_config(node.ip)
-        ArakoonInstaller._deploy(config, offline_nodes)
+                    if filesystem is True:
+                        config.delete_config(node.ip)
+        ArakoonInstaller._deploy(config, filesystem=filesystem, offline_nodes=offline_nodes)
         restart_ips = [node.ip for node in config.nodes if node.ip != deleted_node_ip and node.ip not in offline_nodes]
 
         ArakoonInstaller._logger.debug('Shrinking cluster {0} from {1} completed'.format(cluster_name, deleted_node_ip))
@@ -482,7 +483,7 @@ class ArakoonInstaller(object):
         ArakoonInstaller._logger.debug('(Re)deploying cluster {0} from {1}'.format(cluster_name, node_ip))
         config = ArakoonClusterConfig(cluster_name, filesystem)
         config.load_config(node_ip)
-        ArakoonInstaller._deploy(config)
+        ArakoonInstaller._deploy(config, filesystem=filesystem)
 
     @staticmethod
     def get_unused_arakoon_metadata_and_claim(cluster_type, locked=True):
@@ -579,7 +580,7 @@ class ArakoonInstaller(object):
         ArakoonInstaller._logger.debug('Destroy node {0} in cluster {1} completed'.format(node.ip, config.cluster_id))
 
     @staticmethod
-    def _deploy(config, offline_nodes=None):
+    def _deploy(config, filesystem, offline_nodes=None):
         """
         Deploys a complete cluster: Distributing the configuration files, creating directories and services
         """
@@ -617,7 +618,8 @@ class ArakoonInstaller(object):
             ServiceManager.add_service(base_name, root_client,
                                        params={'CLUSTER': config.cluster_id,
                                                'NODE_ID': node.name,
-                                               'CONFIG_PATH': config_path},
+                                               'CONFIG_PATH': config_path,
+                                               'STARTUP_DEPENDENCY': 'started ovs-watcher-config' if filesystem is False else '(local-filesystems and started networking)'},
                                        target_name=target_name)
             ArakoonInstaller._logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
 
@@ -835,6 +837,11 @@ class ArakoonInstaller(object):
             ArakoonInstaller._logger.debug('  Restarted node {0} for cluster {1}'.format(client.ip, cluster_name))
             if len(remaining_ips) > 2:  # A two node cluster needs all nodes running
                 ArakoonInstaller.wait_for_cluster(cluster_name, remaining_ips[0], filesystem)
+        ArakoonInstaller.wait_for_cluster(cluster_name, remaining_ips[0], filesystem)
+        config = ArakoonClusterConfig(cluster_name, filesystem)
+        config.load_config(remaining_ips[0])
+        arakoon_client = ArakoonInstaller.build_client(config)
+        arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, config.export_ini())
         ArakoonInstaller._logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))
 
     @staticmethod

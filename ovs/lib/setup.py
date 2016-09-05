@@ -1230,7 +1230,7 @@ class SetupController(object):
                                                      new_ip=cluster_ip,
                                                      cluster_name=arakoon_cluster_name,
                                                      base_dir=Configuration.get('/ovs/framework/paths|ovsdb'))
-            ArakoonInstaller.restart_cluster_add(arakoon_cluster_name, result['ips'], cluster_ip)
+            ArakoonInstaller.restart_cluster_add(arakoon_cluster_name, result['ips'], cluster_ip, filesystem=False)
             arakoon_ports = [result['client_port'], result['messaging_port']]
 
         if configure_memcached is True:
@@ -1353,7 +1353,7 @@ class SetupController(object):
                                                             remaining_node_ip=master_nodes[0],
                                                             cluster_name=arakoon_cluster_name,
                                                             offline_nodes=offline_node_ips)
-            ArakoonInstaller.restart_cluster_remove(arakoon_cluster_name, remaining_ips)
+            ArakoonInstaller.restart_cluster_remove(arakoon_cluster_name, remaining_ips, filesystem=False)
 
         try:
             external_config = Configuration.get('/ovs/framework/external_config')
@@ -1366,7 +1366,7 @@ class SetupController(object):
                                                                     cluster_name='config',
                                                                     offline_nodes=offline_node_ips,
                                                                     filesystem=True)
-                    ArakoonInstaller.restart_cluster_remove(arakoon_cluster_name, remaining_ips, filesystem=True)
+                    ArakoonInstaller.restart_cluster_remove('config', remaining_ips, filesystem=True)
 
                 else:
                     from ovs.extensions.db.etcd.installer import EtcdInstaller
@@ -1398,7 +1398,6 @@ class SetupController(object):
             if cluster_ip in remaining_nodes:
                 remaining_nodes.remove(cluster_ip)
 
-            ArakoonInstaller.restart_cluster_remove(arakoon_cluster_name, remaining_nodes)
             PersistentFactory.store = None
             VolatileFactory.store = None
 

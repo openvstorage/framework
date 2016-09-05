@@ -20,7 +20,6 @@ Watcher module for framework and volumedriver
 """
 
 import sys
-import json
 import time
 import uuid
 import logging
@@ -67,10 +66,11 @@ class Watcher(object):
                 if Configuration.get_store() == 'arakoon':
                     from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
                     from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
+                    from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
                     config = ArakoonClusterConfig(cluster_id='cacc', filesystem=True)
                     config.load_config('127.0.0.1')
                     client = ArakoonInstaller.build_client(config)
-                    contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY)
+                    contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())
                     with open(ArakoonConfiguration.CACC_LOCATION, 'w') as config_file:
                         config_file.write(contents)
                 self.log_message(target, '  Configuration store OK', 0)

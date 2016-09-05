@@ -121,7 +121,7 @@ class StorageDriverController(object):
             if client is not None and ServiceManager.has_service(current_service.name, client=client) is True:
                 ServiceManager.stop_service(current_service.name, client=client)
                 ServiceManager.remove_service(current_service.name, client=client)
-            ArakoonInstaller.restart_cluster_remove(cluster_name, remaining_ips)
+            ArakoonInstaller.restart_cluster_remove(cluster_name, remaining_ips, filesystem=False)
             current_service.delete()
             StorageDriverController._configure_arakoon_to_volumedriver(cluster_name=cluster_name)
 
