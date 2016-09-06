@@ -27,7 +27,7 @@ from django.http import HttpResponse
 from middleware import OVSMiddleware
 from oauth2.exceptions import HttpBadRequestException, HttpUnauthorizedException, HttpTooManyRequestsException
 from oauth2.toolbox import Toolbox as OAuth2Toolbox
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic import fakesleep
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -158,9 +158,9 @@ class Authentication(unittest.TestCase):
 
         fakesleep.monkey_patch()
 
-        EtcdConfiguration.set('/ovs/framework/plugins/installed', {'generic': [],
+        Configuration.set('/ovs/framework/plugins/installed', {'generic': [],
                                                                    'backends': []})
-        EtcdConfiguration.set('/ovs/framework/cluster_id', 'cluster_id')
+        Configuration.set('/ovs/framework/cluster_id', 'cluster_id')
 
     @classmethod
     def tearDownClass(cls):

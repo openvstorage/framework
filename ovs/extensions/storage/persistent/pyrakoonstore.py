@@ -26,9 +26,9 @@ import random
 from StringIO import StringIO
 from threading import Lock, current_thread
 from ConfigParser import RawConfigParser
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNotFound, ArakoonSockNotReadable, ArakoonSockReadNoBytes, ArakoonSockSendError, ArakoonAssertionFailed
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storage.exceptions import KeyNotFoundException, AssertException
 from ovs.log.log_handler import LogHandler
 
@@ -58,13 +58,13 @@ class PyrakoonStore(object):
     * Raises generic exception
     """
     _logger = LogHandler.get('extensions', name='arakoon_store')
-    ETCD_CONFIG_KEY = '/ovs/arakoon/{0}/config'
+    CONFIG_KEY = '/ovs/arakoon/{0}/config'
 
     def __init__(self, cluster):
         """
         Initializes the client
         """
-        contents = EtcdConfiguration.get(PyrakoonStore.ETCD_CONFIG_KEY.format(cluster), raw=True)
+        contents = Configuration.get(PyrakoonStore.CONFIG_KEY.format(cluster), raw=True)
         parser = RawConfigParser()
         parser.readfp(StringIO(contents))
         nodes = {}

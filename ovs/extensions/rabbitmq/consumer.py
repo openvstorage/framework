@@ -25,7 +25,7 @@ import sys
 import pika
 import inspect
 import logging
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.extensions.rabbitmq.processor import process
 from ovs.log.log_handler import LogHandler
@@ -61,8 +61,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     try:
         run_event_consumer = False
-        my_ip = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(System.get_my_machine_id()))
-        for endpoint in EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints'):
+        my_ip = Configuration.get('/ovs/framework/hosts/{0}/ip'.format(System.get_my_machine_id()))
+        for endpoint in Configuration.get('/ovs/framework/messagequeue|endpoints'):
             if endpoint.startswith(my_ip):
                 run_event_consumer = True
 
@@ -88,7 +88,7 @@ if __name__ == '__main__':
                 logger.debug('{0}: {1}'.format(key.name, [current_map['task'].__name__ for current_map in mapping[key]]))
 
             # Starting connection and handling
-            rmq_servers = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
+            rmq_servers = Configuration.get('/ovs/framework/messagequeue|endpoints')
             channel = None
             server = ''
             loglevel = logging.root.manager.disable  # Workaround for disabling logging
@@ -99,8 +99,8 @@ if __name__ == '__main__':
                         pika.ConnectionParameters(host=server.split(':')[0],
                                                   port=int(server.split(':')[1]),
                                                   credentials=pika.PlainCredentials(
-                                                      EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
-                                                      EtcdConfiguration.get('/ovs/framework/messagequeue|password'))
+                                                      Configuration.get('/ovs/framework/messagequeue|user'),
+                                                      Configuration.get('/ovs/framework/messagequeue|password'))
                                                   )
                     )
                     channel = connection.channel()

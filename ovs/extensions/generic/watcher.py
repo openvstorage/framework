@@ -55,6 +55,27 @@ class Watcher(object):
             key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))
             value = str(time.time())
 
+            if target == 'config':
+                self.log_message(target, 'Testing configuration store...', 0)
+                from ovs.extensions.generic.configuration import Configuration
+                try:
+                    Configuration.list('/')
+                except Exception as ex:
+                    self.log_message(target, '  Error during configuration store test: {0}'.format(ex), 2)
+                    return False
+                if Configuration.get_store() == 'arakoon':
+                    from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+                    from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
+                    from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
+                    config = ArakoonClusterConfig(cluster_id='cacc', filesystem=True)
+                    config.load_config('127.0.0.1')
+                    client = ArakoonInstaller.build_client(config)
+                    contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())
+                    with open(ArakoonConfiguration.CACC_LOCATION, 'w') as config_file:
+                        config_file.write(contents)
+                self.log_message(target, '  Configuration store OK', 0)
+                return True
+
             if target == 'framework':
                 # Volatile
                 self.log_message(target, 'Testing volatile store...', 0)
@@ -117,9 +138,9 @@ class Watcher(object):
                 tries = 0
                 while tries < max_tries:
                     try:
-                        from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+                        from ovs.extensions.generic.configuration import Configuration
                         from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
-                        cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
+                        cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
                         client = PyrakoonStore(cluster=cluster_name)
                         client.set(key, value)
                         if client.get(key) == value:
@@ -140,8 +161,8 @@ class Watcher(object):
                 # RabbitMQ
                 self.log_message(target, 'Test rabbitMQ...', 0)
                 import pika
-                from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-                messagequeue = EtcdConfiguration.get('/ovs/framework/messagequeue')
+                from ovs.extensions.generic.configuration import Configuration
+                messagequeue = Configuration.get('/ovs/framework/messagequeue')
                 rmq_servers = messagequeue['endpoints']
                 good_node = False
                 for server in rmq_servers:

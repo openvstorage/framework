@@ -21,7 +21,7 @@ import os
 import copy
 import json
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
@@ -173,8 +173,8 @@ class ObjectRegistryClient(object):
         key = vpool.identifier
         if key not in oclient_vpool_cache:
             arakoon_node_configs = []
-            arakoon_cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
-            config = ArakoonClusterConfig(arakoon_cluster_name)
+            arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
+            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
             config.load_config()
             for node in config.nodes:
                 arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
@@ -344,8 +344,8 @@ class StorageDriverConfiguration(object):
         self._logger = LogHandler.get('extensions', name='storagedriver')
         self.config_type = config_type
         self.configuration = {}
-        self.path = '/ovs/vpools/{0}/hosts/{1}/config/{{0}}'.format(vpool_guid, storagedriver_id)
-        self.remote_path = 'etcd://127.0.0.1:2379{0}'.format(self.path.format('')).strip('/')
+        self.key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool_guid, storagedriver_id)
+        self.remote_path = Configuration.get_configuration_path(self.key).strip('/')
         self.is_new = True
         self.dirty_entries = []
         self.params = copy.deepcopy(StorageDriverConfiguration.parameters)  # Never use parameters directly
@@ -361,13 +361,14 @@ class StorageDriverConfiguration(object):
         Loads the configuration from a given file, optionally a remote one
         """
         self.configuration = {}
-        if EtcdConfiguration.dir_exists(self.path.format('')):
+        if Configuration.exists(self.key):
             self.is_new = False
+            configuration = json.loads(Configuration.get(self.key, raw=True))
             for key in self.params[self.config_type]:
-                if EtcdConfiguration.exists(self.path.format(key)):
-                    self.configuration[key] = json.loads(EtcdConfiguration.get(self.path.format(key), raw=True))
+                if key in configuration:
+                    self.configuration[key] = configuration[key]
         else:
-            self._logger.debug('Could not find config {0}, a new one will be created'.format(self.path.format('')))
+            self._logger.debug('Could not find config {0}, a new one will be created'.format(self.key))
         self.dirty_entries = []
 
     def save(self, client=None, reload_config=True):
@@ -377,9 +378,7 @@ class StorageDriverConfiguration(object):
         :param reload_config: Reload the running Storage Driver configuration
         """
         self._validate()
-        for key in self.configuration:
-            contents = json.dumps(self.configuration[key], indent=4)
-            EtcdConfiguration.set(self.path.format(key), contents, raw=True)
+        Configuration.set(self.key, json.dumps(self.configuration, indent=4), raw=True)
         if self.config_type == 'storagedriver' and reload_config is True:
             if len(self.dirty_entries) > 0:
                 if client is None:

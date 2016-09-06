@@ -33,7 +33,7 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonAdmin, ArakoonClientConfig
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -395,7 +395,7 @@ class ScheduledTaskController(object):
 
         for cluster in arakoon_clusters:
             ScheduledTaskController._logger.info('  Collapsing cluster {0}'.format(cluster))
-            contents = EtcdConfiguration.get(ArakoonClusterConfig.ETCD_CONFIG_KEY.format(cluster), raw=True)
+            contents = Configuration.get(ArakoonClusterConfig.CONFIG_KEY.format(cluster), raw=True)
             parser = RawConfigParser()
             parser.readfp(StringIO(contents))
             nodes = {}

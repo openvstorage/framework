@@ -19,7 +19,7 @@ BackendType module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Dynamic
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 
 
 class BackendType(DataObject):
@@ -37,6 +37,6 @@ class BackendType(DataObject):
         Checks whether this BackendType has a plugin installed
         """
         try:
-            return self.code in EtcdConfiguration.get('/ovs/framework/plugins/installed|backends')
+            return self.code in Configuration.get('/ovs/framework/plugins/installed|backends')
         except:
             return False

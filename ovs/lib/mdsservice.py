@@ -33,7 +33,7 @@ from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
@@ -98,7 +98,7 @@ class MDSServiceController(object):
             if service.storagerouter_guid == storagerouter.guid:
                 occupied_ports.extend(service.ports)
 
-        mds_port_range = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ports|mds'.format(System.get_my_machine_id(client)))
+        mds_port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|mds'.format(System.get_my_machine_id(client)))
         free_ports = System.get_free_ports(selected_range=mds_port_range,
                                            exclude=occupied_ports,
                                            nr=1,
@@ -396,9 +396,9 @@ class MDSServiceController(object):
                                        'loads': {},
                                        'available': []}}
 
-        tlogs = EtcdConfiguration.get('/ovs/framework/storagedriver|mds_tlogs')
-        safety = EtcdConfiguration.get('/ovs/framework/storagedriver|mds_safety')
-        max_load = EtcdConfiguration.get('/ovs/framework/storagedriver|mds_maxload')
+        tlogs = Configuration.get('/ovs/framework/storagedriver|mds_tlogs')
+        safety = Configuration.get('/ovs/framework/storagedriver|mds_safety')
+        max_load = Configuration.get('/ovs/framework/storagedriver|mds_maxload')
         for service in services:
             importance = None
             if service.storagerouter in primary_storagerouters:
@@ -692,7 +692,7 @@ class MDSServiceController(object):
                 mds_per_load[load] = []
             mds_per_load[load].append(storagerouter)
 
-        safety = EtcdConfiguration.get('/ovs/framework/storagedriver|mds_safety')
+        safety = Configuration.get('/ovs/framework/storagedriver|mds_safety')
         config_set = {}
         for storagerouter, ip_info in mds_per_storagerouter.iteritems():
             config_set[storagerouter.guid] = [ip_info]
@@ -739,7 +739,7 @@ class MDSServiceController(object):
                 mds_dict[vpool][storagerouter]['services'].append(mds_service)
 
         failures = []
-        max_load = EtcdConfiguration.get('/ovs/framework/storagedriver|mds_maxload')
+        max_load = Configuration.get('/ovs/framework/storagedriver|mds_maxload')
         for vpool, storagerouter_info in mds_dict.iteritems():
             # 1. First, make sure there's at least one MDS on every StorageRouter that's not overloaded
             # If not, create an extra MDS for that StorageRouter
