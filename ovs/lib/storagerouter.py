@@ -830,7 +830,7 @@ class StorageRouterController(object):
                 'ips': [storagedriver.storage_ip],
                 'manifest_cache_size': manifest_cache_size,
                 'fragment_cache': fragment_cache_info,
-                'transport': 'rdma' if has_rdma else 'tcp',
+                'transport': 'tcp',
                 'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
             }, indent=4), raw=True)
 
