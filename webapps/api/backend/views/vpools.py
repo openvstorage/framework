@@ -18,6 +18,7 @@
 VPool module
 """
 
+import time
 from rest_framework import viewsets
 from rest_framework.decorators import link, action
 from rest_framework.permissions import IsAuthenticated
@@ -180,3 +181,47 @@ class VPoolViewSet(viewsets.ViewSet):
             if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
                 return True
         return False
+
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VPool)
+    def create_snapshots(self, vdisk_guids, name, timestamp=None, consistent=False, automatic=False, sticky=False):
+        """
+        Creates snapshots for a list of VDisks
+        :param vdisk_guids: Guids of the virtual disks to create snapshot from
+        :type vdisk_guids: list
+        :param name: Name of the snapshot (label)
+        :type name: str
+        :param timestamp: Timestamp of the snapshot
+        :type timestamp: int
+        :param consistent: Flag - is_consistent
+        :type consistent: bool
+        :param automatic: Flag - is_automatic
+        :type automatic: bool
+        :param sticky: Flag - is_sticky
+        :type sticky: bool
+        """
+        if timestamp is None:
+            timestamp = str(int(time.time()))
+        metadata = {'label': name,
+                    'timestamp': timestamp,
+                    'is_consistent': True if consistent else False,
+                    'is_sticky': True if sticky else False,
+                    'is_automatic': True if automatic else False}
+        return VDiskController.create_snapshots.delay(vdisk_guids=vdisk_guids,
+                                                      metadata=metadata)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VPool)
+    def remove_snapshots(self, snapshot_mapping):
+        """
+        Remove a snapshot from a list of VDisks
+        :param snapshot_mapping: Dict containing vDisk guid / Snapshot ID pairs
+        :type snapshot_mapping: dict
+        """
+        return VDiskController.delete_snapshots.delay(snapshot_mapping=snapshot_mapping)
