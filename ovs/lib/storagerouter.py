@@ -890,7 +890,7 @@ class StorageRouterController(object):
                                           'alba_connection_port': alba_proxy.service.ports[0],
                                           'alba_connection_preset': vpool.metadata['backend']['preset'],
                                           'alba_connection_timeout': 15,
-                                          'alba_connection_transport': 'RDMA' if has_rdma else 'TCP',
+                                          'alba_connection_transport': 'TCP',
                                           'backend_type': 'ALBA'}
             if use_accelerated_alba is False and has_rdma is True:
                 backend_connection_manager['alba_connection_rora_manifest_cache_capacity'] = manifest_cache_size
