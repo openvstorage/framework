@@ -18,6 +18,7 @@
 VPool module
 """
 
+import time
 from rest_framework import viewsets
 from rest_framework.decorators import link, action
 from rest_framework.permissions import IsAuthenticated
@@ -180,3 +181,40 @@ class VPoolViewSet(viewsets.ViewSet):
             if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
                 return True
         return False
+
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VPool)
+    def create_snapshots(self, vdisk_guids, name, timestamp=None, consistent=False, automatic=False, sticky=False):
+        """
+        Creates a snapshot from the vDisk
+        :param vdisk_guids: Guids of the virtual disk to create snapshot from
+        :param name: Name of the snapshot (label)
+        :param timestamp: Timestamp of the snapshot - integer
+        :param consistent: Flag - is_consistent
+        :param automatic: Flag - is_automatic
+        :param sticky: Flag - is_sticky
+        """
+        if timestamp is None:
+            timestamp = str(int(time.time()))
+        metadata = {'label': name,
+                    'timestamp': timestamp,
+                    'is_consistent': True if consistent else False,
+                    'is_sticky': True if sticky else False,
+                    'is_automatic': True if automatic else False}
+        return VDiskController.create_snapshots.delay(vdisk_guids=vdisk_guids,
+                                                      metadata=metadata)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VPool)
+    def remove_snapshots(self, snapshot_mapping):
+        """
+        Remove a snapshot from a VDisk
+        :param snapshot_mapping: Dict containing vDisk.guid / snapshot_id pairs
+        """
+        return VDiskController.delete_snapshots.delay(snapshot_mapping=snapshot_mapping)

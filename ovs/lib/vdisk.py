@@ -323,22 +323,51 @@ class VDiskController(object):
         """
         if not isinstance(metadata, dict):
             raise ValueError('Expected metadata as dict, got {0} instead'.format(type(metadata)))
-        vdisk = VDisk(vdisk_guid)
-        VDiskController._logger.info('Create snapshot for vDisk {0}'.format(vdisk.name))
+        result = VDiskController.create_snapshots([vdisk_guid], metadata)
+        if result[vdisk_guid][0] is False:
+            raise RuntimeError(result[vdisk_guid][1])
+        return result[vdisk_guid][1]
 
+    @staticmethod
+    @celery.task(name='ovs.vdisk.create_snapshots')
+    def create_snapshots(vdisk_guids, metadata):
+        """
+        Create a vDisk snapshot
+        :param vdisk_guids: Guid of the vDisks
+        :type vdisk_guids: list
+        :param metadata: Dictionary of metadata
+        :type metadata: dict
+        :return: ID of the newly created snapshot
+        :rtype: dict
+        """
+        if not isinstance(metadata, dict):
+            raise ValueError('Expected metadata as dict, got {0} instead'.format(type(metadata)))
         metadata = pickle.dumps(metadata)
-        snapshot_id = str(uuid.uuid4())
-        vdisk.invalidate_dynamics(['snapshots'])
-        if len(vdisk.snapshots) > 0:
-            most_recent_snap = sorted(vdisk.snapshots, key=lambda k: k['timestamp'], reverse=True)[0]  # Most recent first
-            if VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk.guid, snapshot_id=most_recent_snap['guid']) is False:
-                raise RuntimeError('Previously created snapshot did not make it to the backend yet')
+        results = {}
+        for guid in vdisk_guids:
+            try:
+                vdisk = VDisk(guid)
+            except ObjectNotFoundException:
+                results[guid] = [False, 'VDisk could not be found'.format(guid)]
+                continue
 
-        vdisk.storagedriver_client.create_snapshot(volume_id=str(vdisk.volume_id),
-                                                   snapshot_id=str(snapshot_id),
-                                                   metadata=metadata)
-        vdisk.invalidate_dynamics(['snapshots'])
-        return snapshot_id
+            VDiskController._logger.info('Create snapshot for vDisk {0}'.format(vdisk.name))
+            snapshot_id = str(uuid.uuid4())
+            vdisk.invalidate_dynamics(['snapshots'])
+            if len(vdisk.snapshots) > 0:
+                most_recent_snap = sorted(vdisk.snapshots, key=lambda k: k['timestamp'], reverse=True)[0]  # Most recent first
+                if VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk.guid, snapshot_id=most_recent_snap['guid']) is False:
+                    results[guid] = [False, 'Previously created snapshot did not make it to the backend yet']
+                    continue
+            try:
+                vdisk.storagedriver_client.create_snapshot(volume_id=str(vdisk.volume_id),
+                                                           snapshot_id=str(snapshot_id),
+                                                           metadata=metadata)
+                vdisk.invalidate_dynamics(['snapshots'])
+                results[guid] = [True, snapshot_id]
+            except Exception as ex:
+                results[guid] = [False, ex.message]
+        return results
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete_snapshot')
@@ -350,15 +379,38 @@ class VDiskController(object):
         :param snapshot_id: ID of the snapshot
         :type snapshot_id: str
         """
-        vdisk = VDisk(vdisk_guid)
-        if snapshot_id not in [snap['guid'] for snap in vdisk.snapshots]:
-            raise RuntimeError('Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name))
-        clones_of_snapshot = VDiskList.get_by_parentsnapshot(snapshot_id)
-        if len(clones_of_snapshot) > 0:
-            raise RuntimeError('Snapshot {0} has {1} volume{2} cloned from it, cannot remove'.format(snapshot_id, len(clones_of_snapshot), '' if len(clones_of_snapshot) == 1 else 's'))
-        VDiskController._logger.info('Deleting snapshot {0} from vDisk {1}'.format(snapshot_id, vdisk.name))
-        vdisk.storagedriver_client.delete_snapshot(str(vdisk.volume_id), str(snapshot_id))
-        vdisk.invalidate_dynamics(['snapshots'])
+        result = VDiskController.delete_snapshots({vdisk_guid: snapshot_id})
+        if result[vdisk_guid][0] is False:
+            raise RuntimeError(result[vdisk_guid][1])
+
+    @staticmethod
+    @celery.task(name='ovs.vdisk.delete_snapshots')
+    def delete_snapshots(snapshot_mapping):
+        """
+        Delete a vDisk snapshot
+        :param snapshot_mapping: Mapping of VDisk guid and snapshot_id
+        :type snapshot_mapping: dict
+        """
+        results = {}
+        for vdisk_guid, snapshot_id in snapshot_mapping.iteritems():
+            try:
+                vdisk = VDisk(vdisk_guid)
+                if snapshot_id not in [snap['guid'] for snap in vdisk.snapshots]:
+                    results[vdisk_guid] = [False, 'Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name)]
+                    continue
+
+                clones_of_snapshot = VDiskList.get_by_parentsnapshot(snapshot_id)
+                if len(clones_of_snapshot) > 0:
+                    results[vdisk_guid] = [False, 'Snapshot {0} has {1} volume{2} cloned from it, cannot remove'.format(snapshot_id, len(clones_of_snapshot), '' if len(clones_of_snapshot) == 1 else 's')]
+                    continue
+
+                VDiskController._logger.info('Deleting snapshot {0} from vDisk {1}'.format(snapshot_id, vdisk.name))
+                vdisk.storagedriver_client.delete_snapshot(str(vdisk.volume_id), str(snapshot_id))
+                vdisk.invalidate_dynamics(['snapshots'])
+                results[vdisk_guid] = [True, snapshot_id]
+            except Exception as ex:
+                results[vdisk_guid] = [False, ex.message]
+        return results
 
     @staticmethod
     @celery.task(name='ovs.vdisk.set_as_template')
