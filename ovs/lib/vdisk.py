@@ -324,15 +324,16 @@ class VDiskController(object):
         if not isinstance(metadata, dict):
             raise ValueError('Expected metadata as dict, got {0} instead'.format(type(metadata)))
         result = VDiskController.create_snapshots([vdisk_guid], metadata)
-        if result[vdisk_guid][0] is False:
-            raise RuntimeError(result[vdisk_guid][1])
-        return result[vdisk_guid][1]
+        vdisk_result = result[vdisk_guid]
+        if vdisk_result[0] is False:
+            raise RuntimeError(vdisk_result[1])
+        return vdisk_result[1]
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_snapshots')
     def create_snapshots(vdisk_guids, metadata):
         """
-        Create a vDisk snapshot
+        Create vDisk snapshots
         :param vdisk_guids: Guid of the vDisks
         :type vdisk_guids: list
         :param metadata: Dictionary of metadata
@@ -380,14 +381,15 @@ class VDiskController(object):
         :type snapshot_id: str
         """
         result = VDiskController.delete_snapshots({vdisk_guid: snapshot_id})
-        if result[vdisk_guid][0] is False:
-            raise RuntimeError(result[vdisk_guid][1])
+        vdisk_result = result[vdisk_guid]
+        if vdisk_result[0] is False:
+            raise RuntimeError(vdisk_result[1])
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete_snapshots')
     def delete_snapshots(snapshot_mapping):
         """
-        Delete a vDisk snapshot
+        Delete vDisk snapshots
         :param snapshot_mapping: Mapping of VDisk guid and snapshot_id
         :type snapshot_mapping: dict
         """
