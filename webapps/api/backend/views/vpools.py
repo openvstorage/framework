@@ -189,13 +189,19 @@ class VPoolViewSet(viewsets.ViewSet):
     @load(VPool)
     def create_snapshots(self, vdisk_guids, name, timestamp=None, consistent=False, automatic=False, sticky=False):
         """
-        Creates a snapshot from the vDisk
-        :param vdisk_guids: Guids of the virtual disk to create snapshot from
+        Creates snapshots for a list of VDisks
+        :param vdisk_guids: Guids of the virtual disks to create snapshot from
+        :type vdisk_guids: list
         :param name: Name of the snapshot (label)
-        :param timestamp: Timestamp of the snapshot - integer
+        :type name: str
+        :param timestamp: Timestamp of the snapshot
+        :type timestamp: int
         :param consistent: Flag - is_consistent
+        :type consistent: bool
         :param automatic: Flag - is_automatic
+        :type automatic: bool
         :param sticky: Flag - is_sticky
+        :type sticky: bool
         """
         if timestamp is None:
             timestamp = str(int(time.time()))
@@ -214,7 +220,8 @@ class VPoolViewSet(viewsets.ViewSet):
     @load(VPool)
     def remove_snapshots(self, snapshot_mapping):
         """
-        Remove a snapshot from a VDisk
-        :param snapshot_mapping: Dict containing vDisk.guid / snapshot_id pairs
+        Remove a snapshot from a list of VDisks
+        :param snapshot_mapping: Dict containing vDisk guid / Snapshot ID pairs
+        :type snapshot_mapping: dict
         """
         return VDiskController.delete_snapshots.delay(snapshot_mapping=snapshot_mapping)

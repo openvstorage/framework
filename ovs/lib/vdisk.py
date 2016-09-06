@@ -349,7 +349,7 @@ class VDiskController(object):
             try:
                 vdisk = VDisk(guid)
             except ObjectNotFoundException:
-                results[guid] = [False, 'VDisk could not be found'.format(guid)]
+                results[guid] = [False, 'VDisk could not be found']
                 continue
 
             try:
@@ -390,13 +390,14 @@ class VDiskController(object):
     def delete_snapshots(snapshot_mapping):
         """
         Delete vDisk snapshots
-        :param snapshot_mapping: Mapping of VDisk guid and snapshot_id
+        :param snapshot_mapping: Mapping of VDisk guid and Snapshot ID
         :type snapshot_mapping: dict
         """
         results = {}
         for vdisk_guid, snapshot_id in snapshot_mapping.iteritems():
             try:
                 vdisk = VDisk(vdisk_guid)
+                vdisk.invalidate_dynamics(['snapshots'])
                 if snapshot_id not in [snap['guid'] for snap in vdisk.snapshots]:
                     results[vdisk_guid] = [False, 'Snapshot {0} does not belong to vDisk {1}'.format(snapshot_id, vdisk.name)]
                     continue
