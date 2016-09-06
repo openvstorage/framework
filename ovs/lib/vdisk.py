@@ -348,11 +348,6 @@ class VDiskController(object):
         for guid in vdisk_guids:
             try:
                 vdisk = VDisk(guid)
-            except ObjectNotFoundException:
-                results[guid] = [False, 'VDisk could not be found']
-                continue
-
-            try:
                 VDiskController._logger.info('Create snapshot for vDisk {0}'.format(vdisk.name))
                 snapshot_id = str(uuid.uuid4())
                 vdisk.invalidate_dynamics(['snapshots'])
