@@ -352,15 +352,15 @@ class VDiskController(object):
                 results[guid] = [False, 'VDisk could not be found'.format(guid)]
                 continue
 
-            VDiskController._logger.info('Create snapshot for vDisk {0}'.format(vdisk.name))
-            snapshot_id = str(uuid.uuid4())
-            vdisk.invalidate_dynamics(['snapshots'])
-            if len(vdisk.snapshots) > 0:
-                most_recent_snap = sorted(vdisk.snapshots, key=lambda k: k['timestamp'], reverse=True)[0]  # Most recent first
-                if VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk.guid, snapshot_id=most_recent_snap['guid']) is False:
-                    results[guid] = [False, 'Previously created snapshot did not make it to the backend yet']
-                    continue
             try:
+                VDiskController._logger.info('Create snapshot for vDisk {0}'.format(vdisk.name))
+                snapshot_id = str(uuid.uuid4())
+                vdisk.invalidate_dynamics(['snapshots'])
+                if len(vdisk.snapshots) > 0:
+                    most_recent_snap = sorted(vdisk.snapshots, key=lambda k: k['timestamp'], reverse=True)[0]  # Most recent first
+                    if VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk.guid, snapshot_id=most_recent_snap['guid']) is False:
+                        results[guid] = [False, 'Previously created snapshot did not make it to the backend yet']
+                        continue
                 vdisk.storagedriver_client.create_snapshot(volume_id=str(vdisk.volume_id),
                                                            snapshot_id=str(snapshot_id),
                                                            metadata=metadata)
