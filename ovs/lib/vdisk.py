@@ -37,7 +37,6 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
@@ -982,7 +981,7 @@ class VDiskController(object):
                             try:
                                 root_client = SSHClient(storagerouter, username='root')
                                 service_name = 'dtl_{0}'.format(vpool.name)
-                                if ServiceManager.has_service(service_name, client=root_client) is True and ServiceManager.get_service_status(service_name, client=root_client) is True:
+                                if ServiceManager.has_service(service_name, client=root_client) is True and ServiceManager.get_service_status(service_name, client=root_client)[0] is True:
                                     root_client_map[storagerouter] = root_client
                                     possible_srs.append(storagerouter)
                                 else:

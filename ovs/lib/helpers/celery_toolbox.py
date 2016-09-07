@@ -73,7 +73,7 @@ class CeleryToolbox():
                     if ip not in ssh_clients:
                         ssh_clients[ip] = SSHClient(ip, username='root')
                     client = ssh_clients[ip]
-                    if ServiceManager.get_service_status('workers', client) is False:
+                    if ServiceManager.get_service_status('workers', client)[0] is False:
                         logger.error('Service ovs-workers on node {0} appears halted while there is a task PENDING for it {1}. Task will be revoked.'.format(ip, task.id))
                         revoke(task.id)
                         del tasklist[ip]

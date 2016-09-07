@@ -86,20 +86,20 @@ class VPool(DataObject):
         storagedriver_config = StorageDriverConfiguration('storagedriver', self.guid, self.storagedrivers[0].storagedriver_id)
         storagedriver_config.load()
 
-        dtl = storagedriver_config.configuration.get('distributed_transaction_log', {})
-        file_system = storagedriver_config.configuration.get('filesystem', {})
-        volume_router = storagedriver_config.configuration.get('volume_router', {})
-        volume_manager = storagedriver_config.configuration.get('volume_manager', {})
+        dtl = storagedriver_config.configuration['distributed_transaction_log']
+        file_system = storagedriver_config.configuration['filesystem']
+        volume_router = storagedriver_config.configuration['volume_router']
+        volume_manager = storagedriver_config.configuration['volume_manager']
 
-        dtl_mode = file_system.get('fs_dtl_mode', StorageDriverClient.VOLDRV_DTL_ASYNC)
-        dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_CONTENT_BASED)
-        cluster_size = volume_manager.get('default_cluster_size', 4096) / 1024
-        dtl_transport = dtl.get('dtl_transport', StorageDriverClient.VOLDRV_DTL_TRANSPORT_TCP)
-        cache_strategy = volume_manager.get('read_cache_default_behaviour', StorageDriverClient.VOLDRV_CACHE_ON_READ)
-        sco_multiplier = volume_router.get('vrouter_sco_multiplier', 1024)
-        dtl_config_mode = file_system.get('fs_dtl_config_mode', StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE)
-        tlog_multiplier = volume_manager.get('number_of_scos_in_tlog', 20)
-        non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
+        dtl_mode = file_system['fs_dtl_mode']
+        dedupe_mode = volume_manager['read_cache_default_mode']
+        cluster_size = volume_manager['default_cluster_size'] / 1024
+        dtl_transport = dtl['dtl_transport']
+        cache_strategy = volume_manager['read_cache_default_behaviour']
+        sco_multiplier = volume_router['vrouter_sco_multiplier']
+        dtl_config_mode = file_system['fs_dtl_config_mode']
+        tlog_multiplier = volume_manager['number_of_scos_in_tlog']
+        non_disposable_sco_factor = volume_manager['non_disposable_scos_factor']
 
         sco_size = sco_multiplier * cluster_size / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
         write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor
