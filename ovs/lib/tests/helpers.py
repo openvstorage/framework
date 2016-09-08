@@ -158,7 +158,7 @@ class Helper(object):
             vdisk.vpool = mds_service.vpool if mds_service is not None else vpool
             vdisk.size = 0
             vdisk.save()
-            vdisk.reload_client()
+            vdisk.reload_clients('storagedriver')
             if mds_service is not None and mds_service.service.storagerouter_guid is not None:
                 junction = MDSServiceVDisk()
                 junction.vdisk = vdisk

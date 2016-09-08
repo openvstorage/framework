@@ -309,6 +309,6 @@ class VDisk(DataObject):
             self._frozen = False
             if client == 'storagedriver':
                 self._storagedriver_client = StorageDriverClient.load(self.vpool)
-            if client == 'objectregistry':
+            elif client == 'objectregistry':
                 self._objectregistry_client = ObjectRegistryClient.load(self.vpool)
             self._frozen = True

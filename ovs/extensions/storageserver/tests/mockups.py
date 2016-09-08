@@ -81,10 +81,10 @@ class MockStorageRouterClient(object):
         """
         Create a vDisk from a vTemplate
         """
-        _ = target_path, metadata_backend_config, parent_volume_id, node_id
-        volume_id = str(uuid.uuid4())
-        MockStorageRouterClient.vrouter_id[self.vpool_guid][volume_id] = node_id
-        return volume_id
+        parent_volume = MockStorageRouterClient.volumes[self.vpool_guid][parent_volume_id]
+        if MockStorageRouterClient.object_type[self.vpool_guid].get(parent_volume_id, 'BASE') != 'TEMPLATE':
+            raise ValueError('Can only clone from a template')
+        return self.create_volume(target_path, metadata_backend_config, parent_volume['volume_size'], node_id)
 
     def create_snapshot(self, volume_id, snapshot_id, metadata):
         """
@@ -374,8 +374,22 @@ class MockObjectRegistryClient(object):
         """
         registrations = []
         for volume_id in MockStorageRouterClient.volumes[self.vpool_guid].iterkeys():
-            registrations.append(ObjectRegistration(MockStorageRouterClient.vrouter_id[self.vpool_guid][volume_id], volume_id))
+            registrations.append(ObjectRegistration(
+                MockStorageRouterClient.vrouter_id[self.vpool_guid][volume_id],
+                volume_id,
+                MockStorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')
+            ))
         return registrations
+
+    def find(self, volume_id):
+        volumes = MockStorageRouterClient.volumes[self.vpool_guid]
+        if volume_id in volumes:
+            return ObjectRegistration(
+                MockStorageRouterClient.vrouter_id[self.vpool_guid][volume_id],
+                volume_id,
+                MockStorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')
+            )
+        return None
 
 
 class MockMetadataServerClient(object):
@@ -444,9 +458,10 @@ class ObjectRegistration(object):
     """
     Mocked ObjectRegistration
     """
-    def __init__(self, node_id, object_id):
+    def __init__(self, node_id, object_id, object_type):
         self._node_id = node_id
         self._object_id = object_id
+        self._object_type = object_type
 
     def node_id(self):
         """
@@ -459,6 +474,12 @@ class ObjectRegistration(object):
         Object ID
         """
         return self._object_id
+
+    def object_type(self):
+        """
+        Object Type
+        """
+        return self._object_type
 
 
 class ArakoonNodeConfig(object):
