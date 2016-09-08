@@ -222,7 +222,9 @@ class VDisk(DataObject):
         Returns whether the vdisk is a template
         """
         vdisk_object = self.objectregistry_client.find(str(self.volume_id))
-        return str(vdisk_object.object_type()) == 'TEMPLATE'
+        if vdisk_object is not None:
+            return str(vdisk_object.object_type()) == 'TEMPLATE'
+        return False
 
     def _edge_clients(self):
         """
