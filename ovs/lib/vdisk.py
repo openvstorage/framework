@@ -539,8 +539,8 @@ class VDiskController(object):
         vpool = storagedriver.vpool
         if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
             raise RuntimeError('A vDisk with this name already exists on vPool {0}'.format(vpool.name))
-        if volume_size > 2 * 1024 ** 4:
-            raise ValueError('Maximum volume size of 2TiB exceeded')
+        if volume_size > 64 * 1024 ** 4:
+            raise ValueError('Maximum volume size of 64TiB exceeded')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
         if mds_service is None:
