@@ -170,6 +170,9 @@ class ObjectRegistryClient(object):
         Initializes the wrapper for a given vpool
         :param vpool: vPool for which the ObjectRegistryClient needs to be loaded
         """
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            return ORClient(str(vpool.guid), None, None)
+
         key = vpool.identifier
         if key not in oclient_vpool_cache:
             arakoon_node_configs = []

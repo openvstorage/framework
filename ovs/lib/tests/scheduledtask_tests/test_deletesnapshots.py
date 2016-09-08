@@ -154,7 +154,7 @@ class DeleteSnapshots(unittest.TestCase):
         vdisk_1_1.devicename = 'dummy'
         vdisk_1_1.size = 0
         vdisk_1_1.save()
-        vdisk_1_1.reload_client()
+        vdisk_1_1.reload_clients('storagedriver')
 
         [dynamic for dynamic in vdisk_1_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
@@ -184,7 +184,7 @@ class DeleteSnapshots(unittest.TestCase):
         clone_vdisk.parentsnapshot = base_snapshot_guid
         clone_vdisk.size = 0
         clone_vdisk.save()
-        clone_vdisk.reload_client()
+        clone_vdisk.reload_clients('storagedriver')
 
         for h in [6, 12, 18]:
             timestamp = base_timestamp + (hour * h)
@@ -243,7 +243,7 @@ class DeleteSnapshots(unittest.TestCase):
         vdisk_1.devicename = 'dummy'
         vdisk_1.size = 0
         vdisk_1.save()
-        vdisk_1.reload_client()
+        vdisk_1.reload_clients('storagedriver')
 
         [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
