@@ -25,11 +25,11 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import ClusterContact, DTLMode, LocalStorageRouterClient, MDSNodeConfig, ReadCacheBehaviour, ReadCacheMode, Statistics, VolumeInfo
+from volumedriver.storagerouter.storagerouterclient import ClusterContact, DTLMode, MDSNodeConfig, ReadCacheBehaviour, ReadCacheMode, Statistics, VolumeInfo
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
-    from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient as MDSClient, MockStorageRouterClient as SRClient, MockObjectRegistryClient as ORClient, ArakoonNodeConfig
+    from ovs.extensions.storageserver.tests.mockups import ArakoonNodeConfig, LocalStorageRouterClient, MDSClient, StorageRouterClient, ObjectRegistryClient as ORClient
 else:
-    from volumedriver.storagerouter.storagerouterclient import MDSClient, StorageRouterClient as SRClient, ObjectRegistryClient as ORClient, ArakoonNodeConfig
+    from volumedriver.storagerouter.storagerouterclient import ArakoonNodeConfig, LocalStorageRouterClient, MDSClient, StorageRouterClient, ObjectRegistryClient as ORClient
 
 client_vpool_cache = {}
 oclient_vpool_cache = {}
@@ -149,7 +149,7 @@ class StorageDriverClient(object):
             cluster_contacts = []
             for storagedriver in vpool.storagedrivers[:3]:
                 cluster_contacts.append(ClusterContact(str(storagedriver.cluster_ip), storagedriver.ports['xmlrpc']))
-            client = SRClient(str(vpool.guid), cluster_contacts)
+            client = StorageRouterClient(str(vpool.guid), cluster_contacts)
             client_vpool_cache[key] = client
         return client_vpool_cache[key]
 

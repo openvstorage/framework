@@ -17,6 +17,7 @@
 Remote RPyC wrapper module
 """
 
+import os
 from subprocess import check_output
 from rpyc.utils.zerodeploy import DeployedServer
 from plumbum import SshMachine
@@ -47,12 +48,16 @@ class remote(object):
         else:
             raise ValueError('IP info needs to be a single IP or a list of IPs')
 
+        self._unittest_mode = os.environ.get('RUNNING_UNITTESTS') == 'True'
+        if self._unittest_mode is True:
+            self.ips = ['127.0.0.1']
+
         if not isinstance(modules, list) and not isinstance(modules, set) and not isinstance(modules, tuple):
             raise ValueError('Modules should be a list, set or tuple')
 
         self.username = username if username is not None else check_output('whoami').strip()
         ssh_opts = []
-        if strict_host_key_checking is False:
+        if strict_host_key_checking is False or self._unittest_mode is True:
             ssh_opts.append('-o StrictHostKeyChecking=no')
         self.machines = [SshMachine(ip, user=self.username, password=password, ssh_opts=tuple(ssh_opts)) for ip in self.ips]
         self.servers = [DeployedServer(machine) for machine in self.machines]
