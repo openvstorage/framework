@@ -135,7 +135,7 @@ class DTLCheckup(unittest.TestCase):
             vdisk.vpool = vpool
             vdisk.size = 0
             vdisk.save()
-            vdisk.reload_client()
+            vdisk.reload_clients('storagedriver')
             MockStorageRouterClient.vrouter_id[vpool.guid]['vdisk_{0}'.format(vdisk_id)] = str(storage_driver_id)
             vdisks[vdisk_id] = vdisk
 

@@ -55,7 +55,7 @@ class ScheduledTaskController(object):
     _logger = LogHandler.get('lib', name='scheduled tasks')
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.snapshot_all_vdisks', schedule=crontab(minute='0', hour='2-22'))
+    @celery.task(name='ovs.scheduled.snapshot_all_vdisks', schedule=crontab(minute='0', hour='*'))
     @ensure_single(task_name='ovs.scheduled.snapshot_all_vdisks', extra_task_names=['ovs.scheduled.delete_snapshots'])
     def snapshot_all_vdisks():
         """
