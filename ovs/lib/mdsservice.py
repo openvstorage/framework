@@ -255,7 +255,7 @@ class MDSServiceController(object):
 
         :return: None
         """
-        vdisk.reload_clients('storagedriver')
+        vdisk.reload_client('storagedriver')
         vdisk.invalidate_dynamics(['info'])
         config = vdisk.info['metadata_backend_config']
         config_dict = {}
@@ -326,7 +326,7 @@ class MDSServiceController(object):
         # GATHER INFORMATION #
         ######################
         MDSServiceController._logger.debug('MDS safety: vDisk {0}: Start checkup for virtual disk {1}'.format(vdisk.guid, vdisk.name))
-        vdisk.reload_clients('storagedriver')
+        vdisk.reload_client('storagedriver')
         vdisk.invalidate_dynamics(['info', 'storagedriver_id', 'storagerouter_guid'])
         if vdisk.storagerouter_guid is None:
             raise ValueError('Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any Storage Router'.format(vdisk.name, vdisk.guid))

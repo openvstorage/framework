@@ -103,7 +103,7 @@ class Helper(object):
             vdisk.vpool = vpool
             vdisk.size = 0
             vdisk.save()
-            vdisk.reload_clients('storagedriver')
+            vdisk.reload_client('storagedriver')
             StorageRouterClient.vrouter_id[vpool.guid]['vdisk_{0}'.format(vdisk_id)] = str(storage_driver_id)
             vdisks[vdisk_id] = vdisk
         for sr_id in structure.get('storagerouters', []):
@@ -182,7 +182,7 @@ class Helper(object):
             vdisk.vpool = mds_service.vpool if mds_service is not None else vpool
             vdisk.size = 0
             vdisk.save()
-            vdisk.reload_clients('storagedriver')
+            vdisk.reload_client('storagedriver')
             if mds_service is not None and mds_service.service.storagerouter_guid is not None:
                 junction = MDSServiceVDisk()
                 junction.vdisk = vdisk

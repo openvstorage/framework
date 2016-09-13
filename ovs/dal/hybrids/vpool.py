@@ -63,7 +63,7 @@ class VPool(DataObject):
         :return: StorageDriverClient
         """
         if self._storagedriver_client is None:
-            self.reload_clients('storagedriver')
+            self.reload_client('storagedriver')
         return self._storagedriver_client
 
     @property
@@ -73,7 +73,7 @@ class VPool(DataObject):
         :return: ObjectRegistryClient
         """
         if self._objectregistry_client is None:
-            self.reload_clients('objectregistry')
+            self.reload_client('objectregistry')
         return self._objectregistry_client
 
     def _configuration(self):
@@ -141,13 +141,13 @@ class VPool(DataObject):
         """
         return '{0}_{1}'.format(self.guid, '_'.join(self.storagedrivers_guids))
 
-    def reload_clients(self, client):
+    def reload_client(self, client):
         """
-        Reloads the StorageDriverClient and ObjectRegistryClient
+        Reloads the StorageDriverClient or ObjectRegistryClient
         """
         self._frozen = False
         if client == 'storagedriver':
             self._storagedriver_client = StorageDriverClient.load(self)
-        if client == 'objectregistry':
+        elif client == 'objectregistry':
             self._objectregistry_client = ObjectRegistryClient.load(self)
         self._frozen = True
