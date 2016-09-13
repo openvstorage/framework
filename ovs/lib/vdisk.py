@@ -132,9 +132,11 @@ class VDiskController(object):
         :param volume_size: New size in bytes
         :type volume_size: int
         """
+        vdisk = VDisk(vdisk_guid)
         if volume_size > 2 * 1024 ** 4:
             raise ValueError('Maximum volume size of 2TiB exceeded')
-        vdisk = VDisk(vdisk_guid)
+        if volume_size < vdisk.size:
+            raise ValueError('Shrinking is not possible')
         VDiskController._logger.info('Extending vDisk {0} to {1}B'.format(vdisk.name, volume_size))
         vdisk.storagedriver_client.truncate(object_id=str(vdisk.volume_id),
                                             new_size='{0}B'.format(volume_size))
