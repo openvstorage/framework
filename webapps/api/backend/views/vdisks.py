@@ -194,7 +194,7 @@ class VDiskViewSet(viewsets.ViewSet):
         Create a new vdisk
         :param name: Name of the new vdisk
         :type name: str
-        :param size: Size of  virtual disk
+        :param size: Size of  virtual disk in bytes
         :type size: int
         :param vpool_guid: Guid of vPool to create new vdisk on
         :type vpool_guid: str
@@ -342,3 +342,20 @@ class VDiskViewSet(viewsets.ViewSet):
         :param snapshot_id: Snapshot to verify
         """
         return VDiskController.is_volume_synced_up_to_snapshot.delay(vdisk_guid=vdisk.guid, snapshot_id=snapshot_id)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(VDisk)
+    def extend(self, vdisk, new_size):
+        """
+        Extends a given vDisk to a new size
+        :param vdisk: The vDisk to extend
+        :type vdisk: VDisk
+        :param new_size: The new size of the vDisk (in bytes)
+        :type new_size: int
+        """
+        new_size = int(new_size)
+        return VDiskController.extend.delay(vdisk_guid=vdisk.guid,
+                                            volume_size=new_size)
