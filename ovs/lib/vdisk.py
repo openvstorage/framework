@@ -129,24 +129,14 @@ class VDiskController(object):
         Extend a vdisk through API
         :param vdisk_guid: Guid of the vdisk to extend
         :type vdisk_guid: str
-        :param volume_size: New size (GB)
+        :param volume_size: New size in bytes
         :type volume_size: int
         """
         vdisk = VDisk(vdisk_guid)
-        VDiskController._logger.info('Extending vDisk {0}'.format(vdisk.name))
-        client = None
-        storagedriver = None
-        for sd in vdisk.vpool.storagedrivers:
-            try:
-                client = SSHClient(sd.storagerouter)
-                storagedriver = sd
-                break
-            except UnableToConnectException:
-                pass
-        if client is None:
-            raise RuntimeError('Could not connect to any of the nodes serving vDisk {0}'.format(vdisk.name))
-        client.run('truncate -s {0} {1}/{2}'.format(volume_size, storagedriver.mountpoint, vdisk.devicename.strip('/')))
-        VDiskController._logger.info('Extended vDisk {0}'.format(vdisk.name))
+        VDiskController._logger.info('Extending vDisk {0} to {1}B'.format(vdisk.name, volume_size))
+        vdisk.storagedriver_client.truncate(object_id=str(vdisk.volume_id),
+                                            new_size='{0}B'.format(volume_size))
+        VDiskController._logger.info('Extended vDisk {0} to {1}B'.format(vdisk.name, volume_size))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.resize_from_voldrv')
