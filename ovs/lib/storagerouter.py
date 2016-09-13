@@ -477,7 +477,9 @@ class StorageRouterController(object):
 
         if read_overlap is True or write_overlap is True:
             for policy in cluster_policies:
-                size_to_reserve = int(cluster_total_size / sco_size * (1200 + (policy[0] + policy[1]) * (25 * sco_size / policy[0] / cluster_frag_size + 56)))
+                k_policy = int(policy[0])
+                m_policy = int(policy[1])
+                size_to_reserve = int(cluster_total_size / sco_size * (1200 + (k_policy + m_policy) * (25 * sco_size / k_policy / cluster_frag_size + 56)))
                 sizes_to_reserve.append(size_to_reserve)
             # For more information about above formula: see http://jira.cloudfounders.com/browse/OVS-3553
 
@@ -525,14 +527,6 @@ class StorageRouterController(object):
 
         if arakoon_service_found is False and (DiskPartition.ROLES.DB not in partition_info or len(partition_info[DiskPartition.ROLES.DB]) == 0):
             error_messages.append('DB partition role required')
-
-        # Check available IP addresses
-        ipaddresses = metadata['ipaddresses']
-        grid_ip = Configuration.get('/ovs/framework/hosts/{0}/ip'.format(unique_id))
-        if grid_ip in ipaddresses:
-            ipaddresses.remove(grid_ip)
-        if not ipaddresses:
-            error_messages.append('No available IP addresses found suitable for Storage Router storage IP')
 
         if error_messages:
             raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
@@ -609,6 +603,7 @@ class StorageRouterController(object):
                                                       existing_storagedriver.ports['management'],
                                                       existing_storagedriver.ports['xmlrpc'],
                                                       existing_storagedriver.ports['dtl']))
+        grid_ip = Configuration.get('/ovs/framework/hosts/{0}/ip'.format(unique_id))
         node_configs.append(ClusterNodeConfig(vrouter_id, str(grid_ip), ports[0], ports[1], ports[2]))
 
         try:
