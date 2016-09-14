@@ -1293,16 +1293,16 @@ class StorageRouterController(object):
             dirs_to_remove.append(sd_partition.path)
             sd_partition.delete()
 
+        if vpool.backend_type.code == 'alba':
+            config_tree = '/ovs/vpools/{0}/proxies/{1}'.format(vpool.guid, storage_driver.alba_proxy.guid)
+            Configuration.delete(config_tree)
+
         if storage_router_online is True:
             # Cleanup directories/files
             StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Deleting vPool related directories and files'.format(storage_driver.guid))
             machine_id = System.get_my_machine_id(client)
             dirs_to_remove.append(storage_driver.mountpoint)
             dirs_to_remove.append('{0}/{1}'.format(Configuration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(machine_id)), vpool.name))
-
-            if vpool.backend_type.code == 'alba':
-                config_tree = '/ovs/vpools/{0}/proxies/{1}'.format(vpool.guid, storage_driver.alba_proxy.guid)
-                Configuration.delete(config_tree)
 
             try:
                 mountpoints = StorageRouterController._get_mountpoints(client)

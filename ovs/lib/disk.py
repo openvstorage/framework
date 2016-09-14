@@ -94,6 +94,7 @@ class DiskController(object):
                               ('DEVNAME' in device and ('loop' in device['DEVNAME'] or 'nvme' in device['DEVNAME']
                                                         or 'md' in device['DEVNAME'] or 'vd' in device['DEVNAME']))]
                 for device in devices:
+                    device = dict(device)  # Fool PyCharm about type of 'device'
                     is_partition = device['DEVTYPE'] == 'partition'
                     device_path = device['DEVNAME']
                     device_name = device_path.split('/')[-1]
@@ -252,7 +253,13 @@ class DiskController(object):
         """
         Updates a disk
         """
+        # In certain cases container will not contain information about size, path, is_ssd, ...
+        # The property 'state' should always be available
+        # This might be a breaking change when a disk is effectively broken or in an unknown state,
+        # in case an issue is found, we should investigate immediately on the environment having this problem
+        if 'state' not in container:
+            raise ValueError('Missing property "state" for disk "{0}". Cannot update disk information'.format(disk.name))
         for prop in ['vendor', 'state', 'path', 'is_ssd', 'model', 'size']:
-            value = container[prop] if prop in container else None
-            setattr(disk, prop, value)
+            if prop in container:
+                setattr(disk, prop, container[prop])
         disk.save()
