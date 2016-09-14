@@ -1861,6 +1861,11 @@ class StorageRouterController(object):
                 if partition.mountpoint != mountpoint:
                     raise RuntimeError('Unexpected mountpoint')
             StorageRouterController._logger.debug('Mountpoint configured')
+        elif len(roles) == 0:  # Unmount disk without any roles assigned to be claimed by a backend
+            with remote(storagerouter.ip, [DiskTools], username='root') as rem:
+                StorageRouterController._logger.debug('Unmounting mountpoint: {0}'.format(partition.mountpoint))
+                rem.DiskTools.umount(mountpoint=partition.mountpoint)
+                DiskController.sync_with_reality(storagerouter_guid)
         partition.roles = roles
         partition.save()
         StorageRouterController._logger.debug('Partition configured')
