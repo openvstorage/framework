@@ -19,9 +19,9 @@ Debian Package module
 """
 
 import time
+from subprocess import check_output, CalledProcessError
+from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
-from subprocess import check_output
-from subprocess import CalledProcessError
 
 
 class DebianPackage(object):
@@ -45,19 +45,14 @@ class DebianPackage(object):
 
     @staticmethod
     def _get_installed_candidate_version(package_name, client):
-        def _lstrip(_string, _prefix):
-            if _string.startswith(_prefix):
-                return _string[len(_prefix):]
-            return _string
-
         installed = None
         candidate = None
         for line in client.run('apt-cache policy {0} {1}'.format(package_name, DebianPackage.APT_CONFIG_STRING)).splitlines():
             line = line.strip()
             if line.startswith('Installed:'):
-                installed = _lstrip(line, 'Installed:').strip()
+                installed = Toolbox.remove_prefix(line, 'Installed:').strip()
             elif line.startswith('Candidate:'):
-                candidate = _lstrip(line, 'Candidate:').strip()
+                candidate = Toolbox.remove_prefix(line, 'Candidate:').strip()
             if installed is not None and candidate is not None:
                 break
         return installed if installed != '(none)' else None, candidate if candidate != '(none)' else None
