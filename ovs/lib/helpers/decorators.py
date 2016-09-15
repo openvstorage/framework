@@ -291,7 +291,7 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 while counter < timeout:
                     if persistent_client.exists(persistent_key):
                         value = persistent_client.get(persistent_key)
-                        first_element = value['values'][0]['timestamp']
+                        first_element = value['values'][0]['timestamp'] if len(value['values']) > 0 else None
 
                     if first_element == now:
                         try:
