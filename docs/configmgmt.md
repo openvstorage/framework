@@ -1,4 +1,15 @@
-## ETCD
+## Configuration Manegement
+As Open vStorage is completely distributed it uses a distributed configuration management system.
+There are 2 option as configuration management system:
+* Arakoon, the preferred and advised system.
+* ETCD
+
+#### Set, get and list configuration keys
+The [OVS commandline](https://openvstorage.gitbooks.io/administration/content/Administration/usingthecli/configmgmt.html) allows to easily list and change the configuration parameters of the cluster:
+* `ovs config edit some/key`: Edit that key in your `$EDITOR`. If it doesn't exist, the key is created.
+* `ovs config list some`: List all keys with the given prefix.
+* `ovs config get some/key`: Print the content of the given key.
+
 
 #### Framework
 All framework keys stated below are relative to ```/ovs/framework```. E.g. ```cluster_id``` will be ```/ovs/framework/cluster_id```.
