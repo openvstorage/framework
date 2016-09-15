@@ -87,7 +87,7 @@ class DiskController(object):
             for member in re.findall('(?: +[0-9]+){4} +[^/]+/dev/([a-z0-9]+)', md_information):
                 raid_members.append(member)
             # Gather disk information
-            with remote(storagerouter.ip, [Context, DiskTools, os]) as rem:
+            with remote(storagerouter.ip, [Context, DiskTools, os], username='root') as rem:
                 context = rem.Context()
                 devices = [device for device in context.list_devices(subsystem='block')
                            if ('ID_TYPE' in device and device['ID_TYPE'] == 'disk') or
