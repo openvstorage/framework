@@ -127,7 +127,7 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 :param level:   Log level
                 :return:        None
                 """
-                if level not in ('info', 'warning', 'debug', 'error'):
+                if level not in ('info', 'warning', 'debug', 'error', 'exception'):
                     raise ValueError('Unsupported log level "{0}" specified'.format(level))
                 complete_message = 'Ensure single {0} mode - ID {1} - {2}'.format(mode, now, message)
                 getattr(logger, level)(complete_message)
@@ -294,6 +294,7 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                         first_element = value['values'][0]['timestamp'] if len(value['values']) > 0 else None
 
                     if first_element == now:
+                        output = None
                         try:
                             if counter != 0:
                                 current_time = int(time.time())
@@ -303,8 +304,9 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                                                                                                                      current_time - starting_time))
                             output = function(*args, **kwargs)
                             log_message('Task {0} finished successfully'.format(task_name))
+                        except Exception:
+                            log_message('Task {0} {1} failed'.format(task_name, params_info), level='exception')
                         finally:
-                            log_message('Task {0} with params {1} failed'.format(task_name, params_info), level='error')
                             update_value(key=persistent_key,
                                          append=False)
                         return output
