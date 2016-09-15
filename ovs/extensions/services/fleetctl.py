@@ -48,6 +48,11 @@ class FleetCtl(object):
         This will generate a .service (temporary) file to feed to fleet to start a service
          service will become "name@<client.ip>.service"
         """
+        def _lstrip(_string, _prefix):
+            if _string.startswith(_prefix):
+                return _string[len(_prefix):]
+            return _string
+
         if params is None:
             params = {}
         if additional_dependencies is None:
@@ -73,7 +78,7 @@ class FleetCtl(object):
             template_file = template_file.replace('<{0}>'.format(key), value)
         if '<SERVICE_NAME>' in template_file:
             service_name = name if target_name is None else target_name
-            template_file = template_file.replace('<SERVICE_NAME>', service_name.lstrip('ovs-'))
+            template_file = template_file.replace('<SERVICE_NAME>', _lstrip(service_name, 'ovs-'))
         template_file = template_file.replace('<_SERVICE_SUFFIX_>', '@{0}'.format(client_ip))
 
         dependencies = ''

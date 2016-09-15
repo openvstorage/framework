@@ -52,6 +52,11 @@ class Systemd(object):
 
     @staticmethod
     def add_service(name, client, params=None, target_name=None, additional_dependencies=None):
+        def _lstrip(_string, _prefix):
+            if _string.startswith(_prefix):
+                return _string[len(_prefix):]
+            return _string
+
         if params is None:
             params = {}
 
@@ -69,7 +74,7 @@ class Systemd(object):
             template_file = template_file.replace('<{0}>'.format(key), value)
         if '<SERVICE_NAME>' in template_file:
             service_name = name if target_name is None else target_name
-            template_file = template_file.replace('<SERVICE_NAME>', service_name.lstrip('ovs-'))
+            template_file = template_file.replace('<SERVICE_NAME>', _lstrip(service_name, 'ovs-'))
         template_file = template_file.replace('<_SERVICE_SUFFIX_>', '')
 
         dependencies = ''
