@@ -56,6 +56,11 @@ function show_help {
     echo "    - ovs unittest list            List all unittests"
     echo "    - ovs unittest <filepath>      Run the unittests in <filepath>"
     echo ""
+    echo "  * Configuration editing:"
+    echo "    - ovs config edit some/key     Opens the contents of 'some/key' in your EDITOR, and updates it after editting"
+    echo "    - ovs config list [some]       Lists all keys [under 'some']"
+    echo "    - ovs config get some/key      Prints the contents of 'some/key'"
+    echo ""
     echo "  * Custom Open vStorage modules:"
     echo "    - ovs <modulename> <arguments> Execute a custom Open vStorage module in /opt/OpenvStorage/scripts/"
     echo ""
@@ -165,6 +170,42 @@ elif [ "$1" = "unittest" ] ; then
             filename="$2"
         fi
         python -c "from ovs.lib.helpers.unittests import UnitTest; UnitTest.run_tests('$filename')"
+    fi
+elif [ "$1" = "config" ] ; then
+    if [ "$2" = "edit" ] ; then
+        if [ "$#" -eq 3 ] ; then
+          TEMP="/tmp/$(basename $0).$$.$RANDOM.tmp"
+          python -c """
+from ovs.extensions.generic.configuration import Configuration
+with open('$TEMP', 'w') as f:
+    if Configuration.exists('$3', raw=True):
+        f.write(Configuration.get('$3', raw=True))
+    else:
+        f.write('')
+"""
+          ${EDITOR:=nano} $TEMP
+          python -c """
+from ovs.extensions.generic.configuration import Configuration
+with open('$TEMP', 'r') as f:
+    Configuration.set('$3', f.read(), raw=True)
+"""
+        else
+            show_help
+        fi
+    elif [ "$2" = "list" ] ; then
+        python -c """
+from ovs.extensions.generic.configuration import Configuration
+for entry in Configuration.list('$3'):
+    print entry
+"""
+    elif [ "$2" = "get" ] ; then
+        python -c """
+from ovs.extensions.generic.configuration import Configuration;
+if Configuration.exists('$3', raw=True):
+    print Configuration.get('$3', raw=True)
+"""
+    else
+        show_help
     fi
 elif [ "$#" -ge 1 ] ; then
     module=${1}

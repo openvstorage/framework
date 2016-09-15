@@ -100,8 +100,13 @@ class ArakoonConfiguration(object):
         """
         key = ArakoonConfiguration._clean_key(key)
         client = ArakoonConfiguration._get_client()
+        entries = []
         for entry in client.prefix(key):
-            yield entry.replace(key, '').strip('/').split('/')[0]
+            if key == '' or entry.startswith(key + '/'):
+                cleaned = entry.lstrip(key).strip('/').split('/')[0]
+                if cleaned not in entries:
+                    entries.append(cleaned)
+                    yield cleaned
 
     @staticmethod
     @locked()
