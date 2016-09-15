@@ -189,6 +189,7 @@ from ovs.extensions.generic.configuration import Configuration
 with open('$TEMP', 'r') as f:
     Configuration.set('$3', f.read(), raw=True)
 """
+          rm -f $TEMP
         else
             show_help
         fi
