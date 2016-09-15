@@ -20,6 +20,7 @@ Generic module for managing configuration in Arakoon
 from ConfigParser import RawConfigParser
 from threading import Lock
 from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
+from ovs.extensions.generic.toolbox import Toolbox
 
 
 def locked():
@@ -103,7 +104,7 @@ class ArakoonConfiguration(object):
         entries = []
         for entry in client.prefix(key):
             if key == '' or entry.startswith(key + '/'):
-                cleaned = entry.lstrip(key).strip('/').split('/')[0]
+                cleaned = Toolbox.remove_prefix(entry, key).strip('/').split('/')[0]
                 if cleaned not in entries:
                     entries.append(cleaned)
                     yield cleaned
