@@ -1126,7 +1126,7 @@ class StorageRouterController(object):
 
         # Remove stale vDisks
         voldrv_vdisks = [entry.object_id() for entry in vpool.objectregistry_client.get_all_registrations()]
-        model_vdisk_guids = [vdisk.guid for vdisk in VDiskList.get_vdisks() if vdisk.vpool == vpool]
+        model_vdisk_guids = [vdisk.guid for vdisk in vpool.vdisks]
         voldrv_vdisk_guids = VDiskList.get_in_volume_ids(voldrv_vdisks).guids
         for vdisk_guid in set(model_vdisk_guids).difference(set(voldrv_vdisk_guids)):
             StorageRouterController._logger.warning('vDisk with guid {0} does no longer exist on any StorageDriver linked to vPool {1}, deleting...'.format(vdisk_guid, vpool.name))
@@ -1331,14 +1331,14 @@ class StorageRouterController(object):
                 StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - DTL checkup failed for vPool {1} with guid {2}'.format(storage_driver.guid, vpool.name, vpool.guid))
 
         if sd_can_be_deleted is True:
-            storage_driver.delete(abandon=['logs'])  # Detach from the log entries
+            storage_driver.delete()
             if storage_drivers_left is False:
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing vPool from model'.format(storage_driver.guid))
                 vpool.delete()
                 Configuration.delete('/ovs/vpools/{0}'.format(vpool.guid))
         else:
             try:
-                vpool.delete()
+                vpool.delete()  # Try to delete the vPool to invoke a proper stacktrace to see why it can't be deleted
             except Exception:
                 errors_found = True
                 StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Cleaning up vpool from the model failed'.format(storage_driver.guid))
