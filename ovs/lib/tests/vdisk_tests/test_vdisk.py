@@ -97,7 +97,7 @@ class VDiskTest(unittest.TestCase):
         )
         size_64_tib = 64 * 1024 ** 4
 
-        # Verify maximum size of 2TiB
+        # Verify maximum size of 64TiB
         vdisk_name_1 = 'vdisk_1'
         vdisk_name_2 = 'vdisk_2'
         with self.assertRaises(ValueError):
