@@ -37,7 +37,6 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
@@ -81,7 +80,7 @@ class VDiskController(object):
         return response
 
     @staticmethod
-    def _clean_vdisk_from_model(vdisk):
+    def clean_vdisk_from_model(vdisk):
         """
         Removes a vDisk from the model
         :param vdisk: The vDisk to be removed
@@ -106,7 +105,7 @@ class VDiskController(object):
         vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
         if vdisk is not None:
             with volatile_mutex('voldrv_event_disk_{0}'.format(vdisk.volume_id), wait=20):
-                VDiskController._clean_vdisk_from_model(vdisk)
+                VDiskController.clean_vdisk_from_model(vdisk)
         else:
             VDiskController._logger.info('Volume {0} does not exist (yet)'.format(volume_id))
 
@@ -179,7 +178,7 @@ class VDiskController(object):
                 VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
             except SRCObjectNotFoundException:
                 VDiskController._logger.warning('vDisk object seems to be removed in the meantime.')
-                VDiskController._clean_vdisk_from_model(vdisk)
+                VDiskController.clean_vdisk_from_model(vdisk)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.migrate_from_voldrv')

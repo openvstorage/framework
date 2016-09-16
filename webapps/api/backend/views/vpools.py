@@ -99,7 +99,7 @@ class VPoolViewSet(viewsets.ViewSet):
         if sd_guid is None:
             raise HttpNotAcceptableException(error_description='Storage Router {0} is not a member of vPool {1}'.format(sr.name, vpool.name),
                                              error='impossible_request')
-        return StorageRouterController.remove_storagedriver.s(sd_guid).apply_async(routing_key='sr.{0}'.format(sr.machine_id))
+        return StorageRouterController.remove_storagedriver.s(sd_guid).apply_async()
 
     @action()
     @log()
