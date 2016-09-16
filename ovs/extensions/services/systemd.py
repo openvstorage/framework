@@ -19,6 +19,7 @@ Systemd module
 """
 
 from subprocess import CalledProcessError
+from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 
 
@@ -69,7 +70,7 @@ class Systemd(object):
             template_file = template_file.replace('<{0}>'.format(key), value)
         if '<SERVICE_NAME>' in template_file:
             service_name = name if target_name is None else target_name
-            template_file = template_file.replace('<SERVICE_NAME>', service_name.lstrip('ovs-'))
+            template_file = template_file.replace('<SERVICE_NAME>', Toolbox.remove_prefix(service_name, 'ovs-'))
         template_file = template_file.replace('<_SERVICE_SUFFIX_>', '')
 
         dependencies = ''

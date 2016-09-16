@@ -85,11 +85,11 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
     one completes, which will result in the fact that the task will execute normally.
 
     Allowed modes:
-     - DEFAULT: Deduplication based on the task's name. If any new task with the same name is scheduled it will be
+     - DEFAULT: De-duplication based on the task's name. If any new task with the same name is scheduled it will be
                 discarded
-     - DEDUPED: Deduplication based on the task's name and arguments. If a new task with the same name and arguments
+     - DEDUPED: De-duplication based on the task's name and arguments. If a new task with the same name and arguments
                 is scheduled while the first one is currently being executed, it will be allowed on the queue (to make
-                sure there will be at least one new execution). All subsequent idential tasks will be discarded.
+                sure there will be at least one new execution). All subsequent identical tasks will be discarded.
                 Tasks with different arguments will be executed in parallel
      - CHAINED: Identical as DEDUPED with the exception that all tasks will be executed in serial.
 
@@ -127,7 +127,7 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 :param level:   Log level
                 :return:        None
                 """
-                if level not in ('info', 'warning', 'debug', 'error'):
+                if level not in ('info', 'warning', 'debug', 'error', 'exception'):
                     raise ValueError('Unsupported log level "{0}" specified'.format(level))
                 complete_message = 'Ensure single {0} mode - ID {1} - {2}'.format(mode, now, message)
                 getattr(logger, level)(complete_message)
@@ -152,8 +152,11 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                                     break
                         elif append is False and len(val['values']) > 0:
                             val['values'].pop(0)
+                        log_message('Amount of jobs pending for key {0}: {1}'.format(key, len(val['values'])))
+                        for kwarg in val['values']:
+                            log_message('  KWARGS: {0}'.format(kwarg['kwargs']))
                     else:
-                        log_message('Setting initial value for key {0}'.format(persistent_key))
+                        log_message('Setting initial value for key {0}'.format(key))
                         val = {'mode': mode,
                                'values': []}
                     persistent_client.set(key, val)
@@ -285,12 +288,13 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                 # Poll the arakoon to see whether this call is the first in list, if so --> execute, else wait
                 first_element = None
                 counter = 0
-                while first_element != now and counter < timeout:
+                while counter < timeout:
                     if persistent_client.exists(persistent_key):
                         value = persistent_client.get(persistent_key)
-                        first_element = value['values'][0]['timestamp']
+                        first_element = value['values'][0]['timestamp'] if len(value['values']) > 0 else None
 
                     if first_element == now:
+                        output = None
                         try:
                             if counter != 0:
                                 current_time = int(time.time())
@@ -300,6 +304,8 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                                                                                                                      current_time - starting_time))
                             output = function(*args, **kwargs)
                             log_message('Task {0} finished successfully'.format(task_name))
+                        except Exception:
+                            log_message('Task {0} {1} failed'.format(task_name, params_info), level='exception')
                         finally:
                             update_value(key=persistent_key,
                                          append=False)
