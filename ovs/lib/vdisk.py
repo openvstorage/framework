@@ -1153,7 +1153,10 @@ class VDiskController(object):
         storagedriver_config.load()
         metadata_page_capacity = 256
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
-        num_pages = int(vdisk.size / (metadata_page_capacity * cluster_size))
+        num_pages = min(
+            int(vdisk.size / float(metadata_page_capacity * cluster_size)),
+            int(2 * 1024 ** 4 / float(metadata_page_capacity * cluster_size))
+        )
         VDiskController._logger.info('Setting metadata pagecache size for vdisk {0} to {1}'.format(vdisk.name, num_pages))
         vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), num_pages)
 
