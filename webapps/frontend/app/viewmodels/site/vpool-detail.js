@@ -87,9 +87,6 @@ define([
                         return storageDriver;
                     }, 'guid'
                 );
-                $.each(self.storageDrivers(), function(_, sd) {
-                    calls.push(sd.canBeDeleted());
-                });
                 $.when.apply($, calls)
                     .done(function() {
                         var map = self.srCanDeleteMap();
@@ -104,7 +101,7 @@ define([
                             var found = false;
                             $.each(self.storageDrivers(), function(_, sd) {
                                 if (sd.storageRouterGuid() === srGuid) {
-                                    map[srGuid] = sd.canDelete();
+                                    map[srGuid] = sd.vdiskGuids().length === 0;
                                     found = true;
                                     return false;
                                 }

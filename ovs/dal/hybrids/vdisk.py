@@ -131,12 +131,12 @@ class VDisk(DataObject):
                 voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id)
             except:
                 voldrv_snapshots = []
-            for id in voldrv_snapshots:
-                snapshot = self.storagedriver_client.info_snapshot(volume_id, id)
+            for snap_id in voldrv_snapshots:
+                snapshot = self.storagedriver_client.info_snapshot(volume_id, snap_id)
                 if snapshot.metadata:
                     metadata = pickle.loads(snapshot.metadata)
                     if isinstance(metadata, dict):
-                        snapshots.append({'guid': id,
+                        snapshots.append({'guid': snap_id,
                                           'timestamp': metadata['timestamp'],
                                           'label': metadata['label'],
                                           'is_consistent': metadata['is_consistent'],
@@ -145,9 +145,9 @@ class VDisk(DataObject):
                                           'in_backend': snapshot.in_backend,
                                           'stored': int(snapshot.stored)})
                 else:
-                    snapshots.append({'guid': id,
+                    snapshots.append({'guid': snap_id,
                                       'timestamp': time.mktime(datetime.strptime(snapshot.timestamp.strip(), '%c').timetuple()),
-                                      'label': id,
+                                      'label': snap_id,
                                       'is_consistent': False,
                                       'is_automatic': False,
                                       'is_sticky': False,

@@ -47,7 +47,8 @@ class StorageDriver(DataObject):
                    Relation('storagerouter', StorageRouter, 'storagedrivers')]
     __dynamics = [Dynamic('status', str, 30),
                   Dynamic('statistics', dict, 4),
-                  Dynamic('edge_clients', list, 30)]
+                  Dynamic('edge_clients', list, 30),
+                  Dynamic('vdisks_guids', list, 15)]
 
     def _status(self):
         """
@@ -86,6 +87,17 @@ class StorageDriver(DataObject):
                 StorageDriver._logger.error('Error loading edge clients from {0}: {1}'.format(self.storagedriver_id, ex))
         clients.sort(key=lambda e: (e['ip'], e['port']))
         return clients
+
+    def _vdisks_guids(self):
+        """
+        Gets the vDisk guids served by this StorageDriver.
+        """
+        from ovs.dal.lists.vdisklist import VDiskList
+        volume_ids = []
+        for entry in self.vpool.objectregistry_client.get_all_registrations():
+            if entry.node_id() == self.storagedriver_id:
+                volume_ids.append(entry.object_id())
+        return VDiskList.get_in_volume_ids(volume_ids).guids
 
     def fetch_statistics(self):
         """
