@@ -1126,9 +1126,8 @@ class StorageRouterController(object):
 
         # Remove stale vDisks
         voldrv_vdisks = [entry.object_id() for entry in vpool.objectregistry_client.get_all_registrations()]
-        model_vdisk_guids = [vdisk.guid for vdisk in vpool.vdisks]
         voldrv_vdisk_guids = VDiskList.get_in_volume_ids(voldrv_vdisks).guids
-        for vdisk_guid in set(model_vdisk_guids).difference(set(voldrv_vdisk_guids)):
+        for vdisk_guid in set(vpool.vdisks_guids).difference(set(voldrv_vdisk_guids)):
             StorageRouterController._logger.warning('vDisk with guid {0} does no longer exist on any StorageDriver linked to vPool {1}, deleting...'.format(vdisk_guid, vpool.name))
             VDiskController.clean_vdisk_from_model(vdisk=VDisk(vdisk_guid))
 
