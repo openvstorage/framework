@@ -1133,6 +1133,9 @@ class SetupController(object):
 
         SetupController._add_services(target_client, unique_id, 'extra')
 
+        SetupController._configure_redis(target_client)
+        Toolbox.change_service_state(target_client, 'redis-server', 'restart', SetupController._logger)
+
         enabled = Configuration.get('/ovs/framework/support|enabled')
         if enabled is True:
             service = 'support-agent'
@@ -1235,8 +1238,6 @@ class SetupController(object):
 
         if configure_memcached is True:
             SetupController._configure_memcached(target_client)
-        SetupController._configure_redis(target_client)
-        Toolbox.change_service_state(target_client, 'redis-server', 'restart', SetupController._logger)
         SetupController._add_services(target_client, unique_id, 'master')
 
         SetupController._log(messages='Update configurations')
