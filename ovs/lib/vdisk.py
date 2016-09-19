@@ -139,6 +139,8 @@ class VDiskController(object):
         VDiskController._logger.info('Extending vDisk {0} to {1}B'.format(vdisk.name, volume_size))
         vdisk.storagedriver_client.truncate(object_id=str(vdisk.volume_id),
                                             new_size='{0}B'.format(volume_size))
+        vdisk.size = volume_size
+        vdisk.save()
         VDiskController._logger.info('Extended vDisk {0} to {1}B'.format(vdisk.name, volume_size))
 
     @staticmethod
