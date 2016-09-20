@@ -18,27 +18,8 @@
 Generic module for managing configuration in Arakoon
 """
 from ConfigParser import RawConfigParser
-from threading import Lock
-from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
+from ovs.extensions.db.arakoon.pyrakoon.client import PyrakoonClient
 from ovs.extensions.generic.toolbox import Toolbox
-
-
-def locked():
-    """
-    Locking decorator.
-    """
-    def wrap(f):
-        """
-        Returns a wrapped function
-        """
-        def new_function(*args, **kw):
-            """
-            Executes the decorated function in a locked context
-            """
-            with ArakoonConfiguration.lock:
-                return f(*args, **kw)
-        return new_function
-    return wrap
 
 
 class ArakoonConfiguration(object):
@@ -48,7 +29,6 @@ class ArakoonConfiguration(object):
 
     CACC_LOCATION = '/opt/OpenvStorage/config/arakoon_cacc.ini'
     _client = None
-    lock = Lock()
 
     def __init__(self):
         """
@@ -66,17 +46,17 @@ class ArakoonConfiguration(object):
         :rtype: str
         """
         import urllib
-        from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
-        config = ArakoonClusterConfig('cacc', filesystem=True)
-        config.load_config('127.0.0.1')
+        parser = RawConfigParser()
+        with open(ArakoonConfiguration.CACC_LOCATION) as config_file:
+            parser.readfp(config_file)
+        cluster_id = parser.get('global', 'cluster_id')
         return 'arakoon://{0}/{1}?{2}'.format(
-            config.cluster_id,
+            cluster_id,
             ArakoonConfiguration._clean_key(key),
             urllib.urlencode({'ini': ArakoonConfiguration.CACC_LOCATION})
         )
 
     @staticmethod
-    @locked()
     def dir_exists(key):
         """
         Verify whether the directory exists
@@ -90,7 +70,6 @@ class ArakoonConfiguration(object):
         return any(client.prefix(key))
 
     @staticmethod
-    @locked()
     def list(key):
         """
         List all keys starting with specified key
@@ -110,7 +89,6 @@ class ArakoonConfiguration(object):
                     yield cleaned
 
     @staticmethod
-    @locked()
     def delete(key, recursive):
         """
         Delete the specified key
@@ -123,12 +101,11 @@ class ArakoonConfiguration(object):
         key = ArakoonConfiguration._clean_key(key)
         client = ArakoonConfiguration._get_client()
         if recursive is True:
-            client.deletePrefix(key)
+            client.delete_prefix(key)
         else:
             client.delete(key)
 
     @staticmethod
-    @locked()
     def get(key):
         """
         Retrieve the value for specified key
@@ -142,7 +119,6 @@ class ArakoonConfiguration(object):
         return client.get(key)
 
     @staticmethod
-    @locked()
     def set(key, value):
         """
         Set a value for specified key
@@ -167,9 +143,8 @@ class ArakoonConfiguration(object):
             nodes = {}
             for node in parser.get('global', 'cluster').split(','):
                 node = node.strip()
-                nodes[node] = ([str(parser.get(node, 'ip'))], int(parser.get(node, 'client_port')))
-            config = ArakoonClientConfig(str(parser.get('global', 'cluster_id')), nodes)
-            ArakoonConfiguration._client = ArakoonClient(config)
+                nodes[node] = ([parser.get(node, 'ip')], parser.get(node, 'client_port'))
+            ArakoonConfiguration._client = PyrakoonClient(parser.get('global', 'cluster_id'), nodes)
         return ArakoonConfiguration._client
 
     @staticmethod

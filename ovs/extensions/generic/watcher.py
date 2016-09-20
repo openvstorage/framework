@@ -67,8 +67,10 @@ class Watcher(object):
                     from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
                     from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
                     from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
+                    with open(ArakoonConfiguration.CACC_LOCATION) as config_file:
+                        contents = config_file.read()
                     config = ArakoonClusterConfig(cluster_id='cacc', filesystem=True)
-                    config.load_config('127.0.0.1')
+                    config.read_config(contents)
                     client = ArakoonInstaller.build_client(config)
                     contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())
                     with open(ArakoonConfiguration.CACC_LOCATION, 'w') as config_file:

@@ -122,10 +122,15 @@ class ArakoonClusterConfig(object):
         else:
             client = self._load_client(ip)
             contents = client.file_read(self.config_path)
+        self.read_config(contents)
 
+    def read_config(self, contents):
+        """
+        Constructs a configuration object from config contents
+        :param contents: Raw .ini contents
+        """
         parser = RawConfigParser()
         parser.readfp(StringIO(contents))
-
         self.nodes = []
         self._extra_globals = {}
         for key in parser.options('global'):
@@ -893,12 +898,11 @@ class ArakoonInstaller(object):
         Build the ArakoonClient object with all configured nodes in the cluster
         :param config: Configuration on which to base the client
         :type config: ArakoonClientConfig
-        :return: The newly generated ArakoonClient
-        :rtype: ArakoonClient
+        :return: The newly generated PyrakoonClient
+        :rtype: PyrakoonClient
         """
-        from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
+        from ovs.extensions.db.arakoon.pyrakoon.client import PyrakoonClient
         nodes = {}
         for node in config.nodes:
-            nodes[node.name] = ([str(node.ip)], int(node.client_port))
-        config = ArakoonClientConfig(str(config.cluster_id), nodes)
-        return ArakoonClient(config)
+            nodes[node.name] = ([node.ip], node.client_port)
+        return PyrakoonClient(config.cluster_id, nodes)

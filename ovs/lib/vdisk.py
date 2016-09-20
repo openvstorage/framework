@@ -132,13 +132,15 @@ class VDiskController(object):
         :type volume_size: int
         """
         vdisk = VDisk(vdisk_guid)
-        if volume_size > 2 * 1024 ** 4:
-            raise ValueError('Maximum volume size of 2TiB exceeded')
+        if volume_size > 64 * 1024 ** 4:
+            raise ValueError('Maximum volume size of 64TiB exceeded')
         if volume_size < vdisk.size:
             raise ValueError('Shrinking is not possible')
         VDiskController._logger.info('Extending vDisk {0} to {1}B'.format(vdisk.name, volume_size))
         vdisk.storagedriver_client.truncate(object_id=str(vdisk.volume_id),
                                             new_size='{0}B'.format(volume_size))
+        vdisk.size = volume_size
+        vdisk.save()
         VDiskController._logger.info('Extended vDisk {0} to {1}B'.format(vdisk.name, volume_size))
 
     @staticmethod
@@ -532,8 +534,8 @@ class VDiskController(object):
         vpool = storagedriver.vpool
         if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
             raise RuntimeError('A vDisk with this name already exists on vPool {0}'.format(vpool.name))
-        if volume_size > 2 * 1024 ** 4:
-            raise ValueError('Maximum volume size of 2TiB exceeded')
+        if volume_size > 64 * 1024 ** 4:
+            raise ValueError('Maximum volume size of 64TiB exceeded')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
         if mds_service is None:
@@ -1152,7 +1154,7 @@ class VDiskController(object):
         storagedriver_config.load()
         metadata_page_capacity = 256
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
-        num_pages = int(vdisk.size / (metadata_page_capacity * cluster_size))
+        num_pages = int(min(vdisk.size, 2 * 1024 ** 4) / float(metadata_page_capacity * cluster_size))
         VDiskController._logger.info('Setting metadata pagecache size for vdisk {0} to {1}'.format(vdisk.name, num_pages))
         vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), num_pages)
 

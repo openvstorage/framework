@@ -593,13 +593,23 @@ class StorageRouterController(object):
         node_configs = []
         for existing_storagedriver in StorageDriverList.get_storagedrivers():
             if existing_storagedriver.vpool_guid == vpool.guid:
-                node_configs.append(ClusterNodeConfig(str(existing_storagedriver.storagedriver_id),
-                                                      str(existing_storagedriver.cluster_ip),
-                                                      existing_storagedriver.ports['management'],
-                                                      existing_storagedriver.ports['xmlrpc'],
-                                                      existing_storagedriver.ports['dtl']))
+                node_configs.append(ClusterNodeConfig(vrouter_id=str(existing_storagedriver.storagedriver_id),
+                                                      host=str(existing_storagedriver.cluster_ip),
+                                                      message_port=existing_storagedriver.ports['management'],
+                                                      xmlrpc_port=existing_storagedriver.ports['xmlrpc'],
+                                                      failovercache_port=existing_storagedriver.ports['dtl'],
+                                                      network_server_uri='{0}://{1}:{2}'.format('rdma' if has_rdma else 'tcp',
+                                                                                                existing_storagedriver.storage_ip,
+                                                                                                existing_storagedriver.ports['edge'])))
         grid_ip = Configuration.get('/ovs/framework/hosts/{0}/ip'.format(unique_id))
-        node_configs.append(ClusterNodeConfig(vrouter_id, str(grid_ip), ports[0], ports[1], ports[2]))
+        node_configs.append(ClusterNodeConfig(vrouter_id=vrouter_id,
+                                              host=str(grid_ip),
+                                              message_port=ports[0],
+                                              xmlrpc_port=ports[1],
+                                              failovercache_port=ports[2],
+                                              network_server_uri='{0}://{1}:{2}'.format('rdma' if has_rdma else 'tcp',
+                                                                                        storage_ip,
+                                                                                        ports[3])))
 
         try:
             vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
@@ -926,9 +936,6 @@ class StorageRouterController(object):
         storagedriver_config.configure_event_publisher(events_amqp_routing_key=Configuration.get('/ovs/framework/messagequeue|queues.storagedriver'),
                                                        events_amqp_uris=queue_urls)
         storagedriver_config.configure_threadpool_component(num_threads=16)
-        storagedriver_config.configure_network_interface(network_uri='{0}://{1}:{2}'.format('rdma' if has_rdma else 'tcp',
-                                                                                            storagedriver.storage_ip,
-                                                                                            storagedriver.ports['edge']))
         storagedriver_config.save(client, reload_config=False)
 
         DiskController.sync_with_reality(storagerouter.guid)
@@ -1061,6 +1068,7 @@ class StorageRouterController(object):
             raise ValueError('VPool should be in {0} status'.format(VPool.STATUSES.RUNNING))
 
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Checking availability of related Storage Routers'.format(storage_driver.guid, storage_driver.name))
+        has_rdma = Configuration.get('/ovs/framework/rdma')
         client = None
         temp_client = None
         errors_found = False
@@ -1237,11 +1245,14 @@ class StorageRouterController(object):
                 node_configs = []
                 for sd in available_storage_drivers:
                     if sd != storage_driver:
-                        node_configs.append(ClusterNodeConfig(str(sd.storagedriver_id),
-                                                              str(sd.cluster_ip),
-                                                              sd.ports['management'],
-                                                              sd.ports['xmlrpc'],
-                                                              sd.ports['dtl']))
+                        node_configs.append(ClusterNodeConfig(vrouter_id=str(sd.storagedriver_id),
+                                                              host=str(sd.cluster_ip),
+                                                              message_port=sd.ports['management'],
+                                                              xmlrpc_port=sd.ports['xmlrpc'],
+                                                              failovercache_port=sd.ports['dtl'],
+                                                              network_server_uri='{0}://{1}:{2}'.format('rdma' if has_rdma else 'tcp',
+                                                                                                        sd.storage_ip,
+                                                                                                        sd.ports['edge'])))
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Node configs - \n{1}'.format(storage_driver.guid, '\n'.join([str(config) for config in node_configs])))
                 vrouter_clusterregistry.set_node_configs(node_configs)
                 srclient = StorageDriverClient.load(vpool)
@@ -1404,7 +1415,8 @@ class StorageRouterController(object):
         :return: Name of tgz containing the logs
         :rtype: str
         """
-        this_client = SSHClient('127.0.0.1', username='root')
+        this_storagerouter = System.get_my_storagerouter()
+        this_client = SSHClient(this_storagerouter, username='root')
         logfile = this_client.run('ovs collect logs').strip()
         logfilename = logfile.split('/')[-1]
 
