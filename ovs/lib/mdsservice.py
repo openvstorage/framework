@@ -161,7 +161,6 @@ class MDSServiceController(object):
         # Generate the correct section in the Storage Driver's configuration
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
         storagedriver_config.load()
-        storagedriver_config.clean()  # Clean out obsolete values
         storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
         storagedriver_config.save(client, reload_config=reload_config)
 
@@ -221,7 +220,6 @@ class MDSServiceController(object):
                 storagedriver = [sd for sd in storagerouter.storagedrivers if sd.vpool_guid == vpool.guid][0]
                 storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
                 storagedriver_config.load()
-                storagedriver_config.clean()  # Clean out obsolete values
                 storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
                 storagedriver_config.save(client, reload_config=reconfigure)
 
@@ -777,7 +775,6 @@ class MDSServiceController(object):
                 storagedriver_config.load()
                 if storagedriver_config.is_new is False:
                     MDSServiceController._logger.info('MDS checkup - vPool {0} - Storage Router {1} - Storing default MDS configuration: {2}'.format(vpool.name, storagerouter.name, mds_config_set[storagerouter.guid]))
-                    storagedriver_config.clean()  # Clean out obsolete values
                     storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[storagerouter.guid])
                     storagedriver_config.save(client)
             # 2. Per VPool, execute a safety check, making sure the master/slave configuration is optimal.
