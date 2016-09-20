@@ -884,7 +884,6 @@ class StorageRouterController(object):
         for current_storagerouter in StorageRouterList.get_masters():
             queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(mq_protocol, mq_user, mq_password, current_storagerouter.ip)})
 
-        storagedriver_config.clean()  # Clean out obsolete values
         if vpool.backend_type.code == 'alba':
             backend_connection_manager = {'alba_connection_host': storagedriver.storage_ip,
                                           'alba_connection_port': alba_proxy.service.ports[0],
@@ -1009,7 +1008,6 @@ class StorageRouterController(object):
             storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
             storagedriver_config.load()
             if storagedriver_config.is_new is False:
-                storagedriver_config.clean()  # Clean out obsolete values
                 storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
                 storagedriver_config.save(node_client)
 
