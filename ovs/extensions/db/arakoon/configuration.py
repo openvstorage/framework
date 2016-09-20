@@ -46,11 +46,12 @@ class ArakoonConfiguration(object):
         :rtype: str
         """
         import urllib
-        from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
-        config = ArakoonClusterConfig('cacc', filesystem=True)
-        config.load_config('127.0.0.1')
+        parser = RawConfigParser()
+        with open(ArakoonConfiguration.CACC_LOCATION) as config_file:
+            parser.readfp(config_file)
+        cluster_id = parser.get('global', 'cluster_id')
         return 'arakoon://{0}/{1}?{2}'.format(
-            config.cluster_id,
+            cluster_id,
             ArakoonConfiguration._clean_key(key),
             urllib.urlencode({'ini': ArakoonConfiguration.CACC_LOCATION})
         )

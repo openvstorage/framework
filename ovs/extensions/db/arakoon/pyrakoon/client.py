@@ -69,11 +69,11 @@ class PyrakoonClient(object):
         self._sequences = {}
 
     @locked()
-    def get(self, key):
+    def get(self, key, consistency=None):
         """
         Retrieves a certain value for a given key
         """
-        return PyrakoonClient._try(self._identifier, self._client.get, key)
+        return PyrakoonClient._try(self._identifier, self._client.get, key, consistency)
 
     @locked()
     def get_multi(self, keys):
