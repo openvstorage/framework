@@ -988,8 +988,7 @@ class StorageRouterController(object):
         tries = 60
         while storagedriver.startup_counter == current_startup_counter and tries > 0:
             StorageRouterController._logger.debug('Waiting for the StorageDriver to start up...')
-            running = ServiceManager.get_service_status(voldrv_service, client=root_client)
-            if running is False:
+            if ServiceManager.get_service_status(voldrv_service, client=root_client)[0] is False:
                 vpool.status = VPool.STATUSES.FAILURE
                 vpool.save()
                 raise RuntimeError('StorageDriver service failed to start (service not running)')

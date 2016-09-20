@@ -671,7 +671,7 @@ class ArakoonInstaller(object):
         :return: None
         """
         if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client):
-            return ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client)
+            return ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client)[0]
         return False
 
     @staticmethod
@@ -874,7 +874,7 @@ class ArakoonInstaller(object):
     @staticmethod
     def unclaim_cluster(cluster_name, master_ip, filesystem, metadata=None):
         """
-        Unlcaims the cluster
+        Un-claims the cluster
         :param cluster_name: Name of the cluster to restart
         :type cluster_name: str
         :param master_ip: IP of one of the cluster nodes
@@ -894,6 +894,13 @@ class ArakoonInstaller(object):
 
     @staticmethod
     def build_client(config):
+        """
+        Build the ArakoonClient object with all configured nodes in the cluster
+        :param config: Configuration on which to base the client
+        :type config: ArakoonClientConfig
+        :return: The newly generated PyrakoonClient
+        :rtype: PyrakoonClient
+        """
         from ovs.extensions.db.arakoon.pyrakoon.client import PyrakoonClient
         nodes = {}
         for node in config.nodes:

@@ -75,7 +75,7 @@ class VDisk(DataObject):
         :return: StorageDriverClient
         """
         if self._storagedriver_client is None:
-            self.reload_clients('storagedriver')
+            self.reload_client('storagedriver')
         return self._storagedriver_client
 
     @property
@@ -85,7 +85,7 @@ class VDisk(DataObject):
         :return: ObjectRegistryClient
         """
         if self._objectregistry_client is None:
-            self.reload_clients('objectregistry')
+            self.reload_client('objectregistry')
         return self._objectregistry_client
 
     def _dtl_status(self):
@@ -303,9 +303,9 @@ class VDisk(DataObject):
                     current_stats['{0}_ps'.format(key)] = max(0, (current_stats[key] - previous_stats[key]) / delta)
         volatile.set(prev_key, current_stats, dynamic.timeout * 10)
 
-    def reload_clients(self, client):
+    def reload_client(self, client):
         """
-        Reloads the StorageDriverClient and ObjectRegistryClient
+        Reloads the StorageDriverClient or ObjectRegistryClient
         """
         if self.vpool_guid:
             self._frozen = False

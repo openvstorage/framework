@@ -57,7 +57,7 @@ class Ubuntu(object):
         :param filesystem: Filesystem of entry
         :return: Fstab entry
         """
-        return '{0}    {1}         {2}    defaults,nobootwait,noatime,discard    0    2'.format(device, mp, filesystem)
+        return '{0}    {1}         {2}    defaults,nofail,noatime,discard    0    2'.format(device, mp, filesystem)
 
     @staticmethod
     def get_ssh_service_name():

@@ -34,7 +34,7 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient
+from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.scheduledtask import ScheduledTaskController
 
@@ -54,7 +54,7 @@ class DeleteSnapshots(unittest.TestCase):
 
         cls.volatile = VolatileFactory.get_client()
         cls.volatile.clean()
-        MockStorageRouterClient.clean()
+        StorageRouterClient.clean()
 
     def setUp(self):
         """
@@ -63,7 +63,7 @@ class DeleteSnapshots(unittest.TestCase):
         # Cleaning storage
         self.volatile.clean()
         self.persistent.clean()
-        MockStorageRouterClient.clean()
+        StorageRouterClient.clean()
 
         self.debug = False
 
@@ -74,7 +74,7 @@ class DeleteSnapshots(unittest.TestCase):
         # Cleaning storage
         self.volatile.clean()
         self.persistent.clean()
-        MockStorageRouterClient.clean()
+        StorageRouterClient.clean()
 
     def _print_message(self, message):
         if self.debug is True:
@@ -154,7 +154,7 @@ class DeleteSnapshots(unittest.TestCase):
         vdisk_1_1.devicename = 'dummy'
         vdisk_1_1.size = 0
         vdisk_1_1.save()
-        vdisk_1_1.reload_clients('storagedriver')
+        vdisk_1_1.reload_client('storagedriver')
 
         [dynamic for dynamic in vdisk_1_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
@@ -184,7 +184,7 @@ class DeleteSnapshots(unittest.TestCase):
         clone_vdisk.parentsnapshot = base_snapshot_guid
         clone_vdisk.size = 0
         clone_vdisk.save()
-        clone_vdisk.reload_clients('storagedriver')
+        clone_vdisk.reload_client('storagedriver')
 
         for h in [6, 12, 18]:
             timestamp = base_timestamp + (hour * h)
@@ -243,7 +243,7 @@ class DeleteSnapshots(unittest.TestCase):
         vdisk_1.devicename = 'dummy'
         vdisk_1.size = 0
         vdisk_1.save()
-        vdisk_1.reload_clients('storagedriver')
+        vdisk_1.reload_client('storagedriver')
 
         [dynamic for dynamic in vdisk_1._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 

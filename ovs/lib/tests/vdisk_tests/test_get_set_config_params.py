@@ -25,7 +25,7 @@ from ovs.extensions.generic import fakesleep
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
-from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient
+from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
 
@@ -44,7 +44,7 @@ class VDiskTest(unittest.TestCase):
         cls.persistent.clean()
         cls.volatile = VolatileFactory.get_client()
         cls.volatile.clean()
-        MockStorageRouterClient.clean()
+        StorageRouterClient.clean()
 
         fakesleep.monkey_patch()
         Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
@@ -58,7 +58,7 @@ class VDiskTest(unittest.TestCase):
         # Cleaning storage
         self.volatile.clean()
         self.persistent.clean()
-        MockStorageRouterClient.clean()
+        StorageRouterClient.clean()
 
     @classmethod
     def tearDownClass(cls):
@@ -83,12 +83,13 @@ class VDiskTest(unittest.TestCase):
             - Attempt to sync and async mode without specifying DTL target
             - Set SCO size
         """
-        vpools, storagerouters, storagedrivers, _, mds_services, _, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1)]}  # (<id>, <storagedriver_id>)
         )
+        storagedrivers = structure['storagedrivers']
 
         # Create vDisk and validate default configuration
         vdisk_1 = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 3, storagedriver_guid=storagedrivers[1].guid))
@@ -105,7 +106,7 @@ class VDiskTest(unittest.TestCase):
                           'dedupe_mode': StorageDriverClient.FRAMEWORK_LOCATION_BASED,
                           'dtl_target': [],
                           'write_buffer': int(tlog_multiplier * default_sco_size * non_disposable_sco_factor),
-                          'cache_strategy': StorageDriverClient.FRAMEWORK_CACHE_ON_READ,
+                          'cache_strategy': StorageDriverClient.FRAMEWORK_NO_CACHE,
                           'readcache_limit': None,
                           'metadata_cache_size': StorageDriverClient.METADATA_CACHE_PAGE_SIZE * 1024}
         for key, value in default_values.iteritems():

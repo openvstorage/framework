@@ -213,7 +213,7 @@ class ScheduledTaskController(object):
                         try:
                             sshclient = SSHClient(storage_driver.storagerouter)
                             # Use ServiceManager(sshclient) to make sure ovs-workers are actually running
-                            if ServiceManager.get_service_status('workers', sshclient) is False:
+                            if ServiceManager.get_service_status('workers', sshclient)[0] is False:
                                 ScheduledTaskController._logger.warning('Gather Scrub - Storage Router {0:<15} - workers are not running'.format(storage_driver.storagerouter.ip))
                             else:
                                 scrub_locations[storage_driver.storagerouter] = str(partition.path)

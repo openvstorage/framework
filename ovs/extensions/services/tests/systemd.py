@@ -41,16 +41,14 @@ class MockSystemd(object):
         MockSystemd.services[name] = 'HALTED'
 
     @staticmethod
-    def get_service_status(name, client, return_output=False):
+    def get_service_status(name, client):
         """
         Retrieve the mocked service status
         """
         _ = client
         output = 'active' if name in MockSystemd.services else 'inactive'
         status = MockSystemd.services.get(name, 'HALTED') == 'RUNNING'
-        if return_output is True:
-            return status, output
-        return status
+        return status, output
 
     @staticmethod
     def remove_service(name, client):
@@ -83,7 +81,7 @@ class MockSystemd(object):
         if name not in MockSystemd.services:
             raise RuntimeError('Service {0} does not exist'.format(name))
         MockSystemd.services[name] = 'RUNNING'
-        status, output = MockSystemd.get_service_status(name, client, True)
+        status, output = MockSystemd.get_service_status(name, client)
         if status is True:
             return output
         raise RuntimeError('Start {0} failed. {1}'.format(name, output))
@@ -96,7 +94,7 @@ class MockSystemd(object):
         if name not in MockSystemd.services:
             raise RuntimeError('Service {0} does not exist'.format(name))
         MockSystemd.services[name] = 'HALTED'
-        status, output = MockSystemd.get_service_status(name, client, True)
+        status, output = MockSystemd.get_service_status(name, client)
         if status is True:
             return output
         raise RuntimeError('Stop {0} failed. {1}'.format(name, output))

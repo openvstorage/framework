@@ -1151,11 +1151,11 @@ class SetupController(object):
 
         SetupController._log(messages='Starting services')
         for service in ['watcher-framework', 'watcher-config']:
-            if ServiceManager.get_service_status(service, target_client) is False:
+            if ServiceManager.get_service_status(service, target_client)[0] is False:
                 ServiceManager.enable_service(service, client=target_client)
                 Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
 
-        SetupController._log(messages='Check ovs-workers')
+        SetupController._log(messages='Check ovs-workers', loglevel='debug')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
         ServiceManager.enable_service('workers', client=target_client)
         Toolbox.wait_for_service(target_client, 'workers', True, SetupController._logger)
@@ -1522,7 +1522,12 @@ EOF
 
         rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
         if rabbitmq_running is True:
-            users = [user.split('\t')[0] for user in client.run('rabbitmqctl list_users').splitlines()[1:-1]]
+            # Example output of 'list_users' command
+            # Listing users ...
+            # guest   [administrator]
+            # ovs     []
+            # ... done.
+            users = [user.split('\t')[0] for user in client.run('rabbitmqctl list_users').splitlines() if '\t' in user and '[' in user and ']' in user]
             if 'ovs' in users:
                 SetupController._log(messages='Already configured RabbitMQ')
                 return
@@ -1535,28 +1540,23 @@ EOF
         # Also retry the add_user/set_permissions, and validate the result
         retry = 0
         while retry < 10:
-            users = Toolbox.retry_client_run(client,
-                                             'rabbitmqctl list_users',
-                                             logger=SetupController._logger).splitlines()[1:-1]
-            users = [usr.split('\t')[0] for usr in users]
+            users = Toolbox.retry_client_run(client=client,
+                                             command='rabbitmqctl list_users',
+                                             logger=SetupController._logger).splitlines()
+            users = [usr.split('\t')[0] for usr in users if '\t' in usr and '[' in usr and ']' in usr]
             SetupController._logger.debug('Rabbitmq users {0}'.format(users))
             if 'ovs' in users:
                 SetupController._logger.debug('User ovs configured in rabbitmq')
                 break
-            else:
-                SetupController._logger.debug(Toolbox.retry_client_run(client,
-                                                                       'rabbitmqctl add_user {0} {1}'.format(rabbitmq_login, rabbitmq_password),
-                                                                       logger=SetupController._logger))
-                SetupController._logger.debug(Toolbox.retry_client_run(client,
-                                                                       'rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(rabbitmq_login),
-                                                                       logger=SetupController._logger))
-                retry += 1
-                time.sleep(1)
-        users = Toolbox.retry_client_run(client,
-                                         'rabbitmqctl list_users',
-                                         logger=SetupController._logger).splitlines()[1:-1]
-        users = [usr.split('\t')[0] for usr in users]
-        SetupController._logger.debug('Rabbitmq users {0}'.format(users))
+
+            SetupController._logger.debug(Toolbox.retry_client_run(client=client,
+                                                                   command='rabbitmqctl add_user {0} {1}'.format(rabbitmq_login, rabbitmq_password),
+                                                                   logger=SetupController._logger))
+            SetupController._logger.debug(Toolbox.retry_client_run(client=client,
+                                                                   command='rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(rabbitmq_login),
+                                                                   logger=SetupController._logger))
+            retry += 1
+            time.sleep(1)
         client.run('rabbitmqctl stop; sleep 5;')
 
     @staticmethod
@@ -1749,7 +1749,7 @@ EOF
                     rabbitmq_pid_ctl = match_groups['pid']
 
         if ServiceManager.has_service('rabbitmq-server', client) \
-                and ServiceManager.get_service_status('rabbitmq-server', client):
+                and ServiceManager.get_service_status('rabbitmq-server', client)[0] is True:
             rabbitmq_running = True
             rabbitmq_pid_sm = ServiceManager.get_service_pid('rabbitmq-server', client)
 
