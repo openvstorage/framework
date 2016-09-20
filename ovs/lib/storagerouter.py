@@ -1405,7 +1405,8 @@ class StorageRouterController(object):
         :return: Name of tgz containing the logs
         :rtype: str
         """
-        this_client = SSHClient('127.0.0.1', username='root')
+        this_storagerouter = System.get_my_storagerouter()
+        this_client = SSHClient(this_storagerouter, username='root')
         logfile = this_client.run('ovs collect logs').strip()
         logfilename = logfile.split('/')[-1]
 
