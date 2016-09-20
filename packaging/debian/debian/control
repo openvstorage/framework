@@ -23,7 +23,7 @@ Description: openvStorage core
 Package: openvstorage-webapps
 Architecture: amd64
 Pre-Depends: openvstorage-core (= ${binary:Version})
-Depends: python-django (>= 1.5.1-2), nginx (>= 1.2.6), python-djangorestframework (>= 2.3.9), python-djangorestframework (<< 2.4),
+Depends: python-django (>= 1.5.1-2), nginx (>= 1.2.6), python-djangorestframework (= 2.3.12-1),
  gunicorn (>= 0.15.0-1), python-gevent (>= 0.13.0-1build2), python-markdown (>= 2.3.1-1)
 Description: openvStorage Web Applications
  Web components for the Open vStorage product
