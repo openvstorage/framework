@@ -28,7 +28,7 @@ class ArakoonConfiguration(object):
     """
 
     CACC_LOCATION = '/opt/OpenvStorage/config/arakoon_cacc.ini'
-    _client = None
+    client = None
 
     def __init__(self):
         """
@@ -136,7 +136,7 @@ class ArakoonConfiguration(object):
 
     @staticmethod
     def _get_client():
-        if ArakoonConfiguration._client is None:
+        if ArakoonConfiguration.client is None:
             parser = RawConfigParser()
             with open(ArakoonConfiguration.CACC_LOCATION) as config_file:
                 parser.readfp(config_file)
@@ -144,8 +144,8 @@ class ArakoonConfiguration(object):
             for node in parser.get('global', 'cluster').split(','):
                 node = node.strip()
                 nodes[node] = ([parser.get(node, 'ip')], parser.get(node, 'client_port'))
-            ArakoonConfiguration._client = PyrakoonClient(parser.get('global', 'cluster_id'), nodes)
-        return ArakoonConfiguration._client
+            ArakoonConfiguration.client = PyrakoonClient(parser.get('global', 'cluster_id'), nodes)
+        return ArakoonConfiguration.client
 
     @staticmethod
     def _clean_key(key):
