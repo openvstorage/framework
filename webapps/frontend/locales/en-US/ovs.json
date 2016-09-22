@@ -871,9 +871,9 @@
                 "nosnapshots": "No Snapshots found",
                 "snapshot": "Snapshots",
                 "rollbackstarted": "Rollback started",
-                "inprogressvdisk": "Disk __what__ rollback in progress...",
-                "failedvdisk": "Disk __what__ rollback failed.",
-                "successvdisk": "Disk __what__ rollback successfully."
+                "inprogress": "Disk __what__ rollback in progress...",
+                "failed": "Disk __what__ rollback failed.",
+                "success": "Disk __what__ rollback successfully."
             }
         },
         "clone": {
