@@ -307,11 +307,11 @@ class MDSServiceController(object):
 
         :return: None
         """
-        def _add_suitable_nodes(local_importance, local_safety):
-            if len(nodes) < local_safety:
-                for local_load in sorted(all_info_dict[local_importance]['loads']):
-                    for local_service in all_info_dict[local_importance]['loads'][local_load]:
-                        if len(nodes) < local_safety and local_service.storagerouter.ip not in nodes:
+        def _add_suitable_nodes(_importance, _safety):
+            if len(nodes) < _safety:
+                for local_load in sorted(all_info_dict[_importance]['loads']):
+                    for local_service in all_info_dict[_importance]['loads'][local_load]:
+                        if len(nodes) < _safety and local_service.storagerouter.ip not in nodes:
                             try:
                                 SSHClient(local_service.storagerouter)
                                 new_services.append(local_service)
@@ -320,12 +320,18 @@ class MDSServiceController(object):
                                 MDSServiceController._logger.debug('MDS safety: vDisk {0}: Skipping storagerouter with IP {1} as it is unreachable'.format(vdisk.guid, service.storagerouter.ip))
             return nodes, new_services
 
+        MDSServiceController._logger.debug('MDS safety: vDisk {0}: Start checkup for virtual disk {1}'.format(vdisk.guid, vdisk.name))
+        tlogs = Configuration.get('/ovs/framework/storagedriver|mds_tlogs')
+        safety = Configuration.get('/ovs/framework/storagedriver|mds_safety')
+        max_load = Configuration.get('/ovs/framework/storagedriver|mds_maxload')
+
         ######################
         # GATHER INFORMATION #
         ######################
-        MDSServiceController._logger.debug('MDS safety: vDisk {0}: Start checkup for virtual disk {1}'.format(vdisk.guid, vdisk.name))
         vdisk.reload_client('storagedriver')
-        vdisk.invalidate_dynamics(['info', 'storagedriver_id', 'storagerouter_guid'])
+        vdisk.reload_client('objectregistry')
+
+        vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
         if vdisk.storagerouter_guid is None:
             raise ValueError('Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any Storage Router'.format(vdisk.name, vdisk.guid))
 
@@ -338,11 +344,9 @@ class MDSServiceController(object):
         nodes = set()
         services = sorted([mds_service.service for mds_service in vdisk.vpool.mds_services
                            if mds_service.service.storagerouter not in excluded_storagerouters], key=lambda k: k.ports)
-        services_load = {}
         service_per_key = {}
         for service in services:
             nodes.add(service.storagerouter.ip)
-            services_load[service] = MDSServiceController.get_mds_load(service.mds_service)
             service_per_key['{0}:{1}'.format(service.storagerouter.ip, service.ports[0])] = service
 
         # Create a pool of StorageRouters being a part of the primary and secondary domains of this Storage Router
@@ -369,6 +373,7 @@ class MDSServiceController(object):
         ###################################
         # VERIFY RECONFIGURATION REQUIRED #
         ###################################
+        vdisk.invalidate_dynamics(['info'])
         configs = vdisk.info['metadata_backend_config']  # Ordered MASTER, SLAVE (secondary domain of master)
         master_service = None
         reconfigure_reasons = []
@@ -393,10 +398,7 @@ class MDSServiceController(object):
                          'secondary': {'used': [],
                                        'loads': {},
                                        'available': []}}
-
-        tlogs = Configuration.get('/ovs/framework/storagedriver|mds_tlogs')
-        safety = Configuration.get('/ovs/framework/storagedriver|mds_safety')
-        max_load = Configuration.get('/ovs/framework/storagedriver|mds_maxload')
+        services_load = {}
         for service in services:
             importance = None
             if service.storagerouter in primary_storagerouters:
@@ -404,14 +406,16 @@ class MDSServiceController(object):
             elif service.storagerouter in secondary_storagerouters:
                 importance = 'secondary'
 
+            loads = MDSServiceController.get_mds_load(service.mds_service)
             if service == master_service or service in slave_services:  # Service is still in use
-                load = services_load[service][0]
+                load = loads[0]
                 if importance is not None:
                     all_info_dict[importance]['used'].append(service)
                 else:
                     reconfigure_reasons.append('Service {0} cannot be used anymore because storagerouter with IP {1} is not part of the domains'.format(service.name, service.storagerouter.ip))
             else:  # Service is not in use, but available
-                load = services_load[service][1]
+                load = loads[1]
+            services_load[service] = load
 
             if importance is not None:
                 all_info_dict[importance]['available'].append(service)
@@ -419,7 +423,6 @@ class MDSServiceController(object):
                     if load not in all_info_dict[importance]['loads']:
                         all_info_dict[importance]['loads'][load] = []
                     all_info_dict[importance]['loads'][load].append(service)
-            services_load[service] = load
 
         service_nodes = []
         if master_service is not None:
@@ -455,12 +458,18 @@ class MDSServiceController(object):
         if primary_services_used < recommended_primary and primary_services_used < primary_services_available:
             # More services can be used in primary domain
             reconfigure_reasons.append('Not enough services in use in primary domain')
+        if primary_services_used > recommended_primary:
+            # Too many services in primary domain
+            reconfigure_reasons.append('Too many services in use in primary domain')
 
         # More services can be used in secondary domain
         secondary_services_used = len(all_info_dict['secondary']['used'])
         secondary_services_available = len(all_info_dict['secondary']['available'])
         if secondary_services_used < recommended_secondary and secondary_services_used < secondary_services_available:
             reconfigure_reasons.append('Not enough services in use in secondary domain')
+        if secondary_services_used > recommended_secondary:
+            # Too many services in secondary domain
+            reconfigure_reasons.append('Too many services in use in secondary domain')
 
         # If secondary domain present, check order in which the slave services are configured
         secondary = False
@@ -480,15 +489,17 @@ class MDSServiceController(object):
         for reason in reconfigure_reasons:
             MDSServiceController._logger.debug('MDS safety: vDisk {0}:    * {1}'.format(vdisk.guid, reason))
 
+        ############################
+        # CREATE NEW CONFIGURATION #
+        ############################
+
         # Check whether the master (if available) is non-local to the vdisk and/or is overloaded
         new_services = []
         master_ok = master_service is not None
         if master_ok is True:
             master_ok = master_service.storagerouter_guid == vdisk.storagerouter_guid and services_load[master_service] <= max_load
 
-        ############################
-        # CREATE NEW CONFIGURATION #
-        ############################
+        previous_master = None
         if master_ok:
             # Add this master to the fresh configuration
             new_services.append(master_service)
@@ -531,6 +542,7 @@ class MDSServiceController(object):
                     if master_service is not None:
                         # The current master (if available) is now candidate to become one of the slaves
                         slave_services.append(master_service)
+                        previous_master = master_service
                 else:
                     # It's not up to date, keep the previous master (if available) and give the local slave some more time to catch up
                     if master_service is not None:
@@ -584,8 +596,8 @@ class MDSServiceController(object):
                 nodes.add(service_to_recycle.storagerouter.ip)
 
         # Add extra (new) slaves until primary safety reached
-        nodes, new_services = _add_suitable_nodes(local_importance='primary',
-                                                  local_safety=recommended_primary)
+        nodes, new_services = _add_suitable_nodes(_importance='primary',
+                                                  _safety=recommended_primary)
 
         # Add recycled secondary slave after primary slaves have been added
         if secondary_node_count == 1:
@@ -594,23 +606,34 @@ class MDSServiceController(object):
 
         # Add extra (new) slaves until secondary safety reached
         if len(secondary_storagerouters) > 0:
-            nodes, new_services = _add_suitable_nodes(local_importance='secondary',
-                                                      local_safety=safety)
+            nodes, new_services = _add_suitable_nodes(_importance='secondary',
+                                                      _safety=safety)
             # Add extra slaves from primary domain in case no suitable nodes found in secondary domain
             if len(nodes) < safety:
-                nodes, new_services = _add_suitable_nodes(local_importance='primary',
-                                                          local_safety=safety)
+                nodes, new_services = _add_suitable_nodes(_importance='primary',
+                                                          _safety=safety)
 
         # Build the new configuration and update the vdisk
-        configs = []
+        configs_no_ex_master = []
+        configs_all = []
+        first = True
         for service in new_services:
             client = MetadataServerClient.load(service)
             client.create_namespace(str(vdisk.volume_id))
+            if first is False:
+                client.set_role(str(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
+            first = False
             # noinspection PyArgumentList
-            configs.append(MDSNodeConfig(address=str(service.storagerouter.ip),
-                                         port=service.ports[0]))
+            config = MDSNodeConfig(address=str(service.storagerouter.ip),
+                                   port=service.ports[0])
+            if previous_master != service:
+                configs_no_ex_master.append(config)
+            configs_all.append(config)
+        if len(configs_no_ex_master) != len(configs_all):
+            vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
+                                                                      metadata_backend_config=MDSMetaDataBackendConfig(configs_no_ex_master))
         vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
-                                                                  metadata_backend_config=MDSMetaDataBackendConfig(configs))
+                                                                  metadata_backend_config=MDSMetaDataBackendConfig(configs_all))
         MDSServiceController.sync_vdisk_to_reality(vdisk)
         MDSServiceController._logger.debug('MDS safety: vDisk {0}: Completed'.format(vdisk.guid))
 

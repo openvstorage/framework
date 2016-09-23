@@ -26,7 +26,7 @@ from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import ClusterContact, DTLMode, MDSNodeConfig, ReadCacheBehaviour, ReadCacheMode, Statistics, VolumeInfo
+from volumedriver.storagerouter.storagerouterclient import ClusterContact, DTLMode, MDSNodeConfig, ReadCacheBehaviour, ReadCacheMode, Statistics, VolumeInfo, Role
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     from ovs.extensions.storageserver.tests.mockups import ArakoonNodeConfig, LocalStorageRouterClient, MDSClient, StorageRouterClient, ObjectRegistryClient as ORClient
 else:
@@ -195,6 +195,9 @@ class MetadataServerClient(object):
     storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
     # noinspection PyArgumentList
     storagerouterclient.Logger.enableLogging()
+
+    MDS_ROLE = type('MDSRole', (), {'MASTER': Role.Master,
+                                    'SLAVE': Role.Slave})
 
     def __init__(self):
         """

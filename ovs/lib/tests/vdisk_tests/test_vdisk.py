@@ -175,13 +175,13 @@ class VDiskTest(unittest.TestCase):
         self.assertTrue(expr=template.is_vtemplate, msg='Dynamic property "is_vtemplate" should be True')
 
         # Create from vDisk which is not a vTemplate
-        StorageRouterClient.object_type[template.vpool_guid][template.volume_id] = 'BASE'
+        template.storagedriver_client._set_object_type(template.volume_id, 'BASE')
         template.invalidate_dynamics(['info', 'is_vtemplate'])
         with self.assertRaises(RuntimeError):
             VDiskController.create_from_template(vdisk_guid=template.guid, name=vdisk_name, storagerouter_guid=storagerouters[1].guid)
 
         # Create from template
-        StorageRouterClient.object_type[template.vpool_guid][template.volume_id] = 'TEMPLATE'
+        template.storagedriver_client._set_object_type(template.volume_id, 'TEMPLATE')
         template.invalidate_dynamics(['info', 'is_vtemplate'])
         info = VDiskController.create_from_template(vdisk_guid=template.guid, name=vdisk_name, storagerouter_guid=storagerouters[1].guid)
         expected_keys = ['vdisk_guid', 'name', 'backingdevice']
@@ -388,7 +388,7 @@ class VDiskTest(unittest.TestCase):
         self.assertTrue(expr=len(vdisks) == 2, msg='Expected to find 2 vDisks after failed clone attempt 6')
 
         # Update backend synced flag and retry
-        StorageRouterClient.snapshots[vdisk1.vpool_guid][vdisk1.volume_id][snapshot_id].in_backend = True
+        vdisk1.storagedriver_client._set_snapshot_in_backend(vdisk1.volume_id, snapshot_id, True)
         vdisk1.invalidate_dynamics('snapshots')
         VDiskController.clone(vdisk_guid=vdisk1.guid,
                               name='clone2',
@@ -639,8 +639,9 @@ class VDiskTest(unittest.TestCase):
         storagedrivers = structure['storagedrivers']
 
         vdisk = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 4, storagedriver_guid=storagedrivers[1].guid))
+        vdisk.storagedriver_client.migrate(vdisk.volume_id, storagedrivers[2].storagedriver_id, False)
         VDiskController.migrate_from_voldrv(volume_id=vdisk.volume_id, new_owner_id=storagedrivers[2].storagedriver_id)
-        # @TODO: Add validations
+        self.assertEqual(vdisk.storagedriver_id, storagedrivers[2].storagedriver_id)
 
     def test_event_resize_from_volumedriver(self):
         """
@@ -656,12 +657,13 @@ class VDiskTest(unittest.TestCase):
         )
         vpools = structure['vpools']
         storagedrivers = structure['storagedrivers']
+        mds_service = structure['mds_services'][1]
 
         # Create volume using resize from voldrv
-        volume_id = 'vdisk_1'
-        device_name = '/{0}.raw'.format(volume_id)
-        _ = StorageRouterClient(vpools[1].guid, None)  # Initialize the mock client
-        StorageRouterClient.vrouter_id[vpools[1].guid][volume_id] = storagedrivers[1].storagedriver_id
+        device_name = '/vdisk.raw'
+        srclient = StorageRouterClient(vpools[1].guid, None)
+        mds_backend_config = Helper._generate_mdsmetadatabackendconfig([mds_service])
+        volume_id = srclient.create_volume(device_name, mds_backend_config, 1024 ** 4, str(storagedrivers[1].storagedriver_id))
         VDiskController.resize_from_voldrv(volume_id=volume_id,
                                            volume_size=1024 ** 4,
                                            volume_path=device_name,
@@ -670,8 +672,8 @@ class VDiskTest(unittest.TestCase):
         self.assertTrue(expr=len(vdisks) == 1,
                         msg='Expected to find 1 vDisk in model')
         self.assertEqual(first=vdisks[0].name,
-                         second=volume_id,
-                         msg='Volume name should be {0}'.format(volume_id))
+                         second='vdisk',
+                         msg='Volume name should be vdisk')
         self.assertEqual(first=vdisks[0].volume_id,
                          second=volume_id,
                          msg='Volume ID should be {0}'.format(volume_id))
@@ -691,8 +693,8 @@ class VDiskTest(unittest.TestCase):
         self.assertTrue(expr=len(vdisks) == 1,
                         msg='Expected to find 1 vDisk in model')
         self.assertEqual(first=vdisks[0].name,
-                         second=volume_id,
-                         msg='Volume name should be {0}'.format(volume_id))
+                         second='vdisk',
+                         msg='Volume name should be vdisk')
         self.assertEqual(first=vdisks[0].size,
                          second=2 * 1024 ** 4,
                          msg='Size should be 2 TiB')

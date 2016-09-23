@@ -202,7 +202,10 @@ class VDisk(DataObject):
         """
         Returns the Volume Storage Driver ID to which the vDisk is connected.
         """
-        return self.info.get('vrouter_id', None)
+        vdisk_object = self.objectregistry_client.find(str(self.volume_id))
+        if vdisk_object is not None:
+            return vdisk_object.node_id()
+        return None
 
     def _storagerouter_guid(self):
         """

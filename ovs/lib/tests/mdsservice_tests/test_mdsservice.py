@@ -73,6 +73,7 @@ class MDSServices(unittest.TestCase):
         """
         self.persistent.clean()
         self.volatile.clean()
+        self.maxDiff = None
         StorageRouterClient.clean()
         MDSClient.clean()
 
@@ -279,13 +280,11 @@ class MDSServices(unittest.TestCase):
             Executes a test run for a given scenario
             """
             for disk_id, mds_ids in scenario.iteritems():
-                configs = []
-                for mds_id in mds_ids:
-                    config = type('MDSNodeConfig', (), {'address': Helper.generate_nc_function(True, mds_services[mds_id]),
-                                                        'port': Helper.generate_nc_function(False, mds_services[mds_id])})()
-                    configs.append(config)
-                mds_backend_config = type('MDSMetaDataBackendConfig', (), {'node_configs': Helper.generate_bc_function(configs)})()
-                StorageRouterClient.metadata_backend_config[vpools[1].guid][vdisks[disk_id].volume_id] = mds_backend_config
+                vdisk = vdisks[disk_id]
+                mds_backend_config = Helper._generate_mdsmetadatabackendconfig([mds_services[mds_id] for mds_id in mds_ids])
+                for config in mds_backend_config.node_configs():
+                    MDSClient(config).create_namespace(vdisk.volume_id)
+                vdisk.storagedriver_client.update_metadata_backend_config(vdisk.volume_id, mds_backend_config)
 
             for vdisk_id in vdisks:
                 MDSServiceController.sync_vdisk_to_reality(vdisks[vdisk_id])
@@ -305,10 +304,11 @@ class MDSServices(unittest.TestCase):
              'mds_services': [(1, 1), (2, 1), (3, 2), (4, 3), (5, 4)],  # (<id>, <storagedriver_id>)
              'storagerouter_domains': [(1, 1, 1, False), (2, 2, 1, False), (3, 3, 1, False), (4, 4, 1, False)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
+        storagedrivers = structure['storagedrivers']
         vpools = structure['vpools']
         mds_services = structure['mds_services']
 
-        vdisks = Helper.create_vdisks_for_mds_service(amount=5, start_id=1, vpool=vpools[1])
+        vdisks = Helper.create_vdisks_for_mds_service(amount=5, start_id=1, storagedriver=storagedrivers[1])
         _test_scenario({1: [1, 3, 4],
                         2: [1, 2],
                         3: [1, 3, 4],
@@ -508,15 +508,15 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # If the tlogs are not caught up, nothing should be changed
-        for vdisk_id in [3, 4]:
-            MDSClient.catchup[vdisks[vdisk_id].volume_id] = 1000
+        MDSClient._set_catchup('10.0.0.2:5', vdisks[3].volume_id, 1000)
+        MDSClient._set_catchup('10.0.0.2:5', vdisks[4].volume_id, 1000)
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # The next run, after tlogs are caught up, a master switch should be executed
-        for vdisk_id in [3, 4]:
-            MDSClient.catchup[vdisks[vdisk_id].volume_id] = 50
+        MDSClient._set_catchup('10.0.0.2:5', vdisks[3].volume_id, 50)
+        MDSClient._set_catchup('10.0.0.2:5', vdisks[4].volume_id, 50)
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.3', 'port': 3}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
@@ -535,7 +535,7 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 6: Validate whether a volume migration makes the master follow
-        StorageRouterClient.vrouter_id[vpools[1].guid][vdisks[1].volume_id] = storagedrivers[3].storagedriver_id
+        vdisks[1].storagedriver_client.migrate(vdisks[1].volume_id, storagedrivers[3].storagedriver_id, False)
         configs = [[{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.2', 'port': 5}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
@@ -989,15 +989,15 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # If the tlogs are not caught up, nothing should be changed
-        for vdisk_id in [3, 4]:
-            MDSClient.catchup[vdisks[vdisk_id].volume_id] = 1000
+        MDSClient._set_catchup('10.0.0.2:5', vdisks[3].volume_id, 1000)
+        MDSClient._set_catchup('10.0.0.2:5', vdisks[4].volume_id, 1000)
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # The next run, after tlogs are caught up, a master switch should be executed
-        for vdisk_id in [3, 4]:
-            MDSClient.catchup[vdisks[vdisk_id].volume_id] = 50
+        MDSClient._set_catchup('10.0.0.2:5', vdisks[3].volume_id, 50)
+        MDSClient._set_catchup('10.0.0.2:5', vdisks[4].volume_id, 50)
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.3', 'port': 3}],
@@ -1016,7 +1016,7 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 6: Validate whether a volume migration makes the master follow
-        StorageRouterClient.vrouter_id[vpools[1].guid][vdisks[1].volume_id] = storagedrivers[3].storagedriver_id
+        vdisks[1].storagedriver_client.migrate(vdisks[1].volume_id, storagedrivers[3].storagedriver_id, False)
         configs = [[{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.3', 'port': 3}],
@@ -1210,3 +1210,68 @@ class MDSServices(unittest.TestCase):
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+
+    def test_role_assignments(self):
+        """
+        Validates whether the role assinment and ex-master behavior is correct:
+        * When a slave is configured as a master, the ex-master should not be immediately recycled as a slave to prevent
+          race conditions in the StorageDriver. It should be left out, and then in a next call be included again.
+        * When an ex-master is recycled, it should be explicitly set to the slave role again
+        """
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
+        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+
+        structure = Helper.build_service_structure(
+            {'vpools': [1],
+             'storagerouters': [1, 2, 3],
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1), (2, 2), (3, 3)]}  # (<id>, <storagedriver_id>)
+        )
+        mds_services = structure['mds_services']
+        storagerouters = structure['storagerouters']
+        storagedrivers = structure['storagedrivers']
+
+        for sr in storagerouters.values():
+            Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 10)
+        vdisks = Helper.create_vdisks_for_mds_service(amount=1, start_id=1, mds_service=mds_services[1])
+        vdisk = vdisks[1]
+
+        # Sub-Test 1: Validate the start configuration which is simple, each disk has only its default local master
+        # | MDS ID | STORAGEROUTER | VPOOL | CAPACITY | LOAD (in percent) |
+        # |    1   |       1       |   1   |    10    |       10,0        |
+        # |    2   |       2       |   1   |    10    |        0,0        |
+        # |    3   |       3       |   1   |    10    |        0,0        |
+        configs = [[{'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 1, 0, 10, 10.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 0, 0, 10,  0.0],
+                 ['10.0.0.3', 3, 0, 0, 10,  0.0]]
+        self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+
+        # Validate first run. Each disk should now have sufficient nodes, since there are plenty of MDS services available
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.3', 'port': 3}]]
+        loads = [['10.0.0.1', 1, 1, 0, 10, 10.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 0, 1, 10, 10.0],
+                 ['10.0.0.3', 3, 0, 1, 10, 10.0]]
+
+        StorageRouterClient.mds_recording = []
+        MDSServiceController.ensure_safety(vdisk)
+        self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+        self.assertListEqual(StorageRouterClient.mds_recording, [['10.0.0.1:1', '10.0.0.2:2', '10.0.0.3:3']])
+
+        vdisk.storagedriver_client.migrate(vdisk.volume_id, storagedrivers[2].storagedriver_id, False)
+
+        configs = [[{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}]]
+        loads = [['10.0.0.1', 1, 0, 1, 10, 10.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 0, 10, 10.0],
+                 ['10.0.0.3', 3, 0, 1, 10, 10.0]]
+
+        StorageRouterClient.mds_recording = []
+        MDSServiceController.ensure_safety(vdisk)
+        self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+        self.assertListEqual(StorageRouterClient.mds_recording, [['10.0.0.2:2', '10.0.0.3:3'],
+                                                                 ['10.0.0.2:2', '10.0.0.1:1', '10.0.0.3:3']])
+
+        config = vdisk.info['metadata_backend_config']
+        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[0]['ip'], config[0]['port']))._get_role(vdisk.volume_id), MDSClient.MASTER_ROLE)
+        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))._get_role(vdisk.volume_id), MDSClient.SLAVE_ROLE)
+        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))._get_role(vdisk.volume_id), MDSClient.SLAVE_ROLE)
