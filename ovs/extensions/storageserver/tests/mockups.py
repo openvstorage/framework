@@ -19,6 +19,7 @@ Mock wrapper class for the storagedriver client
 """
 import copy
 import uuid
+import json
 import pickle
 from volumedriver.storagerouter.storagerouterclient import DTLConfigMode
 
@@ -71,7 +72,7 @@ class StorageRouterClient(object):
                 item[self.vpool_guid] = {}
 
     @staticmethod
-    def clean():
+    def clean(vpool_guid=None, volume_id=None):
         """
         Clean everything up from previous runs
         """
@@ -83,22 +84,30 @@ class StorageRouterClient(object):
                      StorageRouterClient.snapshots,
                      StorageRouterClient.volumes,
                      StorageRouterClient.vrouter_id]:
-            for vpool_guid in item.keys():
-                item[vpool_guid] = {}
+            for this_vpool_guid in item.keys():
+                if vpool_guid is None or vpool_guid == this_vpool_guid:
+                    if volume_id is not None:
+                        if volume_id in item[this_vpool_guid]:
+                            del item[this_vpool_guid][volume_id]
+                    else:
+                        item[this_vpool_guid] = {}
 
     def create_clone(self, target_path, metadata_backend_config, parent_volume_id, parent_snapshot_id, node_id):
         """
         Create a mocked clone
         """
-        _ = target_path, metadata_backend_config, parent_volume_id, parent_snapshot_id, node_id
-        volume_id = str(uuid.uuid4())
-        StorageRouterClient.vrouter_id[self.vpool_guid][volume_id] = node_id
-        return volume_id
+        _ = parent_snapshot_id
+        if parent_volume_id not in StorageRouterClient.volumes[self.vpool_guid]:
+            raise RuntimeError('Could not find volume {0}'.format(parent_volume_id))
+        volume_size = StorageRouterClient.volumes[self.vpool_guid][parent_volume_id]['volume_size']
+        return self.create_volume(target_path, metadata_backend_config, volume_size, node_id)
 
     def create_clone_from_template(self, target_path, metadata_backend_config, parent_volume_id, node_id):
         """
         Create a vDisk from a vTemplate
         """
+        if parent_volume_id not in StorageRouterClient.volumes[self.vpool_guid]:
+            raise RuntimeError('Could not find volume {0}'.format(parent_volume_id))
         parent_volume = StorageRouterClient.volumes[self.vpool_guid][parent_volume_id]
         if StorageRouterClient.object_type[self.vpool_guid].get(parent_volume_id, 'BASE') != 'TEMPLATE':
             raise ValueError('Can only clone from a template')
@@ -123,10 +132,10 @@ class StorageRouterClient(object):
         if storagedriver is None:
             raise ValueError('Failed to retrieve storagedriver with ID {0}'.format(node_id))
         StorageRouterClient.vrouter_id[self.vpool_guid][volume_id] = node_id
+        StorageRouterClient.metadata_backend_config[self.vpool_guid][volume_id] = metadata_backend_config
         StorageRouterClient.volumes[self.vpool_guid][volume_id] = {'volume_id': volume_id,
                                                                    'volume_size': volume_size,
-                                                                   'target_path': target_path,
-                                                                   'metadata_backend_config': metadata_backend_config}
+                                                                   'target_path': target_path}
         return volume_id
 
     def delete_snapshot(self, volume_id, snapshot_id):
@@ -231,7 +240,6 @@ class StorageRouterClient(object):
         """
         Is volume synced up to specified snapshot mockup
         """
-        _ = volume_id, snapshot_id
         snapshot = StorageRouterClient.snapshots[self.vpool_guid].get(volume_id, {}).get(snapshot_id)
         if snapshot is not None:
             if StorageRouterClient.synced is False:
@@ -265,7 +273,6 @@ class StorageRouterClient(object):
         """
         Set the metadata cache capacity for volume
         """
-        _ = self
         if self.vpool_guid not in StorageRouterClient.config_cache:
             StorageRouterClient.config_cache[self.vpool_guid] = {}
         if volume_id not in StorageRouterClient.config_cache[self.vpool_guid]:
@@ -276,7 +283,6 @@ class StorageRouterClient(object):
         """
         Retrieve the read cache behaviour for volume
         """
-        _ = self
         if self.vpool_guid not in StorageRouterClient.config_cache:
             StorageRouterClient.config_cache[self.vpool_guid] = {}
         if volume_id not in StorageRouterClient.config_cache[self.vpool_guid]:
@@ -287,7 +293,6 @@ class StorageRouterClient(object):
         """
         Retrieve the read cache limit for volume
         """
-        _ = self
         if self.vpool_guid not in StorageRouterClient.config_cache:
             StorageRouterClient.config_cache[self.vpool_guid] = {}
         if volume_id not in StorageRouterClient.config_cache[self.vpool_guid]:
@@ -298,7 +303,6 @@ class StorageRouterClient(object):
         """
         Retrieve the read cache mode for volume
         """
-        _ = self
         if self.vpool_guid not in StorageRouterClient.config_cache:
             StorageRouterClient.config_cache[self.vpool_guid] = {}
         if volume_id not in StorageRouterClient.config_cache[self.vpool_guid]:
@@ -309,7 +313,6 @@ class StorageRouterClient(object):
         """
         Retrieve the SCO cache multiplier for a volume
         """
-        _ = self
         if self.vpool_guid not in StorageRouterClient.config_cache:
             StorageRouterClient.config_cache[self.vpool_guid] = {}
         if volume_id not in StorageRouterClient.config_cache[self.vpool_guid]:
@@ -320,7 +323,6 @@ class StorageRouterClient(object):
         """
         Set the SCO multiplier for volume
         """
-        _ = self
         if self.vpool_guid not in StorageRouterClient.config_cache:
             StorageRouterClient.config_cache[self.vpool_guid] = {}
         if volume_id not in StorageRouterClient.config_cache[self.vpool_guid]:
@@ -331,7 +333,6 @@ class StorageRouterClient(object):
         """
         Retrieve the TLOG multiplier for volume
         """
-        _ = self
         if self.vpool_guid not in StorageRouterClient.config_cache:
             StorageRouterClient.config_cache[self.vpool_guid] = {}
         if volume_id not in StorageRouterClient.config_cache[self.vpool_guid]:
@@ -362,13 +363,14 @@ class StorageRouterClient(object):
         """
         for volume_id, volume_info in StorageRouterClient.volumes[self.vpool_guid].iteritems():
             if volume_info['target_path'] == devicename:
-                del StorageRouterClient.volumes[self.vpool_guid][volume_id]
+                StorageRouterClient.clean(self.vpool_guid, volume_id)
                 break
 
     def update_metadata_backend_config(self, volume_id, metadata_backend_config):
         """
         Stores the given config
         """
+        # @TODO: Make sure that all slaves are "SLAVE" and have the namespace created as expected.
         StorageRouterClient.metadata_backend_config[self.vpool_guid][volume_id] = metadata_backend_config
 
     EMPTY_INFO = empty_info
@@ -418,6 +420,7 @@ class MDSClient(object):
     Mocks the Metadata Server Client
     """
     catchup = {}
+    roles = {}
 
     def __init__(self, service):
         """
@@ -431,6 +434,7 @@ class MDSClient(object):
         Clean everything up from previous runs
         """
         MDSClient.catchup = {}
+        MDSClient.roles = {}
 
     def catch_up(self, volume_id, dry_run):
         """
@@ -445,6 +449,13 @@ class MDSClient(object):
         """
         _ = self
         MDSClient.catchup[volume_id] = 0
+
+    def set_role(self, volume_id, role):
+        """
+        Dummy set role method
+        """
+        _ = self
+        MDSClient.roles[volume_id] = role
 
 
 class Snapshot(object):
@@ -473,6 +484,15 @@ class DTLConfig(object):
         self.port = port
         self.mode = mode
         self.dtl_config_mode = DTLConfigMode.MANUAL
+
+    def __repr__(self):
+        """
+        Representation
+        """
+        return json.dumps({'host': self.host,
+                           'port': self.port,
+                           'mode': self.mode,
+                           'dtl_config_mode': self.dtl_config_mode})
 
 
 class ObjectRegistration(object):

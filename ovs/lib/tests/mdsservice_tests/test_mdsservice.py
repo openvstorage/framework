@@ -279,12 +279,7 @@ class MDSServices(unittest.TestCase):
             Executes a test run for a given scenario
             """
             for disk_id, mds_ids in scenario.iteritems():
-                configs = []
-                for mds_id in mds_ids:
-                    config = type('MDSNodeConfig', (), {'address': Helper.generate_nc_function(True, mds_services[mds_id]),
-                                                        'port': Helper.generate_nc_function(False, mds_services[mds_id])})()
-                    configs.append(config)
-                mds_backend_config = type('MDSMetaDataBackendConfig', (), {'node_configs': Helper.generate_bc_function(configs)})()
+                mds_backend_config = Helper._generate_mdsmetadatabackendconfig([mds_services[mds_id] for mds_id in mds_ids])
                 StorageRouterClient.metadata_backend_config[vpools[1].guid][vdisks[disk_id].volume_id] = mds_backend_config
 
             for vdisk_id in vdisks:
@@ -305,10 +300,11 @@ class MDSServices(unittest.TestCase):
              'mds_services': [(1, 1), (2, 1), (3, 2), (4, 3), (5, 4)],  # (<id>, <storagedriver_id>)
              'storagerouter_domains': [(1, 1, 1, False), (2, 2, 1, False), (3, 3, 1, False), (4, 4, 1, False)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
+        storagedrivers = structure['storagedrivers']
         vpools = structure['vpools']
         mds_services = structure['mds_services']
 
-        vdisks = Helper.create_vdisks_for_mds_service(amount=5, start_id=1, vpool=vpools[1])
+        vdisks = Helper.create_vdisks_for_mds_service(amount=5, start_id=1, storagedriver=storagedrivers[1])
         _test_scenario({1: [1, 3, 4],
                         2: [1, 2],
                         3: [1, 3, 4],
