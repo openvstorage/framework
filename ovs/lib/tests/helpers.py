@@ -194,7 +194,8 @@ class Helper(object):
             devicename = 'vdisk_{0}'.format(i)
             mds_backend_config = Helper._generate_mdsmetadatabackendconfig(mds_services)
             volume_id = srclient.create_volume(devicename, mds_backend_config, 0, str(storagedriver_id))
-            MDSClient.catchup[volume_id] = 50
+            if len(mds_services) == 1:
+                MDSClient._set_catchup(mds_services[0], volume_id, 50)
             vdisk = VDisk()
             vdisk.name = str(i)
             vdisk.devicename = devicename
