@@ -1213,45 +1213,10 @@ class MDSServices(unittest.TestCase):
 
     def test_role_assignments(self):
         """
-        Validates whether the ensure_safety call works as expected
-        Default safety used to be 3 (Versions Boston, Chicago, Denver)
-        Default safety changed to 2 (Eugene, ...)
-        MDSServiceController.ensure_safety will make sure that all possible master and slave MDS services are configured correctly in volumedriver
-        Following rules apply:
-            * If master overloaded (load > threshold), master is demoted to slave, least loaded slave is promoted to master
-            * If 1 or more slaves overloaded, new slave will be created based on lowest load
-            * All master and slave services will always be on different nodes
-            * Master WILL ALWAYS be on the local node (where the vDisk is hosted)
-            * Slaves will be filled up until primary safety reached (taken from primary failure domain)
-            * Slaves will be filled up until secondary safety reached if secondary failure domain known
-            * Final configuration:
-                * Safety of 2 and secondary failure domain known
-                    * [MASTER primary failure domain and local, SLAVE in secondary failure domain] --> 1st in list in volumedriver config will be treated as master
-                * Safety of 2 and secondary failure domain NOT known
-                    * [MASTER primary failure domain and local, SLAVE in primary failure domain and NOT local] --> 1st in list in volumedriver config will be treated as master
-        This test does:
-            * Create 4 storagerouters, 4 storagedrivers, 4 MDS services
-            * Create 2 vDisks for each MDS service
-            * Sub-Test 1:
-                * Run ensure_safety
-                * Validate updated configs
-            * Sub-Test 2:
-                * Run ensure safety again and validate configs, nothing should have changed
-            * Sub-Test 3:
-                * Overload an MDS service and validate configurations are rebalanced
-            * Sub-Test 4:
-                * Run ensure safety again and validate configurations
-            * Sub-Test 5:
-                * Add MDS service on storagerouter with overloaded service
-                * Verify an extra slave is added
-                * Set tlogs to > threshold and verify nothing changes in config while catch up is ongoing
-                * Set tlogs to < threshold and verify multiple MDS services on same storagerouter are removed
-            * Sub-Test 6:
-                * Migrate a disk to another storagerouter and verify master follows
-            * Sub-Test 7: Update failure domain
-            * Sub-Test 8: Update backup failure domain
-            * Sub-Test 9: Add backup failure domain
-            * Sub-Test 10: Remove backup failure domain
+        Validates whether the role assinment and ex-master behavior is correct:
+        * When a slave is configured as a master, the ex-master should not be immediately recycled as a slave to prevent
+          race conditions in the StorageDriver. It should be left out, and then in a next call be included again.
+        * When an ex-master is recycled, it should be explicitly set to the slave role again
         """
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
         Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
