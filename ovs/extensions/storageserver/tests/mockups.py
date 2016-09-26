@@ -28,18 +28,35 @@ class LocalStorageRouterClient(object):
     """
     Local Storage Router Client mock class
     """
+    configurations = {}
+
     def __init__(self, path):
         """
         Init method
         """
-        _ = path
+        self.path = path
 
     def update_configuration(self, path):
         """
         Update configuration mock
         """
-        _ = self, path
-        return []
+        from ovs.extensions.generic.configuration import Configuration
+        if path != self.path:
+            raise RuntimeError('Unexpected path passed. Not an issue, but unexpected. This (unittest) code might need to be adapted.')
+        main_key = Configuration.extract_key_from_path(path)
+        current_content = LocalStorageRouterClient.configurations.get(main_key, {})
+        new_content = json.loads(Configuration.get(main_key, raw=True))
+        changes = []
+        for section_key, section in new_content.iteritems():
+            current_section = current_content.get(section_key, {})
+            for key, value in section.iteritems():
+                current_value = current_section.get(key)
+                if current_section.get(key) != value:
+                    changes.append({'param_name': key,
+                                    'old_value': current_value,
+                                    'new_value': value})
+        LocalStorageRouterClient.configurations[main_key] = new_content
+        return changes
 
 
 class StorageRouterClient(object):
