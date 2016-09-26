@@ -17,10 +17,14 @@
 """
 Helper module
 """
+import json
 from ovs.dal.hybrids.backendtype import BackendType
+from ovs.dal.hybrids.disk import Disk
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
+from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.servicetype import ServiceType
@@ -29,8 +33,9 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
-from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
+from ovs.lib.storagedriver import StorageDriverController
 
 
 class Helper(object):
@@ -103,6 +108,25 @@ class Helper(object):
             storagerouter.rdma_capable = False
             storagerouter.save()
             storagerouters[sr_id] = storagerouter
+            disk = Disk()
+            disk.storagerouter = storagerouter
+            disk.state = 'OK'
+            disk.name = '/dev/uda'
+            disk.size = 1 * 1024 ** 4
+            disk.is_ssd = True
+            disk.path = '/dev/uda'
+            disk.save()
+            partition = DiskPartition()
+            partition.offset = 0
+            partition.size = disk.size
+            partition.id = 'unittest_{0}'.format(sr_id)
+            partition.path = '/dev/uda-1'
+            partition.state = 'OK'
+            partition.mountpoint = '/tmp/unittest/sr_{0}/disk_1/partition_1'.format(sr_id)
+            partition.disk = disk
+            for role in [DiskPartition.ROLES.DB, DiskPartition.ROLES]:
+                partition.roles.append(role)
+            partition.save()
         for sd_id, vpool_id, sr_id in structure.get('storagedrivers', ()):
             storagedriver = StorageDriver()
             storagedriver.vpool = vpools[vpool_id]
@@ -150,6 +174,11 @@ class Helper(object):
             mds_service.vpool = sd.vpool
             mds_service.save()
             mds_services[mds_id] = mds_service
+            StorageDriverController.add_storagedriverpartition(sd, {'size': None,
+                                                                    'role': DiskPartition.ROLES.DB,
+                                                                    'sub_role': StorageDriverPartition.SUBROLE.MDS,
+                                                                    'partition': sd.storagerouter.disks[0].partitions[0],
+                                                                    'mds_service': mds_service})
         for srd_id, sr_id, domain_id, backup in structure.get('storagerouter_domains', ()):
             sr_domain = StorageRouterDomain()
             sr_domain.backup = backup
@@ -235,8 +264,6 @@ class Helper(object):
         :type vpool: vPool
         :param storagedriver: StorageDriver on which the vPool is running
         :type storagedriver: StorageDriver
-        :param configuration: If not specified, default configuration is used, else default configuration is extended with specified configuration
-        :type configuration: dict
         :return: None
         """
         default_config = {'backend_connection_manager': {'local_connection_path': ''},
@@ -272,4 +299,5 @@ class Helper(object):
                           'volume_router_cluster': {'vrouter_cluster_id': vpool.guid}}
 
         key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storagedriver.storagedriver_id)
-        Configuration.set(key, default_config)
+        Configuration.set(key, json.dumps(default_config), raw=True)
+        LocalStorageRouterClient.configurations[key] = default_config

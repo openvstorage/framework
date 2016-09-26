@@ -139,11 +139,11 @@ class MDSServiceController(object):
 
         # 2. Storage driver partitions
         from ovs.lib.storagedriver import StorageDriverController
-        sdp = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
-                                                                                 'role': DiskPartition.ROLES.DB,
-                                                                                 'sub_role': StorageDriverPartition.SUBROLE.MDS,
-                                                                                 'partition': db_partition,
-                                                                                 'mds_service': mds_service})
+        StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                           'role': DiskPartition.ROLES.DB,
+                                                                           'sub_role': StorageDriverPartition.SUBROLE.MDS,
+                                                                           'partition': db_partition,
+                                                                           'mds_service': mds_service})
 
         # CONFIGURATIONS
         # 1. Volumedriver
@@ -153,6 +153,9 @@ class MDSServiceController(object):
                 mds_service = service.mds_service
                 if mds_service is not None:
                     if mds_service.vpool_guid == vpool.guid:
+                        sdp = [sd_partition for sd_partition in mds_service.storagedriver_partitions
+                               if sd_partition.role == DiskPartition.ROLES.DB
+                               and sd_partition.sub_role == StorageDriverPartition.SUBROLE.MDS][0]
                         mds_nodes.append({'host': service.storagerouter.ip,
                                           'port': service.ports[0],
                                           'db_directory': sdp.path,
@@ -210,11 +213,13 @@ class MDSServiceController(object):
                     if service.storagerouter_guid == storagerouter.guid:
                         mds_service = service.mds_service
                         if mds_service.vpool_guid == vpool.guid:
-                            sdp = [sd_partition.path for sd_partition in mds_service.storagedriver_partitions if sd_partition.role == DiskPartition.ROLES.DB]
+                            sdp = [sd_partition for sd_partition in mds_service.storagedriver_partitions
+                                   if sd_partition.role == DiskPartition.ROLES.DB
+                                   and sd_partition.sub_role == StorageDriverPartition.SUBROLE.MDS][0]
                             mds_nodes.append({'host': service.storagerouter.ip,
                                               'port': service.ports[0],
-                                              'db_directory': sdp[0],
-                                              'scratch_directory': sdp[0]})
+                                              'db_directory': sdp.path,
+                                              'scratch_directory': sdp.path})
 
                 # Generate the correct section in the Storage Driver's configuration
                 storagedriver = [sd for sd in storagerouter.storagedrivers if sd.vpool_guid == vpool.guid][0]
@@ -753,7 +758,7 @@ class MDSServiceController(object):
                     mds_dict[vpool][storagerouter] = {'client': None,
                                                       'services': []}
                     try:
-                        mds_dict[vpool][storagerouter]['client'] = SSHClient(storagerouter, username = 'root')
+                        mds_dict[vpool][storagerouter]['client'] = SSHClient(storagerouter, username='root')
                         MDSServiceController._logger.info('MDS checkup - vPool {0} - Storage Router {1} - ONLINE'.format(vpool.name, storagerouter.name))
                     except UnableToConnectException:
                         MDSServiceController._logger.info('MDS checkup - vPool {0} - Storage Router {1} - OFFLINE'.format(vpool.name, storagerouter.name))
@@ -805,49 +810,55 @@ class MDSServiceController(object):
             for vdisk in vpool.vdisks:
                 try:
                     MDSServiceController.ensure_safety(vdisk)
-                except Exception as ex:
-                    failures.append('Ensure safety for vDisk {0} with guid {1} failed with error: {2}'.format(vdisk.name, vdisk.guid, ex))
+                except Exception:
+                    message = 'Ensure safety for vDisk {0} with guid {1} failed'.format(vdisk.name, vdisk.guid)
+                    MDSServiceController._logger.exception(message)
+                    failures.append(message)
         if len(failures) > 0:
             raise Exception('\n - ' + '\n - '.join(failures))
         MDSServiceController._logger.info('MDS checkup - Finished')
 
+    @staticmethod
+    def print_current_mds_layout():
+        """
+        Prints the current MDS layout
+        """
+        output = ['',
+                  'Open vStorage - MDS debug information',
+                  '=====================================',
+                  'timestamp: {0}'.format(time.time()),
+                  '']
+        for storagerouter in StorageRouterList.get_storagerouters():
+            output.append('+ {0} ({1})'.format(storagerouter.name, storagerouter.ip))
+            vpools = set(sd.vpool for sd in storagerouter.storagedrivers)
+            for vpool in vpools:
+                output.append('  + {0}'.format(vpool.name))
+                for mds_service in vpool.mds_services:
+                    if mds_service.service.storagerouter_guid == storagerouter.guid:
+                        masters, slaves = 0, 0
+                        for junction in mds_service.vdisks:
+                            if junction.is_master:
+                                masters += 1
+                            else:
+                                slaves += 1
+                        capacity = mds_service.capacity
+                        if capacity == -1:
+                            capacity = 'infinite'
+                        load, _ = MDSServiceController.get_mds_load(mds_service)
+                        if load == float('inf'):
+                            load = 'infinite'
+                        else:
+                            load = '{0}%'.format(round(load, 2))
+                        output.append('    + {0} - port {1} - {2} master(s), {3} slave(s) - capacity: {4}, load: {5}'.format(
+                            mds_service.number, mds_service.service.ports[0], masters, slaves, capacity, load
+                        ))
+        print '\n'.join(output)
 
 if __name__ == '__main__':
     try:
         while True:
-            output = ['',
-                      'Open vStorage - MDS debug information',
-                      '=====================================',
-                      'timestamp: {0}'.format(time.time()),
-                      '']
-            for _sr in StorageRouterList.get_storagerouters():
-                output.append('+ {0} ({1})'.format(_sr.name, _sr.ip))
-                vpools = set(sd.vpool for sd in _sr.storagedrivers)
-                for _vpool in vpools:
-                    output.append('  + {0}'.format(_vpool.name))
-                    for _mds_service in _vpool.mds_services:
-                        if _mds_service.service.storagerouter_guid == _sr.guid:
-                            masters, slaves = 0, 0
-                            for _junction in _mds_service.vdisks:
-                                if _junction.is_master:
-                                    masters += 1
-                                else:
-                                    slaves += 1
-                            capacity = _mds_service.capacity
-                            if capacity == -1:
-                                capacity = 'infinite'
-                            _load, _ = MDSServiceController.get_mds_load(_mds_service)
-                            if _load == float('inf'):
-                                _load = 'infinite'
-                            else:
-                                _load = '{0}%'.format(round(_load, 2))
-                            output.append('    + {0} - port {1} - {2} master(s), {3} slave(s) - capacity: {4}, load: {5}'.format(
-                                _mds_service.number, _mds_service.service.ports[0], masters, slaves, capacity, _load
-                            ))
-            output += ['',
-                       'Press ^C to exit',
-                       '']
-            print '\x1b[2J\x1b[H' + '\n'.join(output)
+            print '\x1b[2J\x1b[H'
+            MDSServiceController.print_current_mds_layout()
             time.sleep(1)
     except KeyboardInterrupt:
         pass
