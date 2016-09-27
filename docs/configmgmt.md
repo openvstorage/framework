@@ -1,8 +1,18 @@
-## Configuration Manegement
+## Configuration Management
 As Open vStorage is completely distributed it uses a distributed configuration management system.
 There are 2 option as configuration management system:
 * Arakoon, the preferred and advised system.
 * ETCD
+
+### The main configuration file 
+The main config file `/opt/OpenvStorage/config/framework.json` contains the json `{"configuration_store": "arakoon|etcd"}` and must be available on all Open vStorage nodes. 
+In case of Arakoon there's the above `arakoon_cacc.ini` file available on all Open vStorage nodes and ALBA backend nodes. 
+This file might be provided by external means (unattended setup) during setup, but is afterwards maintained by the Open vStorage cluster. 
+Whoever is responsible for managing this cluster should make sure that the key `__ovs_config` contains a raw dump of it's config file. 
+The `ovs-watcher-config` on Open vStorage nodes or `asd-watcher` on ALBA backend nodes (referred to as 1st-layer watchers) will monitor availability of this Arakoon (referred to as 1st-layer Arakoon). 
+After `ovs-watcher-config` boots, it will start all other Arakoons (ovsdb, voldrv, abm, nsm, referred to as 2nd-layer arakoons), which will cause the `ovs-watcher-framework` and `ovs-watcher-voldrv` (referred to as 2nd-layer watchers) to start and start up the rest of the framework/voldrv/proxy/... 
+The `asd-watcher` will when started trigger a start of the asd-manager and the asds. If `asd-watcher` detects a change in the config Arakoon's config (`__ovs_config`), it will update it's local `arakoon_cacc.ini` file and restart the asd-manager automatically. 
+`ovs-watcher-config` will do the same for the ovs-nodes but will not restart the framework.
 
 #### Set, get and list configuration keys
 The [OVS commandline](https://openvstorage.gitbooks.io/administration/content/Administration/usingthecli/configmgmt.html) allows to easily list and change the configuration parameters of the cluster:
