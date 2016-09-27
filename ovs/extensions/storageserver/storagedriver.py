@@ -140,16 +140,22 @@ class StorageDriverClient(object):
         pass
 
     @staticmethod
-    def load(vpool):
+    def load(vpool, excluded_storagedrivers=None):
         """
         Initializes the wrapper for a given vpool
         :param vpool: vPool for which the StorageRouterClient needs to be loaded
+        :type vpool: vPool
+        :param excluded_storagedrivers: A list of straogedrivers that cannot be used as a client
+        :type excluded_storagedrivers: list or None
         """
+        if excluded_storagedrivers is None:
+            excluded_storagedrivers = []
         key = vpool.identifier
         if key not in client_vpool_cache:
             cluster_contacts = []
             for storagedriver in vpool.storagedrivers[:3]:
-                cluster_contacts.append(ClusterContact(str(storagedriver.cluster_ip), storagedriver.ports['xmlrpc']))
+                if storagedriver not in excluded_storagedrivers:
+                    cluster_contacts.append(ClusterContact(str(storagedriver.cluster_ip), storagedriver.ports['xmlrpc']))
             client = StorageRouterClient(str(vpool.guid), cluster_contacts)
             client_vpool_cache[key] = client
         return client_vpool_cache[key]
