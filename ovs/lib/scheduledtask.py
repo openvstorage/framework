@@ -215,6 +215,7 @@ class ScheduledTaskController(object):
 
         def _execute_scrub_work(queue, vpool, scrub_info):
             client = None
+            lock_time = 5 * 60
             storagerouter = scrub_info['storage_router']
             scrub_directory = '{0}/scrub_work_{1}_{2}'.format(scrub_info['scrub_path'], vpool.name, storagerouter.name)
             scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}'.format(vpool.guid, storagerouter.guid)
@@ -223,7 +224,7 @@ class ScheduledTaskController(object):
 
             # Deploy a proxy
             try:
-                with file_mutex(name='ovs_albaproxy_scrub', wait=60):
+                with file_mutex(name='ovs_albaproxy_scrub', wait=lock_time):
                     ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
                     client = SSHClient(storagerouter, 'root')
                     client.dir_create(scrub_directory)
@@ -275,12 +276,13 @@ class ScheduledTaskController(object):
                 message = 'Scrubber - vPool {0} - StorageRouter {1} - An error occurred deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service)
                 error_messages.append(message)
                 ScheduledTaskController._logger.exception(message)
-                if client is not None and ServiceManager.has_service(name=alba_proxy_service, client=client):
+                if client is not None and ServiceManager.has_service(name=alba_proxy_service, client=client) is True:
+                    if ServiceManager.get_service_status(name=alba_proxy_service, client=client) is True:
+                        ServiceManager.stop_service(name=alba_proxy_service, client=client)
                     ServiceManager.remove_service(name=alba_proxy_service, client=client)
                 if Configuration.exists(scrub_config_key):
                     Configuration.delete(scrub_config_key)
 
-            vdisk = None
             try:
                 # Empty the queue with vDisks to scrub
                 with remote(storagerouter.ip, [VDisk]) as rem:
@@ -288,45 +290,47 @@ class ScheduledTaskController(object):
                         vdisk_guid = queue.get(False)
                         vdisk = rem.VDisk(vdisk_guid)
                         ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Started scrubbing at location {3}'.format(vpool.name, storagerouter.name, vdisk.name, scrub_directory))
-
-                        # Check MDS master is local. Trigger MDS handover if necessary
-                        configs = _verify_mds_config(current_vdisk=vdisk)
-                        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-                        if configs[0].get('ip') != storagedriver.storagerouter.ip:
-                            ScheduledTaskController._logger.debug('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - MDS master is not local, trigger handover'.format(vpool.name, storagerouter.name, vdisk.name))
-                            MDSServiceController.ensure_safety(vdisk)
+                        try:
+                            # Check MDS master is local. Trigger MDS handover if necessary
                             configs = _verify_mds_config(current_vdisk=vdisk)
+                            storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
                             if configs[0].get('ip') != storagedriver.storagerouter.ip:
-                                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Skipping because master MDS still not local'.format(vpool.name, storagerouter.name, vdisk.name))
-                                continue
+                                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - MDS master is not local, trigger handover'.format(vpool.name, storagerouter.name, vdisk.name))
+                                MDSServiceController.ensure_safety(vdisk)
+                                configs = _verify_mds_config(current_vdisk=vdisk)
+                                if configs[0].get('ip') != storagedriver.storagerouter.ip:
+                                    ScheduledTaskController._logger.warning('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Skipping because master MDS still not local'.format(vpool.name, storagerouter.name, vdisk.name))
+                                    continue
 
-                        # Do the actual scrubbing
-                        with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id)) as locked_client:
-                            ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Retrieve and apply scrub work'.format(vpool.name, storagerouter.name, vdisk.name))
-                            work_units = locked_client.get_scrubbing_workunits()
-                            for work_unit in work_units:
-                                res = locked_client.scrub(work_unit=work_unit,
-                                                          scratch_dir=scrub_directory,
-                                                          log_sinks=[sink],
-                                                          backend_config=Configuration.get_configuration_path(backend_config_key))
-                                locked_client.apply_scrubbing_result(scrubbing_work_result=res)
-                            if work_units:
-                                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - {3} work units successfully applied'.format(vpool.name, storagerouter.name, vdisk.name, len(work_units)))
-                            else:
-                                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - No scrubbing required'.format(vpool.name, storagerouter.name, vdisk.name))
+                            # Do the actual scrubbing
+                            with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id)) as locked_client:
+                                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Retrieve and apply scrub work'.format(vpool.name, storagerouter.name, vdisk.name))
+                                work_units = locked_client.get_scrubbing_workunits()
+                                for work_unit in work_units:
+                                    res = locked_client.scrub(work_unit=work_unit,
+                                                              scratch_dir=scrub_directory,
+                                                              log_sinks=[sink],
+                                                              backend_config=Configuration.get_configuration_path(backend_config_key))
+                                    locked_client.apply_scrubbing_result(scrubbing_work_result=res)
+                                if work_units:
+                                    ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - {3} work units successfully applied'.format(vpool.name, storagerouter.name, vdisk.name, len(work_units)))
+                                else:
+                                    ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - No scrubbing required'.format(vpool.name, storagerouter.name, vdisk.name))
+                        except Exception:
+                            message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Scrubbing failed'.format(vpool.name, storagerouter.name, vdisk.name)
+                            error_messages.append(message)
+                            ScheduledTaskController._logger.exception(message)
+
             except Empty:  # Raised when all items have been fetched from the queue
                 ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Queue completely processed'.format(vpool.name, storagerouter.name))
             except Exception:
-                if vdisk is not None:
-                    message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Scrubbing failed'.format(vpool.name, storagerouter.name, vdisk.name)
-                else:
-                    message = 'Scrubber - vPool {0} - StorageRouter {1} - Scrubbing failed'.format(vpool.name, storagerouter.name)
+                message = 'Scrubber - vPool {0} - StorageRouter {1} - Scrubbing failed'.format(vpool.name, storagerouter.name)
                 error_messages.append(message)
                 ScheduledTaskController._logger.exception(message)
 
             # Delete the proxy again
             try:
-                with file_mutex(name='ovs_albaproxy_scrub', wait=60):
+                with file_mutex(name='ovs_albaproxy_scrub', wait=lock_time):
                     ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Removing service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
                     client = SSHClient(storagerouter, 'root')
                     client.dir_delete(scrub_directory)
