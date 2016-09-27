@@ -69,8 +69,7 @@ class StorageRouterController(object):
     """
     _logger = LogHandler.get('lib', name='storagerouter')
     SUPPORT_AGENT = 'support-agent'
-    PARTITION_DEFAULT_USAGES = {DiskPartition.ROLES.DB: (40, 20),  # 1st number is exact size in GiB, 2nd number is percentage (highest of the 2 will be taken)
-                                DiskPartition.ROLES.SCRUB: (0, 0)}
+    PARTITION_DEFAULT_USAGES = {DiskPartition.ROLES.DB: (40, 20)}
 
     storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
     # noinspection PyArgumentList
@@ -593,6 +592,7 @@ class StorageRouterController(object):
         node_configs = []
         for existing_storagedriver in StorageDriverList.get_storagedrivers():
             if existing_storagedriver.vpool_guid == vpool.guid:
+                # noinspection PyArgumentList
                 node_configs.append(ClusterNodeConfig(vrouter_id=str(existing_storagedriver.storagedriver_id),
                                                       host=str(existing_storagedriver.cluster_ip),
                                                       message_port=existing_storagedriver.ports['management'],
@@ -602,6 +602,7 @@ class StorageRouterController(object):
                                                                                                 existing_storagedriver.storage_ip,
                                                                                                 existing_storagedriver.ports['edge'])))
         grid_ip = Configuration.get('/ovs/framework/hosts/{0}/ip'.format(unique_id))
+        # noinspection PyArgumentList
         node_configs.append(ClusterNodeConfig(vrouter_id=vrouter_id,
                                               host=str(grid_ip),
                                               message_port=ports[0],
@@ -741,18 +742,6 @@ class StorageRouterController(object):
                                  "metadata_path": sdp_metadata.path,
                                  "clean_interval": 1,
                                  "dtl_throttle_usecs": 4000}
-
-        # 5. Create SCRUB storagedriver partition (if necessary)
-        sdp_scrub = None
-        scrub_info = partition_info[DiskPartition.ROLES.SCRUB]
-        if len(scrub_info) > 0:
-            scrub_info = scrub_info[0]
-            size = StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.SCRUB][0] * 1024 ** 3
-            percentage = scrub_info['available'] * StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.SCRUB][1] / 100.0
-            sdp_scrub = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
-                                                                                           'role': DiskPartition.ROLES.SCRUB,
-                                                                                           'partition': DiskPartition(scrub_info['guid'])})
-            dirs2create.append(sdp_scrub.path)
         dirs2create.append(sdp_tlogs.path)
         dirs2create.append(sdp_metadata.path)
 
@@ -830,6 +819,15 @@ class StorageRouterController(object):
                 'ips': [storagedriver.storage_ip],
                 'manifest_cache_size': manifest_cache_size,
                 'fragment_cache': fragment_cache_info,
+                'transport': 'tcp',
+                'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
+            }, indent=4), raw=True)
+            Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({
+                'log_level': 'info',
+                'port': 0,  # Will be overruled by the scrubber scheduled task
+                'ips': ['127.0.0.1'],
+                'manifest_cache_size': manifest_cache_size,
+                'fragment_cache': ['none'],
                 'transport': 'tcp',
                 'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
             }, indent=4), raw=True)
@@ -944,9 +942,6 @@ class StorageRouterController(object):
                                                  fresh_only=True,
                                                  reload_config=False)
 
-        if sdp_scrub is not None:
-            root_client.dir_chmod(sdp_scrub.path, 0777)  # Used by gather_scrub_work which is a celery task executed by 'ovs' user and should be able to write in it
-
         StorageRouterController._logger.info('backend_type: {0}'.format(vpool.backend_type.code))
         params = {'DTL_PATH': sdp_dtl.path,
                   'DTL_ADDRESS': storagedriver.storage_ip,
@@ -959,8 +954,6 @@ class StorageRouterController(object):
         dependencies = None
         if vpool.backend_type.code == 'alba':
             params = {'VPOOL_NAME': vpool_name,
-                      'VPOOL_GUID': vpool.guid,
-                      'PROXY_ID': storagedriver.alba_proxy_guid,
                       'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
                       'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid,
                                                                                                                            storagedriver.alba_proxy_guid))}
@@ -1243,6 +1236,7 @@ class StorageRouterController(object):
                 node_configs = []
                 for sd in available_storage_drivers:
                     if sd != storage_driver:
+                        # noinspection PyArgumentList
                         node_configs.append(ClusterNodeConfig(vrouter_id=str(sd.storagedriver_id),
                                                               host=str(sd.cluster_ip),
                                                               message_port=sd.ports['management'],
@@ -1840,7 +1834,7 @@ class StorageRouterController(object):
     @staticmethod
     def _get_free_ports(client, ports_in_use, number):
         """
-        Gets `number` free ports ports that are not in use and not reserved
+        Gets `number` free ports that are not in use and not reserved
         """
         machine_id = System.get_my_machine_id(client)
         port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
