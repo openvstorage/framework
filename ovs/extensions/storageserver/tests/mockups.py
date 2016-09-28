@@ -18,9 +18,11 @@
 Mock wrapper class for the storagedriver client
 """
 import copy
-import uuid
 import json
+import time
+import uuid
 import pickle
+import threading
 from volumedriver.storagerouter.storagerouterclient import DTLConfigMode
 
 
@@ -66,10 +68,10 @@ class StorageRouterClient(object):
     _config_cache = {}
     _dtl_config_cache = {}
     _metadata_backend_config = {}
-    _object_type = {}
     _snapshots = {}
-    _volumes = {}
-    _vrouter_id = {}
+    volumes = {}
+    vrouter_id = {}
+    object_type = {}
     mds_recording = []
     synced = True
 
@@ -79,13 +81,13 @@ class StorageRouterClient(object):
         """
         _ = arakoon_contacts
         self.vpool_guid = vpool_guid
-        for item in [StorageRouterClient._config_cache,
+        for item in [StorageRouterClient.volumes,
+                     StorageRouterClient.vrouter_id,
+                     StorageRouterClient.object_type,
+                     StorageRouterClient._config_cache,
                      StorageRouterClient._dtl_config_cache,
                      StorageRouterClient._metadata_backend_config,
-                     StorageRouterClient._object_type,
-                     StorageRouterClient._snapshots,
-                     StorageRouterClient._volumes,
-                     StorageRouterClient._vrouter_id]:
+                     StorageRouterClient._snapshots]:
             if self.vpool_guid not in item:
                 item[self.vpool_guid] = {}
 
@@ -95,13 +97,13 @@ class StorageRouterClient(object):
         Clean everything up from previous runs
         """
         StorageRouterClient.synced = True
-        for item in [StorageRouterClient._config_cache,
+        for item in [StorageRouterClient.volumes,
+                     StorageRouterClient.vrouter_id,
+                     StorageRouterClient.object_type,
+                     StorageRouterClient._config_cache,
                      StorageRouterClient._dtl_config_cache,
                      StorageRouterClient._metadata_backend_config,
-                     StorageRouterClient._object_type,
-                     StorageRouterClient._snapshots,
-                     StorageRouterClient._volumes,
-                     StorageRouterClient._vrouter_id]:
+                     StorageRouterClient._snapshots]:
             for this_vpool_guid in item.keys():
                 if vpool_guid is None or vpool_guid == this_vpool_guid:
                     if volume_id is not None:
@@ -115,19 +117,19 @@ class StorageRouterClient(object):
         Create a mocked clone
         """
         _ = parent_snapshot_id
-        if parent_volume_id not in StorageRouterClient._volumes[self.vpool_guid]:
+        if parent_volume_id not in StorageRouterClient.volumes[self.vpool_guid]:
             raise RuntimeError('Could not find volume {0}'.format(parent_volume_id))
-        volume_size = StorageRouterClient._volumes[self.vpool_guid][parent_volume_id]['volume_size']
+        volume_size = StorageRouterClient.volumes[self.vpool_guid][parent_volume_id]['volume_size']
         return self.create_volume(target_path, metadata_backend_config, volume_size, node_id)
 
     def create_clone_from_template(self, target_path, metadata_backend_config, parent_volume_id, node_id):
         """
         Create a vDisk from a vTemplate
         """
-        if parent_volume_id not in StorageRouterClient._volumes[self.vpool_guid]:
+        if parent_volume_id not in StorageRouterClient.volumes[self.vpool_guid]:
             raise RuntimeError('Could not find volume {0}'.format(parent_volume_id))
-        parent_volume = StorageRouterClient._volumes[self.vpool_guid][parent_volume_id]
-        if StorageRouterClient._object_type[self.vpool_guid].get(parent_volume_id, 'BASE') != 'TEMPLATE':
+        parent_volume = StorageRouterClient.volumes[self.vpool_guid][parent_volume_id]
+        if StorageRouterClient.object_type[self.vpool_guid].get(parent_volume_id, 'BASE') != 'TEMPLATE':
             raise ValueError('Can only clone from a template')
         return self.create_volume(target_path, metadata_backend_config, parent_volume['volume_size'], node_id)
 
@@ -157,20 +159,20 @@ class StorageRouterClient(object):
         storagedriver = StorageDriverList.get_by_storagedriver_id(node_id)
         if storagedriver is None:
             raise ValueError('Failed to retrieve storagedriver with ID {0}'.format(node_id))
-        StorageRouterClient._vrouter_id[self.vpool_guid][volume_id] = node_id
+        StorageRouterClient.vrouter_id[self.vpool_guid][volume_id] = node_id
         StorageRouterClient._metadata_backend_config[self.vpool_guid][volume_id] = metadata_backend_config
-        StorageRouterClient._volumes[self.vpool_guid][volume_id] = {'volume_id': volume_id,
-                                                                    'volume_size': volume_size,
-                                                                    'target_path': target_path}
+        StorageRouterClient.volumes[self.vpool_guid][volume_id] = {'volume_id': volume_id,
+                                                                   'volume_size': volume_size,
+                                                                   'target_path': target_path}
         return volume_id
 
     def _set_object_type(self, volume_id, object_type):
         """
         Sets the apparent object type
         """
-        if volume_id not in StorageRouterClient._object_type[self.vpool_guid]:
+        if volume_id not in StorageRouterClient.object_type[self.vpool_guid]:
             raise RuntimeError('Could not find volume {0}'.format(volume_id))
-        StorageRouterClient._object_type[self.vpool_guid][volume_id] = object_type
+        StorageRouterClient.object_type[self.vpool_guid][volume_id] = object_type
 
     def delete_snapshot(self, volume_id, snapshot_id):
         """
@@ -267,8 +269,8 @@ class StorageRouterClient(object):
         return type('Info', (), {'cluster_multiplier': property(lambda s: 8),
                                  'lba_size': property(lambda s: 512),
                                  'metadata_backend_config': property(lambda s: StorageRouterClient._metadata_backend_config[self.vpool_guid].get(volume_id)),
-                                 'object_type': property(lambda s: StorageRouterClient._object_type[self.vpool_guid].get(volume_id, 'BASE')),
-                                 'vrouter_id': property(lambda s: StorageRouterClient._vrouter_id[self.vpool_guid].get(volume_id))})()
+                                 'object_type': property(lambda s: StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')),
+                                 'vrouter_id': property(lambda s: StorageRouterClient.vrouter_id[self.vpool_guid].get(volume_id))})()
 
     def is_volume_synced_up_to_snapshot(self, volume_id, snapshot_id):
         """
@@ -291,7 +293,14 @@ class StorageRouterClient(object):
         """
         Return a list of volumes
         """
-        return [volume_id for volume_id in StorageRouterClient._volumes[self.vpool_guid].iterkeys()]
+        return [volume_id for volume_id in StorageRouterClient.volumes[self.vpool_guid].iterkeys()]
+
+    def make_locked_client(self, volume_id):
+        """
+        Retrieve a mocked locked client connection for the specified volume
+        """
+        _ = self
+        return LockedClient(volume_id)
 
     def set_manual_dtl_config(self, volume_id, config):
         """
@@ -389,13 +398,13 @@ class StorageRouterClient(object):
             for snap_id in copy.deepcopy(StorageRouterClient._snapshots[self.vpool_guid].get(volume_id, {})).iterkeys():
                 if snap_id != newest_snap_id:
                     StorageRouterClient._snapshots[self.vpool_guid][volume_id].pop(snap_id)
-        StorageRouterClient._object_type[self.vpool_guid][volume_id] = 'TEMPLATE'
+        StorageRouterClient.object_type[self.vpool_guid][volume_id] = 'TEMPLATE'
 
     def unlink(self, devicename):
         """
         Delete a volume
         """
-        for volume_id, volume_info in StorageRouterClient._volumes[self.vpool_guid].iteritems():
+        for volume_id, volume_info in StorageRouterClient.volumes[self.vpool_guid].iteritems():
             if volume_info['target_path'] == devicename:
                 StorageRouterClient.clean(self.vpool_guid, volume_id)
                 break
@@ -426,7 +435,7 @@ class StorageRouterClient(object):
         storagedriver = StorageDriverList.get_by_storagedriver_id(node_id)
         if storagedriver is None:
             raise ValueError('Failed to retrieve storagedriver with ID {0}'.format(node_id))
-        StorageRouterClient._vrouter_id[self.vpool_guid][volume_id] = node_id
+        StorageRouterClient.vrouter_id[self.vpool_guid][volume_id] = node_id
 
     EMPTY_INFO = empty_info
 
@@ -448,11 +457,11 @@ class ObjectRegistryClient(object):
         Retrieve all Object Registration objects for all volumes
         """
         registrations = []
-        for volume_id in StorageRouterClient._volumes[self.vpool_guid].iterkeys():
+        for volume_id in StorageRouterClient.volumes[self.vpool_guid].iterkeys():
             registrations.append(ObjectRegistration(
-                StorageRouterClient._vrouter_id[self.vpool_guid][volume_id],
+                StorageRouterClient.vrouter_id[self.vpool_guid][volume_id],
                 volume_id,
-                StorageRouterClient._object_type[self.vpool_guid].get(volume_id, 'BASE')
+                StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')
             ))
         return registrations
 
@@ -460,12 +469,12 @@ class ObjectRegistryClient(object):
         """
         Find Object Registration based on volume ID
         """
-        volumes = StorageRouterClient._volumes[self.vpool_guid]
+        volumes = StorageRouterClient.volumes[self.vpool_guid]
         if volume_id in volumes:
             return ObjectRegistration(
-                StorageRouterClient._vrouter_id[self.vpool_guid][volume_id],
+                StorageRouterClient.vrouter_id[self.vpool_guid][volume_id],
                 volume_id,
-                StorageRouterClient._object_type[self.vpool_guid].get(volume_id, 'BASE')
+                StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')
             )
         return None
 
@@ -541,13 +550,56 @@ class MDSClient(object):
         return MDSClient._roles[self.key][volume_id]
 
     @staticmethod
-    def _set_catchup(key, volume_id, tlogs):
+    def set_catchup(key, volume_id, tlogs):
         """
         Sets the fake catchup work
         """
         if key not in MDSClient._catchup:
             MDSClient._catchup[key] = {}
         MDSClient._catchup[key][volume_id] = tlogs
+
+
+class LockedClient(object):
+    """
+    The locked client class which is used in vdisk.storagedriver_client.make_locked_client
+    """
+    thread_names = []
+    scrub_recording = {}
+
+    def __init__(self, volume_id):
+        self.volume_id = volume_id
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, nspace, update_interval_secs, grace_period_secs):
+        pass
+
+    def get_scrubbing_workunits(self):
+        """
+        Retrieve the amount of scrub work to be done
+        """
+        return LockedClient.scrub_recording[self.volume_id]['scrub_work']
+
+    def scrub(self, *args, **kwargs):
+        """
+        Scrub mock
+        """
+        _ = args, kwargs
+        return len(LockedClient.scrub_recording[self.volume_id]['scrub_work'])
+
+    def apply_scrubbing_result(self, scrubbing_work_result):
+        """
+        Apply scrubbing result
+        """
+        time.sleep(0.05 * scrubbing_work_result)
+        thread_name = threading.current_thread().getName()
+        assert thread_name in LockedClient.scrub_recording[self.volume_id]['possible_threads']
+        if thread_name in LockedClient.thread_names:
+            LockedClient.thread_names.remove(thread_name)
+        if LockedClient.scrub_recording[self.volume_id]['success'] is False:
+            raise Exception('Raising exception while scrubbing')
+        LockedClient.scrub_recording[self.volume_id]['scrub_work'] = []
 
 
 class Snapshot(object):

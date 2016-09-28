@@ -22,8 +22,7 @@ import time
 from subprocess import check_output, CalledProcessError
 from ovs.log.log_handler import LogHandler
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
-    from ovs.extensions.services.tests.upstart import MockUpstart as Upstart
-    from ovs.extensions.services.tests.systemd import MockSystemd as Systemd
+    from ovs.extensions.services.tests.upstart import Upstart
 else:
     from ovs.extensions.services.upstart import Upstart
     from ovs.extensions.services.systemd import Systemd
@@ -47,26 +46,29 @@ class ServiceManager(object):
             """
             _ = cls
             if ServiceManager.ImplementationClass is None:
-                try:
-                    init_info = check_output('cat /proc/1/comm', shell=True)
-                    # All service classes used in below code should share the exact same interface!
-                    if 'init' in init_info:
-                        version_info = check_output('init --version', shell=True)
-                        if 'upstart' in version_info:
-                            ServiceManager.ImplementationClass = Upstart
+                if os.environ.get('RUNNING_UNITTESTS') == 'True':
+                    ServiceManager.ImplementationClass = Upstart
+                else:
+                    try:
+                        init_info = check_output('cat /proc/1/comm', shell=True)
+                        # All service classes used in below code should share the exact same interface!
+                        if 'init' in init_info:
+                            version_info = check_output('init --version', shell=True)
+                            if 'upstart' in version_info:
+                                ServiceManager.ImplementationClass = Upstart
+                            else:
+                                raise RuntimeError('The ServiceManager is unrecognizable')
+                        elif 'systemd' in init_info:
+                            ServiceManager.ImplementationClass = Systemd
+                            if ServiceManager.has_fleet_client() is True and ServiceManager.has_fleet() and \
+                                    ServiceManager._is_fleet_running_and_usable():
+                                from ovs.extensions.services.fleetctl import FleetCtl
+                                ServiceManager.ImplementationClass = FleetCtl
                         else:
-                            raise RuntimeError('The ServiceManager is unrecognizable')
-                    elif 'systemd' in init_info:
-                        ServiceManager.ImplementationClass = Systemd
-                        if ServiceManager.has_fleet_client() is True and ServiceManager.has_fleet() and \
-                                ServiceManager._is_fleet_running_and_usable():
-                            from ovs.extensions.services.fleetctl import FleetCtl
-                            ServiceManager.ImplementationClass = FleetCtl
-                    else:
-                        raise RuntimeError('There was no known ServiceManager detected')
-                except Exception as ex:
-                    ServiceManager._logger.exception('Error loading ServiceManager: {0}'.format(ex))
-                    raise
+                            raise RuntimeError('There was no known ServiceManager detected')
+                    except Exception as ex:
+                        ServiceManager._logger.exception('Error loading ServiceManager: {0}'.format(ex))
+                        raise
             return getattr(ServiceManager.ImplementationClass, item)
 
     __metaclass__ = MetaClass

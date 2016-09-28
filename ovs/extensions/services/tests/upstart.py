@@ -19,7 +19,7 @@ Upstart Mock module
 """
 
 
-class MockUpstart(object):
+class Upstart(object):
     """
     Contains all logic related to Upstart Mock services
     """
@@ -30,24 +30,26 @@ class MockUpstart(object):
         """
         Clean up mocked Class
         """
-        MockUpstart.services = {}
+        Upstart.services = {}
 
     @staticmethod
     def add_service(name, client, params=None, target_name=None, additional_dependencies=None):
         """
         Adds a mocked service
         """
-        _ = client, params, target_name, additional_dependencies
-        MockUpstart.services[name] = 'HALTED'
+        _ = params, additional_dependencies
+        key = 'None' if client is None else client.ip
+        name = name if target_name is None else target_name
+        Upstart.services[key] = {name: 'HALTED'}
 
     @staticmethod
     def get_service_status(name, client):
         """
         Retrieve the mocked service status
         """
-        _ = client
-        output = 'active' if name in MockUpstart.services else 'inactive'
-        status = MockUpstart.services.get(name, 'HALTED') == 'RUNNING'
+        key = 'None' if client is None else client.ip
+        output = 'active' if name in Upstart.services[key] else 'inactive'
+        status = Upstart.services[key].get(name, 'HALTED') == 'RUNNING'
         return status, output
 
     @staticmethod
@@ -55,9 +57,9 @@ class MockUpstart(object):
         """
         Remove a mocked service
         """
-        _ = client
-        if name in MockUpstart.services:
-            MockUpstart.services.pop(name)
+        key = 'None' if client is None else client.ip
+        if name in Upstart.services[key]:
+            Upstart.services[key].pop(name)
 
     @staticmethod
     def disable_service(name, client):
@@ -78,10 +80,11 @@ class MockUpstart(object):
         """
         Start a mocked service
         """
-        if name not in MockUpstart.services:
+        key = 'None' if client is None else client.ip
+        if name not in Upstart.services[key]:
             raise RuntimeError('Service {0} does not exist'.format(name))
-        MockUpstart.services[name] = 'RUNNING'
-        status, output = MockUpstart.get_service_status(name, client)
+        Upstart.services[key][name] = 'RUNNING'
+        status, output = Upstart.get_service_status(name, client)
         if status is True:
             return output
         raise RuntimeError('Start {0} failed. {1}'.format(name, output))
@@ -91,11 +94,12 @@ class MockUpstart(object):
         """
         Stop a mocked service
         """
-        if name not in MockUpstart.services:
+        key = 'None' if client is None else client.ip
+        if name not in Upstart.services[key]:
             raise RuntimeError('Service {0} does not exist'.format(name))
-        MockUpstart.services[name] = 'HALTED'
-        status, output = MockUpstart.get_service_status(name, client)
-        if status is True:
+        Upstart.services[key][name] = 'HALTED'
+        status, output = Upstart.get_service_status(name, client)
+        if status is False:
             return output
         raise RuntimeError('Stop {0} failed. {1}'.format(name, output))
 
@@ -104,16 +108,16 @@ class MockUpstart(object):
         """
         Restart a mocked service
         """
-        MockUpstart.stop_service(name, client)
-        return MockUpstart.start_service(name, client)
+        Upstart.stop_service(name, client)
+        return Upstart.start_service(name, client)
 
     @staticmethod
     def has_service(name, client):
         """
         Verify whether a mocked service exists
         """
-        _ = client
-        return name in MockUpstart.services
+        key = 'None' if client is None else client.ip
+        return name in Upstart.services.get(key, {})
 
     @staticmethod
     def is_enabled(name, client):
@@ -128,8 +132,9 @@ class MockUpstart(object):
         """
         Verify whether a mocked service exists
         """
-        _ = client, path
-        return name in MockUpstart.services
+        _ = path
+        key = 'None' if client is None else client.ip
+        return name in Upstart.services[key]
 
     @staticmethod
     def _get_name(name, client, path=None):

@@ -26,8 +26,11 @@ from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.vdisklist import VDiskList
-from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic import fakesleep
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.tests.upstart import Upstart
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
@@ -49,6 +52,7 @@ class VDiskTest(unittest.TestCase):
         cls.persistent.clean()
         cls.volatile = VolatileFactory.get_client()
         cls.volatile.clean()
+        Upstart.clean()
         StorageRouterClient.clean()
 
         fakesleep.monkey_patch()
@@ -63,6 +67,7 @@ class VDiskTest(unittest.TestCase):
         # Cleaning storage
         self.volatile.clean()
         self.persistent.clean()
+        Upstart.clean()
         StorageRouterClient.clean()
 
     @classmethod
@@ -79,6 +84,20 @@ class VDiskTest(unittest.TestCase):
         # Cleaning storage
         self.volatile.clean()
         self.persistent.clean()
+        Upstart.clean()
+
+    @staticmethod
+    def _roll_out_dtl_services(vpool, storagerouters):
+        """
+        Deploy and start the DTL service on all storagerouters
+        :param storagerouters: StorageRouters to deploy and start a DTL service on
+        :return: None
+        """
+        service_name = 'dtl_{0}'.format(vpool.name)
+        for sr in storagerouters.values():
+            client = SSHClient(sr, 'root')
+            ServiceManager.add_service(name=service_name, client=client)
+            ServiceManager.start_service(name=service_name, client=client)
 
     def test_create_new(self):
         """
@@ -165,9 +184,11 @@ class VDiskTest(unittest.TestCase):
              'storagedrivers': [(1, 1, 1), (2, 1, 2)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2)]}  # (<id>, <storagedriver_id>)
         )
+        vpool = structure['vpools'][1]
         mds_services = structure['mds_services']
         storagedrivers = structure['storagedrivers']
         storagerouters = structure['storagerouters']
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
 
         template = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 3, storagedriver_guid=storagedrivers[1].guid))
         vdisk_name = 'from_template_1'
@@ -308,6 +329,8 @@ class VDiskTest(unittest.TestCase):
         service_type = structure['service_type']
         storagedrivers = structure['storagedrivers']
         storagerouters = structure['storagerouters']
+        self._roll_out_dtl_services(vpool=vpools[1], storagerouters=storagerouters)
+        self._roll_out_dtl_services(vpool=vpools[2], storagerouters=storagerouters)
 
         # Basic clone scenario
         vdisk1 = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 3, storagedriver_guid=storagedrivers[1].guid))
@@ -636,7 +659,10 @@ class VDiskTest(unittest.TestCase):
              'storagedrivers': [(1, 1, 1), (2, 1, 2)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2)]}  # (<id>, <storagedriver_id>)
         )
+        vpool = structure['vpools'][1]
         storagedrivers = structure['storagedrivers']
+        storagerouters = structure['storagerouters']
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
 
         vdisk = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 4, storagedriver_guid=storagedrivers[1].guid))
         vdisk.storagedriver_client.migrate(vdisk.volume_id, storagedrivers[2].storagedriver_id, False)

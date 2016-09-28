@@ -287,11 +287,12 @@ class ScheduledTaskController(object):
                 # Empty the queue with vDisks to scrub
                 with remote(storagerouter.ip, [VDisk]) as rem:
                     while True:
+                        vdisk = None
                         vdisk_guid = queue.get(False)
-                        vdisk = rem.VDisk(vdisk_guid)
-                        ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Started scrubbing at location {3}'.format(vpool.name, storagerouter.name, vdisk.name, scrub_directory))
                         try:
                             # Check MDS master is local. Trigger MDS handover if necessary
+                            vdisk = rem.VDisk(vdisk_guid)
+                            ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Started scrubbing at location {3}'.format(vpool.name, storagerouter.name, vdisk.name, scrub_directory))
                             configs = _verify_mds_config(current_vdisk=vdisk)
                             storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
                             if configs[0].get('ip') != storagedriver.storagerouter.ip:
@@ -317,7 +318,10 @@ class ScheduledTaskController(object):
                                 else:
                                     ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - No scrubbing required'.format(vpool.name, storagerouter.name, vdisk.name))
                         except Exception:
-                            message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Scrubbing failed'.format(vpool.name, storagerouter.name, vdisk.name)
+                            if vdisk is None:
+                                message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk with guid {2} could not be found'.format(vpool.name, storagerouter.name, vdisk_guid)
+                            else:
+                                message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Scrubbing failed'.format(vpool.name, storagerouter.name, vdisk.name)
                             error_messages.append(message)
                             ScheduledTaskController._logger.exception(message)
 
@@ -396,7 +400,10 @@ class ScheduledTaskController(object):
             threads_to_spawn = min(max_threads_per_vpool, len(scrub_locations))
             ScheduledTaskController._logger.info('Scrubber - vPool {0} - Spawning {1} threads'.format(vp.name, threads_to_spawn))
             for _ in range(threads_to_spawn):
-                thread = Thread(target=_execute_scrub_work, args=(vpool_queue, vp, scrub_locations[counter % len(scrub_locations)]))
+                scrub_target = scrub_locations[counter % len(scrub_locations)]
+                thread = Thread(target=_execute_scrub_work,
+                                name='scrub_{0}_{1}'.format(vp.guid, scrub_target['storage_router'].guid),
+                                args=(vpool_queue, vp, scrub_target))
                 thread.start()
                 threads.append(thread)
                 counter += 1
