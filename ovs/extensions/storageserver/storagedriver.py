@@ -145,7 +145,7 @@ class StorageDriverClient(object):
         Initializes the wrapper for a given vpool
         :param vpool: vPool for which the StorageRouterClient needs to be loaded
         :type vpool: vPool
-        :param excluded_storagedrivers: A list of straogedrivers that cannot be used as a client
+        :param excluded_storagedrivers: A list of storagedrivers that cannot be used as a client
         :type excluded_storagedrivers: list or None
         """
         if excluded_storagedrivers is None:
