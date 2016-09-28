@@ -52,13 +52,11 @@ class StorageDriverController(object):
         Marks all StorageDrivers on this StorageRouter offline
         :param storagerouter_guid: Guid of the Storage Router
         :type storagerouter_guid: str
-
-        :return: None
         """
-        storagedrivers = StorageRouter(storagerouter_guid).storagedrivers
-        if len(storagedrivers) > 0:
-            storagedriver_client = StorageDriverClient.load(storagedrivers[0].vpool)
-            for storagedriver in storagedrivers:
+        for storagedriver in StorageRouter(storagerouter_guid).storagedrivers:
+            vpool = storagedriver.vpool
+            if len(vpool.storagedrivers) > 1:
+                storagedriver_client = StorageDriverClient.load(vpool, excluded_storagedrivers=[storagedriver])
                 storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
 
     @staticmethod
