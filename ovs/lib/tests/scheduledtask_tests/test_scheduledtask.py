@@ -96,7 +96,7 @@ class ScheduledTaskTest(unittest.TestCase):
         for vdisk_id in sorted(vdisks):
             vdisk = vdisks[vdisk_id]
             success = vdisk_id % 2 == 0
-            LockedClient.scrub_recording[vdisk.volume_id] = {'success': vdisk_id % 2 == 0,
+            LockedClient.scrub_recording[vdisk.volume_id] = {'success': success,
                                                              'scrub_work': range(vdisk_id),
                                                              'possible_threads': ['scrub_{0}_{1}'.format(vpool.guid, storagerouter.guid)]}
             if success is True:
@@ -119,7 +119,7 @@ class ScheduledTaskTest(unittest.TestCase):
             with vdisk.storagedriver_client.make_locked_client(vdisk.volume_id) as locked_client:
                 self.assertEqual(first=len(locked_client.get_scrubbing_workunits()),
                                  second=int(vdisk.name),
-                                 msg='Scrubbed vDisk {0} does still have scrubbing work left'.format(vdisk.name))
+                                 msg='Scrubbed vDisk {0} does not have the expected amount of scrubbing items: {1}'.format(vdisk.name, int(vdisk.name)))
 
         # Execute scrubbing again
         for vdisk_id in sorted(vdisks):
