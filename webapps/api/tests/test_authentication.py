@@ -147,10 +147,10 @@ class Authentication(unittest.TestCase):
         storagerouter = StorageRouter()
         storagerouter.machine_id = 'storagerouter'
         storagerouter.ip = '127.0.0.1'
+        storagerouter.machine_id = '1'
         storagerouter.rdma_capable = False
         storagerouter.name = 'storagerouter'
         storagerouter.save()
-        System._storagerouter = storagerouter
 
         os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
         from django.test import RequestFactory
@@ -159,8 +159,10 @@ class Authentication(unittest.TestCase):
         fakesleep.monkey_patch()
 
         Configuration.set('/ovs/framework/plugins/installed', {'generic': [],
-                                                                   'backends': []})
+                                                               'backends': []})
         Configuration.set('/ovs/framework/cluster_id', 'cluster_id')
+
+        System._machine_id = {'none': '1'}
 
     @classmethod
     def tearDownClass(cls):

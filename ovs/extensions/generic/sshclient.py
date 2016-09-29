@@ -353,6 +353,9 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
         :param recursive: Chown the directories recursively or not
         :return: None
         """
+        if self._unittest_mode is True:
+            return
+
         all_users = [user_info[0] for user_info in pwd.getpwall()]
         all_groups = [group_info[0] for group_info in grp.getgrall()]
 
@@ -563,6 +566,9 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
         :param group: Group to set
         :return: None
         """
+        if self._unittest_mode is True:
+            return
+
         all_users = [user_info[0] for user_info in pwd.getpwall()]
         all_groups = [group_info[0] for group_info in grp.getgrall()]
 
