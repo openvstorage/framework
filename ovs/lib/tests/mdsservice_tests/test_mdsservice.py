@@ -1285,8 +1285,7 @@ class MDSServices(unittest.TestCase):
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
         Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
         Configuration.set('/ovs/framework/storagedriver|mds_maxload', 70)
-        Configuration.set('/ovs/framework/hosts/unittest/ports', {'mds': [10000, 10100]})
-        System._machine_id = 'unittest'
+        Configuration.set('/ovs/framework/hosts/1/ports', {'mds': [10000, 10100]})
 
         structure = Helper.build_service_structure(
             {'vpools': [1],
@@ -1296,6 +1295,9 @@ class MDSServices(unittest.TestCase):
         )
         mds_service = structure['mds_services'][1]
         vpool = structure['vpools'][1]
+        storagerouter = structure['storagerouters'][1]
+
+        System._machine_id = {storagerouter.ip: '1'}
 
         mds_service.capacity = 10
         mds_service.save()

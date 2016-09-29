@@ -21,6 +21,7 @@ import json
 import unittest
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.threadhelpers import Waiter
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.tests.mockups import LockedClient, StorageRouterClient
@@ -73,8 +74,8 @@ class ScheduledTaskTest(unittest.TestCase):
                           We limit max amount of threads spawned per vPool to 2 in case 3 to 5 vPools are present
         """
         _ = self
-        System._machine_id = 'unittest'
-        Configuration.set('/ovs/framework/hosts/unittest/ports', {'storagedriver': [10000, 10100]})
+        for i in xrange(1, 6):
+            Configuration.set('/ovs/framework/hosts/{0}/ports'.format(i), {'storagedriver': [10000, 10100]})
 
         ##############
         # Scenario 1 #
@@ -90,15 +91,18 @@ class ScheduledTaskTest(unittest.TestCase):
         vpool = structure['vpools'][1]
         vdisks = structure['vdisks']
         storagerouter = structure['storagerouters'][1]
+        System._machine_id = {storagerouter.ip: '1'}
         Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
+        LockedClient.scrub_controller = {'possible_threads': ['scrub_{0}_{1}'.format(vpool.guid, storagerouter.guid)],
+                                         'volumes': {},
+                                         'waiter': Waiter(1)}
         failed_vdisks = []
         successful_vdisks = []
         for vdisk_id in sorted(vdisks):
             vdisk = vdisks[vdisk_id]
             success = vdisk_id % 2 == 0
-            LockedClient.scrub_recording[vdisk.volume_id] = {'success': success,
-                                                             'scrub_work': range(vdisk_id),
-                                                             'possible_threads': ['scrub_{0}_{1}'.format(vpool.guid, storagerouter.guid)]}
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': success,
+                                                                         'scrub_work': range(vdisk_id)}
             if success is True:
                 successful_vdisks.append(vdisk)
             else:
@@ -124,7 +128,7 @@ class ScheduledTaskTest(unittest.TestCase):
         # Execute scrubbing again
         for vdisk_id in sorted(vdisks):
             vdisk = vdisks[vdisk_id]
-            LockedClient.scrub_recording[vdisk.volume_id]['success'] = True
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id]['success'] = True
         ScheduledTaskController.execute_scrub()
         for vdisk in vdisks.values():
             with vdisk.storagedriver_client.make_locked_client(vdisk.volume_id) as locked_client:
@@ -148,15 +152,18 @@ class ScheduledTaskTest(unittest.TestCase):
         vpool = structure['vpools'][1]
         vdisks = structure['vdisks']
         storagerouters = structure['storagerouters']
+        System._machine_id = dict((sr.ip, sr.machine_id) for sr in storagerouters.values())
         Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
 
         thread_names = ['scrub_{0}_{1}'.format(vpool.guid, storagerouter.guid) for storagerouter in storagerouters.values()]
-        LockedClient.thread_names = thread_names
+        LockedClient.scrub_controller = {'possible_threads': thread_names,
+                                         'volumes': {},
+                                         'waiter': Waiter(len(thread_names))}
+        LockedClient.thread_names = thread_names[:]
         for vdisk_id in sorted(vdisks):
             vdisk = vdisks[vdisk_id]
-            LockedClient.scrub_recording[vdisk.volume_id] = {'success': True,
-                                                             'scrub_work': range(vdisk_id),
-                                                             'possible_threads': list(thread_names)}
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
+                                                                         'scrub_work': range(vdisk_id)}
         ScheduledTaskController.execute_scrub()
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=0,
@@ -184,12 +191,14 @@ class ScheduledTaskTest(unittest.TestCase):
             Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({}, indent=4), raw=True)
             for storagerouter in storagerouters.values():
                 thread_names.append('scrub_{0}_{1}'.format(vpool.guid, storagerouter.guid))
-        LockedClient.thread_names = thread_names
+        LockedClient.scrub_controller = {'possible_threads': thread_names,
+                                         'volumes': {},
+                                         'waiter': Waiter(len(thread_names) - 9)}
+        LockedClient.thread_names = thread_names[:]
         for vdisk_id in sorted(vdisks):
             vdisk = vdisks[vdisk_id]
-            LockedClient.scrub_recording[vdisk.volume_id] = {'success': True,
-                                                             'scrub_work': range(vdisk_id),
-                                                             'possible_threads': list(thread_names)}
+            LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
+                                                                         'scrub_work': range(vdisk_id)}
         ScheduledTaskController.execute_scrub()
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=9,  # 5 srs * 3 vps = 15 threads, but only 2 will be spawned per vPool --> 15 - 6 = 9 left

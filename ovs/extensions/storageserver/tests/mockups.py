@@ -564,7 +564,7 @@ class LockedClient(object):
     The locked client class which is used in vdisk.storagedriver_client.make_locked_client
     """
     thread_names = []
-    scrub_recording = {}
+    scrub_controller = {}
 
     def __init__(self, volume_id):
         self.volume_id = volume_id
@@ -579,27 +579,28 @@ class LockedClient(object):
         """
         Retrieve the amount of scrub work to be done
         """
-        return LockedClient.scrub_recording[self.volume_id]['scrub_work']
+        return LockedClient.scrub_controller['volumes'][self.volume_id]['scrub_work']
 
     def scrub(self, *args, **kwargs):
         """
         Scrub mock
         """
         _ = args, kwargs
-        return len(LockedClient.scrub_recording[self.volume_id]['scrub_work'])
+        return len(LockedClient.scrub_controller['volumes'][self.volume_id]['scrub_work'])
 
     def apply_scrubbing_result(self, scrubbing_work_result):
         """
         Apply scrubbing result
         """
-        time.sleep(0.05 * scrubbing_work_result)
+        _ = scrubbing_work_result
+        LockedClient.scrub_controller['waiter'].wait()
         thread_name = threading.current_thread().getName()
-        assert thread_name in LockedClient.scrub_recording[self.volume_id]['possible_threads']
+        assert thread_name in LockedClient.scrub_controller['possible_threads']
         if thread_name in LockedClient.thread_names:
             LockedClient.thread_names.remove(thread_name)
-        if LockedClient.scrub_recording[self.volume_id]['success'] is False:
+        if LockedClient.scrub_controller['volumes'][self.volume_id]['success'] is False:
             raise Exception('Raising exception while scrubbing')
-        LockedClient.scrub_recording[self.volume_id]['scrub_work'] = []
+        LockedClient.scrub_controller['volumes'][self.volume_id]['scrub_work'] = []
 
 
 class Snapshot(object):
