@@ -79,7 +79,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <label class="col-lg-4 control-label" for="readCacheSize" data-i18n="ovs:wizards.add_vpool.gather_config.readcache_size"></label>
             <div class="col-lg-2">
                 <input type="text" id="readCacheSize" class="autofocus form-control" style="text-align: center; width: 110px;"
-                       data-bind="value: controledReadCacheSize, valueUpdate: 'afterkeydown'" />
+                       data-bind="value: controlledReadCacheSize, valueUpdate: 'afterkeydown'" />
             </div>
             <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.gib"></label>
         </div>
@@ -87,7 +87,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <label class="col-lg-4 control-label" for="writeCacheSize" data-i18n="ovs:wizards.add_vpool.gather_config.global_write_buffer"></label>
             <div class="col-lg-2">
                 <input type="text" id="writeCacheSize" class="autofocus form-control" style="text-align: center; width: 110px;"
-                       data-bind="value: controledWriteCacheSize, valueUpdate: 'afterkeydown'" />
+                       data-bind="value: controlledWriteCacheSize, valueUpdate: 'afterkeydown'" />
             </div>
             <label class="col-lg-1 control-label" data-i18n="ovs:generic.units.gib"></label>
         </div>
@@ -167,20 +167,25 @@ but WITHOUT ANY WARRANTY of any kind.
         <div data-i18n="ovs:wizards.add_vpool.gather_config.dedupe_information" data-bind="visible: data.dedupeMode() === 'dedupe'" style="margin-bottom: 10px;"></div>
         <div data-i18n="ovs:wizards.add_vpool.gather_config.information"></div>
         <ul>
-            <li data-bind="visible: correctedReadCacheAvailableSize() !== undefined && data.cacheStrategy() !== 'none'">
+            <li data-bind="visible: data.readCacheAvailableSize() !== undefined && data.cacheStrategy() !== 'none' && Math.floor(data.readCacheAvailableSize() / 1024 / 1024 / 1024) > 0">
                 <span data-i18n="ovs:wizards.add_vpool.gather_config.readcache_size_available"></span>
-                <span data-bind="text: Math.floor(correctedReadCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
+                <span data-bind="text: Math.floor(data.readCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>
             </li>
-            <li data-bind="visible: correctedWriteCacheAvailableSize() !== undefined">
+            <li data-bind="visible: data.writeCacheAvailableSize() !== undefined && Math.floor(data.writeCacheAvailableSize() / 1024 / 1024 / 1024) > 0">
                 <span data-i18n="ovs:wizards.add_vpool.gather_config.global_write_buffer_available"></span>
-                <span data-bind="text: Math.floor(correctedWriteCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
+                <span data-bind="text: Math.floor(data.writeCacheAvailableSize() / 1024 / 1024 / 1024)"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>
             </li>
-            <li data-bind="visible: correctedSharedSize() !== undefined">
+            <li data-bind="visible: data.sharedSize() !== undefined && Math.floor(data.sharedSize() / 1024 / 1024 / 1024) > 0">
                 <span data-i18n="ovs:wizards.add_vpool.gather_config.shared_available"></span>
-                <span data-bind="text: Math.floor(correctedSharedSize() / 1024 / 1024 / 1024)"></span>
+                <span data-bind="text: Math.floor(data.sharedSize() / 1024 / 1024 / 1024)"></span>
                 <span data-i18n="ovs:generic.units.gib"></span>
+            </li>
+            <li data-bind="visible: Math.floor(data.sharedSize() / 1024 / 1024 / 1024) === 0 &&
+                                    Math.floor(data.readCacheAvailableSize() / 1024 / 1024 / 1024) === 0 &&
+                                    Math.floor(data.writeCacheAvailableSize() / 1024 / 1024 / 1024) === 0">
+                <span data-i18n="ovs:wizards.add_vpool.gather_config.no_space_left"></span>
             </li>
         </ul>
     </div>
