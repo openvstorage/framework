@@ -24,7 +24,9 @@ from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.tests.upstart import Upstart
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
@@ -48,6 +50,7 @@ class DTLCheckup(unittest.TestCase):
 
         cls.volatile = VolatileFactory.get_client()
         cls.volatile.clean()
+        Upstart.clean()
         ServiceManager.clean()
         StorageRouterClient.clean()
 
@@ -58,6 +61,7 @@ class DTLCheckup(unittest.TestCase):
         # Cleaning storage
         self.volatile.clean()
         self.persistent.clean()
+        Upstart.clean()
         ServiceManager.clean()
         StorageRouterClient.clean()
 
@@ -68,6 +72,7 @@ class DTLCheckup(unittest.TestCase):
         # Cleaning storage
         self.volatile.clean()
         self.persistent.clean()
+        Upstart.clean()
         ServiceManager.clean()
         StorageRouterClient.clean()
 
@@ -105,6 +110,19 @@ class DTLCheckup(unittest.TestCase):
                                  msg=msg.format(key.capitalize(), actual_value, value))
         return config
 
+    @staticmethod
+    def _roll_out_dtl_services(vpool, storagerouters):
+        """
+        Deploy and start the DTL service on all storagerouters
+        :param storagerouters: StorageRouters to deploy and start a DTL service on
+        :return: None
+        """
+        service_name = 'dtl_{0}'.format(vpool.name)
+        for sr in storagerouters.values():
+            client = SSHClient(sr, 'root')
+            ServiceManager.add_service(name=service_name, client=client)
+            ServiceManager.start_service(name=service_name, client=client)
+
     def test_single_node(self):
         """
         Execute some DTL checkups on a single node installation
@@ -112,7 +130,8 @@ class DTLCheckup(unittest.TestCase):
         # Create 1 vdisk in single node without domains
         structure = Helper.build_service_structure(
             {'vpools': [1],
-             'vdisks': [(1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>)
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <sr_id>)
         )
@@ -121,9 +140,7 @@ class DTLCheckup(unittest.TestCase):
         storagerouter = structure['storagerouters'][1]
         # || StorageRouter || vDisk | Regular Domain || Recovery Domain ||     DTL Target    ||
         #  |       1        |   1   |                 |                  |                    |
-        service_name = 'dtl_{0}'.format(vpool.name)
-        ServiceManager.add_service(name=service_name, client=None)
-        ServiceManager.start_service(name=service_name, client=None)
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=structure['storagerouters'])
         self._run_and_validate_dtl_checkup(vdisk=vdisk,
                                            validations=[{'key': 'config', 'value': None}])
 
@@ -177,7 +194,8 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 5      |       |                 |                  |      1      |
         structure = Helper.build_service_structure(
             {'vpools': [1],
-             'vdisks': [(1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>)
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
              'storagerouters': [1, 2, 3, 4, 5],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4), (5, 1, 5)]}  # (<id>, <vpool_id>, <sr_id>)
         )
@@ -185,9 +203,7 @@ class DTLCheckup(unittest.TestCase):
         vdisk = structure['vdisks'][1]
         storagerouters = structure['storagerouters']
 
-        service_name = 'dtl_{0}'.format(vpool.name)
-        ServiceManager.add_service(name=service_name, client=None)
-        ServiceManager.start_service(name=service_name, client=None)
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
         self._run_and_validate_dtl_checkup(vdisk=vdisk,
                                            validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()[1:]]},
                                                         {'key': 'port', 'value': 3},
@@ -205,7 +221,8 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 5      |       |                 |                  |      1      |
         structure = Helper.build_service_structure(
             {'vpools': [1],
-             'vdisks': [(1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>)
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
              'domains': [1, 2, 3],
              'storagerouters': [1, 2, 3, 4, 5],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4), (5, 1, 5)]}  # (<id>, <vpool_id>, <sr_id>)
@@ -214,9 +231,7 @@ class DTLCheckup(unittest.TestCase):
         vdisk = structure['vdisks'][1]
         storagerouters = structure['storagerouters']
 
-        service_name = 'dtl_{0}'.format(vpool.name)
-        ServiceManager.add_service(name=service_name, client=None)
-        ServiceManager.start_service(name=service_name, client=None)
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
         self._run_and_validate_dtl_checkup(vdisk=vdisk,
                                            validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()[1:]]},
                                                         {'key': 'port', 'value': 3},
@@ -234,8 +249,9 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 5      |       |                 |                  |             |
         structure = Helper.build_service_structure(
             {'vpools': [1],
-             'vdisks': [(1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>)
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'domains': [1, 2, 3],
+             'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
              'storagerouters': [1, 2, 3, 4, 5],
              'storagerouter_domains': [(1, 1, 1, False)],  # (<sr_domain_id>, <sr_id>, <domain_id>, <backup>)
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4), (5, 1, 5)]}  # (<id>, <vpool_id>, <sr_id>)
@@ -245,11 +261,8 @@ class DTLCheckup(unittest.TestCase):
         domain = structure['domains'][1]
         storagerouter = structure['storagerouters'][1]
 
-        service_name = 'dtl_{0}'.format(vpool.name)
-        ServiceManager.add_service(name=service_name, client=None)
-        ServiceManager.start_service(name=service_name, client=None)
-
         # When domains have been attached to the StorageRouter on which the vDisk resides, but no other Storage Routers have same Domain --> Stand Alone
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=structure['storagerouters'])
         self._run_and_validate_dtl_checkup(vdisk=vdisk,
                                            validations=[{'key': 'config', 'value': None}])
 
@@ -283,8 +296,9 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 5      |       |                 |                  |             |
         structure = Helper.build_service_structure(
             {'vpools': [1],
-             'vdisks': [(1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>)
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'domains': [1, 2, 3],
+             'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
              'storagerouters': [1, 2, 3, 4, 5],
              'storagerouter_domains': [(1, 1, 1, False), (2, 2, 1, False)],  # (<sr_domain_id>, <sr_id>, <domain_id>, <backup>)
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4), (5, 1, 5)]}  # (<id>, <vpool_id>, <sr_id>)
@@ -294,9 +308,7 @@ class DTLCheckup(unittest.TestCase):
         domains = structure['domains']
         storagerouters = structure['storagerouters']
 
-        service_name = 'dtl_{0}'.format(vpool.name)
-        ServiceManager.add_service(name=service_name, client=None)
-        ServiceManager.start_service(name=service_name, client=None)
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
         self._run_and_validate_dtl_checkup(vdisk=vdisk,
                                            validations=[{'key': 'host', 'value': storagerouters[2].storagedrivers[0].storage_ip},
                                                         {'key': 'port', 'value': 3},
@@ -368,8 +380,9 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 5      |       |                 |                  |             |
         structure = Helper.build_service_structure(
             {'vpools': [1],
-             'vdisks': [(1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>)
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'domains': [1, 2, 3],
+             'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
              'storagerouters': [1, 2, 3, 4, 5],
              'storagerouter_domains': [(1, 1, 1, True)],  # (<sr_domain_id>, <sr_id>, <domain_id>, <backup>)
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4), (5, 1, 5)]}  # (<id>, <vpool_id>, <sr_id>)
@@ -379,9 +392,7 @@ class DTLCheckup(unittest.TestCase):
         domains = structure['domains']
         storagerouters = structure['storagerouters']
 
-        service_name = 'dtl_{0}'.format(vpool.name)
-        ServiceManager.add_service(name=service_name, client=None)
-        ServiceManager.start_service(name=service_name, client=None)
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
         self._run_and_validate_dtl_checkup(vdisk=vdisk,
                                            validations=[{'key': 'config', 'value': None}])
 
@@ -462,8 +473,9 @@ class DTLCheckup(unittest.TestCase):
         """
         structure = Helper.build_service_structure(
             {'vpools': [1],
-             'vdisks': [(1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>)
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'domains': [1],
+             'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
              'storagerouters': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
              'storagerouter_domains': [(1, 1, 1, True), (2, 2, 1, False), (3, 3, 1, False), (4, 4, 1, False),
                                        (5, 5, 1, False), (6, 6, 1, False), (7, 7, 1, False), (8, 8, 1, False),
@@ -475,9 +487,7 @@ class DTLCheckup(unittest.TestCase):
         vdisk = structure['vdisks'][1]
         storagerouters = structure['storagerouters']
 
-        service_name = 'dtl_{0}'.format(vpool.name)
-        ServiceManager.add_service(name=service_name, client=None)
-        ServiceManager.start_service(name=service_name, client=None)
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
         config = self._run_and_validate_dtl_checkup(vdisk=vdisk,
                                                     validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()[1:]]},
                                                                  {'key': 'port', 'value': 3},
@@ -501,8 +511,9 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 5      |       |                 |                  |             |
         structure = Helper.build_service_structure(
             {'vpools': [1],
-             'vdisks': [(1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>)
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
              'domains': [1, 2],
+             'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
              'storagerouters': [1, 2, 3, 4, 5],
              'storagerouter_domains': [(1, 1, 1, True), (2, 2, 1, False), (3, 3, 1, False), (4, 4, 2, False)],  # (<sr_domain_id>, <sr_id>, <domain_id>, <backup>)
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4), (5, 1, 5)]}  # (<id>, <vpool_id>, <sr_id>)
@@ -512,9 +523,7 @@ class DTLCheckup(unittest.TestCase):
         domains = structure['domains']
         storagerouters = structure['storagerouters']
 
-        service_name = 'dtl_{0}'.format(vpool.name)
-        ServiceManager.add_service(name=service_name, client=None)
-        ServiceManager.start_service(name=service_name, client=None)
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
         self._run_and_validate_dtl_checkup(vdisk=vdisk,
                                            validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()[1:3]]},
                                                         {'key': 'port', 'value': 3},
@@ -570,7 +579,8 @@ class DTLCheckup(unittest.TestCase):
         #  |      sr 1      |   1   |                 |                  |             |
         structure = Helper.build_service_structure(
             {'vpools': [1],
-             'vdisks': [(1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>)
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)]}  # (<id>, <vpool_id>, <sr_id>)
         )
@@ -578,9 +588,7 @@ class DTLCheckup(unittest.TestCase):
         vdisk = structure['vdisks'][1]
         storagerouters = structure['storagerouters']
 
-        service_name = 'dtl_{0}'.format(vpool.name)
-        ServiceManager.add_service(name=service_name, client=None)
-        ServiceManager.start_service(name=service_name, client=None)
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
         self._run_and_validate_dtl_checkup(vdisk=vdisk,
                                            validations=[{'key': 'config', 'value': None}])
 
@@ -594,6 +602,7 @@ class DTLCheckup(unittest.TestCase):
         storagerouter.rdma_capable = False
         storagerouter.save()
         storagerouters[2] = storagerouter
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
 
         storagedriver = StorageDriver()
         storagedriver.vpool = vpool

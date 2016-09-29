@@ -307,7 +307,6 @@ class MDSServices(unittest.TestCase):
              'storagerouter_domains': [(1, 1, 1, False), (2, 2, 1, False), (3, 3, 1, False), (4, 4, 1, False)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
         storagedrivers = structure['storagedrivers']
-        vpools = structure['vpools']
         mds_services = structure['mds_services']
 
         vdisks = Helper.create_vdisks_for_mds_service(amount=5, start_id=1, storagedriver=storagedrivers[1])
@@ -510,15 +509,15 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # If the tlogs are not caught up, nothing should be changed
-        MDSClient._set_catchup('10.0.0.2:5', vdisks[3].volume_id, 1000)
-        MDSClient._set_catchup('10.0.0.2:5', vdisks[4].volume_id, 1000)
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[3].volume_id, 1000)
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[4].volume_id, 1000)
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # The next run, after tlogs are caught up, a master switch should be executed
-        MDSClient._set_catchup('10.0.0.2:5', vdisks[3].volume_id, 50)
-        MDSClient._set_catchup('10.0.0.2:5', vdisks[4].volume_id, 50)
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[3].volume_id, 50)
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[4].volume_id, 50)
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.3', 'port': 3}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
@@ -991,15 +990,15 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # If the tlogs are not caught up, nothing should be changed
-        MDSClient._set_catchup('10.0.0.2:5', vdisks[3].volume_id, 1000)
-        MDSClient._set_catchup('10.0.0.2:5', vdisks[4].volume_id, 1000)
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[3].volume_id, 1000)
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[4].volume_id, 1000)
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # The next run, after tlogs are caught up, a master switch should be executed
-        MDSClient._set_catchup('10.0.0.2:5', vdisks[3].volume_id, 50)
-        MDSClient._set_catchup('10.0.0.2:5', vdisks[4].volume_id, 50)
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[3].volume_id, 50)
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[4].volume_id, 50)
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.3', 'port': 3}],
@@ -1215,7 +1214,7 @@ class MDSServices(unittest.TestCase):
 
     def test_role_assignments(self):
         """
-        Validates whether the role assinment and ex-master behavior is correct:
+        Validates whether the role assignment and ex-master behavior is correct:
         * When a slave is configured as a master, the ex-master should not be immediately recycled as a slave to prevent
           race conditions in the StorageDriver. It should be left out, and then in a next call be included again.
         * When an ex-master is recycled, it should be explicitly set to the slave role again
