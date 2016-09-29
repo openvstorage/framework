@@ -80,13 +80,6 @@ but WITHOUT ANY WARRANTY of any kind.
                 <b data-i18n="ovs:wizards.add_vpool.gather_vpool.mountpoint"></b> <span data-bind="text: data.distributedMtpt()"></span>
             </li>
         </ul>
-        <p data-i18n="ovs:wizards.add_vpool.confirm.cache_sizing"></p>
-        <ul>
-            <li data-bind="visible: data.cacheStrategy() !== 'none'">
-                <b data-i18n="ovs:wizards.add_vpool.gather_config.readcache_size"></b> <span data-bind="text: data.readCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span>
-            </li>
-            <li><b data-i18n="ovs:wizards.add_vpool.gather_config.write_buffer_size"></b> <span data-bind="text: data.writeCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span></li>
-        </ul>
         <div>
             <p data-i18n="ovs:wizards.add_vpool.confirm.configuration"></p>
             <ul>
@@ -94,7 +87,11 @@ but WITHOUT ANY WARRANTY of any kind.
                 <li><b data-i18n="ovs:vpools.dedupe_mode"></b>: <span data-bind="translate: data.dedupeMode() !== undefined ? 'ovs:storagedrivers.configuration.general.dedupe_modes.' + data.dedupeMode() : ''"></span></li>
                 <li><b data-i18n="ovs:vpools.sco_size"></b>: <span data-bind="text: data.scoSize() !== undefined ? data.scoSize() : ''"></span> <span data-i18n="ovs:generic.units.mib"></span></li>
                 <li><b data-i18n="ovs:vpools.cluster_size"></b>: <span data-bind="text: data.clusterSize() !== undefined ? data.clusterSize() : ''"></span> <span data-i18n="ovs:generic.units.kib"></span></li>
-                <li><b data-i18n="ovs:vpools.write_buffer"></b>: <span data-bind="text: data.writeBuffer() !== undefined ? data.writeBuffer() : ''"></span> <span data-i18n="ovs:generic.units.mib"></span></li>
+                <li><b data-i18n="ovs:vpools.volume_write_buffer"></b>: <span data-bind="text: data.writeBuffer() !== undefined ? data.writeBuffer() : ''"></span> <span data-i18n="ovs:generic.units.mib"></span></li>
+                <li><b data-i18n="ovs:vpools.global_write_buffer"></b>: <span data-bind="text: data.writeCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span></li>
+                <li data-bind="visible: data.cacheStrategy() !== 'none'">
+                    <b data-i18n="ovs:wizards.add_vpool.gather_config.readcache_size"></b> <span data-bind="text: data.readCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span>
+                </li>
                 <li>
                     <b data-bind="translate: 'ovs:vpools.' + (data.dtlEnabled() === true ? 'dtl_mode' : 'dtl')"></b>:
                     <span data-bind="translate: (data.dtlEnabled() === true ? 'ovs:storagedrivers.configuration.general.dtl_modes.' + data.dtlMode().name : 'ovs:vpools.dtl_disabled')"></span>

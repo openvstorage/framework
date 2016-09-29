@@ -296,7 +296,7 @@ define([
                         var available_backends = [], calls = [];
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
-                                getData.contents = 'metadata_information,name,usages,presets';
+                                getData.contents = 'name,usages,presets';
                                 if (item.scaling === 'LOCAL') {
                                     getData.contents += ',asd_statistics';
                                 }

@@ -69,7 +69,6 @@ class StorageRouterController(object):
     """
     _logger = LogHandler.get('lib', name='storagerouter')
     SUPPORT_AGENT = 'support-agent'
-    PARTITION_DEFAULT_USAGES = {DiskPartition.ROLES.DB: (40, 20)}
 
     storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
     # noinspection PyArgumentList
@@ -142,16 +141,9 @@ class StorageRouterController(object):
                     size = disk_partition.size if disk_partition.size is not None else 0
                     if partition_available_space is not None:
                         # Take available space reported by df then add back used by roles so that the only used space reported is space not managed by us
-                        # then we'll subtract the roles reserved size
                         available = partition_available_space + used_space_by_roles - claimed_space
                     else:
                         available = size - claimed_space  # Subtract size for roles which have already been claimed by other vpools (but not necessarily already been fully used)
-                    # Subtract size for competing roles on the same partition
-                    for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_USAGES.iteritems():
-                        if sub_role in disk_partition.roles and sub_role != role:
-                            amount = required_size[0] * 1024 ** 3
-                            percentage = required_size[1] * disk_partition.size / 100
-                            available -= max(amount, percentage)
 
                     if available > 0:
                         if (role == DiskPartition.ROLES.READ or role == DiskPartition.ROLES.WRITE) and DiskPartition.ROLES.READ in disk_partition.roles and DiskPartition.ROLES.WRITE in disk_partition.roles and shared is False:
@@ -350,11 +342,6 @@ class StorageRouterController(object):
                     error_messages.append('Not enough available space for {0}'.format(required_role))
 
         # Create vpool metadata
-        cluster_policies = []
-        cluster_frag_size = 1
-        cluster_total_size = 0
-        cluster_nsm_part_guids = []
-
         sco_size = vpool.configuration['sco_size'] if vpool is not None else sco_size
         sco_size *= 1024.0 ** 2
         use_accelerated_alba = False
@@ -415,33 +402,24 @@ class StorageRouterController(object):
                                        port=connection_info['port'],
                                        credentials=(connection_info['client_id'], connection_info['client_secret']),
                                        version=1)
-                backend_dict = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': 'metadata_information,name,usages,presets'})
+                backend_dict = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': 'name,usages,presets'})
                 preset_info = dict((preset['name'], preset) for preset in backend_dict['presets'])
                 if preset_name not in preset_info:
                     raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_guid))
 
-                local_backend = connection_info['local']
                 policies = []
                 for policy_info in preset_info[preset_name]['policies']:
                     policy = json.loads('[{0}]'.format(policy_info.strip('()')))
                     policies.append([policy[0], policy[1]])
-                    if local_backend is True:
-                        cluster_policies.append([policy[0], policy[1]])
 
                 total_size = float(backend_dict['usages']['size'])
                 fragment_size = float(preset_info[preset_name]['fragment_size'])
-                nsm_partition_guids = list(set(backend_dict['metadata_information']['nsm_partition_guids']))
-                if local_backend is True:
-                    cluster_frag_size = fragment_size
-                    cluster_total_size = total_size
-                    cluster_nsm_part_guids = nsm_partition_guids
                 vpool_metadata[key] = {'name': backend_dict['name'],
                                        'arakoon_config': StorageRouterController._retrieve_alba_arakoon_config(backend_guid=backend_guid, ovs_client=ovs_client),
                                        'backend_info': {'policies': policies,
                                                         'sco_size': sco_size,
                                                         'frag_size': fragment_size,
                                                         'total_size': total_size,
-                                                        'nsm_partition_guids': nsm_partition_guids,
                                                         'fragment_cache_on_read': fragment_cache_on_read,
                                                         'fragment_cache_on_write': fragment_cache_on_write},
                                        'connection': connection_info,
@@ -449,58 +427,15 @@ class StorageRouterController(object):
                                        'backend_guid': backend_guid}
 
         # Check mountpoints are mounted
-        db_partition_guids = set()
-        read_partition_guids = set()
-        write_partition_guids = set()
         for role, part_info in partition_info.iteritems():
             for part in part_info:
                 if not client.is_mounted(part['mountpoint']) and part['mountpoint'] != DiskPartition.VIRTUAL_STORAGE_LOCATION:
                     error_messages.append('Mountpoint {0} is not mounted'.format(part['mountpoint']))
-                if role == 'DB':
-                    db_partition_guids.add(part['guid'])
-                elif role == 'READ':
-                    read_partition_guids.add(part['guid'])
-                elif role == 'WRITE':
-                    write_partition_guids.add(part['guid'])
-
-        # Calculate alba metadata overhead
-        db_overlap = len(db_partition_guids.intersection(cluster_nsm_part_guids)) > 0  # We only want to take DB partitions into account already claimed by the NSM clusters
-        read_overlap = db_overlap and len(db_partition_guids.intersection(read_partition_guids)) > 0
-        write_overlap = db_overlap and len(db_partition_guids.intersection(write_partition_guids)) > 0
-        sizes_to_reserve = [0]
-
-        if read_overlap is True or write_overlap is True:
-            for policy in cluster_policies:
-                k_policy = int(policy[0])
-                m_policy = int(policy[1])
-                size_to_reserve = int(cluster_total_size / sco_size * (1200 + (k_policy + m_policy) * (25 * sco_size / k_policy / cluster_frag_size + 56)))
-                sizes_to_reserve.append(size_to_reserve)
-            # For more information about above formula: see http://jira.cloudfounders.com/browse/OVS-3553
-
-        # Check over-allocation for DB
-        db_available_size = partition_info[DiskPartition.ROLES.DB][0]['available']
-        db_required_size = StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3 + max(sizes_to_reserve)
-
-        if db_available_size < db_required_size:
-            error_messages.append('Assigned partition for DB role should be at least {0:.2f} GB'.format(db_required_size / 1024.0 ** 3))
 
         # Check over-allocation for read, write cache
         shared_size_available = metadata['shared_size']
         readcache_size_available = metadata['readcache_size']
         writecache_size_available = metadata['writecache_size']
-
-        if read_overlap is True and write_overlap is True:
-            shared_size_available -= max(sizes_to_reserve)
-            if shared_size_available < 0:
-                shared_size_available = 0
-        elif read_overlap is True:
-            readcache_size_available -= max(sizes_to_reserve)
-            if readcache_size_available < 0:
-                readcache_size_available = 0
-        elif write_overlap is True:
-            writecache_size_available -= max(sizes_to_reserve)
-            if writecache_size_available < 0:
-                writecache_size_available = 0
 
         readcache_size_requested = parameters['readcache_size'] * 1024 ** 3
         writecache_size_requested = parameters['writecache_size'] * 1024 ** 3
@@ -728,13 +663,11 @@ class StorageRouterController(object):
 
         # 4. Assign DB
         db_info = partition_info[DiskPartition.ROLES.DB][0]
-        size = StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3 + max(sizes_to_reserve)
-        percentage = db_info['available'] * StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][1] / 100.0 + max(sizes_to_reserve)
         sdp_tlogs = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
                                                                                        'role': DiskPartition.ROLES.DB,
                                                                                        'sub_role': StorageDriverPartition.SUBROLE.TLOG,
                                                                                        'partition': DiskPartition(db_info['guid'])})
-        sdp_metadata = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
+        sdp_metadata = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
                                                                                           'role': DiskPartition.ROLES.DB,
                                                                                           'sub_role': StorageDriverPartition.SUBROLE.MD,
                                                                                           'partition': DiskPartition(db_info['guid'])})
