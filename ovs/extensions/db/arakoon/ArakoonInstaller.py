@@ -182,9 +182,11 @@ class ArakoonClusterConfig(object):
         """
         contents = RawConfigParser()
         data = self.export()
-        for section in data:
+        sections = data.keys()
+        sections.remove('global')
+        for section in ['global'] + sorted(sections):
             contents.add_section(section)
-            for item in data[section]:
+            for item in sorted(data[section]):
                 contents.set(section, item, data[section][item])
         config_io = StringIO()
         contents.write(config_io)
@@ -249,6 +251,9 @@ class ArakoonInstaller(object):
 
         :return: None
         """
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            return
+
         root_client = SSHClient(ip, username='root')
 
         # Verify whether all files to be archived have been released properly
@@ -589,6 +594,10 @@ class ArakoonInstaller(object):
         """
         Deploys a complete cluster: Distributing the configuration files, creating directories and services
         """
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            if filesystem is True:
+                raise NotImplementedError('At this moment, there is no support for unittesting filesystem backend Arakoon clusters')
+
         ArakoonInstaller._logger.debug('Deploying cluster {0}'.format(config.cluster_id))
         if offline_nodes is None:
             offline_nodes = []
@@ -901,6 +910,10 @@ class ArakoonInstaller(object):
         :return: The newly generated PyrakoonClient
         :rtype: PyrakoonClient
         """
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            from ovs.extensions.db.arakoon.tests.client import MockPyrakoonClient
+            return MockPyrakoonClient(config.cluster_id, None)
+
         from ovs.extensions.db.arakoon.pyrakoon.client import PyrakoonClient
         nodes = {}
         for node in config.nodes:

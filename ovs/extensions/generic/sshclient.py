@@ -93,6 +93,8 @@ class SSHClient(object):
     _logger = LogHandler.get('extensions', name='sshclient')
     client_cache = {}
     IP_REGEX = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
+    _run_returns = {}
+    _run_recordings = []
 
     def __init__(self, endpoint, username='ovs', password=None):
         """
@@ -214,6 +216,10 @@ class SSHClient(object):
         :param command: Command to execute
         :param debug: Extended logging and stderr output returned
         """
+        if self._unittest_mode is True:
+            SSHClient._run_recordings.append(command)
+            if command in SSHClient._run_returns:
+                return SSHClient._run_returns[command]
         if self.is_local is True:
             stderr = None
             try:
@@ -347,6 +353,9 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
         :param recursive: Chown the directories recursively or not
         :return: None
         """
+        if self._unittest_mode is True:
+            return
+
         all_users = [user_info[0] for user_info in pwd.getpwall()]
         all_groups = [group_info[0] for group_info in grp.getgrall()]
 
@@ -557,6 +566,9 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
         :param group: Group to set
         :return: None
         """
+        if self._unittest_mode is True:
+            return
+
         all_users = [user_info[0] for user_info in pwd.getpwall()]
         all_groups = [group_info[0] for group_info in grp.getgrall()]
 

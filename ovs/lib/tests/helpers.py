@@ -17,6 +17,7 @@
 """
 Helper module
 """
+import os
 import json
 from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.hybrids.disk import Disk
@@ -33,6 +34,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.toolbox import Toolbox
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
 from ovs.lib.storagedriver import StorageDriverController
@@ -107,6 +109,7 @@ class Helper(object):
             storagerouter.ip = '10.0.0.{0}'.format(sr_id)
             storagerouter.rdma_capable = False
             storagerouter.save()
+            storagerouter.machine_id = str(sr_id)
             storagerouters[sr_id] = storagerouter
             disk = Disk()
             disk.storagerouter = storagerouter
@@ -240,6 +243,27 @@ class Helper(object):
                 junction.save()
             vdisks[i] = vdisk
         return vdisks
+
+    @staticmethod
+    def extract_dir_structure(directory):
+        """
+        Builds a dict representing a given directory
+        """
+        data = {'dirs': {}, 'files': []}
+        for current_dir, dirs, files in os.walk(directory):
+            current_dir = Toolbox.remove_prefix(current_dir, directory)
+            if current_dir == '':
+                data['dirs'] = dict((entry, {'dirs': {}, 'files': []}) for entry in dirs)
+                data['files'] = files
+            else:
+                dir_entries = current_dir.strip('/').split('/')
+                pointer = data['dirs']
+                for entry in dir_entries[:-1]:
+                    pointer = pointer[entry]['dirs']
+                pointer = pointer[dir_entries[-1]]
+                pointer['dirs'] = dict((entry, {'dirs': {}, 'files': []}) for entry in dirs)
+                pointer['files'] = files
+        return data
 
     @staticmethod
     def _generate_mdsmetadatabackendconfig(mds_services):

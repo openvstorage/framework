@@ -33,8 +33,7 @@ class System(object):
     """
 
     OVS_ID_FILE = '/etc/openvstorage_id'
-    _storagerouter = None
-    _machine_id = None
+    _machine_id = {}
 
     def __init__(self):
         """
@@ -53,7 +52,7 @@ class System(object):
         :rtype: str
         """
         if os.environ.get('RUNNING_UNITTESTS') == 'True':
-            return System._machine_id
+            return System._machine_id.get('none' if client is None else client.ip)
         if client is not None:
             return client.run('cat {0}'.format(System.OVS_ID_FILE)).strip()
         with open(System.OVS_ID_FILE, 'r') as the_file:
@@ -66,11 +65,8 @@ class System(object):
         :return: Storage Router this is executed on
         :rtype: StorageRouter
         """
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
-            storagerouter = System._storagerouter
-        else:
-            from ovs.dal.lists.storagerouterlist import StorageRouterList
-            storagerouter = StorageRouterList.get_by_machine_id(System.get_my_machine_id())
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
+        storagerouter = StorageRouterList.get_by_machine_id(System.get_my_machine_id())
         if storagerouter is None:
             raise RuntimeError('Could not find the local StorageRouter')
         return storagerouter

@@ -306,6 +306,7 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
                             log_message('Task {0} finished successfully'.format(task_name))
                         except Exception:
                             log_message('Task {0} {1} failed'.format(task_name, params_info), level='exception')
+                            raise
                         finally:
                             update_value(key=persistent_key,
                                          append=False)
