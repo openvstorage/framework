@@ -127,8 +127,7 @@ class Helper(object):
             partition.state = 'OK'
             partition.mountpoint = '/tmp/unittest/sr_{0}/disk_1/partition_1'.format(sr_id)
             partition.disk = disk
-            for role in [DiskPartition.ROLES.DB, DiskPartition.ROLES]:
-                partition.roles.append(role)
+            partition.roles = [DiskPartition.ROLES.DB, DiskPartition.ROLES.SCRUB]
             partition.save()
         for sd_id, vpool_id, sr_id in structure.get('storagedrivers', ()):
             storagedriver = StorageDriver()
@@ -146,20 +145,6 @@ class Helper(object):
             storagedriver.save()
             storagedrivers[sd_id] = storagedriver
             Helper._set_vpool_storage_driver_configuration(vpool=vpools[vpool_id], storagedriver=storagedriver)
-        for vdisk_id, storage_driver_id, vpool_id in structure.get('vdisks', ()):
-            vpool = vpools[vpool_id]
-            devicename = 'vdisk_{0}'.format(vdisk_id)
-            mds_backend_config = Helper._generate_mdsmetadatabackendconfig([])
-            volume_id = srclients[vpool_id].create_volume(devicename, mds_backend_config, 0, str(storage_driver_id))
-            vdisk = VDisk()
-            vdisk.name = str(vdisk_id)
-            vdisk.devicename = devicename
-            vdisk.volume_id = volume_id
-            vdisk.vpool = vpool
-            vdisk.size = 0
-            vdisk.save()
-            vdisk.reload_client('storagedriver')
-            vdisks[vdisk_id] = vdisk
         for mds_id, sd_id in structure.get('mds_services', ()):
             sd = storagedrivers[sd_id]
             s_id = '{0}-{1}'.format(sd.storagerouter.name, mds_id)
@@ -182,6 +167,20 @@ class Helper(object):
                                                                     'sub_role': StorageDriverPartition.SUBROLE.MDS,
                                                                     'partition': sd.storagerouter.disks[0].partitions[0],
                                                                     'mds_service': mds_service})
+        for vdisk_id, storage_driver_id, vpool_id, mds_id in structure.get('vdisks', ()):
+            vpool = vpools[vpool_id]
+            devicename = 'vdisk_{0}'.format(vdisk_id)
+            mds_backend_config = Helper._generate_mdsmetadatabackendconfig([] if mds_id is None else [mds_services[mds_id]])
+            volume_id = srclients[vpool_id].create_volume(devicename, mds_backend_config, 0, str(storage_driver_id))
+            vdisk = VDisk()
+            vdisk.name = str(vdisk_id)
+            vdisk.devicename = devicename
+            vdisk.volume_id = volume_id
+            vdisk.vpool = vpool
+            vdisk.size = 0
+            vdisk.save()
+            vdisk.reload_client('storagedriver')
+            vdisks[vdisk_id] = vdisk
         for srd_id, sr_id, domain_id, backup in structure.get('storagerouter_domains', ()):
             sr_domain = StorageRouterDomain()
             sr_domain.backup = backup
@@ -227,7 +226,7 @@ class Helper(object):
             mds_backend_config = Helper._generate_mdsmetadatabackendconfig(mds_services)
             volume_id = srclient.create_volume(devicename, mds_backend_config, 0, str(storagedriver_id))
             if len(mds_services) == 1:
-                MDSClient._set_catchup(mds_services[0], volume_id, 50)
+                MDSClient.set_catchup(mds_services[0], volume_id, 50)
             vdisk = VDisk()
             vdisk.name = str(i)
             vdisk.devicename = devicename

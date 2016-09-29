@@ -112,13 +112,14 @@ class System(object):
         :return: Ports in use
         :rtype: list
         """
-        cmd = "netstat -ln4 | sed 1,2d | sed 's/\s\s*/ /g' | cut -d ' ' -f 4 | cut -d ':' -f 2"
+        cmd = "netstat -ln | sed 1,2d | sed 's/\s\s*/ /g' | cut -d ' ' -f 4 | cut -d ':' -f 2"
         if client is None:
             output = check_output(cmd, shell=True)
         else:
             output = client.run(cmd)
         for found_port in output.splitlines():
-            yield int(found_port.strip())
+            if found_port.isdigit():
+                yield int(found_port.strip())
 
     @staticmethod
     def get_free_ports(selected_range, exclude=None, nr=1, client=None):
