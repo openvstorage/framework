@@ -22,12 +22,12 @@ import json
 import shutil
 import unittest
 from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
 from ovs.lib.tests.helpers import Helper
 
 
@@ -91,7 +91,7 @@ class ArakoonInstallerTester(unittest.TestCase):
 
         # Create new cluster
         mountpoint = storagerouters[1].disks[0].partitions[0].mountpoint
-        if os.path.exists(mountpoint):
+        if os.path.exists(mountpoint) and mountpoint != '/':
             shutil.rmtree(mountpoint)
         base_dir = mountpoint + '/test_create_cluster'
         info = ArakoonInstaller.create_cluster('test', ServiceType.ARAKOON_CLUSTER_TYPES.FWK, storagerouters[1].ip, base_dir)
@@ -133,7 +133,7 @@ class ArakoonInstallerTester(unittest.TestCase):
 
         # Extending cluster
         mountpoint = storagerouters[2].disks[0].partitions[0].mountpoint
-        if os.path.exists(mountpoint):
+        if os.path.exists(mountpoint) and mountpoint != '/':
             shutil.rmtree(mountpoint)
         base_dir2 = mountpoint + '/test_extend_cluster'
         ArakoonInstaller.extend_cluster(storagerouters[1].ip, storagerouters[2].ip, 'test', base_dir2)
