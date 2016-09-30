@@ -857,22 +857,17 @@ class VDiskController(object):
 
                 vpool = vdisk.vpool
                 vpool_config = vpool.configuration
-                Toolbox.verify_required_params(required_params={'dtl_host': (str, None),
-                                                                'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys())},
+                Toolbox.verify_required_params(required_params={'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
+                                                                'dtl_enabled': (bool, None),
+                                                                'dtl_config_mode': (str, [StorageDriverClient.VOLDRV_DTL_MANUAL_MODE, StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE])},
                                                actual_params=vpool_config)
 
                 volume_id = str(vdisk.volume_id)
+                dtl_vpool_enabled = vpool_config['dtl_enabled']
+                dtl_vpool_config_mode = vpool_config['dtl_config_mode']
                 try:
                     current_dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id)
                     current_dtl_config_mode = vdisk.storagedriver_client.get_dtl_config_mode(volume_id)
-                    VDiskController._logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                    VDiskController._logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                    VDiskController._logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                    VDiskController._logger.info(current_dtl_config)
-                    VDiskController._logger.info(current_dtl_config_mode)
-                    VDiskController._logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                    VDiskController._logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                    VDiskController._logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                 except (RuntimeError, SRCObjectNotFoundException):
                     # Can occur when a volume has not been stolen yet from a dead node
                     VDiskController._logger.exception('Failed to retrieve the DTL configuration from storage driver')
@@ -913,7 +908,7 @@ class VDiskController(object):
                         vdisk.save()
 
                 lock_key = 'dtl_checkup_{0}'.format(vdisk.guid)
-                if vpool_config['dtl_mode'] == 'no_sync' and current_dtl_config is None:
+                if dtl_vpool_enabled is False and current_dtl_config is None:
                     VDiskController._logger.info('    DTL is globally disabled for vPool {0} with guid {1}'.format(vpool.name, vpool.guid))
                     try:
                         with volatile_mutex(lock_key, wait=time_to_wait_for_lock):
@@ -1010,16 +1005,21 @@ class VDiskController(object):
                 if current_dtl_config is None:
                     VDiskController._logger.info('        No DTL configuration found, but there are Storage Routers available')
                     reconfigure_required = True
-                elif current_dtl_config_mode == DTLConfigMode.AUTOMATIC or (current_dtl_config_mode == DTLConfigMode.MANUAL and vpool_config['dtl_host'] != ''):
+                elif current_dtl_config_mode == DTLConfigMode.AUTOMATIC:
                     VDiskController._logger.info('        DTL configuration set to AUTOMATIC, switching to manual')
+                    reconfigure_required = True
+                elif dtl_vpool_config_mode == DTLConfigMode.MANUAL and dtl_vpool_enabled is True:
+                    VDiskController._logger.info('        DTL configuration set to MANUAL, but static host provided ... overruling')
                     reconfigure_required = True
                 else:
                     dtl_host = current_dtl_config.host
+                    dtl_mode = current_dtl_config.mode
                     dtl_port = current_dtl_config.port
                     storage_drivers = [sd for sd in vpool.storagedrivers if sd.storage_ip == dtl_host]
 
-                    VDiskController._logger.info('        DTL host: {0}'.format(dtl_host or '-'))
-                    VDiskController._logger.info('        DTL port: {0}'.format(dtl_port or '-'))
+                    VDiskController._logger.info('        DTL host: {0}'.format(dtl_host))
+                    VDiskController._logger.info('        DTL port: {0}'.format(dtl_port))
+                    VDiskController._logger.info('        DTL mode: {0}'.format(dtl_mode))
                     if len(vdisk.domains_dtl) > 0:
                         if dtl_host not in [sd.storage_ip for sr in possible_primary_srs for sd in sr.storagedrivers if sd.vpool_guid == vpool.guid]:
                             VDiskController._logger.info('        Host not in available Storage Routers, manual DTL will be overruled')

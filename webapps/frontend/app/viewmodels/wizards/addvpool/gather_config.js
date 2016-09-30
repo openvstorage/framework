@@ -25,6 +25,22 @@ define([
         self.data = data;
 
         // Computed
+        self.dtlMode = ko.computed({
+            write: function(mode) {
+                if (mode.name === 'no_sync') {
+                    self.data.dtlEnabled(false);
+                } else {
+                    self.data.dtlEnabled(true);
+                }
+                self.data.dtlMode(mode);
+            },
+            read: function() {
+                if (self.data.vPoolAdd() === false && self.data.dtlEnabled() === false) {
+                    return {name: 'no_sync', disabled: false};
+                }
+                return self.data.dtlMode();
+            }
+        });
         self.controlledWriteCacheSize = ko.computed({
             read: function() {
                 if (self.data.writeCacheSize() === undefined) {

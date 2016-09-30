@@ -101,6 +101,7 @@ define(['jquery', 'knockout'], function($, ko){
             dedupeMode:              ko.observable('non_dedupe'),
             dedupeModes:             ko.observableArray(['dedupe', 'non_dedupe']),
             distributedMtpt:         ko.observable(),
+            dtlEnabled:              ko.observable(true),
             dtlMode:                 ko.observable(),
             dtlModes:                ko.observableArray([{name: 'no_sync', disabled: false}, {name: 'a_sync', disabled: false}, {name: 'sync', disabled: false}]),
             dtlTransportMode:        ko.observable({name: 'tcp'}),

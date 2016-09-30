@@ -137,7 +137,7 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry">
-                                        <span data-bind="translate: 'ovs:vpools.' + (item().dtl_mode === 'no_sync' ? 'dtl' : 'dtl_mode')"></span>
+                                        <span data-bind="translate: 'ovs:vpools.' + (item().dtl_enabled === true ? 'dtl_mode' : 'dtl')"></span>
                                         <a data-bind="tooltip: 'ovs:storagedrivers.configuration.general.dtl_help_title'"
                                            class="hand fa noline"
                                            data-i18n="[html]ovs:icons.help"
@@ -148,7 +148,7 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="text: $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item().dtl_mode)"></span>
+                                    <span data-part="lazy-entry" data-bind="text: (item().dtl_enabled === true ? $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item().dtl_mode) : $.t('ovs:storagedrivers.configuration.general.dtl_modes.no_sync'))"></span>
                                 </span>
                             </td>
                         </tr>
@@ -158,13 +158,13 @@ but WITHOUT ANY WARRANTY of any kind.
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry"
                                           data-i18n="ovs:vpools.dtl_transport"
-                                          data-bind="visible: item().dtl_mode !== 'no_sync'"></span>
+                                          data-bind="visible: item().dtl_enabled === true"></span>
                                 </span>
                             </td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry"
-                                          data-bind="visible: item().dtl_mode !== 'no_sync',
+                                          data-bind="visible: item().dtl_enabled === true,
                                                      translate: 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + item().dtl_transport"></span>
                                 </span>
                             </td>

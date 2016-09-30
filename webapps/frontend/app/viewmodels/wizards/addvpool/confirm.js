@@ -56,7 +56,7 @@ define([
                         fragment_cache_on_read: self.data.fragmentCacheOnRead(),
                         fragment_cache_on_write: self.data.fragmentCacheOnWrite(),
                         config_params: {
-                            'dtl_mode': self.data.dtlMode().name,
+                            'dtl_mode': (self.data.dtlEnabled() === true ? self.data.dtlMode().name : 'no_sync'),
                             'sco_size': self.data.scoSize(),
                             'dedupe_mode': self.data.dedupeMode(),
                             'cluster_size': self.data.clusterSize(),
