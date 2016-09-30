@@ -139,7 +139,7 @@ class Helper(object):
                 partition.roles = [DiskPartition.ROLES.DB, DiskPartition.ROLES.SCRUB]
                 partition.save()
         for sd_id, vpool_id, sr_id in structure.get('storagedrivers', ()):
-            if sd_id not in storagedriver:
+            if sd_id not in storagedrivers:
                 storagedriver = StorageDriver()
                 storagedriver.vpool = vpools[vpool_id]
                 storagedriver.storagerouter = storagerouters[sr_id]
