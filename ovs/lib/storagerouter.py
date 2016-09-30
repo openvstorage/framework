@@ -671,10 +671,6 @@ class StorageRouterController(object):
                                                                                           'role': DiskPartition.ROLES.DB,
                                                                                           'sub_role': StorageDriverPartition.SUBROLE.MD,
                                                                                           'partition': DiskPartition(db_info['guid'])})
-        volume_manager_config = {"tlog_path": sdp_tlogs.path,
-                                 "metadata_path": sdp_metadata.path,
-                                 "clean_interval": 1,
-                                 "dtl_throttle_usecs": 4000}
         dirs2create.append(sdp_tlogs.path)
         dirs2create.append(sdp_metadata.path)
 
@@ -788,25 +784,29 @@ class StorageRouterController(object):
             tlog_multiplier = current_vpool_configuration['tlog_multiplier']
             sco_factor = float(current_vpool_configuration['write_buffer']) / tlog_multiplier / sco_size
 
-        filesystem_config = {'fs_enable_shm_interface': 0,
+        filesystem_config = {'fs_dtl_host': '',
+                             'fs_enable_shm_interface': 0,
+                             'fs_enable_network_interface': 1,
                              'fs_metadata_backend_arakoon_cluster_nodes': [],
                              'fs_metadata_backend_mds_nodes': [],
                              'fs_metadata_backend_type': 'MDS',
-                             'fs_enable_network_interface': 1,
                              'fs_virtual_disk_format': 'raw',
                              'fs_raw_disk_suffix': '.raw'}
         if dtl_mode == 'no_sync':
-            filesystem_config['fs_dtl_host'] = ''
             filesystem_config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_MANUAL_MODE
         else:
             filesystem_config['fs_dtl_mode'] = StorageDriverClient.VPOOL_DTL_MODE_MAP[dtl_mode]
             filesystem_config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE
 
-        volume_manager_config['default_cluster_size'] = cluster_size * 1024
-        volume_manager_config['read_cache_default_mode'] = StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode]
-        volume_manager_config['read_cache_default_behaviour'] = StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy]
-        volume_manager_config['number_of_scos_in_tlog'] = tlog_multiplier
-        volume_manager_config['non_disposable_scos_factor'] = sco_factor
+        volume_manager_config = {'tlog_path': sdp_tlogs.path,
+                                 'metadata_path': sdp_metadata.path,
+                                 'clean_interval': 1,
+                                 'dtl_throttle_usecs': 4000,
+                                 'default_cluster_size': cluster_size * 1024,
+                                 'number_of_scos_in_tlog': tlog_multiplier,
+                                 'read_cache_default_mode': StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode],
+                                 'read_cache_default_behaviour': StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy],
+                                 'non_disposable_scos_factor': sco_factor}
 
         queue_urls = []
         mq_protocol = Configuration.get('/ovs/framework/messagequeue|protocol')

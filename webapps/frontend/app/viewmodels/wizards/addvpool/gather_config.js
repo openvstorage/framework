@@ -35,6 +35,9 @@ define([
                 self.data.dtlMode(mode);
             },
             read: function() {
+                if (self.data.vPoolAdd() === false && self.data.dtlEnabled() === false) {
+                    return {name: 'no_sync', disabled: false};
+                }
                 return self.data.dtlMode();
             }
         });

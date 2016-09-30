@@ -116,7 +116,7 @@ define([
             read: function() {
                 return {
                     sco_size: self.scoSize(),
-                    dtl_mode: self.dtlMode(),
+                    dtl_mode: self.dtlEnabled() === true ? self.dtlMode() : 'no_sync',
                     dedupe_mode: self.dedupeMode() !== undefined ? self.dedupeMode().name : undefined,
                     write_buffer: self.writeBuffer(),
                     dtl_target: self.dtlTarget().slice(),
