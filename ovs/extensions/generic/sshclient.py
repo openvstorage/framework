@@ -206,7 +206,11 @@ class SSHClient(object):
         if type(text) is list:
             text = '\n'.join(line.rstrip() for line in text)
         # This strip is absolutely necessary. Without it, channel.communicate() is never executed (odd but true)
-        return text.strip().replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+        try:
+            return text.strip().replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+        except UnicodeDecodeError:
+            SSHClient._logger.error('UnicodeDecodeError with output: {0}'.format(text))
+            raise
 
     @connected()
     def run(self, command, debug=False, suppress_logging=False):
@@ -217,8 +221,10 @@ class SSHClient(object):
         :param debug: Extended logging and stderr output returned
         """
         if self._unittest_mode is True:
+            SSHClient._logger.debug('Executing: {0}'.format(command))
             SSHClient._run_recordings.append(command)
             if command in SSHClient._run_returns:
+                SSHClient._logger.debug('Emulating return value')
                 return SSHClient._run_returns[command]
         if self.is_local is True:
             stderr = None
