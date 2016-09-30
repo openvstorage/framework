@@ -10,6 +10,7 @@ ExecStart=/usr/bin/failovercache --path <DTL_PATH> --address <DTL_ADDRESS> --por
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=60
+LimitNOFILE=4096
 
 [Install]
 WantedBy=multi-user.target
