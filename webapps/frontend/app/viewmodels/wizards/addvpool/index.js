@@ -58,7 +58,6 @@ define([
         data.clusterSize(4);
         data.dedupeMode('non_dedupe');
         data.distributedMtpt(undefined);
-        data.dtlEnabled(true);
         data.dtlMode({name: 'a_sync', disabled: false});
         data.dtlTransportMode({name: 'tcp'});
         data.fragmentCacheOnRead(true);

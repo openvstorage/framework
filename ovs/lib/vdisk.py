@@ -820,9 +820,6 @@ class VDiskController(object):
             storagerouters_to_exclude = []
 
         VDiskController._logger.info('DTL checkup started')
-        required_params = {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
-                           'dtl_enabled': (bool, None)}
-
         vdisk = None
         vpool = None
         if vdisk_guid is not None:
@@ -860,16 +857,25 @@ class VDiskController(object):
 
                 vpool = vdisk.vpool
                 vpool_config = vpool.configuration
-                Toolbox.verify_required_params(required_params, vpool_config)
+                Toolbox.verify_required_params(required_params={'dtl_host': (str, None),
+                                                                'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys())},
+                                               actual_params=vpool_config)
 
                 volume_id = str(vdisk.volume_id)
-                dtl_vpool_enabled = vpool_config['dtl_enabled']
                 try:
                     current_dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id)
                     current_dtl_config_mode = vdisk.storagedriver_client.get_dtl_config_mode(volume_id)
-                except RuntimeError as rte:
+                    VDiskController._logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                    VDiskController._logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                    VDiskController._logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                    VDiskController._logger.info(current_dtl_config)
+                    VDiskController._logger.info(current_dtl_config_mode)
+                    VDiskController._logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                    VDiskController._logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                    VDiskController._logger.info('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                except (RuntimeError, SRCObjectNotFoundException):
                     # Can occur when a volume has not been stolen yet from a dead node
-                    VDiskController._logger.exception('Retrieving DTL configuration from storage driver failed with error: {0}'.format(rte))
+                    VDiskController._logger.exception('Failed to retrieve the DTL configuration from storage driver')
                     errors_found = True
                     vdisks.remove(vdisk)
                     continue
@@ -907,7 +913,7 @@ class VDiskController(object):
                         vdisk.save()
 
                 lock_key = 'dtl_checkup_{0}'.format(vdisk.guid)
-                if dtl_vpool_enabled is False and current_dtl_config is None:
+                if vpool_config['dtl_mode'] == 'no_sync' and current_dtl_config is None:
                     VDiskController._logger.info('    DTL is globally disabled for vPool {0} with guid {1}'.format(vpool.name, vpool.guid))
                     try:
                         with volatile_mutex(lock_key, wait=time_to_wait_for_lock):
@@ -1004,7 +1010,7 @@ class VDiskController(object):
                 if current_dtl_config is None:
                     VDiskController._logger.info('        No DTL configuration found, but there are Storage Routers available')
                     reconfigure_required = True
-                elif current_dtl_config_mode == DTLConfigMode.AUTOMATIC:
+                elif current_dtl_config_mode == DTLConfigMode.AUTOMATIC or (current_dtl_config_mode == DTLConfigMode.MANUAL and vpool_config['dtl_host'] != ''):
                     VDiskController._logger.info('        DTL configuration set to AUTOMATIC, switching to manual')
                     reconfigure_required = True
                 else:
@@ -1155,7 +1161,7 @@ class VDiskController(object):
         metadata_page_capacity = 256
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
         num_pages = int(min(vdisk.size, 2 * 1024 ** 4) / float(metadata_page_capacity * cluster_size))
-        VDiskController._logger.info('Setting metadata pagecache size for vdisk {0} to {1}'.format(vdisk.name, num_pages))
+        VDiskController._logger.info('Setting metadata page cache size for vdisk {0} to {1}'.format(vdisk.name, num_pages))
         vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), num_pages)
 
     @staticmethod

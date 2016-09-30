@@ -48,7 +48,6 @@ define([
         self.deviceName            = ko.observable();
         self.dedupeMode            = ko.observable();
         self.dedupeModes           = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
-        self.dtlEnabled            = ko.observable(true);
         self.dtlManual             = ko.observable();
         self.dtlMode               = ko.observable();
         self.dtlStatus             = ko.observable();
@@ -96,10 +95,8 @@ define([
             },
             write: function(mode) {
                 if (mode === 'no_sync') {
-                    self.dtlEnabled(false);
                     self.dtlTarget([]);
                 } else {
-                    self.dtlEnabled(true);
                     if (self.storageRouterGuids().length <= 1 || (self.dtlTargets().length === 0 && self.domainsPresent())) {
                         self.dtlTarget([]);
                         $.each(self.dtlModes(), function (index, item) {
@@ -294,7 +291,6 @@ define([
                         if (data.hasOwnProperty('metadata_cache_size')) {
                             delete data['metadata_cache_size'];
                         }
-                        self.dtlEnabled(data.dtl_mode !== 'no_sync');
                         if (data.dedupe_mode !== undefined && data.dedupe_mode === 'non_dedupe') {
                             $.each(self.dedupeModes(), function (i, key) {
                                 if (key.name === 'dedupe') {

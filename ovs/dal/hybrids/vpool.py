@@ -91,28 +91,28 @@ class VPool(DataObject):
         volume_router = storagedriver_config.configuration['volume_router']
         volume_manager = storagedriver_config.configuration['volume_manager']
 
-        dtl_mode = file_system['fs_dtl_mode']
+        dtl_host = file_system['fs_dtl_host']
+        dtl_mode = file_system.get('fs_dtl_mode')
         dedupe_mode = volume_manager['read_cache_default_mode']
         cluster_size = volume_manager['default_cluster_size'] / 1024
         dtl_transport = dtl['dtl_transport']
         cache_strategy = volume_manager['read_cache_default_behaviour']
         sco_multiplier = volume_router['vrouter_sco_multiplier']
-        dtl_config_mode = file_system['fs_dtl_config_mode']
         tlog_multiplier = volume_manager['number_of_scos_in_tlog']
         non_disposable_sco_factor = volume_manager['non_disposable_scos_factor']
 
         sco_size = sco_multiplier * cluster_size / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
         write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor
 
-        dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_mode]
-        dtl_enabled = dtl_config_mode == StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE
-        if dtl_enabled is False:
+        if dtl_mode is None:
             dtl_mode = StorageDriverClient.FRAMEWORK_DTL_NO_SYNC
+        else:
+            dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_mode]
 
         return {'sco_size': sco_size,
+                'dtl_host': dtl_host,
                 'dtl_mode': dtl_mode,
                 'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
-                'dtl_enabled': dtl_enabled,
                 'cluster_size': cluster_size,
                 'write_buffer': write_buffer,
                 'dtl_transport': StorageDriverClient.REVERSE_DTL_TRANSPORT_MAP[dtl_transport],

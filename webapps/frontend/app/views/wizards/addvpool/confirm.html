@@ -93,10 +93,10 @@ but WITHOUT ANY WARRANTY of any kind.
                     <b data-i18n="ovs:wizards.add_vpool.gather_config.readcache_size"></b> <span data-bind="text: data.readCacheSize()"></span> <span data-i18n="ovs:generic.units.gib"></span>
                 </li>
                 <li>
-                    <b data-bind="translate: 'ovs:vpools.' + (data.dtlEnabled() === true ? 'dtl_mode' : 'dtl')"></b>:
-                    <span data-bind="translate: (data.dtlEnabled() === true ? 'ovs:storagedrivers.configuration.general.dtl_modes.' + data.dtlMode().name : 'ovs:vpools.dtl_disabled')"></span>
+                    <b data-bind="translate: 'ovs:vpools.' + (data.dtlMode().name === 'no_sync' ? 'dtl' : 'dtl_mode')"></b>:
+                    <span data-bind="translate: (data.dtlMode().name === 'no_sync' ? 'ovs:vpools.dtl_disabled' : 'ovs:storagedrivers.configuration.general.dtl_modes.' + data.dtlMode().name)"></span>
                 </li>
-                <li data-bind="visible: data.dtlEnabled() === true">
+                <li data-bind="visible: data.dtlMode().name !== 'no_sync'">
                     <b data-i18n="ovs:wizards.add_vpool.confirm.dtl_transport"></b>
                     <span data-bind="translate: data.dtlTransportMode() !== undefined ? 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + data.dtlTransportMode().name : ''"></span>
                 </li>

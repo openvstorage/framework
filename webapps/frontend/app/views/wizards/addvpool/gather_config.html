@@ -33,7 +33,7 @@ but WITHOUT ANY WARRANTY of any kind.
                       data-bind="dropdown: {
                                      enabled: data.vPoolAdd,
                                      items: data.dtlModes,
-                                     target: dtlMode,
+                                     target: data.dtlMode,
                                      text: function(item) {
                                          return $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item.name);
                                      }
@@ -41,7 +41,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </span>
             </div>
         </div>
-        <div class="form-group" data-bind="visible: data.dtlEnabled()">
+        <div class="form-group" data-bind="visible: data.dtlMode().name !== 'no_sync'">
             <label class="col-lg-4 control-label" for="dtlTransport" data-i18n="ovs:wizards.add_vpool.gather_config.dtl_transport"></label>
             <div class="col-lg-7" style="margin-bottom: -5px;">
                 <span id="dtlTransport"
