@@ -53,14 +53,17 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         if vpoolguid is not None:
             vpool = VPool(vpoolguid)
-            return vpool.vdisks
-        if storagerouterguid is not None:
+            vdisks = vpool.vdisks
+        elif storagerouterguid is not None:
             storagerouter = StorageRouter(storagerouterguid)
-            return DataList(VDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('guid', DataList.operator.IN, storagerouter.vdisks_guids)]})
+            vdisks = DataList(VDisk, {'type': DataList.where_operator.AND,
+                                      'items': [('guid', DataList.operator.IN, storagerouter.vdisks_guids)]})
+        else:
+            vdisks = VDiskList.get_vdisks()
         if query is not None:
-            return DataList(VDisk, query)
-        return VDiskList.get_vdisks()
+            query_vdisk_guids = DataList(VDisk, query).guids
+            vdisks = [vdisk for vdisk in vdisks if vdisk.guid in query_vdisk_guids]
+        return vdisks
 
     @log()
     @required_roles(['read', 'manage'])
