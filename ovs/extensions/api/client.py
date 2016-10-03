@@ -169,7 +169,6 @@ class OVSClient(object):
             else:
                 raise HttpException(status_code, message)
 
-
     def _call(self, api, params, function, **kwargs):
         if not api.endswith('/'):
             api = '{0}/'.format(api)
