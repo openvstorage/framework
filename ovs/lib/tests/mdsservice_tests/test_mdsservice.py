@@ -26,7 +26,7 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import MetadataServerClient, StorageDriverConfiguration
 from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.tests.helpers import Helper
@@ -1258,7 +1258,10 @@ class MDSServices(unittest.TestCase):
         StorageRouterClient.mds_recording = []
         MDSServiceController.ensure_safety(vdisk)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
-        self.assertListEqual(StorageRouterClient.mds_recording, [['10.0.0.1:1', '10.0.0.2:2', '10.0.0.3:3']])
+        self.assertListEqual(StorageRouterClient.mds_recording, [['10.0.0.1:1', '10.0.0.2:2', '10.0.0.3:3'],
+                                                                 '10.0.0.1:1: Master (I)',
+                                                                 '10.0.0.2:2: Slave (E)',
+                                                                 '10.0.0.3:3: Slave (E)'])
 
         vdisk.storagedriver_client.migrate(vdisk.volume_id, storagedrivers[2].storagedriver_id, False)
 
@@ -1271,12 +1274,16 @@ class MDSServices(unittest.TestCase):
         MDSServiceController.ensure_safety(vdisk)
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
         self.assertListEqual(StorageRouterClient.mds_recording, [['10.0.0.2:2', '10.0.0.3:3'],
-                                                                 ['10.0.0.2:2', '10.0.0.1:1', '10.0.0.3:3']])
+                                                                 '10.0.0.2:2: Master (I)',
+                                                                 ['10.0.0.2:2', '10.0.0.1:1', '10.0.0.3:3'],
+                                                                 '10.0.0.2:2: Master (I)',
+                                                                 '10.0.0.1:1: Slave (E)',
+                                                                 '10.0.0.3:3: Slave (E)'])
 
         config = vdisk.info['metadata_backend_config']
-        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[0]['ip'], config[0]['port']))._get_role(vdisk.volume_id), MDSClient.MASTER_ROLE)
-        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))._get_role(vdisk.volume_id), MDSClient.SLAVE_ROLE)
-        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))._get_role(vdisk.volume_id), MDSClient.SLAVE_ROLE)
+        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[0]['ip'], config[0]['port']))._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.MASTER)
+        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
+        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
 
     def test_mds_checkup(self):
         """

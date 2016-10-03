@@ -19,7 +19,6 @@ Mock wrapper class for the storagedriver client
 """
 import copy
 import json
-import time
 import uuid
 import pickle
 import threading
@@ -413,17 +412,18 @@ class StorageRouterClient(object):
         """
         Stores the given config
         """
+        from ovs.extensions.storageserver.storagedriver import MetadataServerClient
         StorageRouterClient._metadata_backend_config[self.vpool_guid][volume_id] = metadata_backend_config
         config_stream = []
         configs = metadata_backend_config.node_configs()
         if len(configs) == 0:
             raise RuntimeError('At least one config should be passed')
         master = configs[0]
-        client = MDSClient(master)
-        client.set_role(volume_id, MDSClient.MASTER_ROLE)
         for config in configs:
             config_stream.append('{0}:{1}'.format(config.address(), config.port()))
         StorageRouterClient.mds_recording.append(config_stream)
+        client = MDSClient(master)
+        client.set_role(volume_id, MetadataServerClient.MDS_ROLE.MASTER, _internal=True)
 
     def migrate(self, volume_id, node_id, force_restart):
         """
@@ -486,9 +486,6 @@ class MDSClient(object):
     _catchup = {}
     _roles = {}
 
-    MASTER_ROLE = 0
-    SLAVE_ROLE = 1
-
     def __init__(self, node_config, key=None):
         """
         Dummy init method
@@ -529,7 +526,7 @@ class MDSClient(object):
             MDSClient._roles[self.key] = {}
         MDSClient._roles[self.key][volume_id] = None
 
-    def set_role(self, volume_id, role):
+    def set_role(self, volume_id, role, _internal=False):
         """
         Dummy set role method
         """
@@ -538,6 +535,7 @@ class MDSClient(object):
         if volume_id not in MDSClient._roles[self.key]:
             raise RuntimeError('Namespace does not exist')
         MDSClient._roles[self.key][volume_id] = role
+        StorageRouterClient.mds_recording.append('{0}: {1} ({2})'.format(self.key, role, 'I' if _internal is True else 'E'))
 
     def _get_role(self, volume_id):
         """

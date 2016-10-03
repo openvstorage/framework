@@ -621,13 +621,9 @@ class MDSServiceController(object):
         # Build the new configuration and update the vdisk
         configs_no_ex_master = []
         configs_all = []
-        first = True
         for service in new_services:
             client = MetadataServerClient.load(service)
             client.create_namespace(str(vdisk.volume_id))
-            if first is False:
-                client.set_role(str(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
-            first = False
             # noinspection PyArgumentList
             config = MDSNodeConfig(address=str(service.storagerouter.ip),
                                    port=service.ports[0])
@@ -639,6 +635,11 @@ class MDSServiceController(object):
                                                                       metadata_backend_config=MDSMetaDataBackendConfig(configs_no_ex_master))
         vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
                                                                   metadata_backend_config=MDSMetaDataBackendConfig(configs_all))
+
+        for service in new_services[1:]:
+            client = MetadataServerClient.load(service)
+            client.set_role(str(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
+
         MDSServiceController.sync_vdisk_to_reality(vdisk)
         MDSServiceController._logger.debug('MDS safety: vDisk {0}: Completed'.format(vdisk.guid))
 
