@@ -53,6 +53,7 @@ class remote(object):
 
         self.servers = []
         self.modules = modules
+        self._remote_modules = {}
         self._unittest_mode = os.environ.get('RUNNING_UNITTESTS') == 'True'
         if self._unittest_mode is False:
             ssh_opts = []
@@ -82,6 +83,11 @@ class remote(object):
         for server in self.servers:
             server.close()
 
+    def __getitem__(self, item):
+        if item not in self._remote_modules:
+            self._remote_modules[item] = self._get_connection(item)
+        return self._remote_modules[item]
+
     def _build_remote_module(self, connection):
         if self._unittest_mode is False:
             connection.modules['sys'].path.append('/opt/OpenvStorage')
@@ -94,3 +100,7 @@ class remote(object):
             else:
                 remote_modules[module.__name__] = connection.modules[module.__name__]
         return type('remote', (), remote_modules)
+
+    def _get_connection(self, ip):
+        self.connection = self.servers[self.ips.index(ip)].classic_connect()
+        return self._build_remote_module(self.connection)
