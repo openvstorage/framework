@@ -162,7 +162,7 @@ class VDiskViewSet(viewsets.ViewSet):
 
     @action()
     @log()
-    @required_roles(['write'])
+    @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
     def move(self, vdisk, target_storagerouter_guid):
@@ -281,10 +281,8 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Gets all possible target Storage Routers for a given vDisk (e.g. when cloning, creating from template or moving)
         """
-        storagerouters = [] if vdisk.vpool is None else [sd.storagerouter for sd in vdisk.vpool.storagedrivers]
-        if hints.get('full', False) is True:
-            return storagerouters
-        return [sr.guid for sr in storagerouters]
+        _ = hints
+        return [] if vdisk.vpool is None else [sd.storagerouter for sd in vdisk.vpool.storagedrivers]
 
     @action()
     @log()
