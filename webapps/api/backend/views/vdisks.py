@@ -277,11 +277,10 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(StorageRouter)
     @load(VDisk)
-    def get_target_storagerouters(self, vdisk, hints):
+    def get_target_storagerouters(self, vdisk):
         """
         Gets all possible target Storage Routers for a given vDisk (e.g. when cloning, creating from template or moving)
         """
-        _ = hints
         return [] if vdisk.vpool is None else [sd.storagerouter for sd in vdisk.vpool.storagedrivers]
 
     @action()
