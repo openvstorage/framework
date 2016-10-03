@@ -437,15 +437,16 @@
         "details": "Details",
         "performance": "Performance",
         "detail": {
-            "title": "vDisk",
-            "snapshots": "Snapshots",
-            "edgeclients": "Edge Clients",
-            "rollback": "Rollback",
+            "clone": "Clone",
             "configuration": "vDisk configuration",
             "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
-            "clone": "Clone",
+            "edgeclients": "Edge Clients",
+            "move": "Move",
+            "rollback": "Rollback",
             "set_as_template": "Set as vTemplate",
-            "snapshot": "Take snapshot"
+            "snapshot": "Take snapshot",
+            "snapshots": "Snapshots",
+            "title": "vDisk"
         },
         "set_as_template": {
             "done": "vDisk set as vTemplate",
@@ -956,6 +957,23 @@
                 "started": "Configuration started",
                 "inprogress": "The partition is now being configured."
             }
+        },
+        "vdisk_move": {
+            "confirm": {
+                "failed": "Moving vDisk __what__ failed: __why__",
+                "in_progress": "vDisk __what__ is being moved",
+                "started": "Move started",
+                "success": "Successfully moved vDisk __what__"
+            },
+            "gather": {
+                "source": "Source:",
+                "source_unknown": "Information unavailable",
+                "source_unknown_message": "Source StorageRouter information could not be loaded",
+                "target": "Target:",
+                "targets_unavailable": "No targets",
+                "targets_unavailable_message": "No target StorageRouters available to move to"
+            },
+            "title": "Move vDisk"
         }
     },
     "events": {
@@ -988,6 +1006,7 @@
         "loading": "&#xf110;",
         "logs": "&#xf02d;",
         "management": "&#xf0b1;",
+        "move": "&#xf064;",
         "moveaway": "&#xf074;",
         "notchecked": "&#xf096;",
         "password": "&#xf084;",

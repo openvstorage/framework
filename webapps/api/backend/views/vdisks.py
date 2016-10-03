@@ -155,11 +155,27 @@ class VDiskViewSet(viewsets.ViewSet):
         :param storagerouter_guid: Guid of the storagerouter hosting the virtual disk
         :param snapshot_id: ID of the snapshot to clone from
         """
-        storagerouter = StorageRouter(storagerouter_guid)
         return VDiskController.clone.delay(vdisk_guid=vdisk.guid,
                                            snapshot_id=snapshot_id,
                                            name=name,
-                                           storagerouter_guid=storagerouter.guid)
+                                           storagerouter_guid=storagerouter_guid)
+
+    @action()
+    @log()
+    @required_roles(['write'])
+    @return_task()
+    @load(VDisk)
+    def move(self, vdisk, target_storagerouter_guid):
+        """
+        Moves a vDisk
+        :param vdisk: Guid of the virtual disk to move
+        :type vdisk: VDisk
+        :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisk to
+        :type target_storagerouter_guid: str
+        :return: Celery async task
+        """
+        return VDiskController.move.delay(vdisk_guid=vdisk.guid,
+                                          target_storagerouter_guid=target_storagerouter_guid)
 
     @action()
     @log()
@@ -263,23 +279,12 @@ class VDiskViewSet(viewsets.ViewSet):
     @load(VDisk)
     def get_target_storagerouters(self, vdisk, hints):
         """
-        Gets all possible target Storage Routers for a given vDisk (e.g. when cloning or creating from template)
+        Gets all possible target Storage Routers for a given vDisk (e.g. when cloning, creating from template or moving)
         """
-        storagerouter_guids = None
-        storagerouters = {}
-        if vdisk.vpool is not None:
-            vpool = vdisk.vpool
-            this_storagerouter_guids = set()
-            for storagedriver in vpool.storagedrivers:
-                this_storagerouter_guids.add(storagedriver.storagerouter_guid)
-                if hints['full'] is True:
-                    storagerouters[storagedriver.storagerouter_guid] = storagedriver.storagerouter
-            if storagerouter_guids is None:
-                storagerouter_guids = list(this_storagerouter_guids)
-            else:
-                storagerouter_guids = list(this_storagerouter_guids & set(storagerouter_guids))
-            return storagerouter_guids if hints['full'] is False else [storagerouters[guid] for guid in storagerouter_guids]
-        return []
+        storagerouters = [] if vdisk.vpool is None else [sd.storagerouter for sd in vdisk.vpool.storagedrivers]
+        if hints.get('full', False) is True:
+            return storagerouters
+        return [sr.guid for sr in storagerouters]
 
     @action()
     @log()
