@@ -321,6 +321,9 @@ class StorageRouterController(object):
             except Exception as ex:
                 raise RuntimeError('Something went wrong building SSH connections. {0}'.format(ex))
 
+        readcache_size_requested = parameters['readcache_size'] * 1024 ** 3
+        writecache_size_requested = parameters['writecache_size'] * 1024 ** 3
+
         # Check partition role presence
         arakoon_service_found = False
         for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:
@@ -331,7 +334,10 @@ class StorageRouterController(object):
         error_messages = []
         metadata = StorageRouterController.get_metadata(storagerouter.guid)
         partition_info = metadata['partitions']
-        for required_role in [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.DB]:
+        required_roles = [DiskPartition.ROLES.WRITE, DiskPartition.ROLES.DB]
+        if readcache_size_requested > 0:
+            required_roles.append(DiskPartition.ROLES.READ)
+        for required_role in required_roles:
             if required_role not in partition_info:
                 error_messages.append('Missing required partition role {0}'.format(required_role))
             elif len(partition_info[required_role]) == 0:
@@ -437,8 +443,6 @@ class StorageRouterController(object):
         readcache_size_available = metadata['readcache_size']
         writecache_size_available = metadata['writecache_size']
 
-        readcache_size_requested = parameters['readcache_size'] * 1024 ** 3
-        writecache_size_requested = parameters['writecache_size'] * 1024 ** 3
         if readcache_size_requested > readcache_size_available + shared_size_available:
             error_messages.append('Too much space requested for {0} cache. Available: {1:.2f} GiB, Requested: {2:.2f} GiB'.format(DiskPartition.ROLES.READ,
                                                                                                                                   (readcache_size_available + shared_size_available) / 1024.0 ** 3,
