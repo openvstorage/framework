@@ -141,12 +141,8 @@ class OVSClient(object):
                 return parsed_output
             raise RuntimeError('Could not parse returned data: {0}: {1}'.format(status_code, response.text))
         else:
-            if status_code in [401, 403]:
-                exception = ForbiddenException
-            else:
-                exception = RuntimeError
+            message = None
             if parsed_output is not None:
-                message = None
                 if 'error_description' in parsed_output:
                     message = parsed_output['error_description']
                 if 'error' in parsed_output:
@@ -154,18 +150,24 @@ class OVSClient(object):
                         message = parsed_output['error']
                     else:
                         message += ' ({0})'.format(parsed_output['error'])
-                raise exception(message or 'Unknown error')
-            messages = {401: 'No access to the requested API',
-                        403: 'No access to the requested API',
-                        404: 'The requested API could not be found',
-                        405: 'Requested method not allowed',
-                        406: 'The request was unacceptable',
-                        429: 'Rate limit was hit',
-                        500: 'Internal server error'}
-            if status_code in messages:
-                raise exception(messages[status_code])
             else:
-                raise exception('Unknown error')
+                messages = {401: 'No access to the requested API',
+                            403: 'No access to the requested API',
+                            404: 'The requested API could not be found',
+                            405: 'Requested method not allowed',
+                            406: 'The request was unacceptable',
+                            429: 'Rate limit was hit',
+                            500: 'Internal server error'}
+                if status_code in messages:
+                    message = messages[status_code]
+            if message is None:
+                message = 'Unknown error'
+            if status_code in [401, 403]:
+                raise ForbiddenException(message)
+            elif status_code == 404:
+                raise NotFoundException(message)
+            else:
+                raise HttpException(status_code, message)
 
     def _call(self, api, params, function, **kwargs):
         if not api.endswith('/'):
