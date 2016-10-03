@@ -43,6 +43,10 @@ define([
             { key: 'writeSpeed', value: $.t('ovs:generic.write'),      width: 125       },
             { key: 'dtlStatus',  value: $.t('ovs:generic.dtl_status'), width: 50        }
         ];
+        self.vDiskQuery         = JSON.stringify({
+            type: 'AND',
+            items: [['is_vtemplate', 'EQUALS', false]]
+        });
 
         // Handles
         self.vDisksHandle             = {};
@@ -156,6 +160,7 @@ define([
                     options.sort = 'devicename';
                     options.contents = '_dynamics,_relations,-snapshots';
                     options.vpoolguid = self.vPool().guid();
+                    options.query = self.vDiskQuery;
                     self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
