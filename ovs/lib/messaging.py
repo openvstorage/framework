@@ -79,7 +79,7 @@ class MessageController(object):
         """
         Returns all subscriptions for a given subscriber
         """
-        return MessageController._cache.get('msg_subscriptions_%d' % subscriber_id, [])
+        return MessageController._cache.get('msg_subscriptions_{0}'.format(subscriber_id), [])
 
     @staticmethod
     @synchronized()
@@ -87,7 +87,7 @@ class MessageController(object):
         """
         Subscribes a given subscriber to a set of Types
         """
-        MessageController._cache.set('msg_subscriptions_%d' % subscriber_id, subscriptions, MessageController.TIMEOUT)
+        MessageController._cache.set('msg_subscriptions_{0}'.format(subscriber_id), subscriptions, MessageController.TIMEOUT)
         all_subscriptions = MessageController._cache.get('msg_subscriptions', [])
         for subscription in subscriptions:
             if subscription not in all_subscriptions:
@@ -101,7 +101,7 @@ class MessageController(object):
         Re-caches all subscriptions
         """
         try:
-            subscriber_key = 'msg_subscriptions_%d' % subscriber_id
+            subscriber_key = 'msg_subscriptions_{0}'.format(subscriber_id)
             MessageController._cache.set(subscriber_key, MessageController._cache.get(subscriber_key, []), MessageController.TIMEOUT)
             MessageController._cache.set('msg_subscriptions', MessageController._cache.get('msg_subscriptions', []), MessageController.TIMEOUT)
         except Exception:
@@ -114,7 +114,7 @@ class MessageController(object):
         Gets all messages pending for a given subscriber, from a given message id
         """
         try:
-            subscriptions = MessageController._cache.get('msg_subscriptions_%d' % subscriber_id, [])
+            subscriptions = MessageController._cache.get('msg_subscriptions_{0}'.format(subscriber_id), [])
             all_messages = MessageController._cache.get('msg_messages', [])
             messages = []
             last_message_id = 0
