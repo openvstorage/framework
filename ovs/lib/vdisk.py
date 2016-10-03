@@ -422,6 +422,38 @@ class VDiskController(object):
         vdisk.invalidate_dynamics(['is_vtemplate', 'info'])
 
     @staticmethod
+    @celery.task(name='ovs.vdisk.move')
+    def move(vdisk_guid, target_storagerouter_guid):
+        """
+        Move a vDisk to the specified StorageRouter
+        :param vdisk_guid: Guid of the vDisk to move
+        :type vdisk_guid: str
+        :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisk to
+        :type target_storagerouter_guid: str
+        """
+        vdisk = VDisk(vdisk_guid)
+        storagedriver = None
+        storagerouter = StorageRouter(target_storagerouter_guid)
+
+        for sd in storagerouter.storagedrivers:
+            if sd.vpool == vdisk.vpool:
+                storagedriver = sd
+                break
+
+        if storagedriver is None:
+            raise RuntimeError('Failed to find the matching StorageDriver')
+
+        vdisk.storagedriver_client.migrate(object_id=str(vdisk.volume_id),
+                                           node_id=str(storagedriver.storagedriver_id),
+                                           force_restart=False)
+
+        try:
+            MDSServiceController.ensure_safety(vdisk=vdisk)
+            VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
+        except:
+            VDiskController._logger.exception('Executing post-migrate actions failed for vDisk {0}'.format(vdisk.name))
+
+    @staticmethod
     @celery.task(name='ovs.vdisk.rollback')
     def rollback(vdisk_guid, timestamp):
         """

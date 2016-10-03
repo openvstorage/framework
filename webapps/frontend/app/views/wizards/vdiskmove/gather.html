@@ -1,0 +1,62 @@
+<!--
+Copyright (C) 2016 iNuron NV
+
+This file is part of Open vStorage Open Source Edition (OSE),
+as available from
+
+      http://www.openvstorage.org and
+      http://www.openvstorage.com.
+
+This file is free software; you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+as published by the Free Software Foundation, in version 3 as it comes
+in the LICENSE.txt file of the Open vStorage OSE distribution.
+
+Open vStorage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY of any kind.
+-->
+<div>
+    <form class="form-horizontal">
+        <div style="padding-bottom: 10px;">
+            <span data-bind="translate: 'ovs:wizards.vdisk_move.title'"></span>
+            <span data-bind="text: data.vDisk().name()"></span>
+        </div>
+        <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: loading() === true"></span>
+        <div class="form-group" data-bind="visible: loading() === false, css: { 'has-error': canContinue().fields.contains('source') }">
+            <label class="col-lg-2 control-label" data-i18n="ovs:wizards.vdisk_move.gather.source"></label>
+            <!-- ko if: data.source() === undefined -->
+                <span class="col-lg-6" data-bind="translate: 'ovs:wizards.vdisk_move.gather.source_unknown'" style="padding-top: 7px;"></span>
+            <!-- /ko -->
+            <!-- ko if: data.source() !== undefined -->
+                <span class="col-lg-6" data-bind="text: data.source().name()" style="padding-top: 7px;"></span>
+            <!-- /ko -->
+        </div>
+        <div class="form-group" data-bind="visible: loading() === false, css: { 'has-error': canContinue().fields.contains('targets') }">
+            <label class="col-lg-2 control-label" data-i18n="ovs:wizards.vdisk_move.gather.target"></label>
+            <!-- ko if: data.targets().length === 0 -->
+                <span class="col-lg-6" data-bind="translate: 'ovs:wizards.vdisk_move.gather.targets_unavailable'" style="padding-top: 7px;"></span>
+            <!-- /ko -->
+            <!-- ko if: data.targets().length !== 0 -->
+                <div class="col-lg-6">
+                    <span data-bind="dropdown: {
+                                         key: 'guid', keyisfunction: true,
+                                         items: data.targets, target: data.target,
+                                         text: function(item) {
+                                             if (item !== undefined) {
+                                                 return item.name();
+                                             }
+                                         }
+                                     }">
+                    </span>
+                </div>
+            <!-- /ko -->
+        </div>
+    </form>
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value" style="margin-bottom: -10px;">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>
