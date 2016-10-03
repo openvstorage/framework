@@ -166,7 +166,7 @@ class VDiskController(object):
                 vdisk = VDiskList.get_by_devicename_and_vpool(volume_path, storagedriver.vpool)
                 if vdisk is None:
                     vdisk = VDisk()
-                    vdisk.name = volume_path.split('/')[-1].split('.')[0]
+                    vdisk.name = VDiskController.extract_volumename(volume_path)
             vdisk.devicename = volume_path
             vdisk.volume_id = volume_id
             vdisk.size = volume_size
@@ -1173,10 +1173,20 @@ class VDiskController(object):
         :return: A cleaned devicename
         :rtype: str
         """
-        name = name.strip('/').replace(' ', '_').lower()
+        name = name.strip('/').replace(' ', '_')
         while '//' in name:
             name = name.replace('//', '/')
         name = re.compile('[^/\w\-.]+').sub('', name)
-        if re.compile('\w\.[a-z]{3,4}$').search(name) is None:
-            name = '{0}.raw'.format(name.rstrip('.'))
-        return '/{0}'.format(name)
+        filename = name.split('/')[-1]
+        if len(filename) > 4 and filename[-4:] == '.raw':
+            return '/{0}'.format(name)
+        return '/{0}.raw'.format(name)
+
+    @staticmethod
+    def extract_volumename(devicename):
+        """
+        Extracts a reasonable volume name out of a given devicename
+        :param devicename: A raw devicename of a volume (e.g. /foo/bar.raw)
+        :return: A cleaned up volumename (e.g. bar)
+        """
+        return devicename.rsplit('/', 1)[-1].rsplit('.', 1)[0]

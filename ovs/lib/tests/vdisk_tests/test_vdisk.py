@@ -727,17 +727,30 @@ class VDiskTest(unittest.TestCase):
 
     def test_clean_devicename(self):
         """
-        Test the clean devicename functionality
-            - Test several names and validate the return devicename
+        Validates whether a devicename is properly cleaned
+        * Test several names and validate the returned devicename
         """
-        test = {'Foo Bar': '/foo_bar.raw',
-                '/Foo Bar .raw': '/foo_bar_.raw',
+        test = {'Foo Bar': '/Foo_Bar.raw',
+                '/Foo Bar .raw': '/Foo_Bar_.raw',
                 'foo-bar.rawtest': '/foo-bar.rawtest.raw',
                 'test///folder': '/test/folder.raw',
-                'foobar-flat.vmdk': '/foobar-flat.vmdk',
+                'foobar-flat.vmdk': '/foobar-flat.vmdk.raw',
                 '//test.raw': '/test.raw',
                 'test/.raw': '/test/.raw.raw',
-                '//d\'!@#%xfoo Bar/te_b --asdfS SA AS lolz///f.wrv.': '/dxfoo_bar/te_b_--asdfs_sa_as_lolz/f.wrv.raw'}
+                '//d\'!@#%xfoo Bar/te_b --asdfS SA AS lolz///f.wrv.': '/dxfoo_Bar/te_b_--asdfS_SA_AS_lolz/f.wrv..raw'}
         for raw, expected in test.iteritems():
             result = VDiskController.clean_devicename(raw)
+            self.assertEqual(result, expected)
+
+    def test_extract_volumename(self):
+        """
+        Validates whether a correct volumename is yielded from a given devicename
+        * Test several devicenames and validate the returned name
+        """
+        test = {'/foo/Bar/something.raw': 'something',
+                '/Some.long.dotted.name.raw': 'Some.long.dotted.name',
+                '': '',
+                'f4qav@#$%sd.raw': 'f4qav@#$%sd'}
+        for devicename, expected in test.iteritems():
+            result = VDiskController.extract_volumename(devicename)
             self.assertEqual(result, expected)
