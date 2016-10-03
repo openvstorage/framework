@@ -20,6 +20,7 @@ Messaging module
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.generic.filemutex import file_mutex
+from ovs.log.log_handler import LogHandler
 
 
 def synchronized():
@@ -56,6 +57,7 @@ class MessageController(object):
     """
     TIMEOUT = 300
     _cache = VolatileFactory.get_client()
+    _logger = LogHandler.get('lib', name='messaging')
 
     class Type(object):
         """
@@ -77,7 +79,7 @@ class MessageController(object):
         """
         Returns all subscriptions for a given subscriber
         """
-        return MessageController._cache.get('msg_subscriptions_%d' % subscriber_id, [])
+        return MessageController._cache.get('msg_subscriptions_{0}'.format(subscriber_id), [])
 
     @staticmethod
     @synchronized()
@@ -85,7 +87,7 @@ class MessageController(object):
         """
         Subscribes a given subscriber to a set of Types
         """
-        MessageController._cache.set('msg_subscriptions_%d' % subscriber_id, subscriptions, MessageController.TIMEOUT)
+        MessageController._cache.set('msg_subscriptions_{0}'.format(subscriber_id), subscriptions, MessageController.TIMEOUT)
         all_subscriptions = MessageController._cache.get('msg_subscriptions', [])
         for subscription in subscriptions:
             if subscription not in all_subscriptions:
@@ -98,25 +100,33 @@ class MessageController(object):
         """
         Re-caches all subscriptions
         """
-        subscriber_key = 'msg_subscriptions_%d' % subscriber_id
-        MessageController._cache.set(subscriber_key, MessageController._cache.get(subscriber_key, []), MessageController.TIMEOUT)
-        MessageController._cache.set('msg_subscriptions', MessageController._cache.get('msg_subscriptions', []), MessageController.TIMEOUT)
+        try:
+            subscriber_key = 'msg_subscriptions_{0}'.format(subscriber_id)
+            MessageController._cache.set(subscriber_key, MessageController._cache.get(subscriber_key, []), MessageController.TIMEOUT)
+            MessageController._cache.set('msg_subscriptions', MessageController._cache.get('msg_subscriptions', []), MessageController.TIMEOUT)
+        except Exception:
+            MessageController._logger.exception('Error resetting subscriptions')
+            raise
 
     @staticmethod
     def get_messages(subscriber_id, message_id):
         """
         Gets all messages pending for a given subscriber, from a given message id
         """
-        subscriptions = MessageController._cache.get('msg_subscriptions_%d' % subscriber_id, [])
-        all_messages = MessageController._cache.get('msg_messages', [])
-        messages = []
-        last_message_id = 0
-        for message in all_messages:
-            if message['id'] > last_message_id:
-                last_message_id = message['id']
-            if message['id'] > message_id and message['type'] in subscriptions:
-                messages.append(message)
-        return messages, last_message_id
+        try:
+            subscriptions = MessageController._cache.get('msg_subscriptions_{0}'.format(subscriber_id), [])
+            all_messages = MessageController._cache.get('msg_messages', [])
+            messages = []
+            last_message_id = 0
+            for message in all_messages:
+                if message['id'] > last_message_id:
+                    last_message_id = message['id']
+                if message['id'] > message_id and message['type'] in subscriptions:
+                    messages.append(message)
+            return messages, last_message_id
+        except Exception:
+            MessageController._logger.exception('Error loading messages')
+            raise
 
     @staticmethod
     @synchronized()
@@ -137,4 +147,8 @@ class MessageController(object):
         """
         Gets the last messageid
         """
-        return max([m['id'] for m in MessageController._cache.get('msg_messages', [])] + [0])
+        try:
+            return max([m['id'] for m in MessageController._cache.get('msg_messages', [])] + [0])
+        except Exception:
+            MessageController._logger.exception('Error loading last message id')
+            raise

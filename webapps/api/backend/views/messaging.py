@@ -92,7 +92,12 @@ class MessagingViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         thread = gevent.spawn(MessagingViewSet._wait, pk, message_id)
         gevent.joinall([thread])
-        messages, last_message_id = thread.value
+        result = thread.value
+        if result is None:
+            messages = []
+            last_message_id = message_id
+        else:
+            messages, last_message_id = thread.value
         return Response({'messages': messages,
                          'last_message_id': last_message_id,
                          'subscriptions': MessageController.subscriptions(pk)}, status=status.HTTP_200_OK)
