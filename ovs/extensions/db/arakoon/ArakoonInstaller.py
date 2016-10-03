@@ -724,10 +724,11 @@ class ArakoonInstaller(object):
         """
         config = ArakoonClusterConfig(cluster_name, filesystem)
         config.load_config(master_ip)
-        root_client = SSHClient(master_ip, username='root')
-        arakoon_client = ArakoonInstaller.build_client(config)
-        ArakoonInstaller.start(cluster_name, root_client)
+        root_clients = [SSHClient(node.ip, username='root') for node in config.nodes]
+        for client in root_clients:
+            ArakoonInstaller.start(cluster_name, client)
         ArakoonInstaller.wait_for_cluster(cluster_name, master_ip, filesystem)
+        arakoon_client = ArakoonInstaller.build_client(config)
         arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, config.export_ini())
 
     @staticmethod
