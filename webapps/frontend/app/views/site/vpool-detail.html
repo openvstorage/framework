@@ -138,8 +138,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry">
                                         <span data-bind="translate: 'ovs:vpools.' + (item().dtl_enabled === true ? 'dtl_mode' : 'dtl')"></span>
-                                        <a data-bind="tooltip: 'ovs:storagedrivers.configuration.general.dtl_help_title',
-                                                      visible: item().dtl_enabled !== true"
+                                        <a data-bind="tooltip: 'ovs:storagedrivers.configuration.general.dtl_help_title'"
                                            class="hand fa noline"
                                            data-i18n="[html]ovs:icons.help"
                                            style="margin-left: 5px; color: blue;">
@@ -149,7 +148,7 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="text: $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item().dtl_mode)"></span>
+                                    <span data-part="lazy-entry" data-bind="text: (item().dtl_enabled === true ? $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item().dtl_mode) : $.t('ovs:storagedrivers.configuration.general.dtl_modes.no_sync'))"></span>
                                 </span>
                             </td>
                         </tr>

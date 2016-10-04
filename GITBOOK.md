@@ -3,7 +3,7 @@ This book documents the Open vStorage Framework. The Framework is the comfort la
 
 The Open vStorage Documentation is divided into following sections:
 * [Framework Components](docs/components.md)
-* [Conifguration Management](docs/etcd.md)
+* [Configuration Management](docs/configmgmt.md)
 * [Framework Concepts](docs/concepts.md)
 * [Logs](docs/log.md)
 * [Troubleshooting](docs/troubleshooting.md)

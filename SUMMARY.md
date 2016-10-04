@@ -2,7 +2,7 @@
 
 * [Framework Components](docs/components.md)
     * [Data Abstraction layer](docs/dal.md)
-* [Conifguration Management](docs/etcd.md)
+* [Configuration Management](docs/configmgmt.md)
 * [Framework Concepts](docs/concepts.md)
     * [Master and Extra Nodes](docs/masterextra.md)
     * [The watchers](docs/watchers.md)

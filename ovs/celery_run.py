@@ -28,10 +28,11 @@ from celery import Celery
 from celery.signals import task_postrun, worker_process_init, after_setup_logger, after_setup_task_logger
 from ovs.lib.messaging import MessageController
 from ovs.log.log_handler import LogHandler
+from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 
 
 class CeleryMockup(object):
@@ -60,8 +61,8 @@ class CeleryMockup(object):
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     celery = CeleryMockup()
 else:
-    memcache_servers = EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
-    rmq_servers = EtcdConfiguration.get('/ovs/framework/messagequeue|endpoints')
+    memcache_servers = Configuration.get('/ovs/framework/memcache|endpoints')
+    rmq_servers = Configuration.get('/ovs/framework/messagequeue|endpoints')
 
     unique_id = System.get_my_machine_id()
 
@@ -76,9 +77,9 @@ else:
 
     # http://docs.celeryproject.org/en/latest/configuration.html#cache-backend-settings
     celery.conf.CELERY_RESULT_BACKEND = "cache+memcached://{0}/".format(';'.join(memcache_servers))
-    celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(EtcdConfiguration.get('/ovs/framework/messagequeue|protocol'),
-                                                                    EtcdConfiguration.get('/ovs/framework/messagequeue|user'),
-                                                                    EtcdConfiguration.get('/ovs/framework/messagequeue|password'),
+    celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(Configuration.get('/ovs/framework/messagequeue|protocol'),
+                                                                    Configuration.get('/ovs/framework/messagequeue|user'),
+                                                                    Configuration.get('/ovs/framework/messagequeue|password'),
                                                                     server)
                                        for server in rmq_servers])
     celery.conf.BROKER_CONNECTION_MAX_RETRIES = 5
@@ -118,11 +119,13 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
     _ = args, kwargs, kwds
     VolatileFactory.store = None
     PersistentFactory.store = None
+    ArakoonConfiguration.client = None
 
 
 @after_setup_task_logger.connect
 @after_setup_logger.connect
 def load_ovs_logger(**kwargs):
+    """Load a logger."""
     if 'logger' in kwargs:
         kwargs['logger'] = LogHandler.get('celery', name='celery')
 

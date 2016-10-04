@@ -17,6 +17,7 @@
 Remote RPyC wrapper module
 """
 
+import os
 from subprocess import check_output
 from rpyc.utils.zerodeploy import DeployedServer
 from plumbum import SshMachine
@@ -50,13 +51,17 @@ class remote(object):
         if not isinstance(modules, list) and not isinstance(modules, set) and not isinstance(modules, tuple):
             raise ValueError('Modules should be a list, set or tuple')
 
-        self.username = username if username is not None else check_output('whoami').strip()
-        ssh_opts = []
-        if strict_host_key_checking is False:
-            ssh_opts.append('-o StrictHostKeyChecking=no')
-        self.machines = [SshMachine(ip, user=self.username, password=password, ssh_opts=tuple(ssh_opts)) for ip in self.ips]
-        self.servers = [DeployedServer(machine) for machine in self.machines]
+        self.servers = []
         self.modules = modules
+        self._remote_modules = {}
+        self._unittest_mode = os.environ.get('RUNNING_UNITTESTS') == 'True'
+        if self._unittest_mode is False:
+            ssh_opts = []
+            if strict_host_key_checking is False:
+                ssh_opts.append('-o StrictHostKeyChecking=no')
+            self.username = username if username is not None else check_output('whoami').strip()
+            self.machines = [SshMachine(ip, user=self.username, password=password, ssh_opts=tuple(ssh_opts)) for ip in self.ips]
+            self.servers = [DeployedServer(machine) for machine in self.machines]
 
     def __iter__(self):
         replacements = []
@@ -65,7 +70,10 @@ class remote(object):
         return iter(replacements)
 
     def __enter__(self):
-        self.connections = [server.classic_connect() for server in self.servers]
+        if self._unittest_mode is True:
+            self.connections = self.ips
+        else:
+            self.connections = [server.classic_connect() for server in self.servers]
         if len(self.connections) == 1:
             return self._build_remote_module(self.connections[0])
         return self
@@ -75,12 +83,24 @@ class remote(object):
         for server in self.servers:
             server.close()
 
+    def __getitem__(self, item):
+        if item not in self._remote_modules:
+            self._remote_modules[item] = self._get_connection(item)
+        return self._remote_modules[item]
+
     def _build_remote_module(self, connection):
-        connection.modules['sys'].path.append('/opt/OpenvStorage')
+        if self._unittest_mode is False:
+            connection.modules['sys'].path.append('/opt/OpenvStorage')
         remote_modules = {}
         for module in self.modules:
-            if hasattr(module, '__module__'):
+            if self._unittest_mode is True:
+                remote_modules[module.__name__] = module
+            elif hasattr(module, '__module__'):
                 remote_modules[module.__name__] = getattr(connection.modules[module.__module__], module.__name__)
             else:
                 remote_modules[module.__name__] = connection.modules[module.__name__]
         return type('remote', (), remote_modules)
+
+    def _get_connection(self, ip):
+        self.connection = self.servers[self.ips.index(ip)].classic_connect()
+        return self._build_remote_module(self.connection)

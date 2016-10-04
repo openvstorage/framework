@@ -43,6 +43,10 @@ define([
             { key: 'writeSpeed', value: $.t('ovs:generic.write'),      width: 125       },
             { key: 'dtlStatus',  value: $.t('ovs:generic.dtl_status'), width: 50        }
         ];
+        self.vDiskQuery         = JSON.stringify({
+            type: 'AND',
+            items: [['is_vtemplate', 'EQUALS', false]]
+        });
 
         // Handles
         self.vDisksHandle             = {};
@@ -87,9 +91,6 @@ define([
                         return storageDriver;
                     }, 'guid'
                 );
-                $.each(self.storageDrivers(), function(_, sd) {
-                    calls.push(sd.canBeDeleted());
-                });
                 $.when.apply($, calls)
                     .done(function() {
                         var map = self.srCanDeleteMap();
@@ -104,7 +105,7 @@ define([
                             var found = false;
                             $.each(self.storageDrivers(), function(_, sd) {
                                 if (sd.storageRouterGuid() === srGuid) {
-                                    map[srGuid] = sd.canDelete();
+                                    map[srGuid] = sd.vdiskGuids().length === 0;
                                     found = true;
                                     return false;
                                 }
@@ -159,6 +160,7 @@ define([
                     options.sort = 'devicename';
                     options.contents = '_dynamics,_relations,-snapshots';
                     options.vpoolguid = self.vPool().guid();
+                    options.query = self.vDiskQuery;
                     self.vDisksHandle[options.page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({

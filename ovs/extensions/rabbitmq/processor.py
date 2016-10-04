@@ -23,12 +23,11 @@ import json
 from celery.task.control import revoke
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 import volumedriver.storagerouter.FileSystemEvents_pb2 as FileSystemEvents
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from google.protobuf.descriptor import FieldDescriptor
 from ovs.log.log_handler import LogHandler
-from ovs.lib.vdisk import VDiskController
 
 CINDER_VOLUME_UPDATE_CACHE = {}
 
@@ -41,9 +40,9 @@ def process(queue, body, mapping):
     :param mapping:
     """
     logger = LogHandler.get('extensions', name='processor')
-    if queue == EtcdConfiguration.get('/ovs/framework/messagequeue|queues.storagedriver'):
+    if queue == Configuration.get('/ovs/framework/messagequeue|queues.storagedriver'):
         cache = VolatileFactory.get_client()
-        all_extensions = None
+        all_extensions = []
 
         message = FileSystemEvents.EventMessage()
         message.ParseFromString(body)
@@ -125,7 +124,7 @@ def process(queue, body, mapping):
                 ))
         if event is None:
             message_type = 'unknown'
-            if all_extensions is None:
+            if len(all_extensions) == 0:
                 all_extensions = _load_extensions()
             for extension in all_extensions:
                 if message.event.HasExtension(extension):
@@ -142,14 +141,14 @@ def process(queue, body, mapping):
                 volume_id = body['payload']['volume_id']
                 display_name = body['payload']['display_name']
                 CINDER_VOLUME_UPDATE_CACHE[volume_id] = display_name
-            elif event_type == 'volume.update.end':
-                volume_id = body['payload']['volume_id']
-                display_name = body['payload']['display_name']
-                old_display_name = CINDER_VOLUME_UPDATE_CACHE.get(volume_id)
-                if old_display_name and old_display_name != display_name:
-                    logger.info('Caught volume rename event')
-                    VDiskController.update_vdisk_name.apply_async(kwargs={'volume_id': volume_id, 'old_name': old_display_name, 'new_name': display_name})
-                    del CINDER_VOLUME_UPDATE_CACHE[volume_id]
+            # elif event_type == 'volume.update.end':
+            #     volume_id = body['payload']['volume_id']
+            #     display_name = body['payload']['display_name']
+            #     old_display_name = CINDER_VOLUME_UPDATE_CACHE.get(volume_id)
+            #     if old_display_name and old_display_name != display_name:
+            #         logger.info('Caught volume rename event')
+            #         VDiskController.update_vdisk_name.apply_async(kwargs={'volume_id': volume_id, 'old_name': old_display_name, 'new_name': display_name})
+            #         del CINDER_VOLUME_UPDATE_CACHE[volume_id]
         except Exception as ex:
             logger.error('Processing notification failed {0}'.format(ex))
         logger.info('Processed notification from openstack.')

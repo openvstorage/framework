@@ -17,6 +17,7 @@
 """
 VDisk module
 """
+
 import time
 import pickle
 from datetime import datetime
@@ -25,7 +26,7 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.structures import Property, Relation, Dynamic
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient, ObjectRegistryClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
 
@@ -55,7 +56,7 @@ class VDisk(DataObject):
                   Dynamic('storagerouter_guid', str, 15),
                   Dynamic('is_vtemplate', bool, 60),
                   Dynamic('edge_clients', list, 30)]
-    _fixed_properties = ['storagedriver_client']
+    _fixed_properties = ['storagedriver_client', 'objectregistry_client']
 
     def __init__(self, *args, **kwargs):
         """
@@ -64,17 +65,28 @@ class VDisk(DataObject):
         DataObject.__init__(self, *args, **kwargs)
         self._frozen = False
         self._storagedriver_client = None
+        self._objectregistry_client = None
         self._frozen = True
 
     @property
     def storagedriver_client(self):
         """
-        Reload Storage Driver client
+        Client used for communication between Storage Driver and framework
         :return: StorageDriverClient
         """
         if self._storagedriver_client is None:
-            self.reload_client()
+            self.reload_client('storagedriver')
         return self._storagedriver_client
+
+    @property
+    def objectregistry_client(self):
+        """
+        Client used for communication between Storage Driver OR and framework
+        :return: ObjectRegistryClient
+        """
+        if self._objectregistry_client is None:
+            self.reload_client('objectregistry')
+        return self._objectregistry_client
 
     def _dtl_status(self):
         """
@@ -119,12 +131,12 @@ class VDisk(DataObject):
                 voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id)
             except:
                 voldrv_snapshots = []
-            for id in voldrv_snapshots:
-                snapshot = self.storagedriver_client.info_snapshot(volume_id, id)
+            for snap_id in voldrv_snapshots:
+                snapshot = self.storagedriver_client.info_snapshot(volume_id, snap_id)
                 if snapshot.metadata:
                     metadata = pickle.loads(snapshot.metadata)
                     if isinstance(metadata, dict):
-                        snapshots.append({'guid': id,
+                        snapshots.append({'guid': snap_id,
                                           'timestamp': metadata['timestamp'],
                                           'label': metadata['label'],
                                           'is_consistent': metadata['is_consistent'],
@@ -133,9 +145,9 @@ class VDisk(DataObject):
                                           'in_backend': snapshot.in_backend,
                                           'stored': int(snapshot.stored)})
                 else:
-                    snapshots.append({'guid': id,
+                    snapshots.append({'guid': snap_id,
                                       'timestamp': time.mktime(datetime.strptime(snapshot.timestamp.strip(), '%c').timetuple()),
-                                      'label': id,
+                                      'label': snap_id,
                                       'is_consistent': False,
                                       'is_automatic': False,
                                       'is_sticky': False,
@@ -190,7 +202,10 @@ class VDisk(DataObject):
         """
         Returns the Volume Storage Driver ID to which the vDisk is connected.
         """
-        return self.info.get('vrouter_id', None)
+        vdisk_object = self.objectregistry_client.find(str(self.volume_id))
+        if vdisk_object is not None:
+            return vdisk_object.node_id()
+        return None
 
     def _storagerouter_guid(self):
         """
@@ -209,7 +224,10 @@ class VDisk(DataObject):
         """
         Returns whether the vdisk is a template
         """
-        return self.info.get('object_type') == 'TEMPLATE'
+        vdisk_object = self.objectregistry_client.find(str(self.volume_id))
+        if vdisk_object is not None:
+            return str(vdisk_object.object_type()) == 'TEMPLATE'
+        return False
 
     def _edge_clients(self):
         """
@@ -221,15 +239,6 @@ class VDisk(DataObject):
                 if client['object_id'] == self.volume_id:
                     clients[client['key']] = client
         return clients.values()
-
-    def reload_client(self):
-        """
-        Reloads the StorageDriver Client
-        """
-        if self.vpool_guid:
-            self._frozen = False
-            self._storagedriver_client = StorageDriverClient.load(self.vpool)
-            self._frozen = True
 
     def fetch_statistics(self):
         """
@@ -296,3 +305,15 @@ class VDisk(DataObject):
                 else:
                     current_stats['{0}_ps'.format(key)] = max(0, (current_stats[key] - previous_stats[key]) / delta)
         volatile.set(prev_key, current_stats, dynamic.timeout * 10)
+
+    def reload_client(self, client):
+        """
+        Reloads the StorageDriverClient or ObjectRegistryClient
+        """
+        if self.vpool_guid:
+            self._frozen = False
+            if client == 'storagedriver':
+                self._storagedriver_client = StorageDriverClient.load(self.vpool)
+            elif client == 'objectregistry':
+                self._objectregistry_client = ObjectRegistryClient.load(self.vpool)
+            self._frozen = True

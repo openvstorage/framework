@@ -29,7 +29,6 @@ define([
 
         // Handles
         self.fetchAlbaVPoolHandle = undefined;
-        self.loadSRMetadataHandle = undefined;
 
         // Observables
         self.albaBackendLoading    = ko.observable(false);
@@ -148,7 +147,7 @@ define([
                         var available_backends = [], calls = [];
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
-                                getData.contents = 'metadata_information,name,ns_statistics,presets';
+                                getData.contents = 'name,ns_statistics,presets';
                                 if (item.scaling === 'LOCAL') {
                                     getData.contents += ',asd_statistics';
                                 }

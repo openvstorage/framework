@@ -29,6 +29,7 @@ class OVSMigrator(object):
     """
 
     identifier = 'ovs'
+    THIS_VERSION = 10
 
     def __init__(self):
         """ Init method """
@@ -49,8 +50,6 @@ class OVSMigrator(object):
         if working_version == 0:
             # Initial version:
             # * Set the version to THIS RELEASE version
-            #   Version  9: Fargo Alpha, Beta, RC
-            #   Version 10: Fargo RTM
 
             from ovs.dal.hybrids.user import User
             from ovs.dal.hybrids.group import Group
@@ -166,10 +165,8 @@ class OVSMigrator(object):
             slate.is_default = False
             slate.save()
 
-            return 9
-
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
-        if working_version < 10:
-            raise RuntimeError('Cannot upgrade to Fargo')
+        elif working_version < OVSMigrator.THIS_VERSION:
+            pass
 
-        return working_version
+        return OVSMigrator.THIS_VERSION

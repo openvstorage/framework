@@ -20,7 +20,7 @@ Centos OS module
 
 from subprocess import CalledProcessError
 from subprocess import check_output
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 
 
@@ -38,14 +38,14 @@ class Centos(object):
         """
         machine_id = System.get_my_machine_id()
         config_location = '/ovs/framework/hosts/{0}/paths|{1}'.format(machine_id, binary_name)
-        if not EtcdConfiguration.exists(config_location):
+        if not Configuration.exists(config_location):
             try:
                 path = check_output('which {0}'.format(binary_name), shell=True).strip()
-                EtcdConfiguration.set(config_location, path)
+                Configuration.set(config_location, path)
             except CalledProcessError:
                 return None
         else:
-            path = EtcdConfiguration.get(config_location)
+            path = Configuration.get(config_location)
         return path
 
     @staticmethod

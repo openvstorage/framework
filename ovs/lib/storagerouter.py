@@ -20,7 +20,6 @@ StorageRouter module
 import os
 import json
 import time
-import random
 from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
 from StringIO import StringIO
@@ -33,16 +32,17 @@ from ovs.dal.hybrids.service import Service as DalService
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.backendtypelist import BackendTypeList
-from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.api.client import OVSClient
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
@@ -60,10 +60,7 @@ from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import ArakoonNodeConfig
-from volumedriver.storagerouter.storagerouterclient import ClusterNodeConfig
-from volumedriver.storagerouter.storagerouterclient import ClusterRegistry
-from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient
+from volumedriver.storagerouter.storagerouterclient import ArakoonNodeConfig, ClusterNodeConfig, ClusterRegistry, LocalStorageRouterClient
 
 
 class StorageRouterController(object):
@@ -72,8 +69,6 @@ class StorageRouterController(object):
     """
     _logger = LogHandler.get('lib', name='storagerouter')
     SUPPORT_AGENT = 'support-agent'
-    PARTITION_DEFAULT_USAGES = {DiskPartition.ROLES.DB: (40, 20),  # 1st number is exact size in GiB, 2nd number is percentage (highest of the 2 will be taken)
-                                DiskPartition.ROLES.SCRUB: (0, 0)}
 
     storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
     # noinspection PyArgumentList
@@ -86,7 +81,6 @@ class StorageRouterController(object):
         Update a Storage Router's celery heartbeat
         :param storagerouter_guid: Guid of the Storage Router to update
         :type storagerouter_guid: str
-
         :param timestamp: Timestamp to compare to
         :type timestamp: float
         """
@@ -103,7 +97,6 @@ class StorageRouterController(object):
         Gets physical information about the machine this task is running on
         :param storagerouter_guid: Storage Router guid to retrieve the metadata for
         :type storagerouter_guid: str
-
         :return: Metadata information about the Storage Router
         :rtype: dict
         """
@@ -148,16 +141,9 @@ class StorageRouterController(object):
                     size = disk_partition.size if disk_partition.size is not None else 0
                     if partition_available_space is not None:
                         # Take available space reported by df then add back used by roles so that the only used space reported is space not managed by us
-                        # then we'll subtract the roles reserved size
                         available = partition_available_space + used_space_by_roles - claimed_space
                     else:
                         available = size - claimed_space  # Subtract size for roles which have already been claimed by other vpools (but not necessarily already been fully used)
-                    # Subtract size for competing roles on the same partition
-                    for sub_role, required_size in StorageRouterController.PARTITION_DEFAULT_USAGES.iteritems():
-                        if sub_role in disk_partition.roles and sub_role != role:
-                            amount = required_size[0] * 1024 ** 3
-                            percentage = required_size[1] * disk_partition.size / 100
-                            available -= max(amount, percentage)
 
                     if available > 0:
                         if (role == DiskPartition.ROLES.READ or role == DiskPartition.ROLES.WRITE) and DiskPartition.ROLES.READ in disk_partition.roles and DiskPartition.ROLES.WRITE in disk_partition.roles and shared is False:
@@ -207,7 +193,6 @@ class StorageRouterController(object):
         Add a vPool to the machine this task is running on
         :param parameters: Parameters for vPool creation
         :type parameters: dict
-
         :return: None
         """
         sd_config_params = (dict, {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
@@ -286,7 +271,7 @@ class StorageRouterController(object):
             else:
                 extra_required_params = required_params_other
             Toolbox.verify_required_params(extra_required_params, parameters)
-        has_rdma = EtcdConfiguration.get('/ovs/framework/rdma')
+        has_rdma = Configuration.get('/ovs/framework/rdma')
         storage_ip = parameters['storage_ip']
 
         # Verify READ caches
@@ -336,6 +321,9 @@ class StorageRouterController(object):
             except Exception as ex:
                 raise RuntimeError('Something went wrong building SSH connections. {0}'.format(ex))
 
+        readcache_size_requested = parameters['readcache_size'] * 1024 ** 3
+        writecache_size_requested = parameters['writecache_size'] * 1024 ** 3
+
         # Check partition role presence
         arakoon_service_found = False
         for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:
@@ -346,7 +334,10 @@ class StorageRouterController(object):
         error_messages = []
         metadata = StorageRouterController.get_metadata(storagerouter.guid)
         partition_info = metadata['partitions']
-        for required_role in [DiskPartition.ROLES.READ, DiskPartition.ROLES.WRITE, DiskPartition.ROLES.DB]:
+        required_roles = [DiskPartition.ROLES.WRITE, DiskPartition.ROLES.DB]
+        if readcache_size_requested > 0:
+            required_roles.append(DiskPartition.ROLES.READ)
+        for required_role in required_roles:
             if required_role not in partition_info:
                 error_messages.append('Missing required partition role {0}'.format(required_role))
             elif len(partition_info[required_role]) == 0:
@@ -357,11 +348,6 @@ class StorageRouterController(object):
                     error_messages.append('Not enough available space for {0}'.format(required_role))
 
         # Create vpool metadata
-        cluster_policies = []
-        cluster_frag_size = 1
-        cluster_total_size = 0
-        cluster_nsm_part_guids = []
-
         sco_size = vpool.configuration['sco_size'] if vpool is not None else sco_size
         sco_size *= 1024.0 ** 2
         use_accelerated_alba = False
@@ -422,33 +408,24 @@ class StorageRouterController(object):
                                        port=connection_info['port'],
                                        credentials=(connection_info['client_id'], connection_info['client_secret']),
                                        version=1)
-                backend_dict = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': 'metadata_information,name,usages,presets'})
+                backend_dict = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': 'name,usages,presets'})
                 preset_info = dict((preset['name'], preset) for preset in backend_dict['presets'])
                 if preset_name not in preset_info:
                     raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_guid))
 
-                local_backend = connection_info['local']
                 policies = []
                 for policy_info in preset_info[preset_name]['policies']:
                     policy = json.loads('[{0}]'.format(policy_info.strip('()')))
                     policies.append([policy[0], policy[1]])
-                    if local_backend is True:
-                        cluster_policies.append([policy[0], policy[1]])
 
                 total_size = float(backend_dict['usages']['size'])
                 fragment_size = float(preset_info[preset_name]['fragment_size'])
-                nsm_partition_guids = list(set(backend_dict['metadata_information']['nsm_partition_guids']))
-                if local_backend is True:
-                    cluster_frag_size = fragment_size
-                    cluster_total_size = total_size
-                    cluster_nsm_part_guids = nsm_partition_guids
                 vpool_metadata[key] = {'name': backend_dict['name'],
                                        'arakoon_config': StorageRouterController._retrieve_alba_arakoon_config(backend_guid=backend_guid, ovs_client=ovs_client),
                                        'backend_info': {'policies': policies,
                                                         'sco_size': sco_size,
                                                         'frag_size': fragment_size,
                                                         'total_size': total_size,
-                                                        'nsm_partition_guids': nsm_partition_guids,
                                                         'fragment_cache_on_read': fragment_cache_on_read,
                                                         'fragment_cache_on_write': fragment_cache_on_write},
                                        'connection': connection_info,
@@ -456,59 +433,16 @@ class StorageRouterController(object):
                                        'backend_guid': backend_guid}
 
         # Check mountpoints are mounted
-        db_partition_guids = set()
-        read_partition_guids = set()
-        write_partition_guids = set()
         for role, part_info in partition_info.iteritems():
             for part in part_info:
                 if not client.is_mounted(part['mountpoint']) and part['mountpoint'] != DiskPartition.VIRTUAL_STORAGE_LOCATION:
                     error_messages.append('Mountpoint {0} is not mounted'.format(part['mountpoint']))
-                if role == 'DB':
-                    db_partition_guids.add(part['guid'])
-                elif role == 'READ':
-                    read_partition_guids.add(part['guid'])
-                elif role == 'WRITE':
-                    write_partition_guids.add(part['guid'])
-
-        # Calculate alba metadata overhead
-        db_overlap = len(db_partition_guids.intersection(cluster_nsm_part_guids)) > 0  # We only want to take DB partitions into account already claimed by the NSM clusters
-        read_overlap = db_overlap and len(db_partition_guids.intersection(read_partition_guids)) > 0
-        write_overlap = db_overlap and len(db_partition_guids.intersection(write_partition_guids)) > 0
-        sizes_to_reserve = [0]
-
-        if read_overlap is True or write_overlap is True:
-            for policy in cluster_policies:
-                size_to_reserve = int(cluster_total_size / sco_size * (1200 + (policy[0] + policy[1]) * (25 * sco_size / policy[0] / cluster_frag_size + 56)))
-                sizes_to_reserve.append(size_to_reserve)
-            # For more information about above formula: see http://jira.cloudfounders.com/browse/OVS-3553
-
-        # Check over-allocation for DB
-        db_available_size = partition_info[DiskPartition.ROLES.DB][0]['available']
-        db_required_size = StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3 + max(sizes_to_reserve)
-
-        if db_available_size < db_required_size:
-            error_messages.append('Assigned partition for DB role should be at least {0:.2f} GB'.format(db_required_size / 1024.0 ** 3))
 
         # Check over-allocation for read, write cache
         shared_size_available = metadata['shared_size']
         readcache_size_available = metadata['readcache_size']
         writecache_size_available = metadata['writecache_size']
 
-        if read_overlap is True and write_overlap is True:
-            shared_size_available -= max(sizes_to_reserve)
-            if shared_size_available < 0:
-                shared_size_available = 0
-        elif read_overlap is True:
-            readcache_size_available -= max(sizes_to_reserve)
-            if readcache_size_available < 0:
-                readcache_size_available = 0
-        elif write_overlap is True:
-            writecache_size_available -= max(sizes_to_reserve)
-            if writecache_size_available < 0:
-                writecache_size_available = 0
-
-        readcache_size_requested = parameters['readcache_size'] * 1024 ** 3
-        writecache_size_requested = parameters['writecache_size'] * 1024 ** 3
         if readcache_size_requested > readcache_size_available + shared_size_available:
             error_messages.append('Too much space requested for {0} cache. Available: {1:.2f} GiB, Requested: {2:.2f} GiB'.format(DiskPartition.ROLES.READ,
                                                                                                                                   (readcache_size_available + shared_size_available) / 1024.0 ** 3,
@@ -526,14 +460,6 @@ class StorageRouterController(object):
 
         if arakoon_service_found is False and (DiskPartition.ROLES.DB not in partition_info or len(partition_info[DiskPartition.ROLES.DB]) == 0):
             error_messages.append('DB partition role required')
-
-        # Check available IP addresses
-        ipaddresses = metadata['ipaddresses']
-        grid_ip = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ip'.format(unique_id))
-        if grid_ip in ipaddresses:
-            ipaddresses.remove(grid_ip)
-        if not ipaddresses:
-            error_messages.append('No available IP addresses found suitable for Storage Router storage IP')
 
         if error_messages:
             raise ValueError('Errors validating the partition roles:\n - {0}'.format('\n - '.join(set(error_messages))))
@@ -594,8 +520,8 @@ class StorageRouterController(object):
         model_ports_in_use += ports
 
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
-        arakoon_cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
-        config = ArakoonClusterConfig(arakoon_cluster_name)
+        arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
+        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
         config.load_config()
         arakoon_nodes = []
         arakoon_node_configs = []
@@ -605,12 +531,25 @@ class StorageRouterController(object):
         node_configs = []
         for existing_storagedriver in StorageDriverList.get_storagedrivers():
             if existing_storagedriver.vpool_guid == vpool.guid:
-                node_configs.append(ClusterNodeConfig(str(existing_storagedriver.storagedriver_id),
-                                                      str(existing_storagedriver.cluster_ip),
-                                                      existing_storagedriver.ports['management'],
-                                                      existing_storagedriver.ports['xmlrpc'],
-                                                      existing_storagedriver.ports['dtl']))
-        node_configs.append(ClusterNodeConfig(vrouter_id, str(grid_ip), ports[0], ports[1], ports[2]))
+                # noinspection PyArgumentList
+                node_configs.append(ClusterNodeConfig(vrouter_id=str(existing_storagedriver.storagedriver_id),
+                                                      host=str(existing_storagedriver.cluster_ip),
+                                                      message_port=existing_storagedriver.ports['management'],
+                                                      xmlrpc_port=existing_storagedriver.ports['xmlrpc'],
+                                                      failovercache_port=existing_storagedriver.ports['dtl'],
+                                                      network_server_uri='{0}://{1}:{2}'.format('rdma' if has_rdma else 'tcp',
+                                                                                                existing_storagedriver.storage_ip,
+                                                                                                existing_storagedriver.ports['edge'])))
+        grid_ip = Configuration.get('/ovs/framework/hosts/{0}/ip'.format(unique_id))
+        # noinspection PyArgumentList
+        node_configs.append(ClusterNodeConfig(vrouter_id=vrouter_id,
+                                              host=str(grid_ip),
+                                              message_port=ports[0],
+                                              xmlrpc_port=ports[1],
+                                              failovercache_port=ports[2],
+                                              network_server_uri='{0}://{1}:{2}'.format('rdma' if has_rdma else 'tcp',
+                                                                                        storage_ip,
+                                                                                        ports[3])))
 
         try:
             vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
@@ -728,32 +667,14 @@ class StorageRouterController(object):
 
         # 4. Assign DB
         db_info = partition_info[DiskPartition.ROLES.DB][0]
-        size = StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][0] * 1024 ** 3 + max(sizes_to_reserve)
-        percentage = db_info['available'] * StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.DB][1] / 100.0 + max(sizes_to_reserve)
         sdp_tlogs = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
                                                                                        'role': DiskPartition.ROLES.DB,
                                                                                        'sub_role': StorageDriverPartition.SUBROLE.TLOG,
                                                                                        'partition': DiskPartition(db_info['guid'])})
-        sdp_metadata = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
+        sdp_metadata = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
                                                                                           'role': DiskPartition.ROLES.DB,
                                                                                           'sub_role': StorageDriverPartition.SUBROLE.MD,
                                                                                           'partition': DiskPartition(db_info['guid'])})
-        volume_manager_config = {"tlog_path": sdp_tlogs.path,
-                                 "metadata_path": sdp_metadata.path,
-                                 "clean_interval": 1,
-                                 "dtl_throttle_usecs": 4000}
-
-        # 5. Create SCRUB storagedriver partition (if necessary)
-        sdp_scrub = None
-        scrub_info = partition_info[DiskPartition.ROLES.SCRUB]
-        if len(scrub_info) > 0:
-            scrub_info = scrub_info[0]
-            size = StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.SCRUB][0] * 1024 ** 3
-            percentage = scrub_info['available'] * StorageRouterController.PARTITION_DEFAULT_USAGES[DiskPartition.ROLES.SCRUB][1] / 100.0
-            sdp_scrub = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(max(size, percentage)),
-                                                                                           'role': DiskPartition.ROLES.SCRUB,
-                                                                                           'partition': DiskPartition(scrub_info['guid'])})
-            dirs2create.append(sdp_scrub.path)
         dirs2create.append(sdp_tlogs.path)
         dirs2create.append(sdp_metadata.path)
 
@@ -765,7 +686,7 @@ class StorageRouterController(object):
                                                                                      'role': DiskPartition.ROLES.WRITE,
                                                                                      'sub_role': StorageDriverPartition.SUBROLE.DTL,
                                                                                      'partition': largest_write_mountpoint})
-        rsppath = '{0}/{1}'.format(EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(unique_id)), vpool_name)
+        rsppath = '{0}/{1}'.format(Configuration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(unique_id)), vpool_name)
         dirs2create.append(sdp_dtl.path)
         dirs2create.append(sdp_fd.path)
         dirs2create.append(rsppath)
@@ -779,7 +700,7 @@ class StorageRouterController(object):
         root_client.dir_create(dirs2create)
         root_client.file_create(files2create)
 
-        config_dir = '{0}/storagedriver/storagedriver'.format(EtcdConfiguration.get('/ovs/framework/paths|cfgdir'))
+        config_dir = '{0}/storagedriver/storagedriver'.format(Configuration.get('/ovs/framework/paths|cfgdir'))
         client.dir_create(config_dir)
         alba_proxy = storagedriver.alba_proxy
         manifest_cache_size = 16 * 1024 * 1024 * 1024
@@ -806,14 +727,14 @@ class StorageRouterController(object):
                         config.set(section, key, value)
                 config_io = StringIO()
                 config.write(config_io)
-                EtcdConfiguration.set(config_tree.format(metadata_keys[metadata_key]), config_io.getvalue(), raw=True)
+                Configuration.set(config_tree.format(metadata_keys[metadata_key]), config_io.getvalue(), raw=True)
 
             fragment_cache_on_read = parameters['fragment_cache_on_read']
             fragment_cache_on_write = parameters['fragment_cache_on_write']
             if fragment_cache_on_read is False and fragment_cache_on_write is False:
                 fragment_cache_info = ['none']
             elif use_accelerated_alba is True:
-                fragment_cache_info = ['alba', {'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm_aa')),
+                fragment_cache_info = ['alba', {'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_aa')),
                                                 'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
                                                                                'preset': vpool.metadata[storagerouter.guid]['preset']}],
                                                 'manifest_cache_size': 16 * 1024 * 1024 * 1024,
@@ -825,14 +746,23 @@ class StorageRouterController(object):
                                                  'cache_on_read': fragment_cache_on_read,
                                                  'cache_on_write': fragment_cache_on_write}]
 
-            EtcdConfiguration.set(config_tree.format('main'), json.dumps({
+            Configuration.set(config_tree.format('main'), json.dumps({
                 'log_level': 'info',
                 'port': alba_proxy.service.ports[0],
                 'ips': [storagedriver.storage_ip],
                 'manifest_cache_size': manifest_cache_size,
                 'fragment_cache': fragment_cache_info,
-                'transport': 'rdma' if has_rdma else 'tcp',
-                'albamgr_cfg_url': 'etcd://127.0.0.1:2379{0}'.format(config_tree.format('abm'))
+                'transport': 'tcp',
+                'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
+            }, indent=4), raw=True)
+            Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({
+                'log_level': 'info',
+                'port': 0,  # Will be overruled by the scrubber scheduled task
+                'ips': ['127.0.0.1'],
+                'manifest_cache_size': manifest_cache_size,
+                'fragment_cache': ['none'],
+                'transport': 'tcp',
+                'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
             }, indent=4), raw=True)
 
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
@@ -858,40 +788,43 @@ class StorageRouterController(object):
             tlog_multiplier = current_vpool_configuration['tlog_multiplier']
             sco_factor = float(current_vpool_configuration['write_buffer']) / tlog_multiplier / sco_size
 
-        filesystem_config = {'fs_enable_shm_interface': 0,
+        filesystem_config = {'fs_dtl_host': '',
+                             'fs_enable_shm_interface': 0,
+                             'fs_enable_network_interface': 1,
                              'fs_metadata_backend_arakoon_cluster_nodes': [],
                              'fs_metadata_backend_mds_nodes': [],
                              'fs_metadata_backend_type': 'MDS',
-                             'fs_enable_network_interface': 1,
                              'fs_virtual_disk_format': 'raw',
                              'fs_raw_disk_suffix': '.raw'}
         if dtl_mode == 'no_sync':
-            filesystem_config['fs_dtl_host'] = ''
             filesystem_config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_MANUAL_MODE
         else:
             filesystem_config['fs_dtl_mode'] = StorageDriverClient.VPOOL_DTL_MODE_MAP[dtl_mode]
             filesystem_config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE
 
-        volume_manager_config['default_cluster_size'] = cluster_size * 1024
-        volume_manager_config['read_cache_default_mode'] = StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode]
-        volume_manager_config['read_cache_default_behaviour'] = StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy]
-        volume_manager_config['number_of_scos_in_tlog'] = tlog_multiplier
-        volume_manager_config['non_disposable_scos_factor'] = sco_factor
+        volume_manager_config = {'tlog_path': sdp_tlogs.path,
+                                 'metadata_path': sdp_metadata.path,
+                                 'clean_interval': 1,
+                                 'dtl_throttle_usecs': 4000,
+                                 'default_cluster_size': cluster_size * 1024,
+                                 'number_of_scos_in_tlog': tlog_multiplier,
+                                 'read_cache_default_mode': StorageDriverClient.VPOOL_DEDUPE_MAP[dedupe_mode],
+                                 'read_cache_default_behaviour': StorageDriverClient.VPOOL_CACHE_MAP[cache_strategy],
+                                 'non_disposable_scos_factor': sco_factor}
 
         queue_urls = []
-        mq_protocol = EtcdConfiguration.get('/ovs/framework/messagequeue|protocol')
-        mq_user = EtcdConfiguration.get('/ovs/framework/messagequeue|user')
-        mq_password = EtcdConfiguration.get('/ovs/framework/messagequeue|password')
+        mq_protocol = Configuration.get('/ovs/framework/messagequeue|protocol')
+        mq_user = Configuration.get('/ovs/framework/messagequeue|user')
+        mq_password = Configuration.get('/ovs/framework/messagequeue|password')
         for current_storagerouter in StorageRouterList.get_masters():
             queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(mq_protocol, mq_user, mq_password, current_storagerouter.ip)})
 
-        storagedriver_config.clean()  # Clean out obsolete values
         if vpool.backend_type.code == 'alba':
             backend_connection_manager = {'alba_connection_host': storagedriver.storage_ip,
                                           'alba_connection_port': alba_proxy.service.ports[0],
                                           'alba_connection_preset': vpool.metadata['backend']['preset'],
                                           'alba_connection_timeout': 15,
-                                          'alba_connection_transport': 'RDMA' if has_rdma else 'TCP',
+                                          'alba_connection_transport': 'TCP',
                                           'backend_type': 'ALBA'}
             if use_accelerated_alba is False and has_rdma is True:
                 backend_connection_manager['alba_connection_rora_manifest_cache_capacity'] = manifest_cache_size
@@ -934,12 +867,9 @@ class StorageRouterController(object):
         storagedriver_config.configure_file_driver(fd_cache_path=sdp_fd.path,
                                                    fd_extent_cache_capacity='1024',
                                                    fd_namespace='fd-{0}-{1}'.format(vpool_name, vpool.guid))
-        storagedriver_config.configure_event_publisher(events_amqp_routing_key=EtcdConfiguration.get('/ovs/framework/messagequeue|queues.storagedriver'),
+        storagedriver_config.configure_event_publisher(events_amqp_routing_key=Configuration.get('/ovs/framework/messagequeue|queues.storagedriver'),
                                                        events_amqp_uris=queue_urls)
         storagedriver_config.configure_threadpool_component(num_threads=16)
-        storagedriver_config.configure_network_interface(network_uri='{0}://{1}:{2}'.format('rdma' if has_rdma else 'tcp',
-                                                                                            storagedriver.storage_ip,
-                                                                                            storagedriver.ports['edge']))
         storagedriver_config.save(client, reload_config=False)
 
         DiskController.sync_with_reality(storagerouter.guid)
@@ -948,9 +878,6 @@ class StorageRouterController(object):
                                                  vpool=vpool,
                                                  fresh_only=True,
                                                  reload_config=False)
-
-        if sdp_scrub is not None:
-            root_client.dir_chmod(sdp_scrub.path, 0777)  # Used by gather_scrub_work which is a celery task executed by 'ovs' user and should be able to write in it
 
         StorageRouterController._logger.info('backend_type: {0}'.format(vpool.backend_type.code))
         params = {'DTL_PATH': sdp_dtl.path,
@@ -964,9 +891,9 @@ class StorageRouterController(object):
         dependencies = None
         if vpool.backend_type.code == 'alba':
             params = {'VPOOL_NAME': vpool_name,
-                      'VPOOL_GUID': vpool.guid,
-                      'PROXY_ID': storagedriver.alba_proxy_guid,
-                      'LOG_SINK': LogHandler.get_sink_path('alba_proxy')}
+                      'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
+                      'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid,
+                                                                                                                           storagedriver.alba_proxy_guid))}
             alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
             ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name=alba_proxy_service)
             ServiceManager.start_service(alba_proxy_service, client=root_client)
@@ -990,8 +917,7 @@ class StorageRouterController(object):
         tries = 60
         while storagedriver.startup_counter == current_startup_counter and tries > 0:
             StorageRouterController._logger.debug('Waiting for the StorageDriver to start up...')
-            running = ServiceManager.get_service_status(voldrv_service, client=root_client)
-            if running is False:
+            if ServiceManager.get_service_status(voldrv_service, client=root_client)[0] is False:
                 vpool.status = VPool.STATUSES.FAILURE
                 vpool.save()
                 raise RuntimeError('StorageDriver service failed to start (service not running)')
@@ -1012,7 +938,6 @@ class StorageRouterController(object):
             storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
             storagedriver_config.load()
             if storagedriver_config.is_new is False:
-                storagedriver_config.clean()  # Clean out obsolete values
                 storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
                 storagedriver_config.save(node_client)
 
@@ -1054,11 +979,9 @@ class StorageRouterController(object):
         Removes a Storage Driver (if its the last Storage Driver for a vPool, the vPool is removed as well)
         :param storagedriver_guid: Guid of the Storage Driver to remove
         :type storagedriver_guid: str
-
         :param offline_storage_router_guids: Guids of Storage Routers which are offline and will be removed from cluster.
                                              WHETHER VPOOL WILL BE DELETED DEPENDS ON THIS
         :type offline_storage_router_guids: list
-
         :return: None
         """
         storage_driver = StorageDriver(storagedriver_guid)
@@ -1067,55 +990,64 @@ class StorageRouterController(object):
         if offline_storage_router_guids is None:
             offline_storage_router_guids = []
 
-        client = None
-        temp_client = None
-        storage_drivers_left = False
-
-        vpool = storage_driver.vpool
-        storage_router = storage_driver.storagerouter
-        storage_router_online = True
-        storage_routers_offline = [StorageRouter(storage_router_guid) for storage_router_guid in offline_storage_router_guids]
-        sr_sd_map = {}
-        for sd in vpool.storagedrivers:
-            sr_sd_map[sd.storagerouter] = sd
-
         # Validations
-        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Checking availability of related Storage Routers'.format(storage_driver.guid, storage_driver.name))
+        vpool = storage_driver.vpool
         if vpool.status != VPool.STATUSES.RUNNING:
             raise ValueError('VPool should be in {0} status'.format(VPool.STATUSES.RUNNING))
-        for sr, sd in sr_sd_map.iteritems():
-            if sr in storage_routers_offline:
-                StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Router {1} with IP {2} is offline'.format(storage_driver.guid, sr.name, sr.ip))
-                continue
+
+        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Checking availability of related Storage Routers'.format(storage_driver.guid, storage_driver.name))
+        has_rdma = Configuration.get('/ovs/framework/rdma')
+        client = None
+        temp_client = None
+        errors_found = False
+        storage_router = storage_driver.storagerouter
+        storage_drivers_left = False
+        storage_router_online = True
+        storage_routers_offline = [StorageRouter(storage_router_guid) for storage_router_guid in offline_storage_router_guids]
+        available_storage_drivers = []
+        for sd in vpool.storagedrivers:
+            sr = sd.storagerouter
             if sr != storage_router:
                 storage_drivers_left = True
             try:
                 temp_client = SSHClient(sr, username='root')
+                if sr in storage_routers_offline:
+                    raise Exception('Storage Router "{0}" passed as "offline Storage Router" appears to be reachable'.format(sr.name))
                 with remote(temp_client.ip, [LocalStorageRouterClient]) as rem:
-                    path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
-                    lsrc = rem.LocalStorageRouterClient(path)
-                    lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
+                    sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
+                    if Configuration.exists(sd_key) is True:
+                        path = Configuration.get_configuration_path(sd_key)
+                        lsrc = rem.LocalStorageRouterClient(path)
+                        lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
+                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Available Storage Driver for migration - {1}'.format(storage_driver.guid, sd.name))
+                        available_storage_drivers.append(sd)
                 client = temp_client
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Router {1} with IP {2} is online'.format(storage_driver.guid, sr.name, sr.ip))
             except UnableToConnectException:
-                if sr == storage_router:
+                if sr == storage_router or sr in storage_routers_offline:
                     StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Router {1} with IP {2} is offline'.format(storage_driver.guid, sr.name, sr.ip))
-                    storage_router_online = False
+                    if sr == storage_router:
+                        storage_router_online = False
                 else:
                     raise RuntimeError('Not all StorageRouters are reachable')
-            except Exception, ex:
+            except Exception as ex:
                 if 'ClusterNotReachableException' in str(ex):
-                    if len(sr_sd_map) != 1:
+                    if sd != storage_driver:
                         raise RuntimeError('Not all StorageDrivers are reachable, please (re)start them and try again')
-                    client = temp_client
+                    if client is None:
+                        client = temp_client
                 else:
                     raise
 
         if client is None:
             raise RuntimeError('Could not found any responsive node in the cluster')
 
-        if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storage_driver.storagedriver_id) and storage_router_online is True:
+        storage_driver.invalidate_dynamics('vdisks_guids')
+        if len(storage_driver.vdisks_guids) > 0:
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
+
+        if storage_drivers_left and len(available_storage_drivers) == 0:
+            raise RuntimeError('vPool is spread over several other Storage Drivers, but none of them are responsive')
 
         # Start removal
         if storage_drivers_left is True:
@@ -1124,40 +1056,19 @@ class StorageRouterController(object):
             vpool.status = VPool.STATUSES.DELETING
         vpool.save()
 
-        vdisks = []
-        errors_found = False
-        # Migrate vDisks if node is offline
-        if storage_router_online is False:
-            StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Checking migration'.format(storage_driver.guid))
-            available_storage_drivers = []
-            for sd in vpool.storagedrivers:
-                if sd != storage_driver and sd.storagerouter not in storage_routers_offline:
-                    StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Available Storage Driver for migration - {1}'.format(storage_driver.guid, sd.name))
-                    available_storage_drivers.append(str(sd.name))
-            if available_storage_drivers:
-                for vdisk in vpool.vdisks:
-                    vdisk.invalidate_dynamics(['info', 'storagedriver_id'])
-                    if vdisk.storagedriver_id == '':
-                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Migration required'.format(storage_driver.guid, vdisk.guid, vdisk.name))
-                        vdisks.append(vdisk)
-                        try:
-                            vdisk.storagedriver_client.migrate(str(vdisk.volume_id), available_storage_drivers[random.randint(0, len(available_storage_drivers) - 1)], True)
-                        except Exception as ex:
-                            StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Migration failed with error: {3}'.format(storage_driver.guid, vdisk.guid, vdisk.name, ex))
-                            errors_found = True
-                        vdisk.invalidate_dynamics(['info', 'storagedriver_id'])
-                        if vdisk.storagedriver_id:
-                            try:
-                                StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety after migration'.format(storage_driver.guid, vdisk.guid, vdisk.name))
-                                MDSServiceController.ensure_safety(vdisk=vdisk,
-                                                                   excluded_storagerouters=[storage_router] + storage_routers_offline)
-                            except Exception as ex:  # We don't put errors_found to True, because ensure safety could possibly succeed later on
-                                StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed with error: {3}'.format(storage_driver.guid, vdisk.guid, vdisk.name, ex))
-                    else:
-                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - No migration required'.format(storage_driver.guid, vdisk.guid, vdisk.name))
+        available_sr_names = [sd.storagerouter.name for sd in available_storage_drivers]
+        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Routers on which an available Storage Driver runs: {1}'.format(storage_driver.guid, ', '.join(available_sr_names)))
+
+        # Remove stale vDisks
+        voldrv_vdisks = [entry.object_id() for entry in vpool.objectregistry_client.get_all_registrations()]
+        voldrv_vdisk_guids = VDiskList.get_in_volume_ids(voldrv_vdisks).guids
+        for vdisk_guid in set(vpool.vdisks_guids).difference(set(voldrv_vdisk_guids)):
+            StorageRouterController._logger.warning('vDisk with guid {0} does no longer exist on any StorageDriver linked to vPool {1}, deleting...'.format(vdisk_guid, vpool.name))
+            VDiskController.clean_vdisk_from_model(vdisk=VDisk(vdisk_guid))
 
         # Unconfigure or reconfigure the MDSes
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Reconfiguring MDSes'.format(storage_driver.guid))
+        vdisks = []
         mds_services_to_remove = [mds_service for mds_service in vpool.mds_services if mds_service.service.storagerouter_guid == storage_router.guid]
         for mds in mds_services_to_remove:
             for junction in mds.vdisks:
@@ -1171,11 +1082,11 @@ class StorageRouterController(object):
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety'.format(storage_driver.guid, vdisk.guid, vdisk.name))
                         MDSServiceController.ensure_safety(vdisk=vdisk,
                                                            excluded_storagerouters=[storage_router] + storage_routers_offline)
-                    except Exception as ex:
-                        StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed with error: {3}'.format(storage_driver.guid, vdisk.guid, vdisk.name, ex))
+                    except Exception:
+                        StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed'.format(storage_driver.guid, vdisk.guid, vdisk.name))
 
-        arakoon_cluster_name = str(EtcdConfiguration.get('/ovs/framework/arakoon_clusters|voldrv'))
-        config = ArakoonClusterConfig(arakoon_cluster_name)
+        arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
+        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
         config.load_config()
         arakoon_node_configs = []
         offline_node_ips = [sr.ip for sr in storage_routers_offline]
@@ -1202,11 +1113,12 @@ class StorageRouterController(object):
                         ServiceManager.stop_service(service, client=client)
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service))
                         ServiceManager.remove_service(service, client=client)
-                except Exception as ex:
-                    StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed with error: {2}'.format(storage_driver.guid, service, ex))
+                except Exception:
+                    StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service))
                     errors_found = True
 
-            if storage_drivers_left is False:
+            sd_config_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id)
+            if storage_drivers_left is False and Configuration.exists(sd_config_key):
                 try:
                     if ServiceManager.has_service(albaproxy_service, client=client):
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Starting Alba proxy'.format(storage_driver.guid))
@@ -1229,7 +1141,7 @@ class StorageRouterController(object):
 
                     StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs'.format(storage_driver.guid))
                     with remote(client.ip, [LocalStorageRouterClient], username='root') as rem:
-                        path = 'etcd://127.0.0.1:2379/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id)
+                        path = Configuration.get_configuration_path(sd_config_key)
                         storagedriver_client = rem.LocalStorageRouterClient(path)
                         try:
                             storagedriver_client.destroy_filesystem()
@@ -1241,8 +1153,8 @@ class StorageRouterController(object):
 
                     # noinspection PyArgumentList
                     vrouter_clusterregistry.erase_node_configs()
-                except RuntimeError as ex:
-                    StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs failed with error: {1}'.format(storage_driver.guid, ex))
+                except RuntimeError:
+                    StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs failed'.format(storage_driver.guid))
                     errors_found = True
             try:
                 if ServiceManager.has_service(albaproxy_service, client=client):
@@ -1250,8 +1162,8 @@ class StorageRouterController(object):
                     ServiceManager.stop_service(albaproxy_service, client=client)
                     StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, albaproxy_service))
                     ServiceManager.remove_service(albaproxy_service, client=client)
-            except Exception as ex:
-                StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed with error: {2}'.format(storage_driver.guid, albaproxy_service, ex))
+            except Exception:
+                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, albaproxy_service))
                 errors_found = True
 
         # Reconfigure volumedriver arakoon cluster
@@ -1259,22 +1171,26 @@ class StorageRouterController(object):
             if storage_drivers_left is True:
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Reconfiguring volumedriver arakoon cluster'.format(storage_driver.guid))
                 node_configs = []
-                for sd in vpool.storagedrivers:
-                    if sd != storage_driver and sd.storagerouter not in storage_routers_offline:
-                        node_configs.append(ClusterNodeConfig(str(sd.storagedriver_id),
-                                                              str(sd.cluster_ip),
-                                                              sd.ports['management'],
-                                                              sd.ports['xmlrpc'],
-                                                              sd.ports['dtl']))
+                for sd in available_storage_drivers:
+                    if sd != storage_driver:
+                        # noinspection PyArgumentList
+                        node_configs.append(ClusterNodeConfig(vrouter_id=str(sd.storagedriver_id),
+                                                              host=str(sd.cluster_ip),
+                                                              message_port=sd.ports['management'],
+                                                              xmlrpc_port=sd.ports['xmlrpc'],
+                                                              failovercache_port=sd.ports['dtl'],
+                                                              network_server_uri='{0}://{1}:{2}'.format('rdma' if has_rdma else 'tcp',
+                                                                                                        sd.storage_ip,
+                                                                                                        sd.ports['edge'])))
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Node configs - \n{1}'.format(storage_driver.guid, '\n'.join([str(config) for config in node_configs])))
                 vrouter_clusterregistry.set_node_configs(node_configs)
                 srclient = StorageDriverClient.load(vpool)
-                for sd in vpool.storagedrivers:
-                    if sd != storage_driver and sd.storagerouter not in storage_routers_offline:
+                for sd in available_storage_drivers:
+                    if sd != storage_driver:
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Driver {1} {2} - Updating cluster node configs'.format(storage_driver.guid, sd.guid, sd.name))
                         srclient.update_cluster_node_configs(str(sd.storagedriver_id))
-        except Exception as ex:
-            StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Reconfiguring volumedriver arakoon cluster failed with error: {1}'.format(storage_driver.guid, ex))
+        except Exception:
+            StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Reconfiguring volumedriver arakoon cluster failed'.format(storage_driver.guid))
             errors_found = True
 
         # Removing MDS services
@@ -1287,8 +1203,8 @@ class StorageRouterController(object):
                                                         vpool=vpool,
                                                         reconfigure=False,
                                                         allow_offline=not storage_router_online)
-            except Exception as ex:
-                StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Removing MDS service failed with error: {1}'.format(storage_driver.guid, ex))
+            except Exception:
+                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Removing MDS service failed'.format(storage_driver.guid))
                 errors_found = True
 
         # Clean up directories and files
@@ -1297,34 +1213,35 @@ class StorageRouterController(object):
             dirs_to_remove.append(sd_partition.path)
             sd_partition.delete()
 
+        if vpool.backend_type.code == 'alba' and storage_driver.alba_proxy is not None:
+            config_tree = '/ovs/vpools/{0}/proxies/{1}'.format(vpool.guid, storage_driver.alba_proxy.guid)
+            Configuration.delete(config_tree)
+
         if storage_router_online is True:
             # Cleanup directories/files
             StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Deleting vPool related directories and files'.format(storage_driver.guid))
             machine_id = System.get_my_machine_id(client)
             dirs_to_remove.append(storage_driver.mountpoint)
-            dirs_to_remove.append('{0}/{1}'.format(EtcdConfiguration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(machine_id)), vpool.name))
-
-            if vpool.backend_type.code == 'alba':
-                config_tree = '/ovs/vpools/{0}/proxies/{1}'.format(vpool.guid, storage_driver.alba_proxy.guid)
-                EtcdConfiguration.delete(config_tree)
+            dirs_to_remove.append('{0}/{1}'.format(Configuration.get('/ovs/framework/hosts/{0}/storagedriver|rsp'.format(machine_id)), vpool.name))
 
             try:
                 mountpoints = StorageRouterController._get_mountpoints(client)
                 for dir_name in dirs_to_remove:
                     if dir_name and client.dir_exists(dir_name) and dir_name not in mountpoints and dir_name != '/':
                         client.dir_delete(dir_name)
-            except Exception as ex:
-                StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Failed to retrieve mountpoint information or delete directories, error: {1}'.format(storage_driver.guid, ex))
+            except Exception:
+                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Failed to retrieve mountpoint information or delete directories'.format(storage_driver.guid))
+                StorageRouterController._logger.warning('Remove Storage Driver - Guid {0} - Following directories should be checked why deletion is prevented: {1}'.format(storage_driver.guid, ', '.join(dirs_to_remove)))
                 errors_found = True
 
             StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Synchronizing disks with reality'.format(storage_driver.guid))
             try:
                 DiskController.sync_with_reality(storage_router.guid)
-            except Exception as ex:
-                StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Synchronizing disks with reality failed with error: {1}'.format(storage_driver.guid, ex))
+            except Exception:
+                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Synchronizing disks with reality failed'.format(storage_driver.guid))
                 errors_found = True
 
-        EtcdConfiguration.delete('/ovs/vpools/{0}/hosts/{1}'.format(vpool.guid, storage_driver.storagedriver_id))
+        Configuration.delete('/ovs/vpools/{0}/hosts/{1}'.format(vpool.guid, storage_driver.storagedriver_id))
 
         # Model cleanup
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Cleaning up model'.format(storage_driver.guid))
@@ -1333,23 +1250,14 @@ class StorageRouterController(object):
             service = storage_driver.alba_proxy.service
             storage_driver.alba_proxy.delete()
             service.delete()
-        storage_driver.delete(abandon=['logs'])  # Detach from the log entries
 
+        sd_can_be_deleted = True
         if storage_drivers_left is False:
-            EtcdConfiguration.delete('/ovs/vpools/{0}'.format(vpool.guid))
-            try:
-                StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing virtual disks from model'.format(storage_driver.guid))
-                for vdisk in vpool.vdisks:
-                    for junction in vdisk.mds_services:
-                        junction.delete()
-                    vdisk.delete()
-                StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing vPool from model'.format(storage_driver.guid))
-                vpool.delete()
-            except Exception as ex:
-                StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - Cleaning up vdisks from the model failed with error: {1}'.format(storage_driver.guid, ex))
-                errors_found = True
-                vpool.status = VPool.STATUSES.FAILURE
-                vpool.save()
+            for relation in ['mds_services', 'storagedrivers', 'vdisks']:
+                expected_amount = 1 if relation == 'storagedrivers' else 0
+                if len(getattr(vpool, relation)) > expected_amount:
+                    sd_can_be_deleted = False
+                    break
         else:
             if storage_router.guid in vpool.metadata:
                 vpool.metadata.pop(storage_router.guid)
@@ -1357,14 +1265,27 @@ class StorageRouterController(object):
             StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Checking DTL for all virtual disks in vPool {1} with guid {2}'.format(storage_driver.guid, vpool.name, vpool.guid))
             try:
                 VDiskController.dtl_checkup(vpool_guid=vpool.guid, ensure_single_timeout=600)
-            except Exception as ex:
-                StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - DTL checkup failed for vPool {1} with guid {2} with error: {3}'.format(storage_driver.guid, vpool.name, vpool.guid, ex))
+            except Exception:
+                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - DTL checkup failed for vPool {1} with guid {2}'.format(storage_driver.guid, vpool.name, vpool.guid))
+
+        if sd_can_be_deleted is True:
+            storage_driver.delete()
+            if storage_drivers_left is False:
+                StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing vPool from model'.format(storage_driver.guid))
+                vpool.delete()
+                Configuration.delete('/ovs/vpools/{0}'.format(vpool.guid))
+        else:
+            try:
+                vpool.delete()  # Try to delete the vPool to invoke a proper stacktrace to see why it can't be deleted
+            except Exception:
+                errors_found = True
+                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Cleaning up vpool from the model failed'.format(storage_driver.guid))
 
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Running MDS checkup'.format(storage_driver.guid))
         try:
             MDSServiceController.mds_checkup()
-        except Exception as ex:
-            StorageRouterController._logger.error('Remove Storage Driver - Guid {0} - MDS checkup failed with error: {1}'.format(storage_driver.guid, ex))
+        except Exception:
+            StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - MDS checkup failed'.format(storage_driver.guid))
 
         if errors_found is True:
             if storage_drivers_left is True:
@@ -1382,7 +1303,6 @@ class StorageRouterController(object):
         Returns version information regarding a given StorageRouter
         :param storagerouter_guid: Storage Router guid to get version information for
         :type storagerouter_guid: str
-
         :return: Version information
         :rtype: dict
         """
@@ -1397,15 +1317,14 @@ class StorageRouterController(object):
         Returns support information regarding a given StorageRouter
         :param storagerouter_guid: Storage Router guid to get support information for
         :type storagerouter_guid: str
-
         :return: Support information
         :rtype: dict
         """
         return {'storagerouter_guid': storagerouter_guid,
                 'nodeid': System.get_my_machine_id(),
-                'clusterid': EtcdConfiguration.get('/ovs/framework/cluster_id'),
-                'enabled': EtcdConfiguration.get('/ovs/framework/support|enabled'),
-                'enablesupport': EtcdConfiguration.get('ovs/framework/support|enablesupport')}
+                'clusterid': Configuration.get('/ovs/framework/cluster_id'),
+                'enabled': Configuration.get('/ovs/framework/support|enabled'),
+                'enablesupport': Configuration.get('ovs/framework/support|enablesupport')}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_support_metadata')
@@ -1422,11 +1341,11 @@ class StorageRouterController(object):
         Collects logs, moves them to a web-accessible location and returns log tgz's filename
         :param local_storagerouter_guid: Storage Router guid to retrieve log files on
         :type local_storagerouter_guid: str
-
         :return: Name of tgz containing the logs
         :rtype: str
         """
-        this_client = SSHClient('127.0.0.1', username='root')
+        this_storagerouter = System.get_my_storagerouter()
+        this_client = SSHClient(this_storagerouter, username='root')
         logfile = this_client.run('ovs collect logs').strip()
         logfilename = logfile.split('/')[-1]
 
@@ -1445,10 +1364,8 @@ class StorageRouterController(object):
         Configures support on all StorageRouters
         :param enable: If True support agent will be enabled and started, else disabled and stopped
         :type enable: bool
-
         :param enable_support: If False openvpn will be stopped
         :type enable_support: bool
-
         :return: True
         :rtype: bool
         """
@@ -1458,8 +1375,8 @@ class StorageRouterController(object):
                 clients.append((SSHClient(storagerouter), SSHClient(storagerouter, username='root')))
         except UnableToConnectException:
             raise RuntimeError('Not all StorageRouters are reachable')
-        EtcdConfiguration.set('/ovs/framework/support|enabled', enable)
-        EtcdConfiguration.set('/ovs/framework/support|enablesupport', enable_support)
+        Configuration.set('/ovs/framework/support|enabled', enable)
+        Configuration.set('/ovs/framework/support|enablesupport', enable_support)
         for ovs_client, root_client in clients:
             if enable_support is False:
                 root_client.run('service openvpn stop')
@@ -1482,16 +1399,12 @@ class StorageRouterController(object):
         Validates whether connection to a given S3 backend can be made
         :param host: Host to check
         :type host: str
-
         :param port: Port on which to check
         :type port: int
-
         :param accesskey: Access key to be used for connection
         :type accesskey: str
-
         :param secretkey: Secret key to be used for connection
         :type secretkey: str
-
         :return: True if check was successful, False otherwise
         :rtype: bool
         """
@@ -1517,7 +1430,6 @@ class StorageRouterController(object):
         Checks whether a given mountpoint for vPool is in use
         :param name: Name of the mountpoint to check
         :type name: str
-
         :return: True if mountpoint not in use else False
         :rtype: bool
         """
@@ -1533,7 +1445,6 @@ class StorageRouterController(object):
         Checks for new updates
         :param storagerouter_ip: IP of the Storage Router to check for updates
         :type storagerouter_ip: str
-
         :return: Update status for specified storage router
         :rtype: dict
         """
@@ -1595,7 +1506,6 @@ class StorageRouterController(object):
         Retrieve packages and services on which the framework depends
         :param client: SSHClient on which to retrieve the metadata
         :type client: SSHClient
-
         :return: List of dictionaries which contain services to restart,
                                                     packages to update,
                                                     information about potential downtime
@@ -1605,12 +1515,12 @@ class StorageRouterController(object):
         this_sr = StorageRouterList.get_by_ip(client.ip)
         srs = StorageRouterList.get_storagerouters()
         downtime = []
-        fwk_cluster_name = EtcdConfiguration.get('/ovs/framework/arakoon_clusters|ovsdb')
+        fwk_cluster_name = Configuration.get('/ovs/framework/arakoon_clusters|ovsdb')
         metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=fwk_cluster_name)
         if metadata is None:
             raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found None'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
 
-        if metadata.internal is True:
+        if metadata['internal'] is True:
             ovsdb_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == ServiceType.SERVICE_TYPES.ARAKOON and ser.name == 'arakoon-ovsdb']
             downtime = [('ovs', 'ovsdb', None)] if len(ovsdb_cluster) < 3 and this_sr.guid in ovsdb_cluster else []
 
@@ -1643,7 +1553,6 @@ class StorageRouterController(object):
         Retrieve packages and services on which the volumedriver depends
         :param client: SSHClient on which to retrieve the metadata
         :type client: SSHClient
-
         :return: List of dictionaries which contain services to restart,
                                                     packages to update,
                                                     information about potential downtime
@@ -1654,13 +1563,13 @@ class StorageRouterController(object):
         this_sr = StorageRouterList.get_by_ip(client.ip)
         downtime = []
         key = '/ovs/framework/arakoon_clusters|voldrv'
-        if EtcdConfiguration.exists(key):
-            sd_cluster_name = EtcdConfiguration.get(key)
+        if Configuration.exists(key):
+            sd_cluster_name = Configuration.get(key)
             metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=sd_cluster_name)
             if metadata is None:
                 raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found None'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
 
-            if metadata.internal is True:
+            if metadata['internal'] is True:
                 voldrv_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == ServiceType.SERVICE_TYPES.ARAKOON and ser.name == 'arakoon-voldrv']
                 downtime = [('ovs', 'voldrv', None)] if len(voldrv_cluster) < 3 and this_sr.guid in voldrv_cluster else []
 
@@ -1717,7 +1626,6 @@ class StorageRouterController(object):
         Launch the update_framework method in setup.py
         :param storagerouter_ip: IP of the Storage Router to update the framework packages on
         :type storagerouter_ip: str
-
         :return: None
         """
         root_client = SSHClient(storagerouter_ip,
@@ -1731,7 +1639,6 @@ class StorageRouterController(object):
         Launch the update_volumedriver method in setup.py
         :param storagerouter_ip: IP of the Storage Router to update the volumedriver packages on
         :type storagerouter_ip: str
-
         :return: None
         """
         root_client = SSHClient(storagerouter_ip,
@@ -1745,7 +1652,6 @@ class StorageRouterController(object):
         Refreshes all hardware related information
         :param storagerouter_guid: Guid of the Storage Router to refresh the hardware on
         :type storagerouter_guid: str
-
         :return: None
         """
         StorageRouterController.set_rdma_capability(storagerouter_guid)
@@ -1757,7 +1663,6 @@ class StorageRouterController(object):
         Check if the Storage Router has been reconfigured to be able to support RDMA
         :param storagerouter_guid: Guid of the Storage Router to check and set
         :type storagerouter_guid: str
-
         :return: None
         """
         storagerouter = StorageRouter(storagerouter_guid)
@@ -1788,22 +1693,16 @@ class StorageRouterController(object):
         Configures a partition
         :param storagerouter_guid: Guid of the Storage Router to configure a disk on
         :type storagerouter_guid: str
-
         :param disk_guid: Guid of the disk to configure
         :type disk_guid: str
-
         :param partition_guid: Guid of the partition on the disk
         :type partition_guid: str
-
         :param offset: Offset for the partition
         :type offset: int
-
         :param size: Size of the partition
         :type size: int
-
         :param roles: Roles assigned to the partition
         :type roles: list
-
         :return: None
         """
         storagerouter = StorageRouter(storagerouter_guid)
@@ -1872,10 +1771,10 @@ class StorageRouterController(object):
     @staticmethod
     def _get_free_ports(client, ports_in_use, number):
         """
-        Gets `number` free ports ports that are not in use and not reserved
+        Gets `number` free ports that are not in use and not reserved
         """
         machine_id = System.get_my_machine_id(client)
-        port_range = EtcdConfiguration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
+        port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
         ports = System.get_free_ports(port_range, ports_in_use, number, client)
 
         return ports if number != 1 else ports[0]
@@ -1913,10 +1812,8 @@ class StorageRouterController(object):
         Retrieve the ALBA Arakoon configuration
         :param backend_guid: Guid of the ALBA backend
         :type backend_guid: str
-
         :param ovs_client: OVS client object
         :type ovs_client: OVSClient
-
         :return: Arakoon configuration information
         :rtype: dict
         """

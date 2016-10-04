@@ -25,7 +25,7 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 
 
 class MemcacheViewSet(viewsets.ViewSet):
@@ -41,7 +41,7 @@ class MemcacheViewSet(viewsets.ViewSet):
         """
         Get the memcache nodes
         """
-        return EtcdConfiguration.get('/ovs/framework/memcache|endpoints')
+        return Configuration.get('/ovs/framework/memcache|endpoints')
 
     @staticmethod
     def _node_stats(host):

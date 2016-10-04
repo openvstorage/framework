@@ -27,7 +27,7 @@ from django.http import HttpResponse
 from middleware import OVSMiddleware
 from oauth2.exceptions import HttpBadRequestException, HttpUnauthorizedException, HttpTooManyRequestsException
 from oauth2.toolbox import Toolbox as OAuth2Toolbox
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic import fakesleep
 from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -147,10 +147,10 @@ class Authentication(unittest.TestCase):
         storagerouter = StorageRouter()
         storagerouter.machine_id = 'storagerouter'
         storagerouter.ip = '127.0.0.1'
+        storagerouter.machine_id = '1'
         storagerouter.rdma_capable = False
         storagerouter.name = 'storagerouter'
         storagerouter.save()
-        System._storagerouter = storagerouter
 
         os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
         from django.test import RequestFactory
@@ -158,9 +158,11 @@ class Authentication(unittest.TestCase):
 
         fakesleep.monkey_patch()
 
-        EtcdConfiguration.set('/ovs/framework/plugins/installed', {'generic': [],
-                                                                   'backends': []})
-        EtcdConfiguration.set('/ovs/framework/cluster_id', 'cluster_id')
+        Configuration.set('/ovs/framework/plugins/installed', {'generic': [],
+                                                               'backends': []})
+        Configuration.set('/ovs/framework/cluster_id', 'cluster_id')
+
+        System._machine_id = {'none': '1'}
 
     @classmethod
     def tearDownClass(cls):

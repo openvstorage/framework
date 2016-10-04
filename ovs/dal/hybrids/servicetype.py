@@ -30,7 +30,7 @@ class ServiceType(DataObject):
                                                            'ALBA_MGR': 'AlbaManager',
                                                            'MD_SERVER': 'MetadataServer',
                                                            'ALBA_PROXY': 'AlbaProxy'})
-    ARAKOON_CLUSTER_TYPES = DataObject.enumerator('Arakoon_cluster_type', ['ABM', 'FWK', 'NSM', 'SD'])
+    ARAKOON_CLUSTER_TYPES = DataObject.enumerator('Arakoon_cluster_type', ['ABM', 'FWK', 'NSM', 'SD', 'CFG'])
 
     __properties = [Property('name', str, doc='Name of the ServiceType.')]
     __relations = []

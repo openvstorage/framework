@@ -53,14 +53,17 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         if vpoolguid is not None:
             vpool = VPool(vpoolguid)
-            return vpool.vdisks
-        if storagerouterguid is not None:
+            vdisks = vpool.vdisks
+        elif storagerouterguid is not None:
             storagerouter = StorageRouter(storagerouterguid)
-            return DataList(VDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('guid', DataList.operator.IN, storagerouter.vdisks_guids)]})
+            vdisks = DataList(VDisk, {'type': DataList.where_operator.AND,
+                                      'items': [('guid', DataList.operator.IN, storagerouter.vdisks_guids)]})
+        else:
+            vdisks = VDiskList.get_vdisks()
         if query is not None:
-            return DataList(VDisk, query)
-        return VDiskList.get_vdisks()
+            query_vdisk_guids = DataList(VDisk, query).guids
+            vdisks = [vdisk for vdisk in vdisks if vdisk.guid in query_vdisk_guids]
+        return vdisks
 
     @log()
     @required_roles(['read', 'manage'])
@@ -85,7 +88,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :param timestamp: Timestamp of the snapshot to rollback to
         """
         return VDiskController.rollback.delay(vdisk_guid=vdisk.guid,
-                                              timestamp=timestamp)
+                                              timestamp=str(timestamp))
 
     @action()
     @required_roles(['read', 'write', 'manage'])
@@ -152,11 +155,27 @@ class VDiskViewSet(viewsets.ViewSet):
         :param storagerouter_guid: Guid of the storagerouter hosting the virtual disk
         :param snapshot_id: ID of the snapshot to clone from
         """
-        storagerouter = StorageRouter(storagerouter_guid)
         return VDiskController.clone.delay(vdisk_guid=vdisk.guid,
                                            snapshot_id=snapshot_id,
                                            name=name,
-                                           storagerouter_guid=storagerouter.guid)
+                                           storagerouter_guid=storagerouter_guid)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write'])
+    @return_task()
+    @load(VDisk)
+    def move(self, vdisk, target_storagerouter_guid):
+        """
+        Moves a vDisk
+        :param vdisk: Guid of the virtual disk to move
+        :type vdisk: VDisk
+        :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisk to
+        :type target_storagerouter_guid: str
+        :return: Celery async task
+        """
+        return VDiskController.move.delay(vdisk_guid=vdisk.guid,
+                                          target_storagerouter_guid=target_storagerouter_guid)
 
     @action()
     @log()
@@ -194,7 +213,7 @@ class VDiskViewSet(viewsets.ViewSet):
         Create a new vdisk
         :param name: Name of the new vdisk
         :type name: str
-        :param size: Size of  virtual disk
+        :param size: Size of  virtual disk in bytes
         :type size: int
         :param vpool_guid: Guid of vPool to create new vdisk on
         :type vpool_guid: str
@@ -258,25 +277,11 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(StorageRouter)
     @load(VDisk)
-    def get_target_storagerouters(self, vdisk, hints):
+    def get_target_storagerouters(self, vdisk):
         """
-        Gets all possible target Storage Routers for a given vDisk (e.g. when cloning or creating from template)
+        Gets all possible target Storage Routers for a given vDisk (e.g. when cloning, creating from template or moving)
         """
-        storagerouter_guids = None
-        storagerouters = {}
-        if vdisk.vpool is not None:
-            vpool = vdisk.vpool
-            this_storagerouter_guids = set()
-            for storagedriver in vpool.storagedrivers:
-                this_storagerouter_guids.add(storagedriver.storagerouter_guid)
-                if hints['full'] is True:
-                    storagerouters[storagedriver.storagerouter_guid] = storagedriver.storagerouter
-            if storagerouter_guids is None:
-                storagerouter_guids = list(this_storagerouter_guids)
-            else:
-                storagerouter_guids = list(this_storagerouter_guids & set(storagerouter_guids))
-            return storagerouter_guids if hints['full'] is False else [storagerouters[guid] for guid in storagerouter_guids]
-        return []
+        return [] if vdisk.vpool is None else [sd.storagerouter for sd in vdisk.vpool.storagedrivers]
 
     @action()
     @log()
@@ -342,3 +347,20 @@ class VDiskViewSet(viewsets.ViewSet):
         :param snapshot_id: Snapshot to verify
         """
         return VDiskController.is_volume_synced_up_to_snapshot.delay(vdisk_guid=vdisk.guid, snapshot_id=snapshot_id)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(VDisk)
+    def extend(self, vdisk, new_size):
+        """
+        Extends a given vDisk to a new size
+        :param vdisk: The vDisk to extend
+        :type vdisk: VDisk
+        :param new_size: The new size of the vDisk (in bytes)
+        :type new_size: int
+        """
+        new_size = int(new_size)
+        return VDiskController.extend.delay(vdisk_guid=vdisk.guid,
+                                            volume_size=new_size)

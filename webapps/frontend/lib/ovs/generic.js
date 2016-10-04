@@ -503,20 +503,12 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
     }
     function cleanDeviceName(name) {
-        var cleaned, extension='';
-        cleaned = name.replace(/^(\/)+|(\/)+$/g, '').replace(/ /g,"_").toLowerCase();
-        cleaned = cleaned.replace(/[^a-z0-9-_\.\/]+/g, "");
+        var cleaned = name.replace(/^(\/)+|(\/)+$/g, '').replace(/ /g,"_").replace(/[^a-zA-Z0-9-_\.\/]+/g, "");
         while (cleaned.indexOf('//') > -1) {
             cleaned = cleaned.replace(/\/\//g, '/');
         }
-        if (cleaned.indexOf('.') > -1) {
-            extension = cleaned.split('.').pop();
-            if (extension.length == 3 || extension.length == 4) {
-                return cleaned
-            }
-            if (extension.length === 0) {
-               return cleaned + 'raw';
-            }
+        if (cleaned.length > 4 && cleaned.slice(-4) === '.raw') {
+            return cleaned;
         }
         return cleaned + '.raw';
     }

@@ -32,6 +32,7 @@ except googleapiclient.errors.HttpError as he:
     raise ValueError(he)
 
 from ovs.log.log_handler import LogHandler
+from ovs.extensions.generic.toolbox import Toolbox
 from ovs.extensions.services.systemd import Systemd
 
 
@@ -73,7 +74,7 @@ class FleetCtl(object):
             template_file = template_file.replace('<{0}>'.format(key), value)
         if '<SERVICE_NAME>' in template_file:
             service_name = name if target_name is None else target_name
-            template_file = template_file.replace('<SERVICE_NAME>', service_name.lstrip('ovs-'))
+            template_file = template_file.replace('<SERVICE_NAME>', Toolbox.remove_prefix(service_name, 'ovs-'))
         template_file = template_file.replace('<_SERVICE_SUFFIX_>', '@{0}'.format(client_ip))
 
         dependencies = ''
@@ -262,7 +263,7 @@ class FleetCtl(object):
 
     @staticmethod
     def _create_unit(fleet_name, template_file):
-        from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+        from ovs.extensions.generic.configuration import Configuration
         start = time.time()
         while time.time() - start < 60:
             try:
@@ -272,8 +273,8 @@ class FleetCtl(object):
                 if ae.code == 500:
                     FleetCtl._logger.warning('API Error in fleet, most likely caused by etcd, retrying. {0}'.format(ae))
                     key = '/_coreos.com/fleet/job/{0}/object'.format(fleet_name)
-                    if EtcdConfiguration.exists(key):
-                        EtcdConfiguration.delete(key)
+                    if Configuration.exists(key):
+                        Configuration.delete(key)
                     time.sleep(1)
                 else:
                     raise

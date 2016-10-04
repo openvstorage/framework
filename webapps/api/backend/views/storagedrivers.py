@@ -21,10 +21,10 @@ StorageDriver API module
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
+from backend.decorators import required_roles, load, return_list, return_object, return_plain, log
+from backend.exceptions import HttpNotAcceptableException
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.hybrids.storagedriver import StorageDriver
-from ovs.lib.vdisk import VDiskController
-from backend.decorators import required_roles, load, return_list, return_object, return_plain, return_task, log
 
 
 class StorageDriverViewSet(viewsets.ViewSet):
@@ -60,17 +60,11 @@ class StorageDriverViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_plain()
     @load(StorageDriver)
-    def can_be_deleted(self, storagedriver):
+    def can_be_deleted(self, storagedriver, version):
         """
         Checks whether a Storage Driver can be deleted
         """
-        result = True
-        storagerouter = storagedriver.storagerouter
-        storagedrivers_left = len([sd for sd in storagerouter.storagedrivers if sd.guid != storagedriver.guid])
-        vpool = storagedriver.vpool
-
-        if storagedrivers_left is False:
-            result = False
-        if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id):
-            result = False
-        return result
+        if version > 4:
+            raise HttpNotAcceptableException(error_description='Only available in API versions 1 to 4',
+                                             error='invalid_version')
+        return not any(vdisk for vdisk in storagedriver.vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id)

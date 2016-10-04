@@ -33,19 +33,15 @@ class DiskTools(object):
     def create_partition(disk_path, disk_size, partition_start, partition_size):
         """
         Creates a partition
-        :param disk_path:       Path of disk device
-        :type disk_path:        str
-
-        :param disk_size:       Total size of disk
-        :type disk_size:        int
-
+        :param disk_path: Path of disk device
+        :type disk_path: str
+        :param disk_size: Total size of disk
+        :type disk_size: int
         :param partition_start: Start of partition in bytes
-        :type partition_start:  int
-
-        :param partition_size:  End of partition in bytes
-        :type partition_size:   int
-
-        :return:                None
+        :type partition_start: int
+        :param partition_size: End of partition in bytes
+        :type partition_size: int
+        :return: None
         """
         # 1. Verify current label type and add GPT label if none present
         try:
@@ -88,7 +84,7 @@ class DiskTools(object):
         """
         Get partitions info from a device
         :param device: device name: /dev/sda
-
+        :type device: str
         :return: dict {'partition_device': {'key': 'value'}}
         (!) return values are in B not in sectors
         """
@@ -118,9 +114,8 @@ class DiskTools(object):
         """
         Creates a filesystem
         :param partition: Path of partition
-        :type partition:  str
-
-        :return:          None
+        :type partition: str
+        :return: None
         """
         try:
             check_output('mkfs.ext4 -q {0}'.format(partition), shell=True)
@@ -132,16 +127,13 @@ class DiskTools(object):
     def add_fstab(device, mountpoint, filesystem):
         """
         Add entry to /etc/fstab for mountpoint
-        :param device:     Device to add
-        :type device:      str
-
+        :param device: Device to add
+        :type device: str
         :param mountpoint: Mountpoint on which device is mounted
-        :type mountpoint:  str
-
+        :type mountpoint: str
         :param filesystem: Filesystem used
-        :type filesystem:  str
-
-        :return:           None
+        :type filesystem: str
+        :return: None
         """
         new_content = []
         with open('/etc/fstab', 'r') as fstab_file:
@@ -163,10 +155,9 @@ class DiskTools(object):
         """
         Verify whether a mountpoint exists by browsing /etc/fstab
         :param mountpoint: Mountpoint to check
-        :type mountpoint:  str
-
-        :return:           True if mountpoint exists, False otherwise
-        :rtype:            bool
+        :type mountpoint: str
+        :return: True if mountpoint exists, False otherwise
+        :rtype: bool
         """
         with open('/etc/fstab', 'r') as fstab_file:
             for line in fstab_file.readlines():
@@ -179,9 +170,8 @@ class DiskTools(object):
         """
         Mount a partition
         :param mountpoint: Mountpoint on which to mount the partition
-        :type mountpoint:  str
-
-        :return:           None
+        :type mountpoint: str
+        :return: None
         """
         try:
             check_output('mkdir -p {0}'.format(mountpoint), shell=True)
@@ -189,3 +179,16 @@ class DiskTools(object):
         except Exception as ex:
             DiskTools._logger.exception('Error during mount: {0}'.format(ex))
             raise
+
+    @staticmethod
+    def umount(mountpoint):
+        """
+        Unmount a partition
+        :param mountpoint: Mountpoint to unmount
+        :type mountpoint: str
+        :return: None
+        """
+        try:
+            check_output('umount {0}'.format(mountpoint), shell=True)
+        except Exception:
+            DiskTools._logger.exception('Unable to umount mountpoint {0}'.format(mountpoint))

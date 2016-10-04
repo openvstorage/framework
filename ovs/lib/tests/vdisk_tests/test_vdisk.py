@@ -26,11 +26,14 @@ from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.vdisklist import VDiskList
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
 from ovs.extensions.generic import fakesleep
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.services.tests.upstart import Upstart
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.tests.mockups import MockStorageRouterClient
+from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
 
@@ -49,12 +52,13 @@ class VDiskTest(unittest.TestCase):
         cls.persistent.clean()
         cls.volatile = VolatileFactory.get_client()
         cls.volatile.clean()
-        MockStorageRouterClient.clean()
+        Upstart.clean()
+        StorageRouterClient.clean()
 
         fakesleep.monkey_patch()
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_maxload', 75)
-        EtcdConfiguration.set('/ovs/framework/storagedriver|mds_safety', 2)
+        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        Configuration.set('/ovs/framework/storagedriver|mds_maxload', 75)
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
 
     def setUp(self):
         """
@@ -63,7 +67,8 @@ class VDiskTest(unittest.TestCase):
         # Cleaning storage
         self.volatile.clean()
         self.persistent.clean()
-        MockStorageRouterClient.clean()
+        Upstart.clean()
+        StorageRouterClient.clean()
 
     @classmethod
     def tearDownClass(cls):
@@ -79,6 +84,20 @@ class VDiskTest(unittest.TestCase):
         # Cleaning storage
         self.volatile.clean()
         self.persistent.clean()
+        Upstart.clean()
+
+    @staticmethod
+    def _roll_out_dtl_services(vpool, storagerouters):
+        """
+        Deploy and start the DTL service on all storagerouters
+        :param storagerouters: StorageRouters to deploy and start a DTL service on
+        :return: None
+        """
+        service_name = 'dtl_{0}'.format(vpool.name)
+        for sr in storagerouters.values():
+            client = SSHClient(sr, 'root')
+            ServiceManager.add_service(name=service_name, client=client)
+            ServiceManager.start_service(name=service_name, client=client)
 
     def test_create_new(self):
         """
@@ -89,47 +108,51 @@ class VDiskTest(unittest.TestCase):
             - Attempt to create a vDisk with identical devicename
             - Create a vDisk with identical name on another vPool
         """
-        vpools, storagerouters, storagedrivers, _, mds_services, _, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1, 2],
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 2, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2)]}  # (<id>, <storagedriver_id>)
         )
-        two_tib = 2 * 1024 ** 4
+        vpools = structure['vpools']
+        mds_services = structure['mds_services']
+        storagedrivers = structure['storagedrivers']
+        storagerouters = structure['storagerouters']
+        size_64_tib = 64 * 1024 ** 4
 
-        # Verify maximum size of 2TiB
+        # Verify maximum size of 64TiB
         vdisk_name_1 = 'vdisk_1'
         vdisk_name_2 = 'vdisk_2'
         with self.assertRaises(ValueError):
-            VDiskController.create_new(volume_name=vdisk_name_1, volume_size=two_tib + 1, storagedriver_guid=storagedrivers[1].guid)
+            VDiskController.create_new(volume_name=vdisk_name_1, volume_size=size_64_tib + 1, storagedriver_guid=storagedrivers[1].guid)
         self.assertTrue(expr=len(VDiskList.get_vdisks()) == 0, msg='Expected to find 0 vDisks after failure 1')
 
         # Create volume of maximum size
-        VDiskController.create_new(volume_name=vdisk_name_1, volume_size=two_tib, storagedriver_guid=storagedrivers[1].guid)
+        VDiskController.create_new(volume_name=vdisk_name_1, volume_size=size_64_tib, storagedriver_guid=storagedrivers[1].guid)
         vdisks = VDiskList.get_vdisks()
         self.assertTrue(expr=len(vdisks) == 1, msg='Expected to find 1 vDisk')
         self.assertTrue(expr=vdisks[0].storagerouter_guid == storagerouters[1].guid, msg='Storage Router does not match expected value')
-        self.assertTrue(expr=vdisks[0].size == two_tib, msg='Size does not match expected value')
+        self.assertTrue(expr=vdisks[0].size == size_64_tib, msg='Size does not match expected value')
         self.assertTrue(expr=vdisks[0].name == vdisk_name_1, msg='Name does not match expected value')
         self.assertTrue(expr=vdisks[0].vpool == vpools[1], msg='vPool does not match expected value')
         self.assertTrue(expr=vdisks[0].devicename == VDiskController.clean_devicename(vdisk_name_1), msg='Devicename does not match expected value')
 
         # Attempt to create same volume on same vPool
         with self.assertRaises(RuntimeError):
-            VDiskController.create_new(volume_name=vdisk_name_1, volume_size=two_tib, storagedriver_guid=storagedrivers[1].guid)
+            VDiskController.create_new(volume_name=vdisk_name_1, volume_size=size_64_tib, storagedriver_guid=storagedrivers[1].guid)
         self.assertTrue(expr=len(VDiskList.get_vdisks()) == 1, msg='Expected to find 1 vDisk after failure 2')
 
         # Attempt to create volume with identical devicename on same vPool
         with self.assertRaises(RuntimeError):
-            VDiskController.create_new(volume_name='{0}%^$'.format(vdisk_name_1), volume_size=two_tib, storagedriver_guid=storagedrivers[1].guid)
+            VDiskController.create_new(volume_name='{0}%^$'.format(vdisk_name_1), volume_size=size_64_tib, storagedriver_guid=storagedrivers[1].guid)
         self.assertTrue(expr=len(VDiskList.get_vdisks()) == 1, msg='Expected to find 1 vDisk after failure 3')
 
         # Create same volume on another vPool
-        vdisk2 = VDisk(VDiskController.create_new(volume_name=vdisk_name_2, volume_size=two_tib, storagedriver_guid=storagedrivers[2].guid))
+        vdisk2 = VDisk(VDiskController.create_new(volume_name=vdisk_name_2, volume_size=size_64_tib, storagedriver_guid=storagedrivers[2].guid))
         vdisks = VDiskList.get_vdisks()
         self.assertTrue(expr=len(vdisks) == 2, msg='Expected to find 2 vDisks')
         self.assertTrue(expr=vdisk2.storagerouter_guid == storagerouters[1].guid, msg='Storage Router does not match expected value')
-        self.assertTrue(expr=vdisk2.size == two_tib, msg='Size does not match expected value')
+        self.assertTrue(expr=vdisk2.size == size_64_tib, msg='Size does not match expected value')
         self.assertTrue(expr=vdisk2.name == vdisk_name_2, msg='Name does not match expected value')
         self.assertTrue(expr=vdisk2.vpool == vpools[2], msg='vPool does not match expected value')
         self.assertTrue(expr=vdisk2.devicename == VDiskController.clean_devicename(vdisk_name_2), msg='Devicename does not match expected value')
@@ -138,7 +161,7 @@ class VDiskTest(unittest.TestCase):
         mds_services[1].service.storagerouter = storagerouters[2]
         mds_services[1].service.save()
         with self.assertRaises(RuntimeError):
-            VDiskController.create_new(volume_name='vdisk_3', volume_size=two_tib, storagedriver_guid=storagedrivers[1].guid)
+            VDiskController.create_new(volume_name='vdisk_3', volume_size=size_64_tib, storagedriver_guid=storagedrivers[1].guid)
         self.assertTrue(expr=len(VDiskList.get_vdisks()) == 2, msg='Expected to find 2 vDisks after failure 4')
 
     def test_create_from_template(self):
@@ -155,25 +178,31 @@ class VDiskTest(unittest.TestCase):
             - Create from template on another Storage Router
             - Create from template without specifying a Storage Router
         """
-        _, storagerouters, storagedrivers, _, mds_services, _, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'storagerouters': [1, 2, 3],
              'storagedrivers': [(1, 1, 1), (2, 1, 2)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2)]}  # (<id>, <storagedriver_id>)
         )
+        vpool = structure['vpools'][1]
+        mds_services = structure['mds_services']
+        storagedrivers = structure['storagedrivers']
+        storagerouters = structure['storagerouters']
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
+
         template = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 3, storagedriver_guid=storagedrivers[1].guid))
         vdisk_name = 'from_template_1'
         VDiskController.set_as_template(vdisk_guid=template.guid)
         self.assertTrue(expr=template.is_vtemplate, msg='Dynamic property "is_vtemplate" should be True')
 
         # Create from vDisk which is not a vTemplate
-        MockStorageRouterClient.object_type[template.vpool_guid][template.volume_id] = 'BASE'
+        template.storagedriver_client._set_object_type(template.volume_id, 'BASE')
         template.invalidate_dynamics(['info', 'is_vtemplate'])
         with self.assertRaises(RuntimeError):
             VDiskController.create_from_template(vdisk_guid=template.guid, name=vdisk_name, storagerouter_guid=storagerouters[1].guid)
 
         # Create from template
-        MockStorageRouterClient.object_type[template.vpool_guid][template.volume_id] = 'TEMPLATE'
+        template.storagedriver_client._set_object_type(template.volume_id, 'TEMPLATE')
         template.invalidate_dynamics(['info', 'is_vtemplate'])
         info = VDiskController.create_from_template(vdisk_guid=template.guid, name=vdisk_name, storagerouter_guid=storagerouters[1].guid)
         expected_keys = ['vdisk_guid', 'name', 'backingdevice']
@@ -239,13 +268,16 @@ class VDiskTest(unittest.TestCase):
             - Delete 1st vDisk and verify other still remains on correct vPool
             - Delete 2nd vDisk and verify no more volumes left
         """
-        _, _, storagedrivers, _, _, _, domains, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1, 2],
              'domains': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1), (2, 2, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2)]}  # (<id>, <storagedriver_id>)
         )
+        domains = structure['domains']
+        storagedrivers = structure['storagedrivers']
+
         vdisk1 = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 3, storagedriver_guid=storagedrivers[1].guid))
         vdisk2 = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 3, storagedriver_guid=storagedrivers[2].guid))
 
@@ -286,12 +318,19 @@ class VDiskTest(unittest.TestCase):
             - Clone the vDisk on another Storage Router
             - Clone another vDisk with name 'clone1' linked to another vPool
         """
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1, 2],
              'storagerouters': [1, 2, 3],
              'storagedrivers': [(1, 1, 1), (2, 2, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2)]}  # (<id>, <storagedriver_id>)
         )
+        vpools = structure['vpools']
+        mds_services = structure['mds_services']
+        service_type = structure['service_type']
+        storagedrivers = structure['storagedrivers']
+        storagerouters = structure['storagerouters']
+        self._roll_out_dtl_services(vpool=vpools[1], storagerouters=storagerouters)
+        self._roll_out_dtl_services(vpool=vpools[2], storagerouters=storagerouters)
 
         # Basic clone scenario
         vdisk1 = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 3, storagedriver_guid=storagedrivers[1].guid))
@@ -372,7 +411,7 @@ class VDiskTest(unittest.TestCase):
         self.assertTrue(expr=len(vdisks) == 2, msg='Expected to find 2 vDisks after failed clone attempt 6')
 
         # Update backend synced flag and retry
-        MockStorageRouterClient.snapshots[vdisk1.vpool_guid][vdisk1.volume_id][snapshot_id].in_backend = True
+        vdisk1.storagedriver_client._set_snapshot_in_backend(vdisk1.volume_id, snapshot_id, True)
         vdisk1.invalidate_dynamics('snapshots')
         VDiskController.clone(vdisk_guid=vdisk1.guid,
                               name='clone2',
@@ -430,7 +469,7 @@ class VDiskTest(unittest.TestCase):
         self.assertTrue(expr=len([vdisk for vdisk in VDiskList.get_vdisks() if vdisk.name == 'clone1']) == 2, msg='Expected to find 2 vDisks with name "clone1"')
 
         # Attempt to clone without specifying snapshot and snapshot fails to sync to backend
-        MockStorageRouterClient.synced = False
+        StorageRouterClient.synced = False
         vdisk2 = VDisk(VDiskController.create_new(volume_name='vdisk_2', volume_size=1024 ** 3, storagedriver_guid=storagedrivers[1].guid))
         with self.assertRaises(RuntimeError):
             VDiskController.clone(vdisk_guid=vdisk2.guid,
@@ -438,7 +477,7 @@ class VDiskTest(unittest.TestCase):
         vdisk2.invalidate_dynamics()
         self.assertTrue(expr=len(vdisk2.snapshots) == 0, msg='Expected to find 0 snapshots after clone failure')
         self.assertTrue(expr=len(vdisk2.child_vdisks) == 0, msg='Expected to find 0 children after clone failure')
-        MockStorageRouterClient.synced = True
+        StorageRouterClient.synced = True
 
     def test_create_snapshot(self):
         """
@@ -447,12 +486,14 @@ class VDiskTest(unittest.TestCase):
             - Attempt to create a snapshot providing incorrect parameters
             - Create a snapshot and make some assertions
         """
-        _, _, storagedrivers, _, _, _, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1)]}  # (<id>, <storagedriver_id>)
         )
+        storagedrivers = structure['storagedrivers']
+
         vdisk1 = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 3, storagedriver_guid=storagedrivers[1].guid))
         with self.assertRaises(ValueError):
             # noinspection PyTypeChecker
@@ -491,12 +532,14 @@ class VDiskTest(unittest.TestCase):
             - Create a vDisk and take a snapshot
             - Attempt to delete a non-existing snapshot
         """
-        _, _, storagedrivers, _, _, _, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1)]}  # (<id>, <storagedriver_id>)
         )
+        storagedrivers = structure['storagedrivers']
+
         vdisk1 = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 3, storagedriver_guid=storagedrivers[1].guid))
         VDiskController.create_snapshot(vdisk_guid=vdisk1.guid, metadata={'timestamp': int(time.time()),
                                                                           'label': 'label1',
@@ -523,12 +566,15 @@ class VDiskTest(unittest.TestCase):
             - List the volumes on vPool1
             - List the volumes on vPool2
         """
-        vpools, _, storagedrivers, _, _, _, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1, 2],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1), (2, 2, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2)]}  # (<id>, <storagedriver_id>)
         )
+        vpools = structure['vpools']
+        storagedrivers = structure['storagedrivers']
+
         vpool1 = vpools[1]
         vpool2 = vpools[2]
         VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 4, storagedriver_guid=storagedrivers[1].guid)
@@ -573,12 +619,14 @@ class VDiskTest(unittest.TestCase):
             - Create a vDisk
             - Set it as template and make some assertions
         """
-        _, _, storagedrivers, _, _, _, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1)]}  # (<id>, <storagedriver_id>)
         )
+        storagedrivers = structure['storagedrivers']
+
         vdisk = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 4, storagedriver_guid=storagedrivers[1].guid))
         metadata = {'is_consistent': True,
                     'is_automatic': True,
@@ -605,15 +653,21 @@ class VDiskTest(unittest.TestCase):
         Test migrate from volumedriver event
         """
         _ = self
-        _, storagerouters, storagedrivers, _, _, _, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'storagerouters': [1, 2],
              'storagedrivers': [(1, 1, 1), (2, 1, 2)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1), (2, 2)]}  # (<id>, <storagedriver_id>)
         )
+        vpool = structure['vpools'][1]
+        storagedrivers = structure['storagedrivers']
+        storagerouters = structure['storagerouters']
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
+
         vdisk = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 4, storagedriver_guid=storagedrivers[1].guid))
+        vdisk.storagedriver_client.migrate(vdisk.volume_id, storagedrivers[2].storagedriver_id, False)
         VDiskController.migrate_from_voldrv(volume_id=vdisk.volume_id, new_owner_id=storagedrivers[2].storagedriver_id)
-        # @TODO: Add validations
+        self.assertEqual(vdisk.storagedriver_id, storagedrivers[2].storagedriver_id)
 
     def test_event_resize_from_volumedriver(self):
         """
@@ -621,18 +675,21 @@ class VDiskTest(unittest.TestCase):
             - Create a vDisk using the resize event
             - Resize the created vDisk using the same resize event
         """
-        vpools, _, storagedrivers, _, _, _, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
              'mds_services': [(1, 1)]}  # (<id>, <storagedriver_id>)
         )
+        vpools = structure['vpools']
+        storagedrivers = structure['storagedrivers']
+        mds_service = structure['mds_services'][1]
 
         # Create volume using resize from voldrv
-        volume_id = 'vdisk_1'
-        device_name = '/{0}.raw'.format(volume_id)
-        _ = MockStorageRouterClient(vpools[1].guid, None)  # Initialize the mock client
-        MockStorageRouterClient.vrouter_id[vpools[1].guid][volume_id] = storagedrivers[1].storagedriver_id
+        device_name = '/vdisk.raw'
+        srclient = StorageRouterClient(vpools[1].guid, None)
+        mds_backend_config = Helper._generate_mdsmetadatabackendconfig([mds_service])
+        volume_id = srclient.create_volume(device_name, mds_backend_config, 1024 ** 4, str(storagedrivers[1].storagedriver_id))
         VDiskController.resize_from_voldrv(volume_id=volume_id,
                                            volume_size=1024 ** 4,
                                            volume_path=device_name,
@@ -641,8 +698,8 @@ class VDiskTest(unittest.TestCase):
         self.assertTrue(expr=len(vdisks) == 1,
                         msg='Expected to find 1 vDisk in model')
         self.assertEqual(first=vdisks[0].name,
-                         second=volume_id,
-                         msg='Volume name should be {0}'.format(volume_id))
+                         second='vdisk',
+                         msg='Volume name should be vdisk')
         self.assertEqual(first=vdisks[0].volume_id,
                          second=volume_id,
                          msg='Volume ID should be {0}'.format(volume_id))
@@ -662,25 +719,38 @@ class VDiskTest(unittest.TestCase):
         self.assertTrue(expr=len(vdisks) == 1,
                         msg='Expected to find 1 vDisk in model')
         self.assertEqual(first=vdisks[0].name,
-                         second=volume_id,
-                         msg='Volume name should be {0}'.format(volume_id))
+                         second='vdisk',
+                         msg='Volume name should be vdisk')
         self.assertEqual(first=vdisks[0].size,
                          second=2 * 1024 ** 4,
                          msg='Size should be 2 TiB')
 
     def test_clean_devicename(self):
         """
-        Test the clean devicename functionality
-            - Test several names and validate the return devicename
+        Validates whether a devicename is properly cleaned
+        * Test several names and validate the returned devicename
         """
-        test = {'Foo Bar': '/foo_bar.raw',
-                '/Foo Bar .raw': '/foo_bar_.raw',
+        test = {'Foo Bar': '/Foo_Bar.raw',
+                '/Foo Bar .raw': '/Foo_Bar_.raw',
                 'foo-bar.rawtest': '/foo-bar.rawtest.raw',
                 'test///folder': '/test/folder.raw',
-                'foobar-flat.vmdk': '/foobar-flat.vmdk',
+                'foobar-flat.vmdk': '/foobar-flat.vmdk.raw',
                 '//test.raw': '/test.raw',
                 'test/.raw': '/test/.raw.raw',
-                '//d\'!@#%xfoo Bar/te_b --asdfS SA AS lolz///f.wrv.': '/dxfoo_bar/te_b_--asdfs_sa_as_lolz/f.wrv.raw'}
+                '//d\'!@#%xfoo Bar/te_b --asdfS SA AS lolz///f.wrv.': '/dxfoo_Bar/te_b_--asdfS_SA_AS_lolz/f.wrv..raw'}
         for raw, expected in test.iteritems():
             result = VDiskController.clean_devicename(raw)
+            self.assertEqual(result, expected)
+
+    def test_extract_volumename(self):
+        """
+        Validates whether a correct volumename is yielded from a given devicename
+        * Test several devicenames and validate the returned name
+        """
+        test = {'/foo/Bar/something.raw': 'something',
+                '/Some.long.dotted.name.raw': 'Some.long.dotted.name',
+                '': '',
+                'f4qav@#$%sd.raw': 'f4qav@#$%sd'}
+        for devicename, expected in test.iteritems():
+            result = VDiskController.extract_volumename(devicename)
             self.assertEqual(result, expected)

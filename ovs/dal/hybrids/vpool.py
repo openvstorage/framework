@@ -63,7 +63,7 @@ class VPool(DataObject):
         :return: StorageDriverClient
         """
         if self._storagedriver_client is None:
-            self.reload_clients('storagedriver')
+            self.reload_client('storagedriver')
         return self._storagedriver_client
 
     @property
@@ -73,7 +73,7 @@ class VPool(DataObject):
         :return: ObjectRegistryClient
         """
         if self._objectregistry_client is None:
-            self.reload_clients('objectregistry')
+            self.reload_client('objectregistry')
         return self._objectregistry_client
 
     def _configuration(self):
@@ -86,37 +86,35 @@ class VPool(DataObject):
         storagedriver_config = StorageDriverConfiguration('storagedriver', self.guid, self.storagedrivers[0].storagedriver_id)
         storagedriver_config.load()
 
-        dtl = storagedriver_config.configuration.get('distributed_transaction_log', {})
-        file_system = storagedriver_config.configuration.get('filesystem', {})
-        volume_router = storagedriver_config.configuration.get('volume_router', {})
-        volume_manager = storagedriver_config.configuration.get('volume_manager', {})
+        dtl = storagedriver_config.configuration['distributed_transaction_log']
+        file_system = storagedriver_config.configuration['filesystem']
+        volume_router = storagedriver_config.configuration['volume_router']
+        volume_manager = storagedriver_config.configuration['volume_manager']
 
+        dtl_host = file_system['fs_dtl_host']
         dtl_mode = file_system.get('fs_dtl_mode', StorageDriverClient.VOLDRV_DTL_ASYNC)
-        dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_CONTENT_BASED)
-        cluster_size = volume_manager.get('default_cluster_size', 4096) / 1024
-        dtl_transport = dtl.get('dtl_transport', StorageDriverClient.VOLDRV_DTL_TRANSPORT_TCP)
-        cache_strategy = volume_manager.get('read_cache_default_behaviour', StorageDriverClient.VOLDRV_CACHE_ON_READ)
-        sco_multiplier = volume_router.get('vrouter_sco_multiplier', 1024)
-        dtl_config_mode = file_system.get('fs_dtl_config_mode', StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE)
-        tlog_multiplier = volume_manager.get('number_of_scos_in_tlog', 20)
-        non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
+        dedupe_mode = volume_manager['read_cache_default_mode']
+        cluster_size = volume_manager['default_cluster_size'] / 1024
+        dtl_transport = dtl['dtl_transport']
+        cache_strategy = volume_manager['read_cache_default_behaviour']
+        sco_multiplier = volume_router['vrouter_sco_multiplier']
+        dtl_config_mode = file_system['fs_dtl_config_mode']
+        tlog_multiplier = volume_manager['number_of_scos_in_tlog']
+        non_disposable_sco_factor = volume_manager['non_disposable_scos_factor']
 
         sco_size = sco_multiplier * cluster_size / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
         write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor
-
-        dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_mode]
-        dtl_enabled = dtl_config_mode == StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE
-        if dtl_enabled is False:
-            dtl_mode = StorageDriverClient.FRAMEWORK_DTL_NO_SYNC
+        dtl_enabled = not (dtl_config_mode == StorageDriverClient.VOLDRV_DTL_MANUAL_MODE and dtl_host == '')
 
         return {'sco_size': sco_size,
-                'dtl_mode': dtl_mode,
+                'dtl_mode': StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_mode] if dtl_enabled is True else 'no_sync',
                 'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
                 'dtl_enabled': dtl_enabled,
                 'cluster_size': cluster_size,
                 'write_buffer': write_buffer,
                 'dtl_transport': StorageDriverClient.REVERSE_DTL_TRANSPORT_MAP[dtl_transport],
                 'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],
+                'dtl_config_mode': dtl_config_mode,
                 'tlog_multiplier': tlog_multiplier}
 
     def _statistics(self, dynamic):
@@ -141,13 +139,13 @@ class VPool(DataObject):
         """
         return '{0}_{1}'.format(self.guid, '_'.join(self.storagedrivers_guids))
 
-    def reload_clients(self, client):
+    def reload_client(self, client):
         """
-        Reloads the StorageDriverClient and ObjectRegistryClient
+        Reloads the StorageDriverClient or ObjectRegistryClient
         """
         self._frozen = False
         if client == 'storagedriver':
             self._storagedriver_client = StorageDriverClient.load(self)
-        if client == 'objectregistry':
+        elif client == 'objectregistry':
             self._objectregistry_client = ObjectRegistryClient.load(self)
         self._frozen = True

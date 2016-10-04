@@ -13,11 +13,14 @@
 #
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
+"""
+Migrator module
+"""
+
 import os
 import imp
 import inspect
-from etcd import EtcdConnectionFailed
-from ovs.extensions.db.etcd.configuration import EtcdConfiguration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 
 
@@ -37,7 +40,7 @@ class Migrator(object):
         """
         machine_id = System.get_my_machine_id()
         key = '/ovs/framework/hosts/{0}/versions'.format(machine_id)
-        data = EtcdConfiguration.get(key) if EtcdConfiguration.exists(key) else {}
+        data = Configuration.get(key) if Configuration.exists(key) else {}
         migrators = []
         path = '/'.join([os.path.dirname(__file__), 'migration'])
         for filename in os.listdir(path):
@@ -56,4 +59,4 @@ class Migrator(object):
                 end_version = version
             data[identifier] = end_version
 
-        EtcdConfiguration.set(key, data)
+        Configuration.set(key, data)
