@@ -825,6 +825,22 @@ class StorageRouterController(object):
         backend_connection_manager.update({'backend_interface_retries_on_error': 5,
                                            'backend_interface_retry_interval_secs': 1,
                                            'backend_interface_retry_backoff_multiplier': 2.0})
+
+        volume_router = {'vrouter_id': vrouter_id,
+                         'vrouter_redirect_timeout_ms': '5000',
+                         'vrouter_routing_retries': 10,
+                         'vrouter_volume_read_threshold': 1024,
+                         'vrouter_volume_write_threshold': 1024,
+                         'vrouter_file_read_threshold': 1024,
+                         'vrouter_file_write_threshold': 1024,
+                         'vrouter_min_workers': 4,
+                         'vrouter_max_workers': 16,
+                         'vrouter_sco_multiplier': sco_size * 1024 / cluster_size,  # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB),
+                         'vrouter_backend_sync_timeout_ms': 5000,
+                         'vrouter_migrate_timeout_ms': 5000}
+        if vpool.backend_type.code == 'alba':
+            volume_router['vrouter_use_fencing'] = True
+
         storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
         storagedriver_config.configure_content_addressed_cache(clustercache_mount_points=readcaches,
                                                                read_cache_serialization_path=rsppath)
@@ -835,18 +851,7 @@ class StorageRouterController(object):
                                                                    dtl_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport])
         storagedriver_config.configure_filesystem(**filesystem_config)
         storagedriver_config.configure_volume_manager(**volume_manager_config)
-        storagedriver_config.configure_volume_router(vrouter_id=vrouter_id,
-                                                     vrouter_redirect_timeout_ms='5000',
-                                                     vrouter_routing_retries=10,
-                                                     vrouter_volume_read_threshold=1024,
-                                                     vrouter_volume_write_threshold=1024,
-                                                     vrouter_file_read_threshold=1024,
-                                                     vrouter_file_write_threshold=1024,
-                                                     vrouter_min_workers=4,
-                                                     vrouter_max_workers=16,
-                                                     vrouter_sco_multiplier=sco_size * 1024 / cluster_size,  # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB),
-                                                     vrouter_backend_sync_timeout_ms=5000,
-                                                     vrouter_migrate_timeout_ms=5000)
+        storagedriver_config.configure_volume_router(**volume_router)
         storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
         storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=arakoon_cluster_name,
                                                        vregistry_arakoon_cluster_nodes=arakoon_nodes)
