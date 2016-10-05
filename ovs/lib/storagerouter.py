@@ -520,48 +520,9 @@ class StorageRouterController(object):
         model_ports_in_use += ports
 
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
-        arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
-        config.load_config()
-        arakoon_nodes = []
-        arakoon_node_configs = []
-        for node in config.nodes:
-            arakoon_nodes.append({'node_id': node.name, 'host': node.ip, 'port': node.client_port})
-            arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
-        node_configs = []
-        for existing_storagedriver in StorageDriverList.get_storagedrivers():
-            if existing_storagedriver.vpool_guid == vpool.guid:
-                # noinspection PyArgumentList
-                node_configs.append(ClusterNodeConfig(vrouter_id=str(existing_storagedriver.storagedriver_id),
-                                                      host=str(existing_storagedriver.cluster_ip),
-                                                      message_port=existing_storagedriver.ports['management'],
-                                                      xmlrpc_port=existing_storagedriver.ports['xmlrpc'],
-                                                      failovercache_port=existing_storagedriver.ports['dtl'],
-                                                      network_server_uri='{0}://{1}:{2}'.format('rdma' if has_rdma else 'tcp',
-                                                                                                existing_storagedriver.storage_ip,
-                                                                                                existing_storagedriver.ports['edge'])))
         grid_ip = Configuration.get('/ovs/framework/hosts/{0}/ip'.format(unique_id))
-        # noinspection PyArgumentList
-        node_configs.append(ClusterNodeConfig(vrouter_id=vrouter_id,
-                                              host=str(grid_ip),
-                                              message_port=ports[0],
-                                              xmlrpc_port=ports[1],
-                                              failovercache_port=ports[2],
-                                              network_server_uri='{0}://{1}:{2}'.format('rdma' if has_rdma else 'tcp',
-                                                                                        storage_ip,
-                                                                                        ports[3])))
 
-        try:
-            vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
-            vrouter_clusterregistry.set_node_configs(node_configs)
-        except:
-            vpool.status = VPool.STATUSES.FAILURE
-            vpool.save()
-            if new_vpool is True:
-                vpool.delete()
-            raise
-
-        # Updating the model
+        # Prepare the model
         storagedriver = StorageDriver()
         storagedriver.name = vrouter_id.replace('_', ' ')
         storagedriver.ports = {'management': ports[0],
@@ -576,6 +537,34 @@ class StorageRouterController(object):
         storagedriver.description = storagedriver.name
         storagedriver.storagerouter = storagerouter
         storagedriver.storagedriver_id = vrouter_id
+
+        arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
+        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
+        config.load_config()
+        arakoon_nodes = []
+        arakoon_node_configs = []
+        for node in config.nodes:
+            arakoon_nodes.append({'node_id': node.name, 'host': node.ip, 'port': node.client_port})
+            arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
+        node_configs = []
+        for existing_storagedriver in StorageDriverList.get_storagedrivers():
+            if existing_storagedriver.vpool_guid == vpool.guid:
+                existing_storagedriver.invalidate_dynamics('cluster_node_config')
+                node_configs.append(ClusterNodeConfig(**existing_storagedriver.cluster_node_config))
+        storagedriver.invalidate_dynamics('cluster_node_config')
+        node_configs.append(ClusterNodeConfig(**storagedriver.cluster_node_config))
+
+        try:
+            vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
+            vrouter_clusterregistry.set_node_configs(node_configs)
+        except:
+            vpool.status = VPool.STATUSES.FAILURE
+            vpool.save()
+            if new_vpool is True:
+                vpool.delete()
+            raise
+
+        # Store the model
         storagedriver.save()
 
         ##############################

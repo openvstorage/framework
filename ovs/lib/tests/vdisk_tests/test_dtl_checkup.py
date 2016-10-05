@@ -621,3 +621,34 @@ class DTLCheckup(unittest.TestCase):
                                            validations=[{'key': 'host', 'value': storagerouters[2].storagedrivers[0].storage_ip},
                                                         {'key': 'port', 'value': 3},
                                                         {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
+
+    def test_incorrect_dtl_fixup(self):
+        """
+        Validates whether the DTL checkup logic can fix a vDisk who's DTL is configured to an unexpected ip
+        """
+        structure = Helper.build_service_structure(
+            {'vpools': [1],
+             'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
+             'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
+             'storagerouters': [1, 2],
+             'storagedrivers': [(1, 1, 1), (2, 1, 2)]}  # (<id>, <vpool_id>, <sr_id>)
+        )
+        vpool = structure['vpools'][1]
+        vdisk = structure['vdisks'][1]
+        storagerouters = structure['storagerouters']
+
+        self._roll_out_dtl_services(vpool=vpool, storagerouters=storagerouters)
+        self._run_and_validate_dtl_checkup(vdisk=vdisk,
+                                           validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()]},
+                                                        {'key': 'port', 'value': 3},
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])
+
+        # Set DTL manually to an unexpected IP
+        vdisk.storagedriver_client.set_manual_dtl_config(volume_id=vdisk.volume_id,
+                                                         config=DTLConfig(str(storagerouters[1].ip), 3, DTLMode.SYNCHRONOUS))
+
+        # And after another DTL checkup, it should be restored again
+        self._run_and_validate_dtl_checkup(vdisk=vdisk,
+                                           validations=[{'key': 'host', 'value': [sr.storagedrivers[0].storage_ip for sr in storagerouters.values()]},
+                                                        {'key': 'port', 'value': 3},
+                                                        {'key': 'mode', 'value': DTLMode.ASYNCHRONOUS}])

@@ -986,7 +986,9 @@ class VDiskController(object):
                 current_sr = None
                 available_primary_srs = available_primary_srs.difference(available_secondary_srs)
                 if current_dtl_config is not None:
-                    current_sr = [sd for sd in vpool.storagedrivers if sd.storage_ip == current_dtl_config.host][0].storagerouter
+                    sds = [sd for sd in vpool.storagedrivers if sd.storage_ip == current_dtl_config.host]
+                    if len(sds) > 0:
+                        current_sr = sds[0].storagerouter
 
                 for importance, possible_srs in {'secondary': possible_secondary_srs,
                                                  'primary': possible_primary_srs}.iteritems():
@@ -1042,6 +1044,9 @@ class VDiskController(object):
                     reconfigure_required = True
                 elif dtl_vpool_config_mode == DTLConfigMode.MANUAL and dtl_vpool_enabled is True:
                     VDiskController._logger.info('        DTL configuration set to MANUAL, but static host provided ... overruling')
+                    reconfigure_required = True
+                elif current_sr is None:
+                    VDiskController._logger.info('        DTL configuration set to MANUAL, but no StorageRouter found ... correcting')
                     reconfigure_required = True
                 else:
                     dtl_host = current_dtl_config.host
