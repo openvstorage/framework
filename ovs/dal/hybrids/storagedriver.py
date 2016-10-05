@@ -48,7 +48,8 @@ class StorageDriver(DataObject):
     __dynamics = [Dynamic('status', str, 30),
                   Dynamic('statistics', dict, 4),
                   Dynamic('edge_clients', list, 30),
-                  Dynamic('vdisks_guids', list, 15)]
+                  Dynamic('vdisks_guids', list, 15),
+                  Dynamic('cluster_node_config', dict, 3600)]
 
     def _status(self):
         """
@@ -144,3 +145,20 @@ class StorageDriver(DataObject):
         except:
             pass
         return sdstatsdict
+
+    def _cluster_node_config(self):
+        """
+        Prepares a ClusterNodeConfig dict for the StorageDriver process
+        """
+        from ovs.extensions.generic.configuration import Configuration
+        rdma = Configuration.get('/ovs/framework/rdma')
+        return {'vrouter_id': str(self.storagedriver_id),
+                'host': str(self.storage_ip),
+                'message_port': self.ports['management'],
+                'xmlrpc_host': str(self.cluster_ip),
+                'xmlrpc_port': self.ports['xmlrpc'],
+                'failovercache_host': str(self.storage_ip),
+                'failovercache_port': self.ports['dtl'],
+                'network_server_uri': '{0}://{1}:{2}'.format('rdma' if rdma else 'tcp',
+                                                             self.storage_ip,
+                                                             self.ports['edge'])}
