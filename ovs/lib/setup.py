@@ -1429,7 +1429,7 @@ class SetupController(object):
                     SetupController._log(messages=['\nFailed to remove/unconfigure RabbitMQ', ex], loglevel='exception')
 
             SetupController._log(messages='Removing services')
-            services = ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'snmp', 'webapp-api', 'volumerouter-consumer']
+            services = ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
             if unconfigure_rabbitmq is False:
                 services.remove('rabbitmq-server')
             if unconfigure_memcached is False:
@@ -1632,7 +1632,7 @@ EOF
         services = ['workers', 'watcher-framework', 'watcher-config']
         worker_queue = unique_id
         if node_type == 'master':
-            services += ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'snmp', 'webapp-api', 'volumerouter-consumer']
+            services += ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
             worker_queue += ',ovs_masters'
 
         params = {'MEMCACHE_NODE_IP': client.ip,
@@ -1647,7 +1647,7 @@ EOF
         SetupController._log(messages='Removing services')
         services = ['workers', 'support-agent', 'watcher-framework', 'watcher-config']
         if node_type == 'master':
-            services += ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'snmp', 'webapp-api', 'volumerouter-consumer']
+            services += ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
 
         for service in services:
             if ServiceManager.has_service(service, client=client):
