@@ -91,20 +91,26 @@ class StorageRouter(DataObject):
         """
         Calculates the current Storage Router status based on various heartbeats
         """
+        pointer = 0
+        statusses = ['OK', 'WARNING', 'FAILURE']
         current_time = time.time()
         if self.heartbeats is not None:
             process_delay = abs(self.heartbeats.get('process', 0) - current_time)
             if process_delay > 60 * 5:
-                return 'FAILURE'
+                pointer = max(pointer, 2)
             else:
                 delay = abs(self.heartbeats.get('celery', 0) - current_time)
                 if delay > 60 * 5:
-                    return 'FAILURE'
+                    pointer = max(pointer, 2)
                 elif delay > 60 * 2:
-                    return 'WARNING'
-                else:
-                    return 'OK'
-        return 'UNKNOWN'
+                    pointer = max(pointer, 1)
+        for disk in self.disks:
+            if disk.state == 'MISSING':
+                pointer = max(pointer, 2)
+            for partition in disk.partitions:
+                if partition.state == 'MISSING':
+                    pointer = max(pointer, 2)
+        return statusses[pointer]
 
     def _partition_config(self):
         """
