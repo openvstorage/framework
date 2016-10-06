@@ -28,9 +28,20 @@ define([
         self.data   = data;
         self.shared = shared;
 
+        // Observables
+        self.loaded  = ko.observable(false);
+        self.loading = ko.observable(false);
+
+        // Handles
+        self.loadMetadataHandle = undefined;
+
         // Computed
         self.canContinue = ko.computed(function() {
-            var valid = true, reasons = [], fields = [];
+            var valid = !self.loading(), reasons = [], fields = [];
+            if (self.loaded() === false && self.loading() === false) {
+                valid = false;
+                reasons.push($.t('ovs:wizards.configure_partition.gather.metadata_failure'));
+            }
             return { value: valid, reasons: reasons, fields: fields };
         });
 
@@ -51,22 +62,24 @@ define([
                 api.post('storagerouters/' + self.data.storageRouter().guid() + '/configure_disk', { data: postData })
                         .then(self.shared.tasks.wait)
                         .done(function() {
-                            generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:wizards.configurepartition.confirm.success'));
+                            generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:wizards.configure_partition.confirm.success'));
                         })
                         .fail(function() {
-                            generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:wizards.configurepartition.confirm.creating') }));
+                            generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:wizards.configure_partition.confirm.creating') }));
                         });
-                generic.alertInfo($.t('ovs:wizards.configurepartition.confirm.started'), $.t('ovs:wizards.configurepartition.confirm.inprogress'));
+                generic.alertInfo($.t('ovs:wizards.configure_partition.confirm.started'), $.t('ovs:wizards.configure_partition.confirm.in_progress'));
                 deferred.resolve();
             }).promise();
         };
 
         // Durandal
         self.activate = function() {
-            return $.Deferred(function(deferred) {
-                api.post('storagerouters/' + self.data.storageRouter().guid() + '/get_metadata')
-                    .then(self.shared.tasks.wait)
-                    .then(function(metadata) {
+            self.loading(true);
+            generic.xhrAbort(self.loadMetadataHandle);
+            self.loadMetadataHandle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/get_metadata')
+                .then(self.shared.tasks.wait)
+                .done(function(metadata) {
+                    if (self.loaded() === false) {
                         self.data.currentUsage(metadata.partitions);
                         self.data.roles([]);
                         $.each(metadata.partitions, function(role, partitions) {
@@ -76,10 +89,15 @@ define([
                                 }
                             })
                         });
-                    })
-                    .done(deferred.resolve)
-                    .fail(deferred.reject);
-            }).promise();
+                    }
+                    self.loaded(true);
+                })
+                .fail(function() {
+                    self.loaded(false);
+                })
+                .always(function() {
+                    self.loading(false);
+                });
         };
     };
 });

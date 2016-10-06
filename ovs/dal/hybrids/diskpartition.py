@@ -29,14 +29,12 @@ class DiskPartition(DataObject):
     ROLES = DataObject.enumerator('Role', ['DB', 'READ', 'SCRUB', 'WRITE', 'BACKEND'])
     VIRTUAL_STORAGE_LOCATION = '/mnt/storage'
 
-    __properties = [Property('id', str, doc='The partition identifier'),
-                    Property('filesystem', str, mandatory=False, doc='The filesystem used on the partition'),
-                    Property('state', ['OK', 'FAILURE', 'MISSING'], doc='State of the partition'),
-                    Property('inode', int, mandatory=False, doc='The partitions inode'),
+    __properties = [Property('filesystem', str, mandatory=False, doc='The filesystem used on the partition'),
+                    Property('state', Disk.STATES.keys(), doc='State of the partition'),
                     Property('offset', int, doc='Offset of the partition'),
                     Property('size', int, doc='Size of the partition'),
                     Property('mountpoint', str, mandatory=False, doc='Mountpoint of the partition, None if not mounted'),
-                    Property('path', str, doc='The partition path'),
+                    Property('aliases', list, doc='The partition aliases'),
                     Property('roles', list, default=[], doc='A list of claimed roles')]
     __relations = [Relation('disk', Disk, 'partitions')]
     __dynamics = [Dynamic('usage', list, 120),

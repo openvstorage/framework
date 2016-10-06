@@ -26,31 +26,27 @@ define([
         self.loadHandle = undefined;
 
         // Observables
-        self.trigger    = ko.observable();
+        self.filesystem = ko.observable();
+        self.guid       = ko.observable(guid);
         self.loading    = ko.observable(false);
         self.loaded     = ko.observable(false);
-        self.guid       = ko.observable(guid);
-        self.id         = ko.observable();
-        self.filesystem = ko.observable();
-        self.state      = ko.observable();
-        self.inode      = ko.observable();
-        self.offset     = ko.observable().extend({ format: generic.formatBytes });
-        self.size       = ko.observable().extend({ format: generic.formatBytes });
         self.mountpoint = ko.observable();
-        self.path       = ko.observable();
-        self.usage      = ko.observable();
+        self.offset     = ko.observable().extend({ format: generic.formatBytes });
+        self.aliases    = ko.observable();
         self.roles      = ko.observableArray([]);
+        self.size       = ko.observable().extend({ format: generic.formatBytes });
+        self.state      = ko.observable();
+        self.trigger    = ko.observable();
+        self.usage      = ko.observable();
 
         // Functions
         self.fillData = function(data) {
-            self.id(data.id);
             self.filesystem(data.filesystem);
             self.state(data.state);
-            self.inode(data.inode);
             self.offset(data.offset);
             self.size(data.size);
             self.mountpoint(data.mountpoint);
-            self.path(data.path);
+            self.aliases(data.aliases);
             self.usage(generic.tryGet(data, 'usage', undefined));
             self.roles(data.roles);
 
