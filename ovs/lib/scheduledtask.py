@@ -390,6 +390,8 @@ class ScheduledTaskController(object):
             # Fill queue with all vDisks for current vPool
             vpool_queue = Queue()
             for vd in vp.vdisks:
+                if vd.is_vtemplate is True:
+                    continue
                 vd.invalidate_dynamics('storagedriver_id')
                 if not vd.storagedriver_id:
                     ScheduledTaskController._logger.warning('Scrubber - vPool {0} - vDisk {1} {2} - No StorageDriver ID found'.format(vp.name, vd.guid, vd.name))
