@@ -1428,19 +1428,19 @@ class Basic(unittest.TestCase):
         disk2 = TestDisk()
         disk2.name = 'disk'
         disk2.description = 'disk'
-        with self.assertRaises(UniqueContraintViolationException) as exception:
+        with self.assertRaises(UniqueConstraintViolationException) as exception:
             disk2.save()
         self.assertIn('TestDisk.name', exception.exception.message, '\TestDisk.name\' should be in exception message: {0}'.format(exception.exception.message))
         disk2.name = 'disk2'
         disk2.save()
         disk1.save()
         disk1.name = 'disk2'
-        with self.assertRaises(UniqueContraintViolationException):
+        with self.assertRaises(UniqueConstraintViolationException):
             disk1.save()
         disk3 = TestDisk(disk1.guid)
         disk3.save()
         disk3.name = 'disk2'
-        with self.assertRaises(UniqueContraintViolationException):
+        with self.assertRaises(UniqueConstraintViolationException):
             disk3.save()
         disk3.name = 'disk1'
         disk3.save()

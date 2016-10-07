@@ -74,7 +74,8 @@ class VolatileObjectException(Exception):
     """
     pass
 
-class UniqueContraintViolationException(Exception):
+
+class UniqueConstraintViolationException(Exception):
     """
     Raised when a unique constraint is violated
     """

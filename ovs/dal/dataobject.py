@@ -26,7 +26,7 @@ import hashlib
 from random import randint
 from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
                                 MissingMandatoryFieldsException, RaceConditionException, InvalidRelationException,
-                                VolatileObjectException, UniqueContraintViolationException)
+                                VolatileObjectException, UniqueConstraintViolationException)
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.datalist import DataList
@@ -667,7 +667,7 @@ class DataObject(object):
             except AssertException as ex:
                 if 'ovs_unique' in ex.message:
                     field = ex.message.split('_', 3)[-1].rsplit('_', 1)[0]
-                    raise UniqueContraintViolationException('The unique constraint on {0}.{1} was violated'.format(
+                    raise UniqueConstraintViolationException('The unique constraint on {0}.{1} was violated'.format(
                         self.__class__.__name__, field
                     ))
                 last_assert = ex
