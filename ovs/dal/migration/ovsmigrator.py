@@ -176,21 +176,17 @@ class OVSMigrator(object):
             for class_descriptor in hybrid_structure.values():
                 cls = Descriptor().load(class_descriptor).get_object()
                 classname = cls.__name__.lower()
+                unique_key = 'ovs_unique_{0}_{{0}}_'.format(classname)
                 uniques = []
                 for prop in cls._properties:
-                    if prop.unique is True:
+                    if prop.unique is True and len([k for k in client.prefix(unique_key.format(prop.name))]) == 0:
                         uniques.append(prop.name)
                 if len(uniques) > 0:
-                    unique_key = 'ovs_unique_{0}_{{0}}_'.format(classname)
-                    for property_name in uniques[:]:
-                        if len([k for k in client.prefix(unique_key.format(property_name))]) > 0:
-                            uniques.remove(property_name)
-                    if len(uniques) > 0:
-                        prefix = 'ovs_data_{0}_'.format(classname)
-                        for key in client.prefix(prefix):
-                            data = client.get(key)
-                            for property_name in uniques:
-                                key = '{0}{1}'.format(unique_key.format(property_name), hashlib.sha1(str(data[property_name])).hexdigest())
-                                client.set(key, 0)
+                    prefix = 'ovs_data_{0}_'.format(classname)
+                    for key in client.prefix(prefix):
+                        data = client.get(key)
+                        for property_name in uniques:
+                            key = '{0}{1}'.format(unique_key.format(property_name), hashlib.sha1(str(data[property_name])).hexdigest())
+                            client.set(key, 0)
 
         return OVSMigrator.THIS_VERSION
