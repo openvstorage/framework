@@ -24,7 +24,7 @@ class Property(object):
     Property
     """
 
-    def __init__(self, name, property_type, mandatory=True, default=None, doc=None):
+    def __init__(self, name, property_type, mandatory=True, default=None, unique=False, doc=None):
         """
         Initializes a property
         """
@@ -33,6 +33,7 @@ class Property(object):
         self.default = default
         self.docstring = doc
         self.mandatory = mandatory
+        self.unique = unique
 
 
 class Relation(object):

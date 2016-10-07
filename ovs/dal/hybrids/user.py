@@ -27,7 +27,7 @@ class User(DataObject):
     The User class represents a User.  A user is an individual who can perform actions
     on objects in Open vStorage.
     """
-    __properties = [Property('username', str, doc='Username of the User.'),
+    __properties = [Property('username', str, unique=True, doc='Username of the User.'),
                     Property('password', str, doc='Password of the User.'),
                     Property('is_active', bool, doc='Indicates whether the User is active.'),
                     Property('language', ['en-US', 'nl-NL'], default='en-US', doc='Language of the User.')]

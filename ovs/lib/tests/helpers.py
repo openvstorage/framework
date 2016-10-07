@@ -117,8 +117,8 @@ class Helper(object):
                 storagerouter.ip = '10.0.0.{0}'.format(sr_id)
                 storagerouter.rdma_capable = False
                 storagerouter.node_type = 'MASTER'
-                storagerouter.save()
                 storagerouter.machine_id = str(sr_id)
+                storagerouter.save()
                 storagerouters[sr_id] = storagerouter
                 disk = Disk()
                 disk.storagerouter = storagerouter
