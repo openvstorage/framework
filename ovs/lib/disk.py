@@ -51,27 +51,25 @@ class DiskController(object):
         try:
             client = SSHClient(storagerouter, username='root')
         except UnableToConnectException:
-            DiskController._logger.info('Could not connect to StorageRouter {0}'.format(storagerouter.ip))
-            return
+            DiskController._logger.exception('Could not connect to StorageRouter {0}'.format(storagerouter.ip))
+            raise
 
         # Retrieve all symlinks for all devices
         # Example of path_mapping:
         # {'/dev/md0': ['/dev/disk/by-id/md-uuid-ad2de634:26d97253:5eda0a23:96986b76', '/dev/disk/by-id/md-name-OVS-1:0'],
         #  '/dev/sda': ['/dev/disk/by-path/pci-0000:03:00.0-sas-0x5000c295fe2ff771-lun-0'],
         #  '/dev/sda1': ['/dev/disk/by-uuid/e3e0bc62-4edc-4c6b-a6ce-1f39e8f27e41', '/dev/disk/by-path/pci-0000:03:00.0-sas-0x5000c295fe2ff771-lun-0-part1']}
-        name_path_mapping = {}
-        path_name_mapping = {}
+        name_alias_mapping = {}
+        alias_name_mapping = {}
         for path_type in client.dir_list('/dev/disk'):
             directory = '/dev/disk/{0}'.format(path_type)
-            if not client.dir_exists(directory=directory):
-                continue
             for symlink in client.dir_list(directory=directory):
                 symlink_path = '{0}/{1}'.format(directory, symlink)
                 link = client.file_read_link(symlink_path)
-                if link not in name_path_mapping:
-                    name_path_mapping[link] = []
-                name_path_mapping[link].append(symlink_path)
-                path_name_mapping[symlink_path] = link
+                if link not in name_alias_mapping:
+                    name_alias_mapping[link] = []
+                name_alias_mapping[link].append(symlink_path)
+                alias_name_mapping[symlink_path] = link
 
         # Parse 'lsblk' output
         # --exclude 1 for RAM devices, 2 for floppy devices, 11 for CD-ROM devices (See https://www.kernel.org/doc/Documentation/devices.txt)
@@ -85,22 +83,23 @@ class DiskController(object):
                 DiskController._logger.error('Device regex did not match for {0}. Please investigate'.format(device))
                 raise Exception('Failed to parse \'lsblk\' output')
 
-            name = match.groupdict()['name'].strip()
-            size = match.groupdict()['size'].strip()
-            model = match.groupdict()['model'].strip()
-            state = match.groupdict()['state'].strip()
-            dev_nr = match.groupdict()['dev_nr'].strip()
-            fs_type = match.groupdict()['fstype'].strip()
-            dev_type = match.groupdict()['type'].strip()
-            rotational = match.groupdict()['rota'].strip()
-            mount_point = match.groupdict()['mtpt'].strip()
-            sector_size = match.groupdict()['sector_size'].strip()
+            groupdict = match.groupdict()
+            name = groupdict['name'].strip()
+            size = groupdict['size'].strip()
+            model = groupdict['model'].strip()
+            state = groupdict['state'].strip()
+            dev_nr = groupdict['dev_nr'].strip()
+            fs_type = groupdict['fstype'].strip()
+            dev_type = groupdict['type'].strip()
+            rotational = groupdict['rota'].strip()
+            mount_point = groupdict['mtpt'].strip()
+            sector_size = groupdict['sector_size'].strip()
 
             if dev_type == 'rom':
                 continue
 
             friendly_path = '/dev/{0}'.format(name)
-            system_aliases = name_path_mapping.get(friendly_path, [friendly_path])
+            system_aliases = name_alias_mapping.get(friendly_path, [friendly_path])
             DiskController._logger.info('Investigating device {0}'.format(friendly_path))
 
             device_state = None
@@ -151,11 +150,11 @@ class DiskController(object):
         for disk in storagerouter.disks:
             disk_info = None
             for alias in disk.aliases:
-                if alias in path_name_mapping:
-                    disk_info = configuration.pop(path_name_mapping[alias].replace('/dev/', ''))
+                if alias in alias_name_mapping:
+                    disk_info = configuration.pop(alias_name_mapping[alias].replace('/dev/', ''))
                     break
 
-            if disk_info is None and disk.name.startswith('loop') and disk.name in configuration:  # Partitioned loop devices no longer show up in path_name_mapping
+            if disk_info is None and disk.name.startswith('loop') and disk.name in configuration:  # Partitioned loop devices no longer show up in alias_name_mapping
                 disk_info = configuration.pop(disk.name)
 
             # Remove disk / partitions if not reported by 'lsblk'

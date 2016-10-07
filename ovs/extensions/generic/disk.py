@@ -31,11 +31,11 @@ class DiskTools(object):
     _logger = LogHandler.get('extensions', name='disk-tools')
 
     @staticmethod
-    def create_partition(disk_aliases, disk_size, partition_start, partition_size):
+    def create_partition(disk_alias, disk_size, partition_start, partition_size):
         """
         Creates a partition
-        :param disk_aliases: Paths of the disk device
-        :type disk_aliases: list
+        :param disk_alias: Path of the disk device
+        :type disk_alias: str
         :param disk_size: Total size of disk
         :type disk_size: int
         :param partition_start: Start of partition in bytes
@@ -44,11 +44,7 @@ class DiskTools(object):
         :type partition_size: int
         :return: None
         """
-        if len(disk_aliases) == 0:
-            raise ValueError('No disk aliases provided')
-
         # Verify current label type and add GPT label if none present
-        disk_alias = disk_aliases[0]
         try:
             command = 'parted {0} print | grep "Partition Table"'.format(disk_alias)
             DiskTools._logger.info('Checking partition label-type with command: {0}'.format(command))
@@ -85,18 +81,15 @@ class DiskTools(object):
         check_output(command, shell=True)
 
     @staticmethod
-    def make_fs(partition_aliases):
+    def make_fs(partition_alias):
         """
         Creates a filesystem
-        :param partition_aliases: Paths of the partition
-        :type partition_aliases: list
+        :param partition_alias: Path of the partition
+        :type partition_alias: str
         :return: None
         """
-        if len(partition_aliases) == 0:
-            raise ValueError('No partition aliases provided')
-
         try:
-            check_output('mkfs.ext4 -q {0}'.format(partition_aliases[0]), shell=True)
+            check_output('mkfs.ext4 -q {0}'.format(partition_alias), shell=True)
         except Exception:
             DiskTools._logger.exception('Error during filesystem creation')
             raise

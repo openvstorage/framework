@@ -1712,7 +1712,9 @@ class StorageRouterController(object):
         if partition_guid is None:
             StorageRouterController._logger.debug('Creating new partition - Offset: {0} bytes - Size: {1} bytes - Roles: {2}'.format(offset, size, roles))
             with remote(storagerouter.ip, [DiskTools], username='root') as rem:
-                rem.DiskTools.create_partition(disk_aliases=disk.aliases,
+                if len(disk.aliases) == 0:
+                    raise ValueError('Disk {0} does not have any aliases'.format(disk.name))
+                rem.DiskTools.create_partition(disk_alias=disk.aliases[0],
                                                disk_size=disk.size,
                                                partition_start=offset,
                                                partition_size=size)
@@ -1738,7 +1740,9 @@ class StorageRouterController(object):
         if partition.filesystem is None or partition_guid is None:
             StorageRouterController._logger.debug('Creating filesystem')
             with remote(storagerouter.ip, [DiskTools], username='root') as rem:
-                rem.DiskTools.make_fs(partition_aliases=partition.aliases)
+                if len(partition.aliases) == 0:
+                    raise ValueError('Partition with offset {0} does not have any aliases'.format(partition.offset))
+                rem.DiskTools.make_fs(partition_alias=partition.aliases[0])
                 DiskController.sync_with_reality(storagerouter_guid)
                 partition = DiskPartition(partition.guid)
                 if partition.filesystem not in ['ext4', 'xfs']:
