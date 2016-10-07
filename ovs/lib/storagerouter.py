@@ -1167,15 +1167,7 @@ class StorageRouterController(object):
                 node_configs = []
                 for sd in available_storage_drivers:
                     if sd != storage_driver:
-                        # noinspection PyArgumentList
-                        node_configs.append(ClusterNodeConfig(vrouter_id=str(sd.storagedriver_id),
-                                                              host=str(sd.cluster_ip),
-                                                              message_port=sd.ports['management'],
-                                                              xmlrpc_port=sd.ports['xmlrpc'],
-                                                              failovercache_port=sd.ports['dtl'],
-                                                              network_server_uri='{0}://{1}:{2}'.format('rdma' if has_rdma else 'tcp',
-                                                                                                        sd.storage_ip,
-                                                                                                        sd.ports['edge'])))
+                        node_configs.append(ClusterNodeConfig(**sd.cluster_node_config))
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Node configs - \n{1}'.format(storage_driver.guid, '\n'.join([str(config) for config in node_configs])))
                 vrouter_clusterregistry.set_node_configs(node_configs)
                 srclient = StorageDriverClient.load(vpool)
