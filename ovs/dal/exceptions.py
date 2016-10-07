@@ -73,3 +73,9 @@ class VolatileObjectException(Exception):
     Raised when certain actions are executed on a volatile object (e.g. save)
     """
     pass
+
+class UniqueContraintViolationException(Exception):
+    """
+    Raised when a unique constraint is violated
+    """
+    pass

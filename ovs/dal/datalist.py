@@ -53,6 +53,7 @@ class DataList(object):
         # In case more operators are required, add them here, and implement them in
         # the _evaluate method below
         EQUALS = 'EQUALS'
+        CONTAINS = 'CONTAINS'
         NOT_EQUALS = 'NOT_EQUALS'
         LT = 'LT'
         GT = 'GT'
@@ -178,6 +179,10 @@ class DataList(object):
                 else:
                     return value.lower() in item[2].lower(), instance
             return value in item[2], instance
+        if item[1] == DataList.operator.CONTAINS:
+            if ignorecase:
+                return item[2].lower() in value.lower(), instance
+            return item[2] in value, instance
         raise NotImplementedError('Invalid operator specified')
 
     def _execute_query(self):

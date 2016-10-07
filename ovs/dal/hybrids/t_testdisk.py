@@ -27,7 +27,7 @@ class TestDisk(DataObject):
     This TestDisk object is used for running unittests.
     WARNING: These properties should not be changed
     """
-    __properties = [Property('name', str, doc='Name of the test disk'),
+    __properties = [Property('name', str, unique=True, doc='Name of the test disk'),
                     Property('description', str, mandatory=False, doc='Description of the test disk'),
                     Property('size', float, default=0, doc='Size of the test disk'),
                     Property('order', int, default=0, doc='Order of the test disk'),
