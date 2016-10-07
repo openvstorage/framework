@@ -36,6 +36,7 @@ from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.j_roleclient import RoleClient
 from ovs.dal.hybrids.j_rolegroup import RoleGroup
 from ovs.dal.hybrids.role import Role
+from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.hybrids.user import User
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.lists.userlist import UserList
@@ -90,13 +91,11 @@ class Decorators(unittest.TestCase):
         user.group = viewers_group
         user.save()
         sort_combinations = [('bb', 'aa'), ('aa', 'cc'), ('bb', 'dd'), ('aa', 'bb')]  # No logical ordering
-        for username, password in sort_combinations:
-            sort_user = User()
-            sort_user.username = username
-            sort_user.password = password
-            sort_user.is_active = True
-            sort_user.group = viewers_group
-            sort_user.save()
+        for name, description in sort_combinations:
+            machine = TestMachine()
+            machine.name = name
+            machine.description = description
+            machine.save()
 
         # Create internal OAuth 2 clients
         admin_client = Client()
@@ -423,36 +422,36 @@ class Decorators(unittest.TestCase):
         from backend.decorators import return_list
         from ovs.dal.datalist import DataList
 
-        @return_list(User)
+        @return_list(TestMachine)
         def the_function_rl_1(*args, **kwargs):
             """
-            Returns a list of all Users.
+            Returns a list of all Machines.
             """
             output_values['args'] = args
             output_values['kwargs'] = kwargs
-            return data_list_users
+            return data_list_machines
 
-        @return_list(User, default_sort='username,password')
+        @return_list(TestMachine, default_sort='name,description')
         def the_function_rl_2(*args, **kwargs):
             """
-            Returns a guid list of all Users.
+            Returns a guid list of all Machines.
             """
             output_values['args'] = args
             output_values['kwargs'] = kwargs
-            return data_list_userguids
+            return data_list_machineguids
 
-        # Username/password combinations: [('bb', 'aa'), ('aa', 'cc'), ('bb', 'dd'), ('aa', 'bb')]
+        # Name/description combinations: [('bb', 'aa'), ('aa', 'cc'), ('bb', 'dd'), ('aa', 'bb')]
         output_values = {}
-        data_list_users = DataList(User, {'type': DataList.where_operator.OR,
-                                          'items': [('username', DataList.operator.EQUALS, 'aa'),
-                                                    ('username', DataList.operator.EQUALS, 'bb')]})
-        self.assertEqual(len(data_list_users), 4)
+        data_list_machines = DataList(TestMachine, {'type': DataList.where_operator.OR,
+                                                    'items': [('name', DataList.operator.EQUALS, 'aa'),
+                                                              ('name', DataList.operator.EQUALS, 'bb')]})
+        self.assertEqual(len(data_list_machines), 4)
         guid_table = {}
-        for user in data_list_users:
-            if user.username not in guid_table:
-                guid_table[user.username] = {}
-            guid_table[user.username][user.password] = user.guid
-        data_list_userguids = [user.guid for user in data_list_users]
+        for machine in data_list_machines:
+            if machine.name not in guid_table:
+                guid_table[machine.name] = {}
+            guid_table[machine.name][machine.description] = machine.guid
+        data_list_machineguids = [user.guid for user in data_list_machines]
 
         time.sleep(180)
         request = self.factory.get('/', HTTP_ACCEPT='application/json; version=1')
@@ -461,35 +460,35 @@ class Decorators(unittest.TestCase):
             response = function(1, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], function.__name__ == 'the_function_rl_2')
-            self.assertEqual(len(response.data), len(data_list_users))
+            self.assertEqual(len(response.data), len(data_list_machines))
             if function.__name__ == 'the_function_rl_2':
                 self.assertListEqual(response.data['data'], [guid_table['aa']['bb'],
                                                              guid_table['aa']['cc'],
                                                              guid_table['bb']['aa'],
                                                              guid_table['bb']['dd']])
-            request.QUERY_PARAMS['sort'] = 'username,-password'
+            request.QUERY_PARAMS['sort'] = 'name,-description'
             response = function(2, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
-            self.assertEqual(len(response.data['data']), len(data_list_users))
+            self.assertEqual(len(response.data['data']), len(data_list_machines))
             self.assertListEqual(response.data['data'], [guid_table['aa']['cc'],
                                                          guid_table['aa']['bb'],
                                                          guid_table['bb']['dd'],
                                                          guid_table['bb']['aa']])
-            request.QUERY_PARAMS['sort'] = '-username,-password'
+            request.QUERY_PARAMS['sort'] = '-name,-description'
             response = function(3, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
-            self.assertEqual(len(response.data['data']), len(data_list_users))
+            self.assertEqual(len(response.data['data']), len(data_list_machines))
             self.assertListEqual(response.data['data'], [guid_table['bb']['dd'],
                                                          guid_table['bb']['aa'],
                                                          guid_table['aa']['cc'],
                                                          guid_table['aa']['bb']])
-            request.QUERY_PARAMS['sort'] = 'password,username'
+            request.QUERY_PARAMS['sort'] = 'description,name'
             response = function(4, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
-            self.assertEqual(len(response.data['data']), len(data_list_users))
+            self.assertEqual(len(response.data['data']), len(data_list_machines))
             self.assertListEqual(response.data['data'], [guid_table['bb']['aa'],
                                                          guid_table['aa']['bb'],
                                                          guid_table['aa']['cc'],
@@ -498,12 +497,12 @@ class Decorators(unittest.TestCase):
             response = function(5, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
-            self.assertEqual(len(response.data['data']), len(data_list_users))
+            self.assertEqual(len(response.data['data']), len(data_list_machines))
             if function.__name__ == 'the_function_rl_1':
                 self.assertIsInstance(response.data['data']['instance'], DataList)
-                self.assertIsInstance(response.data['data']['instance'][0], User)
-                self.assertIn(response.data['data']['instance'][0].username, ['aa', 'bb'])
+                self.assertIsInstance(response.data['data']['instance'][0], TestMachine)
+                self.assertIn(response.data['data']['instance'][0].name, ['aa', 'bb'])
             else:
                 self.assertIsInstance(response.data['data']['instance'], list)
-                self.assertIsInstance(response.data['data']['instance'][0], User)
-                self.assertIn(response.data['data']['instance'][0].username, ['aa', 'bb'])
+                self.assertIsInstance(response.data['data']['instance'][0], TestMachine)
+                self.assertIn(response.data['data']['instance'][0].name, ['aa', 'bb'])
