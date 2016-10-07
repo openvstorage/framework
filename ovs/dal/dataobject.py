@@ -634,12 +634,12 @@ class DataObject(object):
             unique_key = 'ovs_unique_{0}_{{0}}_{{1}}'.format(self._classname)
             for prop in self._properties:
                 if prop.unique is True:
+                    if prop.property_type not in [str, int, float, long]:
+                        raise NotImplementedError('A unique constraint can only be set on field of type str, int, float, or long')
                     if self._new is False and prop.name in changed_fields:
-                        value = store_data[prop.name]
-                        key = unique_key.format(prop.name, hashlib.sha1(value if value is not None else 'none').hexdigest())
+                        key = unique_key.format(prop.name, hashlib.sha1(str(store_data[prop.name])).hexdigest())
                         self._persistent.delete(key, transaction=transaction)
-                    value = self._data[prop.name]
-                    key = unique_key.format(prop.name, hashlib.sha1(value if value is not None else 'none').hexdigest())
+                    key = unique_key.format(prop.name, hashlib.sha1(str(self._data[prop.name])).hexdigest())
                     if self._new is True or prop.name in changed_fields:
                         self._persistent.assert_value(key, None, transaction=transaction)
                     self._persistent.set(key, 0, transaction=transaction)
@@ -665,8 +665,8 @@ class DataObject(object):
                         self.__class__.__name__, self._guid
                     ))
             except AssertException as ex:
-                if 'ovs_unique' in ex.message:
-                    field = ex.message.split('_', 3)[-1].rsplit('_', 1)[0]
+                if 'ovs_unique' in str(ex.message):
+                    field = str(ex.message).split('_', 3)[-1].rsplit('_', 1)[0]
                     raise UniqueConstraintViolationException('The unique constraint on {0}.{1} was violated'.format(
                         self.__class__.__name__, field
                     ))

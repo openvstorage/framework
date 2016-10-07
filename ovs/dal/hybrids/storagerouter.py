@@ -28,7 +28,7 @@ class StorageRouter(DataObject):
     """
     A StorageRouter represents the Open vStorage software stack, any (v)machine on which it is installed
     """
-    __properties = [Property('name', str, doc='Name of the Storage Router.'),
+    __properties = [Property('name', str, unique=True, doc='Name of the Storage Router.'),
                     Property('description', str, mandatory=False, doc='Description of the Storage Router.'),
                     Property('machine_id', str, unique=True, mandatory=False, doc='The hardware identifier of the Storage Router'),
                     Property('ip', str, unique=True, doc='IP Address of the Storage Router, if available'),
