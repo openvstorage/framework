@@ -168,7 +168,6 @@ class OVSMigrator(object):
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
         elif working_version < OVSMigrator.THIS_VERSION:
             # Migrate unique constraints
-            import hashlib
             from ovs.dal.helpers import HybridRunner, Descriptor
             from ovs.extensions.storage.persistentfactory import PersistentFactory
             client = PersistentFactory.get_client()
