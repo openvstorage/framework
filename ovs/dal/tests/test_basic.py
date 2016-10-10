@@ -319,7 +319,10 @@ class Basic(unittest.TestCase):
         self.assertEqual(len(list_13), 1, 'list should contain 1')  # single disk
         list_14 = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                       'items': [('name', DataList.operator.EQUALS, 'tESt_1')]})
-        self.assertEqual(len(list_14), 0, 'list should contain 0')  # single disk
+        self.assertEqual(len(list_14), 0, 'list should contain 0')  # no disk
+        list_15 = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                      'items': [('name', DataList.operator.CONTAINS, 'test_1')]})
+        self.assertEqual(len(list_15), 11, 'list should contain 11')  # disk test_1, test_10-19
 
     def test_invalidpropertyassignment(self):
         """
@@ -469,7 +472,7 @@ class Basic(unittest.TestCase):
         keys = ['list_cache', None]
         for key in keys:
             disk0 = TestDisk()
-            disk0.name = 'disk 0'
+            disk0.name = 'disk0_{0}'.format(key)
             disk0.save()
             list_cache = DataList(TestDisk, key=key,
                                   query={'type': DataList.where_operator.AND,
@@ -481,7 +484,7 @@ class Basic(unittest.TestCase):
             machine.name = 'machine'
             machine.save()
             disk1 = TestDisk()
-            disk1.name = 'disk 1'
+            disk1.name = 'disk1_{0}'.format(key)
             disk1.machine = machine
             disk1.save()
             list_cache = DataList(TestDisk, key=key,
@@ -497,7 +500,7 @@ class Basic(unittest.TestCase):
             self.assertTrue(list_cache.from_cache, 'List should be loaded from cache (mode: {0})'.format(key))
             disk2 = TestDisk()
             disk2.machine = machine
-            disk2.name = 'disk 2'
+            disk2.name = 'disk2_{0}'.format(key)
             disk2.save()
             list_cache = DataList(TestDisk, key=key,
                                   query={'type': DataList.where_operator.AND,
@@ -772,7 +775,7 @@ class Basic(unittest.TestCase):
             """
             _ = datalist_object
             disk_x = TestDisk()
-            disk_x.name = 'test'
+            disk_x.name = 'testx'
             disk_x.save()
 
         def _inject_delete(datalist_object):
@@ -792,41 +795,41 @@ class Basic(unittest.TestCase):
 
         disk_z = None  # Needs to be there
         disk_1 = TestDisk()
-        disk_1.name = 'test'
+        disk_1.name = 'test1'
         disk_1.save()
         disk_2 = TestDisk()
-        disk_2.name = 'test'
+        disk_2.name = 'test2'
         disk_2.save()
         # Validates new object creation
         DataList.test_hooks['post_query'] = _inject_new
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('name', DataList.operator.EQUALS, 'test')]})
+                                    'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 2, 'Two disks should be found ({0})'.format(len(disks)))
         del DataList.test_hooks['post_query']
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('name', DataList.operator.EQUALS, 'test')]})
+                                    'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 3, 'Three disks should be found ({0})'.format(len(disks)))
         # Clear the list cache for the next test
-        VolatileFactory.store.delete('ovs_list_420e307cdc7b792aab024842cd278bccdf0af39e0af83e74bf64b998c8f7a400')
+        VolatileFactory.store.delete('ovs_list_6cf5641344cb2ec305c89920407d0def867e1744c88605fdc0f6665a348724a8')
         # Validates object change
         DataList.test_hooks['post_query'] = _inject_update
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('name', DataList.operator.EQUALS, 'test')]})
+                                    'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 3, 'Three disks should be found ({0})'.format(len(disks)))
         del DataList.test_hooks['post_query']
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('name', DataList.operator.EQUALS, 'test')]})
+                                    'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 2, 'Two disk should be found ({0})'.format(len(disks)))
         # Clear the list cache for the next test
-        VolatileFactory.store.delete('ovs_list_420e307cdc7b792aab024842cd278bccdf0af39e0af83e74bf64b998c8f7a400')
+        VolatileFactory.store.delete('ovs_list_6cf5641344cb2ec305c89920407d0def867e1744c88605fdc0f6665a348724a8')
         # Validates object deletion
         DataList.test_hooks['post_query'] = _inject_delete
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('name', DataList.operator.EQUALS, 'test')]})
+                                    'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 2, 'Two disks should be found ({0})'.format(len(disks)))
         del DataList.test_hooks['post_query']
         disks = DataList(TestDisk, {'type': DataList.where_operator.AND,
-                                    'items': [('name', DataList.operator.EQUALS, 'test')]})
+                                    'items': [('name', DataList.operator.CONTAINS, 'test')]})
         self.assertEqual(len(disks), 1, 'One disk should be found ({0})'.format(len(disks)))
         _ = disk_z  # Ignore this object not being used
 
@@ -1413,3 +1416,73 @@ class Basic(unittest.TestCase):
         PersistentFactory.store.delete('ovs_reverseindex_testemachine_{0}|disks|{1}'.format(machine.guid, disk.guid))
         disk.machine = machine2
         disk.save()
+
+    def test_unique_constraint(self):
+        """
+        Validates whether the unique constraint works as expected
+        """
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.description = 'disk1'
+        disk1.save()  # Works, it's the first 'disk1'
+        disk2 = TestDisk()
+        disk2.name = 'disk1'
+        disk2.description = 'disk1'
+        with self.assertRaises(UniqueConstraintViolationException) as exception:
+            disk2.save()  # Fails, there's already a 'disk1'
+        self.assertIn('TestDisk.name', exception.exception.message, '\TestDisk.name\' should be in exception message: {0}'.format(exception.exception.message))
+        disk2.name = 'disk2'
+        disk2.save()  # Works, it's the first 'disk2'
+        disk1.save()  # Works, nothing changed, it's still the only 'disk'
+        disk1.name = 'disk2'
+        with self.assertRaises(UniqueConstraintViolationException):
+            disk1.save()  # Fails, it can't be renamed to 'disk2', since there's already a 'disk2'
+        disk3 = TestDisk(disk1.guid)  # Currently is 'disk1'
+        disk3.save()
+        disk3.name = 'disk2'
+        with self.assertRaises(UniqueConstraintViolationException):
+            disk3.save()  # Fails, it can't be renamed to 'disk2', since there's already a 'disk2'
+        disk3.name = 'disk3'
+        disk3.save()  # Works, it's the first 'disk3'
+        disk3.delete()  # Works, no problem deleting 'disk3'
+        disk4 = TestDisk()
+        disk4.name = 'disk3'
+        disk4.save()  # Works, it's again the first 'disk3', since the previous one was deleted
+
+        disk2a = TestDisk(disk2.guid)
+        disk2b = TestDisk(disk2.guid)
+        disk2b.name = 'disk2b'
+        disk2b.save()  # Works, it's the first 'disk2b', so 'disk2' can be renamed to 'disk2b'
+        disk2a.delete()  # Works, no problem deleting 'disk2b'
+        disk2c = TestDisk()
+        disk2c.name = 'disk2b'
+        disk2c.save()  # Works, 'disk2b' was deleted
+        disk2c.name = 'disk2'
+        disk2c.save()  # Works, there is no 'disk2'
+
+        disk5 = TestDisk()
+        disk5.name = 'disk5'
+        disk5.save()
+
+        def _delete():
+            disk5.delete()
+        disk5.delete(_hook=_delete)
+
+        disk6 = TestDisk()
+        disk6.name = 'disk6'
+        disk6.save()
+        disk6a = TestDisk(disk6.guid)
+        disk6b = TestDisk(disk6.guid)
+        disk6a.name = 'disk6a'
+        disk6a.save()  # Works, it's the first 'disk6a', so 'disk6' can be renamed to 'disk6a'
+        disk6c = TestDisk()
+        disk6c.name = 'disk6'
+        disk6c.save()  # Works, at this point, there's no 'disk6' anymore
+        disk6b.delete()  # Works, no problem deleting 'disk6a'
+        disk6d = TestDisk()
+        disk6d.name = 'disk6'
+        with self.assertRaises(UniqueConstraintViolationException):
+            disk6d.save()  # Fails, 'disk6' already exists
+        disk6e = TestDisk()
+        disk6e.name = 'disk6a'
+        disk6e.save()

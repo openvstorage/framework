@@ -26,6 +26,7 @@ class TestMachine(DataObject):
     This TestMachine object is used for running unittests.
     WARNING: These properties should not be changed
     """
-    __properties = [Property('name', str, doc='Name of the test machine')]
+    __properties = [Property('name', str, doc='Name of the test machine'),
+                    Property('description', str, mandatory=False, doc='Description of the test machine')]
     __relations = []
     __dynamics = []

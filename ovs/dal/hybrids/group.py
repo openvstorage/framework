@@ -25,7 +25,7 @@ class Group(DataObject):
     """
     The Group class represents a Group. A group is used to bind a set of Users to a set of Roles.
     """
-    __properties = [Property('name', str, doc='Name of the Group.'),
+    __properties = [Property('name', str, unique=True, doc='Name of the Group.'),
                     Property('description', str, mandatory=False, doc='Description of the Group.')]
     __relations = []
     __dynamics = []

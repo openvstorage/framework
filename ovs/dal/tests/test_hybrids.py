@@ -84,13 +84,19 @@ class Hybrid(unittest.TestCase):
             self.assertIsInstance(cls._dynamics, list, '_dynamics required: {0}'.format(cls.__name__))
             # Check types
             allowed_types = [int, float, long, str, bool, list, dict, set]
+            unique_types = [int, float, long, str]
             for prop in cls._properties:
                 is_allowed_type = prop.property_type in allowed_types \
                     or isinstance(prop.property_type, list)
                 self.assertTrue(is_allowed_type,
                                 '_property {0}.{1} should be one of {2}'.format(
-                                    cls.__name__, prop.name, str(allowed_types)
+                                    cls.__name__, prop.name, allowed_types
                                 ))
+                if prop.unique is True:
+                    self.assertIn(prop.property_type, unique_types,
+                                  '_property {0}.{1} can only be unique if it is one of {2}'.format(
+                                      cls.__name__, prop.name, unique_types
+                                  ))
             for dynamic in cls._dynamics:
                 is_allowed_type = dynamic.return_type in allowed_types \
                     or isinstance(dynamic.return_type, list)

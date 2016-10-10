@@ -33,6 +33,7 @@ class DummyPersistentStore(object):
 
     def __init__(self):
         self._sequences = {}
+        self._sequences_tlog = {}
         self._keep_in_memory_only = True
 
     def clean(self):
@@ -97,17 +98,22 @@ class DummyPersistentStore(object):
         data = self._read()
         return [(k, v) for k, v in data.iteritems() if k.startswith(key)]
 
-    def set(self, key, value, transaction=None):
+    def set(self, key, value, transaction=None, _tlog=None):
         """
         Sets the value for a key to a given value
         """
         if transaction is not None:
             return self._sequences[transaction].append([self.set, {'key': key, 'value': value}])
         data = self._read()
+        if _tlog is not None:
+            if key in data:
+                self._sequences_tlog[_tlog].append([self.set, {'key': key, 'value': data[key]}])
+            else:
+                self._sequences_tlog[_tlog].append([self.delete, {'key': key}])
         data[key] = copy.deepcopy(value)
         self._save(data)
 
-    def delete(self, key, must_exist=True, transaction=None):
+    def delete(self, key, must_exist=True, transaction=None, _tlog=None):
         """
         Deletes a given key from the store
         """
@@ -115,6 +121,8 @@ class DummyPersistentStore(object):
             return self._sequences[transaction].append([self.delete, {'key': key, 'must_exist': must_exist}])
         data = self._read()
         if key in data:
+            if _tlog is not None:
+                self._sequences_tlog[_tlog].append([self.set, {'key': key, 'value': data[key]}])
             del data[key]
             self._save(data)
         elif must_exist is True:
@@ -137,22 +145,28 @@ class DummyPersistentStore(object):
         _ = self
         pass
 
-    def assert_value(self, key, value, transaction=None):
+    def assert_value(self, key, value, transaction=None, _tlog=None):
         """
         Asserts a key-value pair
         """
+        _ = _tlog
         if transaction is not None:
             return self._sequences[transaction].append([self.assert_value, {'key': key, 'value': value}])
         data = self._read()
-        if key not in data:
-            raise AssertException(key)
-        if json.dumps(data[key], sort_keys=True) != json.dumps(value, sort_keys=True):
-            raise AssertException(key)
+        if value is None:
+            if key in data:
+                raise AssertException(key)
+        else:
+            if key not in data:
+                raise AssertException(key)
+            if json.dumps(data[key], sort_keys=True) != json.dumps(value, sort_keys=True):
+                raise AssertException(key)
 
-    def assert_exists(self, key, transaction=None):
+    def assert_exists(self, key, transaction=None, _tlog=None):
         """
         Asserts whether a given key exists
         """
+        _ = _tlog
         if transaction is not None:
             return self._sequences[transaction].append([self.assert_exists, {'key': key}])
         data = self._read()
@@ -165,14 +179,21 @@ class DummyPersistentStore(object):
         """
         key = str(uuid.uuid4())
         self._sequences[key] = []
+        self._sequences_tlog[key] = []
         return key
 
     def apply_transaction(self, transaction):
         """
         Applies a transaction
         """
+        self._sequences_tlog[transaction] = []
         for item in self._sequences[transaction]:
-            item[0](**item[1])
+            try:
+                item[0](_tlog=transaction, **item[1])
+            except Exception:
+                for titem in self._sequences_tlog[transaction]:
+                    titem[0](**titem[1])
+                raise
 
     def _save(self, data):
         """

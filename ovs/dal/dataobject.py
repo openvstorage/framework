@@ -22,10 +22,11 @@ import copy
 import time
 import json
 import inspect
+import hashlib
 from random import randint
 from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
                                 MissingMandatoryFieldsException, RaceConditionException, InvalidRelationException,
-                                VolatileObjectException)
+                                VolatileObjectException, UniqueConstraintViolationException)
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.datalist import DataList
@@ -541,9 +542,11 @@ class DataObject(object):
             transaction = self._persistent.begin_transaction()
             if self._new is True:
                 data = {'_version': 0}
+                store_data = {'_version': 0}
             elif optimistic is True:
                 self._persistent.assert_value(self._key, self._original, transaction=transaction)
                 data = copy.deepcopy(self._original)
+                store_data = copy.deepcopy(self._original)
             else:
                 try:
                     current_data = self._persistent.get(self._key)
@@ -553,6 +556,7 @@ class DataObject(object):
                     ))
                 self._persistent.assert_value(self._key, current_data, transaction=transaction)
                 data = copy.deepcopy(current_data)
+                store_data = copy.deepcopy(current_data)
 
             changed_fields = []
             data_conflicts = []
@@ -626,6 +630,21 @@ class DataObject(object):
                     for key in cache_keys[list_key][1]:
                         self._persistent.delete(key, must_exist=False, transaction=transaction)
 
+            # Validate unique constraints
+            unique_key = 'ovs_unique_{0}_{{0}}_{{1}}'.format(self._classname)
+            for prop in self._properties:
+                if prop.unique is True:
+                    if prop.property_type not in [str, int, float, long]:
+                        raise NotImplementedError('A unique constraint can only be set on field of type str, int, float, or long')
+                    if self._new is False and prop.name in changed_fields:
+                        key = unique_key.format(prop.name, hashlib.sha1(str(store_data[prop.name])).hexdigest())
+                        self._persistent.assert_value(key, self._key, transaction=transaction)
+                        self._persistent.delete(key, transaction=transaction)
+                    key = unique_key.format(prop.name, hashlib.sha1(str(self._data[prop.name])).hexdigest())
+                    if self._new is True or prop.name in changed_fields:
+                        self._persistent.assert_value(key, None, transaction=transaction)
+                    self._persistent.set(key, self._key, transaction=transaction)
+
             if _hook is not None:
                 _hook()
 
@@ -638,12 +657,20 @@ class DataObject(object):
                 self._volatile.delete(self._key)
                 successful = True
             except KeyNotFoundException as ex:
-                if ex.message != self._key:
+                if 'ovs_unique' in ex.message and tries == 1:
+                    optimistic = False
+                elif ex.message != self._key:
                     raise
-                raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(
-                    self.__class__.__name__, self._guid
-                ))
+                else:
+                    raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(
+                        self.__class__.__name__, self._guid
+                    ))
             except AssertException as ex:
+                if 'ovs_unique' in str(ex.message):
+                    field = str(ex.message).split('_', 3)[-1].rsplit('_', 1)[0]
+                    raise UniqueConstraintViolationException('The unique constraint on {0}.{1} was violated'.format(
+                        self.__class__.__name__, field
+                    ))
                 last_assert = ex
                 optimistic = False
                 self._mutex_version.release()  # Make sure it's released before a sleep
@@ -672,6 +699,7 @@ class DataObject(object):
 
         tries = 0
         successful = False
+        optimistic = True
         last_assert = None
         while successful is False:
             tries += 1
@@ -739,6 +767,20 @@ class DataObject(object):
                     self._volatile.delete(list_key)
                 self._persistent.delete(key, must_exist=False, transaction=transaction)
 
+            # Delete constraints
+            if optimistic is False:
+                store_data = self._persistent.get(self._key)
+            else:
+                store_data = self._original
+            unique_key = 'ovs_unique_{0}_{{0}}_{{1}}'.format(self._classname)
+            for prop in self._properties:
+                if prop.unique is True:
+                    if prop.property_type not in [str, int, float, long]:
+                        raise NotImplementedError('A unique constraint can only be set on field of type str, int, float, or long')
+                    key = unique_key.format(prop.name, hashlib.sha1(str(store_data[prop.name])).hexdigest())
+                    self._persistent.assert_value(key, self._key, transaction=transaction)
+                    self._persistent.delete(key, transaction=transaction)
+
             if _hook is not None:
                 _hook()
 
@@ -746,10 +788,15 @@ class DataObject(object):
                 self._persistent.apply_transaction(transaction)
                 successful = True
             except KeyNotFoundException as ex:
-                if ex.message != self._key:
+                if 'ovs_unique' in ex.message and tries == 1:
+                    optimistic = False
+                elif ex.message != self._key:
                     raise
-                successful = True
+                else:
+                    successful = True
             except AssertException as ex:
+                if 'ovs_unique' in str(ex.message):
+                    optimistic = False
                 last_assert = ex
 
         # Delete the object and its properties out of the volatile store
