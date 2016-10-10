@@ -698,6 +698,7 @@ class DataObject(object):
 
         tries = 0
         successful = False
+        optimistic = True
         last_assert = None
         while successful is False:
             tries += 1
@@ -765,6 +766,19 @@ class DataObject(object):
                     self._volatile.delete(list_key)
                 self._persistent.delete(key, must_exist=False, transaction=transaction)
 
+            # Delete constraints
+            if optimistic is False:
+                store_data = self._persistent.get(self._key)
+            else:
+                store_data = self._original
+            unique_key = 'ovs_unique_{0}_{{0}}_{{1}}'.format(self._classname)
+            for prop in self._properties:
+                if prop.unique is True:
+                    if prop.property_type not in [str, int, float, long]:
+                        raise NotImplementedError('A unique constraint can only be set on field of type str, int, float, or long')
+                    key = unique_key.format(prop.name, hashlib.sha1(str(store_data[prop.name])).hexdigest())
+                    self._persistent.delete(key, transaction=transaction)
+
             if _hook is not None:
                 _hook()
 
@@ -772,9 +786,12 @@ class DataObject(object):
                 self._persistent.apply_transaction(transaction)
                 successful = True
             except KeyNotFoundException as ex:
-                if ex.message != self._key:
+                if 'ovs_unique' in ex.message and tries == 1:
+                    optimistic = False
+                elif ex.message != self._key:
                     raise
-                successful = True
+                else:
+                    successful = True
             except AssertException as ex:
                 last_assert = ex
 

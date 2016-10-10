@@ -1424,23 +1424,37 @@ class Basic(unittest.TestCase):
         disk1 = TestDisk()
         disk1.name = 'disk'
         disk1.description = 'disk'
-        disk1.save()
+        disk1.save()  # Works, it's the first 'disk'
         disk2 = TestDisk()
         disk2.name = 'disk'
         disk2.description = 'disk'
         with self.assertRaises(UniqueConstraintViolationException) as exception:
-            disk2.save()
+            disk2.save()  # Fails, there's already a 'disk'
         self.assertIn('TestDisk.name', exception.exception.message, '\TestDisk.name\' should be in exception message: {0}'.format(exception.exception.message))
         disk2.name = 'disk2'
-        disk2.save()
-        disk1.save()
+        disk2.save()  # Works, it's the first 'disk2'
+        disk1.save()  # Works, nothing changed, it's still the only 'disk'
         disk1.name = 'disk2'
         with self.assertRaises(UniqueConstraintViolationException):
-            disk1.save()
+            disk1.save()  # Fails, it can't be renamed to 'disk2', since there's already a 'disk2'
         disk3 = TestDisk(disk1.guid)
         disk3.save()
         disk3.name = 'disk2'
         with self.assertRaises(UniqueConstraintViolationException):
-            disk3.save()
+            disk3.save()  # Fails, it can't be renamed to 'disk2', since there's already a 'disk2'
         disk3.name = 'disk1'
-        disk3.save()
+        disk3.save()  # Works, it's the first 'disk1'
+        disk3.delete()  # Works, no problem deleting 'disk1'
+        disk4 = TestDisk()
+        disk4.name = 'disk1'
+        disk4.save()  # Works, it's again the first 'disk1', since the previous one was deleted
+        disk5 = TestDisk(disk2.guid)
+        disk6 = TestDisk(disk2.guid)
+        disk6.name = 'disk3'
+        disk6.save()  # Works, it's the first 'disk3', so 'disk2' can be renamed to 'disk3'
+        disk5.delete()  # Works, no problem deleting 'disk3'
+        disk7 = TestDisk()
+        disk7.name = 'disk3'
+        disk7.save()  # Works, 'disk3' was deleted
+        disk7.name = 'disk2'
+        disk7.save()  # Works, there is no 'disk2'
