@@ -185,7 +185,7 @@ class OVSMigrator(object):
                     for key in client.prefix(prefix):
                         data = client.get(key)
                         for property_name in uniques:
-                            key = '{0}{1}'.format(unique_key.format(property_name), hashlib.sha1(str(data[property_name])).hexdigest())
-                            client.set(key, 0)
+                            ukey = '{0}{1}'.format(unique_key.format(property_name), hashlib.sha1(str(data[property_name])).hexdigest())
+                            client.set(ukey, key)
 
         return OVSMigrator.THIS_VERSION
