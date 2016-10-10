@@ -638,11 +638,12 @@ class DataObject(object):
                         raise NotImplementedError('A unique constraint can only be set on field of type str, int, float, or long')
                     if self._new is False and prop.name in changed_fields:
                         key = unique_key.format(prop.name, hashlib.sha1(str(store_data[prop.name])).hexdigest())
+                        self._persistent.assert_value(key, self._key, transaction=transaction)
                         self._persistent.delete(key, transaction=transaction)
                     key = unique_key.format(prop.name, hashlib.sha1(str(self._data[prop.name])).hexdigest())
                     if self._new is True or prop.name in changed_fields:
                         self._persistent.assert_value(key, None, transaction=transaction)
-                    self._persistent.set(key, 0, transaction=transaction)
+                    self._persistent.set(key, self._key, transaction=transaction)
 
             if _hook is not None:
                 _hook()
@@ -777,6 +778,7 @@ class DataObject(object):
                     if prop.property_type not in [str, int, float, long]:
                         raise NotImplementedError('A unique constraint can only be set on field of type str, int, float, or long')
                     key = unique_key.format(prop.name, hashlib.sha1(str(store_data[prop.name])).hexdigest())
+                    self._persistent.assert_value(key, self._key, transaction=transaction)
                     self._persistent.delete(key, transaction=transaction)
 
             if _hook is not None:
@@ -793,6 +795,8 @@ class DataObject(object):
                 else:
                     successful = True
             except AssertException as ex:
+                if 'ovs_unique' in str(ex.message):
+                    optimistic = False
                 last_assert = ex
 
         # Delete the object and its properties out of the volatile store

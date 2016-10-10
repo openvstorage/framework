@@ -1422,14 +1422,14 @@ class Basic(unittest.TestCase):
         Validates whether the unique constraint works as expected
         """
         disk1 = TestDisk()
-        disk1.name = 'disk'
-        disk1.description = 'disk'
-        disk1.save()  # Works, it's the first 'disk'
+        disk1.name = 'disk1'
+        disk1.description = 'disk1'
+        disk1.save()  # Works, it's the first 'disk1'
         disk2 = TestDisk()
-        disk2.name = 'disk'
-        disk2.description = 'disk'
+        disk2.name = 'disk1'
+        disk2.description = 'disk1'
         with self.assertRaises(UniqueConstraintViolationException) as exception:
-            disk2.save()  # Fails, there's already a 'disk'
+            disk2.save()  # Fails, there's already a 'disk1'
         self.assertIn('TestDisk.name', exception.exception.message, '\TestDisk.name\' should be in exception message: {0}'.format(exception.exception.message))
         disk2.name = 'disk2'
         disk2.save()  # Works, it's the first 'disk2'
@@ -1437,31 +1437,52 @@ class Basic(unittest.TestCase):
         disk1.name = 'disk2'
         with self.assertRaises(UniqueConstraintViolationException):
             disk1.save()  # Fails, it can't be renamed to 'disk2', since there's already a 'disk2'
-        disk3 = TestDisk(disk1.guid)
+        disk3 = TestDisk(disk1.guid)  # Currently is 'disk1'
         disk3.save()
         disk3.name = 'disk2'
         with self.assertRaises(UniqueConstraintViolationException):
             disk3.save()  # Fails, it can't be renamed to 'disk2', since there's already a 'disk2'
-        disk3.name = 'disk1'
-        disk3.save()  # Works, it's the first 'disk1'
-        disk3.delete()  # Works, no problem deleting 'disk1'
+        disk3.name = 'disk3'
+        disk3.save()  # Works, it's the first 'disk3'
+        disk3.delete()  # Works, no problem deleting 'disk3'
         disk4 = TestDisk()
-        disk4.name = 'disk1'
-        disk4.save()  # Works, it's again the first 'disk1', since the previous one was deleted
-        disk5 = TestDisk(disk2.guid)
-        disk6 = TestDisk(disk2.guid)
-        disk6.name = 'disk6'
-        disk6.save()  # Works, it's the first 'disk6', so 'disk2' can be renamed to 'disk6'
-        disk5.delete()  # Works, no problem deleting 'disk6'
-        disk7 = TestDisk()
-        disk7.name = 'disk6'
-        disk7.save()  # Works, 'disk6' was deleted
-        disk7.name = 'disk2'
-        disk7.save()  # Works, there is no 'disk2'
-        disk8 = TestDisk()
-        disk8.name = 'disk8'
-        disk8.save()
+        disk4.name = 'disk3'
+        disk4.save()  # Works, it's again the first 'disk3', since the previous one was deleted
+
+        disk2a = TestDisk(disk2.guid)
+        disk2b = TestDisk(disk2.guid)
+        disk2b.name = 'disk2b'
+        disk2b.save()  # Works, it's the first 'disk2b', so 'disk2' can be renamed to 'disk2b'
+        disk2a.delete()  # Works, no problem deleting 'disk2b'
+        disk2c = TestDisk()
+        disk2c.name = 'disk2b'
+        disk2c.save()  # Works, 'disk2b' was deleted
+        disk2c.name = 'disk2'
+        disk2c.save()  # Works, there is no 'disk2'
+
+        disk5 = TestDisk()
+        disk5.name = 'disk5'
+        disk5.save()
 
         def _delete():
-            disk8.delete()
-        disk8.delete(_hook=_delete)
+            disk5.delete()
+        disk5.delete(_hook=_delete)
+
+        disk6 = TestDisk()
+        disk6.name = 'disk6'
+        disk6.save()
+        disk6a = TestDisk(disk6.guid)
+        disk6b = TestDisk(disk6.guid)
+        disk6a.name = 'disk6a'
+        disk6a.save()  # Works, it's the first 'disk6a', so 'disk6' can be renamed to 'disk6a'
+        disk6c = TestDisk()
+        disk6c.name = 'disk6'
+        disk6c.save()  # Works, at this point, there's no 'disk6' anymore
+        disk6b.delete()  # Works, no problem deleting 'disk6a'
+        disk6d = TestDisk()
+        disk6d.name = 'disk6'
+        with self.assertRaises(UniqueConstraintViolationException):
+            disk6d.save()  # Fails, 'disk6' already exists
+        disk6e = TestDisk()
+        disk6e.name = 'disk6a'
+        disk6e.save()
