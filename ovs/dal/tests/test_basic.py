@@ -1450,11 +1450,18 @@ class Basic(unittest.TestCase):
         disk4.save()  # Works, it's again the first 'disk1', since the previous one was deleted
         disk5 = TestDisk(disk2.guid)
         disk6 = TestDisk(disk2.guid)
-        disk6.name = 'disk3'
-        disk6.save()  # Works, it's the first 'disk3', so 'disk2' can be renamed to 'disk3'
-        disk5.delete()  # Works, no problem deleting 'disk3'
+        disk6.name = 'disk6'
+        disk6.save()  # Works, it's the first 'disk6', so 'disk2' can be renamed to 'disk6'
+        disk5.delete()  # Works, no problem deleting 'disk6'
         disk7 = TestDisk()
-        disk7.name = 'disk3'
-        disk7.save()  # Works, 'disk3' was deleted
+        disk7.name = 'disk6'
+        disk7.save()  # Works, 'disk6' was deleted
         disk7.name = 'disk2'
         disk7.save()  # Works, there is no 'disk2'
+        disk8 = TestDisk()
+        disk8.name = 'disk8'
+        disk8.save()
+
+        def _delete():
+            disk8.delete()
+        disk8.delete(_hook=_delete)
