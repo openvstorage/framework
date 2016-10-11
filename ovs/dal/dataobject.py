@@ -957,7 +957,7 @@ class DataObject(object):
                     cached_data = {'data': dynamic_data}
                     if dynamic.timeout > 0:
                         self._volatile.set(cache_key, cached_data, dynamic.timeout)
-            return cached_data['data']
+            return Toolbox.convert_unicode_to_string(cached_data['data'])
         finally:
             mutex.release()
 

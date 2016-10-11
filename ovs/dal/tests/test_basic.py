@@ -600,12 +600,10 @@ class Basic(unittest.TestCase):
         self.assertIn('name', dictionary, 'Serialized object should have correct properties')
         self.assertEqual(dictionary['name'], 'disk', 'Serialized object should have correct name')
         self.assertIn('machine_guid', dictionary, 'Serialized object should have correct depth')
-        self.assertEqual(dictionary['machine_guid'], machine.guid,
-                         'Serialized object should have correct properties')
+        self.assertEqual(dictionary['machine_guid'], machine.guid, 'Serialized object should have correct properties')
         dictionary = disk.serialize(depth=1)
         self.assertIn('machine', dictionary, 'Serialized object should have correct depth')
-        self.assertEqual(dictionary['machine']['name'], 'machine',
-                         'Serialized object should have correct properties at all depths')
+        self.assertEqual(dictionary['machine']['name'], 'machine', 'Serialized object should have correct properties at all depths')
 
     def test_volatiemutex(self):
         """
@@ -1172,23 +1170,23 @@ class Basic(unittest.TestCase):
         Validates whether the invalidate_dynamics call actually works.
         """
         disk = TestDisk()
-        disk.__dict__['dynamic_value'] = 0
-        disk.dynamic_value = 0
+        disk._frozen = False
+        disk.dynamic_int = 0
         disk.name = 'test'
         disk.save()
-        value = disk.updatable
+        value = disk.updatable_int
         self.assertEqual(value, 0, 'Dynamic should be 0')
-        disk.dynamic_value = 5
-        value = disk.updatable
+        disk.dynamic_int = 5
+        value = disk.updatable_int
         self.assertEqual(value, 0, 'Dynamic should still be 0 ({0})'.format(value))
         time.sleep(5)
-        value = disk.updatable
+        value = disk.updatable_int
         self.assertEqual(value, 5, 'Dynamic should be 5 now ({0})'.format(value))
-        disk.dynamic_value = 10
-        value = disk.updatable
+        disk.dynamic_int = 10
+        value = disk.updatable_int
         self.assertEqual(value, 5, 'Dynamic should still be 5 ({0})'.format(value))
-        disk.invalidate_dynamics(['updatable'])
-        value = disk.updatable
+        disk.invalidate_dynamics(['updatable_int'])
+        value = disk.updatable_int
         self.assertEqual(value, 10, 'Dynamic should be 10 now ({0})'.format(value))
 
     def test_enumerator(self):
@@ -1486,3 +1484,41 @@ class Basic(unittest.TestCase):
         disk6e = TestDisk()
         disk6e.name = 'disk6a'
         disk6e.save()
+
+    def test_dynamic_unicode_return(self):
+        """
+        Validates whether dynamic properties return string values (iso unicode)
+        """
+        disk = TestDisk()
+        disk._frozen = False
+        disk.dynamic_string = u'test'
+        self.assertIsInstance(disk.updatable_string, str, 'Return value should be string, not unicode')
+        self.assertIsInstance(disk.updatable_string, str, 'Return value should be string, not unicode')
+        disk.dynamic_list = [u'test1', 'test2']
+        dynamic = disk.updatable_list
+        self.assertIsInstance(dynamic, list, 'Return value should be list')
+        self.assertIsInstance(dynamic[0], str, 'Return value should be string, not unicode')
+        self.assertIsInstance(dynamic[1], str, 'Return value should be string, not unicode')
+        dynamic = disk.updatable_list
+        self.assertIsInstance(dynamic[0], str, 'Return value should be string, not unicode')
+        self.assertIsInstance(dynamic[1], str, 'Return value should be string, not unicode')
+        disk.dynamic_dict = {'a': u'foo',
+                             u'b': 'bar'}
+        dynamic = disk.updatable_dict
+        self.assertIsInstance(dynamic, dict, 'Return value should be dict')
+        keys = dynamic.keys()
+        values = dynamic.values()
+        self.assertIsInstance(keys[0], str, 'Return value should be string, not unicode')
+        self.assertIsInstance(keys[1], str, 'Return value should be string, not unicode')
+        self.assertIsInstance(values[0], str, 'Return value should be string, not unicode')
+        self.assertIsInstance(values[1], str, 'Return value should be string, not unicode')
+        dynamic = disk.updatable_dict
+        keys = dynamic.keys()
+        values = dynamic.values()
+        self.assertIsInstance(keys[0], str, 'Return value should be string, not unicode')
+        self.assertIsInstance(keys[1], str, 'Return value should be string, not unicode')
+        self.assertIsInstance(values[0], str, 'Return value should be string, not unicode')
+        self.assertIsInstance(values[1], str, 'Return value should be string, not unicode')
+        disk.dynamic_int = 5
+        dynamic = disk.updatable_int
+        self.assertIsInstance(dynamic, int, 'Return value should be int')

@@ -152,12 +152,12 @@ class StorageDriver(DataObject):
         """
         from ovs.extensions.generic.configuration import Configuration
         rdma = Configuration.get('/ovs/framework/rdma')
-        return {'vrouter_id': str(self.storagedriver_id),
-                'host': str(self.storage_ip),
+        return {'vrouter_id': self.storagedriver_id,
+                'host': self.storage_ip,
                 'message_port': self.ports['management'],
-                'xmlrpc_host': str(self.cluster_ip),
+                'xmlrpc_host': self.cluster_ip,
                 'xmlrpc_port': self.ports['xmlrpc'],
-                'failovercache_host': str(self.storage_ip),
+                'failovercache_host': self.storage_ip,
                 'failovercache_port': self.ports['dtl'],
                 'network_server_uri': '{0}://{1}:{2}'.format('rdma' if rdma else 'tcp',
                                                              self.storage_ip,
