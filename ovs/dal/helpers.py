@@ -287,6 +287,16 @@ class Toolbox(object):
                 key[index] = key[index].lower()
         return tuple(key)
 
+    @staticmethod
+    def convert_unicode_to_string(original):
+        if isinstance(original, dict):
+            return {Toolbox.convert_unicode_to_string(key): Toolbox.convert_unicode_to_string(value) for key, value in original.iteritems()}
+        if isinstance(original, list):
+            return [Toolbox.convert_unicode_to_string(item) for item in original]
+        if isinstance(original, unicode):
+            return str(original)
+        return original
+
 
 class Migration(object):
     """
