@@ -95,7 +95,7 @@ define([
             binder.binding = function(obj, view) {
                 $(view).i18n();
             };
+            app.setRoot('viewmodels/shell');
         });
-        app.setRoot('viewmodels/shell');
     });
 });
