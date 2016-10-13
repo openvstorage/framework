@@ -32,7 +32,13 @@ define([
 
         // Computed
         self.canContinue = ko.computed(function() {
-            return { value: !self.loading(), reasons: [], fields: [] };
+            var valid = true, reasons = [], fields = [];
+            if (self.data.storageRouter() === undefined) {
+                valid = false;
+                fields.push('sr');
+                reasons.push($.t('ovs:wizards.scrub.gather.nostoragerouter'));
+            }
+            return { value: valid, reasons: reasons, fields: fields };
         });
 
         // Functions

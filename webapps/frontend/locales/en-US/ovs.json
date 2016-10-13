@@ -850,11 +850,12 @@
         "scrub": {
             "title": "Scrub a vDisk",
             "gather": {
-                "basicinfo": "Select the StorageRouter on which to execute the scrubbing.",
-                "scrubstarted": "Started",
+                "basicinfo": "Select the Storage Router on which to execute the scrubbing.",
+                "failed": "Scrubbing failed",
                 "inprogress": "The selected vDisk is being scrubbed",
-                "success": "Scrubbing finished",
-                "failed": "Scrubbing failed"
+                "nostoragerouter": "No Storage Router information found",
+                "scrubstarted": "Started",
+                "success": "Scrubbing finished"
             }
         },
         "shrink_vpool": {
