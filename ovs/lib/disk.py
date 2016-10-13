@@ -104,8 +104,11 @@ class DiskController(object):
             system_aliases = name_alias_mapping.get(friendly_path, [friendly_path])
             DiskController._logger.info('Investigating device {0}'.format(friendly_path))
 
+            link = client.file_read_link('/sys/block/{0}'.format(name))
             device_state = None
-            if client.file_read_link('/sys/block/{0}'.format(name)) is not None:  # If this returns, it means its a device and not a partition
+            device_is_also_partition = False
+            if link is not None:  # If this returns, it means its a device and not a partition
+                device_is_also_partition = mount_point != ''  # LVM, RAID1, ... have the tendency to be a device with a partition on it, but the partition is not reported by 'lsblk'
                 device_state = Disk.STATES.OK if state == 'running' or dev_nr.split(':')[0] != '8' else Disk.STATES.FAILURE
                 parsed_devices.append({'name': name,
                                        'state': device_state})
@@ -116,10 +119,10 @@ class DiskController(object):
                                        'is_ssd': rotational == '0',
                                        'aliases': system_aliases,
                                        'partitions': {}}
-            if client.file_read_link('/sys/block/{0}'.format(name)) is None or dev_type == 'lvm':
+            if link is None or device_is_also_partition is True:
                 current_device = None
                 current_device_state = None
-                if dev_type == 'lvm':
+                if device_is_also_partition is True:
                     offset = 0
                     current_device = name
                     current_device_state = device_state
@@ -143,8 +146,6 @@ class DiskController(object):
                     except Exception:
                         partition_state = Disk.STATES.FAILURE
 
-                if offset in configuration[current_device]['partitions']:
-                    raise ValueError('Multiple partitions found with offset 0 for disk {0}'.format(name))
                 configuration[current_device]['partitions'][offset] = {'size': int(size),
                                                                        'state': partition_state,
                                                                        'offset': offset,
