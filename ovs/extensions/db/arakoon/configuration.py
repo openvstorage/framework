@@ -82,7 +82,7 @@ class ArakoonConfiguration(object):
         client = ArakoonConfiguration._get_client()
         entries = []
         for entry in client.prefix(key):
-            if key == '' or entry.startswith(key + '/'):
+            if key == '' or entry.startswith(key.rstrip('/') + '/'):
                 cleaned = Toolbox.remove_prefix(entry, key).strip('/').split('/')[0]
                 if cleaned not in entries:
                     entries.append(cleaned)
