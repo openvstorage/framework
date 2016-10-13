@@ -55,13 +55,15 @@ class DiskController(object):
             raise
 
         # Retrieve all symlinks for all devices
-        # Example of path_mapping:
+        # Example of name_alias_mapping:
         # {'/dev/md0': ['/dev/disk/by-id/md-uuid-ad2de634:26d97253:5eda0a23:96986b76', '/dev/disk/by-id/md-name-OVS-1:0'],
         #  '/dev/sda': ['/dev/disk/by-path/pci-0000:03:00.0-sas-0x5000c295fe2ff771-lun-0'],
         #  '/dev/sda1': ['/dev/disk/by-uuid/e3e0bc62-4edc-4c6b-a6ce-1f39e8f27e41', '/dev/disk/by-path/pci-0000:03:00.0-sas-0x5000c295fe2ff771-lun-0-part1']}
         name_alias_mapping = {}
         alias_name_mapping = {}
-        for path_type in client.dir_list('/dev/disk'):
+        for path_type in client.dir_list(directory='/dev/disk'):
+            if path_type in ['by-uuid', 'by-partuuid']:  # UUIDs can change after creating a filesystem on a partition
+                continue
             directory = '/dev/disk/{0}'.format(path_type)
             for symlink in client.dir_list(directory=directory):
                 symlink_path = '{0}/{1}'.format(directory, symlink)
@@ -104,7 +106,7 @@ class DiskController(object):
 
             device_state = None
             if client.file_read_link('/sys/block/{0}'.format(name)) is not None:  # If this returns, it means its a device and not a partition
-                device_state = 'OK' if state == 'running' or dev_nr.split(':')[0] != '8' else Disk.STATES.FAILURE
+                device_state = Disk.STATES.OK if state == 'running' or dev_nr.split(':')[0] != '8' else Disk.STATES.FAILURE
                 parsed_devices.append({'name': name,
                                        'state': device_state})
                 configuration[name] = {'name': name,
@@ -122,6 +124,7 @@ class DiskController(object):
                     current_device = name
                     current_device_state = device_state
                 else:
+                    offset = 0
                     for device_info in reversed(parsed_devices):
                         try:
                             current_device = device_info['name']
@@ -133,12 +136,15 @@ class DiskController(object):
                 if current_device is None:
                     raise RuntimeError('Failed to retrieve the device information for current partition')
                 mount_point = mount_point if mount_point != '' else None
-                partition_state = 'OK' if current_device_state == 'OK' else Disk.STATES.FAILURE
+                partition_state = Disk.STATES.OK if current_device_state == Disk.STATES.OK else Disk.STATES.FAILURE
                 if mount_point is not None and fs_type != 'swap':
                     try:
                         client.run('touch {0}/{1}; rm {0}/{1}'.format(mount_point, str(time.time())))
                     except Exception:
                         partition_state = Disk.STATES.FAILURE
+
+                if offset in configuration[current_device]['partitions']:
+                    raise ValueError('Multiple partitions found with offset 0 for disk {0}'.format(name))
                 configuration[current_device]['partitions'][offset] = {'size': int(size),
                                                                        'state': partition_state,
                                                                        'offset': offset,
