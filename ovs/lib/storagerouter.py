@@ -129,12 +129,15 @@ class StorageRouterController(object):
 
                 partition_available_space = None
                 if disk_partition.mountpoint is not None:
-                    disk_partition_device = client.file_read_link(path=disk_partition.path)
-                    try:
-                        available = client.run('df -B 1 --output=avail {0}'.format(disk_partition_device)).splitlines()[-1]
-                        partition_available_space = int(available)
-                    except Exception as ex:
-                        StorageRouterController._logger.warning('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
+                    for alias in disk_partition.aliases:
+                        StorageRouterController._logger.info('Verifying disk partition usage by checking path {0}'.format(alias))
+                        disk_partition_device = client.file_read_link(path=alias)
+                        try:
+                            available = client.run('df -B 1 --output=avail {0}'.format(disk_partition_device)).splitlines()[-1]
+                            partition_available_space = int(available)
+                            break
+                        except Exception as ex:
+                            StorageRouterController._logger.warning('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
 
                 shared = False
                 for role in disk_partition.roles:
@@ -1695,14 +1698,15 @@ class StorageRouterController(object):
         for role in roles:
             if role not in DiskPartition.ROLES or role == DiskPartition.ROLES.BACKEND:
                 raise RuntimeError('Invalid role specified: {0}'.format(role))
-        DiskController.sync_with_reality(storagerouter_guid)
         disk = Disk(disk_guid)
         if disk.storagerouter_guid != storagerouter_guid:
             raise RuntimeError('The given Disk is not on the given StorageRouter')
         if partition_guid is None:
             StorageRouterController._logger.debug('Creating new partition - Offset: {0} bytes - Size: {1} bytes - Roles: {2}'.format(offset, size, roles))
             with remote(storagerouter.ip, [DiskTools], username='root') as rem:
-                rem.DiskTools.create_partition(disk_path=disk.path,
+                if len(disk.aliases) == 0:
+                    raise ValueError('Disk {0} does not have any aliases'.format(disk.name))
+                rem.DiskTools.create_partition(disk_alias=disk.aliases[0],
                                                disk_size=disk.size,
                                                partition_start=offset,
                                                partition_size=size)
@@ -1723,10 +1727,14 @@ class StorageRouterController(object):
             partition = DiskPartition(partition_guid)
             if partition.disk_guid != disk_guid:
                 raise RuntimeError('The given DiskPartition is not on the given Disk')
+            if partition.filesystem in ['swap', 'linux_raid_member', 'LVM2_member']:
+                raise RuntimeError("It is not allowed to assign roles on partitions of type: ['swap', 'linux_raid_member', 'LVM2_member']")
         if partition.filesystem is None or partition_guid is None:
             StorageRouterController._logger.debug('Creating filesystem')
             with remote(storagerouter.ip, [DiskTools], username='root') as rem:
-                rem.DiskTools.make_fs(partition.path)
+                if len(partition.aliases) == 0:
+                    raise ValueError('Partition with offset {0} does not have any aliases'.format(partition.offset))
+                rem.DiskTools.make_fs(partition_alias=partition.aliases[0])
                 DiskController.sync_with_reality(storagerouter_guid)
                 partition = DiskPartition(partition.guid)
                 if partition.filesystem not in ['ext4', 'xfs']:
@@ -1743,7 +1751,9 @@ class StorageRouterController(object):
                     if not rem.DiskTools.mountpoint_exists(mountpoint):
                         break
                 StorageRouterController._logger.debug('Found mountpoint: {0}'.format(mountpoint))
-                rem.DiskTools.add_fstab(partition.path, mountpoint, partition.filesystem)
+                rem.DiskTools.add_fstab(partition_aliases=partition.aliases,
+                                        mountpoint=mountpoint,
+                                        filesystem=partition.filesystem)
                 rem.DiskTools.mount(mountpoint)
                 DiskController.sync_with_reality(storagerouter_guid)
                 partition = DiskPartition(partition.guid)

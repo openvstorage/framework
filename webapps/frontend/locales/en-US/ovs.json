@@ -136,6 +136,7 @@
         "actions": "Actions",
         "address": "Address",
         "administration": "Administration",
+        "aliases": "Aliases",
         "api": "API",
         "areyousure": "Are you sure?",
         "backendtype": "Type",
@@ -809,6 +810,26 @@
                 "success": "Creation of vPool __what__ finished."
             }
         },
+        "configure_partition": {
+            "title": "Configure partitions",
+            "gather": {
+                "basic_info": "Configure the selected partition or raw disk space. Where required, a partition will be created, adding a filesystem and mounting it.",
+                "device": "Device",
+                "metadata_failure": "Failed to load the information about the current roles",
+                "filesystem": "Filesystem",
+                "mountpoint": "Mountpoint",
+                "offset": "Offset",
+                "role_info": "Update/select the required roles for the partition. Roles in use cannot be removed. Only one DB and one SCRUB role can be assigned to any of the partitions.",
+                "roles": "Roles",
+                "size": "Size"
+            },
+            "confirm": {
+                "creating": "configuring the partition",
+                "success": "Partition configured",
+                "started": "Configuration started",
+                "in_progress": "The partition is now being configured."
+            }
+        },
         "create_ft": {
             "title": "Create from vTemplate",
             "gather": {
@@ -938,25 +959,6 @@
         },
         "update": {
             "title": "Update __what__"
-        },
-        "configurepartition": {
-            "title": "Configure partitions",
-            "gather": {
-                "basicinfo": "Configure the selected partition or raw disk space. Where required, a partition will be created, adding a filesystem and mounting it.",
-                "roleinfo": "Update/select the required roles for the partition. Roles in use cannot be removed. Only one DB and one SCRUB role can be assigned to any of the partitions.",
-                "roles": "Roles",
-                "device": "Device",
-                "mountpoint": "Mountpoint",
-                "filesystem": "Filesystem",
-                "size": "Size",
-                "offset": "Offset"
-            },
-            "confirm": {
-                "creating": "configuring the partition",
-                "success": "Partition configured",
-                "started": "Configuration started",
-                "inprogress": "The partition is now being configured."
-            }
         },
         "vdisk_move": {
             "confirm": {

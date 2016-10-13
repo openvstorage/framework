@@ -126,13 +126,12 @@ class Helper(object):
                 disk.name = '/dev/uda'
                 disk.size = 1 * 1024 ** 4
                 disk.is_ssd = True
-                disk.path = '/dev/uda'
+                disk.aliases = ['/dev/uda']
                 disk.save()
                 partition = DiskPartition()
                 partition.offset = 0
                 partition.size = disk.size
-                partition.id = 'unittest_{0}'.format(sr_id)
-                partition.path = '/dev/uda-1'
+                partition.aliases = ['/dev/uda-1']
                 partition.state = 'OK'
                 partition.mountpoint = '/tmp/unittest/sr_{0}/disk_1/partition_1'.format(sr_id)
                 partition.disk = disk
