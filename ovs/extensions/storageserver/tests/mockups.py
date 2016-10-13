@@ -593,7 +593,9 @@ class LockedClient(object):
         _ = scrubbing_work_result
         LockedClient.scrub_controller['waiter'].wait()
         thread_name = threading.current_thread().getName()
-        assert thread_name in LockedClient.scrub_controller['possible_threads']
+        possible_thread_names = LockedClient.scrub_controller['possible_threads']
+        if possible_thread_names is not None:
+            assert thread_name in possible_thread_names
         if thread_name in LockedClient.thread_names:
             LockedClient.thread_names.remove(thread_name)
         if LockedClient.scrub_controller['volumes'][self.volume_id]['success'] is False:

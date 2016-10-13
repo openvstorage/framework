@@ -33,7 +33,8 @@ define([
             if (self.data.vObject() === undefined) {
                 valid = false;
                 reasons.push($.t('ovs:wizards.snapshot.gather.noobject'));
-            } else if (!self.data.name()) {
+            }
+            if (!self.data.name()) {
                 valid = false;
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.snapshot.gather.noname'));
