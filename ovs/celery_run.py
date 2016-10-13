@@ -29,6 +29,7 @@ from celery.signals import task_postrun, worker_process_init, after_setup_logger
 from ovs.lib.messaging import MessageController
 from ovs.log.log_handler import LogHandler
 from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.configuration import Configuration
@@ -137,4 +138,7 @@ if __name__ == '__main__':
 
         cache = PersistentFactory.get_client()
         for key in cache.prefix(ENSURE_SINGLE_KEY):
-            cache.delete(key)
+            try:
+                cache.delete(key)
+            except KeyNotFoundException:
+                pass
