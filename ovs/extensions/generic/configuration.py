@@ -64,6 +64,7 @@ class Configuration(object):
 
     base_config = {'cluster_id': None,
                    'external_config': None,
+                   'auto_scrub': True,
                    'plugins/installed': {'backends': [],
                                          'generic': []},
                    'paths': {'cfgdir': '/opt/OpenvStorage/config',

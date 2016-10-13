@@ -73,6 +73,13 @@ but WITHOUT ANY WARRANTY of any kind.
                                    enable: $root.shared.user.roles().contains('write')">
                     <span class="fa hand" data-i18n="[html]ovs:icons.move"></span>
                 </button>
+                <button type="button" class="btn btn-mini btn-default hand"
+                        id="vdisk-scrub" style="color: #428bca;"
+                        data-bind="click: function() { $root.scrub(); },
+                                   tooltip: 'ovs:vdisks.detail.scrub',
+                                   enable: $root.shared.user.roles().contains('manage')">
+                    <span class="fa hand" data-i18n="[html]ovs:icons.scrub"></span>
+                </button>
             </li>
         </ul>
         <div class="tab-content">

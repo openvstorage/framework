@@ -444,6 +444,7 @@
             "edgeclients": "Edge Clients",
             "move": "Move",
             "rollback": "Rollback",
+            "scrub": "Scrub",
             "set_as_template": "Set as vTemplate",
             "snapshot": "Take snapshot",
             "snapshots": "Snapshots",
@@ -867,6 +868,17 @@
                 "information": "Extending a vPool does not allow to reconfigure the name and backend information"
             }
         },
+        "scrub": {
+            "title": "Scrub a vDisk",
+            "gather": {
+                "basicinfo": "Select the Storage Router on which to execute the scrubbing.",
+                "failed": "Scrubbing failed",
+                "inprogress": "The selected vDisk is being scrubbed",
+                "nostoragerouter": "No Storage Router information found",
+                "scrubstarted": "Started",
+                "success": "Scrubbing finished"
+            }
+        },
         "shrink_vpool": {
             "title": "Remove Storage Driver from vPool",
             "confirm": {
@@ -983,12 +995,14 @@
     "title": "Open vStorage",
     "icons": {
         "add": "&#xf067;",
+        "archive": "&#xf187;",
         "ban": "&#xf05e;",
         "cancel": "&#xf00d;",
         "cancel_circle": "&#xf057;",
         "check": "&#xf00c;",
         "checked": "&#xf046;",
         "check_circle": "&#xf058;",
+        "clone": "&#xf24d;",
         "cog": "&#xf013;",
         "collapse": "&#xf147;",
         "configuration": "&#xf013;",
@@ -1008,6 +1022,7 @@
         "loading": "&#xf110;",
         "logs": "&#xf02d;",
         "management": "&#xf0b1;",
+        "markoffline": "&#xf1cd;",
         "move": "&#xf064;",
         "moveaway": "&#xf074;",
         "notchecked": "&#xf096;",
@@ -1015,6 +1030,7 @@
         "rights": "&#xf132;",
         "rollback": "&#xf01e;",
         "save": "&#xf0c7;",
+        "scrub": "&#xf1b8;",
         "separator": "&#xf101;",
         "set_as_template": "&#xf023;",
         "snapshot": "&#xf030;",
@@ -1025,9 +1041,6 @@
         "up": "&#xf106;",
         "vdisks": "&#xf0a0;",
         "vpools": "&#xf0c2;",
-        "warning": "&#xf071;",
-        "clone": "&#xf24d;",
-        "archive": "&#xf187;",
-        "markoffline": "&#xf1cd"
+        "warning": "&#xf071;"
     }
 }

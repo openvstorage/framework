@@ -18,11 +18,12 @@ define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vdisk', '../containers/vpool', '../containers/storagerouter', '../containers/domain',
-    '../wizards/clone/index', '../wizards/vdiskmove/index', '../wizards/rollback/index', '../wizards/snapshot/index'
+    '../wizards/clone/index', '../wizards/vdiskmove/index', '../wizards/rollback/index', '../wizards/snapshot/index',
+    '../wizards/scrub/index'
 ], function(
     $, app, dialog, ko, router, shared, generic, Refresher, api,
     VDisk, VPool, StorageRouter, Domain,
-    CloneWizard, MoveWizard, RollbackWizard, SnapshotWizard
+    CloneWizard, MoveWizard, RollbackWizard, SnapshotWizard, ScrubWizard
 ) {
     "use strict";
     return function() {
@@ -228,6 +229,14 @@ define([
         self.move = function() {
             if (self.vDisk() !== undefined) {
                 dialog.show(new MoveWizard({
+                    modal: true,
+                    vdisk: self.vDisk()
+                }));
+            }
+        };
+        self.scrub = function() {
+            if (self.vDisk() !== undefined) {
+                dialog.show(new ScrubWizard({
                     modal: true,
                     vdisk: self.vDisk()
                 }));

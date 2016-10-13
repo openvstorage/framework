@@ -23,8 +23,10 @@ import uuid
 import pickle
 import random
 from celery.schedules import crontab
+from Queue import Queue
 from ovs.celery_run import celery
 from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_vdiskdomain import VDiskDomain
 from ovs.dal.hybrids.storagedriver import StorageDriver
@@ -1174,6 +1176,34 @@ class VDiskController(object):
         """
         vdisk = VDisk(vdisk_guid)
         return vdisk.storagedriver_client.is_volume_synced_up_to_snapshot(str(vdisk.volume_id), str(snapshot_id))
+
+    @staticmethod
+    @celery.task(name='ovs.vdisk.scrub_single_vdisk')
+    def scrub_single_vdisk(vdisk_guid, storagerouter_guid):
+        """
+        Scrubs a given vDisk on a given StorageRouter
+        :param vdisk_guid: The guid of the vDisk to scrub
+        :type vdisk_guid: str
+        :param storagerouter_guid: The guid of the StorageRouter to scrub on
+        :type storagerouter_guid: str
+        :return: None
+        """
+        from ovs.lib.scheduledtask import ScheduledTaskController
+
+        vdisk = VDisk(vdisk_guid)
+        storagerouter = StorageRouter(storagerouter_guid)
+        scrub_partitions = storagerouter.partition_config.get(DiskPartition.ROLES.SCRUB, [])
+        if len(scrub_partitions) == 0:
+            raise RuntimeError('No scrub locations found on StorageRouter {0}'.format(storagerouter.name))
+        partition = DiskPartition(scrub_partitions[0])
+        queue = Queue()
+        queue.put(vdisk_guid)
+        scrub_info = {'scrub_path': str(partition.folder),
+                      'storage_router': storagerouter}
+        error_messages = []
+        ScheduledTaskController.execute_scrub_work(queue, vdisk.vpool, scrub_info, error_messages)
+        if len(error_messages) > 0:
+            raise RuntimeError('Error when scrubbing vDisk {0}:\n- {1}'.format(vdisk.guid, '\n- '.join(error_messages)))
 
     @staticmethod
     def _wait_for_snapshot_to_be_synced_to_backend(vdisk_guid, snapshot_id):

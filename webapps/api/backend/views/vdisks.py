@@ -24,6 +24,7 @@ from rest_framework.permissions import IsAuthenticated
 from backend.decorators import required_roles, load, return_list, return_object, return_task, log
 from backend.exceptions import HttpNotAcceptableException
 from ovs.dal.datalist import DataList
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
@@ -364,3 +365,38 @@ class VDiskViewSet(viewsets.ViewSet):
         new_size = int(new_size)
         return VDiskController.extend.delay(vdisk_guid=vdisk.guid,
                                             volume_size=new_size)
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_list(StorageRouter)
+    @load(VDisk)
+    def get_scrub_storagerouters(self):
+        """
+        Loads a list of suitable StorageRouters for scrubbing the given vDisk
+        :return: A list of StorageRouters
+        :rtype: list
+        """
+        storagerouters = []
+        for storagerouter in StorageRouterList.get_storagerouters():
+            scrub_partitions = storagerouter.partition_config.get(DiskPartition.ROLES.SCRUB, [])
+            if len(scrub_partitions) == 0:
+                continue
+            storagerouters.append(storagerouter)
+        return storagerouters
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(VDisk)
+    def scrub(self, vdisk, storagerouter_guid):
+        """
+        Scrubs a given vDisk on a given StorageRouter
+        :param vdisk: the vDisk to scrub
+        :type vdisk: VDisk
+        :param storagerouter_guid: The guid of the StorageRouter to scrub
+        :type storagerouter_guid: str
+        :return: A task
+        """
+        return VDiskController.scrub_single_vdisk.delay(vdisk.guid, storagerouter_guid)
