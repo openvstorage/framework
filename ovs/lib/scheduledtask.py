@@ -445,30 +445,46 @@ class ScheduledTaskController(object):
         :return: None
         """
         ScheduledTaskController._logger.info('Starting arakoon collapse')
-        arakoon_clusters = []
+        storagerouters = StorageRouterList.get_storagerouters()
+        cluster_info = [('cacc', storagerouters[0], True)]
+        cluster_names = []
         for service in ServiceList.get_services():
-            if service.is_internal is True and \
-               service.type.name in (ServiceType.SERVICE_TYPES.ARAKOON,
-                                     ServiceType.SERVICE_TYPES.NS_MGR,
-                                     ServiceType.SERVICE_TYPES.ALBA_MGR):
-                arakoon_clusters.append(service.name.replace('arakoon-', ''))
-
-        for cluster in arakoon_clusters:
-            ScheduledTaskController._logger.info('  Collapsing cluster {0}'.format(cluster))
-            contents = Configuration.get(ArakoonClusterConfig.CONFIG_KEY.format(cluster), raw=True)
-            parser = RawConfigParser()
-            parser.readfp(StringIO(contents))
-            nodes = {}
-            for node in parser.get('global', 'cluster').split(','):
-                node = node.strip()
-                nodes[node] = ([str(parser.get(node, 'ip'))], int(parser.get(node, 'client_port')))
-            config = ArakoonClientConfig(str(cluster), nodes)
-            for node in nodes.keys():
-                ScheduledTaskController._logger.info('    Collapsing node: {0}'.format(node))
-                client = ArakoonAdmin(config)
-                try:
-                    client.collapse(str(node), 2)
-                except:
-                    ScheduledTaskController._logger.exception('Error during collapsing cluster {0} node {1}'.format(cluster, node))
+            if service.is_internal is True and service.type.name in (ServiceType.SERVICE_TYPES.ARAKOON,
+                                                                     ServiceType.SERVICE_TYPES.NS_MGR,
+                                                                     ServiceType.SERVICE_TYPES.ALBA_MGR):
+                cluster = service.name.replace('arakoon-', '')
+                if cluster in cluster_names:
+                    continue
+                cluster_names.append(cluster)
+                cluster_info.append((cluster, service.storagerouter, False))
+        workload = {}
+        for cluster, storagerouter, filesystem in cluster_info:
+            ScheduledTaskController._logger.debug('  Collecting info for cluster {0}'.format(cluster))
+            config = ArakoonClusterConfig(cluster, filesystem=filesystem)
+            config.load_config(storagerouter.ip)
+            for node in config.nodes:
+                if node.ip not in workload:
+                    workload[node.ip] = {'node_id': node.name,
+                                         'clusters': []}
+                workload[node.ip]['clusters'].append((cluster, filesystem))
+        for storagerouter in storagerouters:
+            try:
+                if storagerouter.ip not in workload:
+                    continue
+                node_workload = workload[storagerouter.ip]
+                client = SSHClient(storagerouter)
+                for cluster, filesystem in node_workload['clusters']:
+                    try:
+                        ScheduledTaskController._logger.debug('  Collapsing cluster {0} on {1}'.format(cluster, storagerouter.ip))
+                        if filesystem is True:
+                            config_path = ArakoonClusterConfig.CONFIG_FILE.format(cluster)
+                        else:
+                            config_path = Configuration.get_configuration_path(ArakoonClusterConfig.CONFIG_KEY.format(cluster))
+                        client.run('arakoon --collapse-local {0} 2 -config {1}'.format(node_workload['node_id'], config_path))
+                        ScheduledTaskController._logger.info('  Collapsing cluster {0} on {1} completed'.format(cluster, storagerouter.ip))
+                    except:
+                        ScheduledTaskController._logger.exception('  Collapsing cluster {0} on {1} failed'.format(cluster, storagerouter.ip))
+            except UnableToConnectException:
+                ScheduledTaskController._logger.error('  Could not collapse any cluster on {0} (not reachable)'.format(storagerouter.name))
 
         ScheduledTaskController._logger.info('Arakoon collapse finished')
