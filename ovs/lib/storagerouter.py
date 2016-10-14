@@ -191,7 +191,6 @@ class StorageRouterController(object):
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.add_vpool')
-    @ensure_single(task_name='ovs.storagerouter.add_vpool', mode='CHAINED')
     def add_vpool(parameters):
         """
         Add a vPool to the machine this task is running on
