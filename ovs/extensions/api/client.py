@@ -238,7 +238,7 @@ class OVSClient(object):
 
     def delete(self, api, params=None):
         """
-        Executes a PATH call
+        Executes a DELETE call
         :param api: Specification to fill out in the URL, eg: /vpools/<vpool_guid>/
         :param params: Additional query parameters, eg: _dynamics
         """
