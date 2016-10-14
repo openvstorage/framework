@@ -21,7 +21,13 @@ import time
 import base64
 import urllib
 import hashlib
+import logging
 import requests
+from requests.packages.urllib3 import disable_warnings
+from requests.packages.urllib3.exceptions import InsecurePlatformWarning
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from requests.packages.urllib3.exceptions import SNIMissingWarning
+logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 
 class HttpException(RuntimeError):
@@ -53,6 +59,10 @@ class OVSClient(object):
     """
     Represents the OVS client
     """
+
+    disable_warnings(InsecurePlatformWarning)
+    disable_warnings(InsecureRequestWarning)
+    disable_warnings(SNIMissingWarning)
 
     def __init__(self, ip, port, credentials=None, verify=False, version='*', raw_response=False):
         """
@@ -137,9 +147,7 @@ class OVSClient(object):
             pass
 
         if 200 <= status_code < 300:
-            if parsed_output is not None:
-                return parsed_output
-            raise RuntimeError('Could not parse returned data: {0}: {1}'.format(status_code, response.text))
+            return parsed_output
         else:
             message = None
             if parsed_output is not None:
@@ -196,7 +204,7 @@ class OVSClient(object):
     def get(self, api, params=None):
         """
         Executes a GET call
-        :param api: Specification for to fill out in the URL, eg: /vpools/<vpool_guid>/shrink_vpool
+        :param api: Specification to fill out in the URL, eg: /vpools/<vpool_guid>/shrink_vpool
         :param params: Additional query parameters, eg: _dynamics
         """
         return self._call(api=api, params=params, function=requests.get)
@@ -204,7 +212,7 @@ class OVSClient(object):
     def post(self, api, data=None, params=None):
         """
         Executes a POST call
-        :param api: Specification for to fill out in the URL, eg: /vpools/<vpool_guid>/shrink_vpool
+        :param api: Specification to fill out in the URL, eg: /vpools/<vpool_guid>/shrink_vpool
         :param data: Data to post
         :param params: Additional query parameters, eg: _dynamics
         """
@@ -213,7 +221,7 @@ class OVSClient(object):
     def put(self, api, data=None, params=None):
         """
         Executes a PUT call
-        :param api: Specification for to fill out in the URL, eg: /vpools/<vpool_guid>/shrink_vpool
+        :param api: Specification to fill out in the URL, eg: /vpools/<vpool_guid>/shrink_vpool
         :param data: Data to put
         :param params: Additional query parameters, eg: _dynamics
         """
@@ -222,11 +230,19 @@ class OVSClient(object):
     def patch(self, api, data=None, params=None):
         """
         Executes a PATCH call
-        :param api: Specification for to fill out in the URL, eg: /vpools/<vpool_guid>/shrink_vpool
+        :param api: Specification to fill out in the URL, eg: /vpools/<vpool_guid>/shrink_vpool
         :param data: Data to patch
         :param params: Additional query parameters, eg: _dynamics
         """
         return self._call(api=api, params=params, function=requests.patch, data=data)
+
+    def delete(self, api, params=None):
+        """
+        Executes a PATH call
+        :param api: Specification to fill out in the URL, eg: /vpools/<vpool_guid>/
+        :param params: Additional query parameters, eg: _dynamics
+        """
+        return self._call(api=api, params=params, function=requests.delete)
 
     def wait_for_task(self, task_id, timeout=None):
         """
