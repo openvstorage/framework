@@ -108,24 +108,29 @@ class Configuration(object):
         raise NotImplementedError()
 
     @staticmethod
-    def get(key, raw=False):
+    def get(key, raw=False, **kwargs):
         """
         Get value from the configuration store
         :param key: Key to get
         :param raw: Raw data if True else json format
         :return: Value for key
         """
-        key_entries = key.split('|')
-        data = Configuration._get(key_entries[0], raw)
-        if len(key_entries) == 1:
-            return data
         try:
-            temp_data = data
-            for entry in key_entries[1].split('.'):
-                temp_data = temp_data[entry]
-            return temp_data
-        except KeyError as ex:
-            raise NotFoundException(ex.message)
+            key_entries = key.split('|')
+            data = Configuration._get(key_entries[0], raw)
+            if len(key_entries) == 1:
+                return data
+            try:
+                temp_data = data
+                for entry in key_entries[1].split('.'):
+                    temp_data = temp_data[entry]
+                return temp_data
+            except KeyError as ex:
+                raise NotFoundException(ex.message)
+        except NotFoundException:
+            if 'default' in kwargs:
+                return kwargs['default']
+            raise
 
     @staticmethod
     def set(key, value, raw=False):
