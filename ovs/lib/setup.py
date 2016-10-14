@@ -1862,7 +1862,8 @@ EOF
                                                         'master_ip': (str, Toolbox.regex_ip),
                                                         'master_password': (str, None),
                                                         'node_type': (str, ['master', 'extra'], False),
-                                                        'rdma': (bool, None, False)})
+                                                        'rdma': (bool, None, False),
+                                                        'logging_target': (dict, None, False)})
         # Parameters only required for 1st node
         if 'cluster_ip' not in config or config['master_ip'] == config['cluster_ip']:
             Toolbox.verify_required_params(actual_params=config,
