@@ -94,7 +94,7 @@ elif [ "$1" = "update" ] ; then
     fi
 elif [ "$1" = "remove" ] ; then
     if [ "$2" = "nodes" ] ; then
-        python -c "from ovs.lib.setup import SetupController; SetupController.remove_nodes(\"$3\")"
+        python -c "from ovs.lib.setup import SetupController; SetupController.remove_nodes('$3', '$4')"
     else
         show_help
     fi

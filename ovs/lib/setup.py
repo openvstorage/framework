@@ -566,7 +566,7 @@ class SetupController(object):
             sys.exit(1)
 
     @staticmethod
-    def remove_nodes(node_ips):
+    def remove_nodes(node_ips, silent=None):
         """
         Remove the nodes with specified IPs from the cluster
         :param node_ips: IPs of nodes to remove
@@ -579,8 +579,7 @@ class SetupController(object):
         from ovs.dal.lists.storagerouterlist import StorageRouterList
         from ovs.dal.lists.vdisklist import VDiskList
 
-        SetupController._log(messages='Remove nodes started', title=True)
-        SetupController._log(messages='\nWARNING: Some of these steps may take a very long time, please check the logs for more logging information\n\n')
+        SetupController._log(messages='Remove nodes', boxed=True)
 
         ###############
         # VALIDATIONS #
@@ -598,7 +597,17 @@ class SetupController(object):
                 raise ValueError('Invalid IP {0} specified'.format(storage_router_ip))
             storage_router_ips_to_remove.add(storage_router_ip)
 
-        SetupController._log(messages='Following nodes with IPs will be removed from the cluster: {0}'.format(list(storage_router_ips_to_remove)))
+        SetupController._log(messages='\nFollowing nodes with IPs will be removed from the cluster: {0}'.format(', '.join(list(storage_router_ips_to_remove))))
+
+        if silent != '--force-yes':
+            proceed = Interactive.ask_yesno(message='Are you sure?', default_value=False)
+            if proceed is False:
+                SetupController._log(messages='Abort removal', title=True)
+                sys.exit(1)
+
+        SetupController._log(messages='Remove nodes started', title=True)
+        SetupController._log(messages='WARNING: Some of these steps may take a very long time, please check the logs for more logging information\n\n')
+
         storage_router_all = StorageRouterList.get_storagerouters()
         storage_router_masters = StorageRouterList.get_masters()
         storage_router_all_ips = set([storage_router.ip for storage_router in storage_router_all])
