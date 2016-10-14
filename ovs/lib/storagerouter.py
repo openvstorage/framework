@@ -1423,9 +1423,7 @@ class StorageRouterController(object):
         :rtype: bool
         """
         mountpoint = '/mnt/{0}'.format(name)
-        if not os.path.exists(mountpoint):
-            return True
-        return check_output('sudo -s ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'
+        return not os.path.exists(mountpoint)
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_update_status')

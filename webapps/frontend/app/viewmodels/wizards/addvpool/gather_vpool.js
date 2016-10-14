@@ -47,17 +47,16 @@ define([
             if (storageRouter == undefined) {
                 return;
             }
+            self.metadataLoading(true);
             var map = self.srMetadataMap(), srGuid = storageRouter.guid();
             if (!map.hasOwnProperty(srGuid)) {
                 self.srMetadataMap()[srGuid] = undefined;
-                self.metadataLoading(true);
                 generic.xhrAbort(self.loadSRMetadataHandle);
                 self.loadSRMetadataHandle = api.post('storagerouters/' + srGuid + '/get_metadata')
                     .then(self.shared.tasks.wait)
                     .done(function(srData) {
-                        self.fillSRData(srData);
                         self.srMetadataMap()[storageRouter.guid()] = srData;
-                        self.metadataLoading(false);
+                        self.fillSRData(srData);
                     });
             } else if (map[srGuid] !== undefined) {
                 self.fillSRData(map[srGuid]);
@@ -96,13 +95,13 @@ define([
                         reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.no_credentials'));
                     }
                 }
-                if (preValidation.valid === false) {
-                    showErrors = true;
-                    reasons = reasons.concat(preValidation.reasons);
-                    fields = fields.concat(preValidation.fields);
-                }
             } else if (self.data.backend() === 'alba' && self.data.albaBackend() === undefined) {
                 valid = false;
+            }
+            if (preValidation.valid === false) {
+                showErrors = true;
+                reasons = reasons.concat(preValidation.reasons);
+                fields = fields.concat(preValidation.fields);
             }
             if (self.data.scrubAvailable() === false) {
                 reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', { what: 'SCRUB' }));
@@ -115,6 +114,7 @@ define([
                 });
             }
             $.each(requiredRoles, function(index, role) {
+                valid = false;
                 reasons.push($.t('ovs:wizards.add_vpool.gather_backend.missing_role', { what: role }));
             });
             if (self.data.backend() === 'alba' && self.data.vPoolAdd()) {
@@ -139,6 +139,10 @@ define([
                 valid = false;
                 reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_storageip'));
                 fields.push('storageip');
+            }
+            if (self.metadataLoading()) {
+                valid = false;
+                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.metadata_loading'))
             }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
@@ -179,6 +183,7 @@ define([
             } else if (self.data.distributedMtpt() === undefined || !srData.mountpoints.contains(self.data.distributedMtpt())) {
                 self.data.distributedMtpt(srData.mountpoints[0]);
             }
+            self.metadataLoading(false);
         };
         self.preValidate = function() {
             var validationResult = { valid: true, reasons: [], fields: [] };
