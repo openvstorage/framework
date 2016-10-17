@@ -418,20 +418,6 @@
             "error_msg": "saving __what__"
         }
     },
-    "statistics": {
-        "title": "Statistics",
-        "introduction": "This page contains various system statistics.",
-        "memcache": {
-            "title": "Memcache",
-            "hitspeed": "Requests per second:",
-            "memoryusage": "Memory usage:",
-            "keysincache": "Keys in cache:",
-            "cachehits": "Cache hits:",
-            "cachetraffic": "Cache traffic",
-            "uptime": "Uptime",
-            "rawinfo": "Raw memcached information"
-        }
-    },
     "vdisks": {
         "add": "Add new vDisk",
         "title": "vDisks",
