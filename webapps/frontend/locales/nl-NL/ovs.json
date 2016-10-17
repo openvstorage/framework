@@ -78,19 +78,6 @@
         "backendconnection": "Connectie",
         "backendlogin": "Login"
     },
-    "statistics": {
-        "title": "Statistieken",
-        "introduction": "Deze pagina bevat de statistieken van uw omgeving",
-        "memcache": {
-            "title": "Memcache",
-            "memoryusage": "Geheugen in gebruik:",
-            "keysincache": "Keys in de cache:",
-            "cachehits": "Cache hits:",
-            "cachetraffic": "Cache traffic",
-            "uptime": "Actief",
-            "rawinfo": "Raw memcached informatie"
-        }
-    },
     "dashboard": {
         "title": "Dashboard",
         "introduction": "Open vStorage is de volgende generatie in Software-Defined Storage."
