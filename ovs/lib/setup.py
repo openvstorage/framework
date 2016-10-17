@@ -536,6 +536,15 @@ class SetupController(object):
                 master_ip = master_node_ips[0]
                 ip_client_map = dict((node_ip, SSHClient(node_ip, username='root')) for node_ip in node_ips)
 
+            if node_action == 'demote':
+                for cluster_name in Configuration.list('/ovs/arakoon'):
+                    config = ArakoonClusterConfig(cluster_name, False)
+                    config.load_config()
+                    arakoon_client = ArakoonInstaller.build_client(config)
+                    metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
+                    if len(config.nodes) == 1 and config.nodes[0].ip == master_ip and metadata.get('internal') is True:
+                        raise RuntimeError('Demote is not supported when single node Arakoon cluster(s) are present, please promote another node first')
+
             configure_rabbitmq = SetupController._is_internally_managed(service='rabbitmq')
             configure_memcached = SetupController._is_internally_managed(service='memcached')
             if node_action == 'promote':
@@ -571,7 +580,8 @@ class SetupController(object):
         Remove the nodes with specified IPs from the cluster
         :param node_ips: IPs of nodes to remove
         :type node_ips: str
-
+        :param silent: If silent == '--force-yes' no question will be asked to confirm the removal
+        :type silent: str
         :return: None
         """
         from ovs.lib.storagedriver import StorageDriverController
