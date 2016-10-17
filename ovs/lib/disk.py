@@ -161,7 +161,7 @@ class DiskController(object):
                     disk_info = configuration.pop(alias_name_mapping[alias].replace('/dev/', ''))
                     break
 
-            if disk_info is None and disk.name.startswith('loop') and disk.name in configuration:  # Partitioned loop devices no longer show up in alias_name_mapping
+            if disk_info is None and disk.name in configuration and (disk.name.startswith('loop') or disk.name.startswith('nvme')):  # Partitioned loop, nvme devices no longer show up in alias_name_mapping
                 disk_info = configuration.pop(disk.name)
 
             # Remove disk / partitions if not reported by 'lsblk'
