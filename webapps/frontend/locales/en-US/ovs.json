@@ -767,7 +767,7 @@
                 "ip_address": "Storage IP:",
                 "loading_backend_information": "Backend information is being loaded",
                 "local_host": "Use local Open vStorage backend",
-                "metadata_loading": "MetaData is still begin loaded",
+                "metadata_loading": "MetaData is being loaded",
                 "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
                 "missing_role": "Missing required partition role: __what__",
                 "missing_storageip": "A Storage IP must be selected",
