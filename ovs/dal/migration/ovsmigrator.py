@@ -228,8 +228,7 @@ class OVSMigrator(object):
                         disk.save()
                     for partition in disk.partitions:
                         # noinspection PyProtectedMember
-                        partition_path = partition._data['path']
-                        partition_device = alias_name_mapping.get(partition_path)
+                        partition_device = alias_name_mapping.get(partition._data['path'])
                         if partition.aliases is None:
                             if partition_device is None:
                                 partition.aliases = []
