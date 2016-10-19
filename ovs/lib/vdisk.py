@@ -635,11 +635,11 @@ class VDiskController(object):
         tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id)
         readcache_limit = vdisk.storagedriver_client.get_readcache_limit(volume_id)
         non_disposable_sco_factor = vdisk.storagedriver_client.get_sco_cache_max_non_disposable_factor(volume_id)
-        metadata_cache_size = vdisk.storagedriver_client.get_metadata_cache_capacity(volume_id)
-        if not metadata_cache_size:
+        metadata_cache_capacity = vdisk.storagedriver_client.get_metadata_cache_capacity(volume_id)
+        if not metadata_cache_capacity:
             metadata_cache_size = StorageDriverClient.DEFAULT_METADATA_CACHE_SIZE
         else:
-            metadata_cache_size *= StorageDriverClient.METADATA_CACHE_PAGE_SIZE
+            metadata_cache_size = metadata_cache_capacity * StorageDriverClient.METADATA_CACHE_PAGE_SIZE
 
         dtl_target = []
         if dtl_config is None:
@@ -1225,11 +1225,11 @@ class VDiskController(object):
         """
         storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, vdisk.storagedriver_id)
         storagedriver_config.load()
-        metadata_page_capacity = 256
+        metadata_page_capacity = 64  # "size" of a page = amount of entries in a page (addressable by 6 bits)
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
-        num_pages = int(min(vdisk.size, 2 * 1024 ** 4) / float(metadata_page_capacity * cluster_size))
-        VDiskController._logger.info('Setting metadata page cache size for vdisk {0} to {1}'.format(vdisk.name, num_pages))
-        vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), num_pages)
+        cache_capacity = int(min(vdisk.size, 2 * 1024 ** 4) / float(metadata_page_capacity * cluster_size))
+        VDiskController._logger.info('Setting metadata page cache size for vdisk {0} to {1}'.format(vdisk.name, cache_capacity))
+        vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), cache_capacity)
 
     @staticmethod
     def clean_devicename(name):

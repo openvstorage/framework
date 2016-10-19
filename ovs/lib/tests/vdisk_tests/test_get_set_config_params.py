@@ -101,6 +101,7 @@ class VDiskTest(unittest.TestCase):
         tlog_multiplier = vdisk_1.storagedriver_client.get_tlog_multiplier(vdisk_1.volume_id)
         default_sco_size = vdisk_1.storagedriver_client.get_sco_multiplier(vdisk_1.volume_id) / 1024 * 4
         non_disposable_sco_factor = vdisk_1.storagedriver_client.get_sco_cache_max_non_disposable_factor(vdisk_1.volume_id)
+        cache_capacity = 4096  # Based on 1GiB size and "metadata_page_capacity" of 64 (6 bits)
         default_values = {'sco_size': default_sco_size,
                           'dtl_mode': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC,
                           'dedupe_mode': StorageDriverClient.FRAMEWORK_LOCATION_BASED,
@@ -108,11 +109,11 @@ class VDiskTest(unittest.TestCase):
                           'write_buffer': int(tlog_multiplier * default_sco_size * non_disposable_sco_factor),
                           'cache_strategy': StorageDriverClient.FRAMEWORK_NO_CACHE,
                           'readcache_limit': None,
-                          'metadata_cache_size': StorageDriverClient.METADATA_CACHE_PAGE_SIZE * 1024}
+                          'metadata_cache_size': StorageDriverClient.METADATA_CACHE_PAGE_SIZE * cache_capacity}
         for key, value in default_values.iteritems():
             self.assertEqual(first=configuration[key],
                              second=value,
-                             msg='Value for "{0}" does not match expected default value'.format(key))
+                             msg='Value for "{0}" does not match expected default value: {1} vs {2}'.format(key, configuration[key], value))
 
         # Attempt to set incorrect values
         new_config_params = {'dtl_mode': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC,
