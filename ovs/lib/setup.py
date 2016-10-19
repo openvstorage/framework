@@ -183,7 +183,10 @@ class SetupController(object):
                         SetupController.nodes = SetupController._retrieve_storagerouters(ip=master_ip, password=master_password)
                         master_ips = [sr_info['ip'] for sr_info in SetupController.nodes.itervalues() if sr_info['type'] == 'master']
                         if master_ip not in master_ips:
-                            raise ValueError('Incorrect master IP provided, please choose from: {0}'.format(', '.join(master_ips)))
+                            if master_ips:
+                                raise ValueError('Incorrect master IP provided, please choose from: {0}'.format(', '.join(master_ips)))
+                            else:
+                                raise ValueError('Could not load master information at {0}. Is that node running correctly?'.format(master_ip))
 
                         current_sr_message = []
                         for sr_name in sorted(SetupController.nodes):
@@ -223,7 +226,10 @@ class SetupController(object):
                     if master_ip != cluster_ip:
                         master_ips = [sr_info['ip'] for sr_info in SetupController.nodes.itervalues() if sr_info['type'] == 'master']
                         if master_ip not in master_ips:
-                            raise ValueError('Incorrect master IP provided, please choose from: {0}'.format(', '.join(master_ips)))
+                            if master_ips:
+                                raise ValueError('Incorrect master IP provided, please choose from: {0}'.format(', '.join(master_ips)))
+                            else:
+                                raise ValueError('Could not load master information at {0}. Is that node running correctly?'.format(master_ip))
                     else:
                         if node_type == 'extra':
                             raise ValueError('A 1st node can never be installed as an "extra" node')
@@ -1902,7 +1908,7 @@ EOF
                     storagerouters[sr.name] = {'ip': sr.ip,
                                                'type': sr.node_type.lower()}
         except Exception as ex:
-            SetupController._log('Error loading storagerouters: {0}'.format(ex), loglevel='exception')
+            SetupController._log('Error loading storagerouters: {0}'.format(ex), loglevel='exception', silent=True)
         return storagerouters
 
     @staticmethod
@@ -1940,7 +1946,7 @@ EOF
         return internal
 
     @staticmethod
-    def _log(messages, title=False, boxed=False, loglevel='info'):
+    def _log(messages, title=False, boxed=False, loglevel='info', silent=False):
         """
         Print a message on stdout and log to file
         :param messages: Messages to print and log
@@ -1959,15 +1965,16 @@ EOF
         """
         if type(messages) in (str, basestring, unicode):
             messages = [messages]
-        if boxed is True:
-            print Interactive.boxed_message(lines=messages)
-        else:
-            for message in messages:
-                if title is True:
-                    message = '\n+++ {0} +++\n'.format(message)
-                if loglevel in ['error', 'exception']:
-                    message = 'ERROR: {0}'.format(message)
-                print message
+        if silent is False:
+            if boxed is True:
+                print Interactive.boxed_message(lines=messages)
+            else:
+                for message in messages:
+                    if title is True:
+                        message = '\n+++ {0} +++\n'.format(message)
+                    if loglevel in ['error', 'exception']:
+                        message = 'ERROR: {0}'.format(message)
+                    print message
 
         for message in messages:
             getattr(SetupController._logger, loglevel)(message)
