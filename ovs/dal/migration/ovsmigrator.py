@@ -234,8 +234,7 @@ class OVSMigrator(object):
                                 partition.aliases = []
                                 partition.save()
                                 continue
-                            aliases = name_alias_mapping.get(partition_device, [])
-                            partition.aliases = aliases
+                            partition.aliases = name_alias_mapping.get(partition_device, [])
                             partition.save()
 
                 DiskController.sync_with_reality(storagerouter_guid=storagerouter.guid)
