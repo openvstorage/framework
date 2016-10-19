@@ -33,6 +33,7 @@ class UnitTest(object):
     Class to execute all unit tests or a subset of tests
     """
     _test_info = {}
+    _invalid_test_modules = []
     _ERROR = '\033[91mERROR\033[0m'
     _SUCCESS = '\033[92mSUCCESS\033[0m'
     _FAILURE = '\033[93mFAILURE\033[0m'
@@ -68,7 +69,7 @@ class UnitTest(object):
             return '{0} second{1}'.format(seconds, '' if seconds == 1 else 's')
 
     @staticmethod
-    def _gather_test_info(directories=None):
+    def _gather_test_info(directories=None, silent_invalid_modules=False):
         """
         Retrieve all test classes recursively in the specified directories
         :param directories: Directories to recursively check
@@ -85,6 +86,7 @@ class UnitTest(object):
             raise ValueError('Directories should be a list or string')
 
         UnitTest._test_info = {}
+        UnitTest._failed_test_classes = {}
         for directory in directories:
             directory = directory.rstrip('/')
             for root, dirs, files in os.walk(directory):
@@ -100,7 +102,9 @@ class UnitTest(object):
                         try:
                             module = inspect.imp.load_source(name, filepath)
                         except Exception as ex:
-                            print 'Test file {0} could not be loaded. Error: {1}'.format(filepath, ex)
+                            if silent_invalid_modules is False:
+                                print 'Test file {0} could not be loaded. Error: {1}'.format(filepath, ex)
+                            UnitTest._invalid_test_modules.append(filepath)
                             continue
                         filepath = filepath.replace('.py', '')
                         for member in inspect.getmembers(module):
@@ -141,7 +145,7 @@ class UnitTest(object):
         return sorted([test_name for test_name in UnitTest._test_info if test_name.split('.')[0] == file_path and ':' in test_name])
 
     @staticmethod
-    def list_tests(directories=None, print_tests=False):
+    def list_tests(directories=None, print_tests=False, silent_invalid_modules=False):
         """
         List all the tests found on the system or in the directories specified
         :param directories: Directories to check for tests
@@ -153,7 +157,7 @@ class UnitTest(object):
         :return: All tests found
         :rtype: list
         """
-        UnitTest._gather_test_info(directories=directories)
+        UnitTest._gather_test_info(directories=directories, silent_invalid_modules=silent_invalid_modules)
         tests = sorted(key for key in UnitTest._test_info if ':' not in key and '.' not in key)
         if print_tests is True:
             for test in tests:
@@ -172,10 +176,12 @@ class UnitTest(object):
 
         :return: None
         """
+        failed_modules = []
         if tests is None:  # Put all test files and their classes in custom dict
             tests_to_execute = UnitTest.list_tests()
+            failed_modules = UnitTest._invalid_test_modules
         else:  # Validate the specified tests
-            UnitTest._gather_test_info()
+            UnitTest._gather_test_info(silent_invalid_modules=True)
             errors = []
             if isinstance(tests, str):
                 tests = tests.split(',')
@@ -242,20 +248,24 @@ class UnitTest(object):
                     test_results.append('      - Class: {0}, Test: {1}, Message: {2}'.format(error[0].id().split('.')[-2], error[0].id().split('.')[-1], error[1].splitlines()[-1]))
             test_results.append('')
 
-        if len(tests_to_execute) > 1:
+        if len(tests_to_execute) > 1 or len(failed_modules) > 1:
             test_results.append('')
             test_results.append('###########')
             test_results.append('# SUMMARY #')
             test_results.append('###########')
             test_results.append('')
-            test_results.append('  - Total amount of tests: {0}'.format(int(total_tests)))
-            test_results.append('  - Total duration: {0}'.format(UnitTest._sec_to_readable(time.time() - start_all)))
-            test_results.append('    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._SUCCESS, total_success, int(total_tests), total_success / total_tests * 100))
-            if total_failure > 0:
-                test_results.append('    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._FAILURE, total_failure, int(total_tests), total_failure / total_tests * 100))
-            if total_error > 0:
-                test_results.append('    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._ERROR, total_error, int(total_tests), total_error / total_tests * 100))
+            if len(tests_to_execute) > 1:
+                test_results.append('  - Total amount of tests: {0}'.format(int(total_tests)))
+                test_results.append('  - Total duration: {0}'.format(UnitTest._sec_to_readable(time.time() - start_all)))
+                test_results.append('    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._SUCCESS, total_success, int(total_tests), total_success / total_tests * 100))
+                if total_failure > 0:
+                    test_results.append('    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._FAILURE, total_failure, int(total_tests), total_failure / total_tests * 100))
+                if total_error > 0:
+                    test_results.append('    - {0}: {1} / {2} ({3:.2f} %)'.format(UnitTest._ERROR, total_error, int(total_tests), total_error / total_tests * 100))
+            if len(failed_modules) > 1:
+                test_results.append('  - {0}: {1} invalid test modules'.format(UnitTest._ERROR, len(failed_modules)))
             test_results.append('')
         print '\n\n\n{0}'.format('\n'.join(test_results))
         os.environ['RUNNING_UNITTESTS'] = 'False'
-        sys.exit(0 if total_tests == total_success else 1)
+        success = total_tests == total_success and len(failed_modules) == 0
+        sys.exit(0 if success else 1)
