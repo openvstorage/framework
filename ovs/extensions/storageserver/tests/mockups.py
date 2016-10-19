@@ -211,7 +211,7 @@ class StorageRouterClient(object):
         Retrieve the metadata cache capacity for volume
         """
         _ = self
-        return StorageRouterClient._config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('metadata_cache_capacity', 256 * 24)
+        return StorageRouterClient._config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('metadata_cache_capacity', 8192)
 
     def get_readcache_behaviour(self, volume_id):
         """
