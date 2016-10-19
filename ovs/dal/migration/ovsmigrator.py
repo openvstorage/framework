@@ -207,6 +207,7 @@ class OVSMigrator(object):
                 #  '/dev/sda': ['/dev/disk/by-path/pci-0000:03:00.0-sas-0x5000c295fe2ff771-lun-0'],
                 #  '/dev/sda1': ['/dev/disk/by-uuid/e3e0bc62-4edc-4c6b-a6ce-1f39e8f27e41', '/dev/disk/by-path/pci-0000:03:00.0-sas-0x5000c295fe2ff771-lun-0-part1']}
                 name_alias_mapping = {}
+                alias_name_mapping = {}
                 for path_type in client.dir_list(directory='/dev/disk'):
                     if path_type in ['by-uuid', 'by-partuuid']:  # UUIDs can change after creating a filesystem on a partition
                         continue
@@ -217,6 +218,7 @@ class OVSMigrator(object):
                         if link not in name_alias_mapping:
                             name_alias_mapping[link] = []
                         name_alias_mapping[link].append(symlink_path)
+                        alias_name_mapping[symlink_path] = link
 
                 for disk in storagerouter.disks:
                     if disk.aliases is None:
@@ -224,6 +226,16 @@ class OVSMigrator(object):
                         device_path = '/dev/{0}'.format(disk.name)
                         disk.aliases = name_alias_mapping.get(device_path, [device_path])
                         disk.save()
+                    for partition in disk.partitions:
+                        # noinspection PyProtectedMember
+                        partition_device = alias_name_mapping.get(partition._data['path'])
+                        if partition.aliases is None:
+                            if partition_device is None:
+                                partition.aliases = []
+                                partition.save()
+                                continue
+                            partition.aliases = name_alias_mapping.get(partition_device, [])
+                            partition.save()
 
                 DiskController.sync_with_reality(storagerouter_guid=storagerouter.guid)
 
