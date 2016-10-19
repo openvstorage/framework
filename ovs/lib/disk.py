@@ -100,14 +100,13 @@ class DiskController(object):
             if dev_type == 'rom':
                 continue
 
-            friendly_path = '/dev/{0}'.format(name)
-            system_aliases = name_alias_mapping.get(friendly_path, [friendly_path])
-            DiskController._logger.info('Investigating device {0}'.format(friendly_path))
-
             link = client.file_read_link('/sys/block/{0}'.format(name))
             device_state = None
+            friendly_path = '/dev/{0}'.format(name)
+            system_aliases = name_alias_mapping.get(friendly_path, [friendly_path])
             device_is_also_partition = False
             if link is not None:  # If this returns, it means its a device and not a partition
+                DiskController._logger.info('Investigating device {0}'.format(friendly_path))
                 device_is_also_partition = mount_point != ''  # LVM, RAID1, ... have the tendency to be a device with a partition on it, but the partition is not reported by 'lsblk'
                 device_state = Disk.STATES.OK if state == 'running' or dev_nr.split(':')[0] != '8' else Disk.STATES.FAILURE
                 parsed_devices.append({'name': name,
@@ -120,6 +119,7 @@ class DiskController(object):
                                        'aliases': system_aliases,
                                        'partitions': {}}
             if link is None or device_is_also_partition is True:
+                DiskController._logger.info('Investigating partition {0}'.format(friendly_path))
                 current_device = None
                 current_device_state = None
                 if device_is_also_partition is True:
@@ -158,10 +158,14 @@ class DiskController(object):
             disk_info = None
             for alias in disk.aliases:
                 if alias in alias_name_mapping:
-                    disk_info = configuration.pop(alias_name_mapping[alias].replace('/dev/', ''))
-                    break
+                    name = alias_name_mapping[alias].replace('/dev/', '')
+                    if name in configuration:
+                        disk_info = configuration.pop(name)
+                        break
 
-            if disk_info is None and disk.name in configuration and (disk.name.startswith('loop') or disk.name.startswith('nvme')):  # Partitioned loop, nvme devices no longer show up in alias_name_mapping
+            if disk_info is None and disk.name in configuration and (disk.name.startswith('fio') or
+                                                                     disk.name.startswith('loop') or
+                                                                     disk.name.startswith('nvme')):  # Partitioned loop, nvme devices no longer show up in alias_name_mapping
                 disk_info = configuration.pop(disk.name)
 
             # Remove disk / partitions if not reported by 'lsblk'
