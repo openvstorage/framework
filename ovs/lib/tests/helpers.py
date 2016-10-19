@@ -33,6 +33,8 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.lists.backendtypelist import BackendTypeList
+from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
@@ -85,13 +87,17 @@ class Helper(object):
         storagedrivers = previous_structure.get('storagedrivers', {})
         storagerouter_domains = previous_structure.get('storagerouter_domains', {})
 
-        service_type = ServiceType()
-        service_type.name = 'MetadataServer'
-        service_type.save()
-        backend_type = BackendType()
-        backend_type.name = 'BackendType'
-        backend_type.code = 'BT'
-        backend_type.save()
+        service_type = ServiceTypeList.get_by_name('MetadataServer')
+        if service_type is None:
+            service_type = ServiceType()
+            service_type.name = 'MetadataServer'
+            service_type.save()
+        backend_type = BackendTypeList.get_backend_type_by_code('BT')
+        if backend_type is None:
+            backend_type = BackendType()
+            backend_type.name = 'BackendType'
+            backend_type.code = 'BT'
+            backend_type.save()
         srclients = {}
         for domain_id in structure.get('domains', []):
             if domain_id not in domains:
