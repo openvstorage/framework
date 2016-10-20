@@ -250,7 +250,7 @@ class Schedule(object):
         if name in schedules:
             schedule = schedules[name]
             if schedule is None:
-                return None, 'disabled'
+                return None, 'disabled by configuration'
             source = 'scheduled from configuration'
         else:
             schedule = self.kwargs
@@ -259,4 +259,5 @@ class Schedule(object):
             return crontab(**schedule), '{0}: {1}'.format(source, ', '.join(['{0}="{1}"'.format(key, value) for key, value in schedule.iteritems()]))
         except Exception as ex:
             Schedule._logger.error('Could not generate crontab for {0} with data {1} {2}: {3}'.format(name, schedule, source, ex))
+            return None, 'error in configuration'
 
