@@ -21,11 +21,8 @@ ScheduledTaskController module
 import copy
 import json
 import time
-from celery.schedules import crontab
-from ConfigParser import RawConfigParser
 from datetime import datetime, timedelta
 from Queue import Empty, Queue
-from StringIO import StringIO
 from threading import Thread
 from time import mktime
 from ovs.celery_run import celery
@@ -38,7 +35,6 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
-from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonAdmin, ArakoonClientConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.remote import remote
@@ -46,6 +42,7 @@ from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
 from ovs.lib.helpers.decorators import ensure_single
+from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
@@ -59,7 +56,7 @@ class ScheduledTaskController(object):
     _logger = LogHandler.get('lib', name='scheduled tasks')
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.snapshot_all_vdisks', schedule=crontab(minute='0', hour='*'))
+    @celery.task(name='ovs.scheduled.snapshot_all_vdisks', schedule=Schedule(minute='0', hour='*'))
     @ensure_single(task_name='ovs.scheduled.snapshot_all_vdisks', extra_task_names=['ovs.scheduled.delete_snapshots'])
     def snapshot_all_vdisks():
         """
@@ -84,7 +81,7 @@ class ScheduledTaskController(object):
         ScheduledTaskController._logger.info('[SSA] Snapshot has been taken for {0} vDisks, {1} failed.'.format(len(success), len(fail)))
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.delete_snapshots', schedule=crontab(minute='1', hour='2'))
+    @celery.task(name='ovs.scheduled.delete_snapshots', schedule=Schedule(minute='1', hour='2'))
     @ensure_single(task_name='ovs.scheduled.delete_snapshots')
     def delete_snapshots(timestamp=None):
         """
@@ -199,7 +196,7 @@ class ScheduledTaskController(object):
         ScheduledTaskController._logger.info('Delete snapshots finished')
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.execute_scrub', schedule=crontab(minute='0', hour='3'))
+    @celery.task(name='ovs.scheduled.execute_scrub', schedule=Schedule(minute='0', hour='3'))
     @ensure_single(task_name='ovs.scheduled.execute_scrub')
     def execute_scrub():
         """
@@ -437,7 +434,7 @@ class ScheduledTaskController(object):
             ScheduledTaskController._logger.exception(message)
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.collapse_arakoon', schedule=crontab(minute='10', hour='0,2,4,6,8,10,12,14,16,18,20,22'))
+    @celery.task(name='ovs.scheduled.collapse_arakoon', schedule=Schedule(minute='10', hour='0,2,4,6,8,10,12,14,16,18,20,22'))
     @ensure_single(task_name='ovs.scheduled.collapse_arakoon')
     def collapse_arakoon():
         """

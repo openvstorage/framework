@@ -21,13 +21,16 @@ import os
 import re
 import imp
 import sys
+import time
 import random
 import string
 import inspect
 import subprocess
-import time
+from celery.schedules import crontab
 from ovs.dal.helpers import Toolbox as HelperToolbox
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.services.service import ServiceManager
+from ovs.log.log_handler import LogHandler
 
 
 class Toolbox(object):
@@ -227,3 +230,33 @@ class Toolbox(object):
         service_status, output = ServiceManager.get_service_status(name, client)
         if service_status != status:
             raise RuntimeError('Service {0} does not have expected status: {1}'.format(name, output))
+
+
+class Schedule(object):
+    """
+    This decorator adds a schedule to a function. All arguments are these from celery's "crontab" class
+    """
+    _logger = LogHandler.get('lib', name='scheduler')
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def generate_schedule(self, name):
+        try:
+            schedules = Configuration.get('/ovs/framework/scheduling/celery', default={})
+        except Exception as ex:
+            Schedule._logger.error('Error loading celery scheduling configuration for {0}: {1}'.format(name, ex))
+            schedules = {}
+        if name in schedules:
+            schedule = schedules[name]
+            if schedule is None:
+                return None, 'disabled'
+            source = 'scheduled from configuration'
+        else:
+            schedule = self.kwargs
+            source = 'scheduled from code'
+        try:
+            return crontab(**schedule), '{0}: {1}'.format(source, ', '.join(['{0}="{1}"'.format(key, value) for key, value in schedule.iteritems()]))
+        except Exception as ex:
+            Schedule._logger.error('Could not generate crontab for {0} with data {1} {2}: {3}'.format(name, schedule, source, ex))
+

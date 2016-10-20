@@ -18,11 +18,11 @@
 Contains various decorators
 """
 
-import inspect
 import json
+import time
 import random
 import string
-import time
+import inspect
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -107,7 +107,7 @@ def ensure_single(task_name, extra_task_names=None, mode='DEFAULT', global_timeo
 
     :return:                 Pointer to function
     """
-    logger = LogHandler.get('lib', name='scheduled tasks')
+    logger = LogHandler.get('lib', name='ensure single')
 
     def wrap(function):
         """

@@ -19,7 +19,6 @@ StorageDriver module
 """
 
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
-from celery.schedules import crontab
 from ovs.celery_run import celery
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
@@ -35,6 +34,7 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import add_hooks, ensure_single, log
+from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
 
@@ -124,7 +124,7 @@ class StorageDriverController(object):
             StorageDriverController._configure_arakoon_to_volumedriver(cluster_name=cluster_name)
 
     @staticmethod
-    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=crontab(minute='15', hour='*'))
+    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=Schedule(minute='15', hour='*'))
     def scheduled_voldrv_arakoon_checkup():
         """
         Makes sure the volumedriver arakoon is on all available master nodes

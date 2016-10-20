@@ -20,7 +20,6 @@ MDSService module
 import math
 import time
 import random
-from celery.schedules import crontab
 from ovs.celery_run import celery
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_mdsservice import MDSService
@@ -40,6 +39,7 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.storageserver.storagedriver import MetadataServerClient
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single
+from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig
@@ -742,7 +742,7 @@ class MDSServiceController(object):
         return config_set
 
     @staticmethod
-    @celery.task(name='ovs.mds.mds_checkup', schedule=crontab(minute='30', hour='0,4,8,12,16,20'))
+    @celery.task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'))
     @ensure_single(task_name='ovs.mds.mds_checkup', mode='CHAINED')
     def mds_checkup():
         """
