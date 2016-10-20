@@ -82,7 +82,6 @@ class ScheduledTaskTest(unittest.TestCase):
         ##############
         # Scenario 1 #
         ##############
-        Configuration.set('/ovs/framework/auto_scrub', False)
         structure = Helper.build_service_structure(
             {'vpools': [1],
              'vdisks': [(1, 1, 1, 1)],  # (<id>, <storagedriver_id>, <vpool_id>, <mds_service_id>)
@@ -100,11 +99,6 @@ class ScheduledTaskTest(unittest.TestCase):
                                          'waiter': Waiter(1)}
         LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': False,
                                                                      'scrub_work': [0]}
-        ScheduledTaskController.execute_scrub()
-        with vdisk.storagedriver_client.make_locked_client(vdisk.volume_id) as locked_client:
-            self.assertEqual(first=len(locked_client.get_scrubbing_workunits()),
-                             second=1,
-                             msg='Scrubbed vDisk {0} does not have the expected amount of scrubbing items: {1}'.format(vdisk.name, 1))
         with self.assertRaises(Exception) as raise_info:
             VDiskController.scrub_single_vdisk(vdisk.guid, storagerouter.guid)
         self.assertIn(vdisk.name, raise_info.exception.message)
@@ -115,8 +109,6 @@ class ScheduledTaskTest(unittest.TestCase):
             self.assertEqual(first=len(locked_client.get_scrubbing_workunits()),
                              second=0,
                              msg='Scrubbed vDisk {0} does not have the expected amount of scrubbing items: {1}'.format(vdisk.name, 0))
-
-        Configuration.set('/ovs/framework/auto_scrub', True)
 
         ##############
         # Scenario 2 #
