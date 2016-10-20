@@ -22,7 +22,6 @@ import time
 import uuid
 import pickle
 import random
-from celery.schedules import crontab
 from Queue import Queue
 from ovs.celery_run import celery
 from ovs.dal.exceptions import ObjectNotFoundException
@@ -43,7 +42,7 @@ from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volat
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single, log
-from ovs.lib.helpers.toolbox import Toolbox
+from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
@@ -836,7 +835,7 @@ class VDiskController(object):
             raise Exception('Failed to update the values for vDisk {0}'.format(vdisk.name))
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.dtl_checkup', schedule=crontab(minute='15', hour='0,4,8,12,16,20'))
+    @celery.task(name='ovs.vdisk.dtl_checkup', schedule=Schedule(minute='15', hour='0,4,8,12,16,20'))
     @ensure_single(task_name='ovs.vdisk.dtl_checkup', mode='DEDUPED')
     def dtl_checkup(vpool_guid=None, vdisk_guid=None, storagerouters_to_exclude=None):
         """
