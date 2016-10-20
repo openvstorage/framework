@@ -203,11 +203,6 @@ class ScheduledTaskController(object):
         Retrieve and execute scrub work
         :return: None
         """
-        ScheduledTaskController._logger.info('Scrubber - Starting')
-        if Configuration.get('/ovs/framework/auto_scrub') is False:
-            ScheduledTaskController._logger.warning('Scrubber - Automatic scrubbing disabled. Skipping')
-            return
-
         ScheduledTaskController._logger.info('Scrubber - Started')
         vpools = VPoolList.get_vpools()
         error_messages = []
