@@ -136,7 +136,11 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 validation_mandatory_vars = []
                 validation_optional_vars = []
             # Check versioning
-            version = regex.match(request.META['HTTP_ACCEPT']).groupdict()['version']
+            version_match = regex.match(request.META['HTTP_ACCEPT'])
+            if version_match is not None:
+                version = version_match.groupdict()['version']
+            else:
+                version = settings.VERSION[-1]
             versions = (max(min_version, settings.VERSION[0]), min(max_version, settings.VERSION[-1]))
             if version == '*':  # If accepting all versions, it defaults to the highest one
                 version = versions[1]
