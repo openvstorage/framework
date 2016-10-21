@@ -28,6 +28,7 @@ from celery import Celery
 from celery.signals import task_postrun, worker_process_init, after_setup_logger, after_setup_task_logger
 from ovs.lib.messaging import MessageController
 from ovs.log.log_handler import LogHandler
+from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.configuration import Configuration
@@ -118,6 +119,7 @@ def worker_process_init_handler(args=None, kwargs=None, **kwds):
     _ = args, kwargs, kwds
     VolatileFactory.store = None
     PersistentFactory.store = None
+    ArakoonConfiguration.client = None
 
 
 @after_setup_task_logger.connect

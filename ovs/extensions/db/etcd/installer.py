@@ -71,7 +71,7 @@ class EtcdInstaller(object):
 
         client = SSHClient(ip, username='root')
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
-        if ServiceManager.has_service(target_name, client) and ServiceManager.get_service_status(target_name, client) is True:
+        if ServiceManager.has_service(target_name, client) and ServiceManager.get_service_status(target_name, client)[0] is True:
             EtcdInstaller._logger.info('Service {0} already configured and running'.format(target_name))
             return
 
@@ -317,7 +317,7 @@ class EtcdInstaller(object):
     def _setup_proxy(initial_cluster, slave_client, cluster_name, force=False, client_port=DEFAULT_CLIENT_PORT):
         base_name = 'ovs-etcd-proxy'
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
-        if force is False and ServiceManager.has_service(target_name, slave_client) and ServiceManager.get_service_status(target_name, slave_client) is True:
+        if force is False and ServiceManager.has_service(target_name, slave_client) and ServiceManager.get_service_status(target_name, slave_client)[0] is True:
             EtcdInstaller._logger.info('Service {0} already configured and running'.format(target_name))
             return
         EtcdInstaller.stop(cluster_name, slave_client)

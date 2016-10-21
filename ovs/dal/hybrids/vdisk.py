@@ -75,7 +75,7 @@ class VDisk(DataObject):
         :return: StorageDriverClient
         """
         if self._storagedriver_client is None:
-            self.reload_clients('storagedriver')
+            self.reload_client('storagedriver')
         return self._storagedriver_client
 
     @property
@@ -85,7 +85,7 @@ class VDisk(DataObject):
         :return: ObjectRegistryClient
         """
         if self._objectregistry_client is None:
-            self.reload_clients('objectregistry')
+            self.reload_client('objectregistry')
         return self._objectregistry_client
 
     def _dtl_status(self):
@@ -131,12 +131,12 @@ class VDisk(DataObject):
                 voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id)
             except:
                 voldrv_snapshots = []
-            for id in voldrv_snapshots:
-                snapshot = self.storagedriver_client.info_snapshot(volume_id, id)
+            for snap_id in voldrv_snapshots:
+                snapshot = self.storagedriver_client.info_snapshot(volume_id, snap_id)
                 if snapshot.metadata:
                     metadata = pickle.loads(snapshot.metadata)
                     if isinstance(metadata, dict):
-                        snapshots.append({'guid': id,
+                        snapshots.append({'guid': snap_id,
                                           'timestamp': metadata['timestamp'],
                                           'label': metadata['label'],
                                           'is_consistent': metadata['is_consistent'],
@@ -145,9 +145,9 @@ class VDisk(DataObject):
                                           'in_backend': snapshot.in_backend,
                                           'stored': int(snapshot.stored)})
                 else:
-                    snapshots.append({'guid': id,
+                    snapshots.append({'guid': snap_id,
                                       'timestamp': time.mktime(datetime.strptime(snapshot.timestamp.strip(), '%c').timetuple()),
-                                      'label': id,
+                                      'label': snap_id,
                                       'is_consistent': False,
                                       'is_automatic': False,
                                       'is_sticky': False,
@@ -202,7 +202,10 @@ class VDisk(DataObject):
         """
         Returns the Volume Storage Driver ID to which the vDisk is connected.
         """
-        return self.info.get('vrouter_id', None)
+        vdisk_object = self.objectregistry_client.find(str(self.volume_id))
+        if vdisk_object is not None:
+            return vdisk_object.node_id()
+        return None
 
     def _storagerouter_guid(self):
         """
@@ -303,9 +306,9 @@ class VDisk(DataObject):
                     current_stats['{0}_ps'.format(key)] = max(0, (current_stats[key] - previous_stats[key]) / delta)
         volatile.set(prev_key, current_stats, dynamic.timeout * 10)
 
-    def reload_clients(self, client):
+    def reload_client(self, client):
         """
-        Reloads the StorageDriverClient and ObjectRegistryClient
+        Reloads the StorageDriverClient or ObjectRegistryClient
         """
         if self.vpool_guid:
             self._frozen = False

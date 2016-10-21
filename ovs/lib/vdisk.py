@@ -37,7 +37,6 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
@@ -81,7 +80,7 @@ class VDiskController(object):
         return response
 
     @staticmethod
-    def _clean_vdisk_from_model(vdisk):
+    def clean_vdisk_from_model(vdisk):
         """
         Removes a vDisk from the model
         :param vdisk: The vDisk to be removed
@@ -106,7 +105,7 @@ class VDiskController(object):
         vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
         if vdisk is not None:
             with volatile_mutex('voldrv_event_disk_{0}'.format(vdisk.volume_id), wait=20):
-                VDiskController._clean_vdisk_from_model(vdisk)
+                VDiskController.clean_vdisk_from_model(vdisk)
         else:
             VDiskController._logger.info('Volume {0} does not exist (yet)'.format(volume_id))
 
@@ -133,13 +132,15 @@ class VDiskController(object):
         :type volume_size: int
         """
         vdisk = VDisk(vdisk_guid)
-        if volume_size > 2 * 1024 ** 4:
-            raise ValueError('Maximum volume size of 2TiB exceeded')
+        if volume_size > 64 * 1024 ** 4:
+            raise ValueError('Maximum volume size of 64TiB exceeded')
         if volume_size < vdisk.size:
             raise ValueError('Shrinking is not possible')
         VDiskController._logger.info('Extending vDisk {0} to {1}B'.format(vdisk.name, volume_size))
         vdisk.storagedriver_client.truncate(object_id=str(vdisk.volume_id),
                                             new_size='{0}B'.format(volume_size))
+        vdisk.size = volume_size
+        vdisk.save()
         VDiskController._logger.info('Extended vDisk {0} to {1}B'.format(vdisk.name, volume_size))
 
     @staticmethod
@@ -179,7 +180,7 @@ class VDiskController(object):
                 VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
             except SRCObjectNotFoundException:
                 VDiskController._logger.warning('vDisk object seems to be removed in the meantime.')
-                VDiskController._clean_vdisk_from_model(vdisk)
+                VDiskController.clean_vdisk_from_model(vdisk)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.migrate_from_voldrv')
@@ -533,8 +534,8 @@ class VDiskController(object):
         vpool = storagedriver.vpool
         if VDiskList.get_by_devicename_and_vpool(devicename, vpool) is not None:
             raise RuntimeError('A vDisk with this name already exists on vPool {0}'.format(vpool.name))
-        if volume_size > 2 * 1024 ** 4:
-            raise ValueError('Maximum volume size of 2TiB exceeded')
+        if volume_size > 64 * 1024 ** 4:
+            raise ValueError('Maximum volume size of 64TiB exceeded')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
         if mds_service is None:
@@ -976,7 +977,7 @@ class VDiskController(object):
                             try:
                                 root_client = SSHClient(storagerouter, username='root')
                                 service_name = 'dtl_{0}'.format(vpool.name)
-                                if ServiceManager.has_service(service_name, client=root_client) is True and ServiceManager.get_service_status(service_name, client=root_client) is True:
+                                if ServiceManager.has_service(service_name, client=root_client) is True and ServiceManager.get_service_status(service_name, client=root_client)[0] is True:
                                     root_client_map[storagerouter] = root_client
                                     possible_srs.append(storagerouter)
                                 else:
@@ -1153,7 +1154,7 @@ class VDiskController(object):
         storagedriver_config.load()
         metadata_page_capacity = 256
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
-        num_pages = int(vdisk.size / (metadata_page_capacity * cluster_size))
+        num_pages = int(min(vdisk.size, 2 * 1024 ** 4) / float(metadata_page_capacity * cluster_size))
         VDiskController._logger.info('Setting metadata pagecache size for vdisk {0} to {1}'.format(vdisk.name, num_pages))
         vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), num_pages)
 

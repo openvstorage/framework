@@ -169,6 +169,10 @@ define([
                                 if (pdata.hasOwnProperty(partition.guid())) {
                                     partition.fillData(pdata[partition.guid()]);
                                 }
+                                // Show partitions as failed if disk state is in error or missing
+                                if (['ERROR', 'MISSING'].contains(self.state())) {
+                                    partition.state('FAILURE');
+                                }
                             });
                             self.partitions.sort(function(a, b) {
                                 return a.offset.raw() - b.offset.raw();

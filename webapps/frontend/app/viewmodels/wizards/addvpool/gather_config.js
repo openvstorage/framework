@@ -38,80 +38,14 @@ define([
                 return self.data.dtlMode();
             }
         });
-        self.overlaps = ko.computed(function() {
-            var dbOverlap, readOverlap, writeOverlap, dbPartitionGuids = [], writePartitionGuids = [], readPartitionGuids = [],
-                nsmPartitionGuids = self.data.albaBackend() !== undefined ? self.data.albaBackend().metadata_information.nsm_partition_guids : [];
-            if (self.data.partitions() !== undefined) {
-                $.each(self.data.partitions(), function (role, partitions) {
-                    $.each(partitions, function (index, partition) {
-                        if (role === 'READ') {
-                            readPartitionGuids.push(partition.guid);
-                        } else if (role === 'WRITE') {
-                            writePartitionGuids.push(partition.guid);
-                        } else if (role === 'DB') {
-                            dbPartitionGuids.push(partition.guid);
-                        }
-                    });
-                });
-            }
-            dbOverlap = generic.overlap(dbPartitionGuids, nsmPartitionGuids);
-            readOverlap = dbOverlap && generic.overlap(dbPartitionGuids, readPartitionGuids);
-            writeOverlap = dbOverlap && generic.overlap(dbPartitionGuids, writePartitionGuids);
-            return {
-                db: dbOverlap,
-                read: readOverlap,
-                write: writeOverlap
-            };
-        });
-        self.nsmReserved = ko.computed(function() {
-            if (self.data.albaPreset() === undefined || self.data.albaBackend() === undefined) {
-                return 0;
-            }
-            var overlap = self.overlaps();
-            if (overlap.read || overlap.write) {
-                var max = 0, scoSize = self.data.scoSize() * 1024 * 1024,
-                    fragSize = self.data.albaPreset().fragSize,
-                    totalSize = self.data.albaBackend().usages.size;
-                $.each(self.data.albaPreset().policies, function (index, policy) {
-                    // For more information about below formula: see http://jira.cloudfounders.com/browse/OVS-3553
-                    var sizeToReserve = totalSize / scoSize * (1200 + (policy.k + policy.m) * (25 * scoSize / policy.k / fragSize + 56));
-                    if (sizeToReserve > max) {
-                        max = sizeToReserve;
-                    }
-                });
-                return max;
-            }
-            return 0;
-        });
-        self.correctedSharedSize = ko.computed(function() {
-            var overlap = self.overlaps(), max = self.nsmReserved(), size = self.data.sharedSize();
-            if (overlap.read && overlap.write) {
-                size = Math.max(0, size - max);
-            }
-            return size;
-        });
-        self.correctedReadCacheAvailableSize = ko.computed(function() {
-            var overlap = self.overlaps(), max = self.nsmReserved(), size = self.data.readCacheAvailableSize();
-            if (overlap.read && overlap.write) {
-                size = Math.max(0, size - max);
-            }
-            return size;
-        });
-        self.correctedWriteCacheAvailableSize = ko.computed(function() {
-            var overlap = self.overlaps(), max = self.nsmReserved(), size = self.data.writeCacheAvailableSize();
-            if (overlap.read && overlap.write) {
-                size = Math.max(0, size - max);
-            }
-            return size;
-        });
-        self.controledWriteCacheSize = ko.computed({
+        self.controlledWriteCacheSize = ko.computed({
             read: function() {
                 if (self.data.writeCacheSize() === undefined) {
-                    var shared = self.correctedSharedSize();
-                    if (self.correctedReadCacheAvailableSize() === 0 && self.data.cacheStrategy() !== 'none') {
-                        shared = Math.floor(self.correctedSharedSize() / 2);
+                    var shared = self.data.sharedSize();
+                    if (self.data.readCacheAvailableSize() === 0 && self.data.cacheStrategy() !== 'none') {
+                        shared = Math.floor(self.data.sharedSize() / 2);
                     }
-                    self.data.writeCacheSize(Math.floor((self.correctedWriteCacheAvailableSize() + shared) / 1024 / 1024 / 1024));
+                    self.data.writeCacheSize(Math.floor((self.data.writeCacheAvailableSize() + shared) / 1024 / 1024 / 1024));
                 }
                 return self.data.writeCacheSize();
             },
@@ -119,14 +53,14 @@ define([
                 self.data.writeCacheSize(size);
             }
         }).extend({ notify: 'always' });
-        self.controledReadCacheSize = ko.computed({
+        self.controlledReadCacheSize = ko.computed({
             read: function() {
                 if (self.data.cacheStrategy() === 'none') {
                     self.data.readCacheSize(undefined);
                 } else if (self.data.readCacheSize() === undefined) {
-                    var read = self.correctedReadCacheAvailableSize();
+                    var read = self.data.readCacheAvailableSize();
                     if (read === 0) {
-                        self.data.readCacheSize(Math.floor(Math.floor(self.correctedSharedSize() / 2) / 1024 / 1024 / 1024));
+                        self.data.readCacheSize(Math.floor(Math.floor(self.data.sharedSize() / 2) / 1024 / 1024 / 1024));
                     } else {
                         self.data.readCacheSize(Math.floor(read / 1024 / 1024 / 1024));
                     }
@@ -141,9 +75,9 @@ define([
             var reasons = [], fields = [], roleFound = false,
                 readCacheSizeBytes = self.data.readCacheSize() * 1024 * 1024 * 1024,
                 writeCacheSizeBytes = self.data.writeCacheSize() * 1024 * 1024 * 1024,
-                readCacheSizeAvailableBytes = self.correctedReadCacheAvailableSize() + self.correctedSharedSize(),
-                writeCacheSizeAvailableBytes = self.correctedWriteCacheAvailableSize() + self.correctedSharedSize(),
-                sharedAvailableModulus = self.correctedSharedSize() - self.correctedSharedSize() % (1024 * 1024 * 1024);
+                readCacheSizeAvailableBytes = self.data.readCacheAvailableSize() + self.data.sharedSize(),
+                writeCacheSizeAvailableBytes = self.data.writeCacheAvailableSize() + self.data.sharedSize(),
+                sharedAvailableModulus = self.data.sharedSize() - self.data.sharedSize() % (1024 * 1024 * 1024);
             if (self.data.cacheStrategy() === 'none') {
                 readCacheSizeBytes = 0;
             }
@@ -161,16 +95,22 @@ define([
                 fields.push('readCacheSize');
                 reasons.push($.t('ovs:wizards.add_vpool.gather_config.over_allocation'));
             }
-            else if (writeCacheSizeBytes > writeCacheSizeAvailableBytes) {
+            if (writeCacheSizeBytes > writeCacheSizeAvailableBytes) {
                 fields.push('writeCacheSize');
                 reasons.push($.t('ovs:wizards.add_vpool.gather_config.over_allocation'));
             }
-            else if (readCacheSizeBytes + writeCacheSizeBytes > self.correctedReadCacheAvailableSize() + self.correctedWriteCacheAvailableSize() + sharedAvailableModulus) {
+            if (readCacheSizeBytes + writeCacheSizeBytes > self.data.readCacheAvailableSize() + self.data.writeCacheAvailableSize() + sharedAvailableModulus) {
                 fields.push('readCacheSize');
                 fields.push('writeCacheSize');
                 reasons.push($.t('ovs:wizards.add_vpool.gather_config.over_allocation'));
             }
-            return { value: reasons.length === 0, reasons: reasons, fields: fields };
+            var uniqueReasons = [];
+            $.each(reasons, function(_, reason) {
+                if (!uniqueReasons.contains(reason)) {
+                    uniqueReasons.push(reason);
+                }
+            });
+            return { value: reasons.length === 0, reasons: uniqueReasons, fields: fields };
         });
     };
 });

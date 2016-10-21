@@ -101,6 +101,12 @@ class Configuration(object):
                                           key=key)
 
     @staticmethod
+    def extract_key_from_path(path):
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            return path.split('=')[-1]
+        raise NotImplementedError()
+
+    @staticmethod
     def get(key, raw=False):
         """
         Get value from the configuration store

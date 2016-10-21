@@ -184,7 +184,7 @@ class Toolbox(object):
                 logger.debug('  {0:<15} - Enabling service {1}'.format(client.ip, name))
             ServiceManager.enable_service(name, client=client)
 
-        status = ServiceManager.get_service_status(name, client=client)
+        status, _ = ServiceManager.get_service_status(name, client=client)
         if status is False and state in ['start', 'restart']:
             if logger is not None:
                 logger.debug('  {0:<15} - Starting service {1}'.format(client.ip, name))
@@ -218,12 +218,12 @@ class Toolbox(object):
         """
         tries = 10
         while tries > 0:
-            service_status = ServiceManager.get_service_status(name, client)
+            service_status, _ = ServiceManager.get_service_status(name, client)
             if service_status == status:
                 break
             logger.debug('... waiting for service {0}'.format(name))
             tries -= 1
             time.sleep(10 - tries)
-        service_status, output = ServiceManager.get_service_status(name, client, True)
+        service_status, output = ServiceManager.get_service_status(name, client)
         if service_status != status:
             raise RuntimeError('Service {0} does not have expected status: {1}'.format(name, output))

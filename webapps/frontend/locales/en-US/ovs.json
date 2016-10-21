@@ -392,9 +392,11 @@
         "dtl_mode": "DTL Mode",
         "dtl_transport": "DTL Transport",
         "freespace": "Free space",
+        "global_write_buffer": "Global Write Buffer",
         "sco_size": "SCO Size",
         "statistics": "Statistics",
         "title": "vPools",
+        "volume_write_buffer": "Volume Write Buffer",
         "write_buffer": "Write Buffer",
         "detail": {
             "title": "vPool",
@@ -734,7 +736,6 @@
                 "use_local": "Place Fragment Cache on disk"
             },
             "gather_config": {
-                "basic_info": "Specify the configurations for the vPool",
                 "caching": "StorageDriver Caching Information",
                 "cache_strategy": "Strategy:",
                 "cluster_size": "Cluster Size:",
@@ -744,17 +745,17 @@
                 "dtl_mode": "Mode:",
                 "dtl_transport": "Transport Mode:",
                 "global_write_buffer": "Global Write Buffer:",
-                "global_write_buffer_available": "Dedicated Write Buffer space:",
+                "global_write_buffer_available": "Dedicated global Write Buffer space:",
                 "information": "Information about the available space:",
                 "missing_role": "Missing required partition role: __what__",
-                "over_allocation": "Over allocation detected",
+                "no_space_left": "No space left",
+                "over_allocation": "Over-allocation detected",
                 "readcache_size": "Read Cache:",
                 "readcache_size_available": "Dedicated Read Cache space:",
                 "sco_size": "SCO Size:",
                 "shared_available": "Space shared between Read Cache and Global Write Buffer:",
                 "volume": "Volume Information",
-                "volume_write_buffer": "Volume Write Buffer:",
-                "write_buffer_size": "Write Buffer:"
+                "volume_write_buffer": "Volume Write Buffer:"
             },
             "gather_vpool": {
                 "access_key": "Access Key:",
@@ -791,7 +792,6 @@
             "confirm": {
                 "accelerated_backend": "Accelerated Backend:",
                 "basic_info": "Validate the basic vPool information.",
-                "cache_sizing": "Validate whether the required cache sizes are correct.",
                 "configuration": "Validate the configuration settings.",
                 "creating": "creating the vPool",
                 "dtl_transport": "DTL Transport Mode:",
@@ -871,9 +871,9 @@
                 "nosnapshots": "No Snapshots found",
                 "snapshot": "Snapshots",
                 "rollbackstarted": "Rollback started",
-                "inprogressvdisk": "Disk __what__ rollback in progress...",
-                "failedvdisk": "Disk __what__ rollback failed.",
-                "successvdisk": "Disk __what__ rollback successfully."
+                "inprogress": "Disk __what__ rollback in progress...",
+                "failed": "Disk __what__ rollback failed.",
+                "success": "Disk __what__ rollback successfully."
             }
         },
         "clone": {

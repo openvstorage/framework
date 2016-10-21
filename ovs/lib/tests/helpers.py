@@ -17,10 +17,14 @@
 """
 Helper module
 """
+import json
 from ovs.dal.hybrids.backendtype import BackendType
+from ovs.dal.hybrids.disk import Disk
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
+from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.servicetype import ServiceType
@@ -28,7 +32,10 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
-from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient, MockStorageRouterClient
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
+from ovs.lib.storagedriver import StorageDriverController
 
 
 class Helper(object):
@@ -56,7 +63,7 @@ class Helper(object):
         """
         Builds an MDS service structure
         Example:
-            vpools, storagerouters, storagedrivers, services, mds_services, service_type, domains, storagerouter_domains = Helper.build_service_structure(
+            structure = Helper.build_service_structure(
                 {'vpools': [1],
                  'domains': [],
                  'storagerouters': [1],
@@ -65,6 +72,7 @@ class Helper(object):
                  'storagerouter_domains': []}  # (<id>, <storagerouter_id>, <domain_id>)
             )
         """
+        vdisks = {}
         vpools = {}
         domains = {}
         services = {}
@@ -79,6 +87,7 @@ class Helper(object):
         backend_type.name = 'BackendType'
         backend_type.code = 'BT'
         backend_type.save()
+        srclients = {}
         for domain_id in structure.get('domains', []):
             domain = Domain()
             domain.name = 'domain_{0}'.format(domain_id)
@@ -91,6 +100,7 @@ class Helper(object):
             vpool.backend_type = backend_type
             vpool.save()
             vpools[vpool_id] = vpool
+            srclients[vpool_id] = StorageRouterClient(vpool.guid, None)
         for sr_id in structure.get('storagerouters', []):
             storagerouter = StorageRouter()
             storagerouter.name = str(sr_id)
@@ -98,6 +108,24 @@ class Helper(object):
             storagerouter.rdma_capable = False
             storagerouter.save()
             storagerouters[sr_id] = storagerouter
+            disk = Disk()
+            disk.storagerouter = storagerouter
+            disk.state = 'OK'
+            disk.name = '/dev/uda'
+            disk.size = 1 * 1024 ** 4
+            disk.is_ssd = True
+            disk.path = '/dev/uda'
+            disk.save()
+            partition = DiskPartition()
+            partition.offset = 0
+            partition.size = disk.size
+            partition.id = 'unittest_{0}'.format(sr_id)
+            partition.path = '/dev/uda-1'
+            partition.state = 'OK'
+            partition.mountpoint = '/tmp/unittest/sr_{0}/disk_1/partition_1'.format(sr_id)
+            partition.disk = disk
+            partition.roles = [DiskPartition.ROLES.DB, DiskPartition.ROLES.SCRUB]
+            partition.save()
         for sd_id, vpool_id, sr_id in structure.get('storagedrivers', ()):
             storagedriver = StorageDriver()
             storagedriver.vpool = vpools[vpool_id]
@@ -105,7 +133,7 @@ class Helper(object):
             storagedriver.name = str(sd_id)
             storagedriver.mountpoint = '/'
             storagedriver.cluster_ip = storagerouters[sr_id].ip
-            storagedriver.storage_ip = '127.0.0.1'
+            storagedriver.storage_ip = '10.0.1.{0}'.format(sr_id)
             storagedriver.storagedriver_id = str(sd_id)
             storagedriver.ports = {'management': 1,
                                    'xmlrpc': 2,
@@ -113,6 +141,7 @@ class Helper(object):
                                    'edge': 4}
             storagedriver.save()
             storagedrivers[sd_id] = storagedriver
+            Helper._set_vpool_storage_driver_configuration(vpool=vpools[vpool_id], storagedriver=storagedriver)
         for mds_id, sd_id in structure.get('mds_services', ()):
             sd = storagedrivers[sd_id]
             s_id = '{0}-{1}'.format(sd.storagerouter.name, mds_id)
@@ -130,6 +159,25 @@ class Helper(object):
             mds_service.vpool = sd.vpool
             mds_service.save()
             mds_services[mds_id] = mds_service
+            StorageDriverController.add_storagedriverpartition(sd, {'size': None,
+                                                                    'role': DiskPartition.ROLES.DB,
+                                                                    'sub_role': StorageDriverPartition.SUBROLE.MDS,
+                                                                    'partition': sd.storagerouter.disks[0].partitions[0],
+                                                                    'mds_service': mds_service})
+        for vdisk_id, storage_driver_id, vpool_id, mds_id in structure.get('vdisks', ()):
+            vpool = vpools[vpool_id]
+            devicename = 'vdisk_{0}'.format(vdisk_id)
+            mds_backend_config = Helper._generate_mdsmetadatabackendconfig([] if mds_id is None else [mds_services[mds_id]])
+            volume_id = srclients[vpool_id].create_volume(devicename, mds_backend_config, 0, str(storage_driver_id))
+            vdisk = VDisk()
+            vdisk.name = str(vdisk_id)
+            vdisk.devicename = devicename
+            vdisk.volume_id = volume_id
+            vdisk.vpool = vpool
+            vdisk.size = 0
+            vdisk.save()
+            vdisk.reload_client('storagedriver')
+            vdisks[vdisk_id] = vdisk
         for srd_id, sr_id, domain_id, backup in structure.get('storagerouter_domains', ()):
             sr_domain = StorageRouterDomain()
             sr_domain.backup = backup
@@ -137,41 +185,118 @@ class Helper(object):
             sr_domain.storagerouter = storagerouters[sr_id]
             sr_domain.save()
             storagerouter_domains[srd_id] = sr_domain
-        return vpools, storagerouters, storagedrivers, services, mds_services, service_type, domains, storagerouter_domains
+        return {'vdisks': vdisks,
+                'vpools': vpools,
+                'domains': domains,
+                'services': services,
+                'service_type': service_type,
+                'mds_services': mds_services,
+                'storagerouters': storagerouters,
+                'storagedrivers': storagedrivers,
+                'storagerouter_domains': storagerouter_domains}
 
     @staticmethod
-    def create_vdisks_for_mds_service(amount, start_id, mds_service=None, vpool=None):
+    def create_vdisks_for_mds_service(amount, start_id, mds_service=None, storagedriver=None):
         """
         Generates vdisks and appends them to a given mds_service
         """
+        if (mds_service is None and storagedriver is None) or (mds_service is not None and storagedriver is not None):
+            raise RuntimeError('Either `mds_service` or `storagedriver` should be passed')
         vdisks = {}
         storagedriver_id = None
+        vpool = None
+        mds_services = []
         if mds_service is not None:
+            mds_services.append(mds_service)
             for sd in mds_service.vpool.storagedrivers:
                 if sd.storagerouter_guid == mds_service.service.storagerouter_guid:
                     storagedriver_id = sd.storagedriver_id
+                    vpool = sd.vpool
+            if storagedriver_id is None:
+                raise RuntimeError('The given MDSService is located on a node without StorageDriver')
+        else:
+            storagedriver_id = storagedriver.storagedriver_id
+            vpool = storagedriver.vpool
+        srclient = StorageRouterClient(vpool.guid, None)
         for i in xrange(start_id, start_id + amount):
+            devicename = 'vdisk_{0}'.format(i)
+            mds_backend_config = Helper._generate_mdsmetadatabackendconfig(mds_services)
+            volume_id = srclient.create_volume(devicename, mds_backend_config, 0, str(storagedriver_id))
+            if len(mds_services) == 1:
+                MDSClient.set_catchup(mds_services[0], volume_id, 50)
             vdisk = VDisk()
             vdisk.name = str(i)
-            vdisk.devicename = 'vdisk_{0}'.format(i)
-            vdisk.volume_id = 'vdisk_{0}'.format(i)
-            vdisk.vpool = mds_service.vpool if mds_service is not None else vpool
+            vdisk.devicename = devicename
+            vdisk.volume_id = volume_id
+            vdisk.vpool = vpool
             vdisk.size = 0
             vdisk.save()
-            vdisk.reload_clients('storagedriver')
-            if mds_service is not None and mds_service.service.storagerouter_guid is not None:
+            vdisk.reload_client('storagedriver')
+            if mds_service is not None:
                 junction = MDSServiceVDisk()
                 junction.vdisk = vdisk
                 junction.mds_service = mds_service
                 junction.is_master = True
                 junction.save()
-                config = type('MDSNodeConfig', (),
-                              {'address': Helper.generate_nc_function(True, mds_service),
-                               'port': Helper.generate_nc_function(False, mds_service)})()
-                mds_backend_config = type('MDSMetaDataBackendConfig', (),
-                                          {'node_configs': Helper.generate_bc_function([config])})()
-                MockStorageRouterClient.metadata_backend_config[vdisk.vpool_guid]['vdisk_{0}'.format(i)] = mds_backend_config
-                MockMetadataServerClient.catchup['vdisk_{0}'.format(i)] = 50
-                MockStorageRouterClient.vrouter_id[vdisk.vpool_guid]['vdisk_{0}'.format(i)] = storagedriver_id
             vdisks[i] = vdisk
         return vdisks
+
+    @staticmethod
+    def _generate_mdsmetadatabackendconfig(mds_services):
+        """
+        Generates a fake MDSMetaDataBackendConfig
+        """
+        configs = []
+        for mds_service in mds_services:
+            config = type('MDSNodeConfig', (),
+                          {'address': Helper.generate_nc_function(True, mds_service),
+                           'port': Helper.generate_nc_function(False, mds_service)})()
+            configs.append(config)
+        return type('MDSMetaDataBackendConfig', (),
+                    {'node_configs': Helper.generate_bc_function(configs)})()
+
+    @staticmethod
+    def _set_vpool_storage_driver_configuration(vpool, storagedriver):
+        """
+        Mock the vpool configuration
+        :param vpool: vPool to mock the configuration for
+        :type vpool: vPool
+        :param storagedriver: StorageDriver on which the vPool is running
+        :type storagedriver: StorageDriver
+        :return: None
+        """
+        default_config = {'backend_connection_manager': {'local_connection_path': ''},
+                          'content_addressed_cache': {'read_cache_serialization_path': '/var/rsp/{0}'.format(vpool.name)},
+                          'distributed_lock_store': {},
+                          'distributed_transaction_log': {'dtl_path': '',
+                                                          'dtl_transport': 'TCP'},
+                          'event_publisher': {},
+                          'file_driver': {'fd_cache_path': '',
+                                          'fd_namespace': 'fd-{0}-{1}'.format(vpool.name, vpool.guid)},
+                          'filesystem': {'fs_dtl_mode': StorageDriverClient.VOLDRV_DTL_ASYNC,
+                                         'fs_dtl_config_mode': StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE,
+                                         'fs_virtual_disk_format': 'raw'},
+                          'metadata_server': {},
+                          'network_interface': {},
+                          'scocache': {'trigger_gap': '1GB',
+                                       'backoff_gap': '2GB',
+                                       'scocache_mount_points': [{'path': '',
+                                                                  'size': '{0}KiB'.format(20 * 1024 * 1024)}]},
+                          'threadpool_component': {},
+                          'volume_manager': {'metadata_path': '',
+                                             'tlog_path': '',
+                                             'clean_interval': 1,
+                                             'default_cluster_size': 4096,
+                                             'number_of_scos_in_tlog': 16,
+                                             'read_cache_default_mode': StorageDriverClient.VOLDRV_LOCATION_BASED,
+                                             'non_disposable_scos_factor': 2.0,
+                                             'read_cache_default_behaviour': StorageDriverClient.VOLDRV_NO_CACHE},
+                          'volume_registry': {'vregistry_arakoon_cluster_id': 'voldrv',
+                                              'vregistry_arakoon_cluster_nodes': []},
+                          'volume_router': {'vrouter_id': storagedriver.storagedriver_id,
+                                            'vrouter_sco_multiplier': 1024},
+                          'volume_router_cluster': {'vrouter_cluster_id': vpool.guid}}
+
+        key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storagedriver.storagedriver_id)
+        Configuration.set(key, json.dumps(default_config), raw=True)
+        LocalStorageRouterClient.configurations[key] = default_config

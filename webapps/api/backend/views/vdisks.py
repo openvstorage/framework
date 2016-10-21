@@ -85,7 +85,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :param timestamp: Timestamp of the snapshot to rollback to
         """
         return VDiskController.rollback.delay(vdisk_guid=vdisk.guid,
-                                              timestamp=timestamp)
+                                              timestamp=str(timestamp))
 
     @action()
     @required_roles(['read', 'write', 'manage'])

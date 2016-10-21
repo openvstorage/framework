@@ -122,10 +122,15 @@ class ArakoonClusterConfig(object):
         else:
             client = self._load_client(ip)
             contents = client.file_read(self.config_path)
+        self.read_config(contents)
 
+    def read_config(self, contents):
+        """
+        Constructs a configuration object from config contents
+        :param contents: Raw .ini contents
+        """
         parser = RawConfigParser()
         parser.readfp(StringIO(contents))
-
         self.nodes = []
         self._extra_globals = {}
         for key in parser.options('global'):
@@ -666,7 +671,7 @@ class ArakoonInstaller(object):
         :return: None
         """
         if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client):
-            return ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client)
+            return ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client)[0]
         return False
 
     @staticmethod
@@ -869,7 +874,7 @@ class ArakoonInstaller(object):
     @staticmethod
     def unclaim_cluster(cluster_name, master_ip, filesystem, metadata=None):
         """
-        Unlcaims the cluster
+        Un-claims the cluster
         :param cluster_name: Name of the cluster to restart
         :type cluster_name: str
         :param master_ip: IP of one of the cluster nodes
@@ -889,9 +894,15 @@ class ArakoonInstaller(object):
 
     @staticmethod
     def build_client(config):
-        from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonClient, ArakoonClientConfig
+        """
+        Build the ArakoonClient object with all configured nodes in the cluster
+        :param config: Configuration on which to base the client
+        :type config: ArakoonClientConfig
+        :return: The newly generated PyrakoonClient
+        :rtype: PyrakoonClient
+        """
+        from ovs.extensions.db.arakoon.pyrakoon.client import PyrakoonClient
         nodes = {}
         for node in config.nodes:
-            nodes[node.name] = ([str(node.ip)], int(node.client_port))
-        config = ArakoonClientConfig(str(config.cluster_id), nodes)
-        return ArakoonClient(config)
+            nodes[node.name] = ([node.ip], node.client_port)
+        return PyrakoonClient(config.cluster_id, nodes)

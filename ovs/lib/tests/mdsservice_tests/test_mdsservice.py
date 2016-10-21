@@ -23,9 +23,11 @@ from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.hybrids.service import Service
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.tests.mockups import MockMetadataServerClient, MockStorageRouterClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.tests.helpers import Helper
 
@@ -46,8 +48,8 @@ class MDSServices(unittest.TestCase):
         cls.volatile = VolatileFactory.get_client()
         cls.volatile.clean()
 
-        MockStorageRouterClient.clean()
-        MockMetadataServerClient.clean()
+        StorageRouterClient.clean()
+        MDSClient.clean()
 
         Configuration.set('/ovs/framework/logging|path', '/var/log/ovs')
         Configuration.set('/ovs/framework/logging|level', 'DEBUG')
@@ -73,8 +75,9 @@ class MDSServices(unittest.TestCase):
         """
         self.persistent.clean()
         self.volatile.clean()
-        MockStorageRouterClient.clean()
-        MockMetadataServerClient.clean()
+        self.maxDiff = None
+        StorageRouterClient.clean()
+        MDSClient.clean()
 
     def tearDown(self):
         """
@@ -82,8 +85,8 @@ class MDSServices(unittest.TestCase):
         """
         self.persistent.clean()
         self.volatile.clean()
-        MockStorageRouterClient.clean()
-        MockMetadataServerClient.clean()
+        StorageRouterClient.clean()
+        MDSClient.clean()
 
     def _check_reality(self, configs, loads, vdisks, mds_services, display=False):
         """
@@ -136,7 +139,7 @@ class MDSServices(unittest.TestCase):
             * Set capacity to 0  (also implies infinite, but caught in code, otherwise division by 0 error)
                 * Load should ALWAYS return infinite, load_plus should ALWAYS return infinite
         """
-        vpools, storagerouters, storagedrivers, services, mds_services, _, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'domains': [],
              'storagerouters': [1],
@@ -144,7 +147,7 @@ class MDSServices(unittest.TestCase):
              'mds_services': [(1, 1)],  # (<id>, <storagedriver_id>)
              'storagerouter_domains': []}  # (<id>, <storagerouter_id>, <domain_id>)
         )
-        mds_service = mds_services[1]
+        mds_service = structure['mds_services'][1]
         vdisks = Helper.create_vdisks_for_mds_service(amount=2, start_id=1, mds_service=mds_service)
         load, load_plus = MDSServiceController.get_mds_load(mds_service)
         self.assertEqual(load, 20, 'There should be a 20% load. {0}'.format(load))
@@ -189,7 +192,7 @@ class MDSServices(unittest.TestCase):
             * Update capacity for 1 MDS service in vpool1 and validate changes in preferred storage driver config
         """
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
-        vpools, storagerouters, storagedrivers, services, mds_services, _, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1, 2],
              'domains': [1, 2],
              'storagerouters': [1, 2, 3, 4, 5, 6],
@@ -198,6 +201,9 @@ class MDSServices(unittest.TestCase):
              'storagerouter_domains': [(1, 1, 1, False), (2, 1, 2, True), (3, 2, 2, False), (4, 2, 1, True), (5, 3, 1, False), (6, 3, 2, True),
                                        (7, 4, 2, False), (8, 4, 1, True), (9, 5, 1, False), (10, 6, 2, False), (11, 6, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>, <backup>)
         )
+        vpools = structure['vpools']
+        mds_services = structure['mds_services']
+        storagerouters = structure['storagerouters']
         vdisks = {}
         for mds_service in mds_services.itervalues():
             vdisks.update(Helper.create_vdisks_for_mds_service(amount=10, start_id=len(vdisks) + 1, mds_service=mds_service))
@@ -276,13 +282,11 @@ class MDSServices(unittest.TestCase):
             Executes a test run for a given scenario
             """
             for disk_id, mds_ids in scenario.iteritems():
-                configs = []
-                for mds_id in mds_ids:
-                    config = type('MDSNodeConfig', (), {'address': Helper.generate_nc_function(True, mds_services[mds_id]),
-                                                        'port': Helper.generate_nc_function(False, mds_services[mds_id])})()
-                    configs.append(config)
-                mds_backend_config = type('MDSMetaDataBackendConfig', (), {'node_configs': Helper.generate_bc_function(configs)})()
-                MockStorageRouterClient.metadata_backend_config[vpools[1].guid][vdisks[disk_id].volume_id] = mds_backend_config
+                vdisk = vdisks[disk_id]
+                mds_backend_config = Helper._generate_mdsmetadatabackendconfig([mds_services[mds_id] for mds_id in mds_ids])
+                for config in mds_backend_config.node_configs():
+                    MDSClient(config).create_namespace(vdisk.volume_id)
+                vdisk.storagedriver_client.update_metadata_backend_config(vdisk.volume_id, mds_backend_config)
 
             for vdisk_id in vdisks:
                 MDSServiceController.sync_vdisk_to_reality(vdisks[vdisk_id])
@@ -294,7 +298,7 @@ class MDSServices(unittest.TestCase):
                 for junction in disk.mds_services:
                     self.assertIn(junction.mds_service, expected_mds_services)
 
-        vpools, _, _, _, mds_services, _, _, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'domains': [1],
              'storagerouters': [1, 2, 3, 4],
@@ -302,7 +306,10 @@ class MDSServices(unittest.TestCase):
              'mds_services': [(1, 1), (2, 1), (3, 2), (4, 3), (5, 4)],  # (<id>, <storagedriver_id>)
              'storagerouter_domains': [(1, 1, 1, False), (2, 2, 1, False), (3, 3, 1, False), (4, 4, 1, False)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
-        vdisks = Helper.create_vdisks_for_mds_service(amount=5, start_id=1, vpool=vpools[1])
+        storagedrivers = structure['storagedrivers']
+        mds_services = structure['mds_services']
+
+        vdisks = Helper.create_vdisks_for_mds_service(amount=5, start_id=1, storagedriver=storagedrivers[1])
         _test_scenario({1: [1, 3, 4],
                         2: [1, 2],
                         3: [1, 3, 4],
@@ -360,7 +367,7 @@ class MDSServices(unittest.TestCase):
         """
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
         Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, domains, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'domains': [1, 2],
              'storagerouters': [1, 2, 3, 4],
@@ -369,6 +376,12 @@ class MDSServices(unittest.TestCase):
              'storagerouter_domains': [(1, 1, 1, False), (2, 1, 2, True), (3, 2, 1, False), (4, 2, 2, True),
                                        (5, 3, 2, False), (6, 3, 1, True), (7, 4, 2, False), (8, 4, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
+        vpools = structure['vpools']
+        mds_services = structure['mds_services']
+        service_type = structure['service_type']
+        storagedrivers = structure['storagedrivers']
+        storagerouters = structure['storagerouters']
+
         vdisks = {}
         for sr in storagerouters.values():
             Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
@@ -496,15 +509,15 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # If the tlogs are not caught up, nothing should be changed
-        for vdisk_id in [3, 4]:
-            MockMetadataServerClient.catchup[vdisks[vdisk_id].volume_id] = 1000
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[3].volume_id, 1000)
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[4].volume_id, 1000)
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # The next run, after tlogs are caught up, a master switch should be executed
-        for vdisk_id in [3, 4]:
-            MockMetadataServerClient.catchup[vdisks[vdisk_id].volume_id] = 50
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[3].volume_id, 50)
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[4].volume_id, 50)
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.3', 'port': 3}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
@@ -523,7 +536,7 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 6: Validate whether a volume migration makes the master follow
-        MockStorageRouterClient.vrouter_id[vpools[1].guid][vdisks[1].volume_id] = storagedrivers[3].storagedriver_id
+        vdisks[1].storagedriver_client.migrate(vdisks[1].volume_id, storagedrivers[3].storagedriver_id, False)
         configs = [[{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.2', 'port': 5}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
@@ -553,7 +566,7 @@ class MDSServices(unittest.TestCase):
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
         Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
 
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, domains, storagerouter_domains = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'domains': [1, 2, 3],
              'storagerouters': [1, 2, 3, 4, 5, 6, 7],
@@ -563,6 +576,11 @@ class MDSServices(unittest.TestCase):
                                        (5, 3, 1, False), (6, 4, 1, False), (7, 4, 3, True), (8, 5, 2, False),
                                        (9, 5, 3, True), (10, 6, 3, False), (11, 7, 3, False), (12, 7, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
+        domains = structure['domains']
+        mds_services = structure['mds_services']
+        storagerouters = structure['storagerouters']
+        storagerouter_domains = structure['storagerouter_domains']
+
         for sr in storagerouters.values():
             Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 75)
         vdisks = {}
@@ -831,7 +849,7 @@ class MDSServices(unittest.TestCase):
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
         Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
 
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, domains, _ = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'domains': [1, 2],
              'storagerouters': [1, 2, 3, 4],
@@ -840,6 +858,12 @@ class MDSServices(unittest.TestCase):
              'storagerouter_domains': [(1, 1, 1, False), (2, 1, 2, True), (3, 2, 1, False), (4, 2, 2, True),
                                        (5, 3, 2, False), (6, 3, 1, True), (7, 4, 2, False), (8, 4, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
+        vpools = structure['vpools']
+        mds_services = structure['mds_services']
+        service_type = structure['service_type']
+        storagedrivers = structure['storagedrivers']
+        storagerouters = structure['storagerouters']
+
         for sr in storagerouters.values():
             Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 55)
         vdisks = {}
@@ -966,15 +990,15 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # If the tlogs are not caught up, nothing should be changed
-        for vdisk_id in [3, 4]:
-            MockMetadataServerClient.catchup[vdisks[vdisk_id].volume_id] = 1000
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[3].volume_id, 1000)
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[4].volume_id, 1000)
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # The next run, after tlogs are caught up, a master switch should be executed
-        for vdisk_id in [3, 4]:
-            MockMetadataServerClient.catchup[vdisks[vdisk_id].volume_id] = 50
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[3].volume_id, 50)
+        MDSClient.set_catchup('10.0.0.2:5', vdisks[4].volume_id, 50)
         configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.3', 'port': 3}],
@@ -993,7 +1017,7 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Sub-Test 6: Validate whether a volume migration makes the master follow
-        MockStorageRouterClient.vrouter_id[vpools[1].guid][vdisks[1].volume_id] = storagedrivers[3].storagedriver_id
+        vdisks[1].storagedriver_client.migrate(vdisks[1].volume_id, storagedrivers[3].storagedriver_id, False)
         configs = [[{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}],
                    [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
                    [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.3', 'port': 3}],
@@ -1018,7 +1042,7 @@ class MDSServices(unittest.TestCase):
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
         Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
 
-        vpools, storagerouters, storagedrivers, _, mds_services, service_type, domains, storagerouter_domains = Helper.build_service_structure(
+        structure = Helper.build_service_structure(
             {'vpools': [1],
              'domains': [1, 2, 3],
              'storagerouters': [1, 2, 3, 4, 5, 6, 7],
@@ -1028,6 +1052,11 @@ class MDSServices(unittest.TestCase):
                                        (5, 3, 1, False), (6, 4, 1, False), (7, 4, 3, True), (8, 5, 2, False),
                                        (9, 5, 3, True), (10, 6, 3, False), (11, 7, 3, False), (12, 7, 1, True)]}  # (<id>, <storagerouter_id>, <domain_id>)
         )
+        domains = structure['domains']
+        mds_services = structure['mds_services']
+        storagerouters = structure['storagerouters']
+        storagerouter_domains = structure['storagerouter_domains']
+
         for sr in storagerouters.values():
             Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 35)
         vdisks = {}
@@ -1182,3 +1211,129 @@ class MDSServices(unittest.TestCase):
         for vdisk_id in sorted(vdisks):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+
+    def test_role_assignments(self):
+        """
+        Validates whether the role assignment and ex-master behavior is correct:
+        * When a slave is configured as a master, the ex-master should not be immediately recycled as a slave to prevent
+          race conditions in the StorageDriver. It should be left out, and then in a next call be included again.
+        * When an ex-master is recycled, it should be explicitly set to the slave role again
+        """
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
+        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        Configuration.set('/ovs/framework/storagedriver|mds_maxload', 7)
+
+        structure = Helper.build_service_structure(
+            {'vpools': [1],
+             'storagerouters': [1, 2, 3],
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1), (2, 2), (3, 3)]}  # (<id>, <storagedriver_id>)
+        )
+        mds_services = structure['mds_services']
+        storagerouters = structure['storagerouters']
+        storagedrivers = structure['storagedrivers']
+
+        for sr in storagerouters.values():
+            Configuration.set('/ovs/framework/storagedriver|mds_maxload'.format(sr.machine_id), 10)
+        vdisks = Helper.create_vdisks_for_mds_service(amount=1, start_id=1, mds_service=mds_services[1])
+        vdisk = vdisks[1]
+
+        # Sub-Test 1: Validate the start configuration which is simple, each disk has only its default local master
+        # | MDS ID | STORAGEROUTER | VPOOL | CAPACITY | LOAD (in percent) |
+        # |    1   |       1       |   1   |    10    |       10,0        |
+        # |    2   |       2       |   1   |    10    |        0,0        |
+        # |    3   |       3       |   1   |    10    |        0,0        |
+        configs = [[{'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 1, 0, 10, 10.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 0, 0, 10,  0.0],
+                 ['10.0.0.3', 3, 0, 0, 10,  0.0]]
+        self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+
+        # Validate first run. Each disk should now have sufficient nodes, since there are plenty of MDS services available
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.3', 'port': 3}]]
+        loads = [['10.0.0.1', 1, 1, 0, 10, 10.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 0, 1, 10, 10.0],
+                 ['10.0.0.3', 3, 0, 1, 10, 10.0]]
+
+        StorageRouterClient.mds_recording = []
+        MDSServiceController.ensure_safety(vdisk)
+        self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+        self.assertListEqual(StorageRouterClient.mds_recording, [['10.0.0.1:1', '10.0.0.2:2', '10.0.0.3:3']])
+
+        vdisk.storagedriver_client.migrate(vdisk.volume_id, storagedrivers[2].storagedriver_id, False)
+
+        configs = [[{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}]]
+        loads = [['10.0.0.1', 1, 0, 1, 10, 10.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 0, 10, 10.0],
+                 ['10.0.0.3', 3, 0, 1, 10, 10.0]]
+
+        StorageRouterClient.mds_recording = []
+        MDSServiceController.ensure_safety(vdisk)
+        self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+        self.assertListEqual(StorageRouterClient.mds_recording, [['10.0.0.2:2', '10.0.0.3:3'],
+                                                                 ['10.0.0.2:2', '10.0.0.1:1', '10.0.0.3:3']])
+
+        config = vdisk.info['metadata_backend_config']
+        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[0]['ip'], config[0]['port']))._get_role(vdisk.volume_id), MDSClient.MASTER_ROLE)
+        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))._get_role(vdisk.volume_id), MDSClient.SLAVE_ROLE)
+        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))._get_role(vdisk.volume_id), MDSClient.SLAVE_ROLE)
+
+    def test_mds_checkup(self):
+        """
+        Validates the MDS checkup logic: Does it add services when required, does it remove services when required
+        """
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
+        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        Configuration.set('/ovs/framework/storagedriver|mds_maxload', 70)
+        Configuration.set('/ovs/framework/hosts/unittest/ports', {'mds': [10000, 10100]})
+        System._machine_id = 'unittest'
+
+        structure = Helper.build_service_structure(
+            {'vpools': [1],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1)]}  # (<id>, <storagedriver_id>)
+        )
+        mds_service = structure['mds_services'][1]
+        vpool = structure['vpools'][1]
+
+        mds_service.capacity = 10
+        mds_service.save()
+
+        MDSServiceController.mds_checkup()
+        self.assertEqual(len(vpool.mds_services), 1)
+        self.assertEqual(MDSServiceController.get_mds_load(mds_service), (0, 10))
+
+        Helper.create_vdisks_for_mds_service(amount=8, start_id=1, mds_service=mds_service)
+        MDSServiceController.mds_checkup()
+        self.assertEqual(len(vpool.mds_services), 2)
+        mds_service2 = [mdss for mdss in vpool.mds_services if mdss.guid != mds_service.guid][0]
+        self.assertEqual(MDSServiceController.get_mds_load(mds_service), (80, 90))
+        self.assertEqual(MDSServiceController.get_mds_load(mds_service2), (8, 9))
+
+        config = StorageDriverConfiguration('storagedriver', vpool.guid, vpool.storagedrivers[0].storagedriver_id)
+        contents = LocalStorageRouterClient.configurations[config.key]
+        mds_nodes = contents.get('metadata_server', {}).get('mds_nodes', [])
+        mds_nodes.sort(key=lambda i: i['port'])
+        self.assertEqual(len(mds_nodes), 2)
+        self.assertDictEqual(mds_nodes[0], {'host': '10.0.0.1',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_1',
+                                            'port': 1,
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_1'})
+        self.assertDictEqual(mds_nodes[1], {'host': '10.0.0.1',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2',
+                                            'port': 10000,
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2'})
+
+        mds_service.capacity = 0
+        mds_service.save()
+        MDSServiceController.mds_checkup()  # Migrate disks away
+        MDSServiceController.mds_checkup()  # Remove obsolete MDS
+
+        contents = LocalStorageRouterClient.configurations[config.key]
+        mds_nodes = contents.get('metadata_server', {}).get('mds_nodes', [])
+        self.assertEqual(len(mds_nodes), 1)
+        self.assertDictEqual(mds_nodes[0], {'host': '10.0.0.1',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2',
+                                            'port': 10000,
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2'})
