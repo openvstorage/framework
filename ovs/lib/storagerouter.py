@@ -308,6 +308,10 @@ class StorageRouterController(object):
                     raise RuntimeError('A Storage Driver is already linked to this Storage Router for this vPool: {0}'.format(vpool_name))
             all_storagerouters += [sd.storagerouter for sd in vpool.storagedrivers]
 
+        # Check mountpoint
+        if not StorageRouterController.check_mtpt(vpool_name):
+            raise RuntimeError('The mountpoint for vPool {0} already exists'.format(vpool_name))
+
         # Check storagerouter connectivity
         ip_client_map = {}
         offline_nodes_detected = False
