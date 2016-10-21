@@ -18,8 +18,6 @@
 Module for UpdateController
 """
 
-import os
-import json
 import subprocess
 from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.filemutex import NoLockAvailableException
@@ -28,7 +26,6 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.migration.migrator import Migrator
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
-from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 

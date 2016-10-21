@@ -41,15 +41,15 @@ function show_help {
     echo "    - ovs update volumedriver         Update volumedriver components on all nodes in cluster"
     echo ""
     echo "  * Remove options:"
-    echo "    - ovs remove nodes <ips>          Remove nodes from cluster (comma separated list of IPs)"
+    echo "    - ovs remove node <ip>            Remove node from cluster"
     echo ""
     echo "  * Monitor options:"
     echo "    - ovs monitor services            Watch Open vStorage services"
     echo "    - ovs monitor heartbeat           Send an internal heartbeat"
     echo ""
     echo "  * Services options:"
-    echo "    - ovs stop framework [ip|all]     Stop Open vStorage Framework services on this node, on all nodes, or on the given ip"
-    echo "    - ovs start framework [ip|all]    Start Open vStorage Framework services on this node, on all nodes, or on the given ip"
+    echo "    - ovs stop framework <ip|all>     Stop Open vStorage Framework services on this node, on all nodes, or on the given ip"
+    echo "    - ovs start framework <ip|all>    Start Open vStorage Framework services on this node, on all nodes, or on the given ip"
     echo ""
     echo "  * Unit tests:"
     echo "    - ovs unittest                    Execute all unittests"
@@ -93,8 +93,8 @@ elif [ "$1" = "update" ] ; then
         show_help
     fi
 elif [ "$1" = "remove" ] ; then
-    if [ "$2" = "nodes" ] ; then
-        python -c "from ovs.lib.setup import SetupController; SetupController.remove_nodes('$3', '$4')"
+    if [ "$2" = "node" ] ; then
+        python -c "from ovs.lib.setup import SetupController; SetupController.remove_node('$3', '$4')"
     else
         show_help
     fi
@@ -158,7 +158,6 @@ elif [ "$1" = "collect" ] ; then
         rm -f ${LOGFILE}.gz
         touch ${LOGFILE}
         tar uvf ${LOGFILE} /var/log/arakoon* > /dev/null 2>&1
-        tar uvf ${LOGFILE} /var/log/logstash* > /dev/null 2>&1
         tar uvf ${LOGFILE} /var/log/nginx* > /dev/null 2>&1
         tar uvf ${LOGFILE} /var/log/ovs* > /dev/null 2>&1
         tar uvf ${LOGFILE} /var/log/rabbitmq* > /dev/null 2>&1
@@ -200,13 +199,13 @@ with open('$TEMP', 'w') as f:
     else:
         f.write('')
 """
-          ${EDITOR:=nano} $TEMP
+          ${EDITOR:=nano} ${TEMP}
           python -c """
 from ovs.extensions.generic.configuration import Configuration
 with open('$TEMP', 'r') as f:
     Configuration.set('$3', f.read(), raw=True)
 """
-          rm -f $TEMP
+          rm -f ${TEMP}
         else
             show_help
         fi

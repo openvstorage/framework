@@ -138,36 +138,8 @@ class Upstart(object):
         :type client: SSHClient
         :return: None
         """
-        # remove upstart.conf file
         name = Upstart._get_name(name, client)
         client.file_delete('/etc/init/{0}.conf'.format(name))
-        client.file_delete('/etc/init/{0}.override'.format(name))
-
-    @staticmethod
-    def disable_service(name, client):
-        """
-        Disable a service
-        :param name: Name of the service to disable
-        :type name: str
-        :param client: Client on which to disable the service
-        :type client: SSHClient
-        :return: None
-        """
-        name = Upstart._get_name(name, client)
-        client.run('echo "manual" > /etc/init/{0}.override'.format(name))
-
-    @staticmethod
-    def enable_service(name, client):
-        """
-        Enable a service
-        :param name: Name of the service to enable
-        :type name: str
-        :param client: Client on which to enable the service
-        :type client: SSHClient
-        :return: None
-        """
-        name = Upstart._get_name(name, client)
-        client.file_delete('/etc/init/{0}.override'.format(name))
 
     @staticmethod
     def start_service(name, client):
@@ -269,22 +241,6 @@ class Upstart(object):
             return False
 
     @staticmethod
-    def is_enabled(name, client):
-        """
-        Verify whether a service is enabled
-        :param name: Name of the service to verify if enabled
-        :type name: str
-        :param client: Client on which to verify whether the service is enabled
-        :type client: SSHClient
-        :return: Whether the service is enabled
-        :rtype: bool
-        """
-        name = Upstart._get_name(name, client)
-        if client.file_exists('/etc/init/{0}.override'.format(name)):
-            return False
-        return True
-
-    @staticmethod
     def get_service_pid(name, client):
         """
         Retrieve the PID of a service
@@ -314,7 +270,7 @@ class Upstart(object):
     @staticmethod
     def send_signal(name, signal, client):
         """
-        Remove a service
+        Send a signal to a service
         :param name: Name of the service to send a signal
         :type name: str
         :param signal: Signal to pass on to the service

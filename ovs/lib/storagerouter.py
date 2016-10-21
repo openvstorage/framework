@@ -506,7 +506,6 @@ class StorageRouterController(object):
         watcher_volumedriver_service = 'watcher-volumedriver'
         if not ServiceManager.has_service(watcher_volumedriver_service, client=root_client):
             ServiceManager.add_service(watcher_volumedriver_service, client=root_client)
-            ServiceManager.enable_service(watcher_volumedriver_service, client=root_client)
             ServiceManager.start_service(watcher_volumedriver_service, client=root_client)
 
         local_backend_data = {}
@@ -913,7 +912,6 @@ class StorageRouterController(object):
         # Start service
         storagedriver = StorageDriver(storagedriver.guid)
         current_startup_counter = storagedriver.startup_counter
-        ServiceManager.enable_service(voldrv_service, client=root_client)
         ServiceManager.start_service(voldrv_service, client=root_client)
         tries = 60
         while storagedriver.startup_counter == current_startup_counter and tries > 0:
@@ -997,7 +995,6 @@ class StorageRouterController(object):
             raise ValueError('VPool should be in {0} status'.format(VPool.STATUSES.RUNNING))
 
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Checking availability of related Storage Routers'.format(storage_driver.guid, storage_driver.name))
-        has_rdma = Configuration.get('/ovs/framework/rdma')
         client = None
         temp_client = None
         errors_found = False
@@ -1108,8 +1105,6 @@ class StorageRouterController(object):
             for service in [voldrv_service, dtl_service]:
                 try:
                     if ServiceManager.has_service(service, client=client):
-                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Disabling service {1}'.format(storage_driver.guid, service))
-                        ServiceManager.disable_service(service, client=client)
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Stopping service {1}'.format(storage_driver.guid, service))
                         ServiceManager.stop_service(service, client=client)
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service))
@@ -1377,7 +1372,6 @@ class StorageRouterController(object):
             if enable is True:
                 if not ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
                     ServiceManager.add_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-                    ServiceManager.enable_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
                 ServiceManager.restart_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
             else:
                 if ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):

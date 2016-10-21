@@ -635,7 +635,7 @@ class DataObject(object):
             for prop in self._properties:
                 if prop.unique is True:
                     if prop.property_type not in [str, int, float, long]:
-                        raise NotImplementedError('A unique constraint can only be set on field of type str, int, float, or long')
+                        raise RuntimeError('A unique constraint can only be set on field of type str, int, float, or long')
                     if self._new is False and prop.name in changed_fields:
                         key = unique_key.format(prop.name, hashlib.sha1(str(store_data[prop.name])).hexdigest())
                         self._persistent.assert_value(key, self._key, transaction=transaction)
@@ -776,7 +776,7 @@ class DataObject(object):
             for prop in self._properties:
                 if prop.unique is True:
                     if prop.property_type not in [str, int, float, long]:
-                        raise NotImplementedError('A unique constraint can only be set on field of type str, int, float, or long')
+                        raise RuntimeError('A unique constraint can only be set on field of type str, int, float, or long')
                     key = unique_key.format(prop.name, hashlib.sha1(str(store_data[prop.name])).hexdigest())
                     self._persistent.assert_value(key, self._key, transaction=transaction)
                     self._persistent.delete(key, transaction=transaction)
