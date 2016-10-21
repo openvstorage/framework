@@ -133,12 +133,13 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
             <div class="form-group" data-bind="visible: data.useAA() && data.albaAABackend() !== undefined">
                 <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.alba_preset"></label>
-                <div class="col-lg-7">
+                <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('preset') }">
                     <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaAAPreset() === undefined)"></span>
                     <span data-bind="visible: (data.vPoolAdd() === true || data.albaAAPreset() !== undefined),
                                      dropdown: {
                                          key: 'name', keyisfunction: false,
                                          items: data.enhancedAAPresets, target: data.albaAAPreset,
+                                         emptyisloading: false,
                                          text: function(item) {
                                              var policies = [];
                                              if (item !== undefined) {

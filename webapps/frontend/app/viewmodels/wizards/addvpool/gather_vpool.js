@@ -122,6 +122,10 @@ define([
                     valid = false;
                     reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.choose_backend'));
                     fields.push('backend');
+                } else if (self.data.albaPreset() === undefined) {
+                    valid = false;
+                    reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.choose_preset'));
+                    fields.push('preset');
                 }
                 if (self.invalidAlbaInfo() && !self.data.localHost()) {
                     valid = false;
