@@ -71,7 +71,7 @@ define([
                 if (self.data.albaAABackend() === undefined) {
                     reasons.push($.t('ovs:wizards.add_vpool.gather_backend.choose_backend'));
                     fields.push('backend');
-                } else if (self.data.albaPreset() === undefined) {
+                } else if (self.data.albaAAPreset() === undefined) {
                     reasons.push($.t('ovs:wizards.add_vpool.gather_backend.choose_preset'));
                     fields.push('preset');
                 }
