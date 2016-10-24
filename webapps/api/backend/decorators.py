@@ -78,8 +78,10 @@ def required_roles(roles):
                                              error='invalid_roles')
             return f(*args, **kw)
 
+        new_function.__doc__ = f.__doc__
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
+        new_function.ovs_metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         return new_function
     return wrap
 
@@ -94,6 +96,20 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
         """
         Wrapper function
         """
+
+        function_info = inspect.getargspec(f)
+        if function_info.defaults is None:
+            mandatory_vars = function_info.args[1:]
+            optional_vars = []
+        else:
+            mandatory_vars = function_info.args[1:-len(function_info.defaults)]
+            optional_vars = function_info.args[len(mandatory_vars) + 1:]
+        metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
+        metadata['load'] = {'mandatory': mandatory_vars,
+                            'optional': optional_vars,
+                            'object_type': object_type}
+        f.ovs_metadata = metadata
+
         def _try_parse(value):
             """
             Tries to parse a value to a pythonic value
@@ -117,21 +133,14 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             new_kwargs = {}
             validation_new_kwargs = {}
             # Find out the arguments of the decorated function
-            function_info = inspect.getargspec(f)
-            if function_info.defaults is None:
-                mandatory_vars = function_info.args[1:]
-                optional_vars = []
-            else:
-                mandatory_vars = function_info.args[1:-len(function_info.defaults)]
-                optional_vars = function_info.args[len(mandatory_vars) + 1:]
             if validator is not None:
-                function_info = inspect.getargspec(validator)
-                if function_info.defaults is None:
-                    validation_mandatory_vars = function_info.args[1:]
+                f_info = inspect.getargspec(validator)
+                if f_info.defaults is None:
+                    validation_mandatory_vars = f_info.args[1:]
                     validation_optional_vars = []
                 else:
-                    validation_mandatory_vars = function_info.args[1:-len(function_info.defaults)]
-                    validation_optional_vars = function_info.args[len(validation_mandatory_vars) + 1:]
+                    validation_mandatory_vars = f_info.args[1:-len(f_info.defaults)]
+                    validation_optional_vars = f_info.args[len(validation_mandatory_vars) + 1:]
             else:
                 validation_mandatory_vars = []
                 validation_optional_vars = []
@@ -157,7 +166,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                     raise HttpNotFoundException(error_description='The requested object could not be found',
                                                 error='object_not_found')
             # Build new kwargs
-            for _mandatory_vars, _optional_vars, _new_kwargs in [(mandatory_vars, optional_vars, new_kwargs),
+            for _mandatory_vars, _optional_vars, _new_kwargs in [(f.ovs_metadata['load']['mandatory'], f.ovs_metadata['load']['optional'], new_kwargs),
                                                                  (validation_mandatory_vars, validation_optional_vars, validation_new_kwargs)]:
                 if 'version' in _mandatory_vars:
                     _new_kwargs['version'] = version
@@ -203,8 +212,10 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             # Call the function
             return f(args[0], **new_kwargs)
 
+        new_function.__doc__ = f.__doc__
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
+        new_function.ovs_metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         return new_function
     return wrap
 
@@ -257,7 +268,7 @@ def return_list(object_type, default_sort=None):
 
             # 5. Paging
             total_items = len(data_list)
-            page_metadata = {'total_items': total_items,
+            pageovs_metadata = {'total_items': total_items,
                              'current_page': 1,
                              'max_page': 1,
                              'page_size': page_size,
@@ -274,7 +285,7 @@ def return_list(object_type, default_sort=None):
                     start_number = (page - 1) * page_size  # Index - e.g. 0 for page 1, 10 for page 2
                     end_number = start_number + page_size  # Index - e.g. 10 for page 1, 20 for page 2
                 data_list = data_list[start_number: end_number]
-                page_metadata = dict(page_metadata.items() + {'current_page': max(1, page),
+                pageovs_metadata = dict(pageovs_metadata.items() + {'current_page': max(1, page),
                                                               'max_page': max(1, max_page),
                                                               'start_number': start_number + 1,
                                                               'end_number': min(total_items, end_number)}.items())
@@ -290,15 +301,17 @@ def return_list(object_type, default_sort=None):
                 data = data_list
 
             result = {'data': data,
-                      '_paging': page_metadata,
+                      '_paging': pageovs_metadata,
                       '_contents': contents,
                       '_sorting': [s for s in reversed(sort)] if sort else sort}
 
             # 7. Building response
             return Response(result, status=status.HTTP_200_OK)
 
+        new_function.__doc__ = f.__doc__
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
+        new_function.ovs_metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         return new_function
     return wrap
 
@@ -325,8 +338,10 @@ def return_object(object_type):
             obj = f(*args, **kwargs)
             return Response(FullSerializer(object_type, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
 
+        new_function.__doc__ = f.__doc__
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
+        new_function.ovs_metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         return new_function
     return wrap
 
@@ -346,8 +361,10 @@ def return_task():
             task = f(*args, **kwargs)
             return Response(task.id, status=status.HTTP_200_OK)
 
+        new_function.__doc__ = f.__doc__
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
+        new_function.ovs_metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         return new_function
     return wrap
 
@@ -369,8 +386,10 @@ def return_plain():
             result = f(*args, **kwargs)
             return Response(result, status=status.HTTP_200_OK)
 
+        new_function.__doc__ = f.__doc__
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
+        new_function.ovs_metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         return new_function
 
     return wrap
@@ -420,8 +439,10 @@ def limit(amount, per, timeout):
                 client.set(key, rate_info)
             return f(*args, **kwargs)
 
+        new_function.__doc__ = f.__doc__
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
+        new_function.ovs_metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         return new_function
     return wrap
 
@@ -468,8 +489,10 @@ def log(log_slow=True):
                 logger.warning('API call {0}.{1} took {2}s'.format(f.__module__, f.__name__, round(duration, 2)))
             return return_value
 
+        new_function.__doc__ = f.__doc__
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
+        new_function.ovs_metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         return new_function
 
     return wrap

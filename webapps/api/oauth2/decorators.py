@@ -38,7 +38,7 @@ def _find_request(args):
             return item
 
 
-def auto_response():
+def auto_response(beautify=False):
     """
     Json response wrapper
     """
@@ -54,7 +54,11 @@ def auto_response():
             if isinstance(results, HttpResponse):
                 return results
             if isinstance(results, dict):
-                return HttpResponse(json.dumps(results), content_type='application/json')
+                if beautify is True:
+                    data = json.dumps(results, indent=4, sort_keys=True)
+                else:
+                    data = json.dumps(results)
+                return HttpResponse(data, content_type='application/json')
             return HttpResponse(results)
 
         new_function.__name__ = f.__name__
