@@ -227,7 +227,7 @@ define([
                         self.checkMtptHandle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/check_mtpt', { data: postData })
                             .then(self.shared.tasks.wait)
                             .done(function(data) {
-                                if (!data) {
+                                if (data === true) {
                                     validationResult.valid = false;
                                     validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.mtpt_in_use', { what: self.data.name() }));
                                     validationResult.fields.push('name');

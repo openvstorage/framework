@@ -309,7 +309,7 @@ class StorageRouterController(object):
             all_storagerouters += [sd.storagerouter for sd in vpool.storagedrivers]
 
         # Check mountpoint
-        if not StorageRouterController.check_mtpt(vpool_name):
+        if StorageRouterController.mountpoint_exists(name=vpool_name, storagerouter_guid=storagerouter.guid):
             raise RuntimeError('The mountpoint for vPool {0} already exists'.format(vpool_name))
 
         # Check storagerouter connectivity
@@ -414,7 +414,7 @@ class StorageRouterController(object):
                 ovs_client = OVSClient(ip=connection_info['host'],
                                        port=connection_info['port'],
                                        credentials=(connection_info['client_id'], connection_info['client_secret']),
-                                       version=1)
+                                       version=2)
                 backend_dict = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': 'name,usages,presets'})
                 preset_info = dict((preset['name'], preset) for preset in backend_dict['presets'])
                 if preset_name not in preset_info:
@@ -1041,7 +1041,7 @@ class StorageRouterController(object):
             raise RuntimeError('Could not found any responsive node in the cluster')
 
         storage_driver.invalidate_dynamics('vdisks_guids')
-        if len(storage_driver.vdisks_guids) > 0:
+        if len(storage_driver.vdisks_guids) > 0 and storage_router_online is True:
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
 
         if storage_drivers_left and len(available_storage_drivers) == 0:
@@ -1411,17 +1411,19 @@ class StorageRouterController(object):
             return False
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.check_mtpt')
-    def check_mtpt(name):
+    @celery.task(name='ovs.storagerouter.mountpoint_exists')
+    def mountpoint_exists(name, storagerouter_guid):
         """
-        Checks whether a given mountpoint for vPool is in use
+        Checks whether a given mountpoint for a vPool exists
         :param name: Name of the mountpoint to check
         :type name: str
+        :param storagerouter_guid: Guid of the StorageRouter on which to check for mountpoint existence
+        :type storagerouter_guid: str
         :return: True if mountpoint not in use else False
         :rtype: bool
         """
-        mountpoint = '/mnt/{0}'.format(name)
-        return not os.path.exists(mountpoint)
+        client = SSHClient(StorageRouter(storagerouter_guid))
+        return client.dir_exists(directory='/mnt/{0}'.format(name))
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_update_status')

@@ -30,7 +30,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import add_hooks, ensure_single, log
@@ -132,10 +132,13 @@ class StorageDriverController(object):
         """
         _ = complete_removal
         service_name = 'watcher-volumedriver'
-        client = SSHClient(endpoint=cluster_ip, username='root')
-        if ServiceManager.has_service(name=service_name, client=client):
-            ServiceManager.stop_service(name=service_name, client=client)
-            ServiceManager.remove_service(name=service_name, client=client)
+        try:
+            client = SSHClient(endpoint=cluster_ip, username='root')
+            if ServiceManager.has_service(name=service_name, client=client):
+                ServiceManager.stop_service(name=service_name, client=client)
+                ServiceManager.remove_service(name=service_name, client=client)
+        except UnableToConnectException:
+            pass
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=Schedule(minute='15', hour='*'))

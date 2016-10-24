@@ -646,7 +646,7 @@ class SetupController(object):
             raise RuntimeError('Could not connect to any master node in the cluster')
 
         storage_router_to_remove.invalidate_dynamics('vdisks_guids')
-        if len(storage_router_to_remove.vdisks_guids) > 0:
+        if len(storage_router_to_remove.vdisks_guids) > 0:  # vDisks are supposed to be moved away manually before removing a node
             raise RuntimeError("Still vDisks attached to Storage Router {0}".format(storage_router_to_remove.name))
 
         internal_memcached = SetupController._is_internally_managed(service='memcached')
@@ -669,19 +669,20 @@ class SetupController(object):
         #################
         # CONFIRMATIONS #
         #################
-        client = SSHClient(endpoint=storage_router_to_remove, username='root')
         interactive = silent != '--force-yes'
         remove_asd_manager = not interactive  # Remove ASD manager if non-interactive else ask
         if interactive is True:
-            proceed = Interactive.ask_yesno(message='Are you sure?', default_value=False)
+            proceed = Interactive.ask_yesno(message='Are you sure you want to remove node {0}?'.format(storage_router_to_remove.name), default_value=False)
             if proceed is False:
                 SetupController._log(messages='Abort removal', title=True)
                 sys.exit(1)
 
-            if ServiceManager.has_service(name='asd-manager', client=client):
-                remove_asd_manager = Interactive.ask_yesno(message='Do you also want to remove the ASD manager and related ASDs?', default_value=False)
+            if storage_router_to_remove_online is True:
+                client = SSHClient(endpoint=storage_router_to_remove, username='root')
+                if ServiceManager.has_service(name='asd-manager', client=client):
+                    remove_asd_manager = Interactive.ask_yesno(message='Do you also want to remove the ASD manager and related ASDs?', default_value=False)
 
-            if remove_asd_manager is True:
+            if remove_asd_manager is True or storage_router_to_remove_online is False:
                 for function in Toolbox.fetch_hooks('setup', 'validate_asd_removal'):
                     validation_output = function(storage_router_to_remove.ip)
                     if validation_output['confirm'] is True:
@@ -731,23 +732,24 @@ class SetupController(object):
 
             # Stop / remove services
             SetupController._log(messages='    Stopping and removing services')
-            client = SSHClient(endpoint=storage_router_to_remove, username='root')
-            SetupController._remove_services(client=client, node_type=storage_router_to_remove.node_type.lower())
-
             config_store = Configuration.get_store()
-            if config_store == 'etcd':
-                from ovs.extensions.db.etcd.installer import EtcdInstaller
+            if storage_router_to_remove_online is True:
+                client = SSHClient(endpoint=storage_router_to_remove, username='root')
+                SetupController._remove_services(client=client, node_type=storage_router_to_remove.node_type.lower())
 
-                if Configuration.get(key='/ovs/framework/external_config') is None:
-                    SetupController._log(messages='      Removing Etcd cluster')
-                    try:
-                        EtcdInstaller.stop('config', client)
-                        EtcdInstaller.remove('config', client)
-                    except Exception as ex:
-                        SetupController._log(messages=['\nFailed to unconfigure Etcd', ex], loglevel='exception')
+                if config_store == 'etcd':
+                    from ovs.extensions.db.etcd.installer import EtcdInstaller
 
-                SetupController._log(messages='      Removing Etcd proxy')
-                EtcdInstaller.remove_proxy('config', client.ip)
+                    if Configuration.get(key='/ovs/framework/external_config') is None:
+                        SetupController._log(messages='      Removing Etcd cluster')
+                        try:
+                            EtcdInstaller.stop('config', client)
+                            EtcdInstaller.remove('config', client)
+                        except Exception as ex:
+                            SetupController._log(messages=['\nFailed to unconfigure Etcd', ex], loglevel='exception')
+
+                    SetupController._log(messages='      Removing Etcd proxy')
+                    EtcdInstaller.remove_proxy('config', client.ip)
 
             # Clean up model
             SetupController._log(messages='    Removing node from model')
@@ -760,7 +762,6 @@ class SetupController(object):
                 disk.delete()
             for j_domain in storage_router_to_remove.domains:
                 j_domain.delete()
-            storage_router_to_remove.delete()
             Configuration.delete('/ovs/framework/hosts/{0}'.format(storage_router_to_remove.machine_id))
 
             master_ips = [sr.ip for sr in storage_router_masters]
@@ -768,9 +769,12 @@ class SetupController(object):
             offline_node_ips = [node.ip for node in storage_routers_offline]
             SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map, offline_node_ips)
 
-            if config_store == 'arakoon':
-                client.file_delete(filenames=[ArakoonConfiguration.CACC_LOCATION])
-            client.file_delete(filenames=[Configuration.BOOTSTRAP_CONFIG_LOCATION])
+            if storage_router_to_remove_online is True:
+                client = SSHClient(endpoint=storage_router_to_remove, username='root')
+                if config_store == 'arakoon':
+                    client.file_delete(filenames=[ArakoonConfiguration.CACC_LOCATION])
+                client.file_delete(filenames=[Configuration.BOOTSTRAP_CONFIG_LOCATION])
+            storage_router_to_remove.delete()
             SetupController._log(messages='    Successfully removed node\n')
         except Exception as exception:
             SetupController._log(messages='\n')
@@ -782,7 +786,7 @@ class SetupController(object):
             sys.exit(1)
 
         if remove_asd_manager is True:
-            SetupController._log(messages='\nASD Manager removal will now be launched.\n')
+            SetupController._log(messages='\nRemoving ASD Manager')
             with remote(storage_router_to_remove.ip, [os]) as rem:
                 rem.os.system('asd-manager remove --force-yes')
         SetupController._log(messages='Remove nodes finished', title=True)
