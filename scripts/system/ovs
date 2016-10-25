@@ -54,7 +54,7 @@ function show_help {
     echo "  * Unit tests:"
     echo "    - ovs unittest                    Execute all unittests"
     echo "    - ovs unittest list               List all unittests"
-    echo "    - ovs unittest [filepath]         Run the unittests in <filepath>"
+    echo "    - ovs unittest <filepath>         Run the unittests in <filepath>"
     echo ""
     echo "  * Configuration editing:"
     echo "    - ovs config edit some/key        Opens the contents of 'some/key' in your EDITOR, and updates it after editing"
