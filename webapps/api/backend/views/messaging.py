@@ -34,6 +34,7 @@ class MessagingViewSet(viewsets.ViewSet):
     permission_classes = (IsAuthenticated,)
     prefix = r'messages'
     base_name = 'messages'
+    skip_spec = True
 
     @log()
     @required_roles(['read'])

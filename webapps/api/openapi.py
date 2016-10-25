@@ -52,7 +52,7 @@ class OpenAPIView(View):
             version = settings.VERSION[-1]
             data = {'swagger': '2.0',
                     'info': {'title': 'Open vStorage',
-                             'description': 'The Open vStorage API',
+                             'description': 'The Open vStorage API.',
                              'version': str(version)},
                     'basePath': '/api',
                     'schemes': ['https'],
@@ -64,9 +64,9 @@ class OpenAPIView(View):
                                                                   'schema': {'type': 'object',
                                                                              'title': 'APIMetadata',
                                                                              'properties': {'authenticated': {'type': 'boolean',
-                                                                                                              'description': 'Indicates whether the client is authenticated'},
+                                                                                                              'description': 'Indicates whether the client is authenticated.'},
                                                                                             'authentication_state': {'type': 'string',
-                                                                                                                     'description': 'Povides more information on the "authenticated" state of a client',
+                                                                                                                     'description': 'Povides more information on the "authenticated" state of a client.',
                                                                                                                      'enum': ['unauthenticated',
                                                                                                                               'invalid_authorization_type',
                                                                                                                               'invalid_token',
@@ -76,38 +76,38 @@ class OpenAPIView(View):
                                                                                                                               'unexpected_exception']},
                                                                                             'authentication_metadata': {'type': 'object',
                                                                                                                         'title': 'AuthenticationMetadata',
-                                                                                                                        'description': 'Contains information on the usage of an optional 3rd party OAuth2.0 authentication service',
+                                                                                                                        'description': 'Contains information on the usage of an optional 3rd party OAuth2.0 authentication service.',
                                                                                                                         'properties': {'ip': {'type': 'string',
-                                                                                                                                              'description': 'The IP address of the current node'},
+                                                                                                                                              'description': 'The IP address of the current node.'},
                                                                                                                                        'mode': {'type': 'string',
-                                                                                                                                                'description': 'Indicates wheter the "local" or a "remote" authentication endpoint should be used',
+                                                                                                                                                'description': 'Indicates wheter the "local" or a "remote" authentication endpoint should be used.',
                                                                                                                                                 'enum': ['local',
                                                                                                                                                          'remote']},
                                                                                                                                        'authorize_uri': {'type': 'string',
-                                                                                                                                                         'description': 'The URI to which the user has to be redirect to authenticate'},
+                                                                                                                                                         'description': 'The URI to which the user has to be redirect to authenticate.'},
                                                                                                                                        'client_id': {'type': 'string',
-                                                                                                                                                     'description': 'The client identifier to be used when authenticating'},
+                                                                                                                                                     'description': 'The client identifier to be used when authenticating.'},
                                                                                                                                        'scope': {'type': 'string',
-                                                                                                                                                 'description': 'The scope that has to be requested to the authentication endpoint'}},
+                                                                                                                                                 'description': 'The scope that has to be requested to the authentication endpoint.'}},
                                                                                                                         'required': []},
                                                                                             'username': {'type': 'string',
-                                                                                                         'description': 'The username of the client or null if not available'},
+                                                                                                         'description': 'The username of the client or null if not available.'},
                                                                                             'userguid': {'type': 'string',
-                                                                                                         'description': 'The GUID (primary key) of the client\'s user or null if not available'},
+                                                                                                         'description': 'The GUID (primary key) of the client\'s user or null if not available.'},
                                                                                             'roles': {'type': 'array',
-                                                                                                      'description': 'An array of the scopes that were granted to the client',
+                                                                                                      'description': 'An array of the scopes that were granted to the client.',
                                                                                                       'items': {'type': 'string'}},
                                                                                             'identification': {'type': 'object',
                                                                                                                'title': 'APIIdentification',
-                                                                                                               'description': 'Contains identification information about the API/environment',
+                                                                                                               'description': 'Contains identification information about the API/environment.',
                                                                                                                'properties': {'cluster_id': {'type': 'string',
-                                                                                                                                             'description': 'Environment identification string'}},
+                                                                                                                                             'description': 'Environment identification string.'}},
                                                                                                                'required': ['cluster_id']},
                                                                                             'storagerouter_ips': {'type': 'array',
-                                                                                                                  'description': 'An array containing the IP addresses of all StorageRouters in the environment',
+                                                                                                                  'description': 'An array containing the IP addresses of all StorageRouters in the environment.',
                                                                                                                   'items': {'type': 'string'}},
                                                                                             'versions': {'type': 'array',
-                                                                                                         'description': 'An array of all versions that this instance of the API supports',
+                                                                                                         'description': 'An array of all versions that this instance of the API supports.',
                                                                                                          'items': {'type': 'integer'}},
                                                                                             'plugins': {}},
                                                                              'required': ['authenticated',
@@ -145,19 +145,20 @@ class OpenAPIView(View):
             data['paths']['/']['get']['responses']['200']['schema']['properties']['plugins'] = {
                 'type': 'object',
                 'title': 'PluginMetadata',
-                'description': 'Contains information about plugins active in the system. Each property represents a plugin and the area where they provide functionality',
+                'description': 'Contains information about plugins active in the system. Each property represents a plugin and the area where they provide functionality.',
                 'properties': {plugin: {'type': 'array',
-                                        'description': 'An array of all areas the plugin provides functionality',
+                                        'description': 'An array of all areas the plugin provides functionality.',
                                         'items': {'type': 'string'}} for (plugin, info) in plugins.iteritems()},
                 'required': []
             }
 
             # API paths
             def load_parameters(_fun):
+                # Parameters by @load decorators
                 mandatory_args = _fun.ovs_metadata['load']['mandatory']
                 optional_args = _fun.ovs_metadata['load']['optional']
                 object_type = _fun.ovs_metadata['load']['object_type']
-                entries = ['version', 'request', 'local_storagerouter']
+                entries = ['version', 'request', 'local_storagerouter', 'pk']
                 if object_type is not None:
                     entries.append(object_type.__name__.lower())
                 for entry in entries:
@@ -192,7 +193,106 @@ class OpenAPIView(View):
                             elif type_info in ['str', 'basestring', 'unicode']:
                                 info['type'] = 'string'
                     parameter_info.append(info)
+                # Parameters by @returns_* decorators
+                return_info = _fun.ovs_metadata.get('returns', None)
+                if return_info is not None:
+                    # Extra parameters
+                    params = return_info['parameters']
+                    fields = []
+                    if 'contents' in params or 'sorting' in params:
+                        _cls = return_info['object_type']
+                        fields = [prop.name for prop in _cls._properties] + \
+                                 ['{0}_guid'.format(rel.name) for rel in _cls._relations] + \
+                                 [dynamic.name for dynamic in _cls._dynamics]
+                        relation_info = RelationMapper.load_foreign_relations(_cls)
+                        if relation_info is not None:
+                            fields += [('{0}_guid' if rel_info['list'] is False else '{0}_guids').format(key)
+                                       for key, rel_info in relation_info.iteritems()]
+                        fields = fields + ['-{0}'.format(field) for field in fields]
+                    for parameter in params:
+                        if parameter == 'contents':
+                            parameter_info.append({'name': 'contents',
+                                                   'in': 'query',
+                                                   'description': 'Specify the returned contents.',
+                                                   'required': True,
+                                                   'collectionFormat': 'csv',
+                                                   'type': 'array',
+                                                   'enum': ['_dynamics', '_relations', 'guid'] + fields,
+                                                   'items': {'type': 'string'}})
+                        elif parameter == 'paging':
+                            parameter_info.append({'name': 'page',
+                                                   'in': 'query',
+                                                   'description': 'Specifies the page to be returned.',
+                                                   'required': False,
+                                                   'type': 'integer'})
+                            parameter_info.append({'name': 'page_size',
+                                                   'in': 'query',
+                                                   'description': 'Specifies the size of a page. Supported values: 10, 25, 50 and 100. Requires "page" to be set.',
+                                                   'required': False,
+                                                   'type': 'integer'})
+                        elif parameter == 'sorting':
+                            parameter_info.append({'name': 'sort',
+                                                   'in': 'query',
+                                                   'description': 'Specifies the sorting of the list.',
+                                                   'required': False,
+                                                   'default': params[parameter],
+                                                   'enum': ['guid', '-guid'] + fields,
+                                                   'type': 'array',
+                                                   'items': {'type': 'string'}})
                 return parameter_info
+
+            def load_schema(_fun, schema_type):
+                return_info = _fun.ovs_metadata.get('returns', None)
+                if return_info is not None:
+                    _cls = return_info['object_type']
+                    class_schema = {'$ref': '#/definitions/{0}'.format(_cls.__name__)}
+                    if schema_type == 'object':
+                        return class_schema
+                    else:
+                        _cls = return_info['object_type']
+                        fields = [prop.name for prop in _cls._properties] + \
+                                 ['{0}_guid'.format(rel.name) for rel in _cls._relations] + \
+                                 [dynamic.name for dynamic in _cls._dynamics]
+                        relation_info = RelationMapper.load_foreign_relations(_cls)
+                        if relation_info is not None:
+                            fields += [('{0}_guid' if rel_info['list'] is False else '{0}_guids').format(key)
+                                       for key, rel_info in relation_info.iteritems()]
+                        fields = fields + ['-{0}'.format(field) for field in fields]
+                        return {'type': 'object',
+                                'title': '{0}List'.format(_cls.__name__),
+                                'properties': {'_contents': {'type': 'array',
+                                                             'description': 'Requested contents.',
+                                                             'items': {'type': 'string'},
+                                                             'required': True,
+                                                             'collectionFormat': 'csv',
+                                                             'enum': ['_dynamics', '_relations', 'guid'] + fields},
+                                               '_paging': {'type': 'object',
+                                                           'title': 'PagingMetadata',
+                                                           'properties': {'total_items': {'type': 'integer',
+                                                                                          'description': 'Total items available.'},
+                                                                          'max_page': {'type': 'integer',
+                                                                                       'description': 'Last page available.'},
+                                                                          'end_number': {'type': 'integer',
+                                                                                         'description': '1-based index of the last item in the current page.'},
+                                                                          'current_page': {'type': 'integer',
+                                                                                           'description': 'Current page number.'},
+                                                                          'page_size': {'type': 'integer',
+                                                                                        'description': 'Number of items in the current page.'},
+                                                                          'start_number': {'type': 'integer',
+                                                                                           'description': '1-based index of the first item in the current page'}},
+                                                           'required': ['total_items', 'max_page', 'end_number', 'current_page', 'page_size', 'start_number']},
+                                               '_sorting': {'type': 'array',
+                                                            'description': 'Applied sorting',
+                                                            'items': {'type': 'string'},
+                                                            'required': True,
+                                                            'collectionFormat': 'csv',
+                                                            'enum': ['-guid', 'guid'] + fields},
+                                               'data': {'type': 'array',
+                                                        'description': 'List of serialized {0}s.'.format(_cls.__name__),
+                                                        'required': True,
+                                                        'items': class_schema}},
+                                'required': ['_contents', '_paging', '_sorting', 'data']}
+                return {}
 
             paths = data['paths']
             path = '/'.join([os.path.dirname(__file__), 'backend', 'views'])
@@ -205,27 +305,31 @@ class OpenAPIView(View):
                                 and member[1].__module__ == name \
                                 and 'ViewSet' in [base.__name__ for base in member[1].__bases__]:
                             cls = member[1]
+                            if hasattr(cls, 'skip_spec') and cls.skip_spec is True:
+                                continue
                             if hasattr(cls, 'list'):
                                 fun = cls.list
                                 docstring = fun.__doc__.strip().split('\n')[0]
                                 parameters = load_parameters(fun)
+                                schema = load_schema(fun, 'list')
                                 route = {'get': {'summary': docstring,
                                                  'operationId': '{0}.list'.format(member[1].prefix),
                                                  'responses': {'200': {'description': docstring,
-                                                                       'schema': {}}}},
+                                                                       'schema': schema}}},
                                          'parameters': parameters}
                                 paths['/{0}/'.format(member[1].prefix)] = route
                             if hasattr(cls, 'retrieve'):
                                 fun = cls.retrieve
                                 docstring = fun.__doc__.strip().split('\n')[0]
                                 parameters = load_parameters(fun)
+                                schema = load_schema(fun, 'object')
                                 route = {'get': {'summary': docstring,
                                                  'operationId': '{0}.retrieve'.format(member[1].prefix),
                                                  'responses': {'200': {'description': docstring,
-                                                                       'schema': {}}}},
+                                                                       'schema': schema}}},
                                          'parameters': [{'name': 'guid',
                                                          'in': 'path',
-                                                         'description': 'Identifier of the requested object',
+                                                         'description': 'Identifier of the requested object.',
                                                          'required': True,
                                                          'type': 'string'}] + parameters}
                                 paths['/{0}/{{guid}}/'.format(member[1].prefix)] = route
@@ -260,7 +364,7 @@ class OpenAPIView(View):
 
             def build_relation(_cls, relation):
                 itemtype = relation.foreign_type.__name__ if relation.foreign_type is not None else _cls.__name__
-                _docstring = '{1} instance identifier{3}. One-to-{0} relation with {1}.{2}'.format(
+                _docstring = '{1} instance identifier{3}. One-to-{0} relation with {1}.{2}.'.format(
                     'one' if relation.onetoone is True else 'many',
                     itemtype,
                     ('{0}_guid' if relation.onetoone is True else '{0}_guids').format(relation.foreign_key),
@@ -304,7 +408,7 @@ class OpenAPIView(View):
             def build_remote_relation(relation):
                 key, relation_info = relation
                 remote_cls = Descriptor().load(relation_info['class']).get_object()
-                _docstring = '{1} instance identifier{3}. One-to-{0} relation with {1}.{2}'.format(
+                _docstring = '{1} instance identifier{3}. One-to-{0} relation with {1}.{2}.'.format(
                     'one' if relation_info['list'] is False else 'many',
                     remote_cls.__name__,
                     '{0}_guid'.format(relation_info['key']),
@@ -344,9 +448,9 @@ class OpenAPIView(View):
             definitions = data['definitions']
             definitions['DataObject'] = {'type': 'object',
                                          'title': 'DataObject',
-                                         'description': 'Root object inherited by all hybrid objects. Shall not be used directly',
+                                         'description': 'Root object inherited by all hybrid objects. Shall not be used directly.',
                                          'properties': {'guid': {'type': 'string',
-                                                                 'description': 'Identifier of the object'}},
+                                                                 'description': 'Identifier of the object.'}},
                                          'required': ['guid']}
             hybrid_structure = HybridRunner.get_hybrids()
             for class_descriptor in hybrid_structure.values():
@@ -356,6 +460,7 @@ class OpenAPIView(View):
                                                        {'type': 'object',
                                                         'properties': get_properties(cls),
                                                         'required': get_required_properties(cls)}]}
+
         return data
 
     @csrf_exempt
