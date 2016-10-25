@@ -60,6 +60,7 @@ class FleetCtl(object):
             FleetCtl._logger.info('Not re-adding service {0} to machine {1}'.format(name, client_ip))
             return
 
+        # noinspection PyProtectedMember
         name = Systemd._get_name(name, client, '/opt/OpenvStorage/config/templates/systemd/')
         template_service = '/opt/OpenvStorage/config/templates/systemd/{0}.service'
 
@@ -97,6 +98,15 @@ class FleetCtl(object):
 
     @staticmethod
     def get_service_status(name, client):
+        """
+        Retrieve the status of a service
+        :param name: Name of the service to retrieve the status of
+        :type name: str
+        :param client: Client on which to retrieve the status
+        :type client: SSHClient
+        :return: The status of the service and the output of the command
+        :rtype: tuple
+        """
         if FleetCtl._has_service(name, client):
             fleet_name = FleetCtl._get_unit_name(name, client)
             unit = FleetCtl._get_unit(fleet_name)
@@ -106,6 +116,14 @@ class FleetCtl(object):
 
     @staticmethod
     def remove_service(name, client):
+        """
+        Remove a service
+        :param name: Name of the service to remove
+        :type name: str
+        :param client: Client on which to remove the service
+        :type client: SSHClient
+        :return: None
+        """
         if FleetCtl._has_service(name, client):
             fleet_name = FleetCtl._get_unit_name(name, client)
             unit = FleetCtl._get_unit(fleet_name)
@@ -122,23 +140,16 @@ class FleetCtl(object):
             return Systemd.remove_service(name, client)
 
     @staticmethod
-    def disable_service(name, client):
-        if FleetCtl._has_service(name, client):
-            fleet_name = FleetCtl._get_unit_name(name, client)
-            client.run('systemctl disable {0}'.format(fleet_name))
-        else:
-            Systemd.disable_service(name, client)
-
-    @staticmethod
-    def enable_service(name, client):
-        if FleetCtl._has_service(name, client):
-            fleet_name = FleetCtl._get_unit_name(name, client)
-            client.run('systemctl enable {0}'.format(fleet_name))
-        else:
-            Systemd.enable_service(name, client)
-
-    @staticmethod
     def start_service(name, client):
+        """
+        Start a service
+        :param name: Name of the service to start
+        :type name: str
+        :param client: Client on which to start the service
+        :type client: SSHClient
+        :return: The output of the start command
+        :rtype: str
+        """
         if FleetCtl._has_service(name, client):
             fleet_name = FleetCtl._get_unit_name(name, client)
             start = time.time()
@@ -158,6 +169,15 @@ class FleetCtl(object):
 
     @staticmethod
     def stop_service(name, client):
+        """
+        Stop a service
+        :param name: Name of the service to stop
+        :type name: str
+        :param client: Client on which to stop the service
+        :type client: SSHClient
+        :return: The output of the stop command
+        :rtype: str
+        """
         if FleetCtl._has_service(name, client):
             fleet_name = FleetCtl._get_unit_name(name, client)
             start = time.time()
@@ -177,6 +197,15 @@ class FleetCtl(object):
 
     @staticmethod
     def restart_service(name, client):
+        """
+        Restart a service
+        :param name: Name of the service to restart
+        :type name: str
+        :param client: Client on which to restart the service
+        :type client: SSHClient
+        :return: The output of the restart command
+        :rtype: str
+        """
         if not FleetCtl.has_service(name, client):
             return Systemd.restart_service(name, client)
         FleetCtl.stop_service(name, client)
@@ -194,25 +223,45 @@ class FleetCtl(object):
 
     @staticmethod
     def has_service(name, client):
+        """
+        Verify existence of a service
+        :param name: Name of the service to verify
+        :type name: str
+        :param client: Client on which to check for the service
+        :type client: SSHClient
+        :return: Whether the service exists
+        :rtype: bool
+        """
         fleet_has_service = FleetCtl._has_service(name, client)
         if not fleet_has_service:
             return Systemd.has_service(name, client)
         return fleet_has_service
 
     @staticmethod
-    def is_enabled(name, client):
-        if FleetCtl._has_service(name, client):
-            fleet_name = FleetCtl._get_unit_name(name, client)
-            output = client.run('systemctl is-enabled {0} || true'.format(fleet_name))
-            return 'enabled' in output
-        return Systemd.is_enabled(name, client)
-
-    @staticmethod
     def get_service_pid(name, client):
+        """
+        Retrieve the PID of a service
+        :param name: Name of the service to retrieve the PID for
+        :type name: str
+        :param client: Client on which to retrieve the PID for the service
+        :type client: SSHClient
+        :return: The PID of the service or 0 if no PID found
+        :rtype: int
+        """
         return Systemd.get_service_pid(name, client)
 
     @staticmethod
     def send_signal(name, signal, client):
+        """
+        Send a signal to a service
+        :param name: Name of the service to send a signal
+        :type name: str
+        :param signal: Signal to pass on to the service
+        :type signal: int
+        :param client: Client on which to send a signal to the service
+        :type client: SSHClient
+        :return: None
+        """
         return Systemd.send_signal(name, signal, client)
 
     @staticmethod
@@ -248,6 +297,7 @@ class FleetCtl(object):
                 raise ValueError('Unit with name {0} not found'.format(fleet_name))
             raise RuntimeError('Fleet API error {0}'.format(ae))
 
+    # noinspection PyProtectedMember
     @staticmethod
     def _get_unit_name(name, client):
         try:

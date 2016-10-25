@@ -93,38 +93,12 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
-    @load(StorageRouter, max_version=1)
-    def move_away(self, storagerouter):
-        """
-        Marks all StorageDrivers of a given node offline. DO NOT USE ON RUNNING STORAGEROUTERS!
-        """
-        return StorageDriverController.mark_offline.delay(storagerouter.guid)
-
-    @action()
-    @log()
-    @required_roles(['read', 'write', 'manage'])
-    @return_task()
     @load(StorageRouter)
     def mark_offline(self, storagerouter):
         """
         Marks all StorageDrivers of a given node offline. DO NOT USE ON RUNNING STORAGEROUTERS!
         """
         return StorageDriverController.mark_offline.delay(storagerouter.guid)
-
-    @link()
-    @log()
-    @required_roles(['read'])
-    @return_plain()
-    @load(StorageRouter, max_version=1)
-    def get_available_actions(self):
-        """
-        Gets a list of all available actions
-        """
-        actions = []
-        storagerouters = StorageRouterList.get_storagerouters()
-        if len(storagerouters) > 1:
-            actions.append('MOVE_AWAY')
-        return actions
 
     @action()
     @log()
@@ -227,10 +201,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Validates whether the mountpoint for a vPool is available
         """
-        name = str(name)
-        return StorageRouterController.check_mtpt.s(name).apply_async(
-            routing_key='sr.{0}'.format(storagerouter.machine_id)
-        )
+        return StorageRouterController.mountpoint_exists.delay(name=str(name), storagerouter_guid=storagerouter.guid)
 
     @action()
     @log()

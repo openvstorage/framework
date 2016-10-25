@@ -30,7 +30,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import add_hooks, ensure_single, log
@@ -52,6 +52,7 @@ class StorageDriverController(object):
         Marks all StorageDrivers on this StorageRouter offline
         :param storagerouter_guid: Guid of the Storage Router
         :type storagerouter_guid: str
+        :return: None
         """
         for storagedriver in StorageRouter(storagerouter_guid).storagedrivers:
             vpool = storagedriver.vpool
@@ -67,10 +68,8 @@ class StorageDriverController(object):
         Handles error messages/events from the volumedriver
         :param code: Volumedriver error code
         :type code: int
-
         :param volume_id: Name of the volume throwing the error
         :type volume_id: str
-
         :return: None
         """
         if code == VolumeDriverEvents.MDSFailover:
@@ -85,13 +84,10 @@ class StorageDriverController(object):
         Handles the demote for the StorageDrivers
         :param cluster_ip: IP of the node to demote
         :type cluster_ip: str
-
         :param master_ip: IP of the master node
         :type master_ip: str
-
         :param offline_node_ips: IPs of nodes which are offline
         :type offline_node_ips: list
-
         :return: None
         """
         _ = master_ip
@@ -124,10 +120,32 @@ class StorageDriverController(object):
             StorageDriverController._configure_arakoon_to_volumedriver(cluster_name=cluster_name)
 
     @staticmethod
+    @add_hooks('setup', 'remove')
+    def on_remove(cluster_ip, complete_removal):
+        """
+        Handles the StorageDriver removal part of a node
+        :param cluster_ip: IP of the node which is being removed from the cluster
+        :type cluster_ip: str
+        :param complete_removal: Unused for StorageDriver, used for AlbaController
+        :type complete_removal: bool
+        :return: None
+        """
+        _ = complete_removal
+        service_name = 'watcher-volumedriver'
+        try:
+            client = SSHClient(endpoint=cluster_ip, username='root')
+            if ServiceManager.has_service(name=service_name, client=client):
+                ServiceManager.stop_service(name=service_name, client=client)
+                ServiceManager.remove_service(name=service_name, client=client)
+        except UnableToConnectException:
+            pass
+
+    @staticmethod
     @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=Schedule(minute='15', hour='*'))
     def scheduled_voldrv_arakoon_checkup():
         """
         Makes sure the volumedriver arakoon is on all available master nodes
+        :return: None
         """
         StorageDriverController._voldrv_arakoon_checkup(False)
 
@@ -136,6 +154,7 @@ class StorageDriverController(object):
     def manual_voldrv_arakoon_checkup():
         """
         Creates a new Arakoon Cluster if required and extends cluster if possible on all available master nodes
+        :return: None
         """
         StorageDriverController._voldrv_arakoon_checkup(True)
 
@@ -146,8 +165,11 @@ class StorageDriverController(object):
             """
             Add a service to the storage router
             :param service_storagerouter: Storage Router to add the service to
+            :type service_storagerouter: StorageRouter
             :param arakoon_ports: Port information
+            :type arakoon_ports: list
             :return: The newly created and added service
+            :rtype: Service
             """
             new_service = Service()
             new_service.name = service_name
@@ -257,10 +279,8 @@ class StorageDriverController(object):
         Stores new storagedriver partition object with correct number
         :param storagedriver: Storagedriver to create the partition for
         :type storagedriver: StorageDriver
-
         :param partition_info: Partition information containing, role, size, sub_role, disk partition, MDS service
         :type partition_info: dict
-
         :return: Newly created storage driver partition
         :rtype: StorageDriverPartition
         """

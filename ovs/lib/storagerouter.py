@@ -309,7 +309,7 @@ class StorageRouterController(object):
             all_storagerouters += [sd.storagerouter for sd in vpool.storagedrivers]
 
         # Check mountpoint
-        if not StorageRouterController.check_mtpt(vpool_name):
+        if StorageRouterController.mountpoint_exists(name=vpool_name, storagerouter_guid=storagerouter.guid):
             raise RuntimeError('The mountpoint for vPool {0} already exists'.format(vpool_name))
 
         # Check storagerouter connectivity
@@ -414,7 +414,7 @@ class StorageRouterController(object):
                 ovs_client = OVSClient(ip=connection_info['host'],
                                        port=connection_info['port'],
                                        credentials=(connection_info['client_id'], connection_info['client_secret']),
-                                       version=1)
+                                       version=2)
                 backend_dict = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': 'name,usages,presets'})
                 preset_info = dict((preset['name'], preset) for preset in backend_dict['presets'])
                 if preset_name not in preset_info:
@@ -506,7 +506,6 @@ class StorageRouterController(object):
         watcher_volumedriver_service = 'watcher-volumedriver'
         if not ServiceManager.has_service(watcher_volumedriver_service, client=root_client):
             ServiceManager.add_service(watcher_volumedriver_service, client=root_client)
-            ServiceManager.enable_service(watcher_volumedriver_service, client=root_client)
             ServiceManager.start_service(watcher_volumedriver_service, client=root_client)
 
         local_backend_data = {}
@@ -913,7 +912,6 @@ class StorageRouterController(object):
         # Start service
         storagedriver = StorageDriver(storagedriver.guid)
         current_startup_counter = storagedriver.startup_counter
-        ServiceManager.enable_service(voldrv_service, client=root_client)
         ServiceManager.start_service(voldrv_service, client=root_client)
         tries = 60
         while storagedriver.startup_counter == current_startup_counter and tries > 0:
@@ -997,7 +995,6 @@ class StorageRouterController(object):
             raise ValueError('VPool should be in {0} status'.format(VPool.STATUSES.RUNNING))
 
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Checking availability of related Storage Routers'.format(storage_driver.guid, storage_driver.name))
-        has_rdma = Configuration.get('/ovs/framework/rdma')
         client = None
         temp_client = None
         errors_found = False
@@ -1108,8 +1105,6 @@ class StorageRouterController(object):
             for service in [voldrv_service, dtl_service]:
                 try:
                     if ServiceManager.has_service(service, client=client):
-                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Disabling service {1}'.format(storage_driver.guid, service))
-                        ServiceManager.disable_service(service, client=client)
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Stopping service {1}'.format(storage_driver.guid, service))
                         ServiceManager.stop_service(service, client=client)
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service))
@@ -1377,7 +1372,6 @@ class StorageRouterController(object):
             if enable is True:
                 if not ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
                     ServiceManager.add_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
-                    ServiceManager.enable_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
                 ServiceManager.restart_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
             else:
                 if ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
@@ -1417,17 +1411,19 @@ class StorageRouterController(object):
             return False
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.check_mtpt')
-    def check_mtpt(name):
+    @celery.task(name='ovs.storagerouter.mountpoint_exists')
+    def mountpoint_exists(name, storagerouter_guid):
         """
-        Checks whether a given mountpoint for vPool is in use
+        Checks whether a given mountpoint for a vPool exists
         :param name: Name of the mountpoint to check
         :type name: str
+        :param storagerouter_guid: Guid of the StorageRouter on which to check for mountpoint existence
+        :type storagerouter_guid: str
         :return: True if mountpoint not in use else False
         :rtype: bool
         """
-        mountpoint = '/mnt/{0}'.format(name)
-        return not os.path.exists(mountpoint)
+        client = SSHClient(StorageRouter(storagerouter_guid))
+        return client.dir_exists(directory='/mnt/{0}'.format(name))
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_update_status')

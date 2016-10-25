@@ -1,6 +1,5 @@
 ovs                                            opt/OpenvStorage
 config/env/ovs.sh                              etc/profile.d
-config/elk/indexer.conf                        etc/logstash/conf.d
 config/logrotate/openvstorage-logs             etc/logrotate.d
 config/templates                               opt/OpenvStorage/config
 scripts/install/openvstorage-core.postinst.py  opt/OpenvStorage/scripts/install
