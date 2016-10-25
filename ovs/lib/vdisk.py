@@ -85,6 +85,8 @@ class VDiskController(object):
         """
         Removes a vDisk from the model
         :param vdisk: The vDisk to be removed
+        :type vdisk: VDisk
+        :return: None
         """
         VDiskController._logger.info('Cleaning vDisk {0}'.format(vdisk.name))
         for mds_service in vdisk.mds_services:
@@ -102,6 +104,7 @@ class VDiskController(object):
         Triggered by volumedriver messages on the queue
         :param volume_id: Volume ID of the vDisk
         :type volume_id: str
+        :return: None
         """
         vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
         if vdisk is not None:
@@ -117,6 +120,7 @@ class VDiskController(object):
         Delete a vdisk through API
         :param vdisk_guid: Guid of the vDisk to delete
         :type vdisk_guid: str
+        :return: None
         """
         vdisk = VDisk(vdisk_guid)
         vdisk.storagedriver_client.unlink(str(vdisk.devicename))
@@ -131,6 +135,7 @@ class VDiskController(object):
         :type vdisk_guid: str
         :param volume_size: New size in bytes
         :type volume_size: int
+        :return: None
         """
         vdisk = VDisk(vdisk_guid)
         if volume_size > 64 * 1024 ** 4:
@@ -159,6 +164,7 @@ class VDiskController(object):
         :type volume_path: str
         :param storagedriver_id: ID of the storagedriver serving the volume to resize
         :type storagedriver_id: str
+        :return: None
         """
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
@@ -194,6 +200,7 @@ class VDiskController(object):
         :type volume_id: unicode
         :param new_owner_id: ID of the storage driver the volume migrated to
         :type new_owner_id: unicode
+        :return: None
         """
         sd = StorageDriverList.get_by_storagedriver_id(storagedriver_id=new_owner_id)
         vdisk = VDiskList.get_vdisk_by_volume_id(volume_id=volume_id)
@@ -370,6 +377,7 @@ class VDiskController(object):
         :type vdisk_guid: str
         :param snapshot_id: ID of the snapshot
         :type snapshot_id: str
+        :return: None
         """
         result = VDiskController.delete_snapshots({vdisk_guid: snapshot_id})
         vdisk_result = result[vdisk_guid]
@@ -383,6 +391,8 @@ class VDiskController(object):
         Delete vDisk snapshots
         :param snapshot_mapping: Mapping of VDisk guid and Snapshot ID
         :type snapshot_mapping: dict
+        :return: Information about the deleted snapshots, whether they succeeded or not
+        :rtype: dict
         """
         results = {}
         for vdisk_guid, snapshot_id in snapshot_mapping.iteritems():
@@ -413,6 +423,7 @@ class VDiskController(object):
         Set a vDisk as template
         :param vdisk_guid: Guid of the vDisk
         :type vdisk_guid: str
+        :return: None
         """
         vdisk = VDisk(vdisk_guid)
         if vdisk.is_vtemplate is True:
@@ -431,6 +442,7 @@ class VDiskController(object):
         :type vdisk_guid: str
         :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisk to
         :type target_storagerouter_guid: str
+        :return: None
         """
         vdisk = VDisk(vdisk_guid)
         storagedriver = None
@@ -678,27 +690,19 @@ class VDiskController(object):
         :type vdisk_guid: str
         :param new_config_params: New configuration parameters
         :type new_config_params: dict
+        :return: None
         """
         required_params = {'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
                            'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
+                           'dtl_target': (list, Toolbox.regex_guid),
                            'dedupe_mode': (str, StorageDriverClient.VDISK_DEDUPE_MAP.keys()),
                            'write_buffer': (int, {'min': 128, 'max': 10 * 1024}),
                            'cache_strategy': (str, StorageDriverClient.VDISK_CACHE_MAP.keys()),
                            'readcache_limit': (int, {'min': 1, 'max': 10 * 1024}, False)}
 
-        if new_config_params.get('dtl_target') is not None:
-            required_params.update({'dtl_target': (list, Toolbox.regex_guid)})
-
         if new_config_params.get('metadata_cache_size') is not None:
             required_params.update({'metadata_cache_size': (int, {'min': StorageDriverClient.METADATA_CACHE_PAGE_SIZE})})
-
         Toolbox.verify_required_params(required_params, new_config_params)
-
-        all_domains = DomainList.get_domains()
-        if new_config_params['dtl_mode'] != 'no_sync' and new_config_params.get('dtl_target') in [None, []] and len(all_domains) > 0:
-            # If domains present, GUI does not allow to click 'Save' unless at least 1 domain is available
-            # If no domains present, the GUI does allow to click 'Save', which means all available StorageRouters are valid
-            raise ValueError('If DTL mode is Asynchronous or Synchronous, a Domain guid should always be specified')
 
         errors = False
         vdisk = VDisk(vdisk_guid)
@@ -725,7 +729,7 @@ class VDiskController(object):
         # 2nd Check for DTL changes
         new_dtl_mode = new_config_params['dtl_mode']
         old_dtl_mode = old_config_params['dtl_mode']
-        new_dtl_targets = set(new_config_params.get('dtl_target', []))  # Domain guids
+        new_dtl_targets = set(new_config_params['dtl_target'])  # Domain guids
         old_dtl_targets = set(old_config_params['dtl_target'])
 
         if new_dtl_mode == 'no_sync':
@@ -760,7 +764,7 @@ class VDiskController(object):
                     possible_storagerouters = list(StorageRouterList.get_storagerouters())
                 else:  # Find out which Storage Routers have a regular domain configured
                     possible_storagerouter_guids = set()
-                    for domain in all_domains:
+                    for domain in DomainList.get_domains():
                         if storagerouter.guid in domain.storage_router_layout['regular']:
                             if len(domain.storage_router_layout['regular']) > 1:
                                 possible_storagerouter_guids.update(domain.storage_router_layout['regular'])
@@ -846,6 +850,7 @@ class VDiskController(object):
         :type vdisk_guid: str
         :param storagerouters_to_exclude: Storage Router Guids to exclude from possible targets
         :type storagerouters_to_exclude: list
+        :return: None
         """
         if vpool_guid is not None and vdisk_guid is not None:
             raise ValueError('vPool and vDisk are mutually exclusive')
@@ -1122,6 +1127,7 @@ class VDiskController(object):
         :type new_state: int
         :param storagedriver_id: ID of the storagedriver hosting the volume
         :type storagedriver_id: str
+        :return: None
         """
         if new_state == VolumeDriverEvents_pb2.Degraded and old_state != VolumeDriverEvents_pb2.Standalone:
             vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
@@ -1221,6 +1227,7 @@ class VDiskController(object):
         Set metadata page cache size to ratio 1:500 of vdisk.size
         :param vdisk: Object VDisk
         :type vdisk: VDisk
+        :return: None
         """
         storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, vdisk.storagedriver_id)
         storagedriver_config.load()
@@ -1253,6 +1260,7 @@ class VDiskController(object):
         """
         Extracts a reasonable volume name out of a given devicename
         :param devicename: A raw devicename of a volume (e.g. /foo/bar.raw)
+        :type devicename: str
         :return: A cleaned up volumename (e.g. bar)
         """
         return devicename.rsplit('/', 1)[-1].rsplit('.', 1)[0]
