@@ -698,19 +698,6 @@ class SetupController(object):
             if storage_router_to_remove_online is False:
                 SetupController._log(messages='  Marking all Storage Drivers served by Storage Router {0} as offline'.format(storage_router_to_remove.ip))
                 StorageDriverController.mark_offline(storagerouter_guid=storage_router_to_remove.guid)
-                for storagedriver in storage_router_to_remove.storagedrivers:
-                    target_sr = None
-                    for sd in storagedriver.vpool.storagedrivers:
-                        sr = sd.storagerouter
-                        if sr != storage_router_to_remove and sr not in storage_routers_offline:
-                            target_sr = sr
-                            break
-                    if target_sr is not None:
-                        client = SSHClient(target_sr)
-                        old_storage_router_path = '{0}/{1}'.format(storagedriver.mountpoint, storage_router_to_remove.machine_id)
-                        if client.dir_exists(old_storage_router_path):
-                            # Make sure files are "stolen" from the watcher
-                            client.run('ls -Ral {0}'.format(SSHClient.shell_safe(old_storage_router_path)))
 
             # Remove vPools
             SetupController._log(messages='  Removing vPools from node'.format(storage_router_to_remove.ip))
@@ -1702,7 +1689,7 @@ EOF
         services = ['workers', 'support-agent', 'watcher-framework', 'watcher-config']
         if node_type == 'master':
             services += ['scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
-            if SetupController._is_internally_managed(service='rabbitmq'):
+            if SetupController._is_internally_managed(service='rabbitmq') is True:
                 services.append('rabbitmq-server')
             if SetupController._is_internally_managed(service='memcached') is True:
                 services.append('memcached')

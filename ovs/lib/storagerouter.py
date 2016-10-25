@@ -1041,7 +1041,7 @@ class StorageRouterController(object):
             raise RuntimeError('Could not found any responsive node in the cluster')
 
         storage_driver.invalidate_dynamics('vdisks_guids')
-        if len(storage_driver.vdisks_guids) > 0 and storage_router_online is True:
+        if len(storage_driver.vdisks_guids) > 0:
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
 
         if storage_drivers_left and len(available_storage_drivers) == 0:
