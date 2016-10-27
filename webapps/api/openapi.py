@@ -117,7 +117,12 @@ class OpenAPIView(View):
                                                                                       'storagerouter_ips',
                                                                                       'versions',
                                                                                       'plugins']}}}}}},
-                'definitions': {},
+                'definitions': {'APIError': {'type': 'object',
+                                             'properties': {'error': {'type': 'string',
+                                                                      'description': 'An error code'},
+                                                            'error_description': {'type': 'string',
+                                                                                  'description': 'Descriptive error message'}},
+                                             'required': ['error', 'error_description']}},
                 'securityDefinitions': {'oauth2': {'type': 'oauth2',
                                                    'flow': 'password',
                                                    'tokenUrl': 'oauth2/token',
@@ -365,7 +370,9 @@ class OpenAPIView(View):
                                 return_code, schema = load_response(fun)
                                 route = {route_data[0]: {'summary': docstring,
                                                          'operationId': '{0}.{1}'.format(member[1].prefix, call),
-                                                         'responses': {return_code: {'description': docstring}},
+                                                         'responses': {return_code: {'description': docstring},
+                                                                       'default': {'description': 'Error payload',
+                                                                                   'schema': {'$ref': '#/definitions/APIError'}}},
                                                          'parameters': parameters}}
                                 if schema is not None:
                                     route[route_data[0]]['responses'][return_code]['schema'] = schema
@@ -385,7 +392,9 @@ class OpenAPIView(View):
                                 for verb in fun.bind_to_methods:
                                     routes[verb] = {'summary': docstring,
                                                     'operationId': '{0}.{1}_{2}'.format(member[1].prefix, verb, name),
-                                                    'responses': {return_code: {'description': docstring}},
+                                                    'responses': {return_code: {'description': docstring},
+                                                                  'default': {'description': 'Error payload',
+                                                                              'schema': {'$ref': '#/definitions/APIError'}}},
                                                     'parameters': parameters}
                                     if schema is not None:
                                         routes[verb]['responses'][return_code]['schema'] = schema
