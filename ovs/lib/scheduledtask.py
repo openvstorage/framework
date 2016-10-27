@@ -76,7 +76,7 @@ class ScheduledTaskController(object):
                                                 metadata=metadata)
                 success.append(vdisk.guid)
             except Exception:
-                ScheduledTaskController._logger.exception('Error snapshotting vDisk {0}'.format(vdisk.guid))
+                ScheduledTaskController._logger.exception('Error taking snapshot for vDisk {0}'.format(vdisk.guid))
                 fail.append(vdisk.guid)
         ScheduledTaskController._logger.info('[SSA] Snapshot has been taken for {0} vDisks, {1} failed.'.format(len(success), len(fail)))
 

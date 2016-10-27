@@ -42,8 +42,7 @@ from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig
-from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
+from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig
 
 
 class MDSServiceController(object):
@@ -630,11 +629,15 @@ class MDSServiceController(object):
             if previous_master != service:
                 configs_no_ex_master.append(config)
             configs_all.append(config)
-        if len(configs_no_ex_master) != len(configs_all):
+        try:
+            if len(configs_no_ex_master) != len(configs_all):
+                vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
+                                                                          metadata_backend_config=MDSMetaDataBackendConfig(configs_no_ex_master))
             vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
-                                                                      metadata_backend_config=MDSMetaDataBackendConfig(configs_no_ex_master))
-        vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
-                                                                  metadata_backend_config=MDSMetaDataBackendConfig(configs_all))
+                                                                      metadata_backend_config=MDSMetaDataBackendConfig(configs_all))
+        except Exception:
+            MDSServiceController._logger.error('MDS safety: vDisk {0}: Failed to update the metadata backend configuration'.format(vdisk.guid))
+            raise Exception('Volume {0} with guid {1} is not running'.format(vdisk.name, vdisk.guid))
 
         for service in new_services[1:]:
             client = MetadataServerClient.load(service)
