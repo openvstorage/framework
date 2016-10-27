@@ -231,7 +231,7 @@ def return_list(object_type, default_sort=None):
         metadata['returns'] = {'parameters': {'sorting': default_sort,
                                               'paging': None,
                                               'contents': None},
-                               'returns': 'list',
+                               'returns': ['list', '200'],
                                'object_type': object_type}
         f.ovs_metadata = metadata
 
@@ -322,7 +322,7 @@ def return_list(object_type, default_sort=None):
     return wrap
 
 
-def return_object(object_type):
+def return_object(object_type, mode=None):
     """
     Object decorator
     """
@@ -332,9 +332,15 @@ def return_object(object_type):
         Wrapper function
         """
 
+        return_status = status.HTTP_200_OK
+        if mode == 'accepted':
+            return_status = status.HTTP_202_ACCEPTED
+        elif mode == 'created':
+            return_status = status.HTTP_201_CREATED
+
         metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         metadata['returns'] = {'parameters': {'contents': None},
-                               'returns': 'object',
+                               'returns': ['object', str(return_status)],
                                'object_type': object_type}
         f.ovs_metadata = metadata
 
@@ -345,13 +351,11 @@ def return_object(object_type):
             """
             request = _find_request(args)
 
-            # 1. Pre-loading request data
             contents = request.QUERY_PARAMS.get('contents')
             contents = None if contents is None else contents.split(',')
 
-            # 5. Serializing
             obj = f(*args, **kwargs)
-            return Response(FullSerializer(object_type, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
+            return Response(FullSerializer(object_type, contents=contents, instance=obj).data, status=return_status)
 
         return new_function
     return wrap
@@ -369,7 +373,7 @@ def return_task():
 
         metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         metadata['returns'] = {'parameters': {},
-                               'returns': 'task'}
+                               'returns': ['task', '200']}
         f.ovs_metadata = metadata
 
         @wraps(f)
@@ -378,13 +382,13 @@ def return_task():
             Wrapped function
             """
             task = f(*args, **kwargs)
-            return Response(task.id, status=status.HTTP_200_OK)
+            return Response(json.dumps(task.id), status=status.HTTP_200_OK)
 
         return new_function
     return wrap
 
 
-def return_plain():
+def return_simple(mode=None):
     """
     Decorator to return plain data
     """
@@ -394,9 +398,15 @@ def return_plain():
         Wrapper function
         """
 
+        return_status = status.HTTP_200_OK
+        if mode == 'accepted':
+            return_status = status.HTTP_202_ACCEPTED
+        elif mode == 'created':
+            return_status = status.HTTP_201_CREATED
+
         metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
         metadata['returns'] = {'parameters': {},
-                               'returns': 'string'}
+                               'returns': [None, None]}
         f.ovs_metadata = metadata
 
         @wraps(f)
@@ -405,7 +415,9 @@ def return_plain():
             Wrapped function
             """
             result = f(*args, **kwargs)
-            return Response(result, status=status.HTTP_200_OK)
+            if result is None:
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(json.dumps(result), status=return_status)
 
         return new_function
 

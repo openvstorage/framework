@@ -52,6 +52,7 @@ class MessagingViewSet(viewsets.ViewSet):
         """
         Retrieves the subscriptions for a given subscriber
         :param pk: Primary key of subscriber
+        :type pk: int
         """
         try:
             pk = int(pk)
@@ -84,7 +85,9 @@ class MessagingViewSet(viewsets.ViewSet):
         """
         Wait for messages to appear for a given subscriber
         :param pk: Primary key of subscriber
+        :type pk: int
         :param message_id: The last message_id that was already received
+        :type message_id: str
         """
         try:
             pk = int(pk)
@@ -111,6 +114,7 @@ class MessagingViewSet(viewsets.ViewSet):
         """
         Get the last messageid
         :param pk: Primary key of subscriber
+        :type pk: int
         """
         try:
             _ = int(pk)
@@ -126,7 +130,9 @@ class MessagingViewSet(viewsets.ViewSet):
         """
         Subscribes a subscriber to a set of types
         :param request: Raw request object of the call
+        :type request: Request
         :param pk: Primary key of subscriber
+        :type pk: int
         """
         try:
             pk = int(pk)

@@ -18,9 +18,7 @@
 Module for working with celery tasks
 """
 
-from backend.decorators import load
-from backend.decorators import log
-from backend.decorators import required_roles
+from backend.decorators import load, log, required_roles, return_simple
 from celery.task.control import inspect
 from ovs.celery_run import celery
 from rest_framework import status
@@ -40,25 +38,31 @@ class TaskViewSet(viewsets.ViewSet):
 
     @log()
     @required_roles(['read'])
+    @return_simple()
     @load()
     def list(self):
         """
         Overview of active, scheduled, reserved and revoked tasks
+        :return: Dict of all tasks
+        :rtype: dict
         """
         inspector = inspect()
-        data = {'active': inspector.active(),
+        return {'active': inspector.active(),
                 'scheduled': inspector.scheduled(),
                 'reserved': inspector.reserved(),
                 'revoked': inspector.revoked()}
-        return Response(data, status=status.HTTP_200_OK)
 
     @log()
     @required_roles(['read'])
+    @return_simple()
     @load()
     def retrieve(self, pk):
         """
         Load information about a given task
-        :param pk: Primary key
+        :param pk: Task identifier
+        :type pk: str
+        :return: Task metadata (status, result, ...)
+        :rtype: dict
         """
         result = celery.AsyncResult(pk)
         result_status = result.status
@@ -67,22 +71,25 @@ class TaskViewSet(viewsets.ViewSet):
             result_data = result.result
         else:
             result_data = str(result.result) if result.result is not None else None
-        data = {'id': result.id,
+        return {'id': result.id,
                 'status': result_status,
                 'successful': result_successful,
                 'failed': result.failed(),
                 'ready': result.ready(),
                 'result': result_data}
-        return Response(data, status=status.HTTP_200_OK)
 
     @link()
     @log()
     @required_roles(['read'])
+    @return_simple()
     @load()
     def get(self, pk):
         """
         Gets a given task's result
-        :param pk: Primary key
+        :param pk: Task identifier
+        :type pk: str
+        :return: Task result
+        :rtype: dict
         """
         result = celery.AsyncResult(pk)
-        return Response(result.get(), status=status.HTTP_200_OK)
+        return result.get()

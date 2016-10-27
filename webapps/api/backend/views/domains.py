@@ -18,7 +18,7 @@
 Module for domains
 """
 
-from backend.decorators import load, log, required_roles, return_list, return_object
+from backend.decorators import load, log, required_roles, return_list, return_object, return_simple
 from backend.exceptions import HttpNotAcceptableException
 from backend.serializers.serializers import FullSerializer
 from ovs.dal.hybrids.domain import Domain
@@ -53,48 +53,62 @@ class DomainViewSet(viewsets.ViewSet):
     def retrieve(self, domain):
         """
         Load information about a given Domain
+        :param domain: The domain to be retrieved
+        :type domain: Domain
         """
         return domain
 
     @log()
     @required_roles(['read', 'write', 'manage'])
+    @return_object(Domain, mode='created')
     @load()
     def create(self, request, contents=None):
         """
         Creates a new Domain
+        :param request: The raw request:
+        :type request: Request
+        :param contents: Requested contents (serializer hint)
+        :type contents: str
         """
         contents = None if contents is None else contents.split(',')
         serializer = FullSerializer(Domain, contents=contents, instance=Domain(), data=request.DATA)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        domain = serializer.object
+        domain.save()
+        return domain
 
     @log()
     @required_roles(['read', 'write', 'manage'])
+    @return_simple()
     @load(Domain)
     def destroy(self, domain):
         """
         Deletes a Domain
+        :param domain: The domain to return
+        :type domain: Domain
+        :return: None
+        :rtype: None
         """
         if len(domain.storagerouters) > 0 or len(domain.backends) > 0 or len(domain.vdisks_dtl) > 0:
             raise HttpNotAcceptableException(error_description='The given Domain is still in use',
                                              error='in_use')
         domain.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @log()
     @required_roles(['read', 'write', 'manage'])
+    @return_object(Domain, mode='accepted')
     @load(Domain)
     def partial_update(self, domain, request, contents=None):
         """
         Update a Failure Domain
+        :param domain: The domain to update
+        :type domain: Domain
+        :param request: The raw request
+        :type request: Request
+        :param contents: Contents to be updated/returned
+        :type contents: str
         """
         contents = None if contents is None else contents.split(',')
         serializer = FullSerializer(Domain, contents=contents, instance=domain, data=request.DATA)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        domain = serializer.object
+        domain.save()
+        return domain

@@ -22,7 +22,7 @@ import time
 from rest_framework import viewsets
 from rest_framework.decorators import link, action
 from rest_framework.permissions import IsAuthenticated
-from backend.decorators import required_roles, load, return_list, return_object, return_task, return_plain, log
+from backend.decorators import required_roles, load, return_list, return_object, return_task, return_simple, log
 from backend.exceptions import HttpNotAcceptableException
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
@@ -59,6 +59,7 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         Load information about a given vPool
         :param vpool: vPool object to retrieve
+        :type vpool: VPool
         """
         return vpool
 
@@ -71,7 +72,9 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         Retrieves a list of StorageRouters, serving a given vPool
         :param vpool: vPool to retrieve the storagerouter information for
+        :type vpool: VPool
         :param hints: Dictionary with hints
+        :type hints: dict
         """
         if hints.get('full', False) is True:
             return [storagedriver.storagerouter for storagedriver in vpool.storagedrivers]
@@ -86,8 +89,9 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         Remove the storagedriver linking the specified vPool and storagerouter_guid
         :param vpool: vPool to shrink (or delete if its the last storagerouter linked to it)
+        :type vpool: VPool
         :param storagerouter_guid: Guid of the Storage Router
-        :return: Celery tasks' async result
+        :type storagerouter_guid: str
         """
         sr = StorageRouter(storagerouter_guid)
         sd_guid = None
@@ -110,11 +114,15 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         Update Storage Drivers for a given vPool (both adding and removing Storage Drivers)
         :param vpool: vPool to update
+        :type vpool: VPool
         :param storagedriver_guid: Storage Driver to update
-        :param version: Version of API
+        :type storagedriver_guid: str
+        :param version: Client version
+        :type version: int
         :param storagerouter_guids: Storage Router guids
+        :type storagerouter_guids: list
         :param storagedriver_guids: Storage Driver guids
-        :return: Celery task
+        :type storagedriver_guids: list
         """
         if version > 1:
             raise HttpNotAcceptableException(error_description='Only available in API version 1',
@@ -152,15 +160,19 @@ class VPoolViewSet(viewsets.ViewSet):
     @link()
     @log()
     @required_roles(['read'])
-    @return_plain()
+    @return_simple()
     @load(VPool)
     def devicename_exists(self, vpool, name=None, names=None):
         """
         Checks whether a given name can be created on the vpool
         :param vpool: vPool object
+        :type vpool: VPool
         :param name: Candidate name
+        :type name: str
         :param names: Candidate names
-        :return: True or False
+        :type names: list
+        :return: Whether the devicename exists
+        :rtype: bool
         """
         error_message = None
         if not (name is None) ^ (names is None):
@@ -196,11 +208,11 @@ class VPoolViewSet(viewsets.ViewSet):
         :type name: str
         :param timestamp: Timestamp of the snapshot
         :type timestamp: int
-        :param consistent: Flag - is_consistent
+        :param consistent: Indicates whether the snapshots will contain consistent data
         :type consistent: bool
-        :param automatic: Flag - is_automatic
+        :param automatic: Indicate whether the snaphots are taken by an automatic process or manually
         :type automatic: bool
-        :param sticky: Flag - is_sticky
+        :param sticky: Indicates whether the system should clean the snapshots
         :type sticky: bool
         """
         if timestamp is None:

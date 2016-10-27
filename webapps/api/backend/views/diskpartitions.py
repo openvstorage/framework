@@ -41,6 +41,8 @@ class DiskPartitionViewSet(viewsets.ViewSet):
     def list(self, diskguid=None):
         """
         Overview of all disks
+        :param diskguid: Disk guid to get the partitions from
+        :type diskguid: str
         """
         if diskguid is not None:
             disk = Disk(diskguid)
@@ -54,5 +56,7 @@ class DiskPartitionViewSet(viewsets.ViewSet):
     def retrieve(self, diskpartition):
         """
         Load information about a given diskpartition
+        :param diskpartition: The DiskPartition to return
+        :type diskpartition: DiskPartition
         """
         return diskpartition

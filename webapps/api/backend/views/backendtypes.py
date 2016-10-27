@@ -18,7 +18,6 @@
 Contains the BackendTypeViewSet
 """
 
-import json
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from ovs.dal.lists.backendtypelist import BackendTypeList
@@ -42,6 +41,8 @@ class BackendTypeViewSet(viewsets.ViewSet):
     def list(self, query=None):
         """
         Overview of all backend types
+        :param query: Optional filter for BackendTypes
+        :type query: DataQuery
         """
         if query is not None:
             return DataList(BackendType, query)
@@ -54,5 +55,7 @@ class BackendTypeViewSet(viewsets.ViewSet):
     def retrieve(self, backendtype):
         """
         Load information about a given backend type
+        :param backendtype: BackendType to retrieve
+        :type backendtype: BackendType
         """
         return backendtype

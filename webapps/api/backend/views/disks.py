@@ -41,6 +41,8 @@ class DiskViewSet(viewsets.ViewSet):
     def list(self, storagerouterguid=None):
         """
         Overview of all disks
+        :param storagerouterguid: The StorageRouter to get the disks from
+        :type storagerouterguid: guid
         """
         if storagerouterguid is not None:
             storagerouter = StorageRouter(storagerouterguid)
@@ -54,5 +56,7 @@ class DiskViewSet(viewsets.ViewSet):
     def retrieve(self, disk):
         """
         Load information about a given disk
+        :param disk: The Disk to retrieve
+        :type disk: Disk
         """
         return disk

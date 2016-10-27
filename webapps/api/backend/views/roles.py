@@ -50,5 +50,7 @@ class RoleViewSet(viewsets.ViewSet):
     def retrieve(self, role):
         """
         Load information about a given Role
+        :param role: The Role to be returned
+        :type role: Role
         """
         return role

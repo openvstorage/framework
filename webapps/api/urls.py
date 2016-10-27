@@ -54,6 +54,6 @@ urlpatterns = patterns('',
                        url(r'^oauth2/token/', OAuth2TokenView.as_view()),
                        url(r'^oauth2/redirect/', OAuth2RedirectView.as_view()),
                        url(r'^relay/', relay),
-                       url(r'^openapi/', OpenAPIView.as_view()),
+                       url(r'^swagger.json', OpenAPIView.as_view()),
                        url(r'^$', MetadataView.as_view()),
                        url(r'', include(build_router_urls())))

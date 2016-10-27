@@ -50,5 +50,7 @@ class GroupViewSet(viewsets.ViewSet):
     def retrieve(self, group):
         """
         Load information about a given Group
+        :param group: The Group to be returned
+        :type group: Group
         """
         return group

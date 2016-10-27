@@ -48,5 +48,7 @@ class BrandingViewSet(viewsets.ViewSet):
     def retrieve(self, branding):
         """
         Load information about a given branding
+        :param branding: Branding to return
+        :type branding: Branding
         """
         return branding

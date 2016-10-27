@@ -59,7 +59,7 @@ class OVSMiddleware(object):
         # Validate version
         path = request.path
         regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
-        if path != '/api/' and '/api/oauth2/' not in path and '/openapi/' not in path:
+        if path != '/api/' and '/api/oauth2/' not in path and '/swagger.json' not in path:
             if 'HTTP_ACCEPT' not in request.META or regex.match(request.META['HTTP_ACCEPT']) is None:
                 return HttpResponse(
                     json.dumps({'error': 'missing_header',
