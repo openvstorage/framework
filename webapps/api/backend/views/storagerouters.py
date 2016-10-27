@@ -100,19 +100,6 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
-    @load(StorageRouter, max_version=1)
-    def move_away(self, storagerouter):
-        """
-        Marks all StorageDrivers of a given node offline. DO NOT USE ON RUNNING STORAGEROUTERS!
-        :param storagerouter: StorageRouter to move away
-        :type storagerouter: StorageRouter
-        """
-        return StorageDriverController.mark_offline.delay(storagerouter.guid)
-
-    @action()
-    @log()
-    @required_roles(['read', 'write', 'manage'])
-    @return_task()
     @load(StorageRouter)
     def mark_offline(self, storagerouter):
         """
@@ -121,23 +108,6 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :type storagerouter: StorageRouter
         """
         return StorageDriverController.mark_offline.delay(storagerouter.guid)
-
-    @link()
-    @log()
-    @required_roles(['read'])
-    @return_simple()
-    @load(StorageRouter, max_version=1)
-    def get_available_actions(self):
-        """
-        Gets a list of all available actions
-        :return: Actions that can be executed
-        :rtype: list
-        """
-        actions = []
-        storagerouters = StorageRouterList.get_storagerouters()
-        if len(storagerouters) > 1:
-            actions.append('MOVE_AWAY')
-        return actions
 
     @action()
     @log()
@@ -268,10 +238,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :param name: The name of the mountpoint to validate (vPool name)
         :type name: str
         """
-        name = str(name)
-        return StorageRouterController.check_mtpt.s(name).apply_async(
-            routing_key='sr.{0}'.format(storagerouter.machine_id)
-        )
+        return StorageRouterController.mountpoint_exists.delay(name=str(name), storagerouter_guid=storagerouter.guid)
 
     @action()
     @log()

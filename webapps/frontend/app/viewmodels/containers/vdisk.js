@@ -95,7 +95,7 @@ define([
                 return {name: self.dtlMode(), disabled: false};
             },
             write: function(mode) {
-                if (mode === 'no_sync') {
+                if (mode.name === 'no_sync') {
                     self.dtlEnabled(false);
                     self.dtlTarget([]);
                 } else {

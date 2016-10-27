@@ -142,13 +142,9 @@ define([
         self.loadStorageRouters = function() {
             return $.Deferred(function (deferred) {
                 if (generic.xhrCompleted(self.loadStorageRouterHandle)) {
-                    self.loadStorageRouterHandle = api.get('storagerouters', {queryparams: {contents: ''}})
+                    self.loadStorageRouterHandle = api.get('storagerouters')
                         .done(function (data) {
-                            var guids = [];
-                            $.each(data.data, function (index, item) {
-                                guids.push(item.guid);
-                            });
-                            self.vDisk().storageRouterGuids(guids);
+                            self.vDisk().storageRouterGuids(data);
                         })
                         .always(deferred.resolve());
                 }
@@ -267,6 +263,7 @@ define([
                         vd.loadConfiguration(false);
                     });
                 vd.oldConfiguration($.extend({}, vd.configuration()));
+                vd.dtlTarget(vd.configuration().dtl_target.slice());
             }
         };
         self.removeSnapshot = function(snapshotid) {

@@ -19,7 +19,6 @@
 
 import os
 import re
-import pwd
 from subprocess import check_output
 
 if __name__ == '__main__':
@@ -43,21 +42,8 @@ if __name__ == '__main__':
 
     # TODO: set owner:group only where it is really needed
     check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
-    # Cleanup *.pyc files to make sure that on upgrade old obolete pyc files are removed
+    # Cleanup *.pyc files to make sure that on upgrade old obsolete pyc files are removed
     check_output('find /opt/OpenvStorage -name *.pyc -exec rm -f {} \;', shell=True)
-
-    # Few logstash cleanups if it's installed
-    try:
-        pwd.getpwnam('logstash')
-        logstash_installed = True
-    except KeyError:
-        logstash_installed = False
-
-    if logstash_installed:
-        # TODO: logstash user should be added into adm group by logstash package
-        check_output('usermod -a -G adm logstash', shell=True)
-        if os.path.exists('/etc/init/logstash-web.conf'):
-            check_output('echo manual > /etc/init/logstash-web.override', shell=True)
 
     # Configure logging
     check_output('chmod 755 /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh', shell=True)
@@ -92,7 +78,7 @@ if __name__ == '__main__':
     if ssh_content_after != ssh_content_before:
         check_output('service {0} restart'.format(ssh_service), shell=True)
 
-    # Configure coredumps
+    # Configure core-dumps
     limits_file = '/etc/security/limits.conf'
     if os.path.isfile(limits_file):
         contents = file_read(limits_file)

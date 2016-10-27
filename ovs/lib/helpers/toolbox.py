@@ -180,13 +180,6 @@ class Toolbox(object):
         :param logger: LogHandler Object
         """
         action = None
-        # Enable service before changing the state
-        status = ServiceManager.is_enabled(name, client=client)
-        if status is False:
-            if logger is not None:
-                logger.debug('  {0:<15} - Enabling service {1}'.format(client.ip, name))
-            ServiceManager.enable_service(name, client=client)
-
         status, _ = ServiceManager.get_service_status(name, client=client)
         if status is False and state in ['start', 'restart']:
             if logger is not None:

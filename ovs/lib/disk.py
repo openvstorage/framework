@@ -106,7 +106,6 @@ class DiskController(object):
             system_aliases = name_alias_mapping.get(friendly_path, [friendly_path])
             device_is_also_partition = False
             if link is not None:  # If this returns, it means its a device and not a partition
-                DiskController._logger.info('Investigating device {0}'.format(friendly_path))
                 device_is_also_partition = mount_point != ''  # LVM, RAID1, ... have the tendency to be a device with a partition on it, but the partition is not reported by 'lsblk'
                 device_state = Disk.STATES.OK if state == 'running' or dev_nr.split(':')[0] != '8' else Disk.STATES.FAILURE
                 parsed_devices.append({'name': name,
@@ -119,7 +118,6 @@ class DiskController(object):
                                        'aliases': system_aliases,
                                        'partitions': {}}
             if link is None or device_is_also_partition is True:
-                DiskController._logger.info('Investigating partition {0}'.format(friendly_path))
                 current_device = None
                 current_device_state = None
                 if device_is_also_partition is True:

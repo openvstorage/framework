@@ -62,20 +62,6 @@ class Upstart(object):
             Upstart.services[key].pop(name)
 
     @staticmethod
-    def disable_service(name, client):
-        """
-        Disable a mocked service
-        """
-        _ = name, client
-
-    @staticmethod
-    def enable_service(name, client):
-        """
-        Enabled a mocked service
-        """
-        _ = name, client
-
-    @staticmethod
     def start_service(name, client):
         """
         Start a mocked service
@@ -118,14 +104,6 @@ class Upstart(object):
         """
         key = 'None' if client is None else client.ip
         return name in Upstart.services.get(key, {})
-
-    @staticmethod
-    def is_enabled(name, client):
-        """
-        Verify whether a mocked service is enabled
-        """
-        _ = name, client
-        return True
 
     @staticmethod
     def _service_exists(name, client, path):
