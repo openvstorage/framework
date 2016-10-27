@@ -1,5 +1,5 @@
 ### Scheduled Tasks
-The Framework is responsible for executing all Open vStorage scheduled tasks. These tasks are kicked of by celery beat, the task scheduler of Celery. To schedule the exact timing of these tasks, celery schedules are used. These schedules are store in the [distributed configuration management system](configmgmt.md).  
+The Framework is responsible for executing all Open vStorage scheduled tasks. These tasks are kicked of by celery beat, the task scheduler of Celery. To schedule the exact timing of these tasks, celery schedules are used. The default hardcoded schedules can be changed or disabled by saving the desired schedule in the [distributed configuration management system](configmgmt.md).  
 
 An optional new key is introduced in the Configuration management: `/ovs/framework/scheduling/celery` which contains a JSON dictionary where the key is the task's name, and the value is:
 
@@ -10,13 +10,13 @@ Example configuration:
 
 ```
 {
-    "ovs.scheduled.collapse_arakoon": {"minute": "0", "hour": "*"},
-    "alba.nsm_checkup": null
+    "ovs.scheduled.execute_scrub": {"minute": "0", "hour": "*"},
+    "alba.scheduled.verify_namespaces": null
 }
 ```
 
 
-To disblale the automatic scrubbing job add `"ovs.scheduled.execute_scrub": null` to the scheduling key. 
+To disblale the automatic scrubbing job add `"ovs.scheduled.execute_scrub": null` to the JSON object. 
 In case you want to change the schedule for the ALBA backend verifictaion process which checks the state of each object in the backend, add `"alba.scheduled.verify_namespaces": {"minute": "0", "hour": "0", "month_of_year": "*/X"}` where X is the amount of months between each run.
 
 
