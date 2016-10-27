@@ -26,7 +26,7 @@ class Systemd(object):
     """
     Contains all logic related to Systemd services
     """
-    _logger = LogHandler.get('extensions', name='servicemanager')
+    _logger = LogHandler.get('extensions', name='service-manager')
 
     @staticmethod
     def _service_exists(name, client, path):
@@ -136,6 +136,7 @@ class Systemd(object):
         :return: None
         """
         name = Systemd._get_name(name, client)
+        client.run('systemctl disable {0}.service')
         client.file_delete('/lib/systemd/system/{0}.service'.format(name))
         client.run('systemctl daemon-reload')
 

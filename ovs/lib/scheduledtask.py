@@ -253,7 +253,7 @@ class ScheduledTaskController(object):
 
             # Copy backend connection manager information in separate key
             threads_to_spawn = min(max_threads_per_vpool, len(scrub_locations))
-            ScheduledTaskController._logger.info('Scrubber - vPool {0} - Spawning {1} threads'.format(vp.name, threads_to_spawn))
+            ScheduledTaskController._logger.info('Scrubber - vPool {0} - Spawning {1} thread{2}'.format(vp.name, threads_to_spawn, '' if threads_to_spawn == 1 else 's'))
             for _ in range(threads_to_spawn):
                 scrub_target = scrub_locations[counter % len(scrub_locations)]
                 thread = Thread(target=ScheduledTaskController.execute_scrub_work,
@@ -272,8 +272,8 @@ class ScheduledTaskController(object):
     @staticmethod
     def execute_scrub_work(queue, vpool, scrub_info, error_messages):
         """
-        Executes scrub work for a given vDisk quueue and vPool, based on scrub_info
-        :param queue: a Queue with vDisk guids that need to be scrubed (they should only be member of a single vPool)
+        Executes scrub work for a given vDisk queue and vPool, based on scrub_info
+        :param queue: a Queue with vDisk guids that need to be scrubbed (they should only be member of a single vPool)
         :type queue: Queue
         :param vpool: the vPool object of the vDisks
         :type vpool: VPool
