@@ -15,8 +15,8 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define, window */
 define([
-    'durandal/activator', 'plugins/dialog', 'knockout', 'jquery'
-], function(activator, dialog, ko, $) {
+    'durandal/activator', 'plugins/dialog', 'knockout', 'jquery', 'ovs/generic'
+], function(activator, dialog, ko, $, generic) {
     "use strict";
     return function(parent) {
         // Observables
@@ -26,6 +26,7 @@ define([
         parent.running     = ko.observable(false);
         parent.steps       = ko.observableArray([]);
         parent.loadingNext = ko.observable(false);
+        parent.id          = ko.observable(generic.getHash());
 
         // Deferreds
         parent.closing   = $.Deferred();
