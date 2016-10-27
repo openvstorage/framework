@@ -40,6 +40,7 @@ class VDiskViewSet(viewsets.ViewSet):
     permission_classes = (IsAuthenticated,)
     prefix = r'vdisks'
     base_name = 'vdisks'
+    return_exceptions = ['vdisks.create']
 
     @log()
     @required_roles(['read', 'manage'])

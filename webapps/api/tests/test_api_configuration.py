@@ -39,8 +39,7 @@ class APIConfiguration(unittest.TestCase):
         """
         Validates whether all API calls have a proper @return_* decorator
         """
-        return_exceptions = ['tasks.list', 'tasks.retrieve', 'vdisks.create']
-        functions = APIConfiguration._get_functions()
+        functions, return_exceptions = APIConfiguration._get_functions()
         errors = []
         for fun in functions:
             fun_id = '{0}.{1}'.format(fun.__module__, fun.__name__)
@@ -81,7 +80,7 @@ class APIConfiguration(unittest.TestCase):
         """
         Validates whether an @load decorator is set
         """
-        functions = APIConfiguration._get_functions()
+        functions, _ = APIConfiguration._get_functions()
         errors = []
         for fun in functions:
             fun_id = '{0}.{1}'.format(fun.__module__, fun.__name__)
@@ -108,6 +107,7 @@ class APIConfiguration(unittest.TestCase):
     @staticmethod
     def _get_functions():
         funs = []
+        return_exceptions = []
         path = '/'.join([os.path.dirname(__file__), '..', 'backend', 'views'])
         for filename in os.listdir(path):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py'):
@@ -120,7 +120,9 @@ class APIConfiguration(unittest.TestCase):
                         cls = member[1]
                         if hasattr(cls, 'skip_spec') and cls.skip_spec is True:
                             continue
+                        if hasattr(cls, 'return_exceptions'):
+                            return_exceptions += cls.return_exceptions
                         base_calls = ['list', 'retrieve', 'create', 'destroy', 'partial_update']
                         funs += [fun[1] for fun in inspect.getmembers(cls, predicate=inspect.ismethod)
                                  if fun[0] in base_calls or hasattr(fun[1], 'bind_to_methods')]
-        return funs
+        return funs, return_exceptions

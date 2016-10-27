@@ -21,11 +21,9 @@ Module for working with celery tasks
 from backend.decorators import load, log, required_roles, return_simple
 from celery.task.control import inspect
 from ovs.celery_run import celery
-from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.decorators import link
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 
 
 class TaskViewSet(viewsets.ViewSet):
@@ -35,6 +33,7 @@ class TaskViewSet(viewsets.ViewSet):
     permission_classes = (IsAuthenticated,)
     prefix = r'tasks'
     base_name = 'tasks'
+    return_exceptions = ['tasks.list', 'tasks.retrieve']
 
     @log()
     @required_roles(['read'])
