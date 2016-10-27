@@ -7,6 +7,7 @@
     * [Master and Extra Nodes](docs/masterextra.md)
     * [The watchers](docs/watchers.md)
     * [The scrubber](docs/scrubber.md)
+	* [Scheduled Tasks](docs/scheduledtasks.md)
 * [Logs](docs/log.md)
 * [Testing](docs/testing.md)
     * [Automated Tests](docs/autotests.md)
