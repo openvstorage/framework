@@ -370,7 +370,7 @@ class Decorators(unittest.TestCase):
 
         response = the_function_rt(1)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data, '1')
+        self.assertEqual(response.data, 1)
 
     def test_return_object(self):
         """
