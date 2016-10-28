@@ -81,11 +81,10 @@ class OVSMiddleware(object):
         """
         _ = self
         # Process CORS responses
-        print request.META
         if 'HTTP_ORIGIN' in request.META:
             storagerouters = StorageRouterList.get_storagerouters()
             allowed_origins = ['https://{0}'.format(storagerouter.ip) for storagerouter in storagerouters]
-            if request.META['HTTP_ORIGIN'] in allowed_origins + ['null']:  # TODO: remove the ['null']
+            if request.META['HTTP_ORIGIN'] in allowed_origins:
                 response['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
                 response['Access-Control-Allow-Headers'] = 'x-requested-with, content-type, accept, origin, authorization'
                 response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
