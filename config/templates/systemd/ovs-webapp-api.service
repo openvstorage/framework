@@ -1,5 +1,5 @@
 [Unit]
-Description=webapp api
+Description=Open vStorage webapp API
 Requires=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
 After=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
 
