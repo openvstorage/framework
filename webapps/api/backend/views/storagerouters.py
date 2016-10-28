@@ -92,7 +92,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         contents = None if contents is None else contents.split(',')
         serializer = FullSerializer(StorageRouter, contents=contents, instance=storagerouter, data=request.DATA)
-        storagerouter = serializer.object
+        storagerouter = serializer.deserialize()
         storagerouter.save()
         return storagerouter
 

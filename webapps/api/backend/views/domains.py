@@ -71,7 +71,7 @@ class DomainViewSet(viewsets.ViewSet):
         """
         contents = None if contents is None else contents.split(',')
         serializer = FullSerializer(Domain, contents=contents, instance=Domain(), data=request.DATA)
-        domain = serializer.object
+        domain = serializer.deserialize()
         domain.save()
         return domain
 
@@ -108,6 +108,6 @@ class DomainViewSet(viewsets.ViewSet):
         """
         contents = None if contents is None else contents.split(',')
         serializer = FullSerializer(Domain, contents=contents, instance=domain, data=request.DATA)
-        domain = serializer.object
+        domain = serializer.deserialize()
         domain.save()
         return domain

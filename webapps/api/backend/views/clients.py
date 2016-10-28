@@ -99,12 +99,12 @@ class ClientViewSet(viewsets.ViewSet):
         if 'role_guids' in request.DATA:
             del request.DATA['role_guids']
         serializer = FullSerializer(Client, instance=Client(), data=request.DATA)
-        client = serializer.object
+        client = serializer.deserialize()
         if client.user is not None:
             if client.user_guid == request.client.user_guid or Toolbox.is_client_in_roles(request.client, ['manage']):
                 client.grant_type = 'CLIENT_CREDENTIALS'
                 client.client_secret = OAuth2Toolbox.create_hash(64)
-                serializer.save()
+                client.save()
                 if not role_guids:
                     roles = [junction.role for junction in client.user.group.roles]
                 else:

@@ -105,7 +105,7 @@ class BackendViewSet(viewsets.ViewSet):
         :type request: Request
         """
         serializer = FullSerializer(Backend, instance=Backend(), data=request.DATA)
-        backend = serializer.object
+        backend = serializer.deserialize()
         duplicate = BackendList.get_by_name(backend.name)
         if duplicate is None:
             backend.save()

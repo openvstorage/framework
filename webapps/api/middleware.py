@@ -21,6 +21,7 @@ Middleware module
 import re
 import json
 from django.http import HttpResponse
+from ovs.dal.exceptions import MissingMandatoryFieldsException
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.log.log_handler import LogHandler
 
@@ -39,6 +40,11 @@ class OVSMiddleware(object):
         if OVSMiddleware._is_own_httpexception(exception):
             return HttpResponse(exception.data,
                                 status=exception.status_code,
+                                content_type='application/json')
+        if isinstance(exception, MissingMandatoryFieldsException):
+            return HttpResponse(json.dumps({'error': 'invalid_data',
+                                            'error_description': exception.message}),
+                                status=400,
                                 content_type='application/json')
         logger.exception('An unhandled exception occurred: {0}'.format(exception))
         return HttpResponse(

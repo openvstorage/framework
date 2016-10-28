@@ -26,8 +26,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, load, return_object, return_list, log, return_simple
 from api.backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
-from api.backend.serializers.serializers import FullSerializer
-from api.backend.serializers.user import PasswordSerializer
+from api.backend.serializers.serializers import FullSerializer, PasswordSerializer
 from api.backend.toolbox import Toolbox
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.j_roleclient import RoleClient
@@ -86,7 +85,7 @@ class UserViewSet(viewsets.ViewSet):
         :type request: Request
         """
         serializer = FullSerializer(User, instance=User(), data=request.DATA, allow_passwords=True)
-        user = serializer.object
+        user = serializer.deserialize()
         if UserList.get_user_by_username(user.username) is not None:
             raise HttpNotAcceptableException(error_description='User with this username already exists',
                                              error='duplicate')
@@ -157,7 +156,7 @@ class UserViewSet(viewsets.ViewSet):
         """
         contents = None if contents is None else contents.split(',')
         serializer = FullSerializer(User, contents=contents, instance=user, data=request.DATA)
-        user = serializer.object
+        user = serializer.deserialize()
         if user.guid == request.client.user_guid:
             raise HttpForbiddenException(error_description='A user cannot update itself',
                                          error='impossible_request')

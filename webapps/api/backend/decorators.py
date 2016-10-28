@@ -383,7 +383,7 @@ def return_task():
             Wrapped function
             """
             task = f(*args, **kwargs)
-            return Response(json.dumps(task.id), status=status.HTTP_200_OK)
+            return Response(task.id, status=status.HTTP_200_OK)
 
         return new_function
     return wrap
@@ -418,7 +418,7 @@ def return_simple(mode=None):
             result = f(*args, **kwargs)
             if result is None:
                 return Response(status=status.HTTP_204_NO_CONTENT)
-            return Response(json.dumps(result), status=return_status)
+            return Response(result, status=return_status)
 
         return new_function
 
