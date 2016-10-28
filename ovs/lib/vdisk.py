@@ -535,17 +535,7 @@ class VDiskController(object):
         if mds_service is None:
             raise RuntimeError('Could not find a MDS service')
 
-        new_vdisk = VDisk()
-        new_vdisk.size = vdisk.size
-        new_vdisk.vpool = vdisk.vpool
-        new_vdisk.devicename = devicename
-        new_vdisk.parent_vdisk = vdisk
-        new_vdisk.name = name
-        new_vdisk.description = name
-        new_vdisk.save()
-
-        VDiskController._logger.info('Create vDisk from vTemplate {0} to new vDisk {1} to location {2}'.format(vdisk.name, new_vdisk.name, devicename))
-
+        VDiskController._logger.info('Create vDisk from vTemplate {0} to new vDisk {1} to location {2}'.format(vdisk.name, name, devicename))
         try:
             # noinspection PyArgumentList
             backend_config = MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
@@ -554,18 +544,26 @@ class VDiskController(object):
                                                                               metadata_backend_config=MDSMetaDataBackendConfig([backend_config]),
                                                                               parent_volume_id=str(vdisk.volume_id),
                                                                               node_id=str(storagedriver.storagedriver_id))
-            new_vdisk.volume_id = volume_id
-            new_vdisk.save()
+        except Exception as ex:
+            VDiskController._logger.error('Cloning vTemplate {0} failed: {1}'.format(vdisk.name, str(ex)))
+            raise
+
+        new_vdisk = VDisk()
+        new_vdisk.size = vdisk.size
+        new_vdisk.vpool = vdisk.vpool
+        new_vdisk.devicename = devicename
+        new_vdisk.parent_vdisk = vdisk
+        new_vdisk.name = name
+        new_vdisk.description = name
+        new_vdisk.volume_id = volume_id
+        new_vdisk.save()
+
+        VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
+        try:
             MDSServiceController.ensure_safety(new_vdisk)
-            VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
             VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
         except Exception as ex:
-            VDiskController._logger.error('Clone vDisk on volumedriver level failed with exception: {0}'.format(str(ex)))
-            try:
-                VDiskController.delete(new_vdisk.guid)
-            except Exception as ex2:
-                VDiskController._logger.exception('Exception during exception handling of "create_clone_from_template" : {0}'.format(str(ex2)))
-            raise
+            VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}: {1}'.format(name, str(ex)))
 
         return {'vdisk_guid': new_vdisk.guid,
                 'name': new_vdisk.name,
