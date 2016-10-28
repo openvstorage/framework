@@ -286,16 +286,17 @@ class VDiskController(object):
             VDiskController._logger.error('Cloning snapshot to new vDisk {0} failed: {1}'.format(name, str(ex)))
             raise
 
-        new_vdisk = VDisk()
-        new_vdisk.size = vdisk.size
-        new_vdisk.parent_vdisk = vdisk
-        new_vdisk.name = name
-        new_vdisk.description = name
-        new_vdisk.devicename = devicename
-        new_vdisk.parentsnapshot = snapshot_id
-        new_vdisk.vpool = vdisk.vpool
-        new_vdisk.volume_id = volume_id
-        new_vdisk.save()
+        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+            new_vdisk = VDisk()
+            new_vdisk.size = vdisk.size
+            new_vdisk.parent_vdisk = vdisk
+            new_vdisk.name = name
+            new_vdisk.description = name
+            new_vdisk.devicename = devicename
+            new_vdisk.parentsnapshot = snapshot_id
+            new_vdisk.vpool = vdisk.vpool
+            new_vdisk.volume_id = volume_id
+            new_vdisk.save()
 
         VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
         try:
@@ -540,15 +541,16 @@ class VDiskController(object):
             VDiskController._logger.error('Cloning vTemplate {0} failed: {1}'.format(vdisk.name, str(ex)))
             raise
 
-        new_vdisk = VDisk()
-        new_vdisk.size = vdisk.size
-        new_vdisk.vpool = vdisk.vpool
-        new_vdisk.devicename = devicename
-        new_vdisk.parent_vdisk = vdisk
-        new_vdisk.name = name
-        new_vdisk.description = name
-        new_vdisk.volume_id = volume_id
-        new_vdisk.save()
+        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+            new_vdisk = VDisk()
+            new_vdisk.size = vdisk.size
+            new_vdisk.vpool = vdisk.vpool
+            new_vdisk.devicename = devicename
+            new_vdisk.parent_vdisk = vdisk
+            new_vdisk.name = name
+            new_vdisk.description = name
+            new_vdisk.volume_id = volume_id
+            new_vdisk.save()
 
         VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
         try:
@@ -601,14 +603,15 @@ class VDiskController(object):
             VDiskController._logger.error('Creating new vDisk {0} failed: {1}'.format(volume_name, str(ex)))
             raise
 
-        new_vdisk = VDisk()
-        new_vdisk.size = volume_size
-        new_vdisk.vpool = vpool
-        new_vdisk.devicename = devicename
-        new_vdisk.name = volume_name
-        new_vdisk.description = volume_name
-        new_vdisk.volume_id = volume_id
-        new_vdisk.save()
+        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+            new_vdisk = VDisk()
+            new_vdisk.size = volume_size
+            new_vdisk.vpool = vpool
+            new_vdisk.devicename = devicename
+            new_vdisk.name = volume_name
+            new_vdisk.description = volume_name
+            new_vdisk.volume_id = volume_id
+            new_vdisk.save()
 
         VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
         try:
