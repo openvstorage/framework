@@ -1,6 +1,6 @@
 [Unit]
 Description=Watcher for the configuration cluster
-Wants=nginx.service ovs-openstack-events-consumer<_SERVICE_SUFFIX_>.service ovs-scheduled-tasks<_SERVICE_SUFFIX_>.service ovs-volumerouter-consumer<_SERVICE_SUFFIX_>.service ovs-webapp-api<_SERVICE_SUFFIX_>.service ovs-workers<_SERVICE_SUFFIX_>.service
+Wants=nginx.service ovs-scheduled-tasks<_SERVICE_SUFFIX_>.service ovs-volumerouter-consumer<_SERVICE_SUFFIX_>.service ovs-webapp-api<_SERVICE_SUFFIX_>.service ovs-workers<_SERVICE_SUFFIX_>.service
 
 [Service]
 Type=simple
