@@ -17,9 +17,9 @@
 """
 APIConfiguration module
 """
+import os
 import imp
 import inspect
-import os
 import unittest
 
 
@@ -27,13 +27,6 @@ class APIConfiguration(unittest.TestCase):
     """
     This test suite will validate whether all API's are properly decorated
     """
-
-    @classmethod
-    def setUpClass(cls):
-        """
-        Fakes Django environment
-        """
-        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
     def test_return(self):
         """

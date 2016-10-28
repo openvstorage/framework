@@ -19,9 +19,9 @@ Contains the BrandingViewSet
 """
 
 from rest_framework import viewsets
+from api.backend.decorators import return_object, return_list, load, limit, log
 from ovs.dal.lists.brandinglist import BrandingList
 from ovs.dal.hybrids.branding import Branding
-from backend.decorators import return_object, return_list, load, limit, log
 
 
 class BrandingViewSet(viewsets.ViewSet):

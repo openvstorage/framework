@@ -23,8 +23,8 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link, action
+from api.backend.decorators import required_roles, load, log
 from ovs.lib.messaging import MessageController
-from backend.decorators import required_roles, load, log
 
 
 class MessagingViewSet(viewsets.ViewSet):

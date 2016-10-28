@@ -20,10 +20,10 @@ DiskPartition module
 
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from api.backend.decorators import required_roles, load, return_list, return_object, log
 from ovs.dal.lists.diskpartitionlist import DiskPartitionList
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
-from backend.decorators import required_roles, load, return_list, return_object, log
 
 
 class DiskPartitionViewSet(viewsets.ViewSet):

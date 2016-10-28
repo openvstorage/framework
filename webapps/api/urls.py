@@ -21,11 +21,11 @@ import os
 import imp
 import inspect
 from django.conf.urls import patterns, include, url
-from oauth2.tokenview import OAuth2TokenView
-from oauth2.redirectview import OAuth2RedirectView
 from rest_framework.routers import SimpleRouter
-from openapi import OpenAPIView
-from view import MetadataView, relay
+from api.oauth2.tokenview import OAuth2TokenView
+from api.oauth2.redirectview import OAuth2RedirectView
+from api.openapi import OpenAPIView
+from api.view import MetadataView, relay
 
 
 def build_router_urls():

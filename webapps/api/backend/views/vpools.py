@@ -22,8 +22,8 @@ import time
 from rest_framework import viewsets
 from rest_framework.decorators import link, action
 from rest_framework.permissions import IsAuthenticated
-from backend.decorators import required_roles, load, return_list, return_object, return_task, return_simple, log
-from backend.exceptions import HttpNotAcceptableException
+from api.backend.decorators import required_roles, load, return_list, return_object, return_task, return_simple, log
+from api.backend.exceptions import HttpNotAcceptableException
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool

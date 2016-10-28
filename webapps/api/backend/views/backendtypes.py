@@ -20,10 +20,10 @@ Contains the BackendTypeViewSet
 
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from api.backend.decorators import return_object, return_list, load, required_roles, log
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.datalist import DataList
-from backend.decorators import return_object, return_list, load, required_roles, log
 
 
 class BackendTypeViewSet(viewsets.ViewSet):

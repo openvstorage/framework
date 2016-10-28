@@ -24,11 +24,11 @@ import hashlib
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from backend.decorators import required_roles, load, return_object, return_list, log, return_simple
-from backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
-from backend.serializers.serializers import FullSerializer
-from backend.serializers.user import PasswordSerializer
-from backend.toolbox import Toolbox
+from api.backend.decorators import required_roles, load, return_object, return_list, log, return_simple
+from api.backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
+from api.backend.serializers.serializers import FullSerializer
+from api.backend.serializers.user import PasswordSerializer
+from api.backend.toolbox import Toolbox
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.j_roleclient import RoleClient
 from ovs.dal.hybrids.user import User

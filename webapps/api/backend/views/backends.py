@@ -21,10 +21,10 @@ Contains the BackendViewSet
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from backend.decorators import return_object, return_list, load, required_roles, log, return_simple
-from backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
-from backend.serializers.serializers import FullSerializer
-from backend.toolbox import Toolbox
+from api.backend.decorators import return_object, return_list, load, required_roles, log, return_simple
+from api.backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
+from api.backend.serializers.serializers import FullSerializer
+from api.backend.toolbox import Toolbox
 from ovs.dal.lists.backendlist import BackendList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.hybrids.backend import Backend

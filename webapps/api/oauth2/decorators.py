@@ -24,7 +24,7 @@ from django.core.handlers.wsgi import WSGIRequest
 from django.http import HttpResponse
 from functools import wraps
 from rest_framework.request import Request
-from oauth2.exceptions import HttpForbiddenException, HttpTooManyRequestsException
+from api.oauth2.exceptions import HttpForbiddenException, HttpTooManyRequestsException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.log.log_handler import LogHandler

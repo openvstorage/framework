@@ -21,8 +21,8 @@ StorageDriver API module
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
-from backend.decorators import required_roles, load, return_list, return_object, return_simple, log
-from backend.exceptions import HttpNotAcceptableException
+from api.backend.decorators import required_roles, load, return_list, return_object, return_simple, log
+from api.backend.exceptions import HttpNotAcceptableException
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.hybrids.storagedriver import StorageDriver
 

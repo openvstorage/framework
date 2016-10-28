@@ -20,10 +20,10 @@ Disk module
 
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from api.backend.decorators import required_roles, load, return_list, return_object, log
 from ovs.dal.lists.disklist import DiskList
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.storagerouter import StorageRouter
-from backend.decorators import required_roles, load, return_list, return_object, log
 
 
 class DiskViewSet(viewsets.ViewSet):

@@ -19,9 +19,12 @@ StorageRouter module
 """
 
 from celery.task.control import revoke
-from backend.decorators import required_roles, return_list, return_object, return_task, return_simple, load, log
-from backend.exceptions import HttpNotAcceptableException
-from backend.serializers.serializers import FullSerializer
+from rest_framework import viewsets
+from rest_framework.decorators import action, link
+from rest_framework.permissions import IsAuthenticated
+from api.backend.decorators import required_roles, return_list, return_object, return_task, return_simple, load, log
+from api.backend.exceptions import HttpNotAcceptableException
+from api.backend.serializers.serializers import FullSerializer
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.storagerouter import StorageRouter
@@ -33,9 +36,6 @@ from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.vdisk import VDiskController
-from rest_framework import viewsets
-from rest_framework.decorators import action, link
-from rest_framework.permissions import IsAuthenticated
 
 
 class StorageRouterViewSet(viewsets.ViewSet):

@@ -18,14 +18,13 @@
 Module for domains
 """
 
-from backend.decorators import load, log, required_roles, return_list, return_object, return_simple
-from backend.exceptions import HttpNotAcceptableException
-from backend.serializers.serializers import FullSerializer
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from api.backend.decorators import load, log, required_roles, return_list, return_object, return_simple
+from api.backend.exceptions import HttpNotAcceptableException
+from api.backend.serializers.serializers import FullSerializer
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.lists.domainlist import DomainList
-from rest_framework import status, viewsets
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 
 
 class DomainViewSet(viewsets.ViewSet):

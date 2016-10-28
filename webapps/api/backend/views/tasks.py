@@ -18,12 +18,12 @@
 Module for working with celery tasks
 """
 
-from backend.decorators import load, log, required_roles, return_simple
 from celery.task.control import inspect
-from ovs.celery_run import celery
 from rest_framework import viewsets
 from rest_framework.decorators import link
 from rest_framework.permissions import IsAuthenticated
+from api.backend.decorators import load, log, required_roles, return_simple
+from ovs.celery_run import celery
 
 
 class TaskViewSet(viewsets.ViewSet):

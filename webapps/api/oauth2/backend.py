@@ -20,7 +20,7 @@ Contains the OAuth 2 authentication/authorization backends
 import time
 from django.contrib.auth.models import User as DUser
 from rest_framework.authentication import BaseAuthentication
-from oauth2.exceptions import HttpUnauthorizedException
+from api.oauth2.exceptions import HttpUnauthorizedException
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 
 

@@ -30,7 +30,8 @@ from functools import wraps
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.request import Request
-from backend.exceptions import HttpUnauthorizedException, HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException
+from api.backend.exceptions import HttpUnauthorizedException, HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException
+from api.backend.toolbox import Toolbox
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import Toolbox as DalToolbox
 from ovs.dal.lists.userlist import UserList
@@ -38,11 +39,11 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
-from toolbox import Toolbox
+
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
-    from backend.serializers.mockups import FullSerializer
+    from api.backend.serializers.mockups import FullSerializer
 else:
-    from backend.serializers.serializers import FullSerializer
+    from api.backend.serializers.serializers import FullSerializer
 
 
 def _find_request(args):

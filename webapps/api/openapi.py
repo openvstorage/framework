@@ -25,8 +25,8 @@ import inspect
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-from backend.decorators import load
-from oauth2.decorators import auto_response
+from api.backend.decorators import load
+from api.oauth2.decorators import auto_response
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations import RelationMapper

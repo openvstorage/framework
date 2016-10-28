@@ -24,9 +24,9 @@ from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.conf import settings
-from backend.decorators import required_roles, load
-from backend.exceptions import HttpBadRequestException
-from oauth2.decorators import auto_response, limit, authenticated
+from api.backend.decorators import required_roles, load
+from api.backend.exceptions import HttpBadRequestException
+from api.oauth2.decorators import auto_response, limit, authenticated
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
