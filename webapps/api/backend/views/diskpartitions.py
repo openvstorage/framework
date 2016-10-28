@@ -20,10 +20,10 @@ DiskPartition module
 
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from api.backend.decorators import required_roles, load, return_list, return_object, log
 from ovs.dal.lists.diskpartitionlist import DiskPartitionList
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
-from backend.decorators import required_roles, load, return_list, return_object, log
 
 
 class DiskPartitionViewSet(viewsets.ViewSet):
@@ -41,6 +41,8 @@ class DiskPartitionViewSet(viewsets.ViewSet):
     def list(self, diskguid=None):
         """
         Overview of all disks
+        :param diskguid: Disk guid to get the partitions from
+        :type diskguid: str
         """
         if diskguid is not None:
             disk = Disk(diskguid)
@@ -54,5 +56,7 @@ class DiskPartitionViewSet(viewsets.ViewSet):
     def retrieve(self, diskpartition):
         """
         Load information about a given diskpartition
+        :param diskpartition: The DiskPartition to return
+        :type diskpartition: DiskPartition
         """
         return diskpartition

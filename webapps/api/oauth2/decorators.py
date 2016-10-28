@@ -22,8 +22,9 @@ import time
 from django.contrib.auth import authenticate, login
 from django.core.handlers.wsgi import WSGIRequest
 from django.http import HttpResponse
+from functools import wraps
 from rest_framework.request import Request
-from oauth2.exceptions import HttpForbiddenException, HttpTooManyRequestsException
+from api.oauth2.exceptions import HttpForbiddenException, HttpTooManyRequestsException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.log.log_handler import LogHandler
@@ -38,14 +39,17 @@ def _find_request(args):
             return item
 
 
-def auto_response():
+def auto_response(beautify=False):
     """
     Json response wrapper
     """
+
     def wrap(f):
         """
         Wrapper function
         """
+
+        @wraps(f)
         def new_function(*args, **kw):
             """
             Wrapped function
@@ -54,11 +58,13 @@ def auto_response():
             if isinstance(results, HttpResponse):
                 return results
             if isinstance(results, dict):
-                return HttpResponse(json.dumps(results), content_type='application/json')
+                if beautify is True:
+                    data = json.dumps(results, indent=4, sort_keys=True)
+                else:
+                    data = json.dumps(results)
+                return HttpResponse(data, content_type='application/json')
             return HttpResponse(results)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -73,6 +79,8 @@ def limit(amount, per, timeout):
         """
         Wrapper function
         """
+
+        @wraps(f)
         def new_function(self, request, *args, **kwargs):
             """
             Wrapped function
@@ -109,8 +117,6 @@ def limit(amount, per, timeout):
                 mutex.release()
             return f(self, request, *args, **kwargs)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -125,6 +131,7 @@ def log():
         Wrapper function
         """
 
+        @wraps(f)
         def new_function(self, request, *args, **kwargs):
             """
             Wrapped function
@@ -146,8 +153,6 @@ def log():
             # Call the function
             return f(self, request, *args, **kwargs)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
 
     return wrap
@@ -163,6 +168,7 @@ def authenticated():
         Wrapper function
         """
 
+        @wraps(f)
         def new_function(*args, **kwargs):
             """
             Wrapped function
@@ -175,8 +181,6 @@ def authenticated():
             login(request, user)
             return f(*args, **kwargs)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
 
     return wrap

@@ -95,9 +95,26 @@ class FullSerializer(serializers.Serializer):
             return serializers.WritableField(required=False)
         return serializers.Field()
 
-    class Meta:
+    def deserialize(self):
+        _ = self.errors  # Trigger deserialization
+        return self.object
+
+    class Meta(object):
         """
         Meta class
         """
         fields = ('guid',)
         read_only_fields = ('guid',)
+
+
+class PasswordSerializer(serializers.Serializer):
+    """
+    Serializes received passwords
+    """
+    new_password = serializers.CharField(required=True)
+
+    class Meta(object):
+        """
+        Metaclass
+        """
+        fields = ('new_password',)

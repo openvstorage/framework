@@ -18,14 +18,13 @@
 Contains the BackendViewSet
 """
 
-from rest_framework import status, viewsets
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from backend.decorators import return_object, return_list, load, required_roles, log, return_plain
-from backend.exceptions import HttpForbiddenException
-from backend.serializers.serializers import FullSerializer
-from backend.toolbox import Toolbox
+from api.backend.decorators import return_object, return_list, load, required_roles, log, return_simple
+from api.backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
+from api.backend.serializers.serializers import FullSerializer
+from api.backend.toolbox import Toolbox
 from ovs.dal.lists.backendlist import BackendList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.hybrids.backend import Backend
@@ -48,7 +47,9 @@ class BackendViewSet(viewsets.ViewSet):
     def validate_access(self, backend, request):
         """
         :param backend: The Backend to validate
+        :type backend: Backend
         :param request: The raw request
+        :type request: Request
         """
         _ = self
         if not Toolbox.access_granted(request.client,
@@ -64,6 +65,10 @@ class BackendViewSet(viewsets.ViewSet):
     def list(self, request, backend_type=None):
         """
         Overview of all backends (from a certain type, if given) on the local node (or a remote one)
+        :param request: The raw request
+        :type request: Request
+        :param backend_type: Optional BackendType code to filter
+        :type backend_type: str
         """
         if backend_type is None:
             possible_backends = BackendList.get_backends()
@@ -84,28 +89,34 @@ class BackendViewSet(viewsets.ViewSet):
     def retrieve(self, backend):
         """
         Load information about a given backend
+        :param backend: The backend to retrieve
+        :type backend: Backend
         """
         return backend
 
     @log()
     @required_roles(['read', 'write', 'manage'])
+    @return_object(Backend, mode='created')
     @load()
     def create(self, request):
         """
         Creates a Backend
+        :param request: The raw request
+        :type request: Request
         """
         serializer = FullSerializer(Backend, instance=Backend(), data=request.DATA)
-        if serializer.is_valid():
-            duplicate = BackendList.get_by_name(serializer.object.name)
-            if duplicate is None:
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        backend = serializer.deserialize()
+        duplicate = BackendList.get_by_name(backend.name)
+        if duplicate is None:
+            backend.save()
+            return backend
+        raise HttpNotAcceptableException(error_description='Backend with this name already exists',
+                                         error='duplicate')
 
     @action()
     @log()
     @required_roles(['read', 'write', 'manage'])
-    @return_plain()
+    @return_simple()
     @load(Backend, validator=validate_access)
     def set_domains(self, backend, domain_guids):
         """
@@ -114,6 +125,8 @@ class BackendViewSet(viewsets.ViewSet):
         :type backend: Backend
         :param domain_guids: A list of Domain guids
         :type domain_guids: list
+        :return: None
+        :rtype: None
         """
         for junction in backend.domains:
             if junction.domain_guid not in domain_guids:
@@ -130,7 +143,7 @@ class BackendViewSet(viewsets.ViewSet):
     @action()
     @log()
     @required_roles(['read', 'write', 'manage'])
-    @return_plain()
+    @return_simple(mode='accepted')
     @load(Backend, validator=validate_access)
     def configure_rights(self, backend, new_rights):
         """
@@ -139,8 +152,10 @@ class BackendViewSet(viewsets.ViewSet):
         :type backend: Backend
         :param new_rights: New access rights
         :type new_rights: dict
+        :return: New access rights
+        :rtype: dict
 
-        Example of new_rights.
+        Example of `new_rights`.
         {'users': {'guida': True,
                    'guidb': True,
                    'guidc': False},

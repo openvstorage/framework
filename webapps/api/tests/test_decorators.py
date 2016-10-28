@@ -25,9 +25,9 @@ import uuid
 import hashlib
 import unittest
 from django.http import HttpResponse
-from backend.exceptions import HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException, HttpUnauthorizedException, HttpForbiddenException
-from backend.toolbox import Toolbox  # Required for the tests
-from oauth2.toolbox import Toolbox as OAuth2Toolbox
+from api.backend.exceptions import HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException, HttpUnauthorizedException, HttpForbiddenException
+from api.backend.toolbox import Toolbox  # Required for the tests
+from api.oauth2.toolbox import Toolbox as OAuth2Toolbox
 from ovs.extensions.generic import fakesleep
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -150,9 +150,6 @@ class Decorators(unittest.TestCase):
                         roleclient.role = role
                         roleclient.save()
 
-        sys.path.append('/opt/OpenvStorage')
-        sys.path.append('/opt/OpenvStorage/webapps')
-        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
         from django.conf import settings
         settings.VERSION = (1, 2, 3)
         from django.test import RequestFactory
@@ -171,7 +168,7 @@ class Decorators(unittest.TestCase):
         """
         Validates whether the rate limiter behaves correctly
         """
-        from backend.decorators import limit
+        from api.backend.decorators import limit
 
         @limit(amount=2, per=2, timeout=2)
         def the_function(input_value, *args, **kwargs):
@@ -214,7 +211,7 @@ class Decorators(unittest.TestCase):
         """
         Validates whether the required_roles decorator works
         """
-        from backend.decorators import required_roles
+        from api.backend.decorators import required_roles
 
         @required_roles(['read', 'write', 'manage'])
         def the_function_rr(input_value, *args, **kwargs):
@@ -268,7 +265,7 @@ class Decorators(unittest.TestCase):
         """
         Validates whether the load decorator works
         """
-        from backend.decorators import load
+        from api.backend.decorators import load
 
         @load(User, min_version=2, max_version=2)
         def the_function_tl_1(input_value, request, user, version, mandatory, optional='default'):
@@ -361,7 +358,7 @@ class Decorators(unittest.TestCase):
         """
         Validates whether the return_task decorator will return a task ID
         """
-        from backend.decorators import return_task
+        from api.backend.decorators import return_task
 
         @return_task()
         def the_function_rt(input_value, *args, **kwargs):
@@ -380,7 +377,7 @@ class Decorators(unittest.TestCase):
         Validates whether the return_object decorator works:
         * Parses the 'contents' parameter, and passes it into the serializer
         """
-        from backend.decorators import return_object
+        from api.backend.decorators import return_object
 
         @return_object(User)
         def the_function_ro(input_value, *args, **kwargs):
@@ -419,7 +416,7 @@ class Decorators(unittest.TestCase):
           * If contents are specified: Runs the list trough the serializer
           * Else, return the guid list
         """
-        from backend.decorators import return_list
+        from api.backend.decorators import return_list
         from ovs.dal.datalist import DataList
 
         @return_list(TestMachine)
