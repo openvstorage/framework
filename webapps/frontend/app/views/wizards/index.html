@@ -31,7 +31,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
             <div data-bind="css: { 'modal-footer': modal() }">
                 <div class="pull-left">
-                    <button type='button' class="btn btn-default" name="cancel"
+                    <button type="button" class="btn btn-default" name="cancel"
                             data-bind="click: function() { close(false); }" data-i18n="ovs:generic.cancel">
                     </button>
                 </div>
@@ -41,11 +41,11 @@ but WITHOUT ANY WARRANTY of any kind.
                     </button>
                     <button class="btn btn-primary" name="next"
                             data-bind="attr: {type: (canNext() == true ? 'submit' : 'button')}, css: { disabled: !canNext() || loadingNext() },
-                            visible: hasNext(), click: next, disable: !canNext()" data-i18n="[html]ovs:generic.next">
+                                       visible: hasNext(), click: next, disable: !canNext()" data-i18n="[html]ovs:generic.next">
                     </button>
                     <button class="btn btn-primary" name="submit"
                             data-bind="attr: {type: (canFinish() == true ? 'submit' : 'button')}, css: { disabled: !canFinish() },
-                            visible: hasFinish(), click: finish, disable: !canFinish()" data-i18n="ovs:generic.finish">
+                                       visible: hasFinish(), click: finish, disable: !canFinish()" data-i18n="ovs:generic.finish">
                     </button>
                     <div class="pull-right" style="margin: 7px 5px 0 0;" data-bind="visible: loadingNext">
                         <span class="fa fa-1p5x fa-spin" data-i18n="[html]ovs:icons.loading"></span>
