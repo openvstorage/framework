@@ -103,9 +103,11 @@ elif [ "$1" = "monitor" ] ; then
         service_manager=`cat /proc/1/comm`
         if test "$service_manager" = "systemd"
         then
-            watch -n 1 'echo "OVS running processes:";echo; systemctl -l | grep ovs- | grep "loaded active" | sort; echo; echo "OVS non-running processes:"; systemctl -a | grep ovs- | grep "dead\|activating\|inactive" | sort; echo; echo "OVS disabled services:"; systemctl list-unit-files | grep ovs- | grep disabled | sort'
+            watch -tn 1 'echo "OVS running processes:\n";systemctl -a |egrep "ovs-.*\.service\s+loaded\s+active\s+running\s.*" | sed "s/ \{60\}/ /g" | sort;
+                         echo "\n\nOVS non-running processes:\n"; systemctl -a | egrep "ovs-.*\.service\s+" | grep -v running | sed "s/ \{60\}/ /g" | sort;'
         else
-            watch -n 1 'echo "\nOVS running processes:\n";initctl list | grep ovs | grep start/running | sort;echo "\nOVS non-running processes:\n";initctl list | grep ovs | grep -v start/running | sort'
+            watch -tn 1 'echo "OVS running processes:\n";initctl list | egrep "^ovs-.*\s{1}start/running" | sort;
+                         echo "\n\nOVS non-running processes:\n";initctl list | egrep "^ovs-.*\s{1}" | grep -v start/running | sort;'
         fi
     elif [ "$2" = "heartbeat" ] ; then
         python /opt/OpenvStorage/ovs/extensions/generic/heartbeat.py
