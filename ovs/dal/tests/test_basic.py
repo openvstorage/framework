@@ -1522,3 +1522,18 @@ class Basic(unittest.TestCase):
         disk.dynamic_int = 5
         dynamic = disk.updatable_int
         self.assertIsInstance(dynamic, int, 'Return value should be int')
+
+    def test_aquired_lock_during_caching(self):
+        """
+        Validates whether loading an object won't fail on a non-aquireable cache lock
+        """
+        _ = self
+        disk = TestDisk()
+        disk.name = 'test'
+        disk.save()
+
+        def _lock():
+            disk._mutex_version.acquire()
+
+        _ = TestDisk(disk.guid, _hook={'before_cache': _lock})
+        disk._mutex_version.release()
