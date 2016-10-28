@@ -1523,9 +1523,9 @@ class Basic(unittest.TestCase):
         dynamic = disk.updatable_int
         self.assertIsInstance(dynamic, int, 'Return value should be int')
 
-    def test_aquired_lock_during_caching(self):
+    def test_acquired_lock_during_caching(self):
         """
-        Validates whether loading an object won't fail on a non-aquireable cache lock
+        Validates whether loading an object won't fail on a non-acquireable cache lock
         """
         _ = self
         disk = TestDisk()
