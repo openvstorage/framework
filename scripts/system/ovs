@@ -100,15 +100,7 @@ elif [ "$1" = "remove" ] ; then
     fi
 elif [ "$1" = "monitor" ] ; then
     if [ "$2" = "services" ] ; then
-        service_manager=`cat /proc/1/comm`
-        if test "$service_manager" = "systemd"
-        then
-            watch -tn 1 'echo "OVS running processes:\n";systemctl -a |egrep "ovs-.*\.service\s+loaded\s+active\s+running\s.*" | sed "s/ \{60\}/ /g" | sort;
-                         echo "\n\nOVS non-running processes:\n"; systemctl -a | egrep "ovs-.*\.service\s+" | grep -v running | sed "s/ \{60\}/ /g" | sort;'
-        else
-            watch -tn 1 'echo "OVS running processes:\n";initctl list | egrep "^ovs-.*\s{1}start/running" | sort;
-                         echo "\n\nOVS non-running processes:\n";initctl list | egrep "^ovs-.*\s{1}" | grep -v start/running | sort;'
-        fi
+        python -c "from ovs.lib.setup import SetupController; SetupController.monitor_services()"
     elif [ "$2" = "heartbeat" ] ; then
         python /opt/OpenvStorage/ovs/extensions/generic/heartbeat.py
     else

@@ -24,6 +24,8 @@ import sys
 import json
 import time
 import signal
+from subprocess import CalledProcessError, check_output
+from paramiko import AuthenticationException
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
@@ -38,7 +40,6 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
-from paramiko import AuthenticationException
 
 
 class SetupController(object):
@@ -777,6 +778,68 @@ class SetupController(object):
             with remote(storage_router_to_remove.ip, [os]) as rem:
                 rem.os.system('asd-manager remove --force-yes')
         SetupController._log(messages='Remove nodes finished', title=True)
+
+    @staticmethod
+    def monitor_services():
+        """
+        Monitor the OVS services
+        :return: None
+        """
+        try:
+            previous_output = None
+            service_manager = check_output('cat /proc/1/comm', shell=True).strip()
+            while True:
+                # Gather service states
+                running_services = {}
+                non_running_services = {}
+                longest_service_name = 0
+                if service_manager == 'systemd':
+                    for service_name in check_output('systemctl list-unit-files --type=service | grep "ovs-" | tr -s " " | cut -d " " -f 1', shell=True).splitlines():
+                        try:
+                            service_state = check_output('systemctl is-active {0}'.format(service_name), shell=True).strip()
+                        except CalledProcessError as cpe:
+                            service_state = cpe.output
+
+                        if service_state == 'active':
+                            running_services[service_name] = service_state
+                        else:
+                            non_running_services[service_name] = service_state
+
+                        if len(service_name) > longest_service_name:
+                            longest_service_name = len(service_name)
+                else:
+                    for service_info in check_output('initctl list | grep "ovs-"', shell=True).splitlines():
+                        service_info = service_info.split(',')[0].strip()
+                        service_name = service_info.split()[0].strip()
+                        service_state = service_info.split()[1].strip()
+                        if service_state == "start/running":
+                            running_services[service_name] = service_state
+                        else:
+                            non_running_services[service_name] = service_state
+
+                        if len(service_name) > longest_service_name:
+                            longest_service_name = len(service_name)
+
+                #  Put service states in list
+                output = ['OVS running processes',
+                          '=====================\n']
+                for service_name in sorted(running_services):
+                    output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), running_services[service_name]))
+
+                output.extend(['\n\nOVS non-running processes',
+                               '=========================\n'])
+                for service_name in sorted(non_running_services):
+                    output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), non_running_services[service_name]))
+
+                # Print service states (only if changes)
+                if previous_output != output:
+                    print '\x1b[2J\x1b[H'
+                    for line in output:
+                        print line
+                    previous_output = list(output)
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
 
     @staticmethod
     def _setup_first_node(target_client, unique_id, cluster_name, node_name, enable_heartbeats, external_config, logging_target, rdma):
