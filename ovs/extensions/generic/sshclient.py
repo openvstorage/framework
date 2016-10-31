@@ -1,4 +1,4 @@
-# Copyright (C) 2016 iNuron NV
+#  Copyright (C) 2016 iNuron NV
 #
 # This file is part of Open vStorage Open Source Edition (OSE),
 # as available from
@@ -205,13 +205,17 @@ class SSHClient(object):
     def _clean_text(text):
         if type(text) is list:
             text = '\n'.join(line.rstrip() for line in text)
-        # This strip is absolutely necessary. Without it, channel.communicate() is never executed (odd but true)
         try:
-            cleaned = text.strip().decode('utf-8', 'replace')
+            # This strip is absolutely necessary. Without it, channel.communicate() is never executed (odd but true)
+            if isinstance(text, unicode):
+                cleaned = text.strip()
+            else:
+                cleaned = text.strip().decode('utf-8', 'replace')
             for old, new in {u'\u2018': "'",
                              u'\u201a': "'",
                              u'\u201e': '"',
-                             u'\u201c': '"'}.iteritems():
+                             u'\u201c': '"',
+                             u'\u25cf': '*'}.iteritems():
                 cleaned = cleaned.replace(old, new)
             return cleaned
         except UnicodeDecodeError:
