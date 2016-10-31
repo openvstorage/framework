@@ -51,9 +51,9 @@ define([
 
         // Observables
         self.convertingToTemplate = ko.observable(false);
-        self.removing             = ko.observable(false);
         self.domains              = ko.observableArray([]);
         self.snapshotsInitialLoad = ko.observable(true);
+        self.removing             = ko.observable(false);
         self.vDisk                = ko.observable();
 
         // Handles
