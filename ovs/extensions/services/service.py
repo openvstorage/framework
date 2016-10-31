@@ -32,7 +32,7 @@ class ServiceManager(object):
     """
     Factory class returning specialized classes
     """
-    _logger = LogHandler.get('extensions', name='servicemanager')
+    _logger = LogHandler.get('extensions', name='service-manager')
     ImplementationClass = None
 
     class MetaClass(type):

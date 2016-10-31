@@ -24,6 +24,7 @@ import sys
 import json
 import time
 import signal
+from paramiko import AuthenticationException
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
@@ -38,7 +39,6 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
-from paramiko import AuthenticationException
 
 
 class SetupController(object):
