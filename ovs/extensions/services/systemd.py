@@ -292,7 +292,7 @@ class Systemd(object):
                     try:
                         service_state = check_output('systemctl is-active {0}'.format(service_name), shell=True).strip()
                     except CalledProcessError as cpe:
-                        service_state = cpe.output
+                        service_state = cpe.output.strip()
 
                     service_name = service_name.replace('.service', '')
                     if service_state == 'active':

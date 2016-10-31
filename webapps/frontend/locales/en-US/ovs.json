@@ -339,7 +339,6 @@
                     "on_read": "Cache On Read",
                     "on_write": "Cache On Write"
                 },
-                "caching": "Caching",
                 "cluster_size": "Cluster size",
                 "dedupe": "Deduplication",
                 "dedupe_help_message": "Deduplication will calculate an MD5 sum for each write resulting in performance loss, but better cache performance",
@@ -365,9 +364,7 @@
                     "rdma": "RDMA",
                     "tcp": "TCP"
                 },
-                "readcache_limit": "Read cache limit",
                 "sco_size": "SCO size",
-                "strategy": "Strategy",
                 "volume": "Volumes",
                 "write_buffer": "Maximum write buffer"
             },
