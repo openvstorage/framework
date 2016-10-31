@@ -125,17 +125,14 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(VDisk)
     @load(VDisk)
-    def get_children(self, vdisk, hints):
+    def get_children(self, vdisk):
         """
         Returns a list of vDisk guid(s) of children of a given vDisk
         :param vdisk: Vdisk to get the children from
         :type vdisk: VDisk
-        :param hints: Hints provided by the load decorator
-        :type hints: dict
         :return: Guids of the child vDisks
         :rtype: list
         """
-        _ = hints
         return vdisk.child_vdisks_guids
 
     @link()
