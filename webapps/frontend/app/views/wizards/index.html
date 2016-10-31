@@ -36,6 +36,9 @@ but WITHOUT ANY WARRANTY of any kind.
                     </button>
                 </div>
                 <div class="pull-right">
+                    <div class="pull-left" style="margin: 7px 5px 0 0;" data-bind="visible: loadingNext">
+                        <span class="fa fa-1p5x fa-spin" data-i18n="[html]ovs:icons.loading"></span>
+                    </div>
                     <button type="button" class="btn btn-default" name="previous"
                             data-bind="visible: hasPrevious(), click: previous, disable: !hasPrevious()" data-i18n="[html]ovs:generic.previous">
                     </button>
@@ -47,9 +50,6 @@ but WITHOUT ANY WARRANTY of any kind.
                             data-bind="attr: {type: (canFinish() == true ? 'submit' : 'button')}, css: { disabled: !canFinish() },
                                        visible: hasFinish(), click: finish, disable: !canFinish()" data-i18n="ovs:generic.finish">
                     </button>
-                    <div class="pull-right" style="margin: 7px 5px 0 0;" data-bind="visible: loadingNext">
-                        <span class="fa fa-1p5x fa-spin" data-i18n="[html]ovs:icons.loading"></span>
-                    </div>
                 </div>
             </div>
         </form>
