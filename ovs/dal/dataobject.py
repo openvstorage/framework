@@ -30,7 +30,7 @@ from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, L
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.datalist import DataList
-from ovs.extensions.generic.volatilemutex import volatile_mutex
+from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
 from ovs.extensions.storage.exceptions import KeyNotFoundException, AssertException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -282,6 +282,8 @@ class DataObject(object):
                     raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(
                         self.__class__.__name__, self._guid
                     ))
+                except NoLockAvailableException:
+                    pass
                 finally:
                     self._mutex_version.release()
 
