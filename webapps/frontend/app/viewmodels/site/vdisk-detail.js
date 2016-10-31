@@ -144,7 +144,7 @@ define([
                 if (generic.xhrCompleted(self.loadStorageRouterHandle)) {
                     self.loadStorageRouterHandle = api.get('storagerouters')
                         .done(function (data) {
-                            self.vDisk().storageRouterGuids(data);
+                            self.vDisk().storageRouterGuids(data.data);
                         })
                         .always(deferred.resolve());
                 }

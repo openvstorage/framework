@@ -43,11 +43,7 @@ define([
         self.bandwidthSaved        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.cacheHits             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.cacheMisses           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheStrategies       = ko.observableArray(['on_read', 'on_write', 'none']);
-        self.cacheStrategy         = ko.observable('on_read');
         self.deviceName            = ko.observable();
-        self.dedupeMode            = ko.observable();
-        self.dedupeModes           = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
         self.dtlEnabled            = ko.observable(true);
         self.dtlManual             = ko.observable();
         self.dtlMode               = ko.observable();
@@ -63,7 +59,6 @@ define([
         self.name                  = ko.observable();
         self.namespace             = ko.observable();
         self.oldConfiguration      = ko.observable();
-        self.readCacheLimit        = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});
         self.readSpeed             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.scoSize               = ko.observable(4);
         self.scoSizes              = ko.observableArray([4, 8, 16, 32, 64, 128]);
@@ -117,21 +112,15 @@ define([
                 return {
                     sco_size: self.scoSize(),
                     dtl_mode: self.dtlEnabled() === true ? self.dtlMode() : 'no_sync',
-                    dedupe_mode: self.dedupeMode() !== undefined ? self.dedupeMode().name : undefined,
                     write_buffer: self.writeBuffer(),
-                    dtl_target: self.dtlTarget().slice(),
-                    cache_strategy: self.cacheStrategy(),
-                    readcache_limit: self.readCacheLimit() || null
+                    dtl_target: self.dtlTarget().slice()
                 }
             },
             write: function(configData) {
                 self.writeBuffer(Math.round(configData.write_buffer));
                 self.scoSize(configData.sco_size);
                 self.dtlMode(configData.dtl_mode);
-                self.dedupeMode({name: configData.dedupe_mode, disabled: false});
                 self.dtlTarget(self.dtlManual() ? configData.dtl_target.slice() : []);
-                self.cacheStrategy(configData.cache_strategy);
-                self.readCacheLimit(configData.readcache_limit);
             }
         });
         self.scoSize.subscribe(function(size) {
@@ -295,14 +284,6 @@ define([
                             delete data['metadata_cache_size'];
                         }
                         self.dtlEnabled(data.dtl_mode !== 'no_sync');
-                        if (data.dedupe_mode !== undefined && data.dedupe_mode === 'non_dedupe') {
-                            $.each(self.dedupeModes(), function (i, key) {
-                                if (key.name === 'dedupe') {
-                                    self.dedupeModes()[i].disabled = true;
-                                    return false;
-                                }
-                            });
-                        }
                         self.configuration(data);
                         data = self.configuration(); // Pass through the getter/setter for possible cleanups
                         if (self.oldConfiguration() === undefined) {

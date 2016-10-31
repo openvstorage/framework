@@ -94,7 +94,7 @@ class VDiskTest(unittest.TestCase):
         # Create vDisk and validate default configuration
         vdisk_1 = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 3, storagedriver_guid=storagedrivers[1].guid))
         configuration = VDiskController.get_config_params(vdisk_guid=vdisk_1.guid)
-        expected_keys = {'sco_size', 'dtl_mode', 'dedupe_mode', 'write_buffer', 'dtl_target', 'cache_strategy', 'readcache_limit', 'metadata_cache_size'}
+        expected_keys = {'sco_size', 'dtl_mode', 'write_buffer', 'dtl_target', 'metadata_cache_size'}
         self.assertEqual(first=expected_keys,
                          second=set(configuration.keys()),
                          msg='Keys returned by get_config_params do not match the expected keys')
@@ -104,11 +104,8 @@ class VDiskTest(unittest.TestCase):
         cache_capacity = 4096  # Based on 1GiB size and "metadata_page_capacity" of 64 (6 bits)
         default_values = {'sco_size': default_sco_size,
                           'dtl_mode': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC,
-                          'dedupe_mode': StorageDriverClient.FRAMEWORK_LOCATION_BASED,
                           'dtl_target': [],
                           'write_buffer': int(tlog_multiplier * default_sco_size * non_disposable_sco_factor),
-                          'cache_strategy': StorageDriverClient.FRAMEWORK_NO_CACHE,
-                          'readcache_limit': None,
                           'metadata_cache_size': StorageDriverClient.METADATA_CACHE_PAGE_SIZE * cache_capacity}
         for key, value in default_values.iteritems():
             self.assertEqual(first=configuration[key],
@@ -119,16 +116,11 @@ class VDiskTest(unittest.TestCase):
         new_config_params = {'dtl_mode': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC,
                              'sco_size': 4,
                              'dtl_target': [],
-                             'dedupe_mode': StorageDriverClient.FRAMEWORK_LOCATION_BASED,
-                             'write_buffer': 128,
-                             'cache_strategy': StorageDriverClient.FRAMEWORK_CACHE_ON_READ}
+                             'write_buffer': 128}
         for key, values in {'dtl_mode': ['unknown', StorageDriverClient.VOLDRV_DTL_ASYNC],
                             'sco_size': list(set(range(257)).difference({4, 8, 16, 32, 64, 128})) + [-1],
                             'dtl_target': ['', {}, (), 0],
-                            'dedupe_mode': ['unknown', StorageDriverClient.VOLDRV_LOCATION_BASED],
                             'write_buffer': [-1] + range(128) + range(10241, 10300),
-                            'cache_strategy': ['unknown', StorageDriverClient.VOLDRV_CACHE_ON_READ],
-                            'readcache_limit': [-1, 0] + range(10241, 10300),
                             'metadata_cache_size': [-1] + range(256 * 24)}.iteritems():
             for value in values:
                 config_params = copy.deepcopy(new_config_params)
