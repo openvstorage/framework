@@ -147,7 +147,6 @@
         "children": "Children",
         "city": "City",
         "client": "Client",
-        "clone": "Create clones",
         "component": "Component",
         "consistent": "Consistent",
         "consistentss": "Consistent snapshots",
@@ -243,7 +242,6 @@
         "storagerouter": "Storage Router",
         "storagerouters": "Storage Routers",
         "storeddata": "Stored Data",
-        "templatehaschildren": "This vTemplate does have children",
         "tempspace": "Temporary files",
         "thousandseparator": ",",
         "togglenavigation": "Toggle navigation",
@@ -409,6 +407,7 @@
             "configuration": "vDisk configuration",
             "configuration_info": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
             "edge_clients": "Edge Clients",
+            "has_children": "vDisk has clones",
             "move": "Move",
             "remove": "Remove",
             "rollback": "Rollback",
@@ -418,42 +417,54 @@
             "snapshots": "Snapshots",
             "title": "vDisk"
         },
-        "remove": {
+        "remove_snapshot": {
+            "failed_msg": "Removing snapshot __what__ failed: __why__",
+            "started": "Removing snapshot",
+            "started_msg": "Snapshot __what__ is being removed",
+            "success": "Removed snapshot",
+            "success_msg": "Snapshot __what__ has been removed",
+            "title_msg": "Are you sure you want to remove snapshot __what__?"
+        },
+        "remove_vdisk": {
             "failed_msg": "Removing vDisk __what__ failed: __why__",
-            "started": "Removing",
+            "started": "Removing vDisk",
             "started_msg": "vDisk __what__ is being removed",
-            "success": "Removed",
+            "success": "Removed vDisk",
             "success_msg": "vDisk __what__ has been removed",
-            "title": "Removing vDisk __what__",
             "title_msg": "Are you sure you want to remove vDisk __what__?"
         },
-        "remove_snapshot": {
-            "delete": "Are you sure you want to remove snapshot __what__?",
-            "done": "Snapshot removed",
-            "done_msg": "Snapshot __what__ was removed successfully.",
-            "error_msg": "Failed to remove snapshot __what__."
+        "remove_vtemplate": {
+            "failed_msg": "Removing vTemplate __what__ failed: __why__",
+            "started": "Removing vTemplate",
+            "started_msg": "vTemplate __what__ is being removed",
+            "success": "Removed vTemplate",
+            "success_msg": "vTemplate __what__ has been removed",
+            "title_msg": "Are you sure you want to remove vTemplate __what__?"
         },
         "save_config": {
-            "done": "Save complete",
-            "done_msg": "The configuration details for __what__ are saved.",
-            "error_msg": "saving __what__"
+            "failed_msg": "Saving configuration for vDisk __what__ failed: __why__",
+            "success": "Save complete",
+            "success_msg": "The configuration details for __what__ are saved."
         },
         "set_as_template": {
-            "done": "vDisk set as vTemplate",
-            "done_msg": "vDisk __what__ set as vTemplate",
-            "error_msg": "setting __what__ as vTemplate: __error__",
-            "marked": "Marked for setting as vTemplate",
-            "marked_msg": "vDisk __what__ is marked for setting as vTemplate...",
+            "failed_msg": "Converting vDisk __what__ into vTemplate failed: __why__",
             "no": "Close",
-            "title": "Set vDisk __what__ as vTemplate",
-            "warning": "Warning: After converting a vDisk into a vTemplate, it can no longer actively be used.",
-            "yes": "Set as vTemplate"
+            "started": "Converting vDisk",
+            "started_msg": "vDisk __what__ is being converted into vTemplate",
+            "success": "Converted vDisk",
+            "success_msg": "vDisk __what__ has been converted into vTemplate",
+            "title": "Convert vDisk __what__ into vTemplate",
+            "warning": "Warning: After converting a vDisk into a vTemplate, it can no longer be actively used.",
+            "yes": "Convert into vTemplate"
         }
     },
     "vtemplates": {
         "vdisks": {
             "title": "vDisk Templates"
         },
+        "clone": "Create clones",
+        "has_children": "This vTemplate has children",
+        "remove": "Remove",
         "title": "vTemplates"
     },
     "dashboard": {

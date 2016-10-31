@@ -123,6 +123,8 @@ class VDiskController(object):
         :return: None
         """
         vdisk = VDisk(vdisk_guid)
+        if len(vdisk.child_vdisks) > 0:
+            raise RuntimeError('vDisk {0} has clones, cannot delete'.format(vdisk.name))
         vdisk.storagedriver_client.unlink(str(vdisk.devicename))
         VDiskController.delete_from_voldrv(vdisk.volume_id)
 
@@ -426,12 +428,15 @@ class VDiskController(object):
         if vdisk.is_vtemplate is True:
             VDiskController._logger.info('vDisk {0} has already been set as vTemplate'.format(vdisk.name))
             return
-        VDiskController._logger.info('Setting vDisk {0} as template'.format(vdisk.name))
+        if len(vdisk.child_vdisks) > 0:
+            raise RuntimeError('vDisk {0} has clones, cannot convert to vTemplate'.format(vdisk.name))
+
+        VDiskController._logger.info('Converting vDisk {0} into vTemplate'.format(vdisk.name))
         try:
             vdisk.storagedriver_client.set_volume_as_template(str(vdisk.volume_id))
         except Exception:
-            VDiskController._logger.exception('Failed to set vDisk {0} as template'.format(vdisk.name))
-            raise Exception('Converting vDisk {0} to template failed'.format(vdisk.name))
+            VDiskController._logger.exception('Failed to convert vDisk {0} into vTemplate'.format(vdisk.name))
+            raise Exception('Converting vDisk {0} into vTemplate failed'.format(vdisk.name))
         vdisk.invalidate_dynamics(['is_vtemplate', 'info'])
 
     @staticmethod

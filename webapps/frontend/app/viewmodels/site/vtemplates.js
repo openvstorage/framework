@@ -59,7 +59,7 @@ define([
                                     return new VDisk(guid);
                                 },
                                 dependencyLoader: function(item) {
-                                    item.fetchTemplateChildrenGuids();
+                                    item.fetchChildrenGuids();
                                 }
                             });
                         })
@@ -71,35 +71,31 @@ define([
         };
         self.deleteVDT = function(guid) {
             $.each(self.vDiskTemplates(), function(index, vd) {
-                if (vd.guid() === guid && vd.templateChildrenGuids().length === 0) {
+                if (vd.guid() === guid && vd.childrenGuids().length === 0) {
                     app.showMessage(
-                            $.t('ovs:vdisks.delete.warning', { what: vd.name() }),
-                            $.t('ovs:generic.areyousure'),
-                            [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
-                        )
+                        $.t('ovs:vdisks.remove_vtemplate.title_msg', {what: vd.name()}),
+                        $.t('ovs:generic.areyousure'),
+                        [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                    )
                         .done(function(answer) {
                             if (answer === $.t('ovs:generic.yes')) {
                                 generic.alertInfo(
-                                    $.t('ovs:vdisks.delete.marked'),
-                                    $.t('ovs:vdisks.delete.marked_msg', { what: vd.name() })
+                                    $.t('ovs:vdisks.remove_vtemplate.started'),
+                                    $.t('ovs:vdisks.remove_vtemplate.started_msg', {what: vd.name()})
                                 );
                                 api.post('vdisks/' + vd.guid() + '/delete_vtemplate')
                                     .then(self.shared.tasks.wait)
                                     .done(function() {
                                         generic.alertSuccess(
-                                            $.t('ovs:vdisks.delete.done'),
-                                            $.t('ovs:vdisks.delete.done_msg', { what: vd.name() })
+                                            $.t('ovs:vdisks.remove_vtemplate.success'),
+                                            $.t('ovs:vdisks.remove_vtemplate.success_msg', {what: vd.name()})
                                         );
                                     })
                                     .fail(function(error) {
                                         error = generic.extractErrorMessage(error);
                                         generic.alertError(
                                             $.t('ovs:generic.error'),
-                                            $.t('ovs:generic.messages.errorwhile', {
-                                                context: 'error',
-                                                what: $.t('ovs:vdisks.delete.error_msg', { what: vd.name() }),
-                                                error: error
-                                            })
+                                            $.t('ovs:vdisks.remove_vtemplate.failed_msg', {what: vd.name(), why: error})
                                         );
                                     });
                             }

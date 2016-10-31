@@ -45,14 +45,6 @@ but WITHOUT ANY WARRANTY of any kind.
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         style="color: #428bca;"
-                        id="vdisk-set-as-template"
-                        data-bind="click: function() { $root.setAsTemplate(); },
-                                   enable: $root.shared.user.roles().contains('write') && !$root.removing(),
-                                   tooltip: 'ovs:vdisks.detail.set_as_template'">
-                    <span class="fa hand" data-i18n="[html]ovs:icons.set_as_template"></span>
-                </button>
-                <button type="button" class="btn btn-mini btn-default hand"
-                        style="color: #428bca;"
                         id="vdisk-rollback"
                         data-bind="click: function() { $root.rollback(); },
                                    tooltip: 'ovs:vdisks.detail.rollback',
@@ -81,10 +73,19 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span class="fa hand" data-i18n="[html]ovs:icons.scrub"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
-                        id="vdisk-delete" style="color: #428bca;"
+                        id="vdisk-set-as-template"
+                        data-bind="click: function() { $root.setAsTemplate(); },
+                                   tooltip: childrenGuids().length === 0 ? 'ovs:vdisks.detail.set_as_template' : 'ovs:vdisks.detail.has_children',
+                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified(),
+                                   style: { color: $root.shared.user.roles().contains('write') && childrenGuids().length === 0 ? '#428bca' : 'lightgrey' }">
+                    <span class="fa hand" data-i18n="[html]ovs:icons.set_as_template"></span>
+                </button>
+                <button type="button" class="btn btn-mini btn-default hand"
+                        id="vdisk-delete"
                         data-bind="click: function() { $root.removeVDisk(); },
-                                   tooltip: 'ovs:vdisks.detail.remove',
-                                   enable: $root.shared.user.roles().contains('manage') && !$root.convertingToTemplate()">
+                                   tooltip: childrenGuids().length === 0 ? 'ovs:vdisks.detail.remove' : 'ovs:vdisks.detail.has_children',
+                                   enable: $root.shared.user.roles().contains('manage') && $root.canBeModified(),
+                                   style: { color: $root.shared.user.roles().contains('manage') && childrenGuids().length === 0 ? '#428bca' : 'lightgrey' }">
                     <span class="fa hand" data-i18n="[html]ovs:icons.delete"></span>
                 </button>
             </li>

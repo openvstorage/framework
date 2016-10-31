@@ -130,21 +130,13 @@ class VDiskViewSet(viewsets.ViewSet):
         Returns a list of vDisk guid(s) of children of a given vDisk
         :param vdisk: Vdisk to get the children from
         :type vdisk: VDisk
-        :param hints: Hits provided by the load decorator
+        :param hints: Hints provided by the load decorator
         :type hints: dict
+        :return: Guids of the child vDisks
+        :rtype: list
         """
-        children_vdisk_guids = []
-        children_vdisks = []
-        if vdisk.is_vtemplate is False:
-            raise HttpNotAcceptableException(error_description='vDisk is not a vTemplate',
-                                             error='impossible_request')
-        for cdisk in vdisk.child_vdisks:
-            if cdisk.guid not in children_vdisk_guids:
-                children_vdisk_guids.append(cdisk.guid)
-                if hints['full'] is True:
-                    # Only load full object is required
-                    children_vdisks.append(cdisk)
-        return children_vdisks if hints['full'] is True else children_vdisk_guids
+        _ = hints
+        return vdisk.child_vdisks_guids
 
     @link()
     @required_roles(['read'])
@@ -223,6 +215,9 @@ class VDiskViewSet(viewsets.ViewSet):
         :param vdisk: Guid of the virtual disk to set as template
         :type vdisk: VDisk
         """
+        if len(vdisk.child_vdisks) > 0:
+            raise HttpNotAcceptableException(error_description='vDisk has clones',
+                                             error='impossible_request')
         return VDiskController.set_as_template.delay(vdisk_guid=vdisk.guid)
 
     @action()
@@ -311,7 +306,7 @@ class VDiskViewSet(viewsets.ViewSet):
     def get_target_storagerouters(self, vdisk):
         """
         Gets all possible target Storage Routers for a given vDisk (e.g. when cloning, creating from template or moving)
-        :param vdisk: The vDisk go thet the targets for
+        :param vdisk: The vDisk to get the targets for
         :type vdisk: VDisk
         """
         return [] if vdisk.vpool is None else [sd.storagerouter for sd in vdisk.vpool.storagedrivers]
@@ -327,6 +322,9 @@ class VDiskViewSet(viewsets.ViewSet):
         :param vdisk: The vDisk to delete
         :type vdisk: VDisk
         """
+        if len(vdisk.child_vdisks) > 0:
+            raise HttpNotAcceptableException(error_description='vDisk has clones',
+                                             error='impossible_request')
         return VDiskController.delete.delay(vdisk_guid=vdisk.guid)
 
     @action()
@@ -342,6 +340,9 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         if not vdisk.is_vtemplate:
             raise HttpNotAcceptableException(error_description='vDisk should be a vTemplate',
+                                             error='impossible_request')
+        if len(vdisk.child_vdisks) > 0:
+            raise HttpNotAcceptableException(error_description='vTemplate has clones',
                                              error='impossible_request')
         return VDiskController.delete.delay(vdisk_guid=vdisk.guid)
 
