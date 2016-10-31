@@ -40,14 +40,14 @@ but WITHOUT ANY WARRANTY of any kind.
                         data-bind="click: function() { $root.snapshot(); },
                                    enable: loaded(),
                                    tooltip: 'ovs:vdisks.detail.snapshot',
-                                   enable: $root.shared.user.roles().contains('write') && !$root.convertingToTemplate()">
+                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified()">
                     <span class="fa hand" data-i18n="[html]ovs:icons.snapshot"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         style="color: #428bca;"
                         id="vdisk-set-as-template"
                         data-bind="click: function() { $root.setAsTemplate(); },
-                                   enable: $root.shared.user.roles().contains('write') && !$root.convertingToTemplate(),
+                                   enable: $root.shared.user.roles().contains('write') && !$root.removing(),
                                    tooltip: 'ovs:vdisks.detail.set_as_template'">
                     <span class="fa hand" data-i18n="[html]ovs:icons.set_as_template"></span>
                 </button>
@@ -56,29 +56,36 @@ but WITHOUT ANY WARRANTY of any kind.
                         id="vdisk-rollback"
                         data-bind="click: function() { $root.rollback(); },
                                    tooltip: 'ovs:vdisks.detail.rollback',
-                                   enable: $root.shared.user.roles().contains('write')">
+                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified()">
                     <span class="fa hand" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-clone" style="color: #428bca;"
                         data-bind="click: function() { $root.clone(); },
                                    tooltip: 'ovs:vdisks.detail.clone',
-                                   enable: $root.shared.user.roles().contains('write')">
+                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified()">
                     <span class="fa hand" data-i18n="[html]ovs:icons.clone"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-move" style="color: #428bca;"
                         data-bind="click: function() { $root.move(); },
                                    tooltip: 'ovs:vdisks.detail.move',
-                                   enable: $root.shared.user.roles().contains('write')">
+                                   enable: $root.shared.user.roles().contains('write') && $root.canBeModified()">
                     <span class="fa hand" data-i18n="[html]ovs:icons.move"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-scrub" style="color: #428bca;"
                         data-bind="click: function() { $root.scrub(); },
                                    tooltip: 'ovs:vdisks.detail.scrub',
-                                   enable: $root.shared.user.roles().contains('manage')">
+                                   enable: $root.shared.user.roles().contains('manage') && $root.canBeModified()">
                     <span class="fa hand" data-i18n="[html]ovs:icons.scrub"></span>
+                </button>
+                <button type="button" class="btn btn-mini btn-default hand"
+                        id="vdisk-delete" style="color: #428bca;"
+                        data-bind="click: function() { $root.removeVDisk(); },
+                                   tooltip: 'ovs:vdisks.detail.remove',
+                                   enable: $root.shared.user.roles().contains('manage') && !$root.convertingToTemplate()">
+                    <span class="fa hand" data-i18n="[html]ovs:icons.delete"></span>
                 </button>
             </li>
         </ul>
@@ -190,7 +197,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                         class="btn btn-mini btn-default hand"
                                         data-bind="click: function(){
                                                         $root.removeSnapshot(guid);
-                                                   }, tooltip: 'ovs:generic.removesnapshot' ">
+                                                   }, tooltip: 'ovs:generic.remove_snapshot' ">
                                     <span class="fa hand" data-i18n="[html]ovs:icons.delete"></span>
                                 </button>
                             </td>
@@ -203,7 +210,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
             </div>
             <div class="tab-pane" id="edgeclients" style="padding: 15px;">
-                <h4 data-i18n="ovs:vdisks.detail.edgeclients"></h4>
+                <h4 data-i18n="ovs:vdisks.detail.edge_clients"></h4>
                 <div data-bind="pager: { items: edgeClients, headers: $parent.edgeClientHeaders, refreshInterval: 5000, controls: true }" style="clear: both;">
                     <table data-dummy="dummy">
                         <tr data-part="vitem">
@@ -229,7 +236,7 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                             <td style="padding: 0 0 20px 0;">
                                 <h4 data-i18n="ovs:vdisks.detail.configuration"></h4>
-                                <p data-i18n="ovs:vdisks.detail.configurationinfo"></p>
+                                <p data-i18n="ovs:vdisks.detail.configuration_info"></p>
                                 <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading" data-bind="visible: loadingConfig() === true"></span>
                                 <ul data-bind="visible: loadingConfig() === false">
                                     <li>

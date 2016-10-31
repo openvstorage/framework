@@ -167,7 +167,7 @@
         "dtl_port": "DTL Port",
         "dtl_status": "DTL",
         "edge": "Edge",
-        "edgeclients": "Edge Clients",
+        "edge_clients": "Edge Clients",
         "elementsloading": "Items loading...",
         "error": "Error",
         "errorsfound": "Errors were found. Please check the contents of all fields.",
@@ -188,7 +188,6 @@
         "ip": "IP",
         "latency": "Latency",
         "loadingdata": "Loading data...",
-        "logging": "Kibana logging",
         "logout": "Log out",
         "machine": "Machine",
         "machines": "Machines",
@@ -222,7 +221,7 @@
         "readspeed": "Read Speed",
         "recovery_domains": "Recovery Domains",
         "reload": "Reload",
-        "removesnapshot": "Remove Snapshot",
+        "remove_snapshot": "Remove Snapshot",
         "rescan": "Rescan",
         "results": "results",
         "resultspp": "results per page",
@@ -291,7 +290,6 @@
                 "inprogress": "The hardware capabilities of this Storage Router are being refreshed"
             },
             "hostip": "Host IP",
-            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
             "moveaway": {
                 "warning": "Are you sure you want to move all vDisks away?",
                 "title": "Are you sure",
@@ -311,7 +309,7 @@
                 "failure": "Error saving this Storage Router."
             },
             "scrub_capable": "SCRUB Capable",
-            "storageroutervpoollink": "vPools served by this Storage Router",
+            "storagerouter_vpool_link": "vPools served by this Storage Router",
             "title": "Storage Router",
             "updateserving": "Save changes",
             "edit": "Edit some properties of this Storage Router",
@@ -393,45 +391,52 @@
         "global_write_buffer": "Global Write Buffer",
         "sco_size": "SCO Size",
         "statistics": "Statistics",
+        "storagerouter_vpool_link": "Storage Routers serving this vPool",
         "title": "vPools",
         "volume_write_buffer": "Volume Write Buffer",
         "write_buffer": "Write Buffer",
         "detail": {
-            "title": "vPool",
-            "introduction": "Below an overview of the vPool properties.",
-            "storageroutervpoollink": "Storage Routers serving this vPool",
-            "updateserving": "Save changes",
-            "localvpool": "A vPool on Local Filesystem can not be shared across multiple Storage Routers.",
-            "logging": "vPool logs",
-            "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
-            "logginginfo2": "Open Kibana",
-            "logginginfo3": "to view this vPool's logs.",
-            "configuration": "vPool configuration defaults",
-            "configurationinfo": "Below are the default/fallback values for this vPool's vDisks. If a vDisk has no specific settings, settings will be inherited from its vPool."
-        },
-        "saveconfig": {
-            "done": "Save complete",
-            "done_msg": "The configuration details for __what__ are saved.",
-            "error_msg": "saving __what__"
+            "title": "vPool"
         }
     },
     "vdisks": {
         "add": "Add new vDisk",
-        "title": "vDisks",
         "details": "Details",
         "performance": "Performance",
+        "title": "vDisks",
         "detail": {
             "clone": "Clone",
             "configuration": "vDisk configuration",
-            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
-            "edgeclients": "Edge Clients",
+            "configuration_info": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
+            "edge_clients": "Edge Clients",
             "move": "Move",
+            "remove": "Remove",
             "rollback": "Rollback",
             "scrub": "Scrub",
             "set_as_template": "Set as vTemplate",
             "snapshot": "Take snapshot",
             "snapshots": "Snapshots",
             "title": "vDisk"
+        },
+        "remove": {
+            "failed_msg": "Removing vDisk __what__ failed: __why__",
+            "started": "Removing",
+            "started_msg": "vDisk __what__ is being removed",
+            "success": "Removed",
+            "success_msg": "vDisk __what__ has been removed",
+            "title": "Removing vDisk __what__",
+            "title_msg": "Are you sure you want to remove vDisk __what__?"
+        },
+        "remove_snapshot": {
+            "delete": "Are you sure you want to remove snapshot __what__?",
+            "done": "Snapshot removed",
+            "done_msg": "Snapshot __what__ was removed successfully.",
+            "error_msg": "Failed to remove snapshot __what__."
+        },
+        "save_config": {
+            "done": "Save complete",
+            "done_msg": "The configuration details for __what__ are saved.",
+            "error_msg": "saving __what__"
         },
         "set_as_template": {
             "done": "vDisk set as vTemplate",
@@ -443,29 +448,7 @@
             "title": "Set vDisk __what__ as vTemplate",
             "warning": "Warning: After converting a vDisk into a vTemplate, it can no longer actively be used.",
             "yes": "Set as vTemplate"
-        },
-        "saveconfig": {
-            "done": "Save complete",
-            "done_msg": "The configuration details for __what__ are saved.",
-            "error_msg": "saving __what__"
-        },
-        "removesnapshot": {
-            "delete": "Are you sure you want to remove snapshot __what__?",
-            "done": "Snapshot removed",
-            "done_msg": "Snapshot __what__ was removed successfully.",
-            "error_msg": "Failed to remove snapshot __what__."
-        },
-        "delete": {
-            "warning": "Are you sure you want to delete __what__?",
-            "marked": "Marked for deletion",
-            "marked_msg": "vDisk __what__ is marked for deletion...",
-            "done": "vDisk deleted",
-            "done_msg": "vDisk __what__ deleted",
-            "error_msg": "deleting __what__"
         }
-    },
-    "edgeclients": {
-        "title": "Edge Clients"
     },
     "vtemplates": {
         "vdisks": {
@@ -1021,7 +1004,7 @@
         "set_as_template": "&#xf023;",
         "snapshot": "&#xf030;",
         "storagerouter": "&#xf0c2;",
-        "storageroutervpoollink": "&#xf07c;",
+        "storagerouter_vpool_link": "&#xf07c;",
         "sync": "&#xf021;",
         "unlink": "&#xf127;",
         "up": "&#xf106;",

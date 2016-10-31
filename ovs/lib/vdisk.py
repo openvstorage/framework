@@ -117,7 +117,7 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.delete')
     def delete(vdisk_guid):
         """
-        Delete a vdisk through API
+        Delete a vDisk through API
         :param vdisk_guid: Guid of the vDisk to delete
         :type vdisk_guid: str
         :return: None
@@ -130,8 +130,8 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.extend')
     def extend(vdisk_guid, volume_size):
         """
-        Extend a vdisk through API
-        :param vdisk_guid: Guid of the vdisk to extend
+        Extend a vDisk through API
+        :param vdisk_guid: Guid of the vDisk to extend
         :type vdisk_guid: str
         :param volume_size: New size in bytes
         :type volume_size: int
@@ -567,7 +567,7 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.create_new')
     def create_new(volume_name, volume_size, storagedriver_guid):
         """
-        Create a new vdisk/volume using hypervisor calls
+        Create a new vDisk/volume using hypervisor calls
         :param volume_name: Name of the vDisk (can be a filename or a user friendly name)
         :type volume_name: str
         :param volume_size: Size of the vDisk
@@ -1138,8 +1138,8 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.schedule_backend_sync')
     def schedule_backend_sync(vdisk_guid):
         """
-        Schedule a backend sync on a vdisk
-        :param vdisk_guid: Guid of vdisk to schedule a backend sync to
+        Schedule a backend sync on a vDisk
+        :param vdisk_guid: Guid of vDisk to schedule a backend sync to
         :type vdisk_guid: str
         :return: TLogName associated with the data sent off to the backend
         :rtype: str
@@ -1157,7 +1157,7 @@ class VDiskController(object):
     def is_volume_synced_up_to_tlog(vdisk_guid, tlog_name):
         """
         Verify if a volume is synced up to a specific tlog
-        :param vdisk_guid: Guid of vdisk to verify
+        :param vdisk_guid: Guid of vDisk to verify
         :type vdisk_guid: str
         :param tlog_name: Tlog_name to verify
         :type tlog_name: str
@@ -1176,7 +1176,7 @@ class VDiskController(object):
     def is_volume_synced_up_to_snapshot(vdisk_guid, snapshot_id):
         """
         Verify if a volume is synced up to a specific snapshot
-        :param vdisk_guid: Guid of vdisk to verify
+        :param vdisk_guid: Guid of vDisk to verify
         :type vdisk_guid: str
         :param snapshot_id: Snapshot_id to verify
         :type snapshot_id: str
@@ -1233,7 +1233,7 @@ class VDiskController(object):
     def _set_vdisk_metadata_pagecache_size(vdisk):
         """
         Set metadata page cache size to ratio 1:500 of vdisk.size
-        :param vdisk: Object VDisk
+        :param vdisk: Object vDisk
         :type vdisk: VDisk
         :return: None
         """
