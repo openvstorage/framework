@@ -100,7 +100,7 @@ elif [ "$1" = "remove" ] ; then
     fi
 elif [ "$1" = "monitor" ] ; then
     if [ "$2" = "services" ] ; then
-        python -c "from ovs.lib.setup import SetupController; SetupController.monitor_services()"
+        python -c "from ovs.extensions.services.service import ServiceManager; ServiceManager.monitor_services()"
     elif [ "$2" = "heartbeat" ] ; then
         python /opt/OpenvStorage/ovs/extensions/generic/heartbeat.py
     else

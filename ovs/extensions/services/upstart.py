@@ -20,7 +20,7 @@ Upstart module
 
 import re
 import time
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, check_output
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 
@@ -29,7 +29,7 @@ class Upstart(object):
     """
     Contains all logic related to Upstart services
     """
-    _logger = LogHandler.get('extensions', name='servicemanager')
+    _logger = LogHandler.get('extensions', name='service-manager')
 
     @staticmethod
     def _service_exists(name, client, path):
@@ -297,3 +297,51 @@ class Upstart(object):
         for filename in client.dir_list('/etc/init'):
             if filename.endswith('.conf'):
                 yield filename.replace('.conf', '')
+
+    @staticmethod
+    def monitor_services():
+        """
+        Monitor the local OVS services
+        :return: None
+        """
+        try:
+            previous_output = None
+            while True:
+                # Gather service states
+                running_services = {}
+                non_running_services = {}
+                longest_service_name = 0
+                for service_info in check_output('initctl list', shell=True).splitlines():
+                    if not service_info.startswith('ovs-'):
+                        continue
+                    service_info = service_info.split(',')[0].strip()
+                    service_name = service_info.split()[0].strip()
+                    service_state = service_info.split()[1].strip()
+                    if service_state == "start/running":
+                        running_services[service_name] = service_state
+                    else:
+                        non_running_services[service_name] = service_state
+
+                    if len(service_name) > longest_service_name:
+                        longest_service_name = len(service_name)
+
+                # Put service states in list
+                output = ['OVS running processes',
+                          '=====================\n']
+                for service_name in sorted(running_services):
+                    output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), running_services[service_name]))
+
+                output.extend(['\n\nOVS non-running processes',
+                               '=========================\n'])
+                for service_name in sorted(non_running_services):
+                    output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), non_running_services[service_name]))
+
+                # Print service states (only if changes)
+                if previous_output != output:
+                    print '\x1b[2J\x1b[H'
+                    for line in output:
+                        print line
+                    previous_output = list(output)
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
