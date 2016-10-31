@@ -1,5 +1,5 @@
 [Unit]
-Description=ovs dtl
+Description=Open vStorage distributed transaction log
 Requires=<ADDITIONAL_DEPENDENCIES>
 Wants=ovs-watcher-volumedriver<_SERVICE_SUFFIX_>.service
 After=ovs-watcher-volumedriver<_SERVICE_SUFFIX_>.service
