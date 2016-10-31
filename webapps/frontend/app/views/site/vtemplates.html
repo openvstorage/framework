@@ -26,25 +26,25 @@ but WITHOUT ANY WARRANTY of any kind.
                     </span>
                     <span data-bind="text: name"></span>
                 </td>
-                <td><span data-bind="text: templateChildrenGuids().length"></span></td>
+                <td><span data-bind="text: childrenGuids().length"></span></td>
                 <td>
                     <i data-bind="attr: { id: 'vd-template-delete' + guid() },
                                   click: function() {
-                                      if ($.inArray('write', $root.shared.user.roles()) !== -1) {
+                                      if ($root.shared.user.roles().contains('write')) {
                                           $root.deleteVDT($data.guid());
                                       }
                                   },
-                                  style: { color: $.inArray('write', $root.shared.user.roles()) !== -1 && templateChildrenGuids().length === 0 ? 'black' : 'lightgrey' },
-                                  tooltip: templateChildrenGuids().length > 0 ? 'ovs:generic.templatehaschildren' : ''"
+                                  style: { color: $root.shared.user.roles().contains('write') && childrenGuids().length === 0 ? 'black' : 'lightgrey' },
+                                  tooltip: childrenGuids().length > 0 ? 'ovs:vtemplates.has_children' : 'ovs:vtemplates.remove'"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
                     <i data-bind="attr: { id: 'vd-template-create-' + guid() },
                                   click: function() {
-                                      if ($.inArray('write', $root.shared.user.roles()) !== -1) {
+                                      if ($root.shared.user.roles().contains('write')) {
                                           $root.createFromVDT($data.guid());
                                       }
                                   },
-                                  tooltip: 'ovs:generic.clone',
-                                  style: { color: $.inArray('write', $root.shared.user.roles()) !== -1 ? 'black' : 'lightgrey' }"
+                                  tooltip: 'ovs:vtemplates.clone',
+                                  style: { color: $root.shared.user.roles().contains('write') ? 'black' : 'lightgrey' }"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.fromtemplate"></i>
                 </td>
             </tr>
