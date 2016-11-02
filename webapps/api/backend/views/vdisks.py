@@ -118,6 +118,10 @@ class VDiskViewSet(viewsets.ViewSet):
                 raise HttpNotAcceptableException(error_description='API version 1 requires a Storage Router IP',
                                                  error='invalid_version')
             new_config_params['dtl_target'] = [junction.domain_guid for junction in storage_router.domains]
+
+        new_config_params.pop('dedupe_mode', None)
+        new_config_params.pop('cache_strategy', None)
+        new_config_params.pop('readcache_limit', None)
         return VDiskController.set_config_params.delay(vdisk_guid=vdisk.guid, new_config_params=new_config_params)
 
     @link()
