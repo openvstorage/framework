@@ -33,7 +33,7 @@ APP_NAME = 'api'
 BASE_WWW_DIR = os.path.dirname(__file__)
 
 BASE_FOLDER = '/opt/OpenvStorage/webapps/{0}'.format(APP_NAME)
-VERSION = (2, 3, 4, 5, 6)  # This tuple should contain all supported API versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
+VERSION = (2, 3, 4, 5)  # This tuple should contain all supported API versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
 
 BASE_LOG_DIR = '/var/log/ovs'
 LOG_FILENAME = '/django.log'
