@@ -690,6 +690,11 @@ class VDiskController(object):
         :type new_config_params: dict
         :return: None
         """
+        # Backwards compatibility
+        new_config_params.pop('dedupe_mode', None)
+        new_config_params.pop('cache_strategy', None)
+        new_config_params.pop('readcache_limit', None)
+
         required_params = {'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
                            'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
                            'dtl_target': (list, Toolbox.regex_guid),
