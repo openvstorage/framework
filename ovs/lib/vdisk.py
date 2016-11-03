@@ -187,13 +187,16 @@ class VDiskController(object):
             vdisk.metadata = {'lba_size': vdisk.info['lba_size'],
                               'cluster_multiplier': vdisk.info['cluster_multiplier']}
             vdisk.save()
+
+            VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
             try:
                 VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
                 MDSServiceController.ensure_safety(vdisk)
-                VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
             except SRCObjectNotFoundException:
-                VDiskController._logger.warning('vDisk object seems to be removed in the meantime.')
+                VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
                 VDiskController.clean_vdisk_from_model(vdisk)
+            except Exception:
+                VDiskController._logger.exception('Error processing resize_from_voldrv event')
 
     @staticmethod
     @celery.task(name='ovs.vdisk.migrate_from_voldrv')
@@ -302,8 +305,11 @@ class VDiskController(object):
 
         VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
         try:
-            MDSServiceController.ensure_safety(new_vdisk)
             VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
+            MDSServiceController.ensure_safety(new_vdisk)
+        except SRCObjectNotFoundException:
+            VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
+            VDiskController.clean_vdisk_from_model(new_vdisk)
         except Exception:
             VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}'.format(name))
 
@@ -559,8 +565,11 @@ class VDiskController(object):
 
         VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
         try:
-            MDSServiceController.ensure_safety(new_vdisk)
             VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
+            MDSServiceController.ensure_safety(new_vdisk)
+        except SRCObjectNotFoundException:
+            VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
+            VDiskController.clean_vdisk_from_model(new_vdisk)
         except Exception:
             VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}'.format(name))
 
@@ -620,8 +629,11 @@ class VDiskController(object):
 
         VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
         try:
-            MDSServiceController.ensure_safety(new_vdisk)
             VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
+            MDSServiceController.ensure_safety(new_vdisk)
+        except SRCObjectNotFoundException:
+            VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
+            VDiskController.clean_vdisk_from_model(new_vdisk)
         except Exception:
             VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}'.format(volume_name))
 
@@ -1247,17 +1259,16 @@ class VDiskController(object):
         :type vdisk: VDisk
         :return: None
         """
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, vdisk.storagedriver_id)
+        storagedriver_id = vdisk.storagedriver_id
+        if storagedriver_id is None:
+            raise SRCObjectNotFoundException()
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, storagedriver_id)
         storagedriver_config.load()
         metadata_page_capacity = 64  # "size" of a page = amount of entries in a page (addressable by 6 bits)
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
         cache_capacity = int(min(vdisk.size, 2 * 1024 ** 4) / float(metadata_page_capacity * cluster_size))
         VDiskController._logger.info('Setting metadata page cache size for vdisk {0} to {1}'.format(vdisk.name, cache_capacity))
-        try:
-            vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), cache_capacity)
-        except Exception:
-            VDiskController._logger.exception('Failed to set the metadata page cache size for vDisk {0}'.format(vdisk.name))
-            raise Exception('Setting the metadata page cache size for vDisk {0} failed'.format(vdisk.name))
+        vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), cache_capacity)
 
     @staticmethod
     def clean_devicename(name):

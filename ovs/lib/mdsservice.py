@@ -42,7 +42,7 @@ from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig
+from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig, ObjectNotFoundException as SRCObjectNotFoundException
 
 
 class MDSServiceController(object):
@@ -337,7 +337,7 @@ class MDSServiceController(object):
 
         vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
         if vdisk.storagerouter_guid is None:
-            raise ValueError('Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any Storage Router'.format(vdisk.name, vdisk.guid))
+            raise SRCObjectNotFoundException('Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any Storage Router'.format(vdisk.name, vdisk.guid))
 
         if excluded_storagerouters is None:
             excluded_storagerouters = []
