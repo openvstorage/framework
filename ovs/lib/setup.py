@@ -879,10 +879,6 @@ class SetupController(object):
         Configuration.set('/ovs/framework/rdma', rdma)
         Configuration.set('/ovs/framework/cluster_name', cluster_name)
 
-        if ServiceManager.has_fleet():
-            SetupController._log(messages='Setting up Fleet')
-            ServiceManager.setup_fleet()
-
         metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, locked=False)
         arakoon_ports = []
         if metadata is None:  # No externally managed cluster found, we create 1 ourselves
@@ -1172,10 +1168,6 @@ class SetupController(object):
                                      master_client.file_read(ArakoonConfiguration.CACC_LOCATION))
 
         Configuration.initialize_host(machine_id)
-
-        if ServiceManager.has_fleet():
-            SetupController._log(messages='Setting up fleet')
-            ServiceManager.setup_fleet()
 
         SetupController._add_services(target_client, unique_id, 'extra')
 
