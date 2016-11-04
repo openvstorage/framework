@@ -37,7 +37,7 @@ class OVSMiddleware(object):
         """
         _ = self, request
         logger = LogHandler.get('api', 'middleware')
-        if OVSMiddleware._is_own_httpexception(exception):
+        if OVSMiddleware.is_own_httpexception(exception):
             return HttpResponse(exception.data,
                                 status=exception.status_code,
                                 content_type='application/json')
@@ -91,7 +91,7 @@ class OVSMiddleware(object):
         return response
 
     @staticmethod
-    def _is_own_httpexception(exception):
+    def is_own_httpexception(exception):
         """
         This is some sad, sad code and the only known workaround to ceck whether the given exception
         is an instance of one of our own exceptions. No, isinstance doesn't work as it somehow is convinced
