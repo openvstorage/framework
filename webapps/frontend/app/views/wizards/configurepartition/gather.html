@@ -16,68 +16,68 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
-    <form role="form form-horizontal" class="form-horizontal">
-        <p data-i18n="ovs:wizards.configurepartition.gather.basicinfo"></p>
-        <div class="form-group">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.configurepartition.gather.device"></label>
-            <div class="col-lg-7" style="padding-top: 7px;">
-                <span data-bind="if: isEmpty(data.partition().path())">
-                    <span data-bind="text: data.disk().path()"></span>
-                </span>
-                <span data-bind="if: !isEmpty(data.partition().path())">
-                    <span data-bind="text: data.partition().path()"></span>
-                </span>
-            </div>
+    <p data-i18n="ovs:wizards.configure_partition.gather.basic_info"></p>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.configure_partition.gather.device"></label>
+        <div class="col-lg-7" style="padding-top: 7px;">
+            <span data-bind="if: isEmpty(data.partition().aliases())">
+                <span data-bind="text: data.disk().aliases()[0]"></span>
+            </span>
+            <span data-bind="if: !isEmpty(data.partition().aliases())">
+                <span data-bind="text: data.partition().aliases()[0]"></span>
+            </span>
         </div>
-        <div class="form-group">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.configurepartition.gather.offset"></label>
-            <div class="col-lg-7" style="padding-top: 7px;">
-                <span data-bind="text: data.partition().offset()"></span>
-            </div>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.configure_partition.gather.offset"></label>
+        <div class="col-lg-7" style="padding-top: 7px;">
+            <span data-bind="text: data.partition().offset()"></span>
         </div>
-        <div class="form-group">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.configurepartition.gather.size"></label>
-            <div class="col-lg-7" style="padding-top: 7px;">
-                <span data-bind="text: data.partition().size()"></span>
-            </div>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.configure_partition.gather.size"></label>
+        <div class="col-lg-7" style="padding-top: 7px;">
+            <span data-bind="text: data.partition().size()"></span>
         </div>
-        <div class="form-group">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.configurepartition.gather.filesystem"></label>
-            <div class="col-lg-7" style="padding-top: 7px;">
-                <span data-bind="if: isEmpty(data.partition().filesystem())">
-                    <i data-i18n="ovs:generic.unavailable"></i>
-                </span>
-                <span data-bind="if: !isEmpty(data.partition().filesystem())">
-                    <span data-bind="text: data.partition().filesystem()"></span>
-                </span>
-            </div>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.configure_partition.gather.filesystem"></label>
+        <div class="col-lg-7" style="padding-top: 7px;">
+            <span data-bind="if: isEmpty(data.partition().filesystem())">
+                <i data-i18n="ovs:generic.unavailable"></i>
+            </span>
+            <span data-bind="if: !isEmpty(data.partition().filesystem())">
+                <span data-bind="text: data.partition().filesystem()"></span>
+            </span>
         </div>
-        <div class="form-group">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.configurepartition.gather.mountpoint"></label>
-            <div class="col-lg-7" style="padding-top: 7px;">
-                <span data-bind="if: isEmpty(data.partition().mountpoint())">
-                    <i data-i18n="ovs:generic.unavailable"></i>
-                </span>
-                <span data-bind="if: !isEmpty(data.partition().mountpoint())">
-                    <span data-bind="text: data.partition().mountpoint()"></span>
-                </span>
-            </div>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.configure_partition.gather.mountpoint"></label>
+        <div class="col-lg-7" style="padding-top: 7px;">
+            <span data-bind="if: isEmpty(data.partition().mountpoint())">
+                <i data-i18n="ovs:generic.unavailable"></i>
+            </span>
+            <span data-bind="if: !isEmpty(data.partition().mountpoint())">
+                <span data-bind="text: data.partition().mountpoint()"></span>
+            </span>
         </div>
-        <p data-i18n="ovs:wizards.configurepartition.gather.roleinfo"></p>
-        <div class="form-group">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.configurepartition.gather.roles"></label>
-            <div class="col-lg-7">
-                <span data-bind="dropdown: {
-                                     items: data.availableRoles, target: data.roles, key: 'name',
-                                     text: function(item) {
-                                         return $.t('ovs:generic.partitionroles.' + item.name);
-                                     }
-                                 }">
-                </span>
-            </div>
+    </div>
+    <p data-i18n="ovs:wizards.configure_partition.gather.role_info"></p>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.configure_partition.gather.roles"></label>
+        <div class="col-lg-7">
+            <span class="fa fa-spin" data-bind="visible: loading()" data-i18n="[html]ovs:icons.loading" style="margin-top: 9px;"></span>
+            <span data-bind="visible: !loading(),
+                             dropdown: {
+                                 items: data.availableRoles, target: data.roles, key: 'name',
+                                 text: function(item) {
+                                     return $.t('ovs:generic.partitionroles.' + item.name);
+                                 }
+                             }">
+            </span>
         </div>
-    </form>
-    <div class="alert alert-danger" data-bind="visible: !canContinue().value" style="margin-bottom: -10px;">
+    </div>
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value && !loading()" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
         <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
         <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">

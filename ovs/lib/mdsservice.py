@@ -20,7 +20,6 @@ MDSService module
 import math
 import time
 import random
-from celery.schedules import crontab
 from ovs.celery_run import celery
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_mdsservice import MDSService
@@ -40,10 +39,10 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.storageserver.storagedriver import MetadataServerClient
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single
+from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig
-from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
+from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig, ObjectNotFoundException as SRCObjectNotFoundException
 
 
 class MDSServiceController(object):
@@ -338,7 +337,7 @@ class MDSServiceController(object):
 
         vdisk.invalidate_dynamics(['storagedriver_id', 'storagerouter_guid'])
         if vdisk.storagerouter_guid is None:
-            raise ValueError('Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any Storage Router'.format(vdisk.name, vdisk.guid))
+            raise SRCObjectNotFoundException('Cannot ensure MDS safety for vDisk {0} with guid {1} because vDisk is not attached to any Storage Router'.format(vdisk.name, vdisk.guid))
 
         if excluded_storagerouters is None:
             excluded_storagerouters = []
@@ -630,11 +629,15 @@ class MDSServiceController(object):
             if previous_master != service:
                 configs_no_ex_master.append(config)
             configs_all.append(config)
-        if len(configs_no_ex_master) != len(configs_all):
+        try:
+            if len(configs_no_ex_master) != len(configs_all):
+                vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
+                                                                          metadata_backend_config=MDSMetaDataBackendConfig(configs_no_ex_master))
             vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
-                                                                      metadata_backend_config=MDSMetaDataBackendConfig(configs_no_ex_master))
-        vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
-                                                                  metadata_backend_config=MDSMetaDataBackendConfig(configs_all))
+                                                                      metadata_backend_config=MDSMetaDataBackendConfig(configs_all))
+        except Exception:
+            MDSServiceController._logger.exception('MDS safety: vDisk {0}: Failed to update the metadata backend configuration'.format(vdisk.guid))
+            raise Exception('MDS configuration for volume {0} with guid {1} could not be changed'.format(vdisk.name, vdisk.guid))
 
         for service in new_services[1:]:
             client = MetadataServerClient.load(service)
@@ -742,7 +745,7 @@ class MDSServiceController(object):
         return config_set
 
     @staticmethod
-    @celery.task(name='ovs.mds.mds_checkup', schedule=crontab(minute='30', hour='0,4,8,12,16,20'))
+    @celery.task(name='ovs.mds.mds_checkup', schedule=Schedule(minute='30', hour='0,4,8,12,16,20'))
     @ensure_single(task_name='ovs.mds.mds_checkup', mode='CHAINED')
     def mds_checkup():
         """

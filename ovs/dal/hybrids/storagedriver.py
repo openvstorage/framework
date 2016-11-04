@@ -39,7 +39,7 @@ class StorageDriver(DataObject):
                     Property('ports', dict, doc='Ports on which the Storage Driver is listening (management, xmlrpc, dtl, edge).'),
                     Property('cluster_ip', str, doc='IP address on which the Storage Driver is listening.'),
                     Property('storage_ip', str, doc='IP address on which the vpool is shared to hypervisor'),
-                    Property('storagedriver_id', str, doc='ID of the Storage Driver as known by the Storage Drivers.'),
+                    Property('storagedriver_id', str, unique=True, doc='ID of the Storage Driver as known by the Storage Drivers.'),
                     Property('mountpoint', str, doc='Mountpoint from which the Storage Driver serves data'),
                     Property('mountpoint_dfs', str, mandatory=False, doc='Location of the backend in case of a distributed FS'),
                     Property('startup_counter', int, default=0, doc='StorageDriver startup counter')]
@@ -48,7 +48,8 @@ class StorageDriver(DataObject):
     __dynamics = [Dynamic('status', str, 30),
                   Dynamic('statistics', dict, 4),
                   Dynamic('edge_clients', list, 30),
-                  Dynamic('vdisks_guids', list, 15)]
+                  Dynamic('vdisks_guids', list, 15),
+                  Dynamic('cluster_node_config', dict, 3600)]
 
     def _status(self):
         """
@@ -144,3 +145,20 @@ class StorageDriver(DataObject):
         except:
             pass
         return sdstatsdict
+
+    def _cluster_node_config(self):
+        """
+        Prepares a ClusterNodeConfig dict for the StorageDriver process
+        """
+        from ovs.extensions.generic.configuration import Configuration
+        rdma = Configuration.get('/ovs/framework/rdma')
+        return {'vrouter_id': self.storagedriver_id,
+                'host': self.storage_ip,
+                'message_port': self.ports['management'],
+                'xmlrpc_host': self.cluster_ip,
+                'xmlrpc_port': self.ports['xmlrpc'],
+                'failovercache_host': self.storage_ip,
+                'failovercache_port': self.ports['dtl'],
+                'network_server_uri': '{0}://{1}:{2}'.format('rdma' if rdma else 'tcp',
+                                                             self.storage_ip,
+                                                             self.ports['edge'])}

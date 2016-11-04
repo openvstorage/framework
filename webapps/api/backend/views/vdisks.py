@@ -21,9 +21,10 @@ import time
 from rest_framework import viewsets
 from rest_framework.decorators import action, link
 from rest_framework.permissions import IsAuthenticated
-from backend.decorators import required_roles, load, return_list, return_object, return_task, log
-from backend.exceptions import HttpNotAcceptableException
+from api.backend.decorators import required_roles, load, return_list, return_object, return_task, log
+from api.backend.exceptions import HttpNotAcceptableException
 from ovs.dal.datalist import DataList
+from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
@@ -39,6 +40,7 @@ class VDiskViewSet(viewsets.ViewSet):
     permission_classes = (IsAuthenticated,)
     prefix = r'vdisks'
     base_name = 'vdisks'
+    return_exceptions = ['vdisks.create']
 
     @log()
     @required_roles(['read', 'manage'])
@@ -48,8 +50,11 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Overview of all vDisks
         :param vpoolguid: Guid of the vPool to retrieve its disks
+        :type vpoolguid: str
         :param storagerouterguid: Guid of the StorageRouter to retrieve its disks
+        :type storagerouterguid: str
         :param query: A query to be executed if required
+        :type query: DataQuery
         """
         if vpoolguid is not None:
             vpool = VPool(vpoolguid)
@@ -73,6 +78,7 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Load information about a given vDisk
         :param vdisk: Guid of the virtual disk to retrieve
+        :type vdisk: VDisk
         """
         return vdisk
 
@@ -85,7 +91,9 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Rollbacks a vDisk to a given timestamp
         :param vdisk: Guid of the virtual disk
+        :type vdisk: VDisk
         :param timestamp: Timestamp of the snapshot to rollback to
+        :type timestamp: int
         """
         return VDiskController.rollback.delay(vdisk_guid=vdisk.guid,
                                               timestamp=str(timestamp))
@@ -98,8 +106,11 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Sets configuration parameters to a given vdisk.
         :param vdisk: Guid of the virtual disk to configure
+        :type vdisk: VDisk
         :param new_config_params: Configuration settings for the virtual disk
-        :param version: API version
+        :type new_config_params: dict
+        :param version: Client version
+        :type version: int
         """
         if version == 1 and 'dtl_target' in new_config_params:
             storage_router = StorageRouterList.get_by_ip(new_config_params['dtl_target'])
@@ -107,6 +118,10 @@ class VDiskViewSet(viewsets.ViewSet):
                 raise HttpNotAcceptableException(error_description='API version 1 requires a Storage Router IP',
                                                  error='invalid_version')
             new_config_params['dtl_target'] = [junction.domain_guid for junction in storage_router.domains]
+
+        new_config_params.pop('dedupe_mode', None)
+        new_config_params.pop('cache_strategy', None)
+        new_config_params.pop('readcache_limit', None)
         return VDiskController.set_config_params.delay(vdisk_guid=vdisk.guid, new_config_params=new_config_params)
 
     @link()
@@ -114,22 +129,15 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(VDisk)
     @load(VDisk)
-    def get_children(self, vdisk, hints):
+    def get_children(self, vdisk):
         """
         Returns a list of vDisk guid(s) of children of a given vDisk
+        :param vdisk: Vdisk to get the children from
+        :type vdisk: VDisk
+        :return: Guids of the child vDisks
+        :rtype: list
         """
-        children_vdisk_guids = []
-        children_vdisks = []
-        if vdisk.is_vtemplate is False:
-            raise HttpNotAcceptableException(error_description='vDisk is not a vTemplate',
-                                             error='impossible_request')
-        for cdisk in vdisk.child_vdisks:
-            if cdisk.guid not in children_vdisk_guids:
-                children_vdisk_guids.append(cdisk.guid)
-                if hints['full'] is True:
-                    # Only load full object is required
-                    children_vdisks.append(cdisk)
-        return children_vdisks if hints['full'] is True else children_vdisk_guids
+        return vdisk.child_vdisks_guids
 
     @link()
     @required_roles(['read'])
@@ -139,6 +147,7 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Retrieve the configuration parameters for the given disk from the storagedriver.
         :param vdisk: Guid of the virtual disk to retrieve its running configuration
+        :type vdisk: VDisk
         """
         return VDiskController.get_config_params.delay(vdisk_guid=vdisk.guid)
 
@@ -151,9 +160,13 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Clones a vDisk
         :param vdisk: Guid of the virtual disk to clone
+        :type vdisk: VDisk
         :param name: Name for the clone (filename or user friendly name)
+        :type name: str
         :param storagerouter_guid: Guid of the storagerouter hosting the virtual disk
+        :type storagerouter_guid: str
         :param snapshot_id: ID of the snapshot to clone from
+        :type snapshot_id: str
         """
         return VDiskController.clone.delay(vdisk_guid=vdisk.guid,
                                            snapshot_id=snapshot_id,
@@ -172,7 +185,6 @@ class VDiskViewSet(viewsets.ViewSet):
         :type vdisk: VDisk
         :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisk to
         :type target_storagerouter_guid: str
-        :return: Celery async task
         """
         return VDiskController.move.delay(vdisk_guid=vdisk.guid,
                                           target_storagerouter_guid=target_storagerouter_guid)
@@ -186,7 +198,9 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Remove a snapshot from a VDisk
         :param vdisk: Guid of the virtual disk whose snapshot is to be removed
+        :type vdisk: VDisk
         :param snapshot_id: ID of the snapshot to remove
+        :type snapshot_id: str
         """
         return VDiskController.delete_snapshot.delay(vdisk_guid=vdisk.guid,
                                                      snapshot_id=snapshot_id)
@@ -200,7 +214,11 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Sets a vDisk as template
         :param vdisk: Guid of the virtual disk to set as template
+        :type vdisk: VDisk
         """
+        if len(vdisk.child_vdisks) > 0:
+            raise HttpNotAcceptableException(error_description='vDisk has clones',
+                                             error='impossible_request')
         return VDiskController.set_as_template.delay(vdisk_guid=vdisk.guid)
 
     @action()
@@ -219,7 +237,6 @@ class VDiskViewSet(viewsets.ViewSet):
         :type vpool_guid: str
         :param storagerouter_guid: Guid of the storagerouter to assign disk to
         :type storagerouter_guid: str
-        :return: Celery task
         """
         storagerouter = StorageRouter(storagerouter_guid)
         for storagedriver in storagerouter.storagedrivers:
@@ -239,12 +256,19 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Creates a snapshot from the vDisk
         :param vdisk: Guid of the virtual disk to create snapshot from
+        :type vdisk: VDisk
         :param name: Name of the snapshot (label)
+        :type name: str
         :param version: Client version
-        :param timestamp: Timestamp of the snapshot - integer
-        :param consistent: Flag - is_consistent
-        :param automatic: Flag - is_automatic
-        :param sticky: Flag - is_sticky
+        :type version: int
+        :param timestamp: Timestamp of the snapshot
+        :type timestamp: int
+        :param consistent: Indicates whether the snapshot will be consistent
+        :type consistent: bool
+        :param automatic: Indicates whether the snapshot was triggered by an automatic or manual process
+        :type automatic: bool
+        :param sticky: Indicates whether the system should clean the snapshot automatically
+        :type sticky: bool
         """
         if version >= 3:
             timestamp = str(int(time.time()))
@@ -265,8 +289,11 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Create a new vdisk from a template vDisk
         :param vdisk: Guid of the template virtual disk
+        :type vdisk: VDisk
         :param name: Name of the new vdisk
+        :type name: str
         :param storagerouter_guid: Guid of StorageRouter to create new vDisk on
+        :type storagerouter_guid: str
         """
         return VDiskController.create_from_template.delay(vdisk_guid=vdisk.guid,
                                                           name=name,
@@ -280,6 +307,8 @@ class VDiskViewSet(viewsets.ViewSet):
     def get_target_storagerouters(self, vdisk):
         """
         Gets all possible target Storage Routers for a given vDisk (e.g. when cloning, creating from template or moving)
+        :param vdisk: The vDisk to get the targets for
+        :type vdisk: VDisk
         """
         return [] if vdisk.vpool is None else [sd.storagerouter for sd in vdisk.vpool.storagedrivers]
 
@@ -290,9 +319,13 @@ class VDiskViewSet(viewsets.ViewSet):
     @load(VDisk)
     def delete(self, vdisk):
         """
-        Delete vdisk
-        :param vdisk: Guid of the vdisk to delete
+        Delete a given vDisk
+        :param vdisk: The vDisk to delete
+        :type vdisk: VDisk
         """
+        if len(vdisk.child_vdisks) > 0:
+            raise HttpNotAcceptableException(error_description='vDisk has clones',
+                                             error='impossible_request')
         return VDiskController.delete.delay(vdisk_guid=vdisk.guid)
 
     @action()
@@ -303,9 +336,14 @@ class VDiskViewSet(viewsets.ViewSet):
     def delete_vtemplate(self, vdisk):
         """
         Deletes a vDisk (template)
+        :param vdisk: the vDisk (template) to delete
+        :type vdisk: VDisk
         """
         if not vdisk.is_vtemplate:
             raise HttpNotAcceptableException(error_description='vDisk should be a vTemplate',
+                                             error='impossible_request')
+        if len(vdisk.child_vdisks) > 0:
+            raise HttpNotAcceptableException(error_description='vTemplate has clones',
                                              error='impossible_request')
         return VDiskController.delete.delay(vdisk_guid=vdisk.guid)
 
@@ -318,7 +356,7 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Schedule a backend sync on a vdisk
         :param vdisk: vdisk to schedule a backend sync to
-        :return: TLogName associated with the data sent off to the backend
+        :type vdisk: VDisk
         """
         return VDiskController.schedule_backend_sync.delay(vdisk_guid=vdisk.guid)
 
@@ -331,7 +369,9 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Verify if volume is synced to backend up to a specific tlog
         :param vdisk: vdisk to verify
-        :param tlog_name: TLogName to verify
+        :type vdisk: VDisk
+        :param tlog_name: TLog name to verify
+        :type tlog_name: str
         """
         return VDiskController.is_volume_synced_up_to_tlog.delay(vdisk_guid=vdisk.guid, tlog_name=tlog_name)
 
@@ -344,7 +384,9 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Verify if volume is synced to backend up to a specific snapshot
         :param vdisk: vdisk to verify
+        :type vdisk: VDisk
         :param snapshot_id: Snapshot to verify
+        :type snapshot_id: str
         """
         return VDiskController.is_volume_synced_up_to_snapshot.delay(vdisk_guid=vdisk.guid, snapshot_id=snapshot_id)
 
@@ -364,3 +406,35 @@ class VDiskViewSet(viewsets.ViewSet):
         new_size = int(new_size)
         return VDiskController.extend.delay(vdisk_guid=vdisk.guid,
                                             volume_size=new_size)
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_list(StorageRouter)
+    @load(VDisk)
+    def get_scrub_storagerouters(self):
+        """
+        Loads a list of suitable StorageRouters for scrubbing the given vDisk
+        """
+        storagerouters = []
+        for storagerouter in StorageRouterList.get_storagerouters():
+            scrub_partitions = storagerouter.partition_config.get(DiskPartition.ROLES.SCRUB, [])
+            if len(scrub_partitions) == 0:
+                continue
+            storagerouters.append(storagerouter)
+        return storagerouters
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(VDisk)
+    def scrub(self, vdisk, storagerouter_guid):
+        """
+        Scrubs a given vDisk on a given StorageRouter
+        :param vdisk: the vDisk to scrub
+        :type vdisk: VDisk
+        :param storagerouter_guid: The guid of the StorageRouter to scrub
+        :type storagerouter_guid: str
+        """
+        return VDiskController.scrub_single_vdisk.delay(vdisk.guid, storagerouter_guid)

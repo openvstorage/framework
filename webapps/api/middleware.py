@@ -21,6 +21,7 @@ Middleware module
 import re
 import json
 from django.http import HttpResponse
+from ovs.dal.exceptions import MissingMandatoryFieldsException
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.log.log_handler import LogHandler
 
@@ -36,9 +37,14 @@ class OVSMiddleware(object):
         """
         _ = self, request
         logger = LogHandler.get('api', 'middleware')
-        if OVSMiddleware._is_own_httpexception(exception):
+        if OVSMiddleware.is_own_httpexception(exception):
             return HttpResponse(exception.data,
                                 status=exception.status_code,
+                                content_type='application/json')
+        if isinstance(exception, MissingMandatoryFieldsException):
+            return HttpResponse(json.dumps({'error': 'invalid_data',
+                                            'error_description': exception.message}),
+                                status=400,
                                 content_type='application/json')
         logger.exception('An unhandled exception occurred: {0}'.format(exception))
         return HttpResponse(
@@ -59,7 +65,7 @@ class OVSMiddleware(object):
         # Validate version
         path = request.path
         regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
-        if path != '/api/' and '/api/oauth2/' not in path:
+        if path != '/api/' and '/api/oauth2/' not in path and '/swagger.json' not in path:
             if 'HTTP_ACCEPT' not in request.META or regex.match(request.META['HTTP_ACCEPT']) is None:
                 return HttpResponse(
                     json.dumps({'error': 'missing_header',
@@ -85,7 +91,7 @@ class OVSMiddleware(object):
         return response
 
     @staticmethod
-    def _is_own_httpexception(exception):
+    def is_own_httpexception(exception):
         """
         This is some sad, sad code and the only known workaround to ceck whether the given exception
         is an instance of one of our own exceptions. No, isinstance doesn't work as it somehow is convinced

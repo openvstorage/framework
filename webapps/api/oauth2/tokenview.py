@@ -25,9 +25,9 @@ import hashlib
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
-from oauth2.decorators import auto_response, limit, log
-from oauth2.exceptions import HttpBadRequestException
-from oauth2.toolbox import Toolbox
+from api.oauth2.decorators import auto_response, limit, log
+from api.oauth2.exceptions import HttpBadRequestException
+from api.oauth2.toolbox import Toolbox
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList

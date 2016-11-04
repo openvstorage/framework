@@ -21,11 +21,8 @@ ScheduledTaskController module
 import copy
 import json
 import time
-from celery.schedules import crontab
-from ConfigParser import RawConfigParser
 from datetime import datetime, timedelta
 from Queue import Empty, Queue
-from StringIO import StringIO
 from threading import Thread
 from time import mktime
 from ovs.celery_run import celery
@@ -38,7 +35,6 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
-from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonAdmin, ArakoonClientConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.remote import remote
@@ -46,6 +42,7 @@ from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
 from ovs.lib.helpers.decorators import ensure_single
+from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
@@ -59,7 +56,7 @@ class ScheduledTaskController(object):
     _logger = LogHandler.get('lib', name='scheduled tasks')
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.snapshot_all_vdisks', schedule=crontab(minute='0', hour='*'))
+    @celery.task(name='ovs.scheduled.snapshot_all_vdisks', schedule=Schedule(minute='0', hour='*'))
     @ensure_single(task_name='ovs.scheduled.snapshot_all_vdisks', extra_task_names=['ovs.scheduled.delete_snapshots'])
     def snapshot_all_vdisks():
         """
@@ -79,12 +76,12 @@ class ScheduledTaskController(object):
                                                 metadata=metadata)
                 success.append(vdisk.guid)
             except Exception:
-                ScheduledTaskController._logger.exception('Error snapshotting vDisk {0}'.format(vdisk.guid))
+                ScheduledTaskController._logger.exception('Error taking snapshot for vDisk {0}'.format(vdisk.guid))
                 fail.append(vdisk.guid)
         ScheduledTaskController._logger.info('[SSA] Snapshot has been taken for {0} vDisks, {1} failed.'.format(len(success), len(fail)))
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.delete_snapshots', schedule=crontab(minute='1', hour='2'))
+    @celery.task(name='ovs.scheduled.delete_snapshots', schedule=Schedule(minute='1', hour='2'))
     @ensure_single(task_name='ovs.scheduled.delete_snapshots')
     def delete_snapshots(timestamp=None):
         """
@@ -199,158 +196,14 @@ class ScheduledTaskController(object):
         ScheduledTaskController._logger.info('Delete snapshots finished')
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.execute_scrub', schedule=crontab(minute='0', hour='3'))
+    @celery.task(name='ovs.scheduled.execute_scrub', schedule=Schedule(minute='0', hour='3'))
     @ensure_single(task_name='ovs.scheduled.execute_scrub')
     def execute_scrub():
         """
         Retrieve and execute scrub work
         :return: None
         """
-        def _verify_mds_config(current_vdisk):
-            current_vdisk.invalidate_dynamics('info')
-            vdisk_configs = current_vdisk.info['metadata_backend_config']
-            if len(vdisk_configs) == 0:
-                raise RuntimeError('Could not load MDS configuration')
-            return vdisk_configs
-
-        def _execute_scrub_work(queue, vpool, scrub_info):
-            client = None
-            lock_time = 5 * 60
-            storagerouter = scrub_info['storage_router']
-            scrub_directory = '{0}/scrub_work_{1}_{2}'.format(scrub_info['scrub_path'], vpool.name, storagerouter.name)
-            scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}'.format(vpool.guid, storagerouter.guid)
-            backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, storagerouter.guid)
-            alba_proxy_service = 'ovs-albaproxy_{0}_{1}_scrub'.format(vpool.name, storagerouter.name)
-
-            # Deploy a proxy
-            try:
-                with file_mutex(name='ovs_albaproxy_scrub', wait=lock_time):
-                    ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
-                    client = SSHClient(storagerouter, 'root')
-                    client.dir_create(scrub_directory)
-                    client.dir_chmod(scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
-                    if ServiceManager.has_service(name=alba_proxy_service, client=client) is True and ServiceManager.get_service_status(name=alba_proxy_service, client=client) is True:
-                        ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Re-using existing proxy service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
-                        scrub_config = Configuration.get(scrub_config_key)
-                    else:
-                        machine_id = System.get_my_machine_id(client)
-                        port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
-                        port = System.get_free_ports(selected_range=port_range, nr=1, client=client)[0]
-                        # Scrub config
-                        # {u'albamgr_cfg_url': u'arakoon://config/ovs/vpools/71e2f717-f270-4a41-bbb0-d4c8c084d43e/proxies/64759516-3471-4321-b912-fb424568fc5b/config/abm?ini=%2Fopt%2FOpenvStorage%2Fconfig%2Farakoon_cacc.ini',
-                        #  u'fragment_cache': [u'none'],
-                        #  u'ips': [u'127.0.0.1'],
-                        #  u'log_level': u'info',
-                        #  u'manifest_cache_size': 17179869184,
-                        #  u'port': 0,
-                        #  u'transport': u'tcp'}
-
-                        # Backend config
-                        # {u'alba_connection_host': u'10.100.193.155',
-                        #  u'alba_connection_port': 26204,
-                        #  u'alba_connection_preset': u'preset',
-                        #  u'alba_connection_timeout': 15,
-                        #  u'alba_connection_transport': u'TCP',
-                        #  u'backend_interface_retries_on_error': 5,
-                        #  u'backend_interface_retry_backoff_multiplier': 2.0,
-                        #  u'backend_interface_retry_interval_secs': 1,
-                        #  u'backend_type': u'ALBA'}
-                        scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid))
-                        scrub_config['port'] = port
-                        scrub_config['transport'] = 'tcp'
-                        Configuration.set(scrub_config_key, json.dumps(scrub_config, indent=4), raw=True)
-
-                        params = {'VPOOL_NAME': vpool.name,
-                                  'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
-                                  'CONFIG_PATH': Configuration.get_configuration_path(scrub_config_key)}
-                        ServiceManager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
-                        ServiceManager.start_service(name=alba_proxy_service, client=client)
-                        ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deployed ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
-
-                    backend_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
-                    if vpool.backend_type.code == 'alba':
-                        backend_config['alba_connection_host'] = '127.0.0.1'
-                        backend_config['alba_connection_port'] = scrub_config['port']
-                    Configuration.set(backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
-            except Exception:
-                message = 'Scrubber - vPool {0} - StorageRouter {1} - An error occurred deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service)
-                error_messages.append(message)
-                ScheduledTaskController._logger.exception(message)
-                if client is not None and ServiceManager.has_service(name=alba_proxy_service, client=client) is True:
-                    if ServiceManager.get_service_status(name=alba_proxy_service, client=client) is True:
-                        ServiceManager.stop_service(name=alba_proxy_service, client=client)
-                    ServiceManager.remove_service(name=alba_proxy_service, client=client)
-                if Configuration.exists(scrub_config_key):
-                    Configuration.delete(scrub_config_key)
-
-            try:
-                # Empty the queue with vDisks to scrub
-                with remote(storagerouter.ip, [VDisk]) as rem:
-                    while True:
-                        vdisk = None
-                        vdisk_guid = queue.get(False)
-                        try:
-                            # Check MDS master is local. Trigger MDS handover if necessary
-                            vdisk = rem.VDisk(vdisk_guid)
-                            ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Started scrubbing at location {3}'.format(vpool.name, storagerouter.name, vdisk.name, scrub_directory))
-                            configs = _verify_mds_config(current_vdisk=vdisk)
-                            storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-                            if configs[0].get('ip') != storagedriver.storagerouter.ip:
-                                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - MDS master is not local, trigger handover'.format(vpool.name, storagerouter.name, vdisk.name))
-                                MDSServiceController.ensure_safety(vdisk)
-                                configs = _verify_mds_config(current_vdisk=vdisk)
-                                if configs[0].get('ip') != storagedriver.storagerouter.ip:
-                                    ScheduledTaskController._logger.warning('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Skipping because master MDS still not local'.format(vpool.name, storagerouter.name, vdisk.name))
-                                    continue
-
-                            # Do the actual scrubbing
-                            with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id)) as locked_client:
-                                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Retrieve and apply scrub work'.format(vpool.name, storagerouter.name, vdisk.name))
-                                work_units = locked_client.get_scrubbing_workunits()
-                                for work_unit in work_units:
-                                    res = locked_client.scrub(work_unit=work_unit,
-                                                              scratch_dir=scrub_directory,
-                                                              log_sinks=[sink],
-                                                              backend_config=Configuration.get_configuration_path(backend_config_key))
-                                    locked_client.apply_scrubbing_result(scrubbing_work_result=res)
-                                if work_units:
-                                    ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - {3} work units successfully applied'.format(vpool.name, storagerouter.name, vdisk.name, len(work_units)))
-                                else:
-                                    ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - No scrubbing required'.format(vpool.name, storagerouter.name, vdisk.name))
-                        except Exception:
-                            if vdisk is None:
-                                message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk with guid {2} could not be found'.format(vpool.name, storagerouter.name, vdisk_guid)
-                            else:
-                                message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Scrubbing failed'.format(vpool.name, storagerouter.name, vdisk.name)
-                            error_messages.append(message)
-                            ScheduledTaskController._logger.exception(message)
-
-            except Empty:  # Raised when all items have been fetched from the queue
-                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Queue completely processed'.format(vpool.name, storagerouter.name))
-            except Exception:
-                message = 'Scrubber - vPool {0} - StorageRouter {1} - Scrubbing failed'.format(vpool.name, storagerouter.name)
-                error_messages.append(message)
-                ScheduledTaskController._logger.exception(message)
-
-            # Delete the proxy again
-            try:
-                with file_mutex(name='ovs_albaproxy_scrub', wait=lock_time):
-                    ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Removing service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
-                    client = SSHClient(storagerouter, 'root')
-                    client.dir_delete(scrub_directory)
-                    if ServiceManager.has_service(alba_proxy_service, client=client):
-                        ServiceManager.stop_service(alba_proxy_service, client=client)
-                        ServiceManager.remove_service(alba_proxy_service, client=client)
-                    if Configuration.exists(scrub_config_key):
-                        Configuration.delete(scrub_config_key)
-                    ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Removed service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
-            except Exception:
-                message = 'Scrubber - vPool {0} - StorageRouter {1} - Removing service {2} failed'.format(vpool.name, storagerouter.name, alba_proxy_service)
-                error_messages.append(message)
-                ScheduledTaskController._logger.exception(message)
-
         ScheduledTaskController._logger.info('Scrubber - Started')
-        sink = LogHandler.get_sink_path('scrubber', allow_override=True)
         vpools = VPoolList.get_vpools()
         error_messages = []
         scrub_locations = []
@@ -390,6 +243,8 @@ class ScheduledTaskController(object):
             # Fill queue with all vDisks for current vPool
             vpool_queue = Queue()
             for vd in vp.vdisks:
+                if vd.is_vtemplate is True:
+                    continue
                 vd.invalidate_dynamics('storagedriver_id')
                 if not vd.storagedriver_id:
                     ScheduledTaskController._logger.warning('Scrubber - vPool {0} - vDisk {1} {2} - No StorageDriver ID found'.format(vp.name, vd.guid, vd.name))
@@ -398,12 +253,12 @@ class ScheduledTaskController(object):
 
             # Copy backend connection manager information in separate key
             threads_to_spawn = min(max_threads_per_vpool, len(scrub_locations))
-            ScheduledTaskController._logger.info('Scrubber - vPool {0} - Spawning {1} threads'.format(vp.name, threads_to_spawn))
+            ScheduledTaskController._logger.info('Scrubber - vPool {0} - Spawning {1} thread{2}'.format(vp.name, threads_to_spawn, '' if threads_to_spawn == 1 else 's'))
             for _ in range(threads_to_spawn):
                 scrub_target = scrub_locations[counter % len(scrub_locations)]
-                thread = Thread(target=_execute_scrub_work,
+                thread = Thread(target=ScheduledTaskController.execute_scrub_work,
                                 name='scrub_{0}_{1}'.format(vp.guid, scrub_target['storage_router'].guid),
-                                args=(vpool_queue, vp, scrub_target))
+                                args=(vpool_queue, vp, scrub_target, error_messages))
                 thread.start()
                 threads.append(thread)
                 counter += 1
@@ -415,7 +270,166 @@ class ScheduledTaskController(object):
             raise Exception('Errors occurred while scrubbing:\n  - {0}'.format('\n  - '.join(error_messages)))
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.collapse_arakoon', schedule=crontab(minute='10', hour='0,2,4,6,8,10,12,14,16,18,20,22'))
+    def execute_scrub_work(queue, vpool, scrub_info, error_messages):
+        """
+        Executes scrub work for a given vDisk queue and vPool, based on scrub_info
+        :param queue: a Queue with vDisk guids that need to be scrubbed (they should only be member of a single vPool)
+        :type queue: Queue
+        :param vpool: the vPool object of the vDisks
+        :type vpool: VPool
+        :param scrub_info: A dict containing scrub information: `scrub_path` with the path where to scrub and `storage_router` with the StorageRouter
+                           that needs to do the work
+        :type scrub_info: dict
+        :param error_messages: A list of error messages to be filled
+        :type error_messages: list
+        :return: a list of error messages
+        :rtype: list
+        """
+
+        def _verify_mds_config(current_vdisk):
+            current_vdisk.invalidate_dynamics('info')
+            vdisk_configs = current_vdisk.info['metadata_backend_config']
+            if len(vdisk_configs) == 0:
+                raise RuntimeError('Could not load MDS configuration')
+            return vdisk_configs
+
+        client = None
+        lock_time = 5 * 60
+        storagerouter = scrub_info['storage_router']
+        scrub_directory = '{0}/scrub_work_{1}_{2}'.format(scrub_info['scrub_path'], vpool.name, storagerouter.name)
+        scrub_config_key = 'ovs/vpools/{0}/proxies/scrub/scrub_config_{1}'.format(vpool.guid, storagerouter.guid)
+        backend_config_key = 'ovs/vpools/{0}/proxies/scrub/backend_config_{1}'.format(vpool.guid, storagerouter.guid)
+        alba_proxy_service = 'ovs-albaproxy_{0}_{1}_scrub'.format(vpool.name, storagerouter.name)
+
+        # Deploy a proxy
+        try:
+            with file_mutex(name='ovs_albaproxy_scrub', wait=lock_time):
+                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
+                client = SSHClient(storagerouter, 'root')
+                client.dir_create(scrub_directory)
+                client.dir_chmod(scrub_directory, 0777)  # Celery task executed by 'ovs' user and should be able to write in it
+                if ServiceManager.has_service(name=alba_proxy_service, client=client) is True and ServiceManager.get_service_status(name=alba_proxy_service, client=client) is True:
+                    ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Re-using existing proxy service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
+                    scrub_config = Configuration.get(scrub_config_key)
+                else:
+                    machine_id = System.get_my_machine_id(client)
+                    port_range = Configuration.get('/ovs/framework/hosts/{0}/ports|storagedriver'.format(machine_id))
+                    port = System.get_free_ports(selected_range=port_range, nr=1, client=client)[0]
+                    # Scrub config
+                    # {u'albamgr_cfg_url': u'arakoon://config/ovs/vpools/71e2f717-f270-4a41-bbb0-d4c8c084d43e/proxies/64759516-3471-4321-b912-fb424568fc5b/config/abm?ini=%2Fopt%2FOpenvStorage%2Fconfig%2Farakoon_cacc.ini',
+                    #  u'fragment_cache': [u'none'],
+                    #  u'ips': [u'127.0.0.1'],
+                    #  u'log_level': u'info',
+                    #  u'manifest_cache_size': 17179869184,
+                    #  u'port': 0,
+                    #  u'transport': u'tcp'}
+
+                    # Backend config
+                    # {u'alba_connection_host': u'10.100.193.155',
+                    #  u'alba_connection_port': 26204,
+                    #  u'alba_connection_preset': u'preset',
+                    #  u'alba_connection_timeout': 15,
+                    #  u'alba_connection_transport': u'TCP',
+                    #  u'backend_interface_retries_on_error': 5,
+                    #  u'backend_interface_retry_backoff_multiplier': 2.0,
+                    #  u'backend_interface_retry_interval_secs': 1,
+                    #  u'backend_type': u'ALBA'}
+                    scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid))
+                    scrub_config['port'] = port
+                    scrub_config['transport'] = 'tcp'
+                    Configuration.set(scrub_config_key, json.dumps(scrub_config, indent=4), raw=True)
+
+                    params = {'VPOOL_NAME': vpool.name,
+                              'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
+                              'CONFIG_PATH': Configuration.get_configuration_path(scrub_config_key)}
+                    ServiceManager.add_service(name='ovs-albaproxy', params=params, client=client, target_name=alba_proxy_service)
+                    ServiceManager.start_service(name=alba_proxy_service, client=client)
+                    ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deployed ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
+
+                backend_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
+                if vpool.backend_type.code == 'alba':
+                    backend_config['alba_connection_host'] = '127.0.0.1'
+                    backend_config['alba_connection_port'] = scrub_config['port']
+                Configuration.set(backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
+        except Exception:
+            message = 'Scrubber - vPool {0} - StorageRouter {1} - An error occurred deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service)
+            error_messages.append(message)
+            ScheduledTaskController._logger.exception(message)
+            if client is not None and ServiceManager.has_service(name=alba_proxy_service, client=client) is True:
+                if ServiceManager.get_service_status(name=alba_proxy_service, client=client) is True:
+                    ServiceManager.stop_service(name=alba_proxy_service, client=client)
+                ServiceManager.remove_service(name=alba_proxy_service, client=client)
+            if Configuration.exists(scrub_config_key):
+                Configuration.delete(scrub_config_key)
+
+        try:
+            # Empty the queue with vDisks to scrub
+            with remote(storagerouter.ip, [VDisk]) as rem:
+                while True:
+                    vdisk = None
+                    vdisk_guid = queue.get(False)
+                    try:
+                        # Check MDS master is local. Trigger MDS handover if necessary
+                        vdisk = rem.VDisk(vdisk_guid)
+                        ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Started scrubbing at location {3}'.format(vpool.name, storagerouter.name, vdisk.name, scrub_directory))
+                        configs = _verify_mds_config(current_vdisk=vdisk)
+                        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+                        if configs[0].get('ip') != storagedriver.storagerouter.ip:
+                            ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - MDS master is not local, trigger handover'.format(vpool.name, storagerouter.name, vdisk.name))
+                            MDSServiceController.ensure_safety(VDisk(vdisk_guid))  # Do not use a remote VDisk instance here
+                            configs = _verify_mds_config(current_vdisk=vdisk)
+                            if configs[0].get('ip') != storagedriver.storagerouter.ip:
+                                ScheduledTaskController._logger.warning('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Skipping because master MDS still not local'.format(vpool.name, storagerouter.name, vdisk.name))
+                                continue
+
+                        # Do the actual scrubbing
+                        with vdisk.storagedriver_client.make_locked_client(str(vdisk.volume_id)) as locked_client:
+                            ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Retrieve and apply scrub work'.format(vpool.name, storagerouter.name, vdisk.name))
+                            work_units = locked_client.get_scrubbing_workunits()
+                            for work_unit in work_units:
+                                res = locked_client.scrub(work_unit=work_unit,
+                                                          scratch_dir=scrub_directory,
+                                                          log_sinks=[LogHandler.get_sink_path('scrubber', allow_override=True)],
+                                                          backend_config=Configuration.get_configuration_path(backend_config_key))
+                                locked_client.apply_scrubbing_result(scrubbing_work_result=res)
+                            if work_units:
+                                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - {3} work units successfully applied'.format(vpool.name, storagerouter.name, vdisk.name, len(work_units)))
+                            else:
+                                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - No scrubbing required'.format(vpool.name, storagerouter.name, vdisk.name))
+                    except Exception:
+                        if vdisk is None:
+                            message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk with guid {2} could not be found'.format(vpool.name, storagerouter.name, vdisk_guid)
+                        else:
+                            message = 'Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Scrubbing failed'.format(vpool.name, storagerouter.name, vdisk.name)
+                        error_messages.append(message)
+                        ScheduledTaskController._logger.exception(message)
+
+        except Empty:  # Raised when all items have been fetched from the queue
+            ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Queue completely processed'.format(vpool.name, storagerouter.name))
+        except Exception:
+            message = 'Scrubber - vPool {0} - StorageRouter {1} - Scrubbing failed'.format(vpool.name, storagerouter.name)
+            error_messages.append(message)
+            ScheduledTaskController._logger.exception(message)
+
+        # Delete the proxy again
+        try:
+            with file_mutex(name='ovs_albaproxy_scrub', wait=lock_time):
+                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Removing service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
+                client = SSHClient(storagerouter, 'root')
+                client.dir_delete(scrub_directory)
+                if ServiceManager.has_service(alba_proxy_service, client=client):
+                    ServiceManager.stop_service(alba_proxy_service, client=client)
+                    ServiceManager.remove_service(alba_proxy_service, client=client)
+                if Configuration.exists(scrub_config_key):
+                    Configuration.delete(scrub_config_key)
+                ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Removed service {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
+        except Exception:
+            message = 'Scrubber - vPool {0} - StorageRouter {1} - Removing service {2} failed'.format(vpool.name, storagerouter.name, alba_proxy_service)
+            error_messages.append(message)
+            ScheduledTaskController._logger.exception(message)
+
+    @staticmethod
+    @celery.task(name='ovs.scheduled.collapse_arakoon', schedule=Schedule(minute='10', hour='0,2,4,6,8,10,12,14,16,18,20,22'))
     @ensure_single(task_name='ovs.scheduled.collapse_arakoon')
     def collapse_arakoon():
         """
@@ -423,30 +437,46 @@ class ScheduledTaskController(object):
         :return: None
         """
         ScheduledTaskController._logger.info('Starting arakoon collapse')
-        arakoon_clusters = []
+        storagerouters = StorageRouterList.get_storagerouters()
+        cluster_info = [('cacc', storagerouters[0], True)]
+        cluster_names = []
         for service in ServiceList.get_services():
-            if service.is_internal is True and \
-               service.type.name in (ServiceType.SERVICE_TYPES.ARAKOON,
-                                     ServiceType.SERVICE_TYPES.NS_MGR,
-                                     ServiceType.SERVICE_TYPES.ALBA_MGR):
-                arakoon_clusters.append(service.name.replace('arakoon-', ''))
-
-        for cluster in arakoon_clusters:
-            ScheduledTaskController._logger.info('  Collapsing cluster {0}'.format(cluster))
-            contents = Configuration.get(ArakoonClusterConfig.CONFIG_KEY.format(cluster), raw=True)
-            parser = RawConfigParser()
-            parser.readfp(StringIO(contents))
-            nodes = {}
-            for node in parser.get('global', 'cluster').split(','):
-                node = node.strip()
-                nodes[node] = ([str(parser.get(node, 'ip'))], int(parser.get(node, 'client_port')))
-            config = ArakoonClientConfig(str(cluster), nodes)
-            for node in nodes.keys():
-                ScheduledTaskController._logger.info('    Collapsing node: {0}'.format(node))
-                client = ArakoonAdmin(config)
-                try:
-                    client.collapse(str(node), 2)
-                except:
-                    ScheduledTaskController._logger.exception('Error during collapsing cluster {0} node {1}'.format(cluster, node))
+            if service.is_internal is True and service.type.name in (ServiceType.SERVICE_TYPES.ARAKOON,
+                                                                     ServiceType.SERVICE_TYPES.NS_MGR,
+                                                                     ServiceType.SERVICE_TYPES.ALBA_MGR):
+                cluster = service.name.replace('arakoon-', '')
+                if cluster in cluster_names:
+                    continue
+                cluster_names.append(cluster)
+                cluster_info.append((cluster, service.storagerouter, False))
+        workload = {}
+        for cluster, storagerouter, filesystem in cluster_info:
+            ScheduledTaskController._logger.debug('  Collecting info for cluster {0}'.format(cluster))
+            config = ArakoonClusterConfig(cluster, filesystem=filesystem)
+            config.load_config(storagerouter.ip)
+            for node in config.nodes:
+                if node.ip not in workload:
+                    workload[node.ip] = {'node_id': node.name,
+                                         'clusters': []}
+                workload[node.ip]['clusters'].append((cluster, filesystem))
+        for storagerouter in storagerouters:
+            try:
+                if storagerouter.ip not in workload:
+                    continue
+                node_workload = workload[storagerouter.ip]
+                client = SSHClient(storagerouter)
+                for cluster, filesystem in node_workload['clusters']:
+                    try:
+                        ScheduledTaskController._logger.debug('  Collapsing cluster {0} on {1}'.format(cluster, storagerouter.ip))
+                        if filesystem is True:
+                            config_path = ArakoonClusterConfig.CONFIG_FILE.format(cluster)
+                        else:
+                            config_path = Configuration.get_configuration_path(ArakoonClusterConfig.CONFIG_KEY.format(cluster))
+                        client.run('arakoon --collapse-local {0} 2 -config {1}'.format(node_workload['node_id'], config_path))
+                        ScheduledTaskController._logger.info('  Collapsing cluster {0} on {1} completed'.format(cluster, storagerouter.ip))
+                    except:
+                        ScheduledTaskController._logger.exception('  Collapsing cluster {0} on {1} failed'.format(cluster, storagerouter.ip))
+            except UnableToConnectException:
+                ScheduledTaskController._logger.error('  Could not collapse any cluster on {0} (not reachable)'.format(storagerouter.name))
 
         ScheduledTaskController._logger.info('Arakoon collapse finished')

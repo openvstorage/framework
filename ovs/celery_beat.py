@@ -31,6 +31,7 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.generic.system import System
+from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
 
 
@@ -50,6 +51,7 @@ class DistributedScheduler(Scheduler):
         self._persistent = PersistentFactory.get_client()
         self._namespace = 'ovs_celery_beat'
         self._mutex = volatile_mutex('celery_beat', 10)
+        self._schedule_info = {}
         self._has_lock = False
         super(DistributedScheduler, self).__init__(*args, **kwargs)
         self._logger.debug('DS init')
@@ -60,15 +62,15 @@ class DistributedScheduler(Scheduler):
         """
         self._logger.debug('DS setting up schedule')
         self._load_schedule()
-        self.merge_inplace(DistributedScheduler._discover_schedule())
+        self.merge_inplace(self._discover_schedule())
         self.install_default_entries(self.schedule)
-        for entry in self.schedule:
-            self._logger.debug('* {0}'.format(entry))
+        for schedule, source in self._schedule_info.iteritems():
+            self._logger.debug('* {0} ({1})'.format(schedule, source))
         self._logger.debug('DS setting up schedule - done')
 
-    @staticmethod
-    def _discover_schedule():
-        schedule = {}
+    def _discover_schedule(self):
+        schedules = {}
+        self._schedule_info = {}
         path = '/'.join([os.path.dirname(__file__), 'lib'])
         for filename in os.listdir(path):
             if os.path.isfile('/'.join([path, filename])) and filename.endswith('.py') and filename != '__init__.py':
@@ -80,11 +82,19 @@ class DistributedScheduler(Scheduler):
                             and 'object' in [base.__name__ for base in member[1].__bases__]:
                         for submember in inspect.getmembers(member[1]):
                             if hasattr(submember[1], 'schedule') and (isinstance(submember[1].schedule, crontab) or
-                                                                      isinstance(submember[1].schedule, timedelta)):
-                                schedule[submember[1].name] = {'task': submember[1].name,
-                                                               'schedule': submember[1].schedule,
-                                                               'args': []}
-        return schedule
+                                                                      isinstance(submember[1].schedule, timedelta) or
+                                                                      isinstance(submember[1].schedule, Schedule)):
+                                if isinstance(submember[1].schedule, Schedule):
+                                    schedule, source = submember[1].schedule.generate_schedule(submember[1].name)
+                                else:
+                                    schedule = submember[1].schedule
+                                    source = 'crontab or timedelta from code'
+                                if schedule is not None:
+                                    schedules[submember[1].name] = {'task': submember[1].name,
+                                                                    'schedule': schedule,
+                                                                    'args': []}
+                                self._schedule_info[submember[1].name] = source
+        return schedules
 
     def _load_schedule(self):
         """

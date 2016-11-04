@@ -38,7 +38,7 @@ class DebianPackage(object):
 
     @staticmethod
     def _get_version(package_name, client):
-        command = "dpkg -s {0} | grep Version | cut -d ' ' -f 2".format(package_name)
+        command = "dpkg -s {0} 2> /dev/null | grep Version | cut -d ' ' -f 2".format(package_name)
         if client is None:
             return check_output(command, shell=True).strip()
         return client.run(command).strip()

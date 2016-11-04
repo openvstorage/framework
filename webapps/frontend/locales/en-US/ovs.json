@@ -136,6 +136,7 @@
         "actions": "Actions",
         "address": "Address",
         "administration": "Administration",
+        "aliases": "Aliases",
         "api": "API",
         "areyousure": "Are you sure?",
         "backendtype": "Type",
@@ -146,7 +147,6 @@
         "children": "Children",
         "city": "City",
         "client": "Client",
-        "clone": "Create clones",
         "component": "Component",
         "consistent": "Consistent",
         "consistentss": "Consistent snapshots",
@@ -166,7 +166,7 @@
         "dtl_port": "DTL Port",
         "dtl_status": "DTL",
         "edge": "Edge",
-        "edgeclients": "Edge Clients",
+        "edge_clients": "Edge Clients",
         "elementsloading": "Items loading...",
         "error": "Error",
         "errorsfound": "Errors were found. Please check the contents of all fields.",
@@ -187,7 +187,6 @@
         "ip": "IP",
         "latency": "Latency",
         "loadingdata": "Loading data...",
-        "logging": "Kibana logging",
         "logout": "Log out",
         "machine": "Machine",
         "machines": "Machines",
@@ -221,7 +220,7 @@
         "readspeed": "Read Speed",
         "recovery_domains": "Recovery Domains",
         "reload": "Reload",
-        "removesnapshot": "Remove Snapshot",
+        "remove_snapshot": "Remove Snapshot",
         "rescan": "Rescan",
         "results": "results",
         "resultspp": "results per page",
@@ -243,7 +242,6 @@
         "storagerouter": "Storage Router",
         "storagerouters": "Storage Routers",
         "storeddata": "Stored Data",
-        "templatehaschildren": "This vTemplate does have children",
         "tempspace": "Temporary files",
         "thousandseparator": ",",
         "togglenavigation": "Toggle navigation",
@@ -290,7 +288,6 @@
                 "inprogress": "The hardware capabilities of this Storage Router are being refreshed"
             },
             "hostip": "Host IP",
-            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
             "moveaway": {
                 "warning": "Are you sure you want to move all vDisks away?",
                 "title": "Are you sure",
@@ -310,7 +307,7 @@
                 "failure": "Error saving this Storage Router."
             },
             "scrub_capable": "SCRUB Capable",
-            "storageroutervpoollink": "vPools served by this Storage Router",
+            "storagerouter_vpool_link": "vPools served by this Storage Router",
             "title": "Storage Router",
             "updateserving": "Save changes",
             "edit": "Edit some properties of this Storage Router",
@@ -338,7 +335,6 @@
                     "on_read": "Cache On Read",
                     "on_write": "Cache On Write"
                 },
-                "caching": "Caching",
                 "cluster_size": "Cluster size",
                 "dedupe": "Deduplication",
                 "dedupe_help_message": "Deduplication will calculate an MD5 sum for each write resulting in performance loss, but better cache performance",
@@ -364,9 +360,7 @@
                     "rdma": "RDMA",
                     "tcp": "TCP"
                 },
-                "readcache_limit": "Read cache limit",
                 "sco_size": "SCO size",
-                "strategy": "Strategy",
                 "volume": "Volumes",
                 "write_buffer": "Maximum write buffer"
             },
@@ -395,97 +389,82 @@
         "global_write_buffer": "Global Write Buffer",
         "sco_size": "SCO Size",
         "statistics": "Statistics",
+        "storagerouter_vpool_link": "Storage Routers serving this vPool",
         "title": "vPools",
         "volume_write_buffer": "Volume Write Buffer",
         "write_buffer": "Write Buffer",
         "detail": {
-            "title": "vPool",
-            "introduction": "Below an overview of the vPool properties.",
-            "storageroutervpoollink": "Storage Routers serving this vPool",
-            "updateserving": "Save changes",
-            "localvpool": "A vPool on Local Filesystem can not be shared across multiple Storage Routers.",
-            "logging": "vPool logs",
-            "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
-            "logginginfo2": "Open Kibana",
-            "logginginfo3": "to view this vPool's logs.",
-            "configuration": "vPool configuration defaults",
-            "configurationinfo": "Below are the default/fallback values for this vPool's vDisks. If a vDisk has no specific settings, settings will be inherited from its vPool."
-        },
-        "saveconfig": {
-            "done": "Save complete",
-            "done_msg": "The configuration details for __what__ are saved.",
-            "error_msg": "saving __what__"
-        }
-    },
-    "statistics": {
-        "title": "Statistics",
-        "introduction": "This page contains various system statistics.",
-        "memcache": {
-            "title": "Memcache",
-            "hitspeed": "Requests per second:",
-            "memoryusage": "Memory usage:",
-            "keysincache": "Keys in cache:",
-            "cachehits": "Cache hits:",
-            "cachetraffic": "Cache traffic",
-            "uptime": "Uptime",
-            "rawinfo": "Raw memcached information"
+            "title": "vPool"
         }
     },
     "vdisks": {
         "add": "Add new vDisk",
-        "title": "vDisks",
         "details": "Details",
         "performance": "Performance",
+        "title": "vDisks",
         "detail": {
             "clone": "Clone",
             "configuration": "vDisk configuration",
-            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
-            "edgeclients": "Edge Clients",
+            "configuration_info": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
+            "edge_clients": "Edge Clients",
+            "has_children": "vDisk has clones",
             "move": "Move",
+            "remove": "Remove",
             "rollback": "Rollback",
+            "scrub": "Scrub",
             "set_as_template": "Set as vTemplate",
             "snapshot": "Take snapshot",
             "snapshots": "Snapshots",
             "title": "vDisk"
         },
+        "remove_snapshot": {
+            "failed_msg": "Removing snapshot __what__ failed: __why__",
+            "started": "Removing snapshot",
+            "started_msg": "Snapshot __what__ is being removed",
+            "success": "Removed snapshot",
+            "success_msg": "Snapshot __what__ has been removed",
+            "title_msg": "Are you sure you want to remove snapshot __what__?"
+        },
+        "remove_vdisk": {
+            "failed_msg": "Removing vDisk __what__ failed: __why__",
+            "started": "Removing vDisk",
+            "started_msg": "vDisk __what__ is being removed",
+            "success": "Removed vDisk",
+            "success_msg": "vDisk __what__ has been removed",
+            "title_msg": "Are you sure you want to remove vDisk __what__?"
+        },
+        "remove_vtemplate": {
+            "failed_msg": "Removing vTemplate __what__ failed: __why__",
+            "started": "Removing vTemplate",
+            "started_msg": "vTemplate __what__ is being removed",
+            "success": "Removed vTemplate",
+            "success_msg": "vTemplate __what__ has been removed",
+            "title_msg": "Are you sure you want to remove vTemplate __what__?"
+        },
+        "save_config": {
+            "failed_msg": "Saving configuration for vDisk __what__ failed: __why__",
+            "success": "Save complete",
+            "success_msg": "The configuration details for __what__ are saved."
+        },
         "set_as_template": {
-            "done": "vDisk set as vTemplate",
-            "done_msg": "vDisk __what__ set as vTemplate",
-            "error_msg": "setting __what__ as vTemplate: __error__",
-            "marked": "Marked for setting as vTemplate",
-            "marked_msg": "vDisk __what__ is marked for setting as vTemplate...",
+            "failed_msg": "Converting vDisk __what__ into vTemplate failed: __why__",
             "no": "Close",
-            "title": "Set vDisk __what__ as vTemplate",
-            "warning": "Warning: After converting a vDisk into a vTemplate, it can no longer actively be used.",
-            "yes": "Set as vTemplate"
-        },
-        "saveconfig": {
-            "done": "Save complete",
-            "done_msg": "The configuration details for __what__ are saved.",
-            "error_msg": "saving __what__"
-        },
-        "removesnapshot": {
-            "delete": "Are you sure you want to remove snapshot __what__?",
-            "done": "Snapshot removed",
-            "done_msg": "Snapshot __what__ was removed successfully.",
-            "error_msg": "Failed to remove snapshot __what__."
-        },
-        "delete": {
-            "warning": "Are you sure you want to delete __what__?",
-            "marked": "Marked for deletion",
-            "marked_msg": "vDisk __what__ is marked for deletion...",
-            "done": "vDisk deleted",
-            "done_msg": "vDisk __what__ deleted",
-            "error_msg": "deleting __what__"
+            "started": "Converting vDisk",
+            "started_msg": "vDisk __what__ is being converted into vTemplate",
+            "success": "Converted vDisk",
+            "success_msg": "vDisk __what__ has been converted into vTemplate",
+            "title": "Convert vDisk __what__ into vTemplate",
+            "warning": "Warning: After converting a vDisk into a vTemplate, it can no longer be actively used.",
+            "yes": "Convert into vTemplate"
         }
-    },
-    "edgeclients": {
-        "title": "Edge Clients"
     },
     "vtemplates": {
         "vdisks": {
             "title": "vDisk Templates"
         },
+        "clone": "Create clones",
+        "has_children": "This vTemplate has children",
+        "remove": "Remove",
         "title": "vTemplates"
     },
     "dashboard": {
@@ -721,6 +700,7 @@
                 "alba_preset": "Preset:",
                 "basic_info": "Additional backend information",
                 "choose_backend": "Choose one of the available backends",
+                "choose_preset": "Choose one of the available presets",
                 "client_id": "Client ID:",
                 "client_secret": "Client Secret:",
                 "fragment_cache": "Fragment Cache:",
@@ -766,6 +746,7 @@
                 "backend_type": "Backend Type:",
                 "basic_info": "Add basic vPool information",
                 "choose_backend": "Choose one of the available backends",
+                "choose_preset": "Choose one of the available presets",
                 "client_id": "Client ID:",
                 "client_secret": "Client Secret:",
                 "duplicate_name": "This name already exists",
@@ -779,6 +760,7 @@
                 "ip_address": "Storage IP:",
                 "loading_backend_information": "Backend information is being loaded",
                 "local_host": "Use local Open vStorage backend",
+                "metadata_loading": "MetaData is being loaded",
                 "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
                 "missing_role": "Missing required partition role: __what__",
                 "missing_storageip": "A Storage IP must be selected",
@@ -807,6 +789,26 @@
                 "started": "Started creating",
                 "storagerouter_info": "Validate the Storage Router information.",
                 "success": "Creation of vPool __what__ finished."
+            }
+        },
+        "configure_partition": {
+            "title": "Configure partitions",
+            "gather": {
+                "basic_info": "Configure the selected partition or raw disk space. Where required, a partition will be created, adding a filesystem and mounting it.",
+                "device": "Device",
+                "metadata_failure": "Failed to load the information about the current roles",
+                "filesystem": "Filesystem",
+                "mountpoint": "Mountpoint",
+                "offset": "Offset",
+                "role_info": "Update/select the required roles for the partition. Roles in use cannot be removed. Only one DB and one SCRUB role can be assigned to any of the partitions.",
+                "roles": "Roles",
+                "size": "Size"
+            },
+            "confirm": {
+                "creating": "configuring the partition",
+                "success": "Partition configured",
+                "started": "Configuration started",
+                "in_progress": "The partition is now being configured."
             }
         },
         "create_ft": {
@@ -844,6 +846,17 @@
             "gather_vpool": {
                 "basic_info": "Basic vPool information",
                 "information": "Extending a vPool does not allow to reconfigure the name and backend information"
+            }
+        },
+        "scrub": {
+            "title": "Scrub a vDisk",
+            "gather": {
+                "basicinfo": "Select the Storage Router on which to execute the scrubbing.",
+                "failed": "Scrubbing failed",
+                "inprogress": "The selected vDisk is being scrubbed",
+                "nostoragerouter": "No Storage Router information found",
+                "scrubstarted": "Started",
+                "success": "Scrubbing finished"
             }
         },
         "shrink_vpool": {
@@ -939,25 +952,6 @@
         "update": {
             "title": "Update __what__"
         },
-        "configurepartition": {
-            "title": "Configure partitions",
-            "gather": {
-                "basicinfo": "Configure the selected partition or raw disk space. Where required, a partition will be created, adding a filesystem and mounting it.",
-                "roleinfo": "Update/select the required roles for the partition. Roles in use cannot be removed. Only one DB and one SCRUB role can be assigned to any of the partitions.",
-                "roles": "Roles",
-                "device": "Device",
-                "mountpoint": "Mountpoint",
-                "filesystem": "Filesystem",
-                "size": "Size",
-                "offset": "Offset"
-            },
-            "confirm": {
-                "creating": "configuring the partition",
-                "success": "Partition configured",
-                "started": "Configuration started",
-                "inprogress": "The partition is now being configured."
-            }
-        },
         "vdisk_move": {
             "confirm": {
                 "failed": "Moving vDisk __what__ failed: __why__",
@@ -981,12 +975,14 @@
     "title": "Open vStorage",
     "icons": {
         "add": "&#xf067;",
+        "archive": "&#xf187;",
         "ban": "&#xf05e;",
         "cancel": "&#xf00d;",
         "cancel_circle": "&#xf057;",
         "check": "&#xf00c;",
         "checked": "&#xf046;",
         "check_circle": "&#xf058;",
+        "clone": "&#xf24d;",
         "cog": "&#xf013;",
         "collapse": "&#xf147;",
         "configuration": "&#xf013;",
@@ -1006,6 +1002,7 @@
         "loading": "&#xf110;",
         "logs": "&#xf02d;",
         "management": "&#xf0b1;",
+        "markoffline": "&#xf1cd;",
         "move": "&#xf064;",
         "moveaway": "&#xf074;",
         "notchecked": "&#xf096;",
@@ -1013,19 +1010,17 @@
         "rights": "&#xf132;",
         "rollback": "&#xf01e;",
         "save": "&#xf0c7;",
+        "scrub": "&#xf1b8;",
         "separator": "&#xf101;",
         "set_as_template": "&#xf023;",
         "snapshot": "&#xf030;",
         "storagerouter": "&#xf0c2;",
-        "storageroutervpoollink": "&#xf07c;",
+        "storagerouter_vpool_link": "&#xf07c;",
         "sync": "&#xf021;",
         "unlink": "&#xf127;",
         "up": "&#xf106;",
         "vdisks": "&#xf0a0;",
         "vpools": "&#xf0c2;",
-        "warning": "&#xf071;",
-        "clone": "&#xf24d;",
-        "archive": "&#xf187;",
-        "markoffline": "&#xf1cd"
+        "warning": "&#xf071;"
     }
 }

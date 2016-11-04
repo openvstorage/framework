@@ -27,7 +27,7 @@ class Role(DataObject):
     actions. E.g. a "Viewer" Role can view all data but has no update/write permission.
     """
     __properties = [Property('name', str, doc='Name of the Role'),
-                    Property('code', str, doc='Contains a code which is referenced from the API code'),
+                    Property('code', str, unique=True, doc='Contains a code which is referenced from the API code'),
                     Property('description', str, mandatory=False, doc='Description of the Role')]
     __relations = []
     __dynamics = []

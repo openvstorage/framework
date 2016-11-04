@@ -118,7 +118,7 @@ class PyrakoonStore(object):
         Asserts a key-value pair
         """
         try:
-            return self._client.assert_value(key, ujson.dumps(value, sort_keys=True), transaction)
+            return self._client.assert_value(key, None if value is None else ujson.dumps(value, sort_keys=True), transaction)
         except ArakoonAssertionFailed as assertion:
             raise AssertException(assertion)
 

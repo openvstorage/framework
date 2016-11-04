@@ -20,7 +20,7 @@ Upstart module
 
 import re
 import time
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, check_output
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 
@@ -29,7 +29,7 @@ class Upstart(object):
     """
     Contains all logic related to Upstart services
     """
-    _logger = LogHandler.get('extensions', name='servicemanager')
+    _logger = LogHandler.get('extensions', name='service-manager')
 
     @staticmethod
     def _service_exists(name, client, path):
@@ -138,36 +138,8 @@ class Upstart(object):
         :type client: SSHClient
         :return: None
         """
-        # remove upstart.conf file
         name = Upstart._get_name(name, client)
         client.file_delete('/etc/init/{0}.conf'.format(name))
-        client.file_delete('/etc/init/{0}.override'.format(name))
-
-    @staticmethod
-    def disable_service(name, client):
-        """
-        Disable a service
-        :param name: Name of the service to disable
-        :type name: str
-        :param client: Client on which to disable the service
-        :type client: SSHClient
-        :return: None
-        """
-        name = Upstart._get_name(name, client)
-        client.run('echo "manual" > /etc/init/{0}.override'.format(name))
-
-    @staticmethod
-    def enable_service(name, client):
-        """
-        Enable a service
-        :param name: Name of the service to enable
-        :type name: str
-        :param client: Client on which to enable the service
-        :type client: SSHClient
-        :return: None
-        """
-        name = Upstart._get_name(name, client)
-        client.file_delete('/etc/init/{0}.override'.format(name))
 
     @staticmethod
     def start_service(name, client):
@@ -269,22 +241,6 @@ class Upstart(object):
             return False
 
     @staticmethod
-    def is_enabled(name, client):
-        """
-        Verify whether a service is enabled
-        :param name: Name of the service to verify if enabled
-        :type name: str
-        :param client: Client on which to verify whether the service is enabled
-        :type client: SSHClient
-        :return: Whether the service is enabled
-        :rtype: bool
-        """
-        name = Upstart._get_name(name, client)
-        if client.file_exists('/etc/init/{0}.override'.format(name)):
-            return False
-        return True
-
-    @staticmethod
     def get_service_pid(name, client):
         """
         Retrieve the PID of a service
@@ -314,7 +270,7 @@ class Upstart(object):
     @staticmethod
     def send_signal(name, signal, client):
         """
-        Remove a service
+        Send a signal to a service
         :param name: Name of the service to send a signal
         :type name: str
         :param signal: Signal to pass on to the service
@@ -341,3 +297,51 @@ class Upstart(object):
         for filename in client.dir_list('/etc/init'):
             if filename.endswith('.conf'):
                 yield filename.replace('.conf', '')
+
+    @staticmethod
+    def monitor_services():
+        """
+        Monitor the local OVS services
+        :return: None
+        """
+        try:
+            previous_output = None
+            while True:
+                # Gather service states
+                running_services = {}
+                non_running_services = {}
+                longest_service_name = 0
+                for service_info in check_output('initctl list', shell=True).splitlines():
+                    if not service_info.startswith('ovs-'):
+                        continue
+                    service_info = service_info.split(',')[0].strip()
+                    service_name = service_info.split()[0].strip()
+                    service_state = service_info.split()[1].strip()
+                    if service_state == "start/running":
+                        running_services[service_name] = service_state
+                    else:
+                        non_running_services[service_name] = service_state
+
+                    if len(service_name) > longest_service_name:
+                        longest_service_name = len(service_name)
+
+                # Put service states in list
+                output = ['OVS running processes',
+                          '=====================\n']
+                for service_name in sorted(running_services):
+                    output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), running_services[service_name]))
+
+                output.extend(['\n\nOVS non-running processes',
+                               '=========================\n'])
+                for service_name in sorted(non_running_services):
+                    output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), non_running_services[service_name]))
+
+                # Print service states (only if changes)
+                if previous_output != output:
+                    print '\x1b[2J\x1b[H'
+                    for line in output:
+                        print line
+                    previous_output = list(output)
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass

@@ -1,11 +1,11 @@
 [Unit]
-Description=webapp api
+Description=Open vStorage webapp API
 Requires=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
 After=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
 
 [Service]
 Type=simple
-Environment=PYTHONPATH=:/opt/OpenvStorage:/opt/OpenvStorage/webapps/api
+Environment=PYTHONPATH=:/opt/OpenvStorage:/opt/OpenvStorage/webapps
 WorkingDirectory=/opt/OpenvStorage/webapps
 ExecStart=/usr/bin/gunicorn -c /opt/OpenvStorage/config/django_gunicorn_ovs.cfg.py api.wsgi
 Restart=on-failure

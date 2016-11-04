@@ -33,6 +33,8 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.lists.backendtypelist import BackendTypeList
+from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
@@ -85,13 +87,17 @@ class Helper(object):
         storagedrivers = previous_structure.get('storagedrivers', {})
         storagerouter_domains = previous_structure.get('storagerouter_domains', {})
 
-        service_type = ServiceType()
-        service_type.name = 'MetadataServer'
-        service_type.save()
-        backend_type = BackendType()
-        backend_type.name = 'BackendType'
-        backend_type.code = 'BT'
-        backend_type.save()
+        service_type = ServiceTypeList.get_by_name('MetadataServer')
+        if service_type is None:
+            service_type = ServiceType()
+            service_type.name = 'MetadataServer'
+            service_type.save()
+        backend_type = BackendTypeList.get_backend_type_by_code('BT')
+        if backend_type is None:
+            backend_type = BackendType()
+            backend_type.name = 'BackendType'
+            backend_type.code = 'BT'
+            backend_type.save()
         srclients = {}
         for domain_id in structure.get('domains', []):
             if domain_id not in domains:
@@ -117,8 +123,8 @@ class Helper(object):
                 storagerouter.ip = '10.0.0.{0}'.format(sr_id)
                 storagerouter.rdma_capable = False
                 storagerouter.node_type = 'MASTER'
-                storagerouter.save()
                 storagerouter.machine_id = str(sr_id)
+                storagerouter.save()
                 storagerouters[sr_id] = storagerouter
                 disk = Disk()
                 disk.storagerouter = storagerouter
@@ -126,13 +132,12 @@ class Helper(object):
                 disk.name = '/dev/uda'
                 disk.size = 1 * 1024 ** 4
                 disk.is_ssd = True
-                disk.path = '/dev/uda'
+                disk.aliases = ['/dev/uda']
                 disk.save()
                 partition = DiskPartition()
                 partition.offset = 0
                 partition.size = disk.size
-                partition.id = 'unittest_{0}'.format(sr_id)
-                partition.path = '/dev/uda-1'
+                partition.aliases = ['/dev/uda-1']
                 partition.state = 'OK'
                 partition.mountpoint = '/tmp/unittest/sr_{0}/disk_1/partition_1'.format(sr_id)
                 partition.disk = disk

@@ -27,7 +27,7 @@ define([
         self.data = data;
 
         // Setup
-        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.configurepartition.title')));
+        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.configure_partition.title')));
         self.modal(generic.tryGet(options, 'modal', false));
         self.data.partition(options.partition);
         self.data.disk(options.disk);

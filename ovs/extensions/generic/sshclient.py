@@ -205,9 +205,19 @@ class SSHClient(object):
     def _clean_text(text):
         if type(text) is list:
             text = '\n'.join(line.rstrip() for line in text)
-        # This strip is absolutely necessary. Without it, channel.communicate() is never executed (odd but true)
         try:
-            return text.strip().replace(u'\u2018', u'"').replace(u'\u2019', u'"')
+            # This strip is absolutely necessary. Without it, channel.communicate() is never executed (odd but true)
+            if isinstance(text, unicode):
+                cleaned = text.strip()
+            else:
+                cleaned = text.strip().decode('utf-8', 'replace')
+            for old, new in {u'\u2018': "'",
+                             u'\u201a': "'",
+                             u'\u201e': '"',
+                             u'\u201c': '"',
+                             u'\u25cf': '*'}.iteritems():
+                cleaned = cleaned.replace(old, new)
+            return cleaned
         except UnicodeDecodeError:
             SSHClient._logger.error('UnicodeDecodeError with output: {0}'.format(text))
             raise

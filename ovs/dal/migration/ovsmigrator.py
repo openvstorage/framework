@@ -29,7 +29,7 @@ class OVSMigrator(object):
     """
 
     identifier = 'ovs'
-    THIS_VERSION = 10
+    THIS_VERSION = 11
 
     def __init__(self):
         """ Init method """
@@ -167,6 +167,76 @@ class OVSMigrator(object):
 
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
         elif working_version < OVSMigrator.THIS_VERSION:
-            pass
+            # Migrate unique constraints
+            from ovs.dal.helpers import HybridRunner, Descriptor
+            from ovs.extensions.storage.persistentfactory import PersistentFactory
+            client = PersistentFactory.get_client()
+            hybrid_structure = HybridRunner.get_hybrids()
+            for class_descriptor in hybrid_structure.values():
+                cls = Descriptor().load(class_descriptor).get_object()
+                classname = cls.__name__.lower()
+                unique_key = 'ovs_unique_{0}_{{0}}_'.format(classname)
+                uniques = []
+                # noinspection PyProtectedMember
+                for prop in cls._properties:
+                    if prop.unique is True and len([k for k in client.prefix(unique_key.format(prop.name))]) == 0:
+                        uniques.append(prop.name)
+                if len(uniques) > 0:
+                    prefix = 'ovs_data_{0}_'.format(classname)
+                    for key in client.prefix(prefix):
+                        data = client.get(key)
+                        for property_name in uniques:
+                            ukey = '{0}{1}'.format(unique_key.format(property_name), hashlib.sha1(str(data[property_name])).hexdigest())
+                            client.set(ukey, key)
+
+            # Complete rework of the way we detect devices to assign roles or use as ASD
+            # Allow loop-, raid-, nvme-, ??-devices and logical volumes as ASD (https://github.com/openvstorage/framework/issues/792)
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
+            from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+            from ovs.lib.disk import DiskController
+
+            for storagerouter in StorageRouterList.get_storagerouters():
+                try:
+                    client = SSHClient(storagerouter, username='root')
+                except UnableToConnectException:
+                    raise
+
+                # Retrieve all symlinks for all devices
+                # Example of name_alias_mapping:
+                # {'/dev/md0': ['/dev/disk/by-id/md-uuid-ad2de634:26d97253:5eda0a23:96986b76', '/dev/disk/by-id/md-name-OVS-1:0'],
+                #  '/dev/sda': ['/dev/disk/by-path/pci-0000:03:00.0-sas-0x5000c295fe2ff771-lun-0'],
+                #  '/dev/sda1': ['/dev/disk/by-uuid/e3e0bc62-4edc-4c6b-a6ce-1f39e8f27e41', '/dev/disk/by-path/pci-0000:03:00.0-sas-0x5000c295fe2ff771-lun-0-part1']}
+                name_alias_mapping = {}
+                alias_name_mapping = {}
+                for path_type in client.dir_list(directory='/dev/disk'):
+                    if path_type in ['by-uuid', 'by-partuuid']:  # UUIDs can change after creating a filesystem on a partition
+                        continue
+                    directory = '/dev/disk/{0}'.format(path_type)
+                    for symlink in client.dir_list(directory=directory):
+                        symlink_path = '{0}/{1}'.format(directory, symlink)
+                        link = client.file_read_link(symlink_path)
+                        if link not in name_alias_mapping:
+                            name_alias_mapping[link] = []
+                        name_alias_mapping[link].append(symlink_path)
+                        alias_name_mapping[symlink_path] = link
+
+                for disk in storagerouter.disks:
+                    if disk.aliases is None:
+                        # noinspection PyProtectedMember
+                        device_path = '/dev/{0}'.format(disk.name)
+                        disk.aliases = name_alias_mapping.get(device_path, [device_path])
+                        disk.save()
+                    for partition in disk.partitions:
+                        # noinspection PyProtectedMember
+                        partition_device = alias_name_mapping.get(partition._data['path'])
+                        if partition.aliases is None:
+                            if partition_device is None:
+                                partition.aliases = []
+                                partition.save()
+                                continue
+                            partition.aliases = name_alias_mapping.get(partition_device, [])
+                            partition.save()
+
+                DiskController.sync_with_reality(storagerouter_guid=storagerouter.guid)
 
         return OVSMigrator.THIS_VERSION

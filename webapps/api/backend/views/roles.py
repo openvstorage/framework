@@ -18,9 +18,9 @@
 Module for roles
 """
 
-from backend.decorators import required_roles, return_object, return_list, load, log
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from api.backend.decorators import required_roles, return_object, return_list, load, log
 from ovs.dal.hybrids.role import Role
 from ovs.dal.lists.rolelist import RoleList
 
@@ -50,5 +50,7 @@ class RoleViewSet(viewsets.ViewSet):
     def retrieve(self, role):
         """
         Load information about a given Role
+        :param role: The Role to be returned
+        :type role: Role
         """
         return role

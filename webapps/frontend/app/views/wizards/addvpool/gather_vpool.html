@@ -16,175 +16,174 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
-    <form id="add-vpool-gather-vpool" class="form-horizontal">
-        <p data-bind="visible: data.vPoolAdd()" data-i18n="ovs:wizards.add_vpool.gather_vpool.basic_info"></p>
-        <p data-bind="visible: !data.vPoolAdd()" data-i18n="ovs:wizards.extend_vpool.gather_vpool.basic_info"></p>
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
-            <label class="col-lg-3 control-label" for="inputVpoolName" data-i18n="ovs:wizards.add_vpool.gather_vpool.name"></label>
+    <p data-bind="visible: data.vPoolAdd()" data-i18n="ovs:wizards.add_vpool.gather_vpool.basic_info"></p>
+    <p data-bind="visible: !data.vPoolAdd()" data-i18n="ovs:wizards.extend_vpool.gather_vpool.basic_info"></p>
+    <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
+        <label class="col-lg-3 control-label" for="inputVpoolName" data-i18n="ovs:wizards.add_vpool.gather_vpool.name"></label>
+        <div class="col-lg-7">
+            <input type="text" id="inputVpoolName" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'input', disable: !data.vPoolAdd()" />
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.backend_type"></label>
+        <div class="col-lg-7" style="margin-bottom: -5px;">
+            <span data-bind="dropdown: {
+                                 enabled: data.vPoolAdd,
+                                 items: data.backends, target: data.backend,
+                                 text: function(item) {
+                                     return $.t('ovs:generic.backendtypes.' + item);
+                                 }
+                             }">
+            </span>
+        </div>
+    </div>
+    <div class="form-group" data-bind="visible: data.backend() === 'distributed'">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.mountpoint"></label>
+        <div class="col-lg-7" style="margin-bottom: -5px;">
+            <div data-bind="visible: metadataLoading()" style="padding-top: 6px;"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></div>
+            <span data-bind="visible: !metadataLoading(),
+                             dropdown: {
+                                 items: data.mountpoints,
+                                 target: data.distributedMtpt,
+                                 emptyisloading: false
+                             }"></span>
+        </div>
+    </div>
+    <div data-bind="visible: data.backend() === 'alba' && data.vPoolAdd()">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
+            <div class="col-lg-3"></div>
             <div class="col-lg-7">
-                <input type="text" id="inputVpoolName" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'input', disable: !data.vPoolAdd()" />
+                <input type="checkbox" id="inputVpoolLocalHost" class="autofocus" data-bind="checked: data.localHost" />
+                <label for="inputVpoolLocalHost" data-i18n="ovs:wizards.add_vpool.gather_vpool.local_host" style="font-weight: normal;"></label>
+            </div>
+        </div>
+    </div>
+    <div data-bind="visible: data.backend() !== 'distributed' && !data.localHost() && data.vPoolAdd()">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('host') }">
+            <label class="col-lg-3 control-label" for="inputVpoolHost" data-i18n="ovs:wizards.add_vpool.gather_vpool.host"></label>
+            <div class="col-lg-4">
+                <input type="text" id="inputVpoolHost" class="autofocus form-control" data-bind="value: data.host, valueUpdate: 'input'" />
+            </div>
+            <label class="col-lg-1 control-label" for="inputVpoolPort" data-i18n="ovs:wizards.add_vpool.gather_vpool.port"></label>
+            <div class="col-lg-2">
+                <input type="text" id="inputVpoolPort" class="autofocus form-control" data-bind="value: data.port" />
+            </div>
+        </div>
+    </div>
+    <div data-bind="visible: data.backend().match(/^.+_s3$/) !== null && data.vPoolAdd()">
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('accesskey') }">
+            <label class="col-lg-3 control-label" for="inputVpoolAccessKey" data-i18n="ovs:wizards.add_vpool.gather_vpool.access_key"></label>
+            <div class="col-lg-7">
+                <input type="text" id="inputVpoolAccessKey" class="autofocus form-control" data-bind="value: data.accesskey, valueUpdate: 'input'" />
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('secretkey') }">
+            <label class="col-lg-3 control-label" for="inputVpoolSecretKey" data-i18n="ovs:wizards.add_vpool.gather_vpool.secret_key"></label>
+            <div class="col-lg-7">
+                <input type="password" id="inputVpoolSecretKey" class="autofocus form-control" data-bind="value: data.secretkey, valueUpdate: 'input'" />
+            </div>
+        </div>
+    </div>
+    <div data-bind="visible: data.backend() === 'alba'">
+        <div data-bind="visible: !data.localHost() && data.vPoolAdd()">
+            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
+                <label class="col-lg-3 control-label" for="inputVpoolClientId" data-i18n="ovs:wizards.add_vpool.gather_vpool.client_id"></label>
+                <div class="col-lg-7">
+                    <input type="text" id="inputVpoolClientId" class="autofocus form-control" data-bind="value: data.accesskey, valueUpdate: 'input'" />
+                </div>
+            </div>
+            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientsecret') }">
+                <label class="col-lg-3 control-label" for="inputVpoolClientSecret" data-i18n="ovs:wizards.add_vpool.gather_vpool.client_secret"></label>
+                <div class="col-lg-7">
+                    <input type="password" id="inputVpoolClientSecret" class="autofocus form-control" data-bind="value: data.secretkey, valueUpdate: 'input'">
+                </div>
             </div>
         </div>
         <div class="form-group">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.backend_type"></label>
-            <div class="col-lg-7" style="margin-bottom: -5px;">
-                <span data-bind="dropdown: {
-                                     enabled: data.vPoolAdd,
-                                     items: data.backends, target: data.backend,
-                                     text: function(item) {
-                                         return $.t('ovs:generic.backendtypes.' + item);
-                                     }
-                                 }">
-                </span>
-            </div>
-        </div>
-        <div class="form-group" data-bind="visible: data.backend() === 'distributed'">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.mountpoint"></label>
-            <div class="col-lg-7" style="margin-bottom: -5px;">
-                <div data-bind="visible: metadataLoading()" style="padding-top: 6px;"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></div>
-                <span data-bind="visible: !metadataLoading(),
-                                 dropdown: {
-                                     items: data.mountpoints,
-                                     target: data.distributedMtpt,
-                                     emptyisloading: false
-                                 }"></span>
-            </div>
-        </div>
-        <div data-bind="visible: data.backend() === 'alba' && data.vPoolAdd()">
-            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
-                <div class="col-lg-3"></div>
-                <div class="col-lg-7">
-                    <input type="checkbox" id="inputVpoolLocalHost" class="autofocus" data-bind="checked: data.localHost" />
-                    <label for="inputVpoolLocalHost" data-i18n="ovs:wizards.add_vpool.gather_vpool.local_host" style="font-weight: normal;"></label>
-                </div>
-            </div>
-        </div>
-        <div data-bind="visible: data.backend() !== 'distributed' && !data.localHost() && data.vPoolAdd()">
-            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('host') }">
-                <label class="col-lg-3 control-label" for="inputVpoolHost" data-i18n="ovs:wizards.add_vpool.gather_vpool.host"></label>
-                <div class="col-lg-4">
-                    <input type="text" id="inputVpoolHost" class="autofocus form-control" data-bind="value: data.host, valueUpdate: 'input'" />
-                </div>
-                <label class="col-lg-1 control-label" for="inputVpoolPort" data-i18n="ovs:wizards.add_vpool.gather_vpool.port"></label>
-                <div class="col-lg-2">
-                    <input type="text" id="inputVpoolPort" class="autofocus form-control" data-bind="value: data.port" />
-                </div>
-            </div>
-        </div>
-        <div data-bind="visible: data.backend().match(/^.+_s3$/) !== null && data.vPoolAdd()">
-            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('accesskey') }">
-                <label class="col-lg-3 control-label" for="inputVpoolAccessKey" data-i18n="ovs:wizards.add_vpool.gather_vpool.access_key"></label>
-                <div class="col-lg-7">
-                    <input type="text" id="inputVpoolAccessKey" class="autofocus form-control" data-bind="value: data.accesskey, valueUpdate: 'input'" />
-                </div>
-            </div>
-            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('secretkey') }">
-                <label class="col-lg-3 control-label" for="inputVpoolSecretKey" data-i18n="ovs:wizards.add_vpool.gather_vpool.secret_key"></label>
-                <div class="col-lg-7">
-                    <input type="password" id="inputVpoolSecretKey" class="autofocus form-control" data-bind="value: data.secretkey, valueUpdate: 'input'" />
-                </div>
-            </div>
-        </div>
-        <div data-bind="visible: data.backend() === 'alba'">
-            <div data-bind="visible: !data.localHost() && data.vPoolAdd()">
-                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
-                    <label class="col-lg-3 control-label" for="inputVpoolClientId" data-i18n="ovs:wizards.add_vpool.gather_vpool.client_id"></label>
-                    <div class="col-lg-7">
-                        <input type="text" id="inputVpoolClientId" class="autofocus form-control" data-bind="value: data.accesskey, valueUpdate: 'input'" />
-                    </div>
-                </div>
-                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientsecret') }">
-                    <label class="col-lg-3 control-label" for="inputVpoolClientSecret" data-i18n="ovs:wizards.add_vpool.gather_vpool.client_secret"></label>
-                    <div class="col-lg-7">
-                        <input type="password" id="inputVpoolClientSecret" class="autofocus form-control" data-bind="value: data.secretkey, valueUpdate: 'input'">
-                    </div>
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_backend"></label>
-                <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('backend') }" style="margin-bottom: -5px;">
-                    <!-- ko if: data.albaBackends() === undefined || data.albaBackends().length === 0 -->
-                        <i data-i18n="[html]ovs:wizards.add_vpool.gather_vpool.no_backends"
-                           style="display: inline-block; margin-top: 7px;"></i>
-                    <!-- /ko -->
-                    <!-- ko if: data.albaBackends() !== undefined && data.albaBackends().length > 0 -->
-                        <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaBackend() === undefined)"></span>
-                        <span data-bind="visible: (data.vPoolAdd() === true || data.albaBackend() !== undefined),
-                                         dropdown: {
-                                             enabled: data.vPoolAdd,
-                                             key: 'guid', keyisfunction: false,
-                                             items: data.albaBackends, target: data.albaBackend,
-                                             text: function(item) {
-                                                 if (item !== undefined) {
-                                                     return item.name;
-                                                 }
-                                             }
-                                         }">
-                        </span>
-                    <!-- /ko -->
-                    <button class="btn btn-default"  style="margin-left: 10px;"
-                            data-bind="click: loadAlbaBackends, style: {
-                                           'margin-top': (data.albaBackends() !== undefined && data.albaBackends().length > 0 ? '-26px' : '')
-                                       }, enable: !albaBackendLoading(), visible: data.vPoolAdd()">
-                        <span class="fa fa-" data-bind="css: { 'fa-spin': albaBackendLoading() }" data-i18n="[html]ovs:icons.load"></span>
-                        <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
-                    </button>
-                </div>
-            </div>
-            <div class="form-group" data-bind="visible: data.albaBackend() !== undefined">
-                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset"></label>
-                <div class="col-lg-7" style="margin-bottom: -5px;">
-                    <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPool() !== undefined && data.albaPreset() === undefined)"></span>
-                    <span data-bind="visible: (data.vPoolAdd() === true || data.albaPreset() !== undefined),
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_backend"></label>
+            <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('backend') }" style="margin-bottom: -5px;">
+                <!-- ko if: data.albaBackends() === undefined || data.albaBackends().length === 0 -->
+                    <i data-i18n="[html]ovs:wizards.add_vpool.gather_vpool.no_backends"
+                       style="display: inline-block; margin-top: 7px;"></i>
+                <!-- /ko -->
+                <!-- ko if: data.albaBackends() !== undefined && data.albaBackends().length > 0 -->
+                    <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPoolAdd() === false && data.albaBackend() === undefined)"></span>
+                    <span data-bind="visible: (data.vPoolAdd() === true || data.albaBackend() !== undefined),
                                      dropdown: {
                                          enabled: data.vPoolAdd,
-                                         key: 'name', keyisfunction: false,
-                                         items: data.enhancedPresets, target: data.albaPreset,
+                                         key: 'guid', keyisfunction: false,
+                                         items: data.albaBackends, target: data.albaBackend,
                                          text: function(item) {
-                                             var policies = [];
                                              if (item !== undefined) {
-                                                 $.each(item.policies, function(index, policy) {
-                                                     policies.push(policy.text);
-                                                 });
-                                                 return item.name + ': ' + policies.join(', ');
+                                                 return item.name;
                                              }
                                          }
-                                     }"></span>
-                </div>
+                                     }">
+                    </span>
+                <!-- /ko -->
+                <button type='button' class="btn btn-default"  style="margin-left: 10px;"
+                        data-bind="click: loadAlbaBackends, style: {
+                                       'margin-top': (data.albaBackends() !== undefined && data.albaBackends().length > 0 ? '-26px' : '')
+                                   }, enable: !albaBackendLoading(), visible: data.vPoolAdd()">
+                    <span class="fa fa-" data-bind="css: { 'fa-spin': albaBackendLoading() }" data-i18n="[html]ovs:icons.load"></span>
+                    <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
+                </button>
             </div>
         </div>
-
-        <p data-i18n="ovs:wizards.add_vpool.gather_vpool.extended_info"></p>
-        <div class="form-group">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.initial_storagerouter"></label>
-            <div class="col-lg-7" style="margin-bottom: -5px;">
-                <span data-bind="dropdown: {
-                                     key: 'guid',
-                                     keyisfunction: true,
-                                     items: data.storageRoutersAvailable,
-                                     target: data.storageRouter,
+        <div class="form-group" data-bind="visible: data.albaBackend() !== undefined">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset"></label>
+            <div class="col-lg-7" data-bind="css: { 'has-error': canContinue().fields.contains('preset') }" style="margin-bottom: -5px;">
+                <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading" data-bind="visible: (data.vPool() !== undefined && data.albaPreset() === undefined)"></span>
+                <span data-bind="visible: (data.vPoolAdd() === true || data.albaPreset() !== undefined),
+                                 dropdown: {
+                                     enabled: data.vPoolAdd,
+                                     key: 'name', keyisfunction: false,
+                                     items: data.enhancedPresets, target: data.albaPreset,
+                                     emptyisloading: false,
                                      text: function(item) {
+                                         var policies = [];
                                          if (item !== undefined) {
-                                             return item.name()
+                                             $.each(item.policies, function(index, policy) {
+                                                 policies.push(policy.text);
+                                             });
+                                             return item.name + ': ' + policies.join(', ');
                                          }
                                      }
-                                 }">
-                </span>
-            </div>
-        </div>
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('storageip') }">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.ip_address"></label>
-            <div class="col-lg-7" style="margin-bottom: -5px;">
-                <div data-bind="visible: metadataLoading()" style="padding-top: 6px;"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></div>
-                <span data-bind="visible: !metadataLoading(),
-                                 dropdown: {
-                                     items: data.ipAddresses,
-                                     target: data.storageIP,
-                                     emptyisloading: false
                                  }"></span>
             </div>
         </div>
-    </form>
+    </div>
+
+    <p data-i18n="ovs:wizards.add_vpool.gather_vpool.extended_info"></p>
+    <div class="form-group">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.initial_storagerouter"></label>
+        <div class="col-lg-7" style="margin-bottom: -5px;">
+            <span data-bind="dropdown: {
+                                 key: 'guid',
+                                 keyisfunction: true,
+                                 items: data.storageRoutersAvailable,
+                                 target: data.storageRouter,
+                                 text: function(item) {
+                                     if (item !== undefined) {
+                                         return item.name()
+                                     }
+                                 }
+                             }">
+            </span>
+        </div>
+    </div>
+    <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('storageip') }">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vpool.gather_vpool.ip_address"></label>
+        <div class="col-lg-7" style="margin-bottom: -5px;">
+            <div data-bind="visible: metadataLoading()" style="padding-top: 6px;"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></div>
+            <span data-bind="visible: !metadataLoading(),
+                             dropdown: {
+                                 items: data.ipAddresses,
+                                 target: data.storageIP,
+                                 emptyisloading: false
+                             }"></span>
+        </div>
+    </div>
     <div class="alert alert-warning" data-bind="visible: !isPresetAvailable()" style="margin-top: 20px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset_unavailable"></span>
     </div>

@@ -15,34 +15,24 @@
 // but WITHOUT ANY WARRANTY of any kind.
 /*global define */
 define([
-    'ovs/shared', 'ovs/refresher',
-    '../containers/memcached'
-], function(shared, Refresher, Memcached) {
+    'jquery', 'ovs/generic',
+    '../build', './gather', './data'
+], function($, generic, build, Gather, data) {
     "use strict";
-    return function() {
+    return function(options) {
         var self = this;
+        build(self);
 
         // Variables
-        self.shared    = shared;
-        self.guard     = { authenticated: true };
-        self.refresher = new Refresher();
+        self.data = data;
 
-        // Data
-        self.memcached = new Memcached();
-
-        // Functions
-        self.refresh = function() {
-            self.memcached.refresh();
-        };
-
-        // Durandal
-        self.activate = function() {
-            self.refresher.init(self.refresh, 1000);
-            self.refresher.run();
-            self.refresher.start();
-        };
-        self.deactivate = function() {
-            self.refresher.stop();
-        };
+        // Setup
+        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.scrub.title')));
+        self.modal(generic.tryGet(options, 'modal', false));
+        self.steps([new Gather()]);
+        self.data.vDisk(options.vdisk);
+        self.data.storageRouter(undefined);
+        self.data.storageRouters([]);
+        self.activateStep();
     };
 });

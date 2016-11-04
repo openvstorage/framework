@@ -25,12 +25,13 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 class Disk(DataObject):
     """
     The Disk class represents physical disks that are available to a storagerouter (technically, they can be
-    a virtual disk, but from the OS (and framework) point of view, they're considered physical)
+    virtual disks, but from the OS (and framework) point of view, they're considered physical)
     """
-    __properties = [Property('path', str, doc='The device path'),
-                    Property('vendor', str, mandatory=False, doc='The disks vendor'),
+    STATES = DataObject.enumerator('state', ['OK', 'FAILURE', 'MISSING'])
+
+    __properties = [Property('aliases', list, doc='The device aliases'),
                     Property('model', str, mandatory=False, doc='The disks model'),
-                    Property('state', ['OK', 'ERROR', 'MISSING'], doc='The state of the disk'),
+                    Property('state', STATES.keys(), doc='The state of the disk'),
                     Property('name', str, doc='Name of the disk (e.g. sda)'),
                     Property('size', int, doc='Size of the disk, in bytes'),
                     Property('is_ssd', bool, doc='The type of the disk')]

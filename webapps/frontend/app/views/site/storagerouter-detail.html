@@ -152,11 +152,11 @@ but WITHOUT ANY WARRANTY of any kind.
                         <tr>
                             <td style="width: 90px; vertical-align: middle; padding: 0 0 20px 0;">
                                 <button type="button" class="btn btn-lg" data-bind="enable: false">
-                                    <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.storageroutervpoollink"></span>
+                                    <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.storagerouter_vpool_link"></span>
                                 </button>
                             </td>
                             <td style="padding: 0 0 20px 0;">
-                                <h4 data-i18n="ovs:storagerouters.detail.storageroutervpoollink"></h4>
+                                <h4 data-i18n="ovs:storagerouters.detail.storagerouter_vpool_link"></h4>
                                 <table class="table table-noborder table-hover table-condensed">
                                     <thead>
                                         <tr>
@@ -219,7 +219,7 @@ but WITHOUT ANY WARRANTY of any kind.
                             <td>
                                 <h4 class="pull-left" data-i18n="ovs:storagerouters.detail.disks.title"></h4>
                                 <button class="btn btn-default pull-right hand" id="buttonRescanDisks"
-                                        data-bind="click: $root.rescanDisks, enable: $.inArray('manage', $root.shared.user.roles()) !== -1">
+                                        data-bind="click: $root.rescanDisks, enable: $root.shared.user.roles().contains('manage')">
                                     <span class="fa hand" data-i18n="[html]ovs:icons.load"></span>&nbsp;
                                     <span data-i18n="ovs:generic.rescan" class="hand"></span>
                                 </button>
@@ -273,7 +273,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                     <span style="position: absolute; top: 0; right: 7px;"
                                                           data-bind="visible: !small
                                                                               && $root.shared.user.roles().contains('manage')
-                                                                              && filesystem() !== 'swap'
+                                                                              && !['swap', 'linux_raid_member', 'LVM2_member'].contains(filesystem())
                                                                               && !roles().contains('BACKEND')">
                                                         <span data-bind="position: absolute; top: 0; left: 0">
                                                             <span class="fa hand" data-bind="click: function(partition) { $root.configureRoles(partition, $parent); }"

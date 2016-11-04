@@ -16,61 +16,59 @@ Open vStorage is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
-    <form class="form-horizontal">
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
-            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.add_vdisk.gather.name"></label>
-            <div class="col-lg-7">
-                <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
-                <p class="help-block" data-bind="visible: data.name() !== ''">
-                    <span data-i18n="ovs:wizards.add_vdisk.gather.cleaned_name"></span>
-                    <span data-bind="text: cleanedName()"></span>
-                </p>
-            </div>
+    <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
+        <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.add_vdisk.gather.name"></label>
+        <div class="col-lg-7">
+            <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
+            <p class="help-block" data-bind="visible: data.name() !== ''">
+                <span data-i18n="ovs:wizards.add_vdisk.gather.cleaned_name"></span>
+                <span data-bind="text: cleanedName()"></span>
+            </p>
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('size') }">
-            <label class="col-lg-3 control-label" for="size-entry" data-i18n="ovs:wizards.add_vdisk.gather.size"></label>
-            <div class="col-lg-2">
-                <input type="text" id="size-entry" class="autofocus form-control" data-bind="value: data.sizeEntry, valueUpdate: 'afterkeydown'" style="text-align:right;">
-            </div>
-            <div class="col-lg-2" style="padding-top: 8px; padding-left: 0;">
-                <span data-i18n='ovs:generic.units.gib' style=""></span>
-            </div>
+    </div>
+    <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('size') }">
+        <label class="col-lg-3 control-label" for="size-entry" data-i18n="ovs:wizards.add_vdisk.gather.size"></label>
+        <div class="col-lg-2">
+            <input type="text" id="size-entry" class="autofocus form-control" data-bind="value: data.sizeEntry, valueUpdate: 'afterkeydown'" style="text-align:right;">
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('vpool') }">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.vpool"></label>
-            <div class="col-lg-7">
-                <span data-bind="dropdown: {
-                                    key: 'guid',
-                                    keyisfunction: true,
-                                    items: data.vPools,
-                                    target: data.vPool,
-                                    text: function(item) {
-                                        if (item !== undefined) {
-                                            return item.name()
-                                        }
+        <div class="col-lg-2" style="padding-top: 8px; padding-left: 0;">
+            <span data-i18n='ovs:generic.units.gib' style=""></span>
+        </div>
+    </div>
+    <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('vpool') }">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.vpool"></label>
+        <div class="col-lg-7">
+            <span data-bind="dropdown: {
+                                key: 'guid',
+                                keyisfunction: true,
+                                items: data.vPools,
+                                target: data.vPool,
+                                text: function(item) {
+                                    if (item !== undefined) {
+                                        return item.name()
                                     }
-                                }">
-                </span>
-            </div>
+                                }
+                            }">
+            </span>
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('storageouter') }">
-            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.storagerouter"></label>
-            <div class="col-lg-7">
-                <span data-bind="dropdown: {
-                                    key: 'guid',
-                                    keyisfunction: true,
-                                    items: data.storageRoutersByVpool,
-                                    target: data.storageRouter,
-                                    text: function(item) {
-                                        if (item !== undefined) {
-                                            return item.name()
-                                        }
+    </div>
+    <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('storageouter') }">
+        <label class="col-lg-3 control-label" data-i18n="ovs:wizards.add_vdisk.gather.storagerouter"></label>
+        <div class="col-lg-7">
+            <span data-bind="dropdown: {
+                                key: 'guid',
+                                keyisfunction: true,
+                                items: data.storageRoutersByVpool,
+                                target: data.storageRouter,
+                                text: function(item) {
+                                    if (item !== undefined) {
+                                        return item.name()
                                     }
-                                }">
-                </span>
-            </div>
+                                }
+                            }">
+            </span>
         </div>
-    </form>
+    </div>
     <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
         <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>

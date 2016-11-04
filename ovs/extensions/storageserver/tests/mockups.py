@@ -211,28 +211,7 @@ class StorageRouterClient(object):
         Retrieve the metadata cache capacity for volume
         """
         _ = self
-        return StorageRouterClient._config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('metadata_cache_capacity', 256 * 24)
-
-    def get_readcache_behaviour(self, volume_id):
-        """
-        Retrieve the read cache behaviour for volume
-        """
-        _ = self
-        return StorageRouterClient._config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('readcache_behaviour')
-
-    def get_readcache_limit(self, volume_id):
-        """
-        Retrieve the read cache limit for volume
-        """
-        _ = self
-        return StorageRouterClient._config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('readcache_limit')
-
-    def get_readcache_mode(self, volume_id):
-        """
-        Retrieve the read cache mode for volume
-        """
-        _ = self
-        return StorageRouterClient._config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('readcache_mode')
+        return StorageRouterClient._config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('metadata_cache_capacity', 8192)
 
     def get_sco_cache_max_non_disposable_factor(self, volume_id):
         """
@@ -320,36 +299,6 @@ class StorageRouterClient(object):
         if volume_id not in StorageRouterClient._config_cache[self.vpool_guid]:
             StorageRouterClient._config_cache[self.vpool_guid][volume_id] = {}
         StorageRouterClient._config_cache[self.vpool_guid][volume_id]['metadata_cache_capacity'] = num_pages
-
-    def set_readcache_behaviour(self, volume_id, behaviour):
-        """
-        Retrieve the read cache behaviour for volume
-        """
-        if self.vpool_guid not in StorageRouterClient._config_cache:
-            StorageRouterClient._config_cache[self.vpool_guid] = {}
-        if volume_id not in StorageRouterClient._config_cache[self.vpool_guid]:
-            StorageRouterClient._config_cache[self.vpool_guid][volume_id] = {}
-        StorageRouterClient._config_cache[self.vpool_guid][volume_id]['readcache_behaviour'] = behaviour
-
-    def set_readcache_limit(self, volume_id, limit):
-        """
-        Retrieve the read cache limit for volume
-        """
-        if self.vpool_guid not in StorageRouterClient._config_cache:
-            StorageRouterClient._config_cache[self.vpool_guid] = {}
-        if volume_id not in StorageRouterClient._config_cache[self.vpool_guid]:
-            StorageRouterClient._config_cache[self.vpool_guid][volume_id] = {}
-        StorageRouterClient._config_cache[self.vpool_guid][volume_id]['readcache_limit'] = limit
-
-    def set_readcache_mode(self, volume_id, mode):
-        """
-        Retrieve the read cache mode for volume
-        """
-        if self.vpool_guid not in StorageRouterClient._config_cache:
-            StorageRouterClient._config_cache[self.vpool_guid] = {}
-        if volume_id not in StorageRouterClient._config_cache[self.vpool_guid]:
-            StorageRouterClient._config_cache[self.vpool_guid][volume_id] = {}
-        StorageRouterClient._config_cache[self.vpool_guid][volume_id]['readcache_mode'] = mode
 
     def set_sco_cache_max_non_disposable_factor(self, volume_id, factor):
         """
@@ -593,7 +542,9 @@ class LockedClient(object):
         _ = scrubbing_work_result
         LockedClient.scrub_controller['waiter'].wait()
         thread_name = threading.current_thread().getName()
-        assert thread_name in LockedClient.scrub_controller['possible_threads']
+        possible_thread_names = LockedClient.scrub_controller['possible_threads']
+        if possible_thread_names is not None:
+            assert thread_name in possible_thread_names
         if thread_name in LockedClient.thread_names:
             LockedClient.thread_names.remove(thread_name)
         if LockedClient.scrub_controller['volumes'][self.volume_id]['success'] is False:

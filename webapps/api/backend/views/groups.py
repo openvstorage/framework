@@ -18,9 +18,9 @@
 Module for groups
 """
 
-from backend.decorators import required_roles, return_object, return_list, load, log
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from api.backend.decorators import required_roles, return_object, return_list, load, log
 from ovs.dal.hybrids.group import Group
 from ovs.dal.lists.grouplist import GroupList
 
@@ -50,5 +50,7 @@ class GroupViewSet(viewsets.ViewSet):
     def retrieve(self, group):
         """
         Load information about a given Group
+        :param group: The Group to be returned
+        :type group: Group
         """
         return group

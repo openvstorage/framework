@@ -47,17 +47,16 @@ define([
             if (storageRouter == undefined) {
                 return;
             }
+            self.metadataLoading(true);
             var map = self.srMetadataMap(), srGuid = storageRouter.guid();
             if (!map.hasOwnProperty(srGuid)) {
                 self.srMetadataMap()[srGuid] = undefined;
-                self.metadataLoading(true);
                 generic.xhrAbort(self.loadSRMetadataHandle);
                 self.loadSRMetadataHandle = api.post('storagerouters/' + srGuid + '/get_metadata')
                     .then(self.shared.tasks.wait)
                     .done(function(srData) {
-                        self.fillSRData(srData);
                         self.srMetadataMap()[storageRouter.guid()] = srData;
-                        self.metadataLoading(false);
+                        self.fillSRData(srData);
                     });
             } else if (map[srGuid] !== undefined) {
                 self.fillSRData(map[srGuid]);
@@ -96,32 +95,48 @@ define([
                         reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.no_credentials'));
                     }
                 }
-                if (preValidation.valid === false) {
-                    showErrors = true;
-                    reasons = reasons.concat(preValidation.reasons);
-                    fields = fields.concat(preValidation.fields);
-                }
             } else if (self.data.backend() === 'alba' && self.data.albaBackend() === undefined) {
                 valid = false;
             }
-            if (self.data.scrubAvailable() === false) {
-                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', { what: 'SCRUB' }));
+            if (preValidation.valid === false) {
+                showErrors = true;
+                reasons = reasons.concat(preValidation.reasons);
+                fields = fields.concat(preValidation.fields);
             }
-            if (self.data.partitions() !== undefined) {
-                $.each(self.data.partitions(), function (role, partitions) {
-                    if (requiredRoles.contains(role) && partitions.length > 0) {
-                        generic.removeElement(requiredRoles, role);
-                    }
-                });
+            if (self.metadataLoading() === false) {
+                if (self.data.scrubAvailable() === false) {
+                    valid = false;
+                    reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', { what: 'SCRUB' }));
+                }
+                if (self.data.partitions() !== undefined) {
+                    $.each(self.data.partitions(), function (role, partitions) {
+                        if (requiredRoles.contains(role) && partitions.length > 0) {
+                            generic.removeElement(requiredRoles, role);
+                        }
+                    });
+                    $.each(requiredRoles, function(index, role) {
+                        valid = false;
+                        reasons.push($.t('ovs:wizards.add_vpool.gather_backend.missing_role', { what: role }));
+                    });
+                }
+                if (self.data.storageIP() === undefined) {
+                    valid = false;
+                    reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_storageip'));
+                    fields.push('storageip');
+                }
+            } else {
+                valid = false;
+                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.metadata_loading'));
             }
-            $.each(requiredRoles, function(index, role) {
-                reasons.push($.t('ovs:wizards.add_vpool.gather_backend.missing_role', { what: role }));
-            });
             if (self.data.backend() === 'alba' && self.data.vPoolAdd()) {
                 if (self.data.albaBackend() === undefined) {
                     valid = false;
                     reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.choose_backend'));
                     fields.push('backend');
+                } else if (self.data.albaPreset() === undefined) {
+                    valid = false;
+                    reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.choose_preset'));
+                    fields.push('preset');
                 }
                 if (self.invalidAlbaInfo() && !self.data.localHost()) {
                     valid = false;
@@ -134,11 +149,6 @@ define([
             if (self.data.backend() === 'distributed' && self.data.mountpoints().length === 0) {
                 valid = false;
                 reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_mountpoints'));
-            }
-            if (self.data.storageIP() === undefined || self.metadataLoading()) {
-                valid = false;
-                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_storageip'));
-                fields.push('storageip');
             }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
@@ -179,6 +189,7 @@ define([
             } else if (self.data.distributedMtpt() === undefined || !srData.mountpoints.contains(self.data.distributedMtpt())) {
                 self.data.distributedMtpt(srData.mountpoints[0]);
             }
+            self.metadataLoading(false);
         };
         self.preValidate = function() {
             var validationResult = { valid: true, reasons: [], fields: [] };
@@ -218,7 +229,7 @@ define([
                         self.checkMtptHandle = api.post('storagerouters/' + self.data.storageRouter().guid() + '/check_mtpt', { data: postData })
                             .then(self.shared.tasks.wait)
                             .done(function(data) {
-                                if (!data) {
+                                if (data === true) {
                                     validationResult.valid = false;
                                     validationResult.reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.mtpt_in_use', { what: self.data.name() }));
                                     validationResult.fields.push('name');

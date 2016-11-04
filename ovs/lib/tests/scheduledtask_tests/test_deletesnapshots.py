@@ -103,16 +103,15 @@ class DeleteSnapshots(unittest.TestCase):
         storage_router.save()
         disk = Disk()
         disk.name = 'physical_disk_1'
-        disk.path = '/dev/non-existent'
+        disk.aliases = ['/dev/non-existent']
         disk.size = 500 * 1024 ** 3
         disk.state = 'OK'
         disk.is_ssd = True
         disk.storagerouter = storage_router
         disk.save()
         disk_partition = DiskPartition()
-        disk_partition.id = 'disk_partition_id'
         disk_partition.disk = disk
-        disk_partition.path = '/dev/disk/non-existent'
+        disk_partition.aliases = ['/dev/disk/non-existent']
         disk_partition.size = 400 * 1024 ** 3
         disk_partition.state = 'OK'
         disk_partition.offset = 1024
@@ -220,16 +219,15 @@ class DeleteSnapshots(unittest.TestCase):
         storage_router.save()
         disk = Disk()
         disk.name = 'physical_disk_1'
-        disk.path = '/dev/non-existent'
+        disk.aliases = ['/dev/non-existent']
         disk.size = 500 * 1024 ** 3
         disk.state = 'OK'
         disk.is_ssd = True
         disk.storagerouter = storage_router
         disk.save()
         disk_partition = DiskPartition()
-        disk_partition.id = 'disk_partition_id'
         disk_partition.disk = disk
-        disk_partition.path = '/dev/disk/non-existent'
+        disk_partition.aliases = ['/dev/disk/non-existent']
         disk_partition.size = 400 * 1024 ** 3
         disk_partition.state = 'OK'
         disk_partition.offset = 1024

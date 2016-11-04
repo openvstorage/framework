@@ -31,20 +31,19 @@ define([
         self.storageRouter = ko.observable();
 
         // Observables
-        self.trigger           = ko.observable();
-        self.loading           = ko.observable(false);
-        self.loaded            = ko.observable(false);
-        self.guid              = ko.observable(guid);
-        self.path              = ko.observable();
-        self.vendor            = ko.observable();
         self.diskModel         = ko.observable();
-        self.state             = ko.observable();
-        self.name              = ko.observable();
-        self.size              = ko.observable().extend({ format: generic.formatBytes });
+        self.guid              = ko.observable(guid);
         self.isSsd             = ko.observable();
-        self.storageRouterGuid = ko.observable();
-        self.partitionsLoaded  = ko.observable(false);
+        self.loaded            = ko.observable(false);
+        self.loading           = ko.observable(false);
+        self.name              = ko.observable();
         self.partitions        = ko.observableArray([]);
+        self.partitionsLoaded  = ko.observable(false);
+        self.aliases           = ko.observable();
+        self.size              = ko.observable().extend({ format: generic.formatBytes });
+        self.state             = ko.observable();
+        self.storageRouterGuid = ko.observable();
+        self.trigger           = ko.observable();
 
         // Computed
         self.fullPartitions = ko.computed(function() {
@@ -112,8 +111,7 @@ define([
 
         // Functions
         self.fillData = function(data) {
-            generic.trySet(self.path, data, 'path');
-            generic.trySet(self.vendor, data, 'vendor');
+            generic.trySet(self.aliases, data, 'aliases');
             generic.trySet(self.diskModel, data, 'model');
             generic.trySet(self.state, data, 'state');
             generic.trySet(self.name, data, 'name');
@@ -170,7 +168,7 @@ define([
                                     partition.fillData(pdata[partition.guid()]);
                                 }
                                 // Show partitions as failed if disk state is in error or missing
-                                if (['ERROR', 'MISSING'].contains(self.state())) {
+                                if (['FAILURE', 'MISSING'].contains(self.state())) {
                                     partition.state('FAILURE');
                                 }
                             });

@@ -15,19 +15,5 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-Contains specific User-related serializers
+This package contains plugin extensions' tests
 """
-from rest_framework import serializers
-
-
-class PasswordSerializer(serializers.Serializer):
-    """
-    Serializes received passwords
-    """
-    new_password = serializers.CharField(required=True)
-
-    class Meta:
-        """
-        Metaclass
-        """
-        fields = ('new_password',)

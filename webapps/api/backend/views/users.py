@@ -21,18 +21,16 @@ Module for users
 import random
 import string
 import hashlib
-from rest_framework import status, viewsets
-from rest_framework.response import Response
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from backend.decorators import required_roles, load, return_object, return_list, log
-from backend.exceptions import HttpForbiddenException
-from backend.serializers.user import PasswordSerializer
-from backend.serializers.serializers import FullSerializer
-from backend.toolbox import Toolbox
-from ovs.dal.hybrids.user import User
+from api.backend.decorators import required_roles, load, return_object, return_list, log, return_simple
+from api.backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
+from api.backend.serializers.serializers import FullSerializer, PasswordSerializer
+from api.backend.toolbox import Toolbox
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.j_roleclient import RoleClient
+from ovs.dal.hybrids.user import User
 from ovs.dal.lists.userlist import UserList
 
 
@@ -51,6 +49,8 @@ class UserViewSet(viewsets.ViewSet):
     def list(self, request):
         """
         Lists all available Users where the logged in user has access to
+        :param request: The raw request
+        :type request: Request
         """
         if Toolbox.is_client_in_roles(request.client, ['manage']):
             return UserList.get_users()
@@ -63,9 +63,11 @@ class UserViewSet(viewsets.ViewSet):
     @load(User)
     def retrieve(self, request, user):
         """
-        Load information about a given User
-        Only the currently logged in User is accessible, or all if the logged in User has a
-        system role
+        Load information about a given User. Only the currently logged in User is accessible, or all if the logged in User has a manage role
+        :param request: The raw request
+        :type request: Request
+        :param user: The user to load
+        :type user: User
         """
         if user.guid == request.client.user_guid or Toolbox.is_client_in_roles(request.client, ['manage']):
             return user
@@ -74,48 +76,55 @@ class UserViewSet(viewsets.ViewSet):
 
     @log()
     @required_roles(['read', 'write', 'manage'])
+    @return_object(User, mode='created')
     @load()
     def create(self, request):
         """
         Creates a User
+        :param request: The raw request
+        :type request: Request
         """
         serializer = FullSerializer(User, instance=User(), data=request.DATA, allow_passwords=True)
-        if serializer.is_valid():
-            user = serializer.object
-            if UserList.get_user_by_username(user.username) is not None:
-                return Response('User already exists', status=status.HTTP_303_SEE_OTHER)
-            user.save()
-            pw_client = Client()
-            pw_client.ovs_type = 'INTERNAL'
-            pw_client.grant_type = 'PASSWORD'
-            pw_client.user = user
-            pw_client.save()
-            cc_client = Client()
-            cc_client.ovs_type = 'INTERNAL'
-            cc_client.grant_type = 'CLIENT_CREDENTIALS'
-            cc_client.client_secret = ''.join(random.choice(string.ascii_letters +
-                                                            string.digits +
-                                                            '|_=+*#@!/-[]{}<>.?,\'";:~')
-                                              for _ in range(128))
-            cc_client.user = user
-            cc_client.save()
-            for junction in user.group.roles:
-                for client in [cc_client, pw_client]:
-                    roleclient = RoleClient()
-                    roleclient.client = client
-                    roleclient.role = junction.role
-                    roleclient.save()
-            serializer = FullSerializer(User, instance=user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        user = serializer.deserialize()
+        if UserList.get_user_by_username(user.username) is not None:
+            raise HttpNotAcceptableException(error_description='User with this username already exists',
+                                             error='duplicate')
+        user.save()
+        pw_client = Client()
+        pw_client.ovs_type = 'INTERNAL'
+        pw_client.grant_type = 'PASSWORD'
+        pw_client.user = user
+        pw_client.save()
+        cc_client = Client()
+        cc_client.ovs_type = 'INTERNAL'
+        cc_client.grant_type = 'CLIENT_CREDENTIALS'
+        cc_client.client_secret = ''.join(random.choice(string.ascii_letters +
+                                                        string.digits +
+                                                        '|_=+*#@!/-[]{}<>.?,\'";:~')
+                                          for _ in range(128))
+        cc_client.user = user
+        cc_client.save()
+        for junction in user.group.roles:
+            for client in [cc_client, pw_client]:
+                roleclient = RoleClient()
+                roleclient.client = client
+                roleclient.role = junction.role
+                roleclient.save()
+        return user
 
     @log()
     @required_roles(['read', 'write', 'manage'])
+    @return_simple()
     @load(User)
     def destroy(self, request, user):
         """
         Deletes a user
+        :param request: The raw request
+        :type request: Request
+        :param user: The user to delete
+        :type user: User
+        :return: None
+        :rtype: None
         """
         if request.client.user_guid == user.guid:
             raise HttpForbiddenException(error_description='A user cannot delete itself',
@@ -129,47 +138,53 @@ class UserViewSet(viewsets.ViewSet):
                 junction.delete()
             client.delete()
         user.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return None
 
     @log()
     @required_roles(['read', 'write', 'manage'])
+    @return_object(User, mode='accepted')
     @load(User)
     def partial_update(self, contents, user, request):
         """
         Update a User
+        :param request: The raw request
+        :type request: Request
+        :param user: The user to update
+        :type user: User
+        :param contents: The contents to update/return
+        :type contents: str
         """
         contents = None if contents is None else contents.split(',')
         serializer = FullSerializer(User, contents=contents, instance=user, data=request.DATA)
-        if serializer.is_valid():
-            if user.guid == request.client.user_guid:
-                raise HttpForbiddenException(error_description='A user cannot update itself',
-                                             error='impossible_request')
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        user = serializer.deserialize()
+        if user.guid == request.client.user_guid:
+            raise HttpForbiddenException(error_description='A user cannot update itself',
+                                         error='impossible_request')
+        user.save()
+        return user
 
     @action()
     @log()
     @required_roles(['read', 'write'])
+    @return_object(User, mode='accepted')
     @load(User)
     def set_password(self, request, user):
         """
-        Sets the password of a given User. A logged in User can only changes its own password,
-        or all passwords if the logged in User has a system role
+        Sets the password of a given User. A logged in User can only changes its own password, or all passwords if the logged in User has a manage role
+        :param request: The raw request
+        :type request: Request
+        :param user: The user to update the password from
+        :type user: User
         """
         if user.guid == request.client.user_guid or Toolbox.is_client_in_roles(request.client, ['manage']):
             serializer = PasswordSerializer(data=request.DATA)
-            if serializer.is_valid():
-                user.password = hashlib.sha256(str(serializer.data['new_password'])).hexdigest()
-                user.save()
-                # Now, invalidate all access tokens granted
-                for client in user.clients:
-                    for token in client.tokens:
-                        for junction in token.roles:
-                            junction.delete()
-                        token.delete()
-                return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            user.password = hashlib.sha256(str(serializer.data['new_password'])).hexdigest()
+            user.save()
+            for client in user.clients:
+                for token in client.tokens:
+                    for junction in token.roles:
+                        junction.delete()
+                    token.delete()
+            return user
         raise HttpForbiddenException(error_description='Updating password not allowed',
                                      error='impossible_request')

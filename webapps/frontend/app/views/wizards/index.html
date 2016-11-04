@@ -17,29 +17,41 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <div class="modal-dialog" style="min-width: 700px;">
     <div data-bind="css: { 'modal-content': modal() }">
-        <div class="modal-header" data-bind="visible: modal()">
-            <button type="button" class="close" data-bind="click: function() { close(false); }">&times;</button>
-            <h3 data-bind="text: title"></h3>
-        </div>
-        <h2 data-bind="visible: !modal(), text: title"></h2>
-        <div data-bind="if: modal()">
-            <div class="modal-body" data-bind="compose: activeStep"></div>
-        </div>
-        <div data-bind="if: !modal()">
-            <div class="quote" data-bind="compose: activeStep"></div>
-        </div>
-        <div data-bind="css: { 'modal-footer': modal() }">
-            <button type="button" class="btn btn-default pull-left"
-                    data-bind="click: function() { close(false); }" data-i18n="ovs:generic.cancel"></button>
-            <button type="button"  class="pull-right btn btn-primary"
-                    data-bind="css: { disabled: !canFinish() }, visible: hasFinish(), click: finish" data-i18n="ovs:generic.finish"></button>
-            <button type="button"  class="pull-right btn btn-primary"
-                    data-bind="css: { disabled: !canNext() || loadingNext() }, visible: hasNext(), click: next" data-i18n="[html]ovs:generic.next"></button>
-            <button type="button" class="pull-right btn btn-default"
-                    data-bind="visible: hasPrevious(), click: previous" data-i18n="[html]ovs:generic.previous"></button>
-            <div class="pull-right" style="margin: 7px 5px 0 0;" data-bind="visible: loadingNext">
-                <span class="fa fa-1p5x fa-spin" data-i18n="[html]ovs:icons.loading"></span>
+        <form class="form-horizontal" data-bind="attr: {id: id}">
+            <div class="modal-header" data-bind="visible: modal()">
+                <button type="button" class="close" data-bind="click: function() { close(false); }">&times;</button>
+                <h3 data-bind="text: title"></h3>
             </div>
-        </div>
+            <h2 data-bind="visible: !modal(), text: title"></h2>
+            <div data-bind="if: modal()">
+                <div class="modal-body" data-bind="compose: activeStep"></div>
+            </div>
+            <div data-bind="if: !modal()">
+                <div class="quote" data-bind="compose: activeStep"></div>
+            </div>
+            <div data-bind="css: { 'modal-footer': modal() }">
+                <div class="pull-left">
+                    <button type="button" class="btn btn-default" name="cancel"
+                            data-bind="click: function() { close(false); }" data-i18n="ovs:generic.cancel">
+                    </button>
+                </div>
+                <div class="pull-right">
+                    <div class="pull-left" style="margin: 7px 5px 0 0;" data-bind="visible: loadingNext">
+                        <span class="fa fa-1p5x fa-spin" data-i18n="[html]ovs:icons.loading"></span>
+                    </div>
+                    <button type="button" class="btn btn-default" name="previous"
+                            data-bind="visible: hasPrevious(), click: previous, disable: !hasPrevious()" data-i18n="[html]ovs:generic.previous">
+                    </button>
+                    <button class="btn btn-primary" name="next"
+                            data-bind="attr: {type: (canNext() == true ? 'submit' : 'button')}, css: { disabled: !canNext() || loadingNext() },
+                                       visible: hasNext(), click: next, disable: !canNext()" data-i18n="[html]ovs:generic.next">
+                    </button>
+                    <button class="btn btn-primary" name="submit"
+                            data-bind="attr: {type: (canFinish() == true ? 'submit' : 'button')}, css: { disabled: !canFinish() },
+                                       visible: hasFinish(), click: finish, disable: !canFinish()" data-i18n="ovs:generic.finish">
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>

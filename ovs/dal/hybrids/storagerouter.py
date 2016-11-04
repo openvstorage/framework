@@ -28,10 +28,10 @@ class StorageRouter(DataObject):
     """
     A StorageRouter represents the Open vStorage software stack, any (v)machine on which it is installed
     """
-    __properties = [Property('name', str, doc='Name of the Storage Router.'),
+    __properties = [Property('name', str, unique=True, doc='Name of the Storage Router.'),
                     Property('description', str, mandatory=False, doc='Description of the Storage Router.'),
-                    Property('machine_id', str, mandatory=False, doc='The hardware identifier of the Storage Router'),
-                    Property('ip', str, doc='IP Address of the Storage Router, if available'),
+                    Property('machine_id', str, unique=True, mandatory=False, doc='The hardware identifier of the Storage Router'),
+                    Property('ip', str, unique=True, doc='IP Address of the Storage Router, if available'),
                     Property('heartbeats', dict, default={}, doc='Heartbeat information of various monitors'),
                     Property('node_type', ['MASTER', 'EXTRA'], default='EXTRA', doc='Indicates the node\'s type'),
                     Property('rdma_capable', bool, doc='Is this Storage Router RDMA capable'),
@@ -91,20 +91,26 @@ class StorageRouter(DataObject):
         """
         Calculates the current Storage Router status based on various heartbeats
         """
+        pointer = 0
+        statusses = ['OK', 'WARNING', 'FAILURE']
         current_time = time.time()
         if self.heartbeats is not None:
             process_delay = abs(self.heartbeats.get('process', 0) - current_time)
             if process_delay > 60 * 5:
-                return 'FAILURE'
+                pointer = max(pointer, 2)
             else:
                 delay = abs(self.heartbeats.get('celery', 0) - current_time)
                 if delay > 60 * 5:
-                    return 'FAILURE'
+                    pointer = max(pointer, 2)
                 elif delay > 60 * 2:
-                    return 'WARNING'
-                else:
-                    return 'OK'
-        return 'UNKNOWN'
+                    pointer = max(pointer, 1)
+        for disk in self.disks:
+            if disk.state == 'MISSING':
+                pointer = max(pointer, 2)
+            for partition in disk.partitions:
+                if partition.state == 'MISSING':
+                    pointer = max(pointer, 2)
+        return statusses[pointer]
 
     def _partition_config(self):
         """

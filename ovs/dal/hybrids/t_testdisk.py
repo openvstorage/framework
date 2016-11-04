@@ -27,7 +27,7 @@ class TestDisk(DataObject):
     This TestDisk object is used for running unittests.
     WARNING: These properties should not be changed
     """
-    __properties = [Property('name', str, doc='Name of the test disk'),
+    __properties = [Property('name', str, unique=True, doc='Name of the test disk'),
                     Property('description', str, mandatory=False, doc='Description of the test disk'),
                     Property('size', float, default=0, doc='Size of the test disk'),
                     Property('order', int, default=0, doc='Order of the test disk'),
@@ -38,12 +38,18 @@ class TestDisk(DataObject):
                    Relation('parent', None, 'children', mandatory=False)]
     __dynamics = [Dynamic('used_size', int, 5),
                   Dynamic('wrong_type', int, 5),
-                  Dynamic('updatable', int, 5),
+                  Dynamic('updatable_int', int, 5),
+                  Dynamic('updatable_list', list, 5),
+                  Dynamic('updatable_dict', dict, 5),
+                  Dynamic('updatable_string', str, 5),
                   Dynamic('predictable', int, 5)]
 
     # For testing purposes
     wrong_type_data = 0
-    dynamic_value = 0
+    dynamic_int = 0
+    dynamic_list = []
+    dynamic_dict = {}
+    dynamic_string = ''
 
     def _used_size(self):
         """
@@ -58,11 +64,29 @@ class TestDisk(DataObject):
         """
         return self.wrong_type_data
 
-    def _updatable(self):
+    def _updatable_int(self):
         """
         Returns an external settable value
         """
-        return self.dynamic_value
+        return self.dynamic_int
+
+    def _updatable_list(self):
+        """
+        Returns an external settable value
+        """
+        return self.dynamic_list
+
+    def _updatable_dict(self):
+        """
+        Returns an external settable value
+        """
+        return self.dynamic_dict
+
+    def _updatable_string(self):
+        """
+        Returns an external settable value
+        """
+        return self.dynamic_string
 
     def _predictable(self):
         """

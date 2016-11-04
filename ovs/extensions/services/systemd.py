@@ -17,7 +17,8 @@
 """
 Systemd module
 """
-from subprocess import CalledProcessError
+import time
+from subprocess import CalledProcessError, check_output
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 
@@ -26,7 +27,7 @@ class Systemd(object):
     """
     Contains all logic related to Systemd services
     """
-    _logger = LogHandler.get('extensions', name='servicemanager')
+    _logger = LogHandler.get('extensions', name='service-manager')
 
     @staticmethod
     def _service_exists(name, client, path):
@@ -135,46 +136,13 @@ class Systemd(object):
         :type client: SSHClient
         :return: None
         """
-        # remove systemd.service file
         name = Systemd._get_name(name, client)
+        try:
+            client.run('systemctl disable {0}.service')
+        except CalledProcessError:
+            pass  # Service already disabled
         client.file_delete('/lib/systemd/system/{0}.service'.format(name))
         client.run('systemctl daemon-reload')
-
-    @staticmethod
-    def disable_service(name, client):
-        """
-        Disable a service
-        :param name: Name of the service to disable
-        :type name: str
-        :param client: Client on which to disable the service
-        :type client: SSHClient
-        :return: None
-        """
-        name = Systemd._get_name(name, client)
-        try:
-            client.run('systemctl disable {0}.service'.format(name))
-        except CalledProcessError as cpe:
-            output = cpe.output
-            Systemd._logger.exception('Disable {0} failed, {1}'.format(name, output))
-            raise Exception('Disable {0} failed, {1}'.format(name, output))
-
-    @staticmethod
-    def enable_service(name, client):
-        """
-        Enable a service
-        :param name: Name of the service to enable
-        :type name: str
-        :param client: Client on which to enable the service
-        :type client: SSHClient
-        :return: None
-        """
-        name = Systemd._get_name(name, client)
-        try:
-            client.run('systemctl enable {0}.service'.format(name))
-        except CalledProcessError as cpe:
-            output = cpe.output
-            Systemd._logger.exception('Enable {0} failed, {1}'.format(name, output))
-            raise Exception('Enable {0} failed, {1}'.format(name, output))
 
     @staticmethod
     def start_service(name, client):
@@ -257,25 +225,6 @@ class Systemd(object):
             return False
 
     @staticmethod
-    def is_enabled(name, client):
-        """
-        Verify whether a service is enabled
-        :param name: Name of the service to verify if enabled
-        :type name: str
-        :param client: Client on which to verify whether the service is enabled
-        :type client: SSHClient
-        :return: Whether the service is enabled
-        :rtype: bool
-        """
-        name = Systemd._get_name(name, client)
-        output = client.run('systemctl is-enabled {0} || true'.format(name))
-        if 'enabled' in output:
-            return True
-        if 'disabled' in output:
-            return False
-        return False
-
-    @staticmethod
     def get_service_pid(name, client):
         """
         Retrieve the PID of a service
@@ -299,7 +248,7 @@ class Systemd(object):
     @staticmethod
     def send_signal(name, signal, client):
         """
-        Remove a service
+        Send a signal to a service
         :param name: Name of the service to send a signal
         :type name: str
         :param signal: Signal to pass on to the service
@@ -320,9 +269,57 @@ class Systemd(object):
         List all created services on a system
         :param client: Client on which to list all the services
         :type client: SSHClient
-        :return: List of all services which have been created on some point
+        :return: List of all services which have been created at some point
         :rtype: generator
         """
-        for filename in client.dir_list('/lib/systemd/system/'):
-            if filename.endswith('.service'):
-                yield filename.replace('.service', '')
+        for service_info in client.run('systemctl list-unit-files --type=service --no-legend --no-pager').splitlines():
+            yield '.'.join(service_info.split(' ')[0].split('.')[:-1])
+
+    @staticmethod
+    def monitor_services():
+        """
+        Monitor the local OVS services
+        :return: None
+        """
+        try:
+            previous_output = None
+            while True:
+                # Gather service states
+                running_services = {}
+                non_running_services = {}
+                longest_service_name = 0
+                for service_name in check_output('systemctl list-unit-files --type=service --no-legend --no-pager | grep "ovs-" | tr -s " " | cut -d " " -f 1', shell=True).splitlines():
+                    try:
+                        service_state = check_output('systemctl is-active {0}'.format(service_name), shell=True).strip()
+                    except CalledProcessError as cpe:
+                        service_state = cpe.output.strip()
+
+                    service_name = service_name.replace('.service', '')
+                    if service_state == 'active':
+                        running_services[service_name] = service_state
+                    else:
+                        non_running_services[service_name] = service_state
+
+                    if len(service_name) > longest_service_name:
+                        longest_service_name = len(service_name)
+
+                # Put service states in list
+                output = ['OVS running processes',
+                          '=====================\n']
+                for service_name in sorted(running_services):
+                    output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), running_services[service_name]))
+
+                output.extend(['\n\nOVS non-running processes',
+                               '=========================\n'])
+                for service_name in sorted(non_running_services):
+                    output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), non_running_services[service_name]))
+
+                # Print service states (only if changes)
+                if previous_output != output:
+                    print '\x1b[2J\x1b[H'
+                    for line in output:
+                        print line
+                    previous_output = list(output)
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
