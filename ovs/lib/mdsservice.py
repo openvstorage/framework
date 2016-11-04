@@ -636,8 +636,8 @@ class MDSServiceController(object):
             vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
                                                                       metadata_backend_config=MDSMetaDataBackendConfig(configs_all))
         except Exception:
-            MDSServiceController._logger.error('MDS safety: vDisk {0}: Failed to update the metadata backend configuration'.format(vdisk.guid))
-            raise Exception('Volume {0} with guid {1} is not running'.format(vdisk.name, vdisk.guid))
+            MDSServiceController._logger.exception('MDS safety: vDisk {0}: Failed to update the metadata backend configuration'.format(vdisk.guid))
+            raise Exception('MDS configuration for volume {0} with guid {1} could not be changed'.format(vdisk.name, vdisk.guid))
 
         for service in new_services[1:]:
             client = MetadataServerClient.load(service)
