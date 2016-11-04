@@ -152,6 +152,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 version = version_match.groupdict()['version']
             else:
                 version = settings.VERSION[-1]
+            raw_version = version
             versions = (max(min_version, settings.VERSION[0]), min(max_version, settings.VERSION[-1]))
             if version == '*':  # If accepting all versions, it defaults to the highest one
                 version = versions[1]
@@ -173,6 +174,9 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 if 'version' in _mandatory_vars:
                     _new_kwargs['version'] = version
                     _mandatory_vars.remove('version')
+                if 'raw_version' in _mandatory_vars:
+                    _new_kwargs['raw_version'] = raw_version
+                    _mandatory_vars.remove('raw_version')
                 if 'request' in _mandatory_vars:
                     _new_kwargs['request'] = request
                     _mandatory_vars.remove('request')
