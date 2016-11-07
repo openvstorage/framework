@@ -83,8 +83,7 @@ hosts/$host_id/ports = {"storagedriver": [[26200, 26299]],
                         "arakoon": [26400]}
 hosts/$host_id/promotecompleted = True|False
 hosts/$host_id/setupcompleted = True|False
-hosts/$host_id/storagedriver = {"rsp": "/var/rsp",
-                                "vmware_mode": "ganesha"}
+hosts/$host_id/storagedriver = {"vmware_mode": "ganesha"}
 hosts/$host_id/type = "MASTER|EXTRA|UNCONFIGURED"
 hosts/$host_id/versions = {"ovs": 4,
                            "$plugin_a": $plugin_a_version}

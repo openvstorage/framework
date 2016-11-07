@@ -132,17 +132,6 @@ class OVSMigrator(object):
                             roleclient.role = role
                             roleclient.save()
 
-            # Add backends
-            for backend_type_info in [('Ceph', 'ceph_s3'), ('Amazon', 'amazon_s3'), ('Swift', 'swift_s3'),
-                                      ('Local', 'local'), ('Distributed', 'distributed'), ('ALBA', 'alba')]:
-                code = backend_type_info[1]
-                backend_type = BackendTypeList.get_backend_type_by_code(code)
-                if backend_type is None:
-                    backend_type = BackendType()
-                backend_type.name = backend_type_info[0]
-                backend_type.code = code
-                backend_type.save()
-
             # Add service types
             for service_type_info in [ServiceType.SERVICE_TYPES.MD_SERVER, ServiceType.SERVICE_TYPES.ALBA_PROXY, ServiceType.SERVICE_TYPES.ARAKOON]:
                 service_type = ServiceType()
@@ -238,5 +227,11 @@ class OVSMigrator(object):
                             partition.save()
 
                 DiskController.sync_with_reality(storagerouter_guid=storagerouter.guid)
+
+            # Only support ALBA backendtype
+            from ovs.dal.lists.backendtypelist import BackendTypeList
+            for backend_type in BackendTypeList.get_backend_types():
+                if backend_type.code != 'alba':
+                    backend_type.delete()
 
         return OVSMigrator.THIS_VERSION

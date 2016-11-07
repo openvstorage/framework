@@ -33,12 +33,15 @@ define([
 
         // Observables
         self.backendConnection  = ko.observable();
-        self.backendPreset      = ko.observable();
+        self.backendGuid        = ko.observable();
+        self.backendHost        = ko.observable();
+        self.backendLocal       = ko.observable(true);
         self.backendLogin       = ko.observable();
+        self.backendName        = ko.observable();
+        self.backendPort        = ko.observable();
+        self.backendPreset      = ko.observable();
         self.backendRead        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendReadSpeed   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendType        = ko.observable();
-        self.backendTypeGuid    = ko.observable();
         self.backendWriteSpeed  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.backendWritten     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.bandwidthSaved     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
@@ -85,14 +88,17 @@ define([
             if (data.hasOwnProperty('configuration')) {
                 self.configuration(data.configuration);
             }
-            if (data.metadata !== undefined && data.metadata.hasOwnProperty('backend') && data.metadata.backend.hasOwnProperty('preset')) {
-                self.backendPreset(data.metadata.backend.preset);
-            }
-
-            if (data.hasOwnProperty('backend_type_guid')) {
-                self.backendTypeGuid(data.backend_type_guid);
-            } else {
-                self.backendTypeGuid(undefined);
+            if (data.metadata !== undefined && data.metadata !== null && data.metadata.hasOwnProperty('backend')) {
+                if (data.metadata.backend.hasOwnProperty('backend_info')) {
+                    generic.trySet(self.backendGuid, data.metadata.backend.backend_info, 'backend_guid');
+                    generic.trySet(self.backendName, data.metadata.backend.backend_info, 'name');
+                    generic.trySet(self.backendPreset, data.metadata.backend.backend_info, 'preset');
+                }
+                if (data.metadata.backend.hasOwnProperty('connection_info')) {
+                    generic.trySet(self.backendHost, data.metadata.backend.connection_info, 'host');
+                    generic.trySet(self.backendPort, data.metadata.backend.connection_info, 'port');
+                    generic.trySet(self.backendLocal, data.metadata.backend.connection_info, 'local');
+                }
             }
             if (data.hasOwnProperty('vdisks_guids') && !generic.tryGet(options, 'skipDisks', false)) {
                 generic.crossFiller(
@@ -158,29 +164,6 @@ define([
                         })
                         .fail(deferred.reject);
                 } else {
-                    deferred.resolve();
-                }
-            }).promise();
-        };
-        self.loadBackendType = function(refresh) {
-            refresh = !!refresh;
-            return $.Deferred(function(deferred) {
-                if (self.backendTypeGuid() !== undefined) {
-                    if (self.backendType() === undefined || self.backendTypeGuid() !== self.backendType().guid()) {
-                        var backendType = new BackendType(self.backendTypeGuid());
-                        backendType.load()
-                            .then(deferred.resolve)
-                            .fail(deferred.reject);
-                        self.backendType(backendType);
-                    } else if (refresh) {
-                        self.backendType().load()
-                            .then(deferred.resolve)
-                            .fail(deferred.reject);
-                    } else {
-                        deferred.resolve();
-                    }
-                } else {
-                    self.backendType(undefined);
                     deferred.resolve();
                 }
             }).promise();

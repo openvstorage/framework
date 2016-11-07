@@ -21,7 +21,6 @@ import os
 import time
 import datetime
 import unittest
-from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_mdsservice import MDSService
@@ -86,14 +85,9 @@ class DeleteSnapshots(unittest.TestCase):
         """
         # Setup
         # There are 2 disks, second one cloned from a snapshot of the first
-        backend_type = BackendType()
-        backend_type.name = 'BackendType'
-        backend_type.code = 'BT'
-        backend_type.save()
         vpool = VPool()
         vpool.name = 'vpool'
         vpool.status = 'RUNNING'
-        vpool.backend_type = backend_type
         vpool.save()
         storage_router = StorageRouter()
         storage_router.name = 'storage_router'
@@ -202,14 +196,9 @@ class DeleteSnapshots(unittest.TestCase):
         Validates the happy path; Hourly snapshots are taken with a few manual consistent
         every now and then. The delete policy is executed every day
         """
-        backend_type = BackendType()
-        backend_type.name = 'BackendType'
-        backend_type.code = 'BT'
-        backend_type.save()
         vpool = VPool()
         vpool.name = 'vpool'
         vpool.status = 'RUNNING'
-        vpool.backend_type = backend_type
         vpool.save()
         storage_router = StorageRouter()
         storage_router.name = 'storage_router'

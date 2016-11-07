@@ -54,68 +54,25 @@ define([
         self.loadStorageRoutersHandle = undefined;
 
         // Observables
-        self.storageRoutersLoaded      = ko.observable(false);
-        self.updatingStorageRouters    = ko.observable(false);
-        self.vPool                     = ko.observable();
-        self.srCanDeleteMap            = ko.observable();
-        self.storageDrivers            = ko.observableArray([]);
-        self.storageRouters            = ko.observableArray([]);
+        self.updatingStorageRouters = ko.observable(false);
+        self.vPool                  = ko.observable();
+        self.srSDMap                = ko.observable({});
+        self.storageDrivers         = ko.observableArray([]);
+        self.storageRouters         = ko.observableArray([]);
 
         // Functions
         self.load = function() {
             return $.Deferred(function (deferred) {
                 var vpool = self.vPool();
                 $.when.apply($, [
-                    vpool.load('storagedrivers,vdisks,_dynamics,backend_type'),
-                    vpool.loadStorageRouters(),
-                    self.loadStorageRouters()
+                    vpool.load('storagedrivers,vdisks,_dynamics'),
+                    self.loadStorageRouters(),
+                    self.loadStorageDrivers()
                 ])
-                    .then(vpool.loadBackendType)
-                    .then(self.loadStorageDriverInfo)
                     .fail(function(error) {
                         if (error !== undefined && error.status === 404) {
                             router.navigate(shared.routing.loadHash('vpools'));
                         }
-                    })
-                    .always(deferred.resolve);
-            }).promise();
-        };
-        self.loadStorageDriverInfo = function() {
-            return $.Deferred(function (deferred) {
-                var calls = [];
-                generic.crossFiller(
-                    self.vPool().storageDriverGuids(), self.storageDrivers,
-                    function(guid) {
-                        var storageDriver = new StorageDriver(guid);
-                        calls.push(storageDriver.load());
-                        return storageDriver;
-                    }, 'guid'
-                );
-                $.when.apply($, calls)
-                    .done(function() {
-                        var map = self.srCanDeleteMap();
-                        if (map === undefined) {
-                            map = {};
-                        }
-                        $.each(self.storageRouters(), function(_, sr) {
-                            var srGuid = sr.guid();
-                            if (map[srGuid] === undefined) {
-                                map[srGuid] = null;
-                            }
-                            var found = false;
-                            $.each(self.storageDrivers(), function(_, sd) {
-                                if (sd.storageRouterGuid() === srGuid) {
-                                    map[srGuid] = sd.vdiskGuids().length === 0;
-                                    found = true;
-                                    return false;
-                                }
-                            });
-                            if (found === false) {
-                                map[srGuid] = null;
-                            }
-                        });
-                        self.srCanDeleteMap(map);
-                        deferred.resolve();
                     })
                     .always(deferred.resolve);
             }).promise();
@@ -145,10 +102,42 @@ define([
                                     storageRouter.fillData(sadata[storageRouter.guid()]);
                                 }
                             });
-                            self.storageRoutersLoaded(true);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
+                } else {
+                    deferred.resolve();
+                }
+            }).promise();
+        };
+        self.loadStorageDrivers = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadStorageDriversHandle)) {
+                    self.loadStorageDriversHandle = api.get('storagedrivers', {queryparams: {vpool_guid: self.vPool().guid(), contents: 'storagerouter,vpool_backend_info,vdisks_guids'}})
+                        .done(function(data) {
+                            var guids = [], sddata = {}, map = {};
+                            $.each(data.data, function(index, item) {
+                                guids.push(item.guid);
+                                sddata[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.storageDrivers,
+                                function(guid) {
+                                    return new StorageDriver(guid);
+                                }, 'guid'
+                            );
+                            $.each(self.storageDrivers(), function(index, storageDriver) {
+                                if (sddata.hasOwnProperty(storageDriver.guid())) {
+                                    storageDriver.fillData(sddata[storageDriver.guid()]);
+                                }
+                                map[storageDriver.storageRouterGuid()] = storageDriver;
+                            });
+                            self.srSDMap(map);
+                            deferred.resolve();
+                        })
+                        .fail(function() {
+                            deferred.reject();
+                        });
                 } else {
                     deferred.resolve();
                 }
@@ -179,6 +168,9 @@ define([
                 }
             }).promise();
         };
+        self.formatBytes = function(value) {
+            return generic.formatBytes(value);
+        };
         self.addStorageRouter = function(sr) {
             self.updatingStorageRouters(true);
 
@@ -198,8 +190,8 @@ define([
             });
         };
         self.removeStorageRouter = function(sr) {
-            var single = self.vPool().storageRouterGuids().length === 1;
-            if (self.srCanDeleteMap() !== undefined && self.srCanDeleteMap()[sr.guid()] === true) {
+            var single = generic.keys(self.srSDMap()).length === 1;
+            if (self.srSDMap().hasOwnProperty(sr.guid()) && self.srSDMap()[sr.guid()].canBeDeleted() === true) {
                 self.updatingStorageRouters(true);
                 app.showMessage(
                     $.t('ovs:wizards.shrink_vpool.confirm.remove_' + (single === true ? 'single' : 'multi'), { what: sr.name() }),
@@ -235,9 +227,6 @@ define([
                                             $.t('ovs:wizards.shrink_vpool.confirm.success_multi')
                                         );
                                     }
-                                    var map = self.srCanDeleteMap();
-                                    map[sr.guid()] = null;
-                                    self.srCanDeleteMap(map);
                                 })
                                 .fail(function() {
                                     if (single === true) {
@@ -251,9 +240,6 @@ define([
                                             $.t('ovs:wizards.shrink_vpool.confirm.failed_multi')
                                         );
                                     }
-                                    var map = self.srCanDeleteMap();
-                                    map[sr.guid()] = true;
-                                    self.srCanDeleteMap(map);
                                 })
                                 .always(function() {
                                     self.updatingStorageRouters(false);
@@ -266,7 +252,7 @@ define([
         // Durandal
         self.activate = function(mode, guid) {
             self.vPool(new VPool(guid));
-            self.refresher.init(self.load, 10000);
+            self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
         };

@@ -22,10 +22,9 @@ define([
     return function(guid) {
         var self = this;
 
-        // Handles
-        self.canBeDeletedHandle = undefined;
-
         // Observables
+        self.backendInfo       = ko.observable();
+        self.connectionInfo    = ko.observable();
         self.guid              = ko.observable(guid);
         self.loaded            = ko.observable(false);
         self.loading           = ko.observable(false);
@@ -35,6 +34,7 @@ define([
         self.storageIP         = ko.observable();
         self.storageRouterGuid = ko.observable();
         self.vdiskGuids        = ko.observableArray([]);
+        self.vpoolBackendInfo  = ko.observable();
 
         // Functions
         self.fillData = function(data) {
@@ -44,13 +44,22 @@ define([
             generic.trySet(self.storageIP, data, 'storage_ip');
             generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             generic.trySet(self.vdiskGuids, data, 'vdisks_guids');
+            generic.trySet(self.vpoolBackendInfo, data, 'vpool_backend_info');
+            if (data.hasOwnProperty('vpool_backend_info')) {
+                generic.trySet(self.backendInfo, data.vpool_backend_info, 'backend_info');
+                generic.trySet(self.connectionInfo, data.vpool_backend_info, 'connection_info');
+            }
             self.loaded(true);
             self.loading(false);
         };
-        self.load = function() {
+        self.load = function(contents) {
+            var options = {};
+            if (contents !== undefined) {
+                options.contents = contents;
+            }
             return $.Deferred(function(deferred) {
                 self.loading(true);
-                api.get('storagedrivers/' + self.guid())
+                api.get('storagedrivers/' + self.guid(), {queryparams: options})
                     .done(function(data) {
                         self.fillData(data);
                         deferred.resolve();
@@ -61,5 +70,28 @@ define([
                     });
             }).promise();
         };
+
+        // Computed
+        self.caching = ko.computed(function() {
+            if (self.vpoolBackendInfo() === undefined) {
+                return 'none'
+            }
+            var read = self.vpoolBackendInfo().cache_read,
+                write = self.vpoolBackendInfo().cache_write;
+
+            if (read === true && write === true) {
+                return 'read_and_write';
+            }
+            if (read === true && write === false) {
+                return 'read';
+            }
+            if (read === false && write === true) {
+                return 'write';
+            }
+            return 'none';
+        });
+        self.canBeDeleted = ko.computed(function() {
+            return self.vdiskGuids().length === 0;
+        });
     };
 });

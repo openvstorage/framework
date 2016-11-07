@@ -20,10 +20,10 @@ define(['knockout'], function(ko){
     nameRegex = /^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$/;
     singleton = function() {
         return {
-            backends:                ko.observableArray([]),
-            backendType:             ko.observable(),
-            backendTypes:            ko.observableArray([]),
-            name:                    ko.observable().extend({ regex: nameRegex })
+            backends:     ko.observableArray([]),
+            backendType:  ko.observable(),
+            backendTypes: ko.observableArray([]),
+            name:         ko.observable().extend({ regex: nameRegex })
         };
     };
     return singleton();

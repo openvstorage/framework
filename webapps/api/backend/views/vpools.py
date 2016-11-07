@@ -24,7 +24,6 @@ from rest_framework.decorators import link, action
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, load, return_list, return_object, return_task, return_simple, log
 from api.backend.exceptions import HttpNotAcceptableException
-from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vdisklist import VDiskList
@@ -104,58 +103,6 @@ class VPoolViewSet(viewsets.ViewSet):
             raise HttpNotAcceptableException(error_description='Storage Router {0} is not a member of vPool {1}'.format(sr.name, vpool.name),
                                              error='impossible_request')
         return StorageRouterController.remove_storagedriver.delay(sd_guid)
-
-    @action()
-    @log()
-    @required_roles(['read', 'write', 'manage'])
-    @return_task()
-    @load(VPool)
-    def update_storagedrivers(self, vpool, storagedriver_guid, version, storagerouter_guids=None, storagedriver_guids=None):
-        """
-        Update Storage Drivers for a given vPool (both adding and removing Storage Drivers)
-        :param vpool: vPool to update
-        :type vpool: VPool
-        :param storagedriver_guid: Storage Driver to update
-        :type storagedriver_guid: str
-        :param version: Client version
-        :type version: int
-        :param storagerouter_guids: Storage Router guids
-        :type storagerouter_guids: list
-        :param storagedriver_guids: Storage Driver guids
-        :type storagedriver_guids: list
-        """
-        if version > 1:
-            raise HttpNotAcceptableException(error_description='Only available in API version 1',
-                                             error='invalid_version')
-        storagerouters = []
-        if storagerouter_guids is not None:
-            if storagerouter_guids.strip() != '':
-                for storagerouter_guid in storagerouter_guids.strip().split(','):
-                    storagerouter = StorageRouter(storagerouter_guid)
-                    storagerouters.append((storagerouter.ip, storagerouter.machine_id))
-        valid_storagedriver_guids = []
-        if storagedriver_guids is not None:
-            if storagedriver_guids.strip() != '':
-                for storagedriver_guid in storagedriver_guids.strip().split(','):
-                    storagedriver = StorageDriver(storagedriver_guid)
-                    if storagedriver.vpool_guid != vpool.guid:
-                        raise HttpNotAcceptableException(error_description='Given Storage Driver does not belong to this vPool',
-                                                         error='impossible_request')
-                    valid_storagedriver_guids.append(storagedriver.guid)
-
-        storagedriver = StorageDriver(storagedriver_guid)
-        parameters = {'connection_host': None if vpool.connection is None else vpool.connection.split(':')[0],
-                      'connection_port': None if vpool.connection is None else int(vpool.connection.split(':')[1]),
-                      'connection_username': vpool.login,
-                      'connection_password': vpool.password,
-                      'storage_ip': storagedriver.storage_ip,
-                      'type': vpool.backend_type.code,
-                      'vpool_name': vpool.name}
-        for field in parameters:
-            if isinstance(parameters[field], basestring):
-                parameters[field] = str(parameters[field])
-
-        return StorageRouterController.update_storagedrivers.delay(valid_storagedriver_guids, storagerouters, parameters)
 
     @link()
     @log()

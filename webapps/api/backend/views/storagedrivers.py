@@ -25,6 +25,7 @@ from api.backend.decorators import required_roles, load, return_list, return_obj
 from api.backend.exceptions import HttpNotAcceptableException
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.hybrids.storagedriver import StorageDriver
+from ovs.dal.hybrids.vpool import VPool
 
 
 class StorageDriverViewSet(viewsets.ViewSet):
@@ -39,10 +40,14 @@ class StorageDriverViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(StorageDriver)
     @load()
-    def list(self):
+    def list(self, vpool_guid=None):
         """
         Overview of all StorageDrivers
+        :param vpool_guid: Guid of the vPool
+        :type vpool_guid: str
         """
+        if vpool_guid is not None:
+            return VPool(vpool_guid).storagedrivers
         return StorageDriverList.get_storagedrivers()
 
     @log()
