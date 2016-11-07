@@ -32,9 +32,9 @@ define([
         self.vPoolHeaders = [
             { key: 'status',     value: '',                               width: 30        },
             { key: 'name',       value: $.t('ovs:generic.name'),          width: undefined },
+            { key: 'backend',    value: $.t('ovs:vpools.backend_preset'), width: 250       },
             { key: 'storedData', value: $.t('ovs:generic.storeddata'),    width: 150       },
-            { key: 'iops',       value: $.t('ovs:generic.iops'),          width: 150       },
-            { key: 'backend',    value: $.t('ovs:vpools.backend_preset'), width: 250       }
+            { key: 'iops',       value: $.t('ovs:generic.iops'),          width: 150       }
         ];
         self.vPoolCache = {};
 

@@ -175,8 +175,8 @@ define(['jquery', 'knockout'], function($, ko){
                 if (md.hasOwnProperty('connection_info')) {
                     wizardData.hostAA(md.connection_info.host);
                     wizardData.portAA(md.connection_info.port);
-                    wizardData.clientIDAA(md.connection_info.username);
-                    wizardData.clientSecretAA(md.connection_info.password);
+                    wizardData.clientIDAA(md.connection_info.client_id);
+                    wizardData.clientSecretAA(md.connection_info.client_secret);
                 }
             }
         });

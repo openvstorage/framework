@@ -196,8 +196,8 @@ class StorageRouterController(object):
                                                       'alba_backend_guid': (str, Toolbox.regex_guid)}, False),
                            'connection_info': (dict, {'host': (str, Toolbox.regex_ip),
                                                       'port': (int, None),
-                                                      'username': (str, None),
-                                                      'password': (str, None),
+                                                      'client_id': (str, None),
+                                                      'client_secret': (str, None),
                                                       'local': (bool, None, False)})}
 
         ########################
@@ -266,8 +266,8 @@ class StorageRouterController(object):
         if new_vpool is True:
             vpool = VPool()
             vpool.name = vpool_name
-            vpool.login = connection_info['username']
-            vpool.password = connection_info['password']
+            vpool.login = connection_info['client_id']
+            vpool.password = connection_info['client_secret']
             vpool.metadata = {}
             vpool.connection = '{0}:{1}'.format(connection_info['host'], connection_info['port'])
             vpool.description = vpool_name
@@ -316,8 +316,8 @@ class StorageRouterController(object):
                 try:
                     Toolbox.verify_required_params(required_params={'host': (str, Toolbox.regex_ip),
                                                                     'port': (int, None),
-                                                                    'username': (str, None),
-                                                                    'password': (str, None),
+                                                                    'client_id': (str, None),
+                                                                    'client_secret': (str, None),
                                                                     'local': (bool, None, False)},
                                                    actual_params=connection_info_aa)
                 except RuntimeError as rte:
@@ -385,7 +385,7 @@ class StorageRouterController(object):
         for key, metadata in metadata_map.iteritems():
             ovs_client = OVSClient(ip=metadata['connection_info']['host'],
                                    port=metadata['connection_info']['port'],
-                                   credentials=(metadata['connection_info']['username'], metadata['connection_info']['password']),
+                                   credentials=(metadata['connection_info']['client_id'], metadata['connection_info']['client_secret']),
                                    version=2)
             preset_name = metadata['backend_info']['preset']
             alba_backend_guid = metadata['backend_info']['alba_backend_guid']

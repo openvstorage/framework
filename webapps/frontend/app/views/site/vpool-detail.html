@@ -60,7 +60,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                   href: 'https://' + backendHost() + ':' + backendPort() + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: backendGuid }),
                                                   target: (backendLocal() === true ? '' : '_blank')
                                               }">
-                                    <span data-bind="text: backendName" class="hand"></span> <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: backendLocal() === false"></i>
+                                    <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: backendLocal() === false"></i> <span data-bind="text: backendName" class="hand"></span>
                                 </a>
                             <td data-i18n="ovs:vpools.sco_size"></td>
                             <td>
@@ -259,7 +259,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                               href: 'https://' + $root.srSDMap()[guid()].connectionInfo().host + ':' + $root.srSDMap()[guid()].connectionInfo().port + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: $root.srSDMap()[guid()].backendInfo().backend_guid }),
                                                                               target: ($root.srSDMap()[guid()].connectionInfo().local !== false ? '' : '_blank')
                                                                           }">
-                                                                <span data-bind="text: $root.srSDMap()[guid()].backendInfo().name" class="hand"></span> <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: $root.srSDMap()[guid()].connectionInfo().local === false"></i>
+                                                                <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: $root.srSDMap()[guid()].connectionInfo().local === false"></i> <span data-bind="text: $root.srSDMap()[guid()].backendInfo().name" class="hand"></span>
                                                                 (<span data-bind="text: $root.srSDMap()[guid()].backendInfo().preset" class="hand"></span>)
                                                             </a>
                                                         </td>

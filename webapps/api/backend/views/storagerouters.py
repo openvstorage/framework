@@ -264,6 +264,16 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :param request: The raw request
         :type request: Request
         """
+        def _validate_required_keys(section):
+            for required_key in ['host', 'port', 'client_id', 'client_secret', 'backend']:
+                if required_key not in call_parameters[section]:
+                    raise HttpNotAcceptableException(error_description='Invalid data passed: "{0}" does not contain all required information'.format(section),
+                                                     error='invalid_data')
+            for sub_required_key in ['backend', 'metadata']:
+                if sub_required_key not in call_parameters[section]['backend']:
+                    raise HttpNotAcceptableException(error_description='Invalid data passed: "{0}" does not contain all required information'.format(section),
+                                                     error='invalid_data')
+
         # API backwards compatibility
         if version <= 2:
             call_parameters['storagerouter_ip'] = storagerouter.ip
@@ -271,12 +281,37 @@ class StorageRouterViewSet(viewsets.ViewSet):
             call_parameters['fragment_cache_on_write'] = False
             call_parameters['backend_connection_info'] = {'host': call_parameters.pop('connection_host'),
                                                           'port': call_parameters.pop('connection_port'),
-                                                          'username': call_parameters.pop('connection_username'),
-                                                          'password': call_parameters.pop('connection_password')}
+                                                          'client_id': call_parameters.pop('connection_username'),
+                                                          'client_secret': call_parameters.pop('connection_password')}
             if 'connection_backend' in call_parameters:
                 connection_backend = call_parameters.pop('connection_backend')
                 call_parameters['backend_connection_info']['backend'] = {'backend': connection_backend.pop('backend') if 'backend' in connection_backend else None,
                                                                          'metadata': connection_backend.pop('metadata') if 'metadata' in connection_backend else None}
+        if version < 6:
+            if 'backend_connection_info' not in call_parameters:
+                raise HttpNotAcceptableException(error_description='Invalid data passed: "backend_connection_info" should be passed',
+                                                 error='invalid_data')
+            _validate_required_keys(section='backend_connection_info')
+            call_parameters['backend_info']['preset'] = call_parameters['backend_connection_info']['backend']['metadata']
+            call_parameters['backend_info']['alba_backend_guid'] = call_parameters['backend_connection_info']['backend']['backend']
+            call_parameters['connection_info']['host'] = call_parameters['backend_connection_info']['host']
+            call_parameters['connection_info']['port'] = call_parameters['backend_connection_info']['port']
+            call_parameters['connection_info']['client_id'] = call_parameters['backend_connection_info']['client_id']
+            call_parameters['connection_info']['client_secret'] = call_parameters['backend_connection_info']['client_secret']
+
+            if 'backend_connection_info_aa' in call_parameters:
+                _validate_required_keys(section='backend_connection_info_aa')
+                call_parameters['backend_info_aa']['preset'] = call_parameters['backend_connection_info_aa']['backend']['metadata']
+                call_parameters['backend_info_aa']['alba_backend_guid'] = call_parameters['backend_connection_info_aa']['backend']['backend']
+                call_parameters['connection_info_aa']['host'] = call_parameters['backend_connection_info_aa']['host']
+                call_parameters['connection_info_aa']['port'] = call_parameters['backend_connection_info_aa']['port']
+                call_parameters['connection_info_aa']['client_id'] = call_parameters['backend_connection_info_aa']['client_id']
+                call_parameters['connection_info_aa']['client_secret'] = call_parameters['backend_connection_info_aa']['client_secret']
+
+        if version >= 6 and 'backend_connection_info' in call_parameters:
+            raise HttpNotAcceptableException(error_description='Invalid data passed: "backend_connection_info" is deprecated',
+                                             error='invalid_data')
+
         # API client translation (cover "local backend" selection in GUI)
         if 'backend_info' not in call_parameters or 'connection_info' not in call_parameters or 'config_params' not in call_parameters:
             raise HttpNotAcceptableException(error_description='Invalid call_parameters passed',
@@ -292,14 +327,14 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 raise HttpNotAcceptableException(error_description='Invalid call_parameters passed',
                                                  error='invalid_data')
             if connection_info['host'] == '':
-                connection_info['username'] = client.client_id
-                connection_info['password'] = client.client_secret
+                connection_info['client_id'] = client.client_id
+                connection_info['client_secret'] = client.client_secret
                 connection_info['host'] = local_storagerouter.ip
                 connection_info['port'] = 443
                 connection_info['local'] = True
             if connection_info_aa is not None and connection_info_aa['host'] == '':
-                connection_info_aa['username'] = client.client_id
-                connection_info_aa['password'] = client.client_secret
+                connection_info_aa['client_id'] = client.client_id
+                connection_info_aa['client_secret'] = client.client_secret
                 connection_info_aa['host'] = local_storagerouter.ip
                 connection_info_aa['port'] = 443
                 connection_info_aa['local'] = True

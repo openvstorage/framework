@@ -42,8 +42,8 @@ define([
                             host: self.data.host(),
                             port: self.data.port(),
                             local: self.data.localHost(),
-                            username: self.data.clientID(),
-                            password: self.data.clientSecret()
+                            client_id: self.data.clientID(),
+                            client_secret: self.data.clientSecret()
                         },
                         backend_info: {
                             preset: (self.data.preset() !== undefined ? self.data.preset().name : undefined),
@@ -69,8 +69,8 @@ define([
                         host: self.data.hostAA(),
                         port: self.data.portAA(),
                         local: self.data.localHostAA(),
-                        username: self.data.clientIDAA(),
-                        password: self.data.clientSecretAA()
+                        client_id: self.data.clientIDAA(),
+                        client_secret: self.data.clientSecretAA()
                     };
                     postData.call_parameters.backend_info_aa = {
                         preset: (self.data.presetAA() !== undefined ? self.data.presetAA().name : undefined),

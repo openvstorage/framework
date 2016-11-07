@@ -422,8 +422,8 @@ define([
                             self.data.host('');
                             self.data.port(80);
                         } else {
-                            self.data.clientID(metadata.backend.connection_info.username);
-                            self.data.clientSecret(metadata.backend.connection_info.password);
+                            self.data.clientID(metadata.backend.connection_info.client_id);
+                            self.data.clientSecret(metadata.backend.connection_info.client_secret);
                             self.data.host(metadata.backend.connection_info.host);
                             self.data.port(metadata.backend.connection_info.port);
                         }
