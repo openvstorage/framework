@@ -56,12 +56,17 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                             <td style="width: 12%;" data-i18n="ovs:generic.name"></td>
                             <td style="width: 29%;">
-                                <a data-bind="attr: {
-                                                  href: 'https://' + backendHost() + ':' + backendPort() + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: backendGuid }),
-                                                  target: (backendLocal() === true ? '' : '_blank')
-                                              }">
-                                    <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: backendLocal() === false"></i> <span data-bind="text: backendName" class="hand"></span>
-                                </a>
+                                <!-- ko if: backendGuid() === null -->
+                                    <span data-bind="text: backendName"></span>
+                                <!-- /ko -->
+                                <!-- ko if: backendGuid() !== null -->
+                                    <a data-bind="attr: {
+                                                      href: 'https://' + backendHost() + ':' + backendPort() + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: backendGuid }),
+                                                      target: (backendLocal() === true ? '' : '_blank')
+                                                  }">
+                                        <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: backendLocal() === false"></i> <span data-bind="text: backendName" class="hand"></span>
+                                    </a>
+                                <!-- /ko -->
                             <td data-i18n="ovs:vpools.sco_size"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
@@ -255,8 +260,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                                     <!-- /ko -->
                                                     <!-- ko if: $root.srSDMap()[guid()].backendInfo() !== undefined && $root.srSDMap()[guid()].backendInfo() !== null && $root.srSDMap()[guid()].backendInfo().backend_guid === null-->
                                                         <td>
-                                                            <span data-bind="text: $root.srSDMap()[guid()].backendInfo().name" class="hand"></span>
-                                                            (<span data-bind="text: $root.srSDMap()[guid()].backendInfo().preset" class="hand"></span>)
+                                                            <span data-bind="text: $root.srSDMap()[guid()].backendInfo().name"></span>
+                                                            (<span data-bind="text: $root.srSDMap()[guid()].backendInfo().preset"></span>)
                                                         </td>
                                                     <!-- /ko -->
                                                     <!-- ko if: $root.srSDMap()[guid()].backendInfo() !== undefined && $root.srSDMap()[guid()].backendInfo() !== null && $root.srSDMap()[guid()].backendInfo().backend_guid !== null-->
