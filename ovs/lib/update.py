@@ -72,8 +72,8 @@ class UpdateController(object):
             # Create locks
             UpdateController._log_message('Creating lock files', client_ip=this_client.ip)
             for client in ssh_clients:
-                client.run('touch {0}'.format(upgrade_file))  # Prevents manual install or upgrade individual packages
-                client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Prevents clicking x times on 'Update' btn
+                client.run(['touch', upgrade_file])  # Prevents manual install or upgrade individual packages
+                client.run(['touch', upgrade_ongoing_check_file])  # Prevents clicking x times on 'Update' btn
 
             # Check requirements
             packages_to_update = set()
@@ -251,8 +251,8 @@ class UpdateController(object):
             # 0. Create locks
             UpdateController._log_message('Creating lock files', client_ip=this_client.ip)
             for client in ssh_clients:
-                client.run('touch {0}'.format(upgrade_file))  # Prevents manual install or upgrade individual packages
-                client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Prevents clicking x times on 'Update' btn
+                client.run(['touch', upgrade_file])  # Prevents manual install or upgrade individual packages
+                client.run(['touch', upgrade_ongoing_check_file])  # Prevents clicking x times on 'Update' btn
 
             # 1. Check requirements
             packages_to_update = set()

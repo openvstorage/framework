@@ -41,7 +41,7 @@ class DebianPackage(object):
         command = "dpkg -s {0} 2> /dev/null | grep Version | cut -d ' ' -f 2".format(package_name)
         if client is None:
             return check_output(command, shell=True).strip()
-        return client.run(command, insecure=True).strip()
+        return client.run(command, allow_insecure=True).strip()
 
     @staticmethod
     def _get_installed_candidate_version(package_name, client):

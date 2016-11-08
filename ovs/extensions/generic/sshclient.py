@@ -194,12 +194,12 @@ class SSHClient(object):
         self._client.close()
 
     @staticmethod
-    def shell_safe(path_to_check):
+    def shell_safe(argument):
         """
         Makes sure that the given path/string is escaped and safe for shell
-        :param path_to_check: Path to make safe for shell
+        :param argument: Argument to make safe for shell
         """
-        return "".join([("\\" + _) if _ in " '\";`|" else _ for _ in path_to_check])
+        return "'{0}'".format(argument.replace(r"'", r"'\''"))
 
     @staticmethod
     def _clean_text(text):
@@ -223,14 +223,14 @@ class SSHClient(object):
             raise
 
     @connected()
-    def run(self, command, debug=False, suppress_logging=False, allow_nonzero=False, insecure=False):
+    def run(self, command, debug=False, suppress_logging=False, allow_nonzero=False, allow_insecure=False):
         """
         Executes a shell command
         :param suppress_logging: Do not log anything
         :param command: Command to execute
         :param debug: Extended logging and stderr output returned
         :param allow_nonzero: Allow non-zero exit code
-        :param insecure: Allow string commands (which might be inproper escaped)
+        :param allow_insecure: Allow string commands (which might be inproper escaped)
         """
         if self._unittest_mode is True:
             SSHClient._logger.debug('Executing: {0}'.format(command))
@@ -238,8 +238,8 @@ class SSHClient(object):
             if command in SSHClient._run_returns:
                 SSHClient._logger.debug('Emulating return value')
                 return SSHClient._run_returns[command]
-        if not isinstance(command, list) and not insecure:
-            raise RuntimeError('The given command must be a list, or the insecure flag must be set')
+        if not isinstance(command, list) and not allow_insecure:
+            raise RuntimeError('The given command must be a list, or the allow_insecure flag must be set')
         if self.is_local is True:
             stderr = None
             try:
@@ -270,7 +270,7 @@ class SSHClient(object):
                 raise
         else:
             if isinstance(command, list):
-                command = ' '.join(["'{0}'".format(entry.replace(r"'", r"'\''")) for entry in command])
+                command = ' '.join([self.shell_safe(entry) for entry in command])
             _, stdout, stderr = self._client.exec_command(command)  # stdin, stdout, stderr
             output = self._clean_text(stdout.readlines())
             error = self._clean_text(stderr.readlines())
@@ -657,3 +657,14 @@ print json.dumps(os.path.ismount('{0}'))""".format(path)
             return json.loads(self.run(['python', '-c', """{0}""".format(command)]))
         except ValueError:
             return False
+
+    def get_hostname(self):
+        """
+        Gets the simple and fq domain name
+        """
+        short = self.run(['hostname', '-s'])
+        try:
+            fqdn = self.run(['hostname', '-f'])
+        except:
+            fqdn = short
+        return short, fqdn

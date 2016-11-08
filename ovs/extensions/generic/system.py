@@ -116,7 +116,7 @@ class System(object):
         if client is None:
             output = check_output(cmd, shell=True)
         else:
-            output = client.run(cmd, insecure=True)
+            output = client.run(cmd, allow_insecure=True)
         for found_port in output.splitlines():
             if found_port.isdigit():
                 yield int(found_port.strip())
