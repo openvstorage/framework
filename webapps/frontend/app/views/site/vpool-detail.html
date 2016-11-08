@@ -253,7 +253,13 @@ but WITHOUT ANY WARRANTY of any kind.
                                                     <!-- ko if: $root.srSDMap()[guid()].backendInfo() === undefined || $root.srSDMap()[guid()].backendInfo() === null -->
                                                         <td><span data-i18n="ovs:generic.null"></span></td>
                                                     <!-- /ko -->
-                                                    <!-- ko if: $root.srSDMap()[guid()].backendInfo() !== undefined && $root.srSDMap()[guid()].backendInfo() !== null -->
+                                                    <!-- ko if: $root.srSDMap()[guid()].backendInfo() !== undefined && $root.srSDMap()[guid()].backendInfo() !== null && $root.srSDMap()[guid()].backendInfo().backend_guid === null-->
+                                                        <td>
+                                                            <span data-bind="text: $root.srSDMap()[guid()].backendInfo().name" class="hand"></span>
+                                                            (<span data-bind="text: $root.srSDMap()[guid()].backendInfo().preset" class="hand"></span>)
+                                                        </td>
+                                                    <!-- /ko -->
+                                                    <!-- ko if: $root.srSDMap()[guid()].backendInfo() !== undefined && $root.srSDMap()[guid()].backendInfo() !== null && $root.srSDMap()[guid()].backendInfo().backend_guid !== null-->
                                                         <td>
                                                             <a data-bind="attr: {
                                                                               href: 'https://' + $root.srSDMap()[guid()].connectionInfo().host + ':' + $root.srSDMap()[guid()].connectionInfo().port + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: $root.srSDMap()[guid()].backendInfo().backend_guid }),

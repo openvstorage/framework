@@ -181,8 +181,10 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                       checked: $root.checkedVPoolGuids().contains(guid()),
                                                                       disable: true">
                                                 </td>
-                                                <td><a data-bind="attr: {href: $root.shared.routing.loadHash('vpool-detail', { guid: guid() })}">
-                                                        <span data-bind="text: name()" class="hand"></span></a>
+                                                <td>
+                                                    <a data-bind="attr: {href: $root.shared.routing.loadHash('vpool-detail', { guid: guid() })}">
+                                                        <span data-bind="text: name()" class="hand"></span>
+                                                    </a>
                                                 </td>
                                                 <!-- ko foreach: $parents[0].storageDrivers() -->
                                                     <!-- ko if: $parent.storageDriverGuids().contains(guid()) -->

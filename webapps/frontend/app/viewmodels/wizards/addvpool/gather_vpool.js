@@ -24,25 +24,25 @@ define([
         var self = this;
 
         // Variables
-        self.data = data;
+        self.data   = data;
         self.shared = shared;
 
         // Handles
-        self.checkS3Handle = undefined;
-        self.checkMtptHandle = undefined;
-        self.checkMetadataHandle = undefined;
-        self.fetchAlbaVPoolHandle = undefined;
-        self.loadSRMetadataHandle = undefined;
+        self.checkS3Handle            = undefined;
+        self.checkMtptHandle          = undefined;
+        self.checkMetadataHandle      = undefined;
+        self.fetchAlbaVPoolHandle     = undefined;
+        self.loadSRMetadataHandle     = undefined;
         self.loadStorageRoutersHandle = undefined;
 
         // Observables
-        self.albaPresetMap = ko.observable({});
-        self.invalidAlbaInfo = ko.observable(false);
-        self.loadingBackends = ko.observable(false);
-        self.loadingMetadata = ko.observable(false);
+        self.albaPresetMap         = ko.observable({});
+        self.invalidAlbaInfo       = ko.observable(false);
+        self.loadingBackends       = ko.observable(false);
+        self.loadingMetadata       = ko.observable(false);
         self.loadingPrevalidations = ko.observable(false);
-        self.preValidateResult = ko.observable({valid: true, reasons: [], fields: []});
-        self.srMetadataMap = ko.observable({});
+        self.preValidateResult     = ko.observable({valid: true, reasons: [], fields: []});
+        self.srMetadataMap         = ko.observable({});
 
         self.data.storageRouter.subscribe(function (storageRouter) {
             if (storageRouter == undefined) {

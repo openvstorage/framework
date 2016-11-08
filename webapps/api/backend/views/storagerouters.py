@@ -203,8 +203,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read'])
     @return_task()
-    @load(StorageRouter)
-    def check_s3(self, host, port, accesskey, secretkey, version):
+    @load(StorageRouter, max_version=5)
+    def check_s3(self, host, port, accesskey, secretkey):
         """
         Validates whether connection to a given S3 backend can be made
         :param host: The host of an S3 endpoint
@@ -215,12 +215,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :type accesskey: str
         :param secretkey: The secretkey to be used when validating the S3 endpoint
         :type secretkey: str
-        :param version: Client version
-        :type version: int
         """
-        if version >= 6:
-            raise HttpGoneException(error='Deprecated API call',
-                                    error_description='API is deprecated as of version 6')
         parameters = {'host': host,
                       'port': port,
                       'accesskey': accesskey,
