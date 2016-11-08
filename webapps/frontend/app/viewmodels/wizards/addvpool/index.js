@@ -27,11 +27,11 @@ define([
         self.modal(generic.tryGet(options, 'modal', false));
 
         if (options.vPool !== undefined) {
-            self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.extend_vpool.title')));
+            self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.add_vpool.title_extend')));
             data.vPool(options.vPool);
             data.storageRouter(options.storageRouter);
         } else {
-            self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.add_vpool.title')));
+            self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.add_vpool.title_add')));
             data.vPool(undefined);
             data.storageRouter(undefined);
         }
@@ -41,50 +41,39 @@ define([
         self.activateStep();
 
         // Cleaning data
-        data.aaAccesskey('');
-        data.aaHost('');
-        data.aaLocalHost(true);
-        data.aaPort(80);
-        data.aaSecretkey('');
-        data.accesskey('');
-        data.albaAABackend(undefined);
-        data.albaAAPreset(undefined);
-        data.albaBackend(undefined);
-        data.albaBackends([]);
-        data.albaPreset(undefined);
-        data.backend('alba');
-        data.backends(['alba', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']);
-        data.cacheStrategy('none');
+        data.backend(undefined);
+        data.backendAA(undefined);
+        data.backends([]);
+        data.backendsAA([]);
+        data.clientID('');
+        data.clientIDAA('');
+        data.clientSecret('');
+        data.clientSecretAA('');
         data.clusterSize(4);
-        data.dedupeMode('non_dedupe');
-        data.distributedMtpt(undefined);
         data.dtlEnabled(true);
         data.dtlMode({name: 'a_sync', disabled: false});
         data.dtlTransportMode({name: 'tcp'});
         data.fragmentCacheOnRead(true);
         data.fragmentCacheOnWrite(true);
         data.host('');
+        data.hostAA('');
         data.ipAddresses([]);
         data.localHost(true);
-        data.mountpoints([]);
+        data.localHostAA(true);
         data.name('');
         data.partitions(undefined);
         data.port(80);
-        data.readCacheSize(undefined);
+        data.portAA(80);
+        data.preset(undefined);
+        data.presetAA(undefined);
         data.reUsedStorageRouter(undefined);
-        data.rdmaEnabled(false);
         data.scoSize(4);
         data.scrubAvailable(false);
-        data.secretkey('');
-        data.sharedSize(undefined);
-        data.storageDriver(undefined);
-        data.storageDrivers([]);
         data.storageIP(undefined);
         data.storageRoutersAvailable([]);
         data.storageRoutersUsed([]);
         data.useAA(false);
-        data.volumedriverEdition(undefined);
-        data.writeBuffer(undefined);
-        data.writeCacheSize(undefined);
+        data.writeBufferGlobal(1);
+        data.writeBufferVolume(undefined);
     };
 });

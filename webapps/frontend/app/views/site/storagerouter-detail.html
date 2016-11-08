@@ -120,12 +120,12 @@ but WITHOUT ANY WARRANTY of any kind.
                                                      }, enabled: edit, small: true, emptyisloading: false
                                                  }"></span>
                             </td>
-                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td data-i18n="ovs:generic.read_speed"></td>
                             <td><span data-bind="text: readSpeed"></span></td>
                         </tr>
                         <tr>
                             <td colspan="2"></td>
-                            <td data-i18n="ovs:generic.writespeed"></td>
+                            <td data-i18n="ovs:generic.write_speed"></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
                         </tr>
                     </tbody>
@@ -181,7 +181,11 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                       checked: $root.checkedVPoolGuids().contains(guid()),
                                                                       disable: true">
                                                 </td>
-                                                <td><span data-bind="text: name()"></span></td>
+                                                <td>
+                                                    <a data-bind="attr: {href: $root.shared.routing.loadHash('vpool-detail', { guid: guid() })}">
+                                                        <span data-bind="text: name()" class="hand"></span>
+                                                    </a>
+                                                </td>
                                                 <!-- ko foreach: $parents[0].storageDrivers() -->
                                                     <!-- ko if: $parent.storageDriverGuids().contains(guid()) -->
                                                         <td><span data-bind="text: ports().management"></span></td>

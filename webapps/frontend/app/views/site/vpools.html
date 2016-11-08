@@ -48,20 +48,30 @@ but WITHOUT ANY WARRANTY of any kind.
                 <td>
                     <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid }) }"></a>
                 </td>
+                <!-- ko if: backendPreset() === undefined -->
+                    <td><span data-i18n='ovs:generic.null'></span></td>
+                <!-- /ko -->
+                <!-- ko if: backendPreset() !== undefined && backendLocal() === true -->
+                    <td>
+                        <a data-bind="attr: { href: $root.shared.routing.loadHash('backend-alba-detail', { guid: backendGuid }) }">
+                            <span data-bind="text: backendName" class="hand"></span>
+                            (<span data-bind="text: backendPreset" class="hand"></span>)
+                        </a>
+                    </td>
+                <!-- /ko -->
+                <!-- ko if: backendPreset() !== undefined && backendLocal() === false -->
+                    <td>
+                        <a data-bind="attr: {
+                                          href: 'https://' + backendHost() + ':' + backendPort() + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: backendGuid }),
+                                          target: '_blank'
+                                      }">
+                            <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link"></i> <span data-bind="text: backendName" class="hand"></span>
+                            (<span data-bind="text: backendPreset"></span>)
+                        </a>
+                    </td>
+                <!-- /ko -->
                 <td><span data-bind="text: storedData"></span></td>
                 <td><span data-bind="text: iops"></span></td>
-                <td>
-                    <span data-bind="lazyloader: { item: backendType, loadedObservable: 'loaded', undefinedLoading: false }">
-                        <span data-part="lazy-entry" data-bind="translate: 'ovs:generic.backendtypes.' + item().code()"></span>
-                    </span>
-                </td>
-                <td>
-                    <span data-bind="text: backendConnection"></span>
-                    <span data-bind="visible: backendPreset() !== undefined">
-                        (<span data-bind="text: backendPreset"></span>)
-                    </span>
-                </td>
-                <td><span data-bind="shortText: backendLogin() !== undefined ? backendLogin() : '', maxLength: 25"></span></td>
             </tr>
         </table>
     </div>

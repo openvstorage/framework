@@ -132,17 +132,6 @@ class OVSMigrator(object):
                             roleclient.role = role
                             roleclient.save()
 
-            # Add backends
-            for backend_type_info in [('Ceph', 'ceph_s3'), ('Amazon', 'amazon_s3'), ('Swift', 'swift_s3'),
-                                      ('Local', 'local'), ('Distributed', 'distributed'), ('ALBA', 'alba')]:
-                code = backend_type_info[1]
-                backend_type = BackendTypeList.get_backend_type_by_code(code)
-                if backend_type is None:
-                    backend_type = BackendType()
-                backend_type.name = backend_type_info[0]
-                backend_type.code = code
-                backend_type.save()
-
             # Add service types
             for service_type_info in [ServiceType.SERVICE_TYPES.MD_SERVER, ServiceType.SERVICE_TYPES.ALBA_PROXY, ServiceType.SERVICE_TYPES.ARAKOON]:
                 service_type = ServiceType()
@@ -238,5 +227,43 @@ class OVSMigrator(object):
                             partition.save()
 
                 DiskController.sync_with_reality(storagerouter_guid=storagerouter.guid)
+
+            # Only support ALBA backend type
+            from ovs.dal.lists.backendtypelist import BackendTypeList
+            for backend_type in BackendTypeList.get_backend_types():
+                if backend_type.code != 'alba':
+                    backend_type.delete()
+
+            # Reformat the vpool.metadata information
+            from ovs.dal.lists.vpoollist import VPoolList
+            for vpool in VPoolList.get_vpools():
+                new_metadata = {}
+                for metadata_key, value in vpool.metadata.items():
+                    new_info = {}
+                    storagerouter_guids = [key for key in vpool.metadata.keys() if not key.startswith('backend')]
+                    if isinstance(value, dict):
+                        read_cache = value.get('backend_info', {}).get('fragment_cache_on_read', True)
+                        write_cache = value.get('backend_info', {}).get('fragment_cache_on_write', False)
+                        new_info['backend_info'] = {'alba_backend_guid': value.get('backend_guid'),
+                                                    'backend_guid': None,
+                                                    'frag_size': value.get('backend_info', {}).get('frag_size'),
+                                                    'name': value.get('name'),
+                                                    'policies': value.get('backend_info', {}).get('policies'),
+                                                    'preset': value.get('preset'),
+                                                    'sco_size': value.get('backend_info', {}).get('sco_size'),
+                                                    'total_size': value.get('backend_info', {}).get('total_size')}
+                        new_info['arakoon_config'] = value.get('arakoon_config')
+                        new_info['connection_info'] = {'host': value.get('connection', {}).get('host', ''),
+                                                       'port': value.get('connection', {}).get('port', ''),
+                                                       'local': value.get('connection', {}).get('local', ''),
+                                                       'client_id': value.get('connection', {}).get('client_id', ''),
+                                                       'client_secret': value.get('connection', {}).get('client_secret', '')}
+                        if metadata_key == 'backend':
+                            new_info['caching_info'] = dict((sr_guid, {'fragment_cache_on_read': read_cache, 'fragment_cache_on_write': write_cache}) for sr_guid in storagerouter_guids)
+                    if metadata_key in storagerouter_guids:
+                        metadata_key = 'backend_aa_{0}'.format(metadata_key)
+                    new_metadata[metadata_key] = new_info
+                vpool.metadata = new_metadata
+                vpool.save()
 
         return OVSMigrator.THIS_VERSION
