@@ -53,21 +53,33 @@ but WITHOUT ANY WARRANTY of any kind.
                 <!-- /ko -->
                 <!-- ko if: backendPreset() !== undefined && backendLocal() === true -->
                     <td>
-                        <a data-bind="attr: { href: $root.shared.routing.loadHash('backend-alba-detail', { guid: backendGuid }) }">
-                            <span data-bind="text: backendName" class="hand"></span>
-                            (<span data-bind="text: backendPreset" class="hand"></span>)
-                        </a>
+                        <!-- ko if: backendGuid() === null -->
+                            <span data-bind="text: backendName"></span>
+                            (<span data-bind="text: backendPreset"></span>)
+                        <!-- /ko -->
+                        <!-- ko if: backendGuid() !== null -->
+                            <a data-bind="attr: { href: $root.shared.routing.loadHash('backend-alba-detail', { guid: backendGuid }) }">
+                                <span data-bind="text: backendName" class="hand"></span>
+                                (<span data-bind="text: backendPreset" class="hand"></span>)
+                            </a>
+                        <!-- /ko -->
                     </td>
                 <!-- /ko -->
                 <!-- ko if: backendPreset() !== undefined && backendLocal() === false -->
                     <td>
-                        <a data-bind="attr: {
-                                          href: 'https://' + backendHost() + ':' + backendPort() + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: backendGuid }),
-                                          target: '_blank'
-                                      }">
-                            <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link"></i> <span data-bind="text: backendName" class="hand"></span>
+                        <!-- ko if: backendGuid() === null -->
+                            <span data-bind="text: backendName"></span>
                             (<span data-bind="text: backendPreset"></span>)
-                        </a>
+                        <!-- /ko -->
+                        <!-- ko if: backendGuid() !== null -->
+                            <a data-bind="attr: {
+                                              href: 'https://' + backendHost() + ':' + backendPort() + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: backendGuid }),
+                                              target: '_blank'
+                                          }">
+                                <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link"></i> <span data-bind="text: backendName" class="hand"></span>
+                                (<span data-bind="text: backendPreset"></span>)
+                            </a>
+                        <!-- /ko -->
                     </td>
                 <!-- /ko -->
                 <td><span data-bind="text: storedData"></span></td>

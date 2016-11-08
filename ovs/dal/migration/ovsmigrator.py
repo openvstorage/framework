@@ -57,7 +57,6 @@ class OVSMigrator(object):
             from ovs.dal.hybrids.client import Client
             from ovs.dal.hybrids.j_rolegroup import RoleGroup
             from ovs.dal.hybrids.j_roleclient import RoleClient
-            from ovs.dal.hybrids.backendtype import BackendType
             from ovs.dal.hybrids.servicetype import ServiceType
             from ovs.dal.hybrids.branding import Branding
             from ovs.dal.lists.backendtypelist import BackendTypeList
@@ -265,5 +264,12 @@ class OVSMigrator(object):
                     new_metadata[metadata_key] = new_info
                 vpool.metadata = new_metadata
                 vpool.save()
+
+            # Removal of READ role
+            from ovs.dal.lists.diskpartitionlist import DiskPartitionList
+            for partition in DiskPartitionList.get_partitions():
+                if 'READ' in partition.roles:
+                    partition.roles.remove('READ')
+                    partition.save()
 
         return OVSMigrator.THIS_VERSION
