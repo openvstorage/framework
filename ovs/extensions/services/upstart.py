@@ -113,7 +113,7 @@ class Upstart(object):
         """
         try:
             name = Upstart._get_name(name, client)
-            output = client.run('service {0} status || true'.format(name))
+            output = client.run(['service', name, 'status'])
             # Special cases (especially old SysV ones)
             if 'rabbitmq' in name:
                 status = re.search('\{pid,\d+?\}', output) is not None
@@ -157,7 +157,7 @@ class Upstart(object):
             return output
         try:
             name = Upstart._get_name(name, client)
-            client.run('service {0} start'.format(name))
+            client.run(['service', name, 'start'])
         except CalledProcessError as cpe:
             output = cpe.output
             Upstart._logger.exception('Start {0} failed, {1}'.format(name, output))
@@ -191,7 +191,7 @@ class Upstart(object):
             return output
         try:
             name = Upstart._get_name(name, client)
-            client.run('service {0} stop'.format(name))
+            client.run(['service', name, 'stop'])
         except CalledProcessError as cpe:
             output = cpe.output
             Upstart._logger.exception('Stop {0} failed, {1}'.format(name, output))
@@ -253,7 +253,7 @@ class Upstart(object):
         """
         name = Upstart._get_name(name, client)
         if Upstart.get_service_status(name, client)[0] is True:
-            output = client.run('service {0} status'.format(name))
+            output = client.run(['service', name, 'status'])
             if output:
                 # Special cases (especially old SysV ones)
                 if 'rabbitmq' in name:
@@ -283,7 +283,7 @@ class Upstart(object):
         pid = Upstart.get_service_pid(name, client)
         if pid == -1:
             raise RuntimeError('Could not determine PID to send signal to')
-        client.run('kill -s {0} {1}'.format(signal, pid))
+        client.run(['kill', '-s', signal, pid])
 
     @staticmethod
     def list_services(client):

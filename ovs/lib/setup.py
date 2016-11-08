@@ -111,7 +111,7 @@ class SetupController(object):
             root_client = SSHClient(endpoint='127.0.0.1', username='root')
             unique_id = System.get_my_machine_id(root_client)
 
-            ipaddresses = root_client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
+            ipaddresses = root_client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", insecure=True).strip().splitlines()
             SetupController.host_ips = set([found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1'])
 
             setup_completed = False
@@ -132,7 +132,7 @@ class SetupController(object):
                 if root_client.file_exists('/etc/openvstorage_id') is False:
                     raise RuntimeError("The 'openvstorage' package is not installed on this node")
 
-                node_name = root_client.run('hostname -s')
+                node_name = root_client.run(['hostname', '-s'])
                 fqdn_name = root_client.run('hostname -f || hostname -s')
                 avahi_installed = SetupController._avahi_installed(root_client)
 
