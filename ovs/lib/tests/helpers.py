@@ -19,7 +19,6 @@ Helper module
 """
 import os
 import json
-from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.domain import Domain
@@ -33,7 +32,6 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.toolbox import Toolbox
@@ -92,12 +90,6 @@ class Helper(object):
             service_type = ServiceType()
             service_type.name = 'MetadataServer'
             service_type.save()
-        backend_type = BackendTypeList.get_backend_type_by_code('BT')
-        if backend_type is None:
-            backend_type = BackendType()
-            backend_type.name = 'BackendType'
-            backend_type.code = 'BT'
-            backend_type.save()
         srclients = {}
         for domain_id in structure.get('domains', []):
             if domain_id not in domains:
@@ -110,7 +102,6 @@ class Helper(object):
                 vpool = VPool()
                 vpool.name = str(vpool_id)
                 vpool.status = 'RUNNING'
-                vpool.backend_type = backend_type
                 vpool.save()
                 vpools[vpool_id] = vpool
             else:
@@ -331,9 +322,7 @@ class Helper(object):
                                              'clean_interval': 1,
                                              'default_cluster_size': 4096,
                                              'number_of_scos_in_tlog': 16,
-                                             'read_cache_default_mode': StorageDriverClient.VOLDRV_LOCATION_BASED,
-                                             'non_disposable_scos_factor': 2.0,
-                                             'read_cache_default_behaviour': StorageDriverClient.VOLDRV_NO_CACHE},
+                                             'non_disposable_scos_factor': 2.0},
                           'volume_registry': {'vregistry_arakoon_cluster_id': 'voldrv',
                                               'vregistry_arakoon_cluster_nodes': []},
                           'volume_router': {'vrouter_id': storagedriver.storagedriver_id,

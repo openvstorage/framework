@@ -347,9 +347,8 @@ class ScheduledTaskController(object):
                     ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deployed ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
 
                 backend_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
-                if vpool.backend_type.code == 'alba':
-                    backend_config['alba_connection_host'] = '127.0.0.1'
-                    backend_config['alba_connection_port'] = scrub_config['port']
+                backend_config['alba_connection_host'] = '127.0.0.1'
+                backend_config['alba_connection_port'] = scrub_config['port']
                 Configuration.set(backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
         except Exception:
             message = 'Scrubber - vPool {0} - StorageRouter {1} - An error occurred deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service)
