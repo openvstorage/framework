@@ -260,13 +260,13 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :type request: Request
         """
         def _validate_required_keys(section):
-            for required_key in ['host', 'port', 'client_id', 'client_secret', 'backend']:
+            for required_key in ['host', 'backend']:
                 if required_key not in call_parameters[section]:
-                    raise HttpNotAcceptableException(error_description='Invalid data passed: "{0}" does not contain all required information'.format(section),
+                    raise HttpNotAcceptableException(error_description='Invalid data passed: "{0}" misses information about {1}'.format(section, required_key),
                                                      error='invalid_data')
             for sub_required_key in ['backend', 'metadata']:
                 if sub_required_key not in call_parameters[section]['backend']:
-                    raise HttpNotAcceptableException(error_description='Invalid data passed: "{0}" does not contain all required information'.format(section),
+                    raise HttpNotAcceptableException(error_description='Invalid data passed: "{0}" missing information about {1}'.format(section, sub_required_key),
                                                      error='invalid_data')
 
         # API backwards compatibility
@@ -276,8 +276,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
             call_parameters['fragment_cache_on_write'] = False
             call_parameters['backend_connection_info'] = {'host': call_parameters.pop('connection_host'),
                                                           'port': call_parameters.pop('connection_port'),
-                                                          'client_id': call_parameters.pop('connection_username'),
-                                                          'client_secret': call_parameters.pop('connection_password')}
+                                                          'username': call_parameters.pop('connection_username'),
+                                                          'password': call_parameters.pop('connection_password')}
             if 'connection_backend' in call_parameters:
                 connection_backend = call_parameters.pop('connection_backend')
                 call_parameters['backend_connection_info']['backend'] = {'backend': connection_backend.pop('backend') if 'backend' in connection_backend else None,
@@ -287,21 +287,31 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 raise HttpNotAcceptableException(error_description='Invalid data passed: "backend_connection_info" should be passed',
                                                  error='invalid_data')
             _validate_required_keys(section='backend_connection_info')
+            if 'backend_info' not in call_parameters:
+                call_parameters['backend_info'] = {}
+            if 'connection_info' not in call_parameters:
+                call_parameters['connection_info'] = {}
             call_parameters['backend_info']['preset'] = call_parameters['backend_connection_info']['backend']['metadata']
             call_parameters['backend_info']['alba_backend_guid'] = call_parameters['backend_connection_info']['backend']['backend']
             call_parameters['connection_info']['host'] = call_parameters['backend_connection_info']['host']
-            call_parameters['connection_info']['port'] = call_parameters['backend_connection_info']['port']
-            call_parameters['connection_info']['client_id'] = call_parameters['backend_connection_info']['client_id']
-            call_parameters['connection_info']['client_secret'] = call_parameters['backend_connection_info']['client_secret']
+            call_parameters['connection_info']['port'] = call_parameters['backend_connection_info'].get('port', '')
+            call_parameters['connection_info']['client_id'] = call_parameters['backend_connection_info'].get('username', '')
+            call_parameters['connection_info']['client_secret'] = call_parameters['backend_connection_info'].get('password', '')
+            call_parameters.pop('backend_connection_info')
 
             if 'backend_connection_info_aa' in call_parameters:
+                if 'backend_info_aa' not in call_parameters:
+                    call_parameters['backend_info_aa'] = {}
+                if 'connection_info_aa' not in call_parameters:
+                    call_parameters['connection_info_aa'] = {}
                 _validate_required_keys(section='backend_connection_info_aa')
                 call_parameters['backend_info_aa']['preset'] = call_parameters['backend_connection_info_aa']['backend']['metadata']
                 call_parameters['backend_info_aa']['alba_backend_guid'] = call_parameters['backend_connection_info_aa']['backend']['backend']
                 call_parameters['connection_info_aa']['host'] = call_parameters['backend_connection_info_aa']['host']
-                call_parameters['connection_info_aa']['port'] = call_parameters['backend_connection_info_aa']['port']
-                call_parameters['connection_info_aa']['client_id'] = call_parameters['backend_connection_info_aa']['client_id']
-                call_parameters['connection_info_aa']['client_secret'] = call_parameters['backend_connection_info_aa']['client_secret']
+                call_parameters['connection_info_aa']['port'] = call_parameters['backend_connection_info_aa'].get('port', '')
+                call_parameters['connection_info_aa']['client_id'] = call_parameters['backend_connection_info_aa'].get('username', '')
+                call_parameters['connection_info_aa']['client_secret'] = call_parameters['backend_connection_info_aa'].get('password', '')
+                call_parameters.pop('backend_connection_info_aa')
 
         if version >= 6 and 'backend_connection_info' in call_parameters:
             raise HttpNotAcceptableException(error_description='Invalid data passed: "backend_connection_info" is deprecated',
