@@ -233,11 +233,15 @@ class SSHClient(object):
         :param allow_insecure: Allow string commands (which might be inproper escaped)
         """
         if self._unittest_mode is True:
-            SSHClient._logger.debug('Executing: {0}'.format(command))
-            SSHClient._run_recordings.append(command)
-            if command in SSHClient._run_returns:
+            _command = command
+            if isinstance(command, list):
+                _command = ' '.join(command)
+            SSHClient._logger.debug('Executing: {0}'.format(_command))
+            SSHClient._run_recordings.append(_command)
+            if _command in SSHClient._run_returns:
                 SSHClient._logger.debug('Emulating return value')
-                return SSHClient._run_returns[command]
+                return SSHClient._run_returns[_command]
+
         if not isinstance(command, list) and not allow_insecure:
             raise RuntimeError('The given command must be a list, or the allow_insecure flag must be set')
         if self.is_local is True:
