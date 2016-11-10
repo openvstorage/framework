@@ -616,10 +616,9 @@ class ArakoonInstaller(object):
             if node.crash_log_sinks.startswith('/'):
                 abs_paths.add(os.path.dirname(os.path.abspath(node.crash_log_sinks)))
             abs_paths = list(abs_paths)
-            if not root_client.dir_exists(abs_paths):
-                root_client.dir_create(abs_paths)
-                root_client.dir_chmod(abs_paths, 0755, recursive=True)
-                root_client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
+            root_client.dir_create(abs_paths)
+            root_client.dir_chmod(abs_paths, 0755, recursive=True)
+            root_client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
 
             # Creates services for/on all nodes in the config
             if config.filesystem is True:

@@ -1597,7 +1597,7 @@ class SetupController(object):
                                                                    command=['rabbitmqctl', 'add_user', rabbitmq_login, rabbitmq_password],
                                                                    logger=SetupController._logger))
             SetupController._logger.debug(Toolbox.retry_client_run(client=client,
-                                                                   command=['rabbitmqctl', 'set_permissions', rabbitmq_login, '".*"', '".*"', '".*"'],
+                                                                   command=['rabbitmqctl', 'set_permissions', rabbitmq_login, '.*', '.*', '.*'],
                                                                    logger=SetupController._logger))
             retry += 1
             time.sleep(1)
@@ -1620,7 +1620,7 @@ class SetupController(object):
             Toolbox.change_service_state(client, 'rabbitmq-server', 'restart', SetupController._logger)
 
         time.sleep(5)
-        client.run(['rabbitmqctl', 'set_policy', 'ha-all', '"^(volumerouter|ovs_.*)$"', '\'{"ha-mode":"all"}\''])
+        client.run(['rabbitmqctl', 'set_policy', 'ha-all', '^(volumerouter|ovs_.*)$', '{"ha-mode":"all"}'])
 
     @staticmethod
     def _configure_amqp_to_volumedriver():

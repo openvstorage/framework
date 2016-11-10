@@ -293,7 +293,6 @@ class SSHClient(object):
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
-            directory = self.shell_safe(directory)
             if self.is_local is True:
                 if not os.path.exists(directory):
                     os.makedirs(directory)
@@ -309,7 +308,6 @@ class SSHClient(object):
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
-            directory = self.shell_safe(directory)
             real_path = self.file_read_link(directory)
             if real_path and follow_symlinks is True:
                 self.file_unlink(directory.rstrip('/'))
@@ -333,10 +331,10 @@ class SSHClient(object):
         :param directory: Directory to check for existence
         """
         if self.is_local is True:
-            return os.path.isdir(self.shell_safe(directory))
+            return os.path.isdir(directory)
         else:
             command = """import os, json
-print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
+print json.dumps(os.path.isdir('{0}'))""".format(directory)
             return json.loads(self.run(['python', '-c', """{0}""".format(command)]))
 
     def dir_chmod(self, directories, mode, recursive=False):
@@ -353,7 +351,6 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
-            directory = self.shell_safe(directory)
             if self.is_local is True:
                 os.chmod(directory, mode)
                 if recursive is True:
@@ -362,7 +359,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
                             os.chmod('/'.join([root, sub_dir]), mode)
             else:
                 recursive_str = '-R' if recursive is True else ''
-                self.run(['chmod', recursive_str, oct(mode), directory])
+                self.run(['chmod', recursive_str, str(oct(mode)), directory])
 
     def dir_chown(self, directories, user, group, recursive=False):
         """
@@ -389,7 +386,6 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
-            directory = self.shell_safe(directory)
             if self.is_local is True:
                 os.chown(directory, uid, gid)
                 if recursive is True:
@@ -406,10 +402,10 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
         :param directory: Directory to list
         """
         if self.is_local is True:
-            return os.listdir(self.shell_safe(directory))
+            return os.listdir(directory)
         else:
             command = """import os, json
-print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
+print json.dumps(os.listdir('{0}'))""".format(directory)
             return json.loads(self.run(['python', '-c', """{0}""".format(command)]))
 
     def symlink(self, links):
@@ -437,7 +433,6 @@ print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
             if not filename.startswith('/'):
                 raise ValueError('Absolute path required for filename {0}'.format(filename))
 
-            filename = self.shell_safe(filename)
             if self.is_local is True:
                 if not self.dir_exists(directory=os.path.dirname(filename)):
                     self.dir_create(os.path.dirname(filename))
@@ -456,7 +451,6 @@ print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
         if isinstance(filenames, basestring):
             filenames = [filenames]
         for filename in filenames:
-            filename = self.shell_safe(filename)
             if self.is_local is True:
                 if '*' in filename:
                     for fn in glob.glob(filename):
@@ -480,7 +474,6 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
         :param path: Path of the file to unlink
         :return: None
         """
-        path = self.shell_safe(path)
         if self.is_local is True:
             if os.path.islink(path):
                 os.unlink(path)
@@ -493,7 +486,7 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
         :param path: Path of the symlink
         :return: None
         """
-        path = self.shell_safe(path.rstrip('/'))
+        path = path.rstrip('/')
         if self.is_local is True:
             if os.path.islink(path):
                 return os.path.realpath(path)
@@ -560,10 +553,10 @@ if os.path.islink('{0}'):
         :param filename: File to check for existence
         """
         if self.is_local is True:
-            return os.path.isfile(self.shell_safe(filename))
+            return os.path.isfile(filename)
         else:
             command = """import os, json
-print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
+print json.dumps(os.path.isfile('{0}'))""".format(filename)
             return json.loads(self.run(['python', '-c', """{0}""".format(command)]))
 
     def file_chmod(self, filename, mode):
@@ -572,7 +565,7 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
         :param filename: File to chmod
         :param mode: Mode to give to file, eg: 0744
         """
-        self.run(['chmod', mode, filename])
+        self.run(['chmod', str(mode), filename])
 
     def file_chown(self, filenames, user, group):
         """
@@ -616,7 +609,6 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
         :return: List of files in directory
         """
         all_files = []
-        directory = self.shell_safe(directory)
         if self.is_local is True:
             for root, dirs, files in os.walk(directory):
                 for file_name in files:
@@ -647,7 +639,7 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
         :return: True if mountpoint is mounted
         :rtype: bool
         """
-        path = self.shell_safe(path.rstrip('/'))
+        path = path.rstrip('/')
         if self.is_local is True:
             return os.path.ismount(path)
 
