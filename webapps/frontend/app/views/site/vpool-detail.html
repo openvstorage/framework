@@ -39,7 +39,7 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
+                        <tr>  <!-- row 1 -->
                             <td style="width: 12%;" data-i18n="ovs:generic.status"></td>
                             <td style="width: 20%;">
                                 <div style="width: 14px; height: 14px;"
@@ -54,36 +54,19 @@ but WITHOUT ANY WARRANTY of any kind.
                                                 }">
                                 </div>
                             </td>
-                            <td style="width: 12%;" data-i18n="ovs:generic.writespeed"></td>
-                            <td style="width: 29%;"><span data-bind="text: backendWriteSpeed"></span></td>
-                            <td style="width: 12%;" data-i18n="ovs:vpools.cache_strategy"></td>
-                            <td style="width: 15%;">
-                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="translate: 'ovs:storagedrivers.configuration.general.cache_strategies.' + item().cache_strategy"></span>
-                                </span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style="width: 12%;" data-i18n="ovs:generic.storeddata"></td>
-                            <td style="width: 20%;"><span data-bind="text: storedData"></span></td>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: backendReadSpeed"></span></td>
-                            <td data-i18n="ovs:vpools.dedupe_mode"></td>
-                            <td>
-                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="translate: 'ovs:storagedrivers.configuration.general.dedupe_modes.' + item().dedupe_mode"></span>
-                                </span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
-                            <td data-i18n="ovs:vpools.backendtype"></td>
-                            <td>
-                                <span data-bind="lazyloader: { item: backendType, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="translate: 'ovs:generic.backendtypes.' + item().code()"></span>
-                                </span>
-                            </td>
+                            <td style="width: 12%;" data-i18n="ovs:generic.name"></td>
+                            <td style="width: 29%;">
+                                <!-- ko if: backendGuid() === null -->
+                                    <span data-bind="text: backendName"></span>
+                                <!-- /ko -->
+                                <!-- ko if: backendGuid() !== null -->
+                                    <a data-bind="attr: {
+                                                      href: 'https://' + backendHost() + ':' + backendPort() + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: backendGuid }),
+                                                      target: (backendLocal() === true ? '' : '_blank')
+                                                  }">
+                                        <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: backendLocal() === false"></i> <span data-bind="text: backendName" class="hand"></span>
+                                    </a>
+                                <!-- /ko -->
                             <td data-i18n="ovs:vpools.sco_size"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
@@ -94,11 +77,16 @@ but WITHOUT ANY WARRANTY of any kind.
                                 </span>
                             </td>
                         </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
-                            <td data-i18n="ovs:vpools.backendlogin"></td>
-                            <td><span data-bind="text: backendLogin() ? backendLogin() : '-'"></span></td>
+                        <tr>  <!-- row 2 -->
+                            <td style="width: 12%;" data-i18n="ovs:generic.storeddata"></td>
+                            <td style="width: 20%;"><span data-bind="text: storedData"></span></td>
+                            <!-- ko if: backendPreset() === undefined -->
+                                <td colspan="2" >&nbsp;</td>
+                            <!-- /ko -->
+                            <!-- ko if: backendPreset() !== undefined -->
+                                <td data-i18n="ovs:vpools.preset"></td>
+                                <td><span data-bind="text: backendPreset"></span></td>
+                            <!-- /ko -->
                             <td data-i18n="ovs:vpools.cluster_size"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
@@ -109,12 +97,12 @@ but WITHOUT ANY WARRANTY of any kind.
                                 </span>
                             </td>
                         </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.writespeed"></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
-                            <td data-i18n="ovs:vpools.backendconnection"></td>
-                            <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
-                            <td data-i18n="ovs:vpools.write_buffer"></td>
+                        <tr>  <!-- row 3 -->
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: iops"></span></td>
+                            <td data-i18n="ovs:vpools.backend_login"></td>
+                            <td><span data-bind="text: backendLogin() ? backendLogin() : '-'"></span></td>
+                            <td data-i18n="ovs:vpools.volume_write_buffer"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry">
@@ -124,21 +112,16 @@ but WITHOUT ANY WARRANTY of any kind.
                                 </span>
                             </td>
                         </tr>
-                        <tr>
-                            <td data-i18n="ovs:generic.nrofvdisks"></td>
-                            <td><span data-bind="text: vDisks().length"></span></td>
-                            <!-- ko if: backendPreset() === undefined -->
-                                <td colspan="2" >&nbsp;</td>
-                            <!-- /ko -->
-                            <!-- ko if: backendPreset() !== undefined -->
-                                <td data-i18n="ovs:vpools.backendpreset"></td>
-                                <td><span data-bind="text: backendPreset"></span></td>
-                            <!-- /ko -->
+                        <tr>  <!-- row 4 -->
+                            <td data-i18n="ovs:generic.read_speed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:vpools.backend_connection"></td>
+                            <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry">
                                         <span data-bind="translate: 'ovs:vpools.' + (item().dtl_enabled === true ? 'dtl_mode' : 'dtl')"></span>
-                                        <a data-bind="tooltip: 'ovs:storagedrivers.configuration.general.dtl_help_title'"
+                                        <a data-bind="tooltip: 'ovs:storagedrivers.general.dtl_help_title'"
                                            class="hand fa noline"
                                            data-i18n="[html]ovs:icons.help"
                                            style="margin-left: 5px; color: blue;">
@@ -148,12 +131,15 @@ but WITHOUT ANY WARRANTY of any kind.
                             </td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
-                                    <span data-part="lazy-entry" data-bind="text: (item().dtl_enabled === true ? $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item().dtl_mode) : $.t('ovs:storagedrivers.configuration.general.dtl_modes.no_sync'))"></span>
+                                    <span data-part="lazy-entry" data-bind="text: (item().dtl_enabled === true ? $.t('ovs:storagedrivers.general.dtl_modes.' + item().dtl_mode) : $.t('ovs:storagedrivers.general.dtl_modes.no_sync'))"></span>
                                 </span>
                             </td>
                         </tr>
-                        <tr>
-                            <td colspan="4">&nbsp;</td>
+                        <tr>  <!-- row 5 -->
+                            <td data-i18n="ovs:generic.write_speed"></td>
+                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td data-i18n="ovs:generic.read_speed"></td>
+                            <td><span data-bind="text: backendReadSpeed"></span></td>
                             <td>
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry"
@@ -165,9 +151,16 @@ but WITHOUT ANY WARRANTY of any kind.
                                 <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry"
                                           data-bind="visible: item().dtl_enabled === true,
-                                                     translate: 'ovs:storagedrivers.configuration.general.dtl_transport_modes.' + item().dtl_transport"></span>
+                                                     translate: 'ovs:storagedrivers.general.dtl_transport_modes.' + item().dtl_transport"></span>
                                 </span>
                             </td>
+                        </tr>
+                        <tr>  <!-- row 6 -->
+                            <td data-i18n="ovs:generic.nrofvdisks"></td>
+                            <td><span data-bind="text: vDisks().length"></span></td>
+                            <td data-i18n="ovs:generic.write_speed"></td>
+                            <td><span data-bind="text: backendWriteSpeed"></span></td>
+                            <td colspan="2" >&nbsp;</td>
                         </tr>
                     </tbody>
                 </table>
@@ -231,37 +224,66 @@ but WITHOUT ANY WARRANTY of any kind.
                                     <thead>
                                         <tr>
                                             <th><span data-i18n="ovs:generic.storagerouter"></span></th>
+                                            <th><span data-i18n="ovs:vpools.global_write_buffer"></span></th>
+                                            <th><span data-i18n="ovs:vpools.caching"></span></th>
+                                            <th><span data-i18n="ovs:vpools.accelerated_backend"></span></th>
                                             <th style="width: 70px;"><span data-i18n="ovs:generic.actions"></span></th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <!-- ko foreach: $root.storageRouters() -->
                                             <tr>
-                                                <td><span data-bind="text: name"></span></td>
-                                                <!-- ko if: $root.srCanDeleteMap() !== undefined && ($root.srCanDeleteMap()[guid()] === undefined || $root.srCanDeleteMap()[guid()] === null) -->
                                                 <td>
+                                                    <a data-bind="attr: {href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid })}">
+                                                        <span data-bind="text: name" class="hand"></span></a>
+                                                </td>
+                                                <!-- ko if: $root.srSDMap()[guid()] === undefined -->
+                                                <td><span data-i18n="ovs:generic.null"></span></td>
+                                                <td><span data-i18n="ovs:generic.null"></span></td>
+                                                <td><span data-i18n="ovs:generic.null"></span></td>
+                                                <td style="height:37px;">
                                                     <button type="button"
-                                                        class="btn btn-mini btn-default"
+                                                        class="btn btn-mini btn-default hand"
                                                         data-bind="click: $root.addStorageRouter,
                                                                    enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
                                                                    attr: { id: 'button_add_' + guid()},
-                                                                   visible: $root.srCanDeleteMap() !== undefined && $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
-                                                        <span class="fa" data-i18n="[html]ovs:icons.add"></span>
+                                                                   visible: $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
+                                                        <span class="fa hand" data-i18n="[html]ovs:icons.add"></span>
                                                     </button>
                                                 </td>
                                                 <!-- /ko -->
-                                                <!-- ko if: $root.srCanDeleteMap() !== undefined && ($root.srCanDeleteMap()[guid()] === true || $root.srCanDeleteMap()[guid()] === false) -->
-                                                <td>
+                                                <!-- ko if: $root.srSDMap()[guid()] !== undefined -->
+                                                    <td><span data-bind="text: $root.srSDMap()[guid()].vpoolBackendInfo() === undefined ? '' : $root.formatBytes($root.srSDMap()[guid()].vpoolBackendInfo().global_write_buffer)"></span></td>
+                                                    <td><span data-bind="translate: 'ovs:vpools.caching_types.' + $root.srSDMap()[guid()].caching()"></span></td>
+                                                    <!-- ko if: $root.srSDMap()[guid()].backendInfo() === undefined || $root.srSDMap()[guid()].backendInfo() === null -->
+                                                        <td><span data-i18n="ovs:generic.null"></span></td>
+                                                    <!-- /ko -->
+                                                    <!-- ko if: $root.srSDMap()[guid()].backendInfo() !== undefined && $root.srSDMap()[guid()].backendInfo() !== null && $root.srSDMap()[guid()].backendInfo().backend_guid === null-->
+                                                        <td>
+                                                            <span data-bind="text: $root.srSDMap()[guid()].backendInfo().name"></span>
+                                                            (<span data-bind="text: $root.srSDMap()[guid()].backendInfo().preset"></span>)
+                                                        </td>
+                                                    <!-- /ko -->
+                                                    <!-- ko if: $root.srSDMap()[guid()].backendInfo() !== undefined && $root.srSDMap()[guid()].backendInfo() !== null && $root.srSDMap()[guid()].backendInfo().backend_guid !== null-->
+                                                        <td>
+                                                            <a data-bind="attr: {
+                                                                              href: 'https://' + $root.srSDMap()[guid()].connectionInfo().host + ':' + $root.srSDMap()[guid()].connectionInfo().port + '/' + $root.shared.routing.loadHash('backend-alba-detail', { guid: $root.srSDMap()[guid()].backendInfo().backend_guid }),
+                                                                              target: ($root.srSDMap()[guid()].connectionInfo().local !== false ? '' : '_blank')
+                                                                          }">
+                                                                <i class="fa fa-fw hand" data-i18n="[html]alba:icons.external_link" data-bind="visible: $root.srSDMap()[guid()].connectionInfo().local === false"></i> <span data-bind="text: $root.srSDMap()[guid()].backendInfo().name" class="hand"></span>
+                                                                (<span data-bind="text: $root.srSDMap()[guid()].backendInfo().preset" class="hand"></span>)
+                                                            </a>
+                                                        </td>
+                                                    <!-- /ko -->
+                                                <td style="height:37px;">
                                                     <button type="button"
-                                                            class="btn btn-mini btn-default"
+                                                            class="btn btn-mini btn-default hand"
                                                             data-bind="click: $root.removeStorageRouter,
-                                                                       tooltip: ($root.srCanDeleteMap() === undefined || $root.srCanDeleteMap()[guid()] !== false) ? '' : 'ovs:wizards.shrink_vpool.confirm.cannot_remove',
-                                                                       style: { color: ($root.srCanDeleteMap() !== undefined && $root.srCanDeleteMap()[guid()] === false) ? 'lightgrey' : '' },
+                                                                       tooltip: ($root.srSDMap()[guid()].canBeDeleted() === true) ? '' : 'ovs:wizards.shrink_vpool.confirm.cannot_remove',
+                                                                       style: { color: ($root.srSDMap()[guid()].canBeDeleted() === false) ? 'lightgrey' : '' },
                                                                        attr: { id: 'button_remove_' + guid()},
-                                                                       visible: $root.srCanDeleteMap() !== undefined && $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING',
-                                                                       css: {hand: ($root.srCanDeleteMap() !== undefined && $root.srCanDeleteMap()[guid()] === true)}">
-                                                        <span class="fa" data-i18n="[html]ovs:icons.delete" data-bind="css: {hand: ($root.srCanDeleteMap() !== undefined && $root.srCanDeleteMap()[guid()] === true)}"></span>
-
+                                                                       visible: $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
+                                                        <span class="fa hand" data-i18n="[html]ovs:icons.delete"></span>
                                                     </button>
                                                 </td>
                                                 <!-- /ko -->

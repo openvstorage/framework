@@ -31,29 +31,40 @@ define([
         self.fetchAlbaVPoolHandle = undefined;
 
         // Observables
-        self.albaBackendLoading    = ko.observable(false);
         self.albaPresetMap         = ko.observable({});
-        self.invalidAlbaInfo       = ko.observable(false);
         self.fragmentCacheSettings = ko.observableArray(['write', 'read', 'rw', 'none']);
+        self.invalidAlbaInfo       = ko.observable(false);
+        self.loadingBackends       = ko.observable(false);
+
+        self.data.localHostAA.subscribe(function(local) {
+            if (local === true && self.data.useAA() === true && self.data.backendsAA().length === 0) {
+                self.loadBackends();
+            }
+        });
+        self.data.useAA.subscribe(function(accelerated) {
+            if (accelerated === true && self.data.backendsAA().length === 0) {
+                self.loadBackends();
+            }
+        });
 
         // Computed
         self.localBackendsAvailable = ko.computed(function() {
-            if (self.data.localHost() && self.data.albaBackends().length < 2) {
-                if (self.data.vPoolAdd()) {
-                    self.data.aaLocalHost(false);
+            if (self.data.localHost() && self.data.backends().length < 2) {
+                if (self.data.vPool() === undefined) {
+                    self.data.localHostAA(false);
                 }
                 return false;
             }
-            if (self.data.vPoolAdd()) {
-                self.data.aaLocalHost(true);
+            if (self.data.vPool() === undefined) {
+                self.data.localHostAA(true);
             }
             return true;
         });
         self.isPresetAvailable = ko.computed(function() {
             var presetAvailable = true;
-            if (self.data.albaAABackend() !== undefined && self.data.albaAAPreset() !== undefined) {
-                var guid = self.data.albaAABackend().guid,
-                    name = self.data.albaAAPreset().name;
+            if (self.data.backendAA() !== undefined && self.data.presetAA() !== undefined && self.data.useAA() === true) {
+                var guid = self.data.backendAA().guid,
+                    name = self.data.presetAA().name;
                 if (self.albaPresetMap().hasOwnProperty(guid) && self.albaPresetMap()[guid].hasOwnProperty(name)) {
                     presetAvailable = self.albaPresetMap()[guid][name];
                 }
@@ -67,29 +78,33 @@ define([
         });
         self.canContinue = ko.computed(function() {
             var showErrors = false, reasons = [], fields = [];
-            if (self.data.backend() === 'alba' && self.data.useAA()) {
-                if (self.data.albaAABackend() === undefined) {
-                    reasons.push($.t('ovs:wizards.add_vpool.gather_backend.choose_backend'));
-                    fields.push('backend');
-                } else if (self.data.albaAAPreset() === undefined) {
-                    reasons.push($.t('ovs:wizards.add_vpool.gather_backend.choose_preset'));
-                    fields.push('preset');
-                }
-                if (!self.data.aaLocalHost()) {
-                    if (!self.data.aaHost.valid()) {
-                        fields.push('host');
-                        reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_host'));
+            if (self.data.useAA()) {
+                if (self.loadingBackends() === true) {
+                    reasons.push($.t('ovs:wizards.add_vpool.gather_backend.backends_loading'));
+                } else {
+                    if (self.data.backendAA() === undefined && self.invalidAlbaInfo() === false) {
+                        reasons.push($.t('ovs:wizards.add_vpool.gather_backend.choose_backend'));
+                        fields.push('backend');
+                    } else if (self.data.presetAA() === undefined && self.invalidAlbaInfo() === false) {
+                        reasons.push($.t('ovs:wizards.add_vpool.gather_backend.choose_preset'));
+                        fields.push('preset');
                     }
-                    if (self.data.aaAccesskey() === '' || self.data.aaSecretkey() === '') {
-                        fields.push('clientid');
-                        fields.push('clientsecret');
-                        reasons.push($.t('ovs:wizards.add_vpool.gather_backend.no_credentials'));
-                    }
-                    if (self.invalidAlbaInfo()) {
-                        reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_alba_info'));
-                        fields.push('clientid');
-                        fields.push('clientsecret');
-                        fields.push('host');
+                    if (!self.data.localHostAA()) {
+                        if (!self.data.hostAA.valid()) {
+                            fields.push('host');
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_host'));
+                        }
+                        if (self.data.clientIDAA() === '' || self.data.clientSecretAA() === '') {
+                            fields.push('clientid');
+                            fields.push('clientsecret');
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_backend.no_credentials'));
+                        }
+                        if (self.invalidAlbaInfo()) {
+                            reasons.push($.t('ovs:wizards.add_vpool.gather_backend.invalid_alba_info'));
+                            fields.push('clientid');
+                            fields.push('clientsecret');
+                            fields.push('host');
+                        }
                     }
                 }
             }
@@ -109,41 +124,37 @@ define([
                 self.data.fragmentCacheOnRead(['rw', 'read'].contains(cache));
                 self.data.fragmentCacheOnWrite(['rw', 'write'].contains(cache));
                 if (cache === 'none') {
-                    self.data.cacheStrategy('on_read');
                     self.data.useAA(false);
-                } else {
-                    self.data.cacheStrategy('none');
                 }
             }
         });
 
+        // Functions
         self.shouldSkip = function() {
             return $.Deferred(function(deferred) {
-                if (self.data.backend() !== 'alba' || (!self.data.vPoolAdd() && !self.data.fragmentCacheOnRead() && !self.data.fragmentCacheOnWrite())) {
+                if (self.data.vPool() !== undefined && !self.data.fragmentCacheOnRead() && !self.data.fragmentCacheOnWrite()) {
                     deferred.resolve(true);
                 } else {
                     deferred.resolve(false);
                 }
             }).promise();
         };
-
-        // Functions
-        self.loadAlbaBackends = function() {
+        self.loadBackends = function() {
             return $.Deferred(function(albaDeferred) {
                 generic.xhrAbort(self.fetchAlbaVPoolHandle);
                 var relay = '', remoteInfo = {},
                     getData = {
                         contents: 'available'
                     };
-                if (!self.data.aaLocalHost()) {
+                if (!self.data.localHostAA()) {
                     relay = 'relay/';
-                    remoteInfo.ip = self.data.aaHost();
-                    remoteInfo.port = self.data.aaPort();
-                    remoteInfo.client_id = self.data.aaAccesskey().replace(/\s+/, "");
-                    remoteInfo.client_secret = self.data.aaSecretkey().replace(/\s+/, "");
+                    remoteInfo.ip = self.data.hostAA();
+                    remoteInfo.port = self.data.portAA();
+                    remoteInfo.client_id = self.data.clientIDAA().replace(/\s+/, "");
+                    remoteInfo.client_secret = self.data.clientSecretAA().replace(/\s+/, "");
                 }
                 $.extend(getData, remoteInfo);
-                self.albaBackendLoading(true);
+                self.loadingBackends(true);
                 self.invalidAlbaInfo(false);
                 self.fetchAlbaVPoolHandle = api.get(relay + 'alba/backends', { queryparams: getData })
                     .done(function(data) {
@@ -157,7 +168,7 @@ define([
                                 calls.push(
                                     api.get(relay + 'alba/backends/' + item.guid + '/', { queryparams: getData })
                                         .then(function(data) {
-                                            if (data.guid !== self.data.albaBackend().guid) {
+                                            if (data.guid !== self.data.backend().guid) {
                                                 var asdsFound = false;
                                                 if (data.scaling === 'LOCAL') {
                                                     $.each(data.asd_statistics, function(key, value) {  // As soon as we enter loop, we know at least 1 ASD is linked to this backend
@@ -183,31 +194,33 @@ define([
                                     available_backends.sort(function(backend1, backend2) {
                                         return backend1.name.toLowerCase() < backend2.name.toLowerCase() ? -1 : 1;
                                     });
-                                    self.data.albaAABackends(available_backends);
-                                    self.data.albaAABackend(available_backends[0]);
-                                    self.data.albaAAPreset(self.data.enhancedAAPresets()[0]);
+                                    self.data.backendsAA(available_backends);
+                                    if (self.data.backendAA() === undefined) {
+                                        self.data.backendAA(available_backends[0]);
+                                        self.data.presetAA(self.data.enhancedPresetsAA()[0]);
+                                    }
                                 } else {
-                                    self.data.albaAABackends([]);
-                                    self.data.albaAABackend(undefined);
-                                    self.data.albaAAPreset(undefined);
+                                    self.data.backendsAA([]);
+                                    self.data.backendAA(undefined);
+                                    self.data.presetAA(undefined);
                                 }
-                                self.albaBackendLoading(false);
+                                self.loadingBackends(false);
                             })
                             .done(albaDeferred.resolve)
                             .fail(function() {
-                                self.data.albaAABackends([]);
-                                self.data.albaAABackend(undefined);
-                                self.data.albaAAPreset(undefined);
-                                self.albaBackendLoading(false);
+                                self.data.backendsAA([]);
+                                self.data.backendAA(undefined);
+                                self.data.presetAA(undefined);
+                                self.loadingBackends(false);
                                 self.invalidAlbaInfo(true);
                                 albaDeferred.reject();
                             });
                     })
                     .fail(function() {
-                        self.data.albaAABackends([]);
-                        self.data.albaAABackend(undefined);
-                        self.data.albaAAPreset(undefined);
-                        self.albaBackendLoading(false);
+                        self.data.backendsAA([]);
+                        self.data.backendAA(undefined);
+                        self.data.presetAA(undefined);
+                        self.loadingBackends(false);
                         self.invalidAlbaInfo(true);
                         albaDeferred.reject();
                     });
@@ -216,21 +229,22 @@ define([
 
         // Durandal
         self.activate = function() {
-            if (self.data.albaBackend() !== undefined && self.data.albaAABackend() !== undefined && self.data.albaBackend().guid === self.data.albaAABackend().guid) {
-                self.data.albaAABackends([]);
-                $.each(self.data.albaBackends(), function (_, backend) {
-                    if (backend !== self.data.albaBackend() && !self.data.albaAABackends().contains(backend)) {
-                        self.data.albaAABackends().push(backend);
+            if (self.data.backend() !== undefined && self.data.backendAA() !== undefined && self.data.backend().guid === self.data.backendAA().guid) {
+                self.data.backendsAA([]);
+                $.each(self.data.backends(), function (_, backend) {
+                    if (backend !== self.data.backend() && !self.data.backendsAA().contains(backend)) {
+                        self.data.backendsAA().push(backend);
                     }
                 });
-                if (self.data.albaAABackends().length === 0) {
-                    self.data.albaAABackend(undefined);
-                    self.data.albaAAPreset(undefined);
+                if (self.data.backendsAA().length === 0) {
+                    self.data.backendAA(undefined);
+                    self.data.presetAA(undefined);
                 } else {
-                    self.data.albaAABackend(self.data.albaAABackends()[0]);
-                    self.data.albaAAPreset(self.data.enhancedAAPresets()[0]);
+                    self.data.backendAA(self.data.backendsAA()[0]);
+                    self.data.presetAA(self.data.enhancedPresetsAA()[0]);
                 }
             }
+            self.loadBackends();
         };
     };
 });
