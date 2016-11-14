@@ -22,7 +22,7 @@ import copy
 import json
 import time
 from ConfigParser import RawConfigParser
-from subprocess import check_output, CalledProcessError
+from subprocess import CalledProcessError
 from StringIO import StringIO
 from ovs.celery_run import celery
 from ovs.dal.hybrids.disk import Disk
@@ -764,8 +764,8 @@ class StorageRouterController(object):
                      'VPOOL_NAME': vpool_name,
                      'VPOOL_MOUNTPOINT': storagedriver.mountpoint,
                      'CONFIG_PATH': storagedriver_config.remote_path,
-                     'OVS_UID': check_output('id -u ovs', shell=True).strip(),
-                     'OVS_GID': check_output('id -g ovs', shell=True).strip(),
+                     'OVS_UID': client.run(['id', '-u', 'ovs']).strip(),
+                     'OVS_GID': client.run(['id', '-g', 'ovs']).strip(),
                      'LOG_SINK': LogHandler.get_sink_path('storagedriver')}
         dtl_params = {'DTL_PATH': sdp_dtl.path,
                       'DTL_ADDRESS': storagedriver.storage_ip,

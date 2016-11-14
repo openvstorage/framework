@@ -31,7 +31,7 @@ import select
 import socket
 import logging
 import tempfile
-from subprocess import check_output, CalledProcessError, PIPE, Popen
+from subprocess import CalledProcessError, PIPE, Popen
 from ovs.dal.helpers import Descriptor
 from ovs.extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
@@ -100,6 +100,7 @@ class SSHClient(object):
         """
         Initializes an SSHClient
         """
+        from subprocess import check_output
         from ovs.dal.hybrids.storagerouter import StorageRouter
         storagerouter = None
         if isinstance(endpoint, basestring):
@@ -545,7 +546,7 @@ if os.path.islink('{0}'):
         :param local_filename: Name of the file locally
         """
         if self.is_local is True:
-            check_output('cp -f "{0}" "{1}"'.format(local_filename, remote_filename), shell=True)
+            self.run(['cp', '-f', local_filename, remote_filename])
         else:
             sftp = self._client.open_sftp()
             sftp.put(local_filename, remote_filename)
