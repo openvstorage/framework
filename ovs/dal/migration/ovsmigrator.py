@@ -18,9 +18,9 @@
 OVS migration module
 """
 
-import hashlib
 import random
 import string
+import hashlib
 
 
 class OVSMigrator(object):
@@ -29,7 +29,7 @@ class OVSMigrator(object):
     """
 
     identifier = 'ovs'
-    THIS_VERSION = 11
+    THIS_VERSION = 12
 
     def __init__(self):
         """ Init method """
@@ -215,9 +215,9 @@ class OVSMigrator(object):
                         disk.aliases = name_alias_mapping.get(device_path, [device_path])
                         disk.save()
                     for partition in disk.partitions:
-                        # noinspection PyProtectedMember
-                        partition_device = alias_name_mapping.get(partition._data['path'])
                         if partition.aliases is None:
+                            # noinspection PyProtectedMember
+                            partition_device = alias_name_mapping.get(partition._data.get('path'))
                             if partition_device is None:
                                 partition.aliases = []
                                 partition.save()
