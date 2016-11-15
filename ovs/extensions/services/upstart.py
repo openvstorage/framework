@@ -113,7 +113,7 @@ class Upstart(object):
         """
         try:
             name = Upstart._get_name(name, client)
-            output = client.run(['service', name, 'status'])
+            output = client.run(['service', name, 'status'], allow_nonzero=True)
             # Special cases (especially old SysV ones)
             if 'rabbitmq' in name:
                 status = re.search('\{pid,\d+?\}', output) is not None
