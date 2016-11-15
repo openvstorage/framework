@@ -18,9 +18,9 @@
 OVS migration module
 """
 
-import hashlib
 import random
 import string
+import hashlib
 
 
 class OVSMigrator(object):
