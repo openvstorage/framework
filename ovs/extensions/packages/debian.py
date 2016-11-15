@@ -51,7 +51,7 @@ class DebianPackage(object):
             if client is None:
                 versions[package_name] = check_output(command, shell=True).strip()
             else:
-                versions[package_name] = client.run(command).strip()
+                versions[package_name] = client.run(command, allow_insecure=True).strip()
         return versions
 
     @staticmethod
@@ -69,7 +69,7 @@ class DebianPackage(object):
         versions = {}
         for package_name in package_names:
             versions[package_name] = ''
-            for line in client.run('apt-cache policy {0} {1}'.format(package_name, DebianPackage.APT_CONFIG_STRING)).splitlines():
+            for line in client.run(['apt-cache', 'policy', package_name, DebianPackage.APT_CONFIG_STRING]).splitlines():
                 line = line.strip()
                 if line.startswith('Candidate:'):
                     candidate = Toolbox.remove_prefix(line, 'Candidate:').strip()
@@ -103,7 +103,7 @@ class DebianPackage(object):
             counter += 1
             try_again = ', trying again' if counter < max_counter else ''
             try:
-                client.run('apt-get install -y {0} {1}'.format(force_text, package_name))
+                client.run(['apt-get', 'install', '-y', force_text, package_name])
                 installed, candidate = DebianPackage._get_installed_candidate_version(package_name, client=client)
                 if installed == candidate:
                     success = True
@@ -135,7 +135,7 @@ class DebianPackage(object):
             raise RuntimeError('Only the "root" user can update packages')
 
         try:
-            client.run('aptdcon --refresh --sources-file=ovsaptrepo.list')
+            client.run(['aptdcon', '--refresh', '--sources-file=ovsaptrepo.list'])
         except CalledProcessError:
             DebianPackage._logger.error('Failed to update the packages on StorageRouter with IP {0}'.format(client.ip))
 

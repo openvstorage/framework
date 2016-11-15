@@ -113,14 +113,14 @@ class SupportAgent(object):
         """
         try:
             SupportAgent._logger.debug('Processing: {0}'.format(task))
-            cid = Configuration.get('/ovs/framework/cluster_id')
-            nid = System.get_my_machine_id()
+            cid = Configuration.get('/ovs/framework/cluster_id').replace(r"'", r"'\''")
+            nid = System.get_my_machine_id().replace(r"'", r"'\''")
 
             if task == 'OPEN_TUNNEL':
                 if servicemanager == 'upstart':
                     check_output('service openvpn stop', shell=True)
                 else:
-                    check_output('systemctl stop openvpn@ovs_{0}-{1} || true'.format(cid, nid), shell=True)
+                    check_output("systemctl stop 'openvpn@ovs_{0}-{1}' || true".format(cid, nid), shell=True)
                 check_output('rm -f /etc/openvpn/ovs_*', shell=True)
                 for filename, contents in metadata['files'].iteritems():
                     with open(filename, 'w') as the_file:
@@ -128,17 +128,21 @@ class SupportAgent(object):
                 if servicemanager == 'upstart':
                     check_output('service openvpn start', shell=True)
                 else:
-                    check_output('systemctl start openvpn@ovs_{0}-{1}'.format(cid, nid), shell=True)
+                    check_output("systemctl start 'openvpn@ovs_{0}-{1}'".format(cid, nid), shell=True)
             elif task == 'CLOSE_TUNNEL':
                 if servicemanager == 'upstart':
                     check_output('service openvpn stop', shell=True)
                 else:
-                    check_output('systemctl stop openvpn@ovs_{0}-{1}'.format(cid, nid), shell=True)
+                    check_output("systemctl stop 'openvpn@ovs_{0}-{1}'".format(cid, nid), shell=True)
                 check_output('rm -f /etc/openvpn/ovs_*', shell=True)
             elif task == 'UPLOAD_LOGFILES':
                 logfile = check_output('ovs collect logs', shell=True).strip()
-                check_output('mv {0} /tmp/{1}; curl -T /tmp/{1} ftp://{2} --user {3}:{4}; rm -f {0} /tmp/{1}'.format(
-                    logfile, metadata['filename'], metadata['endpoint'], metadata['user'], metadata['password']
+                check_output("mv '{0}' '/tmp/{1}'; curl -T '/tmp/{1}' 'ftp://{2}' --user '{3}:{4}'; rm -f '{0}' '/tmp/{1}'".format(
+                    logfile.replace(r"'", r"'\''"),
+                    metadata['filename'].replace(r"'", r"'\''"),
+                    metadata['endpoint'].replace(r"'", r"'\''"),
+                    metadata['user'].replace(r"'", r"'\''"),
+                    metadata['password'].replace(r"'", r"'\''")
                 ), shell=True)
             else:
                 raise RuntimeError('Unknown task')

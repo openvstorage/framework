@@ -54,7 +54,7 @@ class System(object):
         if os.environ.get('RUNNING_UNITTESTS') == 'True':
             return System._machine_id.get('none' if client is None else client.ip)
         if client is not None:
-            return client.run('cat {0}'.format(System.OVS_ID_FILE)).strip()
+            return client.run(['cat', System.OVS_ID_FILE]).strip()
         with open(System.OVS_ID_FILE, 'r') as the_file:
             return the_file.read().strip()
 
@@ -116,7 +116,7 @@ class System(object):
         if client is None:
             output = check_output(cmd, shell=True)
         else:
-            output = client.run(cmd)
+            output = client.run(cmd, allow_insecure=True)
         for found_port in output.splitlines():
             if found_port.isdigit():
                 yield int(found_port.strip())
@@ -163,7 +163,7 @@ class System(object):
         if client is None:
             output = check_output(cmd, shell=True)
         else:
-            output = client.run(cmd)
+            output = client.run(cmd.split())
         start_end = map(int, output.split())
         ephemeral_port_range = xrange(min(start_end), max(start_end))
 

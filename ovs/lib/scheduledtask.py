@@ -471,7 +471,7 @@ class ScheduledTaskController(object):
                             config_path = ArakoonClusterConfig.CONFIG_FILE.format(cluster)
                         else:
                             config_path = Configuration.get_configuration_path(ArakoonClusterConfig.CONFIG_KEY.format(cluster))
-                        client.run('arakoon --collapse-local {0} 2 -config {1}'.format(node_workload['node_id'], config_path))
+                        client.run(['arakoon', '--collapse-local', node_workload['node_id'], '2', '-config', config_path])
                         ScheduledTaskController._logger.info('  Collapsing cluster {0} on {1} completed'.format(cluster, storagerouter.ip))
                     except:
                         ScheduledTaskController._logger.exception('  Collapsing cluster {0} on {1} failed'.format(cluster, storagerouter.ip))
