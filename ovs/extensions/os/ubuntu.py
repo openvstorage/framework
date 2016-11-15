@@ -40,7 +40,7 @@ class Ubuntu(object):
         config_location = '/ovs/framework/hosts/{0}/paths|{1}'.format(machine_id, binary_name)
         if not Configuration.exists(config_location):
             try:
-                path = check_output('which {0}'.format(binary_name.replace(r"'", r"'\''")), shell=True).strip()
+                path = check_output("which '{0}'".format(binary_name.replace(r"'", r"'\''")), shell=True).strip()
                 Configuration.set(config_location, path)
             except CalledProcessError:
                 return None

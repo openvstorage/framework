@@ -163,7 +163,7 @@ class System(object):
         if client is None:
             output = check_output(cmd, shell=True)
         else:
-            output = client.run(cmd.split(' '))
+            output = client.run(cmd.split())
         start_end = map(int, output.split())
         ephemeral_port_range = xrange(min(start_end), max(start_end))
 
