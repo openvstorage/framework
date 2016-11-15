@@ -45,8 +45,9 @@ class DiskTools(object):
         :return: None
         """
         # Verify current label type and add GPT label if none present
+        disk_alias = disk_alias.replace(r"'", r"'\''")
         try:
-            command = 'parted {0} print | grep "Partition Table"'.format(disk_alias)
+            command = "parted '{0}' print | grep 'Partition Table'".format(disk_alias)
             DiskTools._logger.info('Checking partition label-type with command: {0}'.format(command))
             label_type = check_output(command, shell=True).strip().split(': ')[1]
         except CalledProcessError:
@@ -54,7 +55,7 @@ class DiskTools(object):
         if label_type in ('error', 'unknown'):
             try:
                 DiskTools._logger.info('Adding GPT label and trying to create partition again')
-                check_output('parted {0} -s mklabel gpt'.format(disk_alias), shell=True)
+                check_output("parted '{0}' -s mklabel gpt".format(disk_alias), shell=True)
                 label_type = 'gpt'
             except Exception:
                 DiskTools._logger.exception('Error during label creation')
@@ -67,11 +68,11 @@ class DiskTools(object):
             end = 100
 
         if label_type == 'gpt':
-            command = 'parted {0} -a optimal -s mkpart {1} {2}% {3}%'.format(disk_alias, disk_alias.split('/')[-1], start, end)
+            command = "parted '{0}' -a optimal -s mkpart '{1}' '{2}%' '{3}%'".format(disk_alias, disk_alias.split('/')[-1], start, end)
         elif label_type == 'msdos':
-            command = 'parted {0} -a optimal -s mkpart primary ext4 {1}% {2}%'.format(disk_alias, start, end)
+            command = "parted '{0}' -a optimal -s mkpart primary ext4 '{1}%' '{2}%'".format(disk_alias, start, end)
         elif label_type == 'bsd':
-            command = 'parted {0} -a optimal -s mkpart ext4 {1}% {2}%'.format(disk_alias, start, end)
+            command = "parted '{0}' -a optimal -s mkpart ext4 '{1}%' '{2}%'".format(disk_alias, start, end)
         else:
             raise ValueError('Unsupported label-type detected: {0}'.format(label_type))
 
@@ -89,7 +90,7 @@ class DiskTools(object):
         :return: None
         """
         try:
-            check_output('mkfs.ext4 -q {0}'.format(partition_alias), shell=True)
+            check_output("mkfs.ext4 -q '{0}'".format(partition_alias.replace(r"'", r"'\''")), shell=True)
         except Exception:
             DiskTools._logger.exception('Error during filesystem creation')
             raise
@@ -164,8 +165,9 @@ class DiskTools(object):
         :return: None
         """
         try:
-            check_output('mkdir -p {0}'.format(mountpoint), shell=True)
-            check_output('mount {0}'.format(mountpoint), shell=True)
+            mountpoint = mountpoint.replace(r"'", r"'\''")
+            check_output("mkdir -p '{0}'".format(mountpoint), shell=True)
+            check_output("mount '{0}'".format(mountpoint), shell=True)
         except Exception as ex:
             DiskTools._logger.exception('Error during mount: {0}'.format(ex))
             raise
@@ -179,6 +181,6 @@ class DiskTools(object):
         :return: None
         """
         try:
-            check_output('umount {0}'.format(mountpoint), shell=True)
+            check_output("umount '{0}'".format(mountpoint.replace(r"'", r"'\''")), shell=True)
         except Exception:
             DiskTools._logger.exception('Unable to umount mountpoint {0}'.format(mountpoint))

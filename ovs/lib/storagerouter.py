@@ -22,7 +22,7 @@ import copy
 import json
 import time
 from ConfigParser import RawConfigParser
-from subprocess import check_output, CalledProcessError
+from subprocess import CalledProcessError
 from StringIO import StringIO
 from ovs.celery_run import celery
 from ovs.dal.hybrids.disk import Disk
@@ -102,7 +102,7 @@ class StorageRouterController(object):
         """
         storagerouter = StorageRouter(storagerouter_guid)
         client = SSHClient(storagerouter)
-        ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
+        ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", allow_insecure=True).strip().splitlines()
         ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses if ipaddr.strip() != '127.0.0.1']
         services_mds = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.MD_SERVER).services
         services_arakoon = [service for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services if service.name != 'arakoon-ovsdb' and service.is_internal is True]
@@ -764,8 +764,8 @@ class StorageRouterController(object):
                      'VPOOL_NAME': vpool_name,
                      'VPOOL_MOUNTPOINT': storagedriver.mountpoint,
                      'CONFIG_PATH': storagedriver_config.remote_path,
-                     'OVS_UID': check_output('id -u ovs', shell=True).strip(),
-                     'OVS_GID': check_output('id -g ovs', shell=True).strip(),
+                     'OVS_UID': client.run(['id', '-u', 'ovs']).strip(),
+                     'OVS_GID': client.run(['id', '-g', 'ovs']).strip(),
                      'LOG_SINK': LogHandler.get_sink_path('storagedriver')}
         dtl_params = {'DTL_PATH': sdp_dtl.path,
                       'DTL_ADDRESS': storagedriver.storage_ip,
@@ -1006,7 +1006,7 @@ class StorageRouterController(object):
                             tries -= 1
                             time.sleep(10 - tries)
                             try:
-                                client.run('alba proxy-statistics --host {0} --port {1}'.format(storage_driver.storage_ip, port))
+                                client.run(['alba', 'proxy-statistics', '--host', storage_driver.storage_ip, '--port', port])
                                 running = True
                             except CalledProcessError as ex:
                                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Fetching alba proxy-statistics failed with error (but ignoring): {1}'.format(storage_driver.guid, ex))
@@ -1211,7 +1211,7 @@ class StorageRouterController(object):
         """
         this_storagerouter = System.get_my_storagerouter()
         this_client = SSHClient(this_storagerouter, username='root')
-        logfile = this_client.run('ovs collect logs').strip()
+        logfile = this_client.run(['ovs', 'collect', 'logs']).strip()
         logfilename = logfile.split('/')[-1]
 
         storagerouter = StorageRouter(local_storagerouter_guid)
@@ -1219,7 +1219,7 @@ class StorageRouterController(object):
         client = SSHClient(storagerouter, username='root')
         client.dir_create(webpath)
         client.file_upload('{0}/{1}'.format(webpath, logfilename), logfile)
-        client.run('chmod 666 {0}/{1}'.format(webpath, logfilename))
+        client.run(['chmod', '666', '{0}/{1}'.format(webpath, logfilename)])
         return logfilename
 
     @staticmethod
@@ -1463,7 +1463,7 @@ class StorageRouterController(object):
         """
         root_client = SSHClient(storagerouter_ip,
                                 username='root')
-        root_client.run('ovs update framework')
+        root_client.run(['ovs', 'update', 'framework'])
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.update_volumedriver')
@@ -1476,7 +1476,7 @@ class StorageRouterController(object):
         """
         root_client = SSHClient(storagerouter_ip,
                                 username='root')
-        root_client.run('ovs update volumedriver')
+        root_client.run(['ovs', 'update', 'volumedriver'])
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.refresh_hardware')
@@ -1513,7 +1513,7 @@ class StorageRouterController(object):
                         for sub_directory in sub_dirs:
                             state_file = '/'.join([sub_root, sub_directory, 'state'])
                             if rem.os.path.exists(state_file):
-                                if 'ACTIVE' in client.run('cat {0}'.format(state_file)):
+                                if 'ACTIVE' in client.run(['cat', state_file]):
                                     rdma_capable = True
         storagerouter.rdma_capable = rdma_capable
         storagerouter.save()
@@ -1640,7 +1640,7 @@ class StorageRouterController(object):
         :return: List of mountpoints
         """
         mountpoints = []
-        for mountpoint in client.run('mount -v').strip().splitlines():
+        for mountpoint in client.run(['mount', '-v']).strip().splitlines():
             mp = mountpoint.split(' ')[2] if len(mountpoint.split(' ')) > 2 else None
             if mp and not mp.startswith('/dev') and not mp.startswith('/proc') and not mp.startswith('/sys') and not mp.startswith('/run') and not mp.startswith('/mnt/alba-asd') and mp != '/':
                 mountpoints.append(mp)

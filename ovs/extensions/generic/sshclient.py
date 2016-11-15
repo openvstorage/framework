@@ -31,7 +31,7 @@ import select
 import socket
 import logging
 import tempfile
-from subprocess import check_output, CalledProcessError, PIPE, Popen
+from subprocess import CalledProcessError, PIPE, Popen
 from ovs.dal.helpers import Descriptor
 from ovs.extensions.generic.remote import remote
 from ovs.log.log_handler import LogHandler
@@ -100,6 +100,7 @@ class SSHClient(object):
         """
         Initializes an SSHClient
         """
+        from subprocess import check_output
         from ovs.dal.hybrids.storagerouter import StorageRouter
         storagerouter = None
         if isinstance(endpoint, basestring):
@@ -194,12 +195,12 @@ class SSHClient(object):
         self._client.close()
 
     @staticmethod
-    def shell_safe(path_to_check):
+    def shell_safe(argument):
         """
         Makes sure that the given path/string is escaped and safe for shell
-        :param path_to_check: Path to make safe for shell
+        :param argument: Argument to make safe for shell
         """
-        return "".join([("\\" + _) if _ in " '\";`|" else _ for _ in path_to_check])
+        return "'{0}'".format(argument.replace(r"'", r"'\''"))
 
     @staticmethod
     def _clean_text(text):
@@ -223,19 +224,27 @@ class SSHClient(object):
             raise
 
     @connected()
-    def run(self, command, debug=False, suppress_logging=False):
+    def run(self, command, debug=False, suppress_logging=False, allow_nonzero=False, allow_insecure=False):
         """
         Executes a shell command
         :param suppress_logging: Do not log anything
         :param command: Command to execute
         :param debug: Extended logging and stderr output returned
+        :param allow_nonzero: Allow non-zero exit code
+        :param allow_insecure: Allow string commands (which might be inproper escaped)
         """
         if self._unittest_mode is True:
-            SSHClient._logger.debug('Executing: {0}'.format(command))
-            SSHClient._run_recordings.append(command)
-            if command in SSHClient._run_returns:
+            _command = command
+            if isinstance(command, list):
+                _command = ' '.join(command)
+            SSHClient._logger.debug('Executing: {0}'.format(_command))
+            SSHClient._run_recordings.append(_command)
+            if _command in SSHClient._run_returns:
                 SSHClient._logger.debug('Emulating return value')
-                return SSHClient._run_returns[command]
+                return SSHClient._run_returns[_command]
+
+        if not isinstance(command, list) and not allow_insecure:
+            raise RuntimeError('The given command must be a list, or the allow_insecure flag must be set')
         if self.is_local is True:
             stderr = None
             try:
@@ -250,7 +259,7 @@ class SSHClient(object):
                 stdout = self._clean_text(stdout)
                 stderr = self._clean_text(stderr)
                 exit_code = channel.returncode
-                if exit_code != 0:  # Raise same error as check_output
+                if exit_code != 0 and allow_nonzero is False:  # Raise same error as check_output
                     raise CalledProcessError(exit_code, command, stdout)
                 if debug:
                     SSHClient._logger.debug('stdout: {0}'.format(stdout))
@@ -266,12 +275,12 @@ class SSHClient(object):
                 raise
         else:
             if isinstance(command, list):
-                command = ' '.join(command)
+                command = ' '.join([self.shell_safe(entry) for entry in command])
             _, stdout, stderr = self._client.exec_command(command)  # stdin, stdout, stderr
             output = self._clean_text(stdout.readlines())
             error = self._clean_text(stderr.readlines())
             exit_code = stdout.channel.recv_exit_status()
-            if exit_code != 0:  # Raise same error as check_output
+            if exit_code != 0 and allow_nonzero is False:  # Raise same error as check_output
                 if suppress_logging is False:
                     SSHClient._logger.error('Command "{0}" failed with output "{1}" and error "{2}"'
                                             .format(command, output, error))
@@ -289,12 +298,11 @@ class SSHClient(object):
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
-            directory = self.shell_safe(directory)
             if self.is_local is True:
                 if not os.path.exists(directory):
                     os.makedirs(directory)
             else:
-                self.run('mkdir -p "{0}"; echo true'.format(directory))
+                self.run(['mkdir', '-p', directory])
 
     def dir_delete(self, directories, follow_symlinks=False):
         """
@@ -305,7 +313,6 @@ class SSHClient(object):
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
-            directory = self.shell_safe(directory)
             real_path = self.file_read_link(directory)
             if real_path and follow_symlinks is True:
                 self.file_unlink(directory.rstrip('/'))
@@ -321,7 +328,7 @@ class SSHClient(object):
                         os.rmdir(directory)
                 else:
                     if self.dir_exists(directory):
-                        self.run('rm -rf {0}'.format(directory))
+                        self.run(['rm', '-rf', directory])
 
     def dir_exists(self, directory):
         """
@@ -329,11 +336,11 @@ class SSHClient(object):
         :param directory: Directory to check for existence
         """
         if self.is_local is True:
-            return os.path.isdir(self.shell_safe(directory))
+            return os.path.isdir(directory)
         else:
             command = """import os, json
-print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
-            return json.loads(self.run('python -c """{0}"""'.format(command)))
+print json.dumps(os.path.isdir('{0}'))""".format(directory)
+            return json.loads(self.run(['python', '-c', """{0}""".format(command)]))
 
     def dir_chmod(self, directories, mode, recursive=False):
         """
@@ -349,7 +356,6 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
-            directory = self.shell_safe(directory)
             if self.is_local is True:
                 os.chmod(directory, mode)
                 if recursive is True:
@@ -358,7 +364,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
                             os.chmod('/'.join([root, sub_dir]), mode)
             else:
                 recursive_str = '-R' if recursive is True else ''
-                self.run('chmod {0} {1} {2}'.format(recursive_str, oct(mode), directory))
+                self.run(['chmod', recursive_str, str(oct(mode)), directory])
 
     def dir_chown(self, directories, user, group, recursive=False):
         """
@@ -385,7 +391,6 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
-            directory = self.shell_safe(directory)
             if self.is_local is True:
                 os.chown(directory, uid, gid)
                 if recursive is True:
@@ -394,7 +399,7 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
                             os.chown('/'.join([root, sub_dir]), uid, gid)
             else:
                 recursive_str = '-R' if recursive is True else ''
-                self.run('chown {0} {1}:{2} {3}'.format(recursive_str, user, group, directory))
+                self.run(['chown', recursive_str, '{0}:{1}'.format(user, group), directory])
 
     def dir_list(self, directory):
         """
@@ -402,11 +407,11 @@ print json.dumps(os.path.isdir('{0}'))""".format(self.shell_safe(directory))
         :param directory: Directory to list
         """
         if self.is_local is True:
-            return os.listdir(self.shell_safe(directory))
+            return os.listdir(directory)
         else:
             command = """import os, json
-print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
-            return json.loads(self.run('python -c """{0}"""'.format(command)))
+print json.dumps(os.listdir('{0}'))""".format(directory)
+            return json.loads(self.run(['python', '-c', """{0}""".format(command)]))
 
     def symlink(self, links):
         """
@@ -419,7 +424,7 @@ print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
                 os.symlink(source, link_name)
         else:
             for link_name, source in links.iteritems():
-                self.run('ln -s {0} {1}'.format(self.shell_safe(source), self.shell_safe(link_name)))
+                self.run(['ln', '-s', source, link_name])
 
     def file_create(self, filenames):
         """
@@ -433,7 +438,6 @@ print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
             if not filename.startswith('/'):
                 raise ValueError('Absolute path required for filename {0}'.format(filename))
 
-            filename = self.shell_safe(filename)
             if self.is_local is True:
                 if not self.dir_exists(directory=os.path.dirname(filename)):
                     self.dir_create(os.path.dirname(filename))
@@ -442,7 +446,7 @@ print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
             else:
                 directory = os.path.dirname(filename)
                 self.dir_create(directory)
-                self.run('touch {0}'.format(filename))
+                self.run(['touch', filename])
 
     def file_delete(self, filenames):
         """
@@ -452,7 +456,6 @@ print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
         if isinstance(filenames, basestring):
             filenames = [filenames]
         for filename in filenames:
-            filename = self.shell_safe(filename)
             if self.is_local is True:
                 if '*' in filename:
                     for fn in glob.glob(filename):
@@ -464,11 +467,11 @@ print json.dumps(os.listdir('{0}'))""".format(self.shell_safe(directory))
                 if '*' in filename:
                     command = """import glob, json
 print json.dumps(glob.glob('{0}'))""".format(filename)
-                    for fn in json.loads(self.run('python -c """{0}"""'.format(command))):
-                        self.run('rm -f "{0}"'.format(fn))
+                    for fn in json.loads(self.run(['python', '-c', """{0}""".format(command)])):
+                        self.run(['rm', '-f', fn])
                 else:
                     if self.file_exists(filename):
-                        self.run('rm -f "{0}"'.format(filename))
+                        self.run(['rm', '-f', filename])
 
     def file_unlink(self, path):
         """
@@ -476,12 +479,11 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
         :param path: Path of the file to unlink
         :return: None
         """
-        path = self.shell_safe(path)
         if self.is_local is True:
             if os.path.islink(path):
                 os.unlink(path)
         else:
-            self.run("unlink {0}".format(path))
+            self.run(['unlink', path])
 
     def file_read_link(self, path):
         """
@@ -489,7 +491,7 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
         :param path: Path of the symlink
         :return: None
         """
-        path = self.shell_safe(path.rstrip('/'))
+        path = path.rstrip('/')
         if self.is_local is True:
             if os.path.islink(path):
                 return os.path.realpath(path)
@@ -498,7 +500,7 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
 if os.path.islink('{0}'):
     print json.dumps(os.path.realpath('{0}'))""".format(path)
             try:
-                return json.loads(self.run('python -c """{0}"""'.format(command)))
+                return json.loads(self.run(['python', '-c', """{0}""".format(command)]))
             except ValueError:
                 pass
 
@@ -511,7 +513,7 @@ if os.path.islink('{0}'):
             with open(filename, 'r') as the_file:
                 return the_file.read()
         else:
-            return self.run('cat "{0}"'.format(filename))
+            return self.run(['cat', filename])
 
     @connected()
     def file_write(self, filename, contents, mode='w'):
@@ -544,7 +546,7 @@ if os.path.islink('{0}'):
         :param local_filename: Name of the file locally
         """
         if self.is_local is True:
-            check_output('cp -f "{0}" "{1}"'.format(local_filename, remote_filename), shell=True)
+            self.run(['cp', '-f', local_filename, remote_filename])
         else:
             sftp = self._client.open_sftp()
             sftp.put(local_filename, remote_filename)
@@ -556,11 +558,11 @@ if os.path.islink('{0}'):
         :param filename: File to check for existence
         """
         if self.is_local is True:
-            return os.path.isfile(self.shell_safe(filename))
+            return os.path.isfile(filename)
         else:
             command = """import os, json
-print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
-            return json.loads(self.run('python -c """{0}"""'.format(command)))
+print json.dumps(os.path.isfile('{0}'))""".format(filename)
+            return json.loads(self.run(['python', '-c', """{0}""".format(command)]))
 
     def file_chmod(self, filename, mode):
         """
@@ -568,11 +570,7 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
         :param filename: File to chmod
         :param mode: Mode to give to file, eg: 0744
         """
-        command = 'chmod {0} "{1}"'.format(mode, filename)
-        if self.is_local is True:
-            check_output(command, shell=True)
-        else:
-            self.run(command)
+        self.run(['chmod', str(mode), filename])
 
     def file_chown(self, filenames, user, group):
         """
@@ -603,7 +601,7 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
             if self.is_local is True:
                 os.chown(filename, uid, gid)
             else:
-                self.run('chown {0}:{1} {2}'.format(user, group, filename))
+                self.run(['chown', '{0}:{1}'.format(user, group), filename])
 
     def file_list(self, directory, abs_path=False, recursive=False):
         """
@@ -616,7 +614,6 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
         :return: List of files in directory
         """
         all_files = []
-        directory = self.shell_safe(directory)
         if self.is_local is True:
             for root, dirs, files in os.walk(directory):
                 for file_name in files:
@@ -647,13 +644,24 @@ print json.dumps(os.path.isfile('{0}'))""".format(self.shell_safe(filename))
         :return: True if mountpoint is mounted
         :rtype: bool
         """
-        path = self.shell_safe(path.rstrip('/'))
+        path = path.rstrip('/')
         if self.is_local is True:
             return os.path.ismount(path)
 
         command = """import os, json
 print json.dumps(os.path.ismount('{0}'))""".format(path)
         try:
-            return json.loads(self.run('python -c """{0}"""'.format(command)))
+            return json.loads(self.run(['python', '-c', """{0}""".format(command)]))
         except ValueError:
             return False
+
+    def get_hostname(self):
+        """
+        Gets the simple and fq domain name
+        """
+        short = self.run(['hostname', '-s'])
+        try:
+            fqdn = self.run(['hostname', '-f'])
+        except:
+            fqdn = short
+        return short, fqdn
