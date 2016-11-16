@@ -246,7 +246,7 @@ class SSHClient(object):
         if not isinstance(command, list) and not allow_insecure:
             raise RuntimeError('The given command must be a list, or the allow_insecure flag must be set')
         if isinstance(command, list):
-            command = [str(sub_command) for sub_command in command]
+            command = ' '.join([self.shell_safe(str(entry)) for entry in command])
         if self.is_local is True:
             stderr = None
             try:
@@ -276,8 +276,6 @@ class SSHClient(object):
                     ))
                 raise
         else:
-            if isinstance(command, list):
-                command = ' '.join([self.shell_safe(entry) for entry in command])
             _, stdout, stderr = self._client.exec_command(command)  # stdin, stdout, stderr
             output = self._clean_text(stdout.readlines())
             error = self._clean_text(stderr.readlines())
