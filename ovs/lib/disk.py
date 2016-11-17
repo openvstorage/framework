@@ -81,8 +81,8 @@ class DiskController(object):
                               '--noheadings',
                               '--exclude',
                               '1,2,11',
-                              '--output=KNAME,SIZE,MODEL,STATE,MAJ:MIN,FSTYPE,TYPE,ROTA,MOUNTPOINT,PHY-SEC']).splitlines()
-        device_regex = re.compile('^KNAME="(?P<name>.*)" SIZE="(?P<size>\d*)" MODEL="(?P<model>.*)" STATE="(?P<state>.*)" MAJ:MIN="(?P<dev_nr>.*)" FSTYPE="(?P<fstype>.*)" TYPE="(?P<type>.*)" ROTA="(?P<rota>[0,1])" MOUNTPOINT="(?P<mtpt>.*)" PHY-SEC="(?P<sector_size>\d*)"$')
+                              '--output=KNAME,SIZE,MODEL,STATE,MAJ:MIN,FSTYPE,TYPE,ROTA,MOUNTPOINT,LOG-SEC']).splitlines()
+        device_regex = re.compile('^KNAME="(?P<name>.*)" SIZE="(?P<size>\d*)" MODEL="(?P<model>.*)" STATE="(?P<state>.*)" MAJ:MIN="(?P<dev_nr>.*)" FSTYPE="(?P<fstype>.*)" TYPE="(?P<type>.*)" ROTA="(?P<rota>[0,1])" MOUNTPOINT="(?P<mtpt>.*)" LOG-SEC="(?P<sector_size>\d*)"$')
         configuration = {}
         parsed_devices = []
         for device in devices:
