@@ -524,6 +524,9 @@ if os.path.islink('{0}'):
         """
         temp_filename = '{0}~'.format(filename)
         if self.is_local is True:
+            if os.path.isfile(filename):
+                # Use .run([cp -pf ...]) here, to make sure owner and other rights are preserved
+                self.run(['cp', '-pf', filename, temp_filename])
             with open(temp_filename, 'w') as the_file:
                 the_file.write(contents)
                 the_file.flush()
@@ -537,6 +540,8 @@ if os.path.islink('{0}'):
                 os.fsync(the_file)
             os.close(handle)
             try:
+                if self.file_exists(filename):
+                    self.run(['cp', '-pf', filename, temp_filename])
                 sftp = self._client.open_sftp()
                 sftp.put(local_temp_filename, temp_filename)
                 sftp.close()
