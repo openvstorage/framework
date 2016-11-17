@@ -100,7 +100,7 @@ class System(object):
             else:
                 contents += '{0} {1}\n'.format(ip, hostnames)
 
-            client.file_write('/etc/hosts', contents, mode='wb')
+            client.file_write('/etc/hosts', contents)
 
     @staticmethod
     def ports_in_use(client=None):
@@ -173,54 +173,3 @@ class System(object):
             if len(free_ports) == nr:
                 return free_ports
         raise ValueError('Unable to find requested nr of free ports')
-
-    @staticmethod
-    def read_config(filename, client=None):
-        """
-        Read a configuration file
-        :param filename: File to read
-        :type filename: str
-
-        :param client: SSHClient to node
-        :type client: SSHClient
-
-        :return: Content of configuration file
-        :rtype: RawConfigParser
-        """
-        if client is None:
-            cp = RawConfigParser()
-            with open(filename, 'r') as config_file:
-                cfg = config_file.read()
-            cp.readfp(StringIO(cfg))
-            return cp
-        else:
-            contents = client.file_read(filename)
-            cp = RawConfigParser()
-            cp.readfp(StringIO(contents))
-            return cp
-
-    @staticmethod
-    def write_config(config, filename, client=None):
-        """
-        Write a configuration file
-        :param config: Contents to write
-        :type config: RawConfigParser
-
-        :param filename: File to write
-        :type filename: str
-
-        :param client: SSHClient to node
-        :type client: SSHClient
-
-        :return: None
-        """
-        if client is None:
-            with open(filename, 'w') as config_file:
-                config.write(config_file)
-        else:
-            temp_filename = '/var/tmp/{0}'.format(str(uuid.uuid4()).replace('-', ''))
-            with open(temp_filename, 'w') as config_file:
-                config.write(config_file)
-            time.sleep(1)
-            client.file_upload(filename, temp_filename)
-            os.remove(temp_filename)

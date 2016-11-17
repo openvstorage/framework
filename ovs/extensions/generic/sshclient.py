@@ -516,27 +516,33 @@ if os.path.islink('{0}'):
             return self.run(['cat', filename])
 
     @connected()
-    def file_write(self, filename, contents, mode='w'):
+    def file_write(self, filename, contents):
         """
         Writes into a file to the remote end
         :param filename: File to write
         :param contents: Contents to write to the file
-        :param mode: Mode to write to the file, can be a, a+, w, w+
         """
+        temp_filename = '{0}~'.format(filename)
         if self.is_local is True:
-            with open(filename, mode) as the_file:
+            with open(temp_filename, 'w') as the_file:
                 the_file.write(contents)
+                the_file.flush()
+                os.fsync(the_file)
+            os.rename(temp_filename, filename)
         else:
-            handle, temp_filename = tempfile.mkstemp()
-            with open(temp_filename, mode) as the_file:
+            handle, local_temp_filename = tempfile.mkstemp()
+            with open(local_temp_filename, 'w') as the_file:
                 the_file.write(contents)
+                the_file.flush()
+                os.fsync(the_file)
             os.close(handle)
             try:
                 sftp = self._client.open_sftp()
-                sftp.put(temp_filename, filename)
+                sftp.put(local_temp_filename, temp_filename)
                 sftp.close()
+                self.run(['mv', '-f', temp_filename, filename])
             finally:
-                os.remove(temp_filename)
+                os.remove(local_temp_filename)
 
     @connected()
     def file_upload(self, remote_filename, local_filename):
@@ -545,12 +551,15 @@ if os.path.islink('{0}'):
         :param remote_filename: Name of the file on the remote location
         :param local_filename: Name of the file locally
         """
+        temp_remote_filename = '{0}~'.format(remote_filename)
         if self.is_local is True:
-            self.run(['cp', '-f', local_filename, remote_filename])
+            self.run(['cp', '-f', local_filename, temp_remote_filename])
+            self.run(['mv', '-f', temp_remote_filename, remote_filename])
         else:
             sftp = self._client.open_sftp()
-            sftp.put(local_filename, remote_filename)
+            sftp.put(local_filename, temp_remote_filename)
             sftp.close()
+            self.run(['mv', '-f', temp_remote_filename, remote_filename])
 
     def file_exists(self, filename):
         """
