@@ -1006,7 +1006,7 @@ class StorageRouterController(object):
                             tries -= 1
                             time.sleep(10 - tries)
                             try:
-                                client.run(['alba', 'proxy-statistics', '--host', storage_driver.storage_ip, '--port', port])
+                                client.run(['alba', 'proxy-statistics', '--host', storage_driver.storage_ip, '--port', str(port)])
                                 running = True
                             except CalledProcessError as ex:
                                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Fetching alba proxy-statistics failed with error (but ignoring): {1}'.format(storage_driver.guid, ex))
