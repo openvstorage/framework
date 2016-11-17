@@ -100,7 +100,7 @@ class System(object):
             else:
                 contents += '{0} {1}\n'.format(ip, hostnames)
 
-            client.file_write('/etc/hosts', contents, mode='wb')
+            client.file_write('/etc/hosts', contents)
 
     @staticmethod
     def ports_in_use(client=None):
