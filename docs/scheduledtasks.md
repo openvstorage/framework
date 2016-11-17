@@ -4,7 +4,7 @@ The Framework is responsible for executing all Open vStorage scheduled tasks. Th
 An optional new key is introduced in the Configuration management: `/ovs/framework/scheduling/celery` which contains a JSON dictionary where the key is the task's name, and the value is:
 
 * null in case the task should be disabled (not automatically executed)
-* A dict containing [crontab[(http://docs.celeryproject.org/en/latest/reference/celery.schedules.html#celery.schedules.crontab)] keyword arguments
+* A dict containing [crontab](http://docs.celeryproject.org/en/latest/reference/celery.schedules.html#celery.schedules.crontab)] keyword arguments
 
 Example configuration:
 
