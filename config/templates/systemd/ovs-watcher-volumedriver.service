@@ -10,8 +10,6 @@ ExecStartPre=/usr/bin/python /opt/OpenvStorage/ovs/extensions/generic/watcher.py
 ExecStart=/usr/bin/python /opt/OpenvStorage/ovs/extensions/generic/watcher.py volumedriver check
 Restart=on-failure
 TimeoutStopSec=3600
-StandardOutput=null
-StandardError=null
 
 [Install]
 WantedBy=multi-user.target
