@@ -22,4 +22,4 @@ In case you want to change the schedule for the ALBA backend verifictaion proces
 
 In case the configuration cannot be parsed at all (e.g. invalid JSON), the code will fallback to the hardcoded schedule. If the crontab arguments are invalid (e.g. they contain an unsupported key) the task will be disabled.
 
-**NOTE:** Changing the schedules should be done with caution. Setting the frequency of some tasks too high or disabling them, might lead to performance loss or can even lead to instability (f.e. when diabling the scrubber). 
+**NOTE:** Changing the schedules should be done with caution. Setting the frequency of some tasks too high or disabling them, might lead to performance loss or can even lead to instability (f.e. when disabling the scrubber). 
