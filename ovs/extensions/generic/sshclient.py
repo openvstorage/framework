@@ -213,11 +213,14 @@ class SSHClient(object):
             else:
                 cleaned = text.strip().decode('utf-8', 'replace')
             for old, new in {u'\u2018': "'",
+                             u'\u2019': "'",
                              u'\u201a': "'",
                              u'\u201e': '"',
                              u'\u201c': '"',
                              u'\u25cf': '*'}.iteritems():
                 cleaned = cleaned.replace(old, new)
+            if isinstance(cleaned, unicode):
+                cleaned = cleaned.encode('ascii', 'replace')
             return cleaned
         except UnicodeDecodeError:
             SSHClient._logger.error('UnicodeDecodeError with output: {0}'.format(text))
