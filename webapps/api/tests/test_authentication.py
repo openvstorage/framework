@@ -24,9 +24,9 @@ import base64
 import hashlib
 import unittest
 from django.http import HttpResponse
-from middleware import OVSMiddleware
-from oauth2.exceptions import HttpBadRequestException, HttpUnauthorizedException, HttpTooManyRequestsException
-from oauth2.toolbox import Toolbox as OAuth2Toolbox
+from api.middleware import OVSMiddleware
+from api.oauth2.exceptions import HttpBadRequestException, HttpUnauthorizedException, HttpTooManyRequestsException
+from api.oauth2.toolbox import Toolbox as OAuth2Toolbox
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic import fakesleep
 from ovs.extensions.generic.system import System
@@ -152,7 +152,6 @@ class Authentication(unittest.TestCase):
         storagerouter.name = 'storagerouter'
         storagerouter.save()
 
-        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
         from django.test import RequestFactory
         cls.factory = RequestFactory()
 
@@ -185,7 +184,7 @@ class Authentication(unittest.TestCase):
         """
         Validates whether the json response behave correctly
         """
-        from oauth2.decorators import auto_response
+        from api.oauth2.decorators import auto_response
 
         @auto_response()
         def the_function(return_value):
@@ -207,7 +206,7 @@ class Authentication(unittest.TestCase):
         """
         Validates whether the rate limiter behaves correctly
         """
-        from oauth2.decorators import limit, auto_response
+        from api.oauth2.decorators import limit, auto_response
 
         @auto_response()
         @limit(amount=2, per=2, timeout=2)
@@ -255,7 +254,7 @@ class Authentication(unittest.TestCase):
         """
         Validates whether not sending a grant_type will fail the call and the grant_type is checked
         """
-        from oauth2.tokenview import OAuth2TokenView
+        from api.oauth2.tokenview import OAuth2TokenView
 
         time.sleep(180)
         request = self.factory.post('/', HTTP_X_REAL_IP='127.0.0.1')
@@ -270,7 +269,7 @@ class Authentication(unittest.TestCase):
         """
         Validates the Resource Owner Password Credentials
         """
-        from oauth2.tokenview import OAuth2TokenView
+        from api.oauth2.tokenview import OAuth2TokenView
 
         time.sleep(180)
         data = {'grant_type': 'password'}
@@ -312,7 +311,7 @@ class Authentication(unittest.TestCase):
         """
         Validates the Client Credentials
         """
-        from oauth2.tokenview import OAuth2TokenView
+        from api.oauth2.tokenview import OAuth2TokenView
 
         time.sleep(180)
         data = {'grant_type': 'client_credentials'}
@@ -370,8 +369,8 @@ class Authentication(unittest.TestCase):
         """
         Validates whether requested scopes are assigned
         """
-        from oauth2.tokenview import OAuth2TokenView
-        from view import MetadataView
+        from api.oauth2.tokenview import OAuth2TokenView
+        from api.view import MetadataView
 
         time.sleep(180)
         data = {'grant_type': 'password',
@@ -418,8 +417,8 @@ class Authentication(unittest.TestCase):
         Validates the Authentication backend
         """
         from django.contrib.auth.models import User as DUser
-        from oauth2.tokenview import OAuth2TokenView
-        from oauth2.backend import OAuth2Backend
+        from api.oauth2.tokenview import OAuth2TokenView
+        from api.oauth2.backend import OAuth2Backend
 
         time.sleep(180)
         backend = OAuth2Backend()
@@ -476,8 +475,8 @@ class Authentication(unittest.TestCase):
         - The 'roles' key is already checked in the Scope-related tests
         """
         from ovs.dal.lists.bearertokenlist import BearerTokenList
-        from oauth2.tokenview import OAuth2TokenView
-        from view import MetadataView
+        from api.oauth2.tokenview import OAuth2TokenView
+        from api.view import MetadataView
 
         def _raise_exception(argument):
             _ = argument

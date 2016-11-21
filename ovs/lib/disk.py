@@ -75,8 +75,14 @@ class DiskController(object):
 
         # Parse 'lsblk' output
         # --exclude 1 for RAM devices, 2 for floppy devices, 11 for CD-ROM devices (See https://www.kernel.org/doc/Documentation/devices.txt)
-        devices = client.run('lsblk --pairs --bytes --noheadings --exclude 1,2,11 --output=KNAME,SIZE,MODEL,STATE,MAJ:MIN,FSTYPE,TYPE,ROTA,MOUNTPOINT,PHY-SEC').splitlines()
-        device_regex = re.compile('^KNAME="(?P<name>.*)" SIZE="(?P<size>\d*)" MODEL="(?P<model>.*)" STATE="(?P<state>.*)" MAJ:MIN="(?P<dev_nr>.*)" FSTYPE="(?P<fstype>.*)" TYPE="(?P<type>.*)" ROTA="(?P<rota>[0,1])" MOUNTPOINT="(?P<mtpt>.*)" PHY-SEC="(?P<sector_size>\d*)"$')
+        devices = client.run(['lsblk',
+                              '--pairs',
+                              '--bytes',
+                              '--noheadings',
+                              '--exclude',
+                              '1,2,11',
+                              '--output=KNAME,SIZE,MODEL,STATE,MAJ:MIN,FSTYPE,TYPE,ROTA,MOUNTPOINT,LOG-SEC']).splitlines()
+        device_regex = re.compile('^KNAME="(?P<name>.*)" SIZE="(?P<size>\d*)" MODEL="(?P<model>.*)" STATE="(?P<state>.*)" MAJ:MIN="(?P<dev_nr>.*)" FSTYPE="(?P<fstype>.*)" TYPE="(?P<type>.*)" ROTA="(?P<rota>[0,1])" MOUNTPOINT="(?P<mtpt>.*)" LOG-SEC="(?P<sector_size>\d*)"$')
         configuration = {}
         parsed_devices = []
         for device in devices:
@@ -140,7 +146,9 @@ class DiskController(object):
                 partition_state = Disk.STATES.OK if current_device_state == Disk.STATES.OK else Disk.STATES.FAILURE
                 if mount_point is not None and fs_type != 'swap':
                     try:
-                        client.run('touch {0}/{1}; rm {0}/{1}'.format(mount_point, str(time.time())))
+                        filename = '{0}/{1}'.format(mount_point, str(time.time()))
+                        client.run(['touch', filename])
+                        client.run(['rm', filename])
                     except Exception:
                         partition_state = Disk.STATES.FAILURE
 

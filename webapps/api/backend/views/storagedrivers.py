@@ -21,10 +21,11 @@ StorageDriver API module
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
-from backend.decorators import required_roles, load, return_list, return_object, return_plain, log
-from backend.exceptions import HttpNotAcceptableException
+from api.backend.decorators import required_roles, load, return_list, return_object, return_simple, log
+from api.backend.exceptions import HttpNotAcceptableException
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.hybrids.storagedriver import StorageDriver
+from ovs.dal.hybrids.vpool import VPool
 
 
 class StorageDriverViewSet(viewsets.ViewSet):
@@ -39,10 +40,14 @@ class StorageDriverViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(StorageDriver)
     @load()
-    def list(self):
+    def list(self, vpool_guid=None):
         """
         Overview of all StorageDrivers
+        :param vpool_guid: Guid of the vPool
+        :type vpool_guid: str
         """
+        if vpool_guid is not None:
+            return VPool(vpool_guid).storagedrivers
         return StorageDriverList.get_storagedrivers()
 
     @log()
@@ -52,17 +57,25 @@ class StorageDriverViewSet(viewsets.ViewSet):
     def retrieve(self, storagedriver):
         """
         Load information about a given StorageDriver
+        :param storagedriver: The StorageDriver to return
+        :type storagedriver: StorageDriver
         """
         return storagedriver
 
     @action()
     @log()
     @required_roles(['read'])
-    @return_plain()
+    @return_simple()
     @load(StorageDriver)
     def can_be_deleted(self, storagedriver, version):
         """
         Checks whether a Storage Driver can be deleted
+        :param storagedriver: StorageDriver to verify
+        :type storagedriver: StorageDriver
+        :param version: Client version
+        :type version: int
+        :return: Whether the StorageDriver can be deleted
+        :rtype: bool
         """
         if version > 4:
             raise HttpNotAcceptableException(error_description='Only available in API versions 1 to 4',

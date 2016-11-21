@@ -238,8 +238,7 @@ class Configuration(object):
         arakoon_start_port = port_info.get('arakoon', 26402)
         storagedriver_port_range = port_info.get('storagedriver', [26200, 26299])
 
-        host_config = {'storagedriver': {'rsp': '/var/rsp'},
-                       'ports': {'storagedriver': [storagedriver_port_range],
+        host_config = {'ports': {'storagedriver': [storagedriver_port_range],
                                  'mds': [mds_port_range],
                                  'arakoon': [arakoon_start_port]},
                        'setupcompleted': False,

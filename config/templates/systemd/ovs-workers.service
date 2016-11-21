@@ -1,5 +1,5 @@
 [Unit]
-Description=ovs workers
+Description=Open vStorage workers
 Requires=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
 After=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
 

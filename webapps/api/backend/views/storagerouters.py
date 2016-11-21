@@ -18,11 +18,13 @@
 StorageRouter module
 """
 
-import json
 from celery.task.control import revoke
-from backend.decorators import required_roles, return_list, return_object, return_task, return_plain, load, log
-from backend.exceptions import HttpNotAcceptableException
-from backend.serializers.serializers import FullSerializer
+from rest_framework import viewsets
+from rest_framework.decorators import action, link
+from rest_framework.permissions import IsAuthenticated
+from api.backend.decorators import required_roles, return_list, return_object, return_task, return_simple, load, log
+from api.backend.exceptions import HttpGoneException, HttpNotAcceptableException
+from api.backend.serializers.serializers import FullSerializer
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.storagerouter import StorageRouter
@@ -34,10 +36,6 @@ from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.vdisk import VDiskController
-from rest_framework import viewsets, status
-from rest_framework.decorators import action, link
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 
 
 class StorageRouterViewSet(viewsets.ViewSet):
@@ -58,6 +56,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def list(self, query=None):
         """
         Overview of all Storage Routers
+        :param query: A query to filter the StorageRouters
+        :type query: DataQuery
         """
         if query is None:
             return StorageRouterList.get_storagerouters()
@@ -71,23 +71,30 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def retrieve(self, storagerouter):
         """
         Load information about a given storage router
+        :param storagerouter: StorageRouter to return
+        :type storagerouter: StorageRouter
         """
         return storagerouter
 
     @log()
     @required_roles(['read', 'write', 'manage'])
+    @return_object(StorageRouter, mode='accepted')
     @load(StorageRouter)
     def partial_update(self, storagerouter, request, contents=None):
         """
         Update a StorageRouter
+        :param storagerouter: StorageRouter to update
+        :type storagerouter: StorageRouter
+        :param request: The raw Request
+        :type request: Request
+        :param contents: Contents to be updated/returned
+        :type contents: str
         """
         contents = None if contents is None else contents.split(',')
         serializer = FullSerializer(StorageRouter, contents=contents, instance=storagerouter, data=request.DATA)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        storagerouter = serializer.deserialize()
+        storagerouter.save()
+        return storagerouter
 
     @action()
     @log()
@@ -97,6 +104,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def mark_offline(self, storagerouter):
         """
         Marks all StorageDrivers of a given node offline. DO NOT USE ON RUNNING STORAGEROUTERS!
+        :param storagerouter: StorageRouter to mark offline
+        :type storagerouter: StorageRouter
         """
         return StorageDriverController.mark_offline.delay(storagerouter.guid)
 
@@ -108,6 +117,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def get_metadata(self, storagerouter):
         """
         Returns a list of mountpoints on the given Storage Router
+        :param storagerouter: StorageRouter to get the metadata from
+        :type storagerouter: StorageRouter
         """
         return StorageRouterController.get_metadata.delay(storagerouter.guid)
 
@@ -119,6 +130,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def get_version_info(self, storagerouter):
         """
         Gets version information of a given Storage Router
+        :param storagerouter: StorageRouter to get the versions from
+        :type storagerouter: StorageRouter
         """
         return StorageRouterController.get_version_info.s(storagerouter.guid).apply_async(
             routing_key='sr.{0}'.format(storagerouter.machine_id)
@@ -132,6 +145,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def get_support_info(self, storagerouter):
         """
         Gets support information of a given Storage Router
+        :param storagerouter: StorageRouter to get the support info from
+        :type storagerouter: StorageRouter
         """
         return StorageRouterController.get_support_info.s(storagerouter.guid).apply_async(
             routing_key='sr.{0}'.format(storagerouter.machine_id)
@@ -145,6 +160,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def get_support_metadata(self, storagerouter):
         """
         Gets support metadata of a given Storage Router
+        :param storagerouter: StorageRouter to get the support metadata from
+        :type storagerouter: StorageRouter
         """
         return StorageRouterController.get_support_metadata.apply_async(
             routing_key='sr.{0}'.format(storagerouter.machine_id)
@@ -158,6 +175,10 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def configure_support(self, enable, enable_support):
         """
         Configures support
+        :param enable: Indicates whether to enable heartbeats
+        :type enable: bool
+        :param enable_support: Indicates whether to enable remote support
+        :type enable_support: bool
         """
         return StorageRouterController.configure_support.delay(enable, enable_support)
 
@@ -169,6 +190,10 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def get_logfiles(self, local_storagerouter, storagerouter):
         """
         Collects logs, moves them to a web-accessible location and returns log tgz's filename
+        :param local_storagerouter: StorageRouter this call is executed on (to store the logfiles on)
+        :type local_storagerouter: StorageRouter
+        :param storagerouter: The StorageRouter to collect the logs from
+        :type storagerouter: StorageRouter
         """
         return StorageRouterController.get_logfiles.s(local_storagerouter.guid).apply_async(
             routing_key='sr.{0}'.format(storagerouter.machine_id)
@@ -178,10 +203,18 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read'])
     @return_task()
-    @load(StorageRouter)
+    @load(StorageRouter, max_version=5)
     def check_s3(self, host, port, accesskey, secretkey):
         """
         Validates whether connection to a given S3 backend can be made
+        :param host: The host of an S3 endpoint
+        :type host: str
+        :param port: The port of an S3 endpoint
+        :type port: int
+        :param accesskey: The accesskey to be used when validating the S3 endpoint
+        :type accesskey: str
+        :param secretkey: The secretkey to be used when validating the S3 endpoint
+        :type secretkey: str
         """
         parameters = {'host': host,
                       'port': port,
@@ -200,6 +233,10 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def check_mtpt(self, storagerouter, name):
         """
         Validates whether the mountpoint for a vPool is available
+        :param storagerouter: The StorageRouter to validate the mountpoint on
+        :type storagerouter: StorageRouter
+        :param name: The name of the mountpoint to validate (vPool name)
+        :type name: str
         """
         return StorageRouterController.mountpoint_exists.delay(name=str(name), storagerouter_guid=storagerouter.guid)
 
@@ -211,7 +248,27 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def add_vpool(self, storagerouter, call_parameters, version, local_storagerouter, request):
         """
         Adds a vPool to a given Storage Router
+        :param storagerouter: StorageRouter to add the vPool to
+        :type storagerouter: StorageRouter
+        :param call_parameters: A complex (JSON encoded) dictionary containing all various parameters to create the vPool
+        :type call_parameters: dict
+        :param version: Client version
+        :type version: int
+        :param local_storagerouter: StorageRouter on which the call is executed
+        :type local_storagerouter: StorageRouter
+        :param request: The raw request
+        :type request: Request
         """
+        def _validate_required_keys(section):
+            for required_key in ['host', 'backend']:
+                if required_key not in call_parameters[section]:
+                    raise HttpNotAcceptableException(error_description='Invalid data passed: "{0}" misses information about {1}'.format(section, required_key),
+                                                     error='invalid_data')
+            for sub_required_key in ['backend', 'metadata']:
+                if sub_required_key not in call_parameters[section]['backend']:
+                    raise HttpNotAcceptableException(error_description='Invalid data passed: "{0}" missing information about {1}'.format(section, sub_required_key),
+                                                     error='invalid_data')
+
         # API backwards compatibility
         if version <= 2:
             call_parameters['storagerouter_ip'] = storagerouter.ip
@@ -225,12 +282,47 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 connection_backend = call_parameters.pop('connection_backend')
                 call_parameters['backend_connection_info']['backend'] = {'backend': connection_backend.pop('backend') if 'backend' in connection_backend else None,
                                                                          'metadata': connection_backend.pop('metadata') if 'metadata' in connection_backend else None}
+        if version < 6:
+            if 'backend_connection_info' not in call_parameters:
+                raise HttpNotAcceptableException(error_description='Invalid data passed: "backend_connection_info" should be passed',
+                                                 error='invalid_data')
+            _validate_required_keys(section='backend_connection_info')
+            if 'backend_info' not in call_parameters:
+                call_parameters['backend_info'] = {}
+            if 'connection_info' not in call_parameters:
+                call_parameters['connection_info'] = {}
+            call_parameters['backend_info']['preset'] = call_parameters['backend_connection_info']['backend']['metadata']
+            call_parameters['backend_info']['alba_backend_guid'] = call_parameters['backend_connection_info']['backend']['backend']
+            call_parameters['connection_info']['host'] = call_parameters['backend_connection_info']['host']
+            call_parameters['connection_info']['port'] = call_parameters['backend_connection_info'].get('port', '')
+            call_parameters['connection_info']['client_id'] = call_parameters['backend_connection_info'].get('username', '')
+            call_parameters['connection_info']['client_secret'] = call_parameters['backend_connection_info'].get('password', '')
+            call_parameters.pop('backend_connection_info')
+
+            if 'backend_connection_info_aa' in call_parameters:
+                if 'backend_info_aa' not in call_parameters:
+                    call_parameters['backend_info_aa'] = {}
+                if 'connection_info_aa' not in call_parameters:
+                    call_parameters['connection_info_aa'] = {}
+                _validate_required_keys(section='backend_connection_info_aa')
+                call_parameters['backend_info_aa']['preset'] = call_parameters['backend_connection_info_aa']['backend']['metadata']
+                call_parameters['backend_info_aa']['alba_backend_guid'] = call_parameters['backend_connection_info_aa']['backend']['backend']
+                call_parameters['connection_info_aa']['host'] = call_parameters['backend_connection_info_aa']['host']
+                call_parameters['connection_info_aa']['port'] = call_parameters['backend_connection_info_aa'].get('port', '')
+                call_parameters['connection_info_aa']['client_id'] = call_parameters['backend_connection_info_aa'].get('username', '')
+                call_parameters['connection_info_aa']['client_secret'] = call_parameters['backend_connection_info_aa'].get('password', '')
+                call_parameters.pop('backend_connection_info_aa')
+
+        if version >= 6 and 'backend_connection_info' in call_parameters:
+            raise HttpNotAcceptableException(error_description='Invalid data passed: "backend_connection_info" is deprecated',
+                                             error='invalid_data')
+
         # API client translation (cover "local backend" selection in GUI)
-        if 'backend_connection_info' not in call_parameters:
+        if 'backend_info' not in call_parameters or 'connection_info' not in call_parameters or 'config_params' not in call_parameters:
             raise HttpNotAcceptableException(error_description='Invalid call_parameters passed',
                                              error='invalid_data')
-        connection_info = call_parameters['backend_connection_info']
-        connection_info_aa = call_parameters.get('backend_connection_info_aa')
+        connection_info = call_parameters['connection_info']
+        connection_info_aa = call_parameters.get('connection_info_aa')
         if connection_info['host'] == '' or (connection_info_aa is not None and connection_info_aa['host'] == ''):
             client = None
             for _client in request.client.user.clients:
@@ -240,17 +332,23 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 raise HttpNotAcceptableException(error_description='Invalid call_parameters passed',
                                                  error='invalid_data')
             if connection_info['host'] == '':
-                connection_info['username'] = client.client_id
-                connection_info['password'] = client.client_secret
+                connection_info['client_id'] = client.client_id
+                connection_info['client_secret'] = client.client_secret
                 connection_info['host'] = local_storagerouter.ip
                 connection_info['port'] = 443
                 connection_info['local'] = True
             if connection_info_aa is not None and connection_info_aa['host'] == '':
-                connection_info_aa['username'] = client.client_id
-                connection_info_aa['password'] = client.client_secret
+                connection_info_aa['client_id'] = client.client_id
+                connection_info_aa['client_secret'] = client.client_secret
                 connection_info_aa['host'] = local_storagerouter.ip
                 connection_info_aa['port'] = 443
                 connection_info_aa['local'] = True
+
+        call_parameters.pop('type', None)
+        call_parameters.pop('readcache_size', None)
+        call_parameters['config_params'].pop('dedupe_mode', None)
+        call_parameters['config_params'].pop('cache_strategy', None)
+
         # Finally, launching the add_vpool task
         return StorageRouterController.add_vpool.delay(call_parameters)
 
@@ -262,6 +360,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def get_update_status(self, storagerouter):
         """
         Return available updates for framework, volumedriver, ...
+        :param storagerouter: StorageRouter to get the update information from
+        :type storagerouter: StorageRouter
         """
         return StorageRouterController.get_update_status.delay(storagerouter.ip)
 
@@ -272,7 +372,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def update_framework(self, storagerouter):
         """
-        Initiate a task on 1 storagerouter to update the framework on ALL storagerouters
+        Initiate a task on the given StorageRouter to update the framework on ALL StorageRouters
+        :param storagerouter: StorageRouter to start the update on
+        :type storagerouter: StorageRouter
         """
         return StorageRouterController.update_framework.delay(storagerouter.ip)
 
@@ -283,7 +385,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @load(StorageRouter)
     def update_volumedriver(self, storagerouter):
         """
-        Initiate a task on 1 storagerouter to update the volumedriver on ALL storagerouters
+        Initiate a task on the given StorageRouter to update the volumedriver on ALL StorageRouters
+        :param storagerouter: StorageRouter to start the update on
+        :type storagerouter: StorageRouter
         """
         return StorageRouterController.update_volumedriver.delay(storagerouter.ip)
 
@@ -295,10 +399,20 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def configure_disk(self, storagerouter, disk_guid, offset, size, roles, partition_guid=None):
         """
         Configures a disk on a StorageRouter
+        :param storagerouter: StorageRouter on which to configure the disk
+        :type storagerouter: StorageRouter
+        :param disk_guid: The GUID of the Disk to configure
+        :type disk_guid: str
+        :param offset: The offset of the partition to configure
+        :type offset: int
+        :param size: The size of the partition to configure
+        :type size: int
+        :param roles: A list of all roles to be assigned
+        :type roles: list
+        :param partition_guid: The guid of the partition if applicable
+        :type partition_guid: str
         """
-        return StorageRouterController.configure_disk.s(
-            storagerouter.guid, disk_guid, partition_guid, offset, size, roles
-        ).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
+        return StorageRouterController.configure_disk.delay(storagerouter.guid, disk_guid, partition_guid, offset, size, roles)
 
     @action()
     @log()
@@ -308,6 +422,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def rescan_disks(self, storagerouter):
         """
         Triggers a disk sync on the given storagerouter
+        :param storagerouter: StorageRouter on which to rescan all disks
+        :type storagerouter: StorageRouter
         """
         return DiskController.sync_with_reality.delay(storagerouter.guid)
 
@@ -319,13 +435,15 @@ class StorageRouterViewSet(viewsets.ViewSet):
     def refresh_hardware(self, storagerouter):
         """
         Refreshes all hardware parameters
+        :param storagerouter: StorageRouter on which to refresh all hardware capabilities
+        :type storagerouter: StorageRouter
         """
         return StorageRouterController.refresh_hardware.delay(storagerouter.guid)
 
     @action()
     @log()
     @required_roles(['read', 'write', 'manage'])
-    @return_plain()
+    @return_simple()
     @load(StorageRouter)
     def set_domains(self, storagerouter, domain_guids, recovery_domain_guids):
         """
@@ -336,6 +454,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :type domain_guids: list
         :param recovery_domain_guids: A list of Domain guids to set as recovery Domain
         :type recovery_domain_guids: list
+        :return: None
+        :rtype: None
         """
         change = False
         for junction in storagerouter.domains:

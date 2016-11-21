@@ -24,9 +24,10 @@ from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.conf import settings
-from backend.decorators import required_roles, load
-from backend.exceptions import HttpBadRequestException
-from oauth2.decorators import auto_response, limit, authenticated
+from api.middleware import OVSMiddleware
+from api.backend.decorators import required_roles, load
+from api.backend.exceptions import HttpBadRequestException
+from api.oauth2.decorators import auto_response, limit, authenticated
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
@@ -142,10 +143,10 @@ def relay(*args, **kwargs):
     @authenticated()
     @required_roles(['read'])
     @load()
-    def _relay(_, ip, port, client_id, client_secret, version, request):
+    def _relay(_, ip, port, client_id, client_secret, raw_version, request):
         path = '/{0}'.format(request.path.replace('/api/relay/', ''))
         method = request.META['REQUEST_METHOD'].lower()
-        client = OVSClient(ip, port, credentials=(client_id, client_secret), version=version, raw_response=True)
+        client = OVSClient(ip, port, credentials=(client_id, client_secret), version=raw_version, raw_response=True)
         if not hasattr(client, method):
             raise HttpBadRequestException(error='unavailable_call',
                                           error_description='Method not available in relay')
@@ -158,11 +159,16 @@ def relay(*args, **kwargs):
                                 status=call_response.status_code)
         for header, value in call_response.headers.iteritems():
             response[header] = value
+        response['OVS-Relay'] = '{0}:{1}'.format(ip, port)
         return response
 
     try:
         return _relay(*args, **kwargs)
     except Exception as ex:
+        if OVSMiddleware.is_own_httpexception(ex):
+            return HttpResponse(ex.data,
+                                status=ex.status_code,
+                                content_type='application/json')
         message = str(ex)
         status_code = 400
         if hasattr(ex, 'detail'):

@@ -1,5 +1,5 @@
 [Unit]
-Description=ovs volumerouter consumer
+Description=Open vStorage volumerouter consumer
 Requires=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
 After=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
 

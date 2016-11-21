@@ -19,8 +19,7 @@ VPool module
 """
 import time
 from ovs.dal.dataobject import DataObject
-from ovs.dal.hybrids.backendtype import BackendType
-from ovs.dal.structures import Dynamic, Property, Relation
+from ovs.dal.structures import Dynamic, Property
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration
 
 
@@ -40,7 +39,7 @@ class VPool(DataObject):
                     Property('metadata', dict, mandatory=False, doc='Metadata for the backends, as used by the Storage Drivers.'),
                     Property('rdma_enabled', bool, default=False, doc='Has the vpool been configured to use RDMA for DTL transport, which is only possible if all storagerouters are RDMA capable'),
                     Property('status', STATUSES.keys(), doc='Status of the vPool')]
-    __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
+    __relations = []
     __dynamics = [Dynamic('configuration', dict, 3600),
                   Dynamic('statistics', dict, 4),
                   Dynamic('identifier', str, 120)]
@@ -93,10 +92,8 @@ class VPool(DataObject):
 
         dtl_host = file_system['fs_dtl_host']
         dtl_mode = file_system.get('fs_dtl_mode', StorageDriverClient.VOLDRV_DTL_ASYNC)
-        dedupe_mode = volume_manager['read_cache_default_mode']
         cluster_size = volume_manager['default_cluster_size'] / 1024
         dtl_transport = dtl['dtl_transport']
-        cache_strategy = volume_manager['read_cache_default_behaviour']
         sco_multiplier = volume_router['vrouter_sco_multiplier']
         dtl_config_mode = file_system['fs_dtl_config_mode']
         tlog_multiplier = volume_manager['number_of_scos_in_tlog']
@@ -108,12 +105,10 @@ class VPool(DataObject):
 
         return {'sco_size': sco_size,
                 'dtl_mode': StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_mode] if dtl_enabled is True else 'no_sync',
-                'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
                 'dtl_enabled': dtl_enabled,
                 'cluster_size': cluster_size,
                 'write_buffer': write_buffer,
                 'dtl_transport': StorageDriverClient.REVERSE_DTL_TRANSPORT_MAP[dtl_transport],
-                'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],
                 'dtl_config_mode': dtl_config_mode,
                 'tlog_multiplier': tlog_multiplier}
 

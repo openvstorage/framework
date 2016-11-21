@@ -79,5 +79,5 @@ class Toolbox(object):
     def create_hash(length):
         return ''.join(random.choice(string.ascii_letters +
                                      string.digits +
-                                     '|_=+*#@!/-[]{}<>.?,\'";:~')
+                                     '|_=+*#@!/-[]{}<>.?,;:~')
                        for _ in range(length))

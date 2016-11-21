@@ -22,9 +22,8 @@ import time
 from rest_framework import viewsets
 from rest_framework.decorators import link, action
 from rest_framework.permissions import IsAuthenticated
-from backend.decorators import required_roles, load, return_list, return_object, return_task, return_plain, log
-from backend.exceptions import HttpNotAcceptableException
-from ovs.dal.hybrids.storagedriver import StorageDriver
+from api.backend.decorators import required_roles, load, return_list, return_object, return_task, return_simple, log
+from api.backend.exceptions import HttpNotAcceptableException
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vdisklist import VDiskList
@@ -59,6 +58,7 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         Load information about a given vPool
         :param vpool: vPool object to retrieve
+        :type vpool: VPool
         """
         return vpool
 
@@ -71,7 +71,9 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         Retrieves a list of StorageRouters, serving a given vPool
         :param vpool: vPool to retrieve the storagerouter information for
+        :type vpool: VPool
         :param hints: Dictionary with hints
+        :type hints: dict
         """
         if hints.get('full', False) is True:
             return [storagedriver.storagerouter for storagedriver in vpool.storagedrivers]
@@ -86,8 +88,9 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         Remove the storagedriver linking the specified vPool and storagerouter_guid
         :param vpool: vPool to shrink (or delete if its the last storagerouter linked to it)
+        :type vpool: VPool
         :param storagerouter_guid: Guid of the Storage Router
-        :return: Celery tasks' async result
+        :type storagerouter_guid: str
         """
         sr = StorageRouter(storagerouter_guid)
         sd_guid = None
@@ -101,66 +104,22 @@ class VPoolViewSet(viewsets.ViewSet):
                                              error='impossible_request')
         return StorageRouterController.remove_storagedriver.delay(sd_guid)
 
-    @action()
-    @log()
-    @required_roles(['read', 'write', 'manage'])
-    @return_task()
-    @load(VPool)
-    def update_storagedrivers(self, vpool, storagedriver_guid, version, storagerouter_guids=None, storagedriver_guids=None):
-        """
-        Update Storage Drivers for a given vPool (both adding and removing Storage Drivers)
-        :param vpool: vPool to update
-        :param storagedriver_guid: Storage Driver to update
-        :param version: Version of API
-        :param storagerouter_guids: Storage Router guids
-        :param storagedriver_guids: Storage Driver guids
-        :return: Celery task
-        """
-        if version > 1:
-            raise HttpNotAcceptableException(error_description='Only available in API version 1',
-                                             error='invalid_version')
-        storagerouters = []
-        if storagerouter_guids is not None:
-            if storagerouter_guids.strip() != '':
-                for storagerouter_guid in storagerouter_guids.strip().split(','):
-                    storagerouter = StorageRouter(storagerouter_guid)
-                    storagerouters.append((storagerouter.ip, storagerouter.machine_id))
-        valid_storagedriver_guids = []
-        if storagedriver_guids is not None:
-            if storagedriver_guids.strip() != '':
-                for storagedriver_guid in storagedriver_guids.strip().split(','):
-                    storagedriver = StorageDriver(storagedriver_guid)
-                    if storagedriver.vpool_guid != vpool.guid:
-                        raise HttpNotAcceptableException(error_description='Given Storage Driver does not belong to this vPool',
-                                                         error='impossible_request')
-                    valid_storagedriver_guids.append(storagedriver.guid)
-
-        storagedriver = StorageDriver(storagedriver_guid)
-        parameters = {'connection_host': None if vpool.connection is None else vpool.connection.split(':')[0],
-                      'connection_port': None if vpool.connection is None else int(vpool.connection.split(':')[1]),
-                      'connection_username': vpool.login,
-                      'connection_password': vpool.password,
-                      'storage_ip': storagedriver.storage_ip,
-                      'type': vpool.backend_type.code,
-                      'vpool_name': vpool.name}
-        for field in parameters:
-            if isinstance(parameters[field], basestring):
-                parameters[field] = str(parameters[field])
-
-        return StorageRouterController.update_storagedrivers.delay(valid_storagedriver_guids, storagerouters, parameters)
-
     @link()
     @log()
     @required_roles(['read'])
-    @return_plain()
+    @return_simple()
     @load(VPool)
     def devicename_exists(self, vpool, name=None, names=None):
         """
         Checks whether a given name can be created on the vpool
         :param vpool: vPool object
+        :type vpool: VPool
         :param name: Candidate name
+        :type name: str
         :param names: Candidate names
-        :return: True or False
+        :type names: list
+        :return: Whether the devicename exists
+        :rtype: bool
         """
         error_message = None
         if not (name is None) ^ (names is None):
@@ -196,11 +155,11 @@ class VPoolViewSet(viewsets.ViewSet):
         :type name: str
         :param timestamp: Timestamp of the snapshot
         :type timestamp: int
-        :param consistent: Flag - is_consistent
+        :param consistent: Indicates whether the snapshots will contain consistent data
         :type consistent: bool
-        :param automatic: Flag - is_automatic
+        :param automatic: Indicate whether the snaphots are taken by an automatic process or manually
         :type automatic: bool
-        :param sticky: Flag - is_sticky
+        :param sticky: Indicates whether the system should clean the snapshots
         :type sticky: bool
         """
         if timestamp is None:

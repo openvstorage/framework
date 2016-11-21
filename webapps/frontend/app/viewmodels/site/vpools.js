@@ -30,13 +30,11 @@ define([
         self.refresher    = new Refresher();
         self.widgets      = [];
         self.vPoolHeaders = [
-            { key: 'status',            value: '',                                        width: 30        },
-            { key: 'name',              value: $.t('ovs:generic.name'),                   width: 150       },
-            { key: 'storedData',        value: $.t('ovs:generic.storeddata'),             width: 175       },
-            { key: 'iops',              value: $.t('ovs:generic.iops'),                   width: 125       },
-            { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),             width: 180       },
-            { key: 'backendConnection', value: $.t('ovs:vpools.backendconnectionpreset'), width: 230       },
-            { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),            width: undefined }
+            { key: 'status',     value: '',                               width: 30        },
+            { key: 'name',       value: $.t('ovs:generic.name'),          width: undefined },
+            { key: 'backend',    value: $.t('ovs:vpools.backend_preset'), width: 250       },
+            { key: 'storedData', value: $.t('ovs:generic.storeddata'),    width: 150       },
+            { key: 'iops',       value: $.t('ovs:generic.iops'),          width: 150       }
         ];
         self.vPoolCache = {};
 
@@ -51,7 +49,7 @@ define([
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.vPoolsHandle[options.page])) {
                     options.sort = 'name';
-                    options.contents = '_dynamics,backend_type';
+                    options.contents = '_dynamics';
                     self.vPoolsHandle[options.page] = api.get('vpools', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({
@@ -61,9 +59,6 @@ define([
                                         self.vPoolCache[guid] = new VPool(guid);
                                     }
                                     return self.vPoolCache[guid];
-                                },
-                                dependencyLoader: function(item) {
-                                    item.loadBackendType(false);
                                 }
                             });
                         })
@@ -83,7 +78,7 @@ define([
         self.activate = function() {
             self.refresher.init(function() {
                 if (generic.xhrCompleted(self.vPoolsHandle[undefined])) {
-                    self.vPoolsHandle[undefined] = api.get('vpools', { queryparams: { contents: 'statistics,backend_type' }})
+                    self.vPoolsHandle[undefined] = api.get('vpools', { queryparams: { contents: 'statistics' }})
                         .done(function(data) {
                             var guids = [], vpdata = {};
                             $.each(data.data, function(index, item) {

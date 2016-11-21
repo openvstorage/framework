@@ -26,8 +26,9 @@ define([
         self.shared = shared;
 
         // Handles
+        self.loadChildrenHandle      = undefined;
+        self.loadConfigHandle        = undefined;
         self.loadHandle              = undefined;
-        self.loadConfig              = undefined;
         self.loadStorageRouterHandle = undefined;
 
         // External dependencies
@@ -38,45 +39,40 @@ define([
         self.vpool              = ko.observable();
 
         // Observables
-        self.backendRead           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.backendWritten        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.bandwidthSaved        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.cacheHits             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheMisses           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheStrategies       = ko.observableArray(['on_read', 'on_write', 'none']);
-        self.cacheStrategy         = ko.observable('on_read');
-        self.deviceName            = ko.observable();
-        self.dedupeMode            = ko.observable();
-        self.dedupeModes           = ko.observableArray([{name: 'dedupe', disabled: false}, {name: 'non_dedupe', disabled: false}]);
-        self.dtlEnabled            = ko.observable(true);
-        self.dtlManual             = ko.observable();
-        self.dtlMode               = ko.observable();
-        self.dtlStatus             = ko.observable();
-        self.dtlTarget             = ko.observableArray([]);
-        self.edgeClients           = ko.observableArray([]);
-        self.guid                  = ko.observable(guid);
-        self.iops                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.isVTemplate           = ko.observable();
-        self.loaded                = ko.observable(false);
-        self.loading               = ko.observable(false);
-        self.loadingConfig         = ko.observable(false);
-        self.name                  = ko.observable();
-        self.namespace             = ko.observable();
-        self.oldConfiguration      = ko.observable();
-        self.readCacheLimit        = ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}});
-        self.readSpeed             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.scoSize               = ko.observable(4);
-        self.scoSizes              = ko.observableArray([4, 8, 16, 32, 64, 128]);
-        self.size                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.snapshots             = ko.observableArray([]);
-        self.storageRouterGuid     = ko.observable();
-        self.storedData            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.templateChildrenGuids = ko.observableArray([]);
-        self.totalCacheHits        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.volumeId              = ko.observable();
-        self.vpoolGuid             = ko.observable();
-        self.writeSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.writeBuffer           = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
+        self.backendRead       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendWritten    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.cacheHits         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheMisses       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.childrenGuids     = ko.observableArray([]);
+        self.deviceName        = ko.observable();
+        self.dtlEnabled        = ko.observable(true);
+        self.dtlManual         = ko.observable();
+        self.dtlMode           = ko.observable();
+        self.dtlStatus         = ko.observable();
+        self.dtlTarget         = ko.observableArray([]);
+        self.edgeClients       = ko.observableArray([]);
+        self.guid              = ko.observable(guid);
+        self.iops              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.isVTemplate       = ko.observable();
+        self.loaded            = ko.observable(false);
+        self.loading           = ko.observable(false);
+        self.loadingConfig     = ko.observable(false);
+        self.name              = ko.observable();
+        self.namespace         = ko.observable();
+        self.oldConfiguration  = ko.observable();
+        self.readSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.scoSize           = ko.observable(4);
+        self.scoSizes          = ko.observableArray([4, 8, 16, 32, 64, 128]);
+        self.size              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.snapshots         = ko.observableArray([]);
+        self.storageRouterGuid = ko.observable();
+        self.storedData        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.totalCacheHits    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.volumeId          = ko.observable();
+        self.vpoolGuid         = ko.observable();
+        self.writeSpeed        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.writeBuffer       = ko.observable(128).extend({numeric: {min: 128, max: 10240}});
 
         // Computed
         self.dtlModes = ko.computed(function() {
@@ -117,21 +113,15 @@ define([
                 return {
                     sco_size: self.scoSize(),
                     dtl_mode: self.dtlEnabled() === true ? self.dtlMode() : 'no_sync',
-                    dedupe_mode: self.dedupeMode() !== undefined ? self.dedupeMode().name : undefined,
                     write_buffer: self.writeBuffer(),
-                    dtl_target: self.dtlTarget().slice(),
-                    cache_strategy: self.cacheStrategy(),
-                    readcache_limit: self.readCacheLimit() || null
+                    dtl_target: self.dtlTarget().slice()
                 }
             },
             write: function(configData) {
                 self.writeBuffer(Math.round(configData.write_buffer));
                 self.scoSize(configData.sco_size);
                 self.dtlMode(configData.dtl_mode);
-                self.dedupeMode({name: configData.dedupe_mode, disabled: false});
                 self.dtlTarget(self.dtlManual() ? configData.dtl_target.slice() : []);
-                self.cacheStrategy(configData.cache_strategy);
-                self.readCacheLimit(configData.readcache_limit);
             }
         });
         self.scoSize.subscribe(function(size) {
@@ -251,12 +241,12 @@ define([
             self.loaded(true);
             self.loading(false);
         };
-        self.fetchTemplateChildrenGuids = function() {
+        self.fetchChildrenGuids = function() {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadChildrenGuid)) {
-                    self.loadChildrenGuid = api.get('vdisks/' + self.guid() + '/get_children')
+                if (generic.xhrCompleted(self.loadChildrenHandle)) {
+                    self.loadChildrenHandle = api.get('vdisks/' + self.guid() + '/get_children')
                         .done(function(data) {
-                            self.templateChildrenGuids(data.data);
+                            self.childrenGuids(data.data);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
@@ -288,39 +278,33 @@ define([
                 self.loadingConfig(true);
             }
             return $.Deferred(function(deferred) {
-                self.loadConfig = api.get('vdisks/' + self.guid() + '/get_config_params')
-                    .then(self.shared.tasks.wait)
-                    .done(function(data) {
-                        if (data.hasOwnProperty('metadata_cache_size')) {
-                            delete data['metadata_cache_size'];
-                        }
-                        self.dtlEnabled(data.dtl_mode !== 'no_sync');
-                        if (data.dedupe_mode !== undefined && data.dedupe_mode === 'non_dedupe') {
-                            $.each(self.dedupeModes(), function (i, key) {
-                                if (key.name === 'dedupe') {
-                                    self.dedupeModes()[i].disabled = true;
-                                    return false;
-                                }
-                            });
-                        }
-                        self.configuration(data);
-                        data = self.configuration(); // Pass through the getter/setter for possible cleanups
-                        if (self.oldConfiguration() === undefined) {
-                            self.oldConfiguration($.extend({}, data)); // Used to make comparison to check for changes
-                            $.each(self.oldConfiguration(), function (key, _) {
-                                if (key === 'write_buffer') {
-                                    var oldConfig = self.oldConfiguration();
-                                    oldConfig.write_buffer = Math.round(self.oldConfiguration().write_buffer);
-                                    self.oldConfiguration(oldConfig);
-                                }
-                            });
-                        }
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject)
-                    .always(function() {
-                        self.loadingConfig(false);
-                    })
+                if (generic.xhrCompleted(self.loadConfigHandle)) {
+                    self.loadConfigHandle = api.get('vdisks/' + self.guid() + '/get_config_params')
+                        .then(self.shared.tasks.wait)
+                        .done(function (data) {
+                            if (data.hasOwnProperty('metadata_cache_size')) {
+                                delete data['metadata_cache_size'];
+                            }
+                            self.dtlEnabled(data.dtl_mode !== 'no_sync');
+                            self.configuration(data);
+                            data = self.configuration(); // Pass through the getter/setter for possible cleanups
+                            if (self.oldConfiguration() === undefined) {
+                                self.oldConfiguration($.extend({}, data)); // Used to make comparison to check for changes
+                                $.each(self.oldConfiguration(), function (key, _) {
+                                    if (key === 'write_buffer') {
+                                        var oldConfig = self.oldConfiguration();
+                                        oldConfig.write_buffer = Math.round(self.oldConfiguration().write_buffer);
+                                        self.oldConfiguration(oldConfig);
+                                    }
+                                });
+                            }
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject)
+                        .always(function () {
+                            self.loadingConfig(false);
+                        })
+                }
             }).promise();
         };
     };

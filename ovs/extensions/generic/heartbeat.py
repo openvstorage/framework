@@ -59,7 +59,7 @@ class HeartBeat(object):
                     # check timeout of other nodes and clear arp cache
                     if node.heartbeats and 'process' in node.heartbeats:
                         if current_time - node.heartbeats['process'] >= HeartBeat.ARP_TIMEOUT:
-                            check_output("/usr/sbin/arp -d {0}".format(node.name), shell=True)
+                            check_output("/usr/sbin/arp -d '{0}'".format(node.name.replace(r"'", r"'\''")), shell=True)
                 except CalledProcessError:
                     logger.exception('Error clearing ARP cache')
 

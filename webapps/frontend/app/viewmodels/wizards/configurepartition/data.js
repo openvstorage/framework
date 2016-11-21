@@ -29,13 +29,12 @@ define(['knockout', 'jquery'], function(ko, $){
                 return [];
             }
             var db = {name: 'db'},
-                read = {name: 'read'},
                 write = {name: 'write'},
                 scrub = {name: 'scrub'},
-                roles = [db, read, write, scrub],
+                roles = [db, scrub, write],
                 hide_db = false,
                 hide_scrub = false,
-                dictionary = {DB: db, READ: read, WRITE: write, SCRUB: scrub};
+                dictionary = {DB: db, WRITE: write, SCRUB: scrub};
             $.each(data.currentUsage(), function(role, partitions) {
                 if (role !== 'BACKEND') {
                     if (partitions.length > 0) {

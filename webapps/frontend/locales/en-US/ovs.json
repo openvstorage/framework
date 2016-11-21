@@ -1,5 +1,5 @@
 {
-    "license": [
+    "_license": [
         "  Copyright 2016 iNuron NV",
         " This file is part of Open vStorage Open Source Edition (OSE),",
         " as available from",
@@ -15,466 +15,21 @@
         " Open vStorage is distributed in the hope that it will be useful,",
         " but WITHOUT ANY WARRANTY of any kind."
     ],
-    "releasename": "Fargo",
-    "generic": {
-        "states": {
-            "backend": {
-                "new": "New",
-                "installing": "Installing",
-                "running": "Running",
-                "stopped": "Stopped",
-                "failure": "Failure",
-                "unknown": "Unknown"
-            },
-            "disk": {
-                "ok": "OK",
-                "missing": "Missing",
-                "failure": "Failure",
-                "raw": "Raw disk"
-            },
-            "dtl": {
-                "catch_up": "Rebuilding",
-                "degraded": "Degraded",
-                "ok_standalone": "Healthy (standalone)",
-                "ok_sync": "Healthy (sync)",
-                "checkup_required": "DTL should be configured",
-                "undefined": "Unknown",
-                "unknown": "Unknown"
-            },
-            "storagerouter": {
-                "ok": "OK",
-                "warning": "Warning",
-                "failure": "Failure",
-                "undefined": "Unknown",
-                "unknown": "Unknown"
-            },
-            "vpool": {
-                "DELETING": "Deleting",
-                "EXTENDING": "Extending",
-                "FAILURE": "Failure",
-                "INSTALLING": "Installing",
-                "RUNNING": "Running",
-                "SHRINKING": "Shrinking"
-            }
+    "backends": {
+        "add": "Add Backend",
+        "edit": {
+            "edit": "Edit backend"
         },
-        "messages": {
-            "savesuccessfully": "__what__ saved successfully.",
-            "errorwhile": "An error occurred while __what__."
+        "new": {
+            "complete": "Backend added",
+            "addsuccess": "The backend was added. Please open the details to configure",
+            "addfailed": "The backend could not be added: __why__"
         },
-        "backendtypes": {
-            "s3": "S3",
-            "amazon_s3": "S3 compatible",
-            "ceph_s3": "Ceph S3",
-            "swift_s3": "Swift S3",
-            "local": "Local FS",
-            "distributed": "Distributed FS",
-            "alba": "Open vStorage Backend"
+        "save": {
+            "success": "The backend was successfully saved",
+            "failure": "Error saving the backend"
         },
-        "granttypes": {
-            "PASSWORD": "Password Credentials",
-            "CLIENT_CREDENTIALS": "Client Credentials"
-        },
-        "partitionroles": {
-            "db": "DB",
-            "read": "Read",
-            "scrub": "Scrub",
-            "write": "Write",
-            "backend": "Backend"
-        },
-        "rights": {
-            "complete": "Applied",
-            "failed": "Error applying Access Rights: __why__",
-            "started_msg": "The Access Rights are being applied",
-            "success": "The Access Rights were succesfully applied",
-            "started": "Applying"
-        },
-        "units": {
-            "b": "B",
-            "bs": "B/s",
-            "g": "G",
-            "gi": "Gi",
-            "gib": "GiB",
-            "gibs": "GiB/s",
-            "k": "k",
-            "ki": "Ki",
-            "kib": "KiB",
-            "kibs": "KiB/s",
-            "m": "M",
-            "mi": "Mi",
-            "mib": "MiB",
-            "mibs": "MiB/s",
-            "t": "T",
-            "ti": "Ti",
-            "tib": "TiB",
-            "tibs": "TiB/s"
-        },
-        "fragmentcaches": {
-            "rw": "On Read & Write",
-            "read": "On Read",
-            "write": "On Write",
-            "none": "No Caching"
-        },
-        "api_errors": {
-            "internal_server": "Unknown server exception",
-            "rate_limit_timeout": "Waiting for API rate-limit lock to be released",
-            "rate_limit_reached": "Reached API rate-limit",
-            "not_authenticated": "Not authenticated",
-            "invalid_roles": "Insufficient rights",
-            "object_not_found": "The object could not be located",
-            "invalid_data": "Invalid data entered",
-            "no_ownership": "No access to this object",
-            "in_use": "The object is still in use",
-            "impossible_request": "The request is not possible",
-            "unavailable_call": "The call is unavailable in the relay",
-            "relay_error": "Error while relaying the call",
-            "unavailable": "The call is unavailable"
-        },
-        "about": "About",
-        "accept": "Accept",
-        "access_rights": "Access Rights",
-        "access_right_resolution": "Access is implicitly <b>denied</b>. However, if the logged in client has an active <b>manage</b> role, access is implicitly <b>granted</b>. An explicit <b>deny</b> wins over any <b>grant</b>. Users logging in into the GUI always use the Access Rights of the user. A grey tick indicates implicit rights, a dark tick indicates explicit rights.",
-        "actions": "Actions",
-        "address": "Address",
-        "administration": "Administration",
-        "aliases": "Aliases",
-        "api": "API",
-        "areyousure": "Are you sure?",
-        "backendtype": "Type",
-        "bandwidth": "Bandwidth",
-        "cache": "Cache",
-        "cancel": "Cancel",
-        "changepassword": "Change password",
-        "children": "Children",
-        "city": "City",
-        "client": "Client",
-        "clone": "Create clones",
-        "component": "Component",
-        "consistent": "Consistent",
-        "consistentss": "Consistent snapshots",
-        "country": "Country",
-        "current": "Current",
-        "custompath": "Custom path",
-        "customvalue": "Custom:",
-        "datetime": "Date / Time",
-        "default": "Default",
-        "deny": "Deny",
-        "description": "Description",
-        "devicename": "Device Name",
-        "disk": "Disk",
-        "disks": "Disks",
-        "domain": "Domain",
-        "domains": "Domains",
-        "dtl_port": "DTL Port",
-        "dtl_status": "DTL",
-        "edge": "Edge",
-        "edgeclients": "Edge Clients",
-        "elementsloading": "Items loading...",
-        "error": "Error",
-        "errorsfound": "Errors were found. Please check the contents of all fields.",
-        "filesystem": "Filesystem",
-        "finish": "Finish",
-        "finished": "Finished",
-        "followingerrorsfound": "Following errors were found:",
-        "for": "for",
-        "from": "from",
-        "fs": "FS",
-        "generated": "Generated",
-        "grant": "Grant",
-        "group": "Group",
-        "host": "Host",
-        "inconsistentss": "Inconsistent snapshots",
-        "inheritedfrom": "Inherited from",
-        "iops": "IOPS",
-        "ip": "IP",
-        "latency": "Latency",
-        "loadingdata": "Loading data...",
-        "logging": "Kibana logging",
-        "logout": "Log out",
-        "machine": "Machine",
-        "machines": "Machines",
-        "management": "Management actions",
-        "metadata": "Metadata",
-        "mgmtcenter": "Mgmt. Center",
-        "mgmtport": "Management",
-        "mountpoint": "Mountpoint",
-        "name": "Name",
-        "namespace": "Backend Location",
-        "next": "Next &raquo;",
-        "no": "No",
-        "noclients": "No Edge Clients connected",
-        "noelements": "No items available",
-        "noentries": "No entries available",
-        "nothingselected": "Nothing selected",
-        "nrofsnapshots": "# Snapshots",
-        "nrofvdisks": "# vDisks",
-        "nrofvpools": "# vPools",
-        "null": "-",
-        "of": "of",
-        "ok": "OK",
-        "partitionusage": "Detailed partition usage:",
-        "password": "Password",
-        "performance": "Performance",
-        "port": "Port",
-        "previous": "&laquo; Previous",
-        "rawdisk": "Raw disk",
-        "rawpartition": "Raw partition",
-        "read": "Read",
-        "readspeed": "Read Speed",
-        "recovery_domains": "Recovery Domains",
-        "reload": "Reload",
-        "removesnapshot": "Remove Snapshot",
-        "rescan": "Rescan",
-        "results": "results",
-        "resultspp": "results per page",
-        "roles": "Roles",
-        "save": "Save",
-        "saved": "Saved",
-        "scrub": "Scrub",
-        "showing": "Showing",
-        "signin": "Sign in",
-        "size": "Size",
-        "sizeamount": "Size: __amount__",
-        "sizeunspecified": "Size up to __amount__",
-        "snapshots": "Snapshots",
-        "spaceleft": "__amount__ left",
-        "state": "State",
-        "status": "Status",
-        "sticky": "Sticky",
-        "storageip": "Storage IP",
-        "storagerouter": "Storage Router",
-        "storagerouters": "Storage Routers",
-        "storeddata": "Stored Data",
-        "templatehaschildren": "This vTemplate does have children",
-        "tempspace": "Temporary files",
-        "thousandseparator": ",",
-        "togglenavigation": "Toggle navigation",
-        "topbandwidth": "Top Bandwidth",
-        "topstoreddata": "Top Stored Data",
-        "type": "Type",
-        "unavailable": "Unavailable",
-        "usedports": "Used Ports",
-        "usage": "Usage",
-        "user": "User",
-        "user_client": "User/Client",
-        "username": "Username",
-        "validuntil": "Valid until",
-        "vdisk": "vDisk",
-        "vdisks": "vDisks",
-        "vpool": "vPool",
-        "vpools": "vPools",
-        "vtemplate": "vTemplate",
-        "warning": "Warning",
-        "welcome": "Welcome",
-        "write": "Write",
-        "writespeed": "Write Speed",
-        "xmlrpcport": "XML-RPC",
-        "xmore": "__amount__ more...",
-        "yes": "Yes"
-    },
-    "storagerouters": {
-        "title": "Storage Routers",
-        "details": "Storage Router Details",
-        "detail": {
-            "disks": {
-                "title": "Physical disks",
-                "rescan": {
-                    "success": "Rescan finished",
-                    "scanning": "rescanning",
-                    "started": "Rescan started",
-                    "inprogress": "The disks of this Storage Router are being rescanned"
-                }
-            },
-            "refresh": {
-                "success": "Refresh finished",
-                "refreshing": "refreshing",
-                "started": "Refresh started",
-                "inprogress": "The hardware capabilities of this Storage Router are being refreshed"
-            },
-            "hostip": "Host IP",
-            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
-            "moveaway": {
-                "warning": "Are you sure you want to move all vDisks away?",
-                "title": "Are you sure",
-                "no": "Cancel",
-                "yes": "Move away",
-                "marked": "Moving away started",
-                "marked_msg": "All vDisks will be moved away from this Storage Router",
-                "done": "Move away complete",
-                "done_msg": "All vDisks have been moved away from __what__",
-                "error_msg": "moving away all vDisks from __what__"
-            },
-            "moveawaymsg": "Move all vDisks away from this Storage Router and start them on other Storage Routers.",
-            "moveawaytitle": "Move all vDisks",
-            "rdma_capable": "RDMA Capable",
-            "save": {
-                "success": "This Storage Router was saved.",
-                "failure": "Error saving this Storage Router."
-            },
-            "scrub_capable": "SCRUB Capable",
-            "storageroutervpoollink": "vPools served by this Storage Router",
-            "title": "Storage Router",
-            "updateserving": "Save changes",
-            "edit": "Edit some properties of this Storage Router",
-            "refreshtt": "Refresh the hardware capabilities of this Storage Router",
-            "offline": {
-                "mark": "Mark this node Offline",
-                "warning": "Please make sure the Storage Router is actually down and unavailable before marking the Storage Router as offline. Marking the Storage Router as offline while it is still available might lead to data corruption.",
-                "title": "Warning",
-                "yes": "Yes, it's offline",
-                "no": "No, back to safety",
-                "pending": "Pending",
-                "pendingmsg": "The Storage Router is being marked offline",
-                "done": "Marked offline",
-                "done_msg": "The Storage Router was marked offline",
-                "error_msg": "marking the Storage Router offline: __error__"
-            }
-        }
-    },
-    "storagedrivers": {
-        "configuration": {
-            "general": {
-                "cache_strategies": {
-                    "none": "No Cache",
-                    "null": "-",
-                    "on_read": "Cache On Read",
-                    "on_write": "Cache On Write"
-                },
-                "caching": "Caching",
-                "cluster_size": "Cluster size",
-                "dedupe": "Deduplication",
-                "dedupe_help_message": "Deduplication will calculate an MD5 sum for each write resulting in performance loss, but better cache performance",
-                "dedupe_help_title": "Help - Deduplication",
-                "dedupe_modes": {
-                    "dedupe": "Deduped",
-                    "non_dedupe": "Non-Deduped",
-                    "null": "-"
-                },
-                "dtl": "Distributed Transaction Log",
-                "dtl_help_message": "Copies unprotected data in the write buffer of a vDisk to another Storage Router",
-                "dtl_help_title": "Distributed Transaction Log",
-                "dtl_mode": "Mode",
-                "dtl_modes": {
-                    "a_sync": "Asynchronous",
-                    "no_sync": "Disabled",
-                    "sync": "Synchronous",
-                    "undefined": "Unknown"
-                },
-                "dtl_target": "Target Domain",
-                "dtl_transport": "Transport Mode",
-                "dtl_transport_modes": {
-                    "rdma": "RDMA",
-                    "tcp": "TCP"
-                },
-                "readcache_limit": "Read cache limit",
-                "sco_size": "SCO size",
-                "strategy": "Strategy",
-                "volume": "Volumes",
-                "write_buffer": "Maximum write buffer"
-            },
-            "vdisk": {
-                "volume": "Volume"
-            }
-        }
-    },
-    "vpools": {
-        "add": "Add new vPool",
-        "backend": "Backend",
-        "backendconnectionpreset": "Connection (Preset)",
-        "backendconnection": "Connection",
-        "backendpreset": "Preset",
-        "backendlogin": "Login",
-        "backendtype": "Type",
-        "cache_strategy": "Cache Strategy",
-        "cluster_size": "Cluster Size",
-        "configuration": "Configurations",
-        "dedupe_mode": "Dedupe Mode",
-        "dtl": "DTL",
-        "dtl_disabled": "Disabled",
-        "dtl_mode": "DTL Mode",
-        "dtl_transport": "DTL Transport",
-        "freespace": "Free space",
-        "global_write_buffer": "Global Write Buffer",
-        "sco_size": "SCO Size",
-        "statistics": "Statistics",
-        "title": "vPools",
-        "volume_write_buffer": "Volume Write Buffer",
-        "write_buffer": "Write Buffer",
-        "detail": {
-            "title": "vPool",
-            "introduction": "Below an overview of the vPool properties.",
-            "storageroutervpoollink": "Storage Routers serving this vPool",
-            "updateserving": "Save changes",
-            "localvpool": "A vPool on Local Filesystem can not be shared across multiple Storage Routers.",
-            "logging": "vPool logs",
-            "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
-            "logginginfo2": "Open Kibana",
-            "logginginfo3": "to view this vPool's logs.",
-            "configuration": "vPool configuration defaults",
-            "configurationinfo": "Below are the default/fallback values for this vPool's vDisks. If a vDisk has no specific settings, settings will be inherited from its vPool."
-        },
-        "saveconfig": {
-            "done": "Save complete",
-            "done_msg": "The configuration details for __what__ are saved.",
-            "error_msg": "saving __what__"
-        }
-    },
-    "vdisks": {
-        "add": "Add new vDisk",
-        "title": "vDisks",
-        "details": "Details",
-        "performance": "Performance",
-        "detail": {
-            "clone": "Clone",
-            "configuration": "vDisk configuration",
-            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
-            "edgeclients": "Edge Clients",
-            "move": "Move",
-            "rollback": "Rollback",
-            "scrub": "Scrub",
-            "set_as_template": "Set as vTemplate",
-            "snapshot": "Take snapshot",
-            "snapshots": "Snapshots",
-            "title": "vDisk"
-        },
-        "set_as_template": {
-            "done": "vDisk set as vTemplate",
-            "done_msg": "vDisk __what__ set as vTemplate",
-            "error_msg": "setting __what__ as vTemplate: __error__",
-            "marked": "Marked for setting as vTemplate",
-            "marked_msg": "vDisk __what__ is marked for setting as vTemplate...",
-            "no": "Close",
-            "title": "Set vDisk __what__ as vTemplate",
-            "warning": "Warning: After converting a vDisk into a vTemplate, it can no longer actively be used.",
-            "yes": "Set as vTemplate"
-        },
-        "saveconfig": {
-            "done": "Save complete",
-            "done_msg": "The configuration details for __what__ are saved.",
-            "error_msg": "saving __what__"
-        },
-        "removesnapshot": {
-            "delete": "Are you sure you want to remove snapshot __what__?",
-            "done": "Snapshot removed",
-            "done_msg": "Snapshot __what__ was removed successfully.",
-            "error_msg": "Failed to remove snapshot __what__."
-        },
-        "delete": {
-            "warning": "Are you sure you want to delete __what__?",
-            "marked": "Marked for deletion",
-            "marked_msg": "vDisk __what__ is marked for deletion...",
-            "done": "vDisk deleted",
-            "done_msg": "vDisk __what__ deleted",
-            "error_msg": "deleting __what__"
-        }
-    },
-    "edgeclients": {
-        "title": "Edge Clients"
-    },
-    "vtemplates": {
-        "vdisks": {
-            "title": "vDisk Templates"
-        },
-        "title": "vTemplates"
+        "title": "Backends"
     },
     "dashboard": {
         "title": "Dashboard",
@@ -510,42 +65,474 @@
             "deletefailed": "Could not delete the Domain: __why__"
         }
     },
-    "users": {
-        "title": "User Mgmt.",
-        "users": {
-            "title": "Users"
+    "downtime": {
+        "general": "Following service__multiple__ will experience downtime:",
+        "ovsdb": "Model availability",
+        "proxy": "Proxy service for vpool",
+        "voldrv": "Storage Driver availability"
+    },
+    "generic": {
+        "about": "About",
+        "accept": "Accept",
+        "access_rights": "Access Rights",
+        "access_right_resolution": "Access is implicitly <b>denied</b>. However, if the logged in client has an active <b>manage</b> role, access is implicitly <b>granted</b>. An explicit <b>deny</b> wins over any <b>grant</b>. Users logging in into the GUI always use the Access Rights of the user. A grey tick indicates implicit rights, a dark tick indicates explicit rights.",
+        "actions": "Actions",
+        "address": "Address",
+        "administration": "Administration",
+        "aliases": "Aliases",
+        "api": "API",
+        "api_errors": {
+            "impossible_request": "The request is not possible",
+            "in_use": "The object is still in use",
+            "internal_server": "Unknown server exception",
+            "invalid_data": "Invalid data entered",
+            "invalid_roles": "Insufficient rights",
+            "object_not_found": "The object could not be located",
+            "no_ownership": "No access to this object",
+            "not_authenticated": "Not authenticated",
+            "rate_limit_reached": "Reached API rate-limit",
+            "rate_limit_timeout": "Waiting for API rate-limit lock to be released",
+            "relay_error": "Error while relaying the call",
+            "unavailable": "The call is unavailable",
+            "unavailable_call": "The call is unavailable in the relay"
         },
-        "clients": {
-            "title": "OAuth 2 Clients",
-            "information": "Below are the configured OAuth 2 Clients for the selected User. Please note that only the Grant type &quot;Client Credentials&quot; is supported.",
-            "clientid": "Client ID",
-            "clientsecret": "Client secret",
-            "granttype": "Grant type",
-            "roles": "Roles",
-            "complete": "Completed",
-            "deletesuccess": "The Client was deleted successfully",
-            "deletefailed": "Could not delete the Client: __why__",
-            "addsuccess": "The Client was added successfully",
-            "addfailed": "Could not add the Client: __why__",
-            "delete": "Are you sure you want to delete Client: __what__?"
+        "areyousure": "Are you sure?",
+        "backend_type": "Type",
+        "backendtypes": {
+            "alba": "Open vStorage Backend"
         },
-        "save": {
-            "complete": "Save completed",
-            "success": "User __what__ updated.",
-            "failed": "Updating __what__ failed: __why__"
+        "bandwidth": "Bandwidth",
+        "cache": "Cache",
+        "cancel": "Cancel",
+        "changepassword": "Change password",
+        "children": "Children",
+        "city": "City",
+        "client": "Client",
+        "component": "Component",
+        "consistent": "Consistent",
+        "consistentss": "Consistent snapshots",
+        "country": "Country",
+        "current": "Current",
+        "custompath": "Custom path",
+        "customvalue": "Custom:",
+        "datetime": "Date / Time",
+        "default": "Default",
+        "deny": "Deny",
+        "description": "Description",
+        "devicename": "Device Name",
+        "disk": "Disk",
+        "disks": "Disks",
+        "domain": "Domain",
+        "domains": "Domains",
+        "dtl_port": "DTL Port",
+        "dtl_status": "DTL",
+        "edge": "Edge",
+        "edge_clients": "Edge Clients",
+        "elementsloading": "Items loading...",
+        "error": "Error",
+        "errorsfound": "Errors were found. Please check the contents of all fields.",
+        "filesystem": "Filesystem",
+        "finish": "Finish",
+        "finished": "Finished",
+        "followingerrorsfound": "Following errors were found:",
+        "for": "for",
+        "fragmentcaches": {
+            "none": "No Caching",
+            "read": "On Read",
+            "rw": "On Read & Write",
+            "write": "On Write"
         },
-        "new": {
-            "complete": "Created",
-            "addsuccess": "User created",
-            "addfailed": "User could not be created: __why__"
+        "from": "from",
+        "fs": "FS",
+        "generated": "Generated",
+        "grant": "Grant",
+        "granttypes": {
+            "CLIENT_CREDENTIALS": "Client Credentials",
+            "PASSWORD": "Password Credentials"
         },
-        "delete": {
-            "delete": "Are you sure you want to delete user __what__?",
-            "complete": "Deleted",
-            "deletesuccess": "User deleted",
-            "deletefailed": "Could not delete the user: __why__"
+        "group": "Group",
+        "host": "Host",
+        "inconsistentss": "Inconsistent snapshots",
+        "inheritedfrom": "Inherited from",
+        "iops": "IOPS",
+        "ip": "IP",
+        "latency": "Latency",
+        "loadingdata": "Loading data...",
+        "logout": "Log out",
+        "machine": "Machine",
+        "machines": "Machines",
+        "management": "Management actions",
+        "messages": {
+            "errorwhile": "An error occurred while __what__.",
+            "savesuccessfully": "__what__ saved successfully."
+        },
+        "metadata": "Metadata",
+        "mgmtcenter": "Mgmt. Center",
+        "mgmtport": "Management",
+        "mountpoint": "Mountpoint",
+        "name": "Name",
+        "namespace": "Backend Location",
+        "next": "Next &raquo;",
+        "no": "No",
+        "noclients": "No Edge Clients connected",
+        "noelements": "No items available",
+        "noentries": "No entries available",
+        "nothingselected": "Nothing selected",
+        "nrofsnapshots": "# Snapshots",
+        "nrofvdisks": "# vDisks",
+        "nrofvpools": "# vPools",
+        "null": "-",
+        "of": "of",
+        "ok": "OK",
+        "partitionroles": {
+            "backend": "Backend",
+            "db": "DB",
+            "scrub": "Scrub",
+            "write": "Write"
+        },
+        "partitionusage": "Detailed partition usage:",
+        "password": "Password",
+        "performance": "Performance",
+        "port": "Port",
+        "previous": "&laquo; Previous",
+        "rawdisk": "Raw disk",
+        "rawpartition": "Raw partition",
+        "read": "Read",
+        "read_speed": "Read Speed",
+        "recovery_domains": "Recovery Domains",
+        "reload": "Reload",
+        "remove_snapshot": "Remove Snapshot",
+        "rescan": "Rescan",
+        "results": "results",
+        "resultspp": "results per page",
+        "rights": {
+            "complete": "Applied",
+            "failed": "Error applying Access Rights: __why__",
+            "started": "Applying",
+            "started_msg": "The Access Rights are being applied",
+            "success": "The Access Rights were succesfully applied"
+        },
+        "roles": "Roles",
+        "save": "Save",
+        "saved": "Saved",
+        "scrub": "Scrub",
+        "showing": "Showing",
+        "signin": "Sign in",
+        "size": "Size",
+        "sizeamount": "Size: __amount__",
+        "sizeunspecified": "Size up to __amount__",
+        "snapshots": "Snapshots",
+        "spaceleft": "__amount__ left",
+        "state": "State",
+        "states": {
+            "backend": {
+                "failure": "Failure",
+                "installing": "Installing",
+                "new": "New",
+                "running": "Running",
+                "stopped": "Stopped",
+                "unknown": "Unknown"
+            },
+            "disk": {
+                "failure": "Failure",
+                "missing": "Missing",
+                "ok": "OK",
+                "raw": "Raw disk"
+            },
+            "dtl": {
+                "catch_up": "Rebuilding",
+                "checkup_required": "DTL should be configured",
+                "degraded": "Degraded",
+                "ok_standalone": "Healthy (standalone)",
+                "ok_sync": "Healthy (sync)",
+                "undefined": "Unknown",
+                "unknown": "Unknown"
+            },
+            "storagerouter": {
+                "failure": "Failure",
+                "ok": "OK",
+                "undefined": "Unknown",
+                "unknown": "Unknown",
+                "warning": "Warning"
+            },
+            "vpool": {
+                "DELETING": "Deleting",
+                "EXTENDING": "Extending",
+                "FAILURE": "Failure",
+                "INSTALLING": "Installing",
+                "RUNNING": "Running",
+                "SHRINKING": "Shrinking"
+            }
+        },
+        "status": "Status",
+        "sticky": "Sticky",
+        "storageip": "Storage IP",
+        "storagerouter": "Storage Router",
+        "storagerouters": "Storage Routers",
+        "storeddata": "Stored Data",
+        "tempspace": "Temporary files",
+        "thousandseparator": ",",
+        "togglenavigation": "Toggle navigation",
+        "topbandwidth": "Top Bandwidth",
+        "topstoreddata": "Top Stored Data",
+        "type": "Type",
+        "unavailable": "Unavailable",
+        "units": {
+            "b": "B",
+            "bs": "B/s",
+            "g": "G",
+            "gi": "Gi",
+            "gib": "GiB",
+            "gibs": "GiB/s",
+            "k": "k",
+            "ki": "Ki",
+            "kib": "KiB",
+            "kibs": "KiB/s",
+            "m": "M",
+            "mi": "Mi",
+            "mib": "MiB",
+            "mibs": "MiB/s",
+            "t": "T",
+            "ti": "Ti",
+            "tib": "TiB",
+            "tibs": "TiB/s"
+        },
+        "usedports": "Used Ports",
+        "usage": "Usage",
+        "user": "User",
+        "user_client": "User/Client",
+        "username": "Username",
+        "validuntil": "Valid until",
+        "vdisk": "vDisk",
+        "vdisks": "vDisks",
+        "vpool": "vPool",
+        "vpools": "vPools",
+        "vtemplate": "vTemplate",
+        "warning": "Warning",
+        "welcome": "Welcome",
+        "write": "Write",
+        "write_speed": "Write Speed",
+        "xmlrpcport": "XML-RPC",
+        "xmore": "__amount__ more...",
+        "yes": "Yes"
+    },
+    "icons": {
+        "add": "&#xf067;",
+        "archive": "&#xf187;",
+        "ban": "&#xf05e;",
+        "cancel": "&#xf00d;",
+        "cancel_circle": "&#xf057;",
+        "check": "&#xf00c;",
+        "checked": "&#xf046;",
+        "check_circle": "&#xf058;",
+        "clone": "&#xf24d;",
+        "cog": "&#xf013;",
+        "collapse": "&#xf147;",
+        "configuration": "&#xf013;",
+        "consistent": "&#xf02e;",
+        "delete": "&#xf014;",
+        "disks": "&#xf233;",
+        "down": "&#xf107;",
+        "edit": "&#xf040;",
+        "expand": "&#xf196;",
+        "externallink": "&#xf08e;",
+        "fromtemplate": "&#xf045;",
+        "help": "&#xf059;",
+        "inconsistent": "&#xf097;",
+        "information": "&#xf05a;",
+        "link": "&#xf0c1;",
+        "load": "&#xf021;",
+        "loading": "&#xf110;",
+        "logs": "&#xf02d;",
+        "management": "&#xf0b1;",
+        "markoffline": "&#xf1cd;",
+        "move": "&#xf064;",
+        "moveaway": "&#xf074;",
+        "notchecked": "&#xf096;",
+        "password": "&#xf084;",
+        "rights": "&#xf132;",
+        "rollback": "&#xf01e;",
+        "save": "&#xf0c7;",
+        "scrub": "&#xf1b8;",
+        "separator": "&#xf101;",
+        "set_as_template": "&#xf023;",
+        "snapshot": "&#xf030;",
+        "storagerouter": "&#xf0c2;",
+        "storagerouter_vpool_link": "&#xf07c;",
+        "sync": "&#xf021;",
+        "unlink": "&#xf127;",
+        "up": "&#xf106;",
+        "vdisks": "&#xf0a0;",
+        "vpools": "&#xf0c2;",
+        "warning": "&#xf071;"
+    },
+    "licenses": {
+        "add": "Add license",
+        "title": "Licenses"
+    },
+    "login": {
+        "introduction": "Please provide the required credentials to log in into your Open vStorage management center.",
+        "invalidcredentials": "The username/password combination were invalid or could not be validated.",
+        "title": "Login",
+        "welcome": "Use the navigation to browse through the interface."
+    },
+    "notfound": {
+        "introduction": "The page you've requested was not found. Please navigate back, and try again or update your bookmarks.",
+        "title": "Page not found"
+    },
+    "packages": {
+        "alba": "OpenvStorage Backend",
+        "arakoon": "Arakoon",
+        "ovs": "Core",
+        "volumedriver": "Storage Driver"
+    },
+    "prerequisites": {
+        "multiple": "The following prerequisites are unmet",
+        "singular": "The following prerequisite is unmet"
+    },
+    "storagerouters": {
+        "detail": {
+            "disks": {
+                "title": "Physical disks",
+                "rescan": {
+                    "success": "Rescan finished",
+                    "scanning": "rescanning",
+                    "started": "Rescan started",
+                    "inprogress": "The disks of this Storage Router are being rescanned"
+                }
+            },
+            "hostip": "Host IP",
+            "moveaway": {
+                "warning": "Are you sure you want to move all vDisks away?",
+                "title": "Are you sure",
+                "no": "Cancel",
+                "yes": "Move away",
+                "marked": "Moving away started",
+                "marked_msg": "All vDisks will be moved away from this Storage Router",
+                "done": "Move away complete",
+                "done_msg": "All vDisks have been moved away from __what__",
+                "error_msg": "moving away all vDisks from __what__"
+            },
+            "moveawaymsg": "Move all vDisks away from this Storage Router and start them on other Storage Routers.",
+            "moveawaytitle": "Move all vDisks",
+            "refresh": {
+                "success": "Refresh finished",
+                "refreshing": "refreshing",
+                "started": "Refresh started",
+                "inprogress": "The hardware capabilities of this Storage Router are being refreshed"
+            },
+            "rdma_capable": "RDMA Capable",
+            "save": {
+                "success": "This Storage Router was saved.",
+                "failure": "Error saving this Storage Router."
+            },
+            "scrub_capable": "SCRUB Capable",
+            "storagerouter_vpool_link": "vPools served by this Storage Router",
+            "title": "Storage Router",
+            "updateserving": "Save changes",
+            "edit": "Edit some properties of this Storage Router",
+            "refreshtt": "Refresh the hardware capabilities of this Storage Router",
+            "offline": {
+                "mark": "Mark this node Offline",
+                "warning": "Please make sure the Storage Router is actually down and unavailable before marking the Storage Router as offline. Marking the Storage Router as offline while it is still available might lead to data corruption.",
+                "title": "Warning",
+                "yes": "Yes, it's offline",
+                "no": "No, back to safety",
+                "pending": "Pending",
+                "pendingmsg": "The Storage Router is being marked offline",
+                "done": "Marked offline",
+                "done_msg": "The Storage Router was marked offline",
+                "error_msg": "marking the Storage Router offline: __error__"
+            }
+        },
+        "details": "Storage Router Details",
+        "title": "Storage Routers"
+    },
+    "storagedrivers": {
+        "general": {
+            "cluster_size": "Cluster size",
+            "dedupe": "Deduplication",
+            "dedupe_help_message": "Deduplication will calculate an MD5 sum for each write resulting in performance loss, but better cache performance",
+            "dedupe_help_title": "Help - Deduplication",
+            "dedupe_modes": {
+                "dedupe": "Deduped",
+                "non_dedupe": "Non-Deduped",
+                "null": "-"
+            },
+            "dtl": "Distributed Transaction Log",
+            "dtl_help_message": "Copies unprotected data in the write buffer of a vDisk to another Storage Router",
+            "dtl_help_title": "Distributed Transaction Log",
+            "dtl_mode": "Mode",
+            "dtl_modes": {
+                "a_sync": "Asynchronous",
+                "no_sync": "Disabled",
+                "sync": "Synchronous",
+                "undefined": "Unknown"
+            },
+            "dtl_target": "Target Domain",
+            "dtl_transport": "Transport Mode",
+            "dtl_transport_modes": {
+                "rdma": "RDMA",
+                "tcp": "TCP"
+            },
+            "sco_size": "SCO size",
+            "volume": "Volumes",
+            "write_buffer": "Maximum write buffer"
+        },
+        "vdisk": {
+            "volume": "Volume"
         }
     },
+    "support": {
+        "alba": "Alba:",
+        "arakoon": "Arakoon",
+        "callhome": "Call Home settings",
+        "clusterid": "Cluster ID:",
+        "commercialsupport": "Commercial support:",
+        "commercialsupporturl": "https://www.openvstorage.com",
+        "communitysupport": "Community support:",
+        "communitysupporturl": "https://groups.google.com/forum/#!forum/open-vstorage",
+        "companywebsite": "Company Website:",
+        "companywebsiteurl": "https://www.openvstorage.com",
+        "description": "Open vStorage has the option to send regular heartbeats with metadata to a centralized server. The heartbeat data can be inspected at the bottom of this page. Additionally, you can enable remote access which enables the Open vStorage support team to access your environment upon your request through a secured tunnel.",
+        "downloadinglogs": "collecting...",
+        "downloadlogs": "download logfiles",
+        "enable": "Heartbeat enabled",
+        "enablesupport": "Remote Access enabled",
+        "failed": "Error",
+        "failedmsg": "Error while applying your settings",
+        "identification": "Identification parameters",
+        "importantwebsites": "Important Websites",
+        "information": "Support information",
+        "installedproducts": "Installed Packages",
+        "lastheartbeat": "Last time received",
+        "metadata": "Heartbeat data",
+        "nodeid": "Node ID",
+        "nodes": "Storage Routers:",
+        "noheartbeat": "never",
+        "openvstorage": "Open vStorage:",
+        "openvstoragebackend": "Open vStorage - Backend:",
+        "openvstoragebackendcore": "Open vStorage - Backend - Core:",
+        "openvstoragebackendwebapps": "Open vStorage - Backend - Webapps:",
+        "openvstoragecore": "Open vStorage - Core:",
+        "openvstoragesdm": "Open vStorage - SDM:",
+        "openvstoragewebapps": "Open vStorage - Webapps:",
+        "product": "Open vStorage",
+        "projectwebsite": "Project Website:",
+        "projectwebsiteurl": "http://www.openvstorage.org",
+        "release_name": "Fargo",
+        "save": "Save settings",
+        "saved": "Saved",
+        "savedmsg": "Settings applied",
+        "saving": "Saving",
+        "savingmsg": "Your settings are being applied",
+        "sourcecode": "Source Code:",
+        "sourcecodeurl": "https://github.com/openvstorage",
+        "title": "Support",
+        "volumedriverbase": "Storage Driver - Base:",
+        "volumedriverserver": "Storage Driver - Server:"
+    },
+    "title": "Open vStorage",
     "updates": {
         "buttons": {"framework": "Update Framework",
                     "volumedriver": "Update Storage Driver"},
@@ -566,103 +553,142 @@
             "title": "Storage Driver"
         }
     },
-    "packages": {
-        "alba": "OpenvStorage Backend",
-        "arakoon": "Arakoon",
-        "ovs": "Core",
-        "volumedriver": "Storage Driver"
-    },
-    "downtime": {
-        "general": "Following service__multiple__ will experience downtime:",
-        "ovsdb": "Model availability",
-        "proxy": "Proxy service for vpool",
-        "voldrv": "Storage Driver availability"
-    },
-    "prerequisites": {
-        "multiple": "The following prerequisites are unmet",
-        "singular": "The following prerequisite is unmet"
-    },
-    "login": {
-        "title": "Login",
-        "introduction": "Please provide the required credentials to log in into your Open vStorage management center.",
-        "invalidcredentials": "The username/password combination were invalid or could not be validated.",
-        "welcome": "Use the navigation to browse through the interface."
-    },
-    "backends": {
-        "title": "Backends",
-        "backendtype": "Type",
-        "add": "Add Backend",
+    "users": {
+        "clients": {
+            "addfailed": "Could not add the Client: __why__",
+            "addsuccess": "The Client was added successfully",
+            "clientid": "Client ID",
+            "clientsecret": "Client secret",
+            "complete": "Completed",
+            "delete": "Are you sure you want to delete Client: __what__?",
+            "deletefailed": "Could not delete the Client: __why__",
+            "deletesuccess": "The Client was deleted successfully",
+            "granttype": "Grant type",
+            "information": "Below are the configured OAuth 2 Clients for the selected User. Please note that only the Grant type &quot;Client Credentials&quot; is supported.",
+            "roles": "Roles",
+            "title": "OAuth 2 Clients"
+        },
+        "delete": {
+            "complete": "Deleted",
+            "delete": "Are you sure you want to delete user __what__?",
+            "deletefailed": "Could not delete the user: __why__",
+            "deletesuccess": "User deleted"
+        },
         "new": {
-            "complete": "Backend added",
-            "addsuccess": "The backend was added. Please open the details to configure",
-            "addfailed": "The backend could not be added: __why__"
+            "addfailed": "User could not be created: __why__",
+            "addsuccess": "User created",
+            "complete": "Created"
         },
         "save": {
-            "success": "The backend was successfully saved",
-            "failure": "Error saving the backend"
+            "complete": "Save completed",
+            "failed": "Updating __what__ failed: __why__",
+            "success": "User __what__ updated."
         },
-        "edit": {
-            "edit": "Edit backend"
+        "title": "User Mgmt.",
+        "users": {
+            "title": "Users"
         }
     },
-    "licenses": {
-        "title": "Licenses",
-        "add": "Add license"
+    "vdisks": {
+        "add": "Add new vDisk",
+        "detail": {
+            "clone": "Clone",
+            "configuration": "vDisk configuration",
+            "configuration_info": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
+            "edge_clients": "Edge Clients",
+            "has_children": "vDisk has clones",
+            "move": "Move",
+            "remove": "Remove",
+            "rollback": "Rollback",
+            "scrub": "Scrub",
+            "set_as_template": "Set as vTemplate",
+            "snapshot": "Take snapshot",
+            "snapshots": "Snapshots",
+            "title": "vDisk"
+        },
+        "details": "Details",
+        "performance": "Performance",
+        "remove_snapshot": {
+            "failed_msg": "Removing snapshot __what__ failed: __why__",
+            "started": "Removing snapshot",
+            "started_msg": "Snapshot __what__ is being removed",
+            "success": "Removed snapshot",
+            "success_msg": "Snapshot __what__ has been removed",
+            "title_msg": "Are you sure you want to remove snapshot __what__?"
+        },
+        "remove_vdisk": {
+            "failed_msg": "Removing vDisk __what__ failed: __why__",
+            "started": "Removing vDisk",
+            "started_msg": "vDisk __what__ is being removed",
+            "success": "Removed vDisk",
+            "success_msg": "vDisk __what__ has been removed",
+            "title_msg": "Are you sure you want to remove vDisk __what__?"
+        },
+        "remove_vtemplate": {
+            "failed_msg": "Removing vTemplate __what__ failed: __why__",
+            "started": "Removing vTemplate",
+            "started_msg": "vTemplate __what__ is being removed",
+            "success": "Removed vTemplate",
+            "success_msg": "vTemplate __what__ has been removed",
+            "title_msg": "Are you sure you want to remove vTemplate __what__?"
+        },
+        "save_config": {
+            "failed_msg": "Saving configuration for vDisk __what__ failed: __why__",
+            "success": "Save complete",
+            "success_msg": "The configuration details for __what__ are saved."
+        },
+        "set_as_template": {
+            "failed_msg": "Converting vDisk __what__ into vTemplate failed: __why__",
+            "no": "Close",
+            "started": "Converting vDisk",
+            "started_msg": "vDisk __what__ is being converted into vTemplate",
+            "success": "Converted vDisk",
+            "success_msg": "vDisk __what__ has been converted into vTemplate",
+            "title": "Convert vDisk __what__ into vTemplate",
+            "warning": "Warning: After converting a vDisk into a vTemplate, it can no longer be actively used.",
+            "yes": "Convert into vTemplate"
+        },
+        "title": "vDisks"
     },
-    "support": {
-        "information": "Support information",
-        "description": "Open vStorage has the option to send regular heartbeats with metadata to a centralized server. The heartbeat data can be inspected at the bottom of this page. Additionally, you can enable remote access which enables the Open vStorage support team to access your environment upon your request through a secured tunnel.",
-        "identification": "Identification parameters",
-        "title": "Support",
-        "clusterid": "Cluster ID:",
-        "nodeid": "Node ID",
-        "nodes": "Storage Routers:",
-        "callhome": "Call Home settings",
-        "metadata": "Heartbeat data",
-        "enable": "Heartbeat enabled",
-        "enablesupport": "Remote Access enabled",
-        "save": "Save settings",
-        "saving": "Saving",
-        "savingmsg": "Your settings are being applied",
-        "saved": "Saved",
-        "savedmsg": "Settings applied",
-        "failed": "Error",
-        "failedmsg": "Error while applying your settings",
-        "downloadinglogs": "collecting...",
-        "downloadlogs": "download logfiles",
-        "product": "Open vStorage",
-        "installedproducts": "Installed Packages",
-        "importantwebsites": "Important Websites",
-        "projectwebsite": "Project Website:",
-        "projectwebsiteurl": "http://www.openvstorage.org",
-        "sourcecode": "Source Code:",
-        "sourcecodeurl": "https://github.com/openvstorage",
-        "companywebsite": "Company Website:",
-        "companywebsiteurl": "https://www.openvstorage.com",
-        "communitysupport": "Community support:",
-        "communitysupporturl": "https://groups.google.com/forum/#!forum/open-vstorage",
-        "commercialsupport": "Commercial support:",
-        "commercialsupporturl": "https://www.openvstorage.com",
-        "openvstorage": "Open vStorage:",
-        "openvstoragecore": "Open vStorage - Core:",
-        "openvstoragewebapps": "Open vStorage - Webapps:",
-        "openvstoragebackend": "Open vStorage - Backend:",
-        "openvstoragebackendcore": "Open vStorage - Backend - Core:",
-        "openvstoragebackendwebapps": "Open vStorage - Backend - Webapps:",
-        "openvstoragesdm": "Open vStorage - SDM:",
-        "volumedriverbase": "Storage Driver - Base:",
-        "volumedriverserver": "Storage Driver - Server:",
-        "alba": "Alba:",
-        "arakoon": "Arakoon",
-        "lastheartbeat": "Last time received",
-        "noheartbeat": "never"
+    "vpools": {
+        "accelerated_backend": "Accelerated Backend (Preset)",
+        "add": "Add new vPool",
+        "backend": "Backend",
+        "backend_connection": "Connection",
+        "backend_login": "Login",
+        "backend_preset": "Backend (Preset)",
+        "caching": "Caching",
+        "caching_types": {
+            "none": "No Caching",
+            "read": "Read",
+            "read_and_write": "Read / Write",
+            "write": "Write"
+        },
+        "cluster_size": "Cluster Size",
+        "configuration": "Configurations",
+        "detail": {
+            "title": "vPool"
+        },
+        "dtl": "DTL",
+        "dtl_disabled": "Disabled",
+        "dtl_mode": "DTL Mode",
+        "dtl_transport": "DTL Transport",
+        "global_write_buffer": "Global Write Buffer",
+        "preset": "Preset",
+        "sco_size": "SCO Size",
+        "statistics": "Statistics",
+        "storagerouter_vpool_link": "Storage Routers serving this vPool",
+        "title": "vPools",
+        "volume_write_buffer": "Volume Write Buffer"
     },
-    "notfound": {
-        "title": "Page not found",
-        "introduction": "The page you've requested was not found. Please navigate back, and try again or update your bookmarks."
-    },
-    "keywords": {
-        "vpool": "vPool"
+    "vtemplates": {
+        "clone": "Create clones",
+        "has_children": "This vTemplate has children",
+        "remove": "Remove",
+        "title": "vTemplates",
+        "vdisks": {
+            "title": "vDisk Templates"
+        }
     },
     "wizards" : {
         "add_backend": {
@@ -701,89 +727,12 @@
             }
         },
         "add_vpool": {
-            "title": "Add new vPool",
-            "gather_backend": {
-                "accelerated_backend": "Accelerated backend:",
-                "accelerated_info": "Accelerated backend information",
-                "alba_backend": "Backend:",
-                "alba_preset": "Preset:",
-                "basic_info": "Additional backend information",
-                "choose_backend": "Choose one of the available backends",
-                "choose_preset": "Choose one of the available presets",
-                "client_id": "Client ID:",
-                "client_secret": "Client Secret:",
-                "fragment_cache": "Fragment Cache:",
-                "host": "Host (FQDN/IP):",
-                "invalid_alba_info": "The entered connection info and credentials are invalid",
-                "invalid_host": "Invalid host (should be a FQDN or IP address)",
-                "local_host": "Use local Open vStorage backend",
-                "missing_role": "Missing required partition role: __what__",
-                "no_backends": "No backends found",
-                "no_credentials": "No credentials were entered",
-                "port": "Port:",
-                "re_use_connection_info": "Re-use connection info:",
-                "use_backend_aa": "Use another ALBA Backend as Fragment Cache",
-                "use_local": "Place Fragment Cache on disk"
-            },
-            "gather_config": {
-                "caching": "StorageDriver Caching Information",
-                "cache_strategy": "Strategy:",
-                "cluster_size": "Cluster Size:",
-                "dedupe": "Deduplication:",
-                "dedupe_information": "Deduplication mode 'Deduped' requires the correct Storage Driver package to be installed",
-                "dtl": "Distributed Transaction Log Information",
-                "dtl_mode": "Mode:",
-                "dtl_transport": "Transport Mode:",
-                "global_write_buffer": "Global Write Buffer:",
-                "global_write_buffer_available": "Dedicated global Write Buffer space:",
-                "information": "Information about the available space:",
-                "missing_role": "Missing required partition role: __what__",
-                "no_space_left": "No space left",
-                "over_allocation": "Over-allocation detected",
-                "readcache_size": "Read Cache:",
-                "readcache_size_available": "Dedicated Read Cache space:",
-                "sco_size": "SCO Size:",
-                "shared_available": "Space shared between Read Cache and Global Write Buffer:",
-                "volume": "Volume Information",
-                "volume_write_buffer": "Volume Write Buffer:"
-            },
-            "gather_vpool": {
-                "access_key": "Access Key:",
-                "alba_backend": "Backend:",
-                "alba_preset": "Preset:",
-                "alba_preset_unavailable": "The selected preset is not usable. To be able to make use of this vPool, please add a suitable policy or claim more ASDs for this backend",
-                "backend_type": "Backend Type:",
-                "basic_info": "Add basic vPool information",
-                "choose_backend": "Choose one of the available backends",
-                "choose_preset": "Choose one of the available presets",
-                "client_id": "Client ID:",
-                "client_secret": "Client Secret:",
-                "duplicate_name": "This name already exists",
-                "extended_info": "Extended vPool information",
-                "host": "Host (FQDN/IP):",
-                "initial_storagerouter": "Storage Router:",
-                "invalid_alba_info": "The entered connection info and credentials are invalid",
-                "invalid_host": "Invalid host (should be a FQDN or IP address)",
-                "invalid_name": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
-                "invalid_s3_info": "Could not connect to the given host/port, or wrong credentials.",
-                "ip_address": "Storage IP:",
-                "loading_backend_information": "Backend information is being loaded",
-                "local_host": "Use local Open vStorage backend",
-                "metadata_loading": "MetaData is being loaded",
-                "missing_mountpoints": "No mountpoints could be found on this storagerouter to be used for a distributed backend",
-                "missing_role": "Missing required partition role: __what__",
-                "missing_storageip": "A Storage IP must be selected",
-                "mountpoint": "Mountpoint:",
-                "mtpt_in_use": "The mountpoint /mnt/__what__ for the vPool is already in use.",
-                "name": "Name:",
-                "no_backends": "No backends found",
-                "no_credentials": "No credentials were entered",
-                "port": "Port:",
-                "secret_key": "Secret Key:"
-            },
             "confirm": {
                 "accelerated_backend": "Accelerated Backend:",
+                "alba_backend": "Backend:",
+                "alba_preset": "Preset:",
                 "basic_info": "Validate the basic vPool information.",
+                "client_id": "Client ID:",
                 "configuration": "Validate the configuration settings.",
                 "creating": "creating the vPool",
                 "dtl_transport": "DTL Transport Mode:",
@@ -794,10 +743,128 @@
                 },
                 "fragment_cache_read": "Fragment cache on read:",
                 "fragment_cache_write": "Fragment cache on write:",
+                "host": "Host (FQDN/IP):",
                 "in_progress": "Creation of vPool __what__ is started.",
+                "initial_storagerouter": "Storage Router:",
+                "ip_address": "Storage IP:",
+                "name": "Name:",
+                "port": "Port:",
                 "started": "Started creating",
                 "storagerouter_info": "Validate the Storage Router information.",
                 "success": "Creation of vPool __what__ finished."
+            },
+            "gather_backend": {
+                "accelerated_info": "Accelerated backend information",
+                "alba_backend": "Backend:",
+                "alba_preset": "Preset:",
+                "alba_preset_unavailable": "The selected preset is not usable. To be able to make use of this vPool, please add a suitable policy or claim more ASDs for this backend",
+                "backends_loading": "Backends are being loaded",
+                "basic_info": "Additional backend information",
+                "choose_backend": "Choose one of the available backends",
+                "choose_preset": "Choose one of the available presets",
+                "client_id": "Client ID:",
+                "client_secret": "Client Secret:",
+                "fragment_cache": "Cache:",
+                "host": "Host (FQDN/IP):",
+                "information_extend": "Extending a vPool does not allow to reconfigure the caching policy",
+                "invalid_alba_info": "The entered connection info and credentials are invalid",
+                "invalid_host": "Invalid host (should be a FQDN or IP address)",
+                "loading_backend_information": "Backend information is being loaded",
+                "local_host": "Use local Open vStorage backend",
+                "no_backends": "No backends found",
+                "no_credentials": "No credentials were entered",
+                "port": "Port:",
+                "re_use_connection_info": "Re-use connection info:",
+                "use_backend_aa": "Use another Backend cache",
+                "use_local": "Use local disk"
+            },
+            "gather_config": {
+                "cluster_size": "Cluster Size:",
+                "dtl": "Distributed Transaction Log Information",
+                "dtl_mode": "Mode:",
+                "dtl_transport": "Transport Mode:",
+                "global_write_buffer": "Global Write Buffer:",
+                "global_write_buffer_available": "Dedicated global Write Buffer space:",
+                "information": "Information about the available space:",
+                "no_space_left": "No space left",
+                "over_allocation": "Over-allocation detected",
+                "sco_size": "SCO Size:",
+                "title_write_buffer": "StorageDriver Write Buffer",
+                "volume": "Volume Information",
+                "volume_write_buffer": "Volume Write Buffer:"
+            },
+            "gather_vpool": {
+                "alba_backend": "Backend:",
+                "alba_preset": "Preset:",
+                "alba_preset_unavailable": "The selected preset is not usable. To be able to make use of this vPool, please add a suitable policy or claim more ASDs for this backend",
+                "backends_loading": "Backends are being loaded",
+                "basic_info_add": "Add basic vPool information",
+                "basic_info_extend": "Basic vPool information",
+                "choose_backend": "Choose one of the available backends",
+                "choose_preset": "Choose one of the available presets",
+                "client_id": "Client ID:",
+                "client_secret": "Client Secret:",
+                "duplicate_name": "This name already exists",
+                "extended_info": "Extended vPool information",
+                "host": "Host (FQDN/IP):",
+                "information_add": "Information about the available space:",
+                "information_extend": "Extending a vPool does not allow to reconfigure the name and backend information",
+                "initial_storagerouter": "Storage Router:",
+                "invalid_alba_info": "The entered connection info and credentials are invalid",
+                "invalid_host": "Invalid host (should be a FQDN or IP address)",
+                "invalid_name": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
+                "ip_address": "Storage IP:",
+                "loading_backend_information": "Backend information is being loaded",
+                "local_host": "Use local Open vStorage backend",
+                "metadata_loading": "MetaData is being loaded",
+                "missing_role": "Missing required partition role: __what__",
+                "missing_storage_ip": "A Storage IP must be selected",
+                "mtpt_in_use": "The mountpoint /mnt/__what__ for the vPool is already in use.",
+                "name": "Name:",
+                "no_backends": "No backends found",
+                "no_credentials": "No credentials were entered",
+                "port": "Port:",
+                "validating_mountpoint": "Validating existance of vPool mountpoint"
+            },
+            "title_add": "Add new vPool",
+            "title_extend": "Extend vPool"
+        },
+        "clone": {
+            "title": "Clone",
+            "gather": {
+                "basicinfo": "Enter basic information:",
+                "cleaned_name": "Devicename on filesystem: ",
+                "duplicate_name": "A virtual disk with this name already exists",
+                "invalid_name": "Invalid name",
+                "name": "Name:",
+                "name_exists": "The devicename already exists",
+                "newsnapshot": "Create a new snapshot",
+                "nostoragerouter": "No Storage Router information found",
+                "selectsnapshots": "Select the Snapshot from which you want to clone:",
+                "snapshots": "Snapshot:",
+                "storagerouters": "Storage Router:"
+            },
+            "confirm": {
+                "clonestarted": "Clone started",
+                "failed": "Failed to clone vDisk __what__ failed.",
+                "inprogress": "vDisk __what__ cloning in progress...",
+                "name": "Name:",
+                "snapshot": "Snapshot:",
+                "storagerouter": "Storage Router:",
+                "success": "Cloned __what__ successfully",
+                "title": "Verify the entered information"
+            }
+        },
+        "changepassword": {
+            "title": "Change password",
+            "confirm": {
+                "title": "Please provide the required information",
+                "introduction": "Enter the new password for user:",
+                "newpassword": "New password",
+                "retype": "Retype",
+                "enternew": "Enter new password",
+                "shouldmatch": "New passwords should match",
+                "updatingpassword": "updating the password"
             }
         },
         "configure_partition": {
@@ -845,16 +912,26 @@
             }
         },
         "extend_vpool": {
-            "title": "Extend vPool",
             "confirm": {
                 "extending": "extending the vPool",
                 "in_progress": "Extending vPool __what__ has started.",
                 "started": "Started extending",
                 "success": "vPool __what__ was successfully extended."
-            },
-            "gather_vpool": {
-                "basic_info": "Basic vPool information",
-                "information": "Extending a vPool does not allow to reconfigure the name and backend information"
+            }
+        },
+        "rollback": {
+            "title": "Rollback",
+            "gather": {
+                "title": "Please provide the required information",
+                "selectsnapshots": "Select the Snapshot to which you want to Rollback:",
+                "novdisk": "No disk loaded",
+                "noname": "No name was entered",
+                "nosnapshots": "No Snapshots found",
+                "snapshot": "Snapshots",
+                "rollbackstarted": "Rollback started",
+                "inprogress": "Disk __what__ rollback in progress...",
+                "failed": "Disk __what__ rollback failed.",
+                "success": "Disk __what__ rollback successfully."
             }
         },
         "scrub": {
@@ -884,47 +961,6 @@
                 "success_single": "The vPool was successfully removed"
             }
         },
-        "rollback": {
-            "title": "Rollback",
-            "gather": {
-                "title": "Please provide the required information",
-                "selectsnapshots": "Select the Snapshot to which you want to Rollback:",
-                "novdisk": "No disk loaded",
-                "noname": "No name was entered",
-                "nosnapshots": "No Snapshots found",
-                "snapshot": "Snapshots",
-                "rollbackstarted": "Rollback started",
-                "inprogress": "Disk __what__ rollback in progress...",
-                "failed": "Disk __what__ rollback failed.",
-                "success": "Disk __what__ rollback successfully."
-            }
-        },
-        "clone": {
-            "title": "Clone",
-            "gather": {
-                "basicinfo": "Enter basic information:",
-                "cleaned_name": "Devicename on filesystem: ",
-                "duplicate_name": "A virtual disk with this name already exists",
-                "invalid_name": "Invalid name",
-                "name": "Name:",
-                "name_exists": "The devicename already exists",
-                "newsnapshot": "Create a new snapshot",
-                "nostoragerouter": "No Storage Router information found",
-                "selectsnapshots": "Select the Snapshot from which you want to clone:",
-                "snapshots": "Snapshot:",
-                "storagerouters": "Storage Router:"
-            },
-            "confirm": {
-                "clonestarted": "Clone started",
-                "failed": "Failed to clone vDisk __what__ failed.",
-                "inprogress": "vDisk __what__ cloning in progress...",
-                "name": "Name:",
-                "snapshot": "Snapshot:",
-                "storagerouter": "Storage Router:",
-                "success": "Cloned __what__ successfully",
-                "title": "Verify the entered information"
-            }
-        },
         "snapshot": {
             "title": "Snapshot",
             "gather": {
@@ -944,18 +980,6 @@
                 "success": "Snapshot successfully.",
                 "name": "Snapshot name",
                 "consistent": "Label as Consistent Snapshot"
-            }
-        },
-        "changepassword": {
-            "title": "Change password",
-            "confirm": {
-                "title": "Please provide the required information",
-                "introduction": "Enter the new password for user:",
-                "newpassword": "New password",
-                "retype": "Retype",
-                "enternew": "Enter new password",
-                "shouldmatch": "New passwords should match",
-                "updatingpassword": "updating the password"
             }
         },
         "update": {
@@ -978,58 +1002,5 @@
             },
             "title": "Move vDisk"
         }
-    },
-    "events": {
-    },
-    "title": "Open vStorage",
-    "icons": {
-        "add": "&#xf067;",
-        "archive": "&#xf187;",
-        "ban": "&#xf05e;",
-        "cancel": "&#xf00d;",
-        "cancel_circle": "&#xf057;",
-        "check": "&#xf00c;",
-        "checked": "&#xf046;",
-        "check_circle": "&#xf058;",
-        "clone": "&#xf24d;",
-        "cog": "&#xf013;",
-        "collapse": "&#xf147;",
-        "configuration": "&#xf013;",
-        "consistent": "&#xf02e;",
-        "delete": "&#xf014;",
-        "disks": "&#xf233;",
-        "down": "&#xf107;",
-        "edit": "&#xf040;",
-        "expand": "&#xf196;",
-        "externallink": "&#xf08e;",
-        "fromtemplate": "&#xf045;",
-        "help": "&#xf059;",
-        "inconsistent": "&#xf097;",
-        "information": "&#xf05a;",
-        "link": "&#xf0c1;",
-        "load": "&#xf021;",
-        "loading": "&#xf110;",
-        "logs": "&#xf02d;",
-        "management": "&#xf0b1;",
-        "markoffline": "&#xf1cd;",
-        "move": "&#xf064;",
-        "moveaway": "&#xf074;",
-        "notchecked": "&#xf096;",
-        "password": "&#xf084;",
-        "rights": "&#xf132;",
-        "rollback": "&#xf01e;",
-        "save": "&#xf0c7;",
-        "scrub": "&#xf1b8;",
-        "separator": "&#xf101;",
-        "set_as_template": "&#xf023;",
-        "snapshot": "&#xf030;",
-        "storagerouter": "&#xf0c2;",
-        "storageroutervpoollink": "&#xf07c;",
-        "sync": "&#xf021;",
-        "unlink": "&#xf127;",
-        "up": "&#xf106;",
-        "vdisks": "&#xf0a0;",
-        "vpools": "&#xf0c2;",
-        "warning": "&#xf071;"
     }
 }

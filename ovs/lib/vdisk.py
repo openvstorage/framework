@@ -117,12 +117,14 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.delete')
     def delete(vdisk_guid):
         """
-        Delete a vdisk through API
+        Delete a vDisk through API
         :param vdisk_guid: Guid of the vDisk to delete
         :type vdisk_guid: str
         :return: None
         """
         vdisk = VDisk(vdisk_guid)
+        if len(vdisk.child_vdisks) > 0:
+            raise RuntimeError('vDisk {0} has clones, cannot delete'.format(vdisk.name))
         vdisk.storagedriver_client.unlink(str(vdisk.devicename))
         VDiskController.delete_from_voldrv(vdisk.volume_id)
 
@@ -130,8 +132,8 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.extend')
     def extend(vdisk_guid, volume_size):
         """
-        Extend a vdisk through API
-        :param vdisk_guid: Guid of the vdisk to extend
+        Extend a vDisk through API
+        :param vdisk_guid: Guid of the vDisk to extend
         :type vdisk_guid: str
         :param volume_size: New size in bytes
         :type volume_size: int
@@ -185,13 +187,16 @@ class VDiskController(object):
             vdisk.metadata = {'lba_size': vdisk.info['lba_size'],
                               'cluster_multiplier': vdisk.info['cluster_multiplier']}
             vdisk.save()
+
+            VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
             try:
                 VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
                 MDSServiceController.ensure_safety(vdisk)
-                VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
             except SRCObjectNotFoundException:
-                VDiskController._logger.warning('vDisk object seems to be removed in the meantime.')
+                VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
                 VDiskController.clean_vdisk_from_model(vdisk)
+            except Exception:
+                VDiskController._logger.exception('Error processing resize_from_voldrv event')
 
     @staticmethod
     @celery.task(name='ovs.vdisk.migrate_from_voldrv')
@@ -271,17 +276,6 @@ class VDiskController(object):
         else:
             VDiskController._wait_for_snapshot_to_be_synced_to_backend(vdisk_guid=vdisk.guid, snapshot_id=snapshot_id)
 
-        # Model new cloned vDisk
-        new_vdisk = VDisk()
-        new_vdisk.size = vdisk.size
-        new_vdisk.parent_vdisk = vdisk
-        new_vdisk.name = name
-        new_vdisk.description = name
-        new_vdisk.devicename = devicename
-        new_vdisk.parentsnapshot = snapshot_id
-        new_vdisk.vpool = vdisk.vpool
-        new_vdisk.save()
-
         # Configure StorageDriver
         try:
             VDiskController._logger.info('Clone snapshot {0} of vDisk {1} to location {2}'.format(snapshot_id, vdisk.name, devicename))
@@ -294,23 +288,30 @@ class VDiskController(object):
                                                                 parent_snapshot_id=str(snapshot_id),
                                                                 node_id=str(storagedriver.storagedriver_id))
         except Exception as ex:
-            VDiskController._logger.error('Caught exception during clone, trying to delete the volume. {0}'.format(ex))
-            try:
-                VDiskController.delete(new_vdisk.guid)
-            except Exception as ex2:
-                VDiskController._logger.exception('Exception during exception handling of "create_clone_from_template" : {0}'.format(str(ex2)))
+            VDiskController._logger.error('Cloning snapshot to new vDisk {0} failed: {1}'.format(name, str(ex)))
             raise
 
-        new_vdisk.volume_id = volume_id
-        new_vdisk.save()
-        VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
+        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+            new_vdisk = VDisk()
+            new_vdisk.size = vdisk.size
+            new_vdisk.parent_vdisk = vdisk
+            new_vdisk.name = name
+            new_vdisk.description = name
+            new_vdisk.devicename = devicename
+            new_vdisk.parentsnapshot = snapshot_id
+            new_vdisk.vpool = vdisk.vpool
+            new_vdisk.volume_id = volume_id
+            new_vdisk.save()
 
-        # Check MDS & DTL for new clone
-        try:
-            MDSServiceController.ensure_safety(new_vdisk)
-        except Exception as ex:
-            VDiskController._logger.error('Caught exception during "ensure_safety" {0}'.format(ex))
         VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
+        try:
+            VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
+            MDSServiceController.ensure_safety(new_vdisk)
+        except SRCObjectNotFoundException:
+            VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
+            VDiskController.clean_vdisk_from_model(new_vdisk)
+        except Exception:
+            VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}'.format(name))
 
         return {'vdisk_guid': new_vdisk.guid,
                 'name': new_vdisk.name,
@@ -433,12 +434,15 @@ class VDiskController(object):
         if vdisk.is_vtemplate is True:
             VDiskController._logger.info('vDisk {0} has already been set as vTemplate'.format(vdisk.name))
             return
-        VDiskController._logger.info('Setting vDisk {0} as template'.format(vdisk.name))
+        if len(vdisk.child_vdisks) > 0:
+            raise RuntimeError('vDisk {0} has clones, cannot convert to vTemplate'.format(vdisk.name))
+
+        VDiskController._logger.info('Converting vDisk {0} into vTemplate'.format(vdisk.name))
         try:
             vdisk.storagedriver_client.set_volume_as_template(str(vdisk.volume_id))
         except Exception:
-            VDiskController._logger.exception('Failed to set vDisk {0} as template'.format(vdisk.name))
-            raise Exception('Converting vDisk {0} to template failed'.format(vdisk.name))
+            VDiskController._logger.exception('Failed to convert vDisk {0} into vTemplate'.format(vdisk.name))
+            raise Exception('Converting vDisk {0} into vTemplate failed'.format(vdisk.name))
         vdisk.invalidate_dynamics(['is_vtemplate', 'info'])
 
     @staticmethod
@@ -535,17 +539,7 @@ class VDiskController(object):
         if mds_service is None:
             raise RuntimeError('Could not find a MDS service')
 
-        new_vdisk = VDisk()
-        new_vdisk.size = vdisk.size
-        new_vdisk.vpool = vdisk.vpool
-        new_vdisk.devicename = devicename
-        new_vdisk.parent_vdisk = vdisk
-        new_vdisk.name = name
-        new_vdisk.description = name
-        new_vdisk.save()
-
-        VDiskController._logger.info('Create vDisk from vTemplate {0} to new vDisk {1} to location {2}'.format(vdisk.name, new_vdisk.name, devicename))
-
+        VDiskController._logger.info('Create vDisk from vTemplate {0} to new vDisk {1} to location {2}'.format(vdisk.name, name, devicename))
         try:
             # noinspection PyArgumentList
             backend_config = MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
@@ -554,18 +548,30 @@ class VDiskController(object):
                                                                               metadata_backend_config=MDSMetaDataBackendConfig([backend_config]),
                                                                               parent_volume_id=str(vdisk.volume_id),
                                                                               node_id=str(storagedriver.storagedriver_id))
+        except Exception as ex:
+            VDiskController._logger.error('Cloning vTemplate {0} failed: {1}'.format(vdisk.name, str(ex)))
+            raise
+
+        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+            new_vdisk = VDisk()
+            new_vdisk.size = vdisk.size
+            new_vdisk.vpool = vdisk.vpool
+            new_vdisk.devicename = devicename
+            new_vdisk.parent_vdisk = vdisk
+            new_vdisk.name = name
+            new_vdisk.description = name
             new_vdisk.volume_id = volume_id
             new_vdisk.save()
-            MDSServiceController.ensure_safety(new_vdisk)
-            VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
+
+        VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
+        try:
             VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
-        except Exception as ex:
-            VDiskController._logger.error('Clone vDisk on volumedriver level failed with exception: {0}'.format(str(ex)))
-            try:
-                VDiskController.delete(new_vdisk.guid)
-            except Exception as ex2:
-                VDiskController._logger.exception('Exception during exception handling of "create_clone_from_template" : {0}'.format(str(ex2)))
-            raise
+            MDSServiceController.ensure_safety(new_vdisk)
+        except SRCObjectNotFoundException:
+            VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
+            VDiskController.clean_vdisk_from_model(new_vdisk)
+        except Exception:
+            VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}'.format(name))
 
         return {'vdisk_guid': new_vdisk.guid,
                 'name': new_vdisk.name,
@@ -575,7 +581,7 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.create_new')
     def create_new(volume_name, volume_size, storagedriver_guid):
         """
-        Create a new vdisk/volume using hypervisor calls
+        Create a new vDisk/volume using hypervisor calls
         :param volume_name: Name of the vDisk (can be a filename or a user friendly name)
         :type volume_name: str
         :param volume_size: Size of the vDisk
@@ -598,17 +604,7 @@ class VDiskController(object):
         if mds_service is None:
             raise RuntimeError('Could not find a MDS service')
 
-        new_vdisk = VDisk()
-        new_vdisk.size = volume_size
-        new_vdisk.vpool = vpool
-        new_vdisk.devicename = devicename
-        new_vdisk.name = volume_name
-        new_vdisk.description = volume_name
-        new_vdisk.save()
-
         VDiskController._logger.info('Creating new empty vDisk {0} of {1} bytes'.format(volume_name, volume_size))
-        # Configure StorageDriver
-        volume_id = None
         try:
             # noinspection PyArgumentList
             backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
@@ -617,19 +613,30 @@ class VDiskController(object):
                                                                  metadata_backend_config=backend_config,
                                                                  volume_size="{0}B".format(volume_size),
                                                                  node_id=str(storagedriver.storagedriver_id))
+        except Exception as ex:
+            VDiskController._logger.error('Creating new vDisk {0} failed: {1}'.format(volume_name, str(ex)))
+            raise
+
+        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+            new_vdisk = VDisk()
+            new_vdisk.size = volume_size
+            new_vdisk.vpool = vpool
+            new_vdisk.devicename = devicename
+            new_vdisk.name = volume_name
+            new_vdisk.description = volume_name
             new_vdisk.volume_id = volume_id
             new_vdisk.save()
-            MDSServiceController.ensure_safety(new_vdisk)
-            VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
+
+        VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
+        try:
             VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
-        except Exception as ex:
-            VDiskController._logger.error('Caught exception during clone, trying to delete the volume. {0}'.format(ex))
-            try:
-                if volume_id is not None:
-                    VDiskController.delete_from_voldrv(volume_id)
-            except Exception as ex2:
-                VDiskController._logger.exception('Exception during exception handling of "create_volume" : {0}'.format(str(ex2)))
-            raise
+            MDSServiceController.ensure_safety(new_vdisk)
+        except SRCObjectNotFoundException:
+            VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
+            VDiskController.clean_vdisk_from_model(new_vdisk)
+        except Exception:
+            VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}'.format(volume_name))
+
         VDiskController._logger.info('Created volume. Location {0}'.format(devicename))
         return new_vdisk.guid
 
@@ -654,10 +661,7 @@ class VDiskController(object):
         try:
             sco_size = vdisk.storagedriver_client.get_sco_multiplier(volume_id) / 1024 * 4
             dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id)
-            dedupe_mode = vdisk.storagedriver_client.get_readcache_mode(volume_id)
-            cache_strategy = vdisk.storagedriver_client.get_readcache_behaviour(volume_id)
             tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id)
-            readcache_limit = vdisk.storagedriver_client.get_readcache_limit(volume_id)
             non_disposable_sco_factor = vdisk.storagedriver_client.get_sco_cache_max_non_disposable_factor(volume_id)
             metadata_cache_capacity = vdisk.storagedriver_client.get_metadata_cache_capacity(volume_id)
         except Exception:
@@ -676,26 +680,15 @@ class VDiskController(object):
             dtl_mode = StorageDriverClient.REVERSE_DTL_MODE_MAP[dtl_config.mode]
             dtl_target = [junction.domain_guid for junction in vdisk.domains_dtl]
 
-        if dedupe_mode is None:
-            dedupe_mode = volume_manager.get('read_cache_default_mode', StorageDriverClient.VOLDRV_LOCATION_BASED)
-        if cache_strategy is None:
-            cache_strategy = volume_manager.get('read_cache_default_behaviour', StorageDriverClient.VOLDRV_CACHE_ON_READ)
         if tlog_multiplier is None:
             tlog_multiplier = volume_manager.get('number_of_scos_in_tlog', 20)
-        if readcache_limit is not None:
-            vol_info = vdisk.storagedriver_client.info_volume(volume_id)
-            block_size = vol_info.lba_size * vol_info.cluster_multiplier or 4096
-            readcache_limit = readcache_limit * block_size / 1024 / 1024 / 1024
         if non_disposable_sco_factor is None:
             non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
 
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
-                'dedupe_mode': StorageDriverClient.REVERSE_DEDUPE_MAP[dedupe_mode],
                 'write_buffer': int(tlog_multiplier * sco_size * non_disposable_sco_factor),
                 'dtl_target': dtl_target,
-                'cache_strategy': StorageDriverClient.REVERSE_CACHE_MAP[cache_strategy],
-                'readcache_limit': readcache_limit,
                 'metadata_cache_size': metadata_cache_size}
 
     @staticmethod
@@ -709,13 +702,15 @@ class VDiskController(object):
         :type new_config_params: dict
         :return: None
         """
+        # Backwards compatibility
+        new_config_params.pop('dedupe_mode', None)
+        new_config_params.pop('cache_strategy', None)
+        new_config_params.pop('readcache_limit', None)
+
         required_params = {'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
                            'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
                            'dtl_target': (list, Toolbox.regex_guid),
-                           'dedupe_mode': (str, StorageDriverClient.VDISK_DEDUPE_MAP.keys()),
-                           'write_buffer': (int, {'min': 128, 'max': 10 * 1024}),
-                           'cache_strategy': (str, StorageDriverClient.VDISK_CACHE_MAP.keys()),
-                           'readcache_limit': (int, {'min': 1, 'max': 10 * 1024}, False)}
+                           'write_buffer': (int, {'min': 128, 'max': 10 * 1024})}
 
         if new_config_params.get('metadata_cache_size') is not None:
             required_params.update({'metadata_cache_size': (int, {'min': StorageDriverClient.METADATA_CACHE_PAGE_SIZE})})
@@ -841,19 +836,10 @@ class VDiskController(object):
                 old_value = old_config_params[key]
                 if new_value != old_value:
                     VDiskController._logger.info('Updating property {0} on vDisk {1} from to {2}'.format(key, vdisk.name, new_value))
-                    if key == 'dedupe_mode':
-                        vdisk.storagedriver_client.set_readcache_mode(volume_id, StorageDriverClient.VDISK_DEDUPE_MAP[new_value])
-                    elif key == 'write_buffer':
+                    if key == 'write_buffer':
                         tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id) or StorageDriverClient.TLOG_MULTIPLIER_MAP[new_sco_size]
                         sco_factor = float(new_value) / tlog_multiplier / new_sco_size
                         vdisk.storagedriver_client.set_sco_cache_max_non_disposable_factor(volume_id, sco_factor)
-                    elif key == 'cache_strategy':
-                        vdisk.storagedriver_client.set_readcache_behaviour(volume_id, StorageDriverClient.VDISK_CACHE_MAP[new_value])
-                    elif key == 'readcache_limit':
-                        vol_info = vdisk.storagedriver_client.info_volume(volume_id)
-                        block_size = vol_info.lba_size * vol_info.cluster_multiplier or 4096
-                        limit = new_value * 1024 * 1024 * 1024 / block_size if new_value else None
-                        vdisk.storagedriver_client.set_readcache_limit(volume_id, limit)
                     elif key == 'metadata_cache_size':
                         vdisk.storagedriver_client.set_metadata_cache_capacity(volume_id, new_value / StorageDriverClient.METADATA_CACHE_PAGE_SIZE)
                     else:
@@ -1174,8 +1160,8 @@ class VDiskController(object):
     @celery.task(name='ovs.vdisk.schedule_backend_sync')
     def schedule_backend_sync(vdisk_guid):
         """
-        Schedule a backend sync on a vdisk
-        :param vdisk_guid: Guid of vdisk to schedule a backend sync to
+        Schedule a backend sync on a vDisk
+        :param vdisk_guid: Guid of vDisk to schedule a backend sync to
         :type vdisk_guid: str
         :return: TLogName associated with the data sent off to the backend
         :rtype: str
@@ -1193,7 +1179,7 @@ class VDiskController(object):
     def is_volume_synced_up_to_tlog(vdisk_guid, tlog_name):
         """
         Verify if a volume is synced up to a specific tlog
-        :param vdisk_guid: Guid of vdisk to verify
+        :param vdisk_guid: Guid of vDisk to verify
         :type vdisk_guid: str
         :param tlog_name: Tlog_name to verify
         :type tlog_name: str
@@ -1212,7 +1198,7 @@ class VDiskController(object):
     def is_volume_synced_up_to_snapshot(vdisk_guid, snapshot_id):
         """
         Verify if a volume is synced up to a specific snapshot
-        :param vdisk_guid: Guid of vdisk to verify
+        :param vdisk_guid: Guid of vDisk to verify
         :type vdisk_guid: str
         :param snapshot_id: Snapshot_id to verify
         :type snapshot_id: str
@@ -1269,21 +1255,20 @@ class VDiskController(object):
     def _set_vdisk_metadata_pagecache_size(vdisk):
         """
         Set metadata page cache size to ratio 1:500 of vdisk.size
-        :param vdisk: Object VDisk
+        :param vdisk: Object vDisk
         :type vdisk: VDisk
         :return: None
         """
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, vdisk.storagedriver_id)
+        storagedriver_id = vdisk.storagedriver_id
+        if storagedriver_id is None:
+            raise SRCObjectNotFoundException()
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, storagedriver_id)
         storagedriver_config.load()
         metadata_page_capacity = 64  # "size" of a page = amount of entries in a page (addressable by 6 bits)
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
         cache_capacity = int(min(vdisk.size, 2 * 1024 ** 4) / float(metadata_page_capacity * cluster_size))
         VDiskController._logger.info('Setting metadata page cache size for vdisk {0} to {1}'.format(vdisk.name, cache_capacity))
-        try:
-            vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), cache_capacity)
-        except Exception:
-            VDiskController._logger.exception('Failed to set the metadata page cache size for vDisk {0}'.format(vdisk.name))
-            raise Exception('Setting the metadata page cache size for vDisk {0} failed'.format(vdisk.name))
+        vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), cache_capacity)
 
     @staticmethod
     def clean_devicename(name):

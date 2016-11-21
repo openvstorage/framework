@@ -41,7 +41,6 @@ class StorageDriver(DataObject):
                     Property('storage_ip', str, doc='IP address on which the vpool is shared to hypervisor'),
                     Property('storagedriver_id', str, unique=True, doc='ID of the Storage Driver as known by the Storage Drivers.'),
                     Property('mountpoint', str, doc='Mountpoint from which the Storage Driver serves data'),
-                    Property('mountpoint_dfs', str, mandatory=False, doc='Location of the backend in case of a distributed FS'),
                     Property('startup_counter', int, default=0, doc='StorageDriver startup counter')]
     __relations = [Relation('vpool', VPool, 'storagedrivers'),
                    Relation('storagerouter', StorageRouter, 'storagedrivers')]
@@ -49,6 +48,7 @@ class StorageDriver(DataObject):
                   Dynamic('statistics', dict, 4),
                   Dynamic('edge_clients', list, 30),
                   Dynamic('vdisks_guids', list, 15),
+                  Dynamic('vpool_backend_info', dict, 60),
                   Dynamic('cluster_node_config', dict, 3600)]
 
     def _status(self):
@@ -145,6 +145,41 @@ class StorageDriver(DataObject):
         except:
             pass
         return sdstatsdict
+
+    def _vpool_backend_info(self):
+        """
+        Retrieve some additional information about the vPool to be shown in the GUI
+        Size of the global write buffer for this Storage Driver, the accelerated backend info, connection info and caching strategy
+        :return: Information about vPool and accelerated Backend
+        :rtype: dict
+        """
+        from ovs.dal.hybrids.diskpartition import DiskPartition
+        from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
+
+        global_write_buffer = 0
+        for partition in self.partitions:
+            if partition.role == DiskPartition.ROLES.WRITE and partition.sub_role == StorageDriverPartition.SUBROLE.SCO:
+                global_write_buffer += partition.size
+
+        cache_read = None
+        cache_write = None
+        backend_info = None
+        connection_info = None
+        metadata_key = 'backend_aa_{0}'.format(self.storagerouter_guid)
+        if metadata_key in self.vpool.metadata:  # Accelerated ALBA
+            metadata = self.vpool.metadata[metadata_key]
+            backend_info = metadata['backend_info']
+            connection_info = metadata['connection_info']
+        if self.storagerouter_guid in self.vpool.metadata['backend']['caching_info']:
+            caching_info = self.vpool.metadata['backend']['caching_info'][self.storagerouter_guid]
+            cache_read = caching_info['fragment_cache_on_read']
+            cache_write = caching_info['fragment_cache_on_write']
+
+        return {'cache_read': cache_read,
+                'cache_write': cache_write,
+                'backend_info': backend_info,
+                'connection_info': connection_info,
+                'global_write_buffer': global_write_buffer}
 
     def _cluster_node_config(self):
         """

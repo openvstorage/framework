@@ -26,10 +26,12 @@ import time
 import inspect
 from django.conf import settings
 from django.core.handlers.wsgi import WSGIRequest
+from functools import wraps
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.request import Request
-from backend.exceptions import HttpUnauthorizedException, HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException
+from api.backend.exceptions import HttpUnauthorizedException, HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException
+from api.backend.toolbox import Toolbox
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import Toolbox as DalToolbox
 from ovs.dal.lists.userlist import UserList
@@ -37,11 +39,11 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
-from toolbox import Toolbox
+
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
-    from backend.serializers.mockups import FullSerializer
+    from api.backend.serializers.mockups import FullSerializer
 else:
-    from backend.serializers.serializers import FullSerializer
+    from api.backend.serializers.serializers import FullSerializer
 
 
 def _find_request(args):
@@ -57,10 +59,13 @@ def required_roles(roles):
     """
     Role validation decorator
     """
+
     def wrap(f):
         """
         Wrapper function
         """
+
+        @wraps(f)
         def new_function(*args, **kw):
             """
             Wrapped function
@@ -78,8 +83,6 @@ def required_roles(roles):
                                              error='invalid_roles')
             return f(*args, **kw)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -94,6 +97,20 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
         """
         Wrapper function
         """
+
+        function_info = inspect.getargspec(f)
+        if function_info.defaults is None:
+            mandatory_vars = function_info.args[1:]
+            optional_vars = []
+        else:
+            mandatory_vars = function_info.args[1:-len(function_info.defaults)]
+            optional_vars = function_info.args[len(mandatory_vars) + 1:]
+        metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
+        metadata['load'] = {'mandatory': mandatory_vars,
+                            'optional': optional_vars,
+                            'object_type': object_type}
+        f.ovs_metadata = metadata
+
         def _try_parse(value):
             """
             Tries to parse a value to a pythonic value
@@ -109,6 +126,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                     pass
             return value
 
+        @wraps(f)
         def new_function(*args, **kwargs):
             """
             Wrapped function
@@ -117,26 +135,24 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             new_kwargs = {}
             validation_new_kwargs = {}
             # Find out the arguments of the decorated function
-            function_info = inspect.getargspec(f)
-            if function_info.defaults is None:
-                mandatory_vars = function_info.args[1:]
-                optional_vars = []
-            else:
-                mandatory_vars = function_info.args[1:-len(function_info.defaults)]
-                optional_vars = function_info.args[len(mandatory_vars) + 1:]
             if validator is not None:
-                function_info = inspect.getargspec(validator)
-                if function_info.defaults is None:
-                    validation_mandatory_vars = function_info.args[1:]
+                f_info = inspect.getargspec(validator)
+                if f_info.defaults is None:
+                    validation_mandatory_vars = f_info.args[1:]
                     validation_optional_vars = []
                 else:
-                    validation_mandatory_vars = function_info.args[1:-len(function_info.defaults)]
-                    validation_optional_vars = function_info.args[len(validation_mandatory_vars) + 1:]
+                    validation_mandatory_vars = f_info.args[1:-len(f_info.defaults)]
+                    validation_optional_vars = f_info.args[len(validation_mandatory_vars) + 1:]
             else:
                 validation_mandatory_vars = []
                 validation_optional_vars = []
             # Check versioning
-            version = regex.match(request.META['HTTP_ACCEPT']).groupdict()['version']
+            version_match = regex.match(request.META['HTTP_ACCEPT'])
+            if version_match is not None:
+                version = version_match.groupdict()['version']
+            else:
+                version = settings.VERSION[-1]
+            raw_version = version
             versions = (max(min_version, settings.VERSION[0]), min(max_version, settings.VERSION[-1]))
             if version == '*':  # If accepting all versions, it defaults to the highest one
                 version = versions[1]
@@ -153,11 +169,14 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                     raise HttpNotFoundException(error_description='The requested object could not be found',
                                                 error='object_not_found')
             # Build new kwargs
-            for _mandatory_vars, _optional_vars, _new_kwargs in [(mandatory_vars, optional_vars, new_kwargs),
+            for _mandatory_vars, _optional_vars, _new_kwargs in [(f.ovs_metadata['load']['mandatory'][:], f.ovs_metadata['load']['optional'][:], new_kwargs),
                                                                  (validation_mandatory_vars, validation_optional_vars, validation_new_kwargs)]:
                 if 'version' in _mandatory_vars:
                     _new_kwargs['version'] = version
                     _mandatory_vars.remove('version')
+                if 'raw_version' in _mandatory_vars:
+                    _new_kwargs['raw_version'] = raw_version
+                    _mandatory_vars.remove('raw_version')
                 if 'request' in _mandatory_vars:
                     _new_kwargs['request'] = request
                     _mandatory_vars.remove('request')
@@ -199,8 +218,6 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             # Call the function
             return f(args[0], **new_kwargs)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -209,10 +226,21 @@ def return_list(object_type, default_sort=None):
     """
     List decorator
     """
+
     def wrap(f):
         """
         Wrapper function
         """
+
+        metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
+        metadata['returns'] = {'parameters': {'sorting': default_sort,
+                                              'paging': None,
+                                              'contents': None},
+                               'returns': ['list', '200'],
+                               'object_type': object_type}
+        f.ovs_metadata = metadata
+
+        @wraps(f)
         def new_function(*args, **kwargs):
             """
             Wrapped function
@@ -274,6 +302,8 @@ def return_list(object_type, default_sort=None):
                                                               'max_page': max(1, max_page),
                                                               'start_number': start_number + 1,
                                                               'end_number': min(total_items, end_number)}.items())
+            else:
+                page_metadata['page_size'] = total_items
 
             # 6. Serializing
             if contents is not None:
@@ -293,36 +323,45 @@ def return_list(object_type, default_sort=None):
             # 7. Building response
             return Response(result, status=status.HTTP_200_OK)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
 
-def return_object(object_type):
+def return_object(object_type, mode=None):
     """
     Object decorator
     """
+
     def wrap(f):
         """
         Wrapper function
         """
+
+        return_status = status.HTTP_200_OK
+        if mode == 'accepted':
+            return_status = status.HTTP_202_ACCEPTED
+        elif mode == 'created':
+            return_status = status.HTTP_201_CREATED
+
+        metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
+        metadata['returns'] = {'parameters': {'contents': None},
+                               'returns': ['object', str(return_status)],
+                               'object_type': object_type}
+        f.ovs_metadata = metadata
+
+        @wraps(f)
         def new_function(*args, **kwargs):
             """
             Wrapped function
             """
             request = _find_request(args)
 
-            # 1. Pre-loading request data
             contents = request.QUERY_PARAMS.get('contents')
             contents = None if contents is None else contents.split(',')
 
-            # 5. Serializing
             obj = f(*args, **kwargs)
-            return Response(FullSerializer(object_type, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
+            return Response(FullSerializer(object_type, contents=contents, instance=obj).data, status=return_status)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -331,10 +370,18 @@ def return_task():
     """
     Object decorator
     """
+
     def wrap(f):
         """
         Wrapper function
         """
+
+        metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
+        metadata['returns'] = {'parameters': {},
+                               'returns': ['task', '200']}
+        f.ovs_metadata = metadata
+
+        @wraps(f)
         def new_function(*args, **kwargs):
             """
             Wrapped function
@@ -342,13 +389,11 @@ def return_task():
             task = f(*args, **kwargs)
             return Response(task.id, status=status.HTTP_200_OK)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
 
-def return_plain():
+def return_simple(mode=None):
     """
     Decorator to return plain data
     """
@@ -358,15 +403,27 @@ def return_plain():
         Wrapper function
         """
 
+        return_status = status.HTTP_200_OK
+        if mode == 'accepted':
+            return_status = status.HTTP_202_ACCEPTED
+        elif mode == 'created':
+            return_status = status.HTTP_201_CREATED
+
+        metadata = f.ovs_metadata if hasattr(f, 'ovs_metadata') else {}
+        metadata['returns'] = {'parameters': {},
+                               'returns': [None, None]}
+        f.ovs_metadata = metadata
+
+        @wraps(f)
         def new_function(*args, **kwargs):
             """
             Wrapped function
             """
             result = f(*args, **kwargs)
-            return Response(result, status=status.HTTP_200_OK)
+            if result is None:
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(result, status=return_status)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
 
     return wrap
@@ -382,6 +439,8 @@ def limit(amount, per, timeout):
         """
         Wrapper function
         """
+
+        @wraps(f)
         def new_function(*args, **kwargs):
             """
             Wrapped function
@@ -416,8 +475,6 @@ def limit(amount, per, timeout):
                 client.set(key, rate_info)
             return f(*args, **kwargs)
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -434,6 +491,7 @@ def log(log_slow=True):
         Wrapper function
         """
 
+        @wraps(f)
         def new_function(*args, **kwargs):
             """
             Wrapped function
@@ -464,8 +522,6 @@ def log(log_slow=True):
                 logger.warning('API call {0}.{1} took {2}s'.format(f.__module__, f.__name__, round(duration, 2)))
             return return_value
 
-        new_function.__name__ = f.__name__
-        new_function.__module__ = f.__module__
         return new_function
 
     return wrap

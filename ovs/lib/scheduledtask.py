@@ -347,9 +347,8 @@ class ScheduledTaskController(object):
                     ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deployed ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
 
                 backend_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
-                if vpool.backend_type.code == 'alba':
-                    backend_config['alba_connection_host'] = '127.0.0.1'
-                    backend_config['alba_connection_port'] = scrub_config['port']
+                backend_config['alba_connection_host'] = '127.0.0.1'
+                backend_config['alba_connection_port'] = scrub_config['port']
                 Configuration.set(backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
         except Exception:
             message = 'Scrubber - vPool {0} - StorageRouter {1} - An error occurred deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service)
@@ -376,7 +375,7 @@ class ScheduledTaskController(object):
                         storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
                         if configs[0].get('ip') != storagedriver.storagerouter.ip:
                             ScheduledTaskController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - MDS master is not local, trigger handover'.format(vpool.name, storagerouter.name, vdisk.name))
-                            MDSServiceController.ensure_safety(vdisk)
+                            MDSServiceController.ensure_safety(VDisk(vdisk_guid))  # Do not use a remote VDisk instance here
                             configs = _verify_mds_config(current_vdisk=vdisk)
                             if configs[0].get('ip') != storagedriver.storagerouter.ip:
                                 ScheduledTaskController._logger.warning('Scrubber - vPool {0} - StorageRouter {1} - vDisk {2} - Skipping because master MDS still not local'.format(vpool.name, storagerouter.name, vdisk.name))
@@ -472,7 +471,7 @@ class ScheduledTaskController(object):
                             config_path = ArakoonClusterConfig.CONFIG_FILE.format(cluster)
                         else:
                             config_path = Configuration.get_configuration_path(ArakoonClusterConfig.CONFIG_KEY.format(cluster))
-                        client.run('arakoon --collapse-local {0} 2 -config {1}'.format(node_workload['node_id'], config_path))
+                        client.run(['arakoon', '--collapse-local', node_workload['node_id'], '2', '-config', config_path])
                         ScheduledTaskController._logger.info('  Collapsing cluster {0} on {1} completed'.format(cluster, storagerouter.ip))
                     except:
                         ScheduledTaskController._logger.exception('  Collapsing cluster {0} on {1} failed'.format(cluster, storagerouter.ip))

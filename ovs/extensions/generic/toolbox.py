@@ -20,6 +20,9 @@ Toolbox module
 
 
 class Toolbox(object):
+    """
+    Generic class for various methods
+    """
     @staticmethod
     def remove_prefix(string, prefix):
         """
