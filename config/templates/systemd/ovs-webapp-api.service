@@ -1,7 +1,6 @@
 [Unit]
 Description=Open vStorage webapp API
-Requires=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
-After=ovs-watcher-framework<_SERVICE_SUFFIX_>.service
+After=ovs-watcher-framework.service
 
 [Service]
 Type=simple
@@ -13,4 +12,4 @@ RestartSec=5
 TimeoutStopSec=60
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.target ovs-watcher-framework.service

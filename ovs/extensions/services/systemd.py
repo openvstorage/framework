@@ -52,7 +52,7 @@ class Systemd(object):
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
-    def add_service(name, client, params=None, target_name=None, additional_dependencies=None):
+    def add_service(name, client, params=None, target_name=None, additional_dependencies=None, startup_dependency=None):
         """
         Add a service
         :param name: Name of the service to add
@@ -60,11 +60,13 @@ class Systemd(object):
         :param client: Client on which to add the service
         :type client: SSHClient
         :param params: Additional information about the service
-        :type params: dict
+        :type params: dict or None
         :param target_name: Overrule default name of the service with this name
-        :type target_name: str
+        :type target_name: str or None
         :param additional_dependencies: Additional dependencies for this service
-        :type additional_dependencies: list
+        :type additional_dependencies: list or None
+        :param startup_dependency: Additional startup dependency
+        :type startup_dependency: str or None
         :return: None
         """
         if params is None:
@@ -85,13 +87,16 @@ class Systemd(object):
         if '<SERVICE_NAME>' in template_file:
             service_name = name if target_name is None else target_name
             template_file = template_file.replace('<SERVICE_NAME>', Toolbox.remove_prefix(service_name, 'ovs-'))
-        template_file = template_file.replace('<_SERVICE_SUFFIX_>', '')
 
         dependencies = ''
         if additional_dependencies:
             for service in additional_dependencies:
                 dependencies += '{0}.service '.format(service)
         template_file = template_file.replace('<ADDITIONAL_DEPENDENCIES>', dependencies)
+        dependency = ''
+        if startup_dependency:
+            dependency = startup_dependency
+        template_file = template_file.replace('<STARTUP_DEPENDENCY>', dependency)
 
         if target_name is None:
             client.file_write('/lib/systemd/system/{0}.service'.format(name), template_file)

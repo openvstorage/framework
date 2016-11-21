@@ -1,7 +1,7 @@
 [Unit]
 Description=ALBA proxy
-Wants=ovs-volumedriver_<VPOOL_NAME><_SERVICE_SUFFIX_>.service
-Before=ovs-volumedriver_<VPOOL_NAME><_SERVICE_SUFFIX_>.service
+After=local-fs.target network-online.target
+Before=ovs-volumedriver_<VPOOL_NAME>.service
 
 [Service]
 Type=simple
@@ -18,4 +18,4 @@ LimitNOFILE=8192
 LimitMEMLOCK=infinity
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.target <ADDITIONAL_DEPENDENCIES>

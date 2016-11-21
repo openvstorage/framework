@@ -1,6 +1,6 @@
 [Unit]
 Description=Watcher for Open vStorage master services
-Wants=nginx.service ovs-scheduled-tasks<_SERVICE_SUFFIX_>.service ovs-volumerouter-consumer<_SERVICE_SUFFIX_>.service ovs-webapp-api<_SERVICE_SUFFIX_>.service ovs-workers<_SERVICE_SUFFIX_>.service
+After=local-fs.target network-online.target
 
 [Service]
 Type=simple
