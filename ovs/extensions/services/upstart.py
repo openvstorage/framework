@@ -54,7 +54,7 @@ class Upstart(object):
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
-    def add_service(name, client, params=None, target_name=None, additional_dependencies=None, startup_dependency=None):
+    def add_service(name, client, params=None, target_name=None, startup_dependency=None):
         """
         Add a service
         :param name: Name of the service to add
@@ -65,8 +65,6 @@ class Upstart(object):
         :type params: dict or None
         :param target_name: Overrule default name of the service with this name
         :type target_name: str or None
-        :param additional_dependencies: Additional dependencies for this service
-        :type additional_dependencies: list or None
         :param startup_dependency: Additional startup dependency
         :type startup_dependency: str or None
         :return: None
@@ -90,11 +88,6 @@ class Upstart(object):
             service_name = name if target_name is None else target_name
             template_file = template_file.replace('<SERVICE_NAME>', Toolbox.remove_prefix(service_name, 'ovs-'))
 
-        dependencies = ''
-        if additional_dependencies:
-            for service in additional_dependencies:
-                dependencies += '{0} '.format(service)
-        template_file = template_file.replace('<ADDITIONAL_DEPENDENCIES>', dependencies)
         dependency = ''
         if startup_dependency:
             dependency = 'started {0}'.format(startup_dependency)

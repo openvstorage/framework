@@ -1,6 +1,7 @@
 [Unit]
 Description=Open vStorage scheduled tasks
 After=ovs-watcher-framework.service
+BindsTo=ovs-watcher-framework.service
 
 [Service]
 Type=simple

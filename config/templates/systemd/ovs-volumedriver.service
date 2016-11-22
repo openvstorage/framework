@@ -1,6 +1,7 @@
 [Unit]
 Description=Open vStorage StorageDriver
 After=ovs-watcher-volumedriver.service
+Wants=ovs-watcher-volumedriver.service
 
 [Service]
 Type=simple

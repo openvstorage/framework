@@ -1,6 +1,7 @@
 [Unit]
 Description=Open vStorage volumerouter consumer
 After=ovs-watcher-framework.service
+BindsTo=ovs-watcher-framework.service
 
 [Service]
 Type=simple
