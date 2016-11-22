@@ -58,7 +58,7 @@ class Watcher(object):
             key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))
             value = str(time.time())
 
-            if target == 'config':
+            if target in ['config', 'framework']:
                 self.log_message(target, 'Testing configuration store...', 0)
                 from ovs.extensions.generic.configuration import Configuration
                 try:

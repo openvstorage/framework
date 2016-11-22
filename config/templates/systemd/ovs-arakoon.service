@@ -1,7 +1,6 @@
 [Unit]
 Description=Arakoon service for cluster <CLUSTER>
 After=local-fs.target network-online.target <STARTUP_DEPENDENCY>
-BindsTo=<STARTUP_DEPENDENCY>
 
 [Service]
 Type=simple
