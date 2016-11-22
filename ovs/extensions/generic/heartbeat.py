@@ -14,6 +14,7 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
+import re
 import time
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.dal.hybrids.storagerouter import StorageRouter
