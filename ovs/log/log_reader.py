@@ -16,10 +16,9 @@
 import os
 import re
 import time
+import platform
 import subprocess
-
 from stat import *
-from subprocess import check_output
 from datetime import date, datetime, timedelta
 from ovs.extensions.generic.remote import remote
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -29,6 +28,8 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 class LogFileTimeParser(object):
     """
     # @TODO Support for rotated log files - currently using the current year for 'Jan 01' dates.
+    # @TODO Support Ubuntu 16.04 journalctl
+
     Extracts parts of a log file based on a start and end date
     Uses binary search logic to speed up searching
     Can filter out errors based on string patterns
@@ -52,6 +53,13 @@ class LogFileTimeParser(object):
     TEMP_FILE_PATH = '/tmp/file_reader.py'
     POSSIBLE_MODES = ['search', 'error-search']
 
+    SUPPORTED_VERSIONS = {
+        "Ubuntu": {
+            "14.04": "file",
+            "16.04": "journal"
+        }
+    }
+
     # Timeout for ssh: 0.0 means no timeout
     TIME_OUT = 0.0
     # For benchmarking purposes
@@ -62,18 +70,21 @@ class LogFileTimeParser(object):
     opened_file = None
 
     @staticmethod
-    def _check_if_local(ip):
+    def _get_exection_mode():
         """
-        Lent from ci.tests.general_network to make it standalone
-        :param ip:
-        :return:
+        Determines the execution mode: 14.04 -> log files 16.04 -> journal
+        :return: execution mode
         """
-        # Check for a local ip - the framework SSH client will not return paramiko if it is
-        local_ips = [lip.strip() for lip in
-                     check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1",
-                                  shell=True).strip().splitlines()]
-        is_local = ip in local_ips
-        return is_local
+        execution_mode = None
+        os_info = platform.linux_distribution()
+        if os_info[0] in LogFileTimeParser.SUPPORTED_VERSIONS:
+            if os_info[1] in LogFileTimeParser.SUPPORTED_VERSIONS[os_info[0]]:
+                execution_mode = LogFileTimeParser.SUPPORTED_VERSIONS[os_info[0]][os_info[1]]
+            else:
+                raise RuntimeError('Logreading is not supported for {0} version {1}'.format(os_info[0], os_info[1]))
+        else:
+            raise RuntimeError('Logreading is not supported for {0}'.format(os_info[0]))
+        return execution_mode
 
     @staticmethod
     def _execute_command(command, wait=True, shell=True):
@@ -111,15 +122,15 @@ class LogFileTimeParser(object):
             raise OverflowError('Would not be able to allocate {0} in {1}'.format(required_space, output_dir))
 
     @staticmethod
-    def execute_search_on_remote(start=None, end=None, paths_to_file=PATHS_TO_FILES, hosts=None, debug=False, python_error=False,
+    def execute_search_on_remote(start=None, end=None, paths=PATHS_TO_FILES, hosts=None, debug=False, python_error=False,
                                  mode='search', username='root', password=None, suppress_return=False, search_patterns=None):
         """
         :param start: Starting date
         :type start: str / Datetime
         :param end: End date
         :type end: str / Datetime
-        :param paths_to_file: List of paths of files that will be searched on all nodes
-        :type paths_to_file: List of str
+        :param paths: List of paths of files / servicenames that will be searched on all nodes
+        :type paths: List of str
         :param debug: Boolean to debug or not
         :type debug: Boolean
         :param hosts: Ip of the nodes
@@ -160,15 +171,15 @@ class LogFileTimeParser(object):
                 if mode == 'search':
                     # Execute search
                      results = remotes[host].LogFileTimeParser().get_lines_between_timestamps(start=start, end=end,
-                                                                                            paths_to_file=paths_to_file,
-                                                                                            search_patterns=search_patterns,
-                                                                                            debug=debug, host=host)
+                                                                                              paths_to_file=paths,
+                                                                                              search_patterns=search_patterns,
+                                                                                              debug=debug, host=host)
                 elif mode == 'error-search':
                     # Execute search
                     results = remotes[host].LogFileTimeParser().search_for_errors(start=start, end=end,
-                                                                                paths_to_file=paths_to_file,
-                                                                                debug=debug, host=host,
-                                                                                python_error=python_error)
+                                                                                  paths_to_file=paths,
+                                                                                  debug=debug, host=host,
+                                                                                  python_error=python_error)
                 # Append output to cache
                 with open(LogFileTimeParser.FILE_PATH_REMOTE, 'a') as f2:
                     f2.write(str(results))
@@ -277,6 +288,15 @@ class LogFileTimeParser(object):
         :type suppress_return: Boolean
         :return: Output of a file as string
         """
+
+        execution_mode = LogFileTimeParser._get_exection_mode()
+
+        if execution_mode == 'file':
+            pass
+        elif execution_mode == 'journal':
+            pass
+        else:
+            raise RuntimeError('Mode {0} not supported.'.format(execution_mode))
         if not start:
             start = (datetime.today() - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
         if not end:
