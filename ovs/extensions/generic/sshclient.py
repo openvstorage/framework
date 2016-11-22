@@ -367,8 +367,10 @@ print json.dumps(os.path.isdir('{0}'))""".format(directory)
                         for sub_dir in dirs:
                             os.chmod('/'.join([root, sub_dir]), mode)
             else:
-                recursive_str = '-R' if recursive is True else ''
-                self.run(['chmod', recursive_str, str(oct(mode)), directory])
+                command = ['chmod', oct(mode), directory]
+                if recursive is True:
+                    command.insert(1, '-R')
+                self.run(command)
 
     def dir_chown(self, directories, user, group, recursive=False):
         """
@@ -402,8 +404,10 @@ print json.dumps(os.path.isdir('{0}'))""".format(directory)
                         for sub_dir in dirs:
                             os.chown('/'.join([root, sub_dir]), uid, gid)
             else:
-                recursive_str = '-R' if recursive is True else ''
-                self.run(['chown', recursive_str, '{0}:{1}'.format(user, group), directory])
+                command = ['chown', '{0}:{1}'.format(user, group), directory]
+                if recursive is True:
+                    command.insert(1, '-R')
+                self.run(command)
 
     def dir_list(self, directory):
         """
