@@ -67,14 +67,13 @@ class OAuth2RedirectView(View):
         base_url = Configuration.get('/ovs/framework/webapps|oauth2.token_uri')
         client_id = Configuration.get('/ovs/framework/webapps|oauth2.client_id')
         client_secret = Configuration.get('/ovs/framework/webapps|oauth2.client_secret')
+        redirect_uri = 'https://{0}/api/oauth2/redirect/'.format(request.META['HTTP_HOST'])
         parameters = {'grant_type': 'authorization_code',
-                      'redirect_url': 'https://{0}/api/oauth2/redirect/'.format(System.get_my_storagerouter().ip),
-                      'client_id': client_id,
+                      'redirect_uri': redirect_uri,
+                      'state': state,
                       'code': code}
-        url = '{0}?{1}'.format(base_url, urllib.urlencode(parameters))
-        headers = {'Accept': 'application/json',
-                   'Authorization': 'Basic {0}'.format(base64.b64encode('{0}:{1}'.format(client_id, client_secret)).strip())}
-        raw_response = requests.post(url=url, headers=headers, verify=False)
+        headers = {'Accept': 'application/json'}
+        raw_response = requests.post(url=base_url, data=parameters, headers=headers, auth=(client_id, client_secret), verify=False)
         response = raw_response.json()
         if 'error' in response:
             error = response['error']
