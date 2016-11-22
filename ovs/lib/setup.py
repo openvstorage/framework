@@ -727,10 +727,10 @@ class SetupController(object):
                 client = SSHClient(endpoint=storage_router_to_remove, username='root')
                 SetupController._remove_services(client=client, node_type=storage_router_to_remove.node_type.lower())
                 service = 'watcher-config'
-                if ServiceManager.has_service(service, client=target_client):
+                if ServiceManager.has_service(service, client=client):
                     SetupController._log(messages='Removing service {0}'.format(service), loglevel='debug')
-                    ServiceManager.stop_service(service, client=target_client)
-                    ServiceManager.remove_service(service, client=target_client)
+                    ServiceManager.stop_service(service, client=client)
+                    ServiceManager.remove_service(service, client=client)
 
                 if config_store == 'etcd':
                     from ovs.extensions.db.etcd.installer import EtcdInstaller
@@ -1193,6 +1193,7 @@ class SetupController(object):
         if not ServiceManager.has_service(service, target_client):
             SetupController._log(messages='Adding service {0}'.format(service), loglevel='debug')
             ServiceManager.add_service(service, params={}, client=target_client)
+            Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
         SetupController._add_services(target_client, unique_id, 'extra')
 
         SetupController._configure_redis(target_client)

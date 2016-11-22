@@ -90,7 +90,6 @@ class Watcher(object):
                         os.rename(temp_filename, ArakoonConfiguration.CACC_LOCATION)
                         Watcher.LOG_CONTENTS = contents
                 self.log_message(target, '  Configuration store OK', 0)
-                return True
 
             if target == 'framework':
                 # Volatile
@@ -200,7 +199,8 @@ class Watcher(object):
                     return False
                 self.log_message(target, '  RabbitMQ test OK', 0)
                 self.log_message(target, 'All tests OK', 0)
-                return True
+
+            return True
         except Exception as ex:
             self.log_message(target, 'Unexpected exception: {0}'.format(ex), 2)
             return False
