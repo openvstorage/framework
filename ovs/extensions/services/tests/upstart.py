@@ -33,11 +33,11 @@ class Upstart(object):
         Upstart.services = {}
 
     @staticmethod
-    def add_service(name, client, params=None, target_name=None, additional_dependencies=None):
+    def add_service(name, client, params=None, target_name=None, startup_dependency=None):
         """
         Adds a mocked service
         """
-        _ = params, additional_dependencies
+        _ = params, startup_dependency
         key = 'None' if client is None else client.ip
         name = name if target_name is None else target_name
         Upstart.services[key] = {name: 'HALTED'}

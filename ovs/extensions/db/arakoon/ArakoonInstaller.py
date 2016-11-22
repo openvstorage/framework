@@ -630,9 +630,9 @@ class ArakoonInstaller(object):
             ServiceManager.add_service(base_name, root_client,
                                        params={'CLUSTER': config.cluster_id,
                                                'NODE_ID': node.name,
-                                               'CONFIG_PATH': config_path,
-                                               'STARTUP_DEPENDENCY': 'started ovs-watcher-config' if filesystem is False else '(local-filesystems and started networking)'},
-                                       target_name=target_name)
+                                               'CONFIG_PATH': config_path},
+                                       target_name=target_name,
+                                       startup_dependency='ovs-watcher-config' if filesystem is False else None)
             ArakoonInstaller._logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
 
     @staticmethod

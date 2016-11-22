@@ -1,6 +1,6 @@
 [Unit]
 Description=Etcd service for cluster <CLUSTER>
-After=local-fs.target network.target
+After=local-fs.target network-online.target
 
 [Service]
 Type=notify

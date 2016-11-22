@@ -726,6 +726,11 @@ class SetupController(object):
             if storage_router_to_remove_online is True:
                 client = SSHClient(endpoint=storage_router_to_remove, username='root')
                 SetupController._remove_services(client=client, node_type=storage_router_to_remove.node_type.lower())
+                service = 'watcher-config'
+                if ServiceManager.has_service(service, client=client):
+                    SetupController._log(messages='Removing service {0}'.format(service), loglevel='debug')
+                    ServiceManager.stop_service(service, client=client)
+                    ServiceManager.remove_service(service, client=client)
 
                 if config_store == 'etcd':
                     from ovs.extensions.db.etcd.installer import EtcdInstaller
@@ -882,6 +887,12 @@ class SetupController(object):
             rdma = Interactive.ask_yesno(message='Enable RDMA?', default_value=False)
         Configuration.set('/ovs/framework/rdma', rdma)
         Configuration.set('/ovs/framework/cluster_name', cluster_name)
+
+        service = 'watcher-config'
+        if not ServiceManager.has_service(service, target_client):
+            SetupController._log(messages='Adding service {0}'.format(service), loglevel='debug')
+            ServiceManager.add_service(service, params={}, client=target_client)
+            Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
 
         metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, locked=False)
         arakoon_ports = []
@@ -1060,6 +1071,11 @@ class SetupController(object):
                     Configuration.set('/ovs/framework/memcache|endpoints', endpoints)
 
         SetupController._remove_services(target_client, 'master')
+        service = 'watcher-config'
+        if ServiceManager.has_service(service, client=target_client):
+            SetupController._log(messages='Removing service {0}'.format(service), loglevel='debug')
+            ServiceManager.stop_service(service, client=target_client)
+            ServiceManager.remove_service(service, client=target_client)
 
         if cfg_mgmt_running is True:
             external_config = required_info['/ovs/framework/external_config']
@@ -1173,6 +1189,11 @@ class SetupController(object):
 
         Configuration.initialize_host(machine_id)
 
+        service = 'watcher-config'
+        if not ServiceManager.has_service(service, target_client):
+            SetupController._log(messages='Adding service {0}'.format(service), loglevel='debug')
+            ServiceManager.add_service(service, params={}, client=target_client)
+            Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
         SetupController._add_services(target_client, unique_id, 'extra')
 
         SetupController._configure_redis(target_client)
@@ -1683,7 +1704,7 @@ class SetupController(object):
     @staticmethod
     def _add_services(client, unique_id, node_type):
         SetupController._log(messages='Adding services')
-        services = ['workers', 'watcher-framework', 'watcher-config']
+        services = ['workers', 'watcher-framework']
         worker_queue = unique_id
         if node_type == 'master':
             services += ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
@@ -1700,7 +1721,7 @@ class SetupController(object):
     def _remove_services(client, node_type):
         SetupController._log(messages='Removing services')
         stop_only = ['rabbitmq-server', 'memcached']
-        services = ['workers', 'support-agent', 'watcher-framework', 'watcher-config']
+        services = ['workers', 'support-agent', 'watcher-framework']
         if node_type == 'master':
             services += ['scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
             if SetupController._is_internally_managed(service='rabbitmq') is True:

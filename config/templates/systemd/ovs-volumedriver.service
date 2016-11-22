@@ -1,8 +1,7 @@
 [Unit]
 Description=Open vStorage StorageDriver
-Requires=<ADDITIONAL_DEPENDENCIES>
-Wants=ovs-watcher-volumedriver<_SERVICE_SUFFIX_>.service
-After=ovs-watcher-volumedriver<_SERVICE_SUFFIX_>.service
+After=ovs-watcher-volumedriver.service
+Wants=ovs-watcher-volumedriver.service
 
 [Service]
 Type=simple
@@ -17,4 +16,4 @@ TimeoutStopSec=<KILL_TIMEOUT>
 LimitMEMLOCK=infinity
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.target ovs-watcher-volumedriver.service
