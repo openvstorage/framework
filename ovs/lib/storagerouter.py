@@ -721,7 +721,7 @@ class StorageRouterController(object):
                          'vrouter_min_workers': 4,
                          'vrouter_max_workers': 16,
                          'vrouter_sco_multiplier': sco_size * 1024 / cluster_size,  # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB),
-                         'vrouter_backend_sync_timeout_ms': 5000,
+                         'vrouter_backend_sync_timeout_ms': 60000,
                          'vrouter_migrate_timeout_ms': 5000,
                          'vrouter_use_fencing': True}
 
