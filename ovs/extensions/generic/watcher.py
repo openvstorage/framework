@@ -19,6 +19,7 @@
 Watcher module for framework and volumedriver
 """
 
+import os
 import sys
 import time
 import uuid
@@ -31,6 +32,8 @@ class Watcher(object):
     """
     Watcher class
     """
+
+    LOG_CONTENTS = None
 
     def __init__(self):
         """
@@ -55,7 +58,7 @@ class Watcher(object):
             key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))
             value = str(time.time())
 
-            if target == 'config':
+            if target in ['config', 'framework']:
                 self.log_message(target, 'Testing configuration store...', 0)
                 from ovs.extensions.generic.configuration import Configuration
                 try:
@@ -73,10 +76,20 @@ class Watcher(object):
                     config.read_config(contents)
                     client = ArakoonInstaller.build_client(config)
                     contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())
-                    with open(ArakoonConfiguration.CACC_LOCATION, 'w') as config_file:
-                        config_file.write(contents)
+                    if Watcher.LOG_CONTENTS != contents:
+                        try:
+                            config.read_config(contents)  # Validate whether the contents are not corrupt
+                        except Exception as ex:
+                            self.log_message(target, '  Configuration stored in configuration store seems to be corrupt: {0}'.format(ex), 2)
+                            return False
+                        temp_filename = '{0}~'.format(ArakoonConfiguration.CACC_LOCATION)
+                        with open(temp_filename, 'w') as config_file:
+                            config_file.write(contents)
+                            config_file.flush()
+                            os.fsync(config_file)
+                        os.rename(temp_filename, ArakoonConfiguration.CACC_LOCATION)
+                        Watcher.LOG_CONTENTS = contents
                 self.log_message(target, '  Configuration store OK', 0)
-                return True
 
             if target == 'framework':
                 # Volatile
@@ -186,7 +199,8 @@ class Watcher(object):
                     return False
                 self.log_message(target, '  RabbitMQ test OK', 0)
                 self.log_message(target, 'All tests OK', 0)
-                return True
+
+            return True
         except Exception as ex:
             self.log_message(target, 'Unexpected exception: {0}'.format(ex), 2)
             return False

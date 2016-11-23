@@ -721,7 +721,7 @@ class StorageRouterController(object):
                          'vrouter_min_workers': 4,
                          'vrouter_max_workers': 16,
                          'vrouter_sco_multiplier': sco_size * 1024 / cluster_size,  # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB),
-                         'vrouter_backend_sync_timeout_ms': 5000,
+                         'vrouter_backend_sync_timeout_ms': 60000,
                          'vrouter_migrate_timeout_ms': 5000,
                          'vrouter_use_fencing': True}
 
@@ -784,7 +784,7 @@ class StorageRouterController(object):
         ServiceManager.start_service(dtl_service, client=root_client)
         ServiceManager.add_service(name='ovs-albaproxy', params=alba_proxy_params, client=root_client, target_name=alba_proxy_service)
         ServiceManager.start_service(alba_proxy_service, client=root_client)
-        ServiceManager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client, target_name=sd_service, additional_dependencies=[alba_proxy_service])
+        ServiceManager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client, target_name=sd_service)
 
         storagedriver = StorageDriver(storagedriver.guid)
         current_startup_counter = storagedriver.startup_counter
@@ -1006,7 +1006,7 @@ class StorageRouterController(object):
                             tries -= 1
                             time.sleep(10 - tries)
                             try:
-                                client.run(['alba', 'proxy-statistics', '--host', storage_driver.storage_ip, '--port', port])
+                                client.run(['alba', 'proxy-statistics', '--host', storage_driver.storage_ip, '--port', str(port)])
                                 running = True
                             except CalledProcessError as ex:
                                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Fetching alba proxy-statistics failed with error (but ignoring): {1}'.format(storage_driver.guid, ex))

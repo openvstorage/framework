@@ -550,8 +550,8 @@ class SetupController(object):
                     config.load_config()
                     arakoon_client = ArakoonInstaller.build_client(config)
                     metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
-                    if len(config.nodes) == 1 and config.nodes[0].ip == master_ip and metadata.get('internal') is True:
-                        raise RuntimeError('Demote is not supported when single node Arakoon cluster(s) are present, please promote another node first')
+                    if len(config.nodes) == 1 and config.nodes[0].ip == ip and metadata.get('internal') is True:
+                        raise RuntimeError('Demote is not supported when single node Arakoon cluster(s) are present on the node to be demoted.')
 
             configure_rabbitmq = SetupController._is_internally_managed(service='rabbitmq')
             configure_memcached = SetupController._is_internally_managed(service='memcached')
@@ -721,11 +721,16 @@ class SetupController(object):
                                              offline_nodes=storage_routers_offline)
 
             # Stop / remove services
-            SetupController._log(messages='    Stopping and removing services')
+            SetupController._log(messages='Stopping and removing services')
             config_store = Configuration.get_store()
             if storage_router_to_remove_online is True:
                 client = SSHClient(endpoint=storage_router_to_remove, username='root')
                 SetupController._remove_services(client=client, node_type=storage_router_to_remove.node_type.lower())
+                service = 'watcher-config'
+                if ServiceManager.has_service(service, client=client):
+                    SetupController._log(messages='Removing service {0}'.format(service), loglevel='debug')
+                    ServiceManager.stop_service(service, client=client)
+                    ServiceManager.remove_service(service, client=client)
 
                 if config_store == 'etcd':
                     from ovs.extensions.db.etcd.installer import EtcdInstaller
@@ -738,12 +743,13 @@ class SetupController(object):
                         except Exception as ex:
                             SetupController._log(messages=['\nFailed to unconfigure Etcd', ex], loglevel='exception')
 
-                    SetupController._log(messages='      Removing Etcd proxy')
+                    SetupController._log(messages='Removing Etcd proxy')
                     EtcdInstaller.remove_proxy('config', client.ip)
 
-            # Clean up model
-            SetupController._log(messages='    Removing node from model')
             SetupController._run_hooks('remove', storage_router_to_remove.ip, complete_removal=remove_asd_manager)
+
+            # Clean up model
+            SetupController._log(messages='Removing node from model')
             for service in storage_router_to_remove.services:
                 service.delete()
             for disk in storage_router_to_remove.disks:
@@ -754,7 +760,7 @@ class SetupController(object):
                 j_domain.delete()
             Configuration.delete('/ovs/framework/hosts/{0}'.format(storage_router_to_remove.machine_id))
 
-            master_ips = [sr.ip for sr in storage_router_masters]
+            master_ips = [sr.ip for sr in StorageRouterList.get_masters()]
             slave_ips = [sr.ip for sr in StorageRouterList.get_slaves()]
             offline_node_ips = [node.ip for node in storage_routers_offline]
             SetupController._restart_framework_and_memcache_services(master_ips, slave_ips, ip_client_map, offline_node_ips)
@@ -765,7 +771,7 @@ class SetupController(object):
                     client.file_delete(filenames=[ArakoonConfiguration.CACC_LOCATION])
                 client.file_delete(filenames=[Configuration.BOOTSTRAP_CONFIG_LOCATION])
             storage_router_to_remove.delete()
-            SetupController._log(messages='    Successfully removed node\n')
+            SetupController._log(messages='Successfully removed node\n')
         except Exception as exception:
             SetupController._log(messages='\n')
             SetupController._log(messages=['An unexpected error occurred:', str(exception)], boxed=True, loglevel='exception')
@@ -881,6 +887,12 @@ class SetupController(object):
             rdma = Interactive.ask_yesno(message='Enable RDMA?', default_value=False)
         Configuration.set('/ovs/framework/rdma', rdma)
         Configuration.set('/ovs/framework/cluster_name', cluster_name)
+
+        service = 'watcher-config'
+        if not ServiceManager.has_service(service, target_client):
+            SetupController._log(messages='Adding service {0}'.format(service), loglevel='debug')
+            ServiceManager.add_service(service, params={}, client=target_client)
+            Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
 
         metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, locked=False)
         arakoon_ports = []
@@ -1059,6 +1071,11 @@ class SetupController(object):
                     Configuration.set('/ovs/framework/memcache|endpoints', endpoints)
 
         SetupController._remove_services(target_client, 'master')
+        service = 'watcher-config'
+        if ServiceManager.has_service(service, client=target_client):
+            SetupController._log(messages='Removing service {0}'.format(service), loglevel='debug')
+            ServiceManager.stop_service(service, client=target_client)
+            ServiceManager.remove_service(service, client=target_client)
 
         if cfg_mgmt_running is True:
             external_config = required_info['/ovs/framework/external_config']
@@ -1172,6 +1189,11 @@ class SetupController(object):
 
         Configuration.initialize_host(machine_id)
 
+        service = 'watcher-config'
+        if not ServiceManager.has_service(service, target_client):
+            SetupController._log(messages='Adding service {0}'.format(service), loglevel='debug')
+            ServiceManager.add_service(service, params={}, client=target_client)
+            Toolbox.change_service_state(target_client, service, 'start', SetupController._logger)
         SetupController._add_services(target_client, unique_id, 'extra')
 
         SetupController._configure_redis(target_client)
@@ -1461,6 +1483,7 @@ class SetupController(object):
                 SetupController._log(messages='Removing/unconfiguring RabbitMQ', loglevel='debug')
                 try:
                     if ServiceManager.has_service('rabbitmq-server', client=target_client):
+                        Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', SetupController._logger)
                         target_client.run(['rabbitmq-server', '-detached'])
                         time.sleep(5)
                         target_client.run(['rabbitmqctl', 'stop_app'])
@@ -1469,17 +1492,27 @@ class SetupController(object):
                         time.sleep(5)
                         target_client.run(['rabbitmqctl', 'stop'])
                         time.sleep(5)
-                        Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', SetupController._logger)
                         target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
+                        Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', SetupController._logger)  # To be sure
                 except Exception as ex:
                     SetupController._log(messages=['\nFailed to remove/unconfigure RabbitMQ', ex], loglevel='exception')
 
-            SetupController._log(messages='Removing services')
-            services = ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
+            SetupController._log(messages='Stopping services')
+            services = ['memcached', 'rabbitmq-server']
             if unconfigure_rabbitmq is False:
                 services.remove('rabbitmq-server')
             if unconfigure_memcached is False:
                 services.remove('memcached')
+            for service in services:
+                if ServiceManager.has_service(service, client=target_client):
+                    SetupController._log(messages='Stopping service {0}'.format(service), loglevel='debug')
+                    try:
+                        Toolbox.change_service_state(target_client, service, 'stop', SetupController._logger)
+                    except Exception as ex:
+                        SetupController._log(messages=['\nFailed to stop service'.format(service), ex], loglevel='exception')
+
+            SetupController._log(messages='Removing services')
+            services = ['scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
             for service in services:
                 if ServiceManager.has_service(service, client=target_client):
                     SetupController._log(messages='Removing service {0}'.format(service), loglevel='debug')
@@ -1492,8 +1525,7 @@ class SetupController(object):
             if ServiceManager.has_service('workers', client=target_client):
                 ServiceManager.add_service(name='workers',
                                            client=target_client,
-                                           params={'MEMCACHE_NODE_IP': cluster_ip,
-                                                   'WORKER_QUEUE': '{0}'.format(unique_id)})
+                                           params={'WORKER_QUEUE': '{0}'.format(unique_id)})
         try:
             SetupController._configure_amqp_to_volumedriver()
         except Exception as ex:
@@ -1514,7 +1546,7 @@ class SetupController(object):
             if SetupController._avahi_installed(target_client) is True:
                 SetupController._configure_avahi(target_client, node_name, 'extra')
         Configuration.set('/ovs/framework/hosts/{0}/type'.format(storagerouter.machine_id), 'EXTRA')
-        SetupController._log(messages='Demote complete')
+        SetupController._log(messages='Demote complete', title=True)
 
     @staticmethod
     def _restart_framework_and_memcache_services(masters, slaves, clients, offline_node_ips=None):
@@ -1655,7 +1687,7 @@ class SetupController(object):
     @staticmethod
     def _configure_avahi(client, node_name, node_type):
         cluster_name = Configuration.get('/ovs/framework/cluster_name')
-        SetupController._log(messages='Announcing service', title=True)
+        SetupController._log(messages='Announcing service')
         client.file_write(SetupController.avahi_filename, """<?xml version="1.0" standalone='no'?>
 <!--*-nxml-*-->
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
@@ -1672,7 +1704,7 @@ class SetupController(object):
     @staticmethod
     def _add_services(client, unique_id, node_type):
         SetupController._log(messages='Adding services')
-        services = ['workers', 'watcher-framework', 'watcher-config']
+        services = ['workers', 'watcher-framework']
         worker_queue = unique_id
         if node_type == 'master':
             services += ['memcached', 'rabbitmq-server', 'scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
@@ -1688,7 +1720,8 @@ class SetupController(object):
     @staticmethod
     def _remove_services(client, node_type):
         SetupController._log(messages='Removing services')
-        services = ['workers', 'support-agent', 'watcher-framework', 'watcher-config']
+        stop_only = ['rabbitmq-server', 'memcached']
+        services = ['workers', 'support-agent', 'watcher-framework']
         if node_type == 'master':
             services += ['scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
             if SetupController._is_internally_managed(service='rabbitmq') is True:
@@ -1698,9 +1731,13 @@ class SetupController(object):
 
         for service in services:
             if ServiceManager.has_service(service, client=client):
-                SetupController._log(messages='Removing service {0}'.format(service), loglevel='debug')
+                SetupController._log(messages='{0} service {1}'.format(
+                    'Removing' if service not in stop_only else 'Stopping',
+                    service
+                ), loglevel='debug')
                 ServiceManager.stop_service(service, client=client)
-                ServiceManager.remove_service(service, client=client)
+                if service not in stop_only:
+                    ServiceManager.remove_service(service, client=client)
 
     @staticmethod
     def _finalize_setup(client, node_name, node_type, unique_id):

@@ -31,6 +31,7 @@ import select
 import socket
 import logging
 import tempfile
+import unicodedata
 from subprocess import CalledProcessError, PIPE, Popen
 from ovs.dal.helpers import Descriptor
 from ovs.extensions.generic.remote import remote
@@ -208,16 +209,19 @@ class SSHClient(object):
             text = '\n'.join(line.rstrip() for line in text)
         try:
             # This strip is absolutely necessary. Without it, channel.communicate() is never executed (odd but true)
-            if isinstance(text, unicode):
-                cleaned = text.strip()
-            else:
-                cleaned = text.strip().decode('utf-8', 'replace')
+            cleaned = text.strip()
+            # I ? unicode
+            if not isinstance(text, unicode):
+                cleaned = unicode(cleaned.decode('utf-8', 'replace'))
             for old, new in {u'\u2018': "'",
+                             u'\u2019': "'",
                              u'\u201a': "'",
                              u'\u201e': '"',
                              u'\u201c': '"',
                              u'\u25cf': '*'}.iteritems():
                 cleaned = cleaned.replace(old, new)
+            cleaned = unicodedata.normalize('NFKD', cleaned)
+            cleaned = cleaned.encode('ascii', 'ignore')
             return cleaned
         except UnicodeDecodeError:
             SSHClient._logger.error('UnicodeDecodeError with output: {0}'.format(text))
@@ -245,6 +249,8 @@ class SSHClient(object):
 
         if not isinstance(command, list) and not allow_insecure:
             raise RuntimeError('The given command must be a list, or the allow_insecure flag must be set')
+        if isinstance(command, list):
+            command = ' '.join([self.shell_safe(str(entry)) for entry in command])
         if self.is_local is True:
             stderr = None
             try:
@@ -274,8 +280,6 @@ class SSHClient(object):
                     ))
                 raise
         else:
-            if isinstance(command, list):
-                command = ' '.join([self.shell_safe(entry) for entry in command])
             _, stdout, stderr = self._client.exec_command(command)  # stdin, stdout, stderr
             output = self._clean_text(stdout.readlines())
             error = self._clean_text(stderr.readlines())
@@ -363,8 +367,10 @@ print json.dumps(os.path.isdir('{0}'))""".format(directory)
                         for sub_dir in dirs:
                             os.chmod('/'.join([root, sub_dir]), mode)
             else:
-                recursive_str = '-R' if recursive is True else ''
-                self.run(['chmod', recursive_str, str(oct(mode)), directory])
+                command = ['chmod', oct(mode), directory]
+                if recursive is True:
+                    command.insert(1, '-R')
+                self.run(command)
 
     def dir_chown(self, directories, user, group, recursive=False):
         """
@@ -398,8 +404,10 @@ print json.dumps(os.path.isdir('{0}'))""".format(directory)
                         for sub_dir in dirs:
                             os.chown('/'.join([root, sub_dir]), uid, gid)
             else:
-                recursive_str = '-R' if recursive is True else ''
-                self.run(['chown', recursive_str, '{0}:{1}'.format(user, group), directory])
+                command = ['chown', '{0}:{1}'.format(user, group), directory]
+                if recursive is True:
+                    command.insert(1, '-R')
+                self.run(command)
 
     def dir_list(self, directory):
         """
@@ -516,27 +524,38 @@ if os.path.islink('{0}'):
             return self.run(['cat', filename])
 
     @connected()
-    def file_write(self, filename, contents, mode='w'):
+    def file_write(self, filename, contents):
         """
         Writes into a file to the remote end
         :param filename: File to write
         :param contents: Contents to write to the file
-        :param mode: Mode to write to the file, can be a, a+, w, w+
         """
+        temp_filename = '{0}~'.format(filename)
         if self.is_local is True:
-            with open(filename, mode) as the_file:
+            if os.path.isfile(filename):
+                # Use .run([cp -pf ...]) here, to make sure owner and other rights are preserved
+                self.run(['cp', '-pf', filename, temp_filename])
+            with open(temp_filename, 'w') as the_file:
                 the_file.write(contents)
+                the_file.flush()
+                os.fsync(the_file)
+            os.rename(temp_filename, filename)
         else:
-            handle, temp_filename = tempfile.mkstemp()
-            with open(temp_filename, mode) as the_file:
+            handle, local_temp_filename = tempfile.mkstemp()
+            with open(local_temp_filename, 'w') as the_file:
                 the_file.write(contents)
+                the_file.flush()
+                os.fsync(the_file)
             os.close(handle)
             try:
+                if self.file_exists(filename):
+                    self.run(['cp', '-pf', filename, temp_filename])
                 sftp = self._client.open_sftp()
-                sftp.put(temp_filename, filename)
+                sftp.put(local_temp_filename, temp_filename)
                 sftp.close()
+                self.run(['mv', '-f', temp_filename, filename])
             finally:
-                os.remove(temp_filename)
+                os.remove(local_temp_filename)
 
     @connected()
     def file_upload(self, remote_filename, local_filename):
@@ -545,12 +564,15 @@ if os.path.islink('{0}'):
         :param remote_filename: Name of the file on the remote location
         :param local_filename: Name of the file locally
         """
+        temp_remote_filename = '{0}~'.format(remote_filename)
         if self.is_local is True:
-            self.run(['cp', '-f', local_filename, remote_filename])
+            self.run(['cp', '-f', local_filename, temp_remote_filename])
+            self.run(['mv', '-f', temp_remote_filename, remote_filename])
         else:
             sftp = self._client.open_sftp()
-            sftp.put(local_filename, remote_filename)
+            sftp.put(local_filename, temp_remote_filename)
             sftp.close()
+            self.run(['mv', '-f', temp_remote_filename, remote_filename])
 
     def file_exists(self, filename):
         """

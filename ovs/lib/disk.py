@@ -81,8 +81,8 @@ class DiskController(object):
                               '--noheadings',
                               '--exclude',
                               '1,2,11',
-                              '--output=KNAME,SIZE,MODEL,STATE,MAJ:MIN,FSTYPE,TYPE,ROTA,MOUNTPOINT,PHY-SEC']).splitlines()
-        device_regex = re.compile('^KNAME="(?P<name>.*)" SIZE="(?P<size>\d*)" MODEL="(?P<model>.*)" STATE="(?P<state>.*)" MAJ:MIN="(?P<dev_nr>.*)" FSTYPE="(?P<fstype>.*)" TYPE="(?P<type>.*)" ROTA="(?P<rota>[0,1])" MOUNTPOINT="(?P<mtpt>.*)" PHY-SEC="(?P<sector_size>\d*)"$')
+                              '--output=KNAME,SIZE,MODEL,STATE,MAJ:MIN,FSTYPE,TYPE,ROTA,MOUNTPOINT,LOG-SEC,SERIAL']).splitlines()
+        device_regex = re.compile('^KNAME="(?P<name>.*)" SIZE="(?P<size>\d*)" MODEL="(?P<model>.*)" STATE="(?P<state>.*)" MAJ:MIN="(?P<dev_nr>.*)" FSTYPE="(?P<fstype>.*)" TYPE="(?P<type>.*)" ROTA="(?P<rota>[0,1])" MOUNTPOINT="(?P<mtpt>.*)" LOG-SEC="(?P<sector_size>\d*)" SERIAL="(?P<serial>.*)"$')
         configuration = {}
         parsed_devices = []
         for device in devices:
@@ -97,6 +97,7 @@ class DiskController(object):
             model = groupdict['model'].strip()
             state = groupdict['state'].strip()
             dev_nr = groupdict['dev_nr'].strip()
+            serial = groupdict['serial'].strip()
             fs_type = groupdict['fstype'].strip()
             dev_type = groupdict['type'].strip()
             rotational = groupdict['rota'].strip()
@@ -119,6 +120,7 @@ class DiskController(object):
                 configuration[name] = {'name': name,
                                        'size': int(size),
                                        'model': model if model != '' else None,
+                                       'serial': serial if serial != '' else None,
                                        'state': device_state,
                                        'is_ssd': rotational == '0',
                                        'aliases': system_aliases,
@@ -248,7 +250,7 @@ class DiskController(object):
         """
         Updates a disk
         """
-        for prop in ['state', 'aliases', 'is_ssd', 'model', 'size', 'name']:
+        for prop in ['state', 'aliases', 'is_ssd', 'model', 'size', 'name', 'serial']:
             if prop in container:
                 setattr(disk, prop, container[prop])
         disk.save()
