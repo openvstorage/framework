@@ -550,8 +550,8 @@ class SetupController(object):
                     config.load_config()
                     arakoon_client = ArakoonInstaller.build_client(config)
                     metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
-                    if len(config.nodes) == 1 and config.nodes[0].ip == master_ip and metadata.get('internal') is True:
-                        raise RuntimeError('Demote is not supported when single node Arakoon cluster(s) are present, please promote another node first')
+                    if len(config.nodes) == 1 and config.nodes[0].ip == ip and metadata.get('internal') is True:
+                        raise RuntimeError('Demote is not supported when single node Arakoon cluster(s) are present on the node to be demoted.')
 
             configure_rabbitmq = SetupController._is_internally_managed(service='rabbitmq')
             configure_memcached = SetupController._is_internally_managed(service='memcached')
