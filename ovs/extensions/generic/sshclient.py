@@ -180,8 +180,8 @@ class SSHClient(object):
                     pass
                 raise
         except socket.error as ex:
-            if 'No route to host' in str(ex):
-                message = 'SocketException: No route to host {0}'.format(self.ip)
+            message = str(ex)
+            if 'No route to host' in message or 'Unable to connect' in message:
                 SSHClient._logger.error(message)
                 raise UnableToConnectException(message)
             raise
