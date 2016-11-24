@@ -28,9 +28,11 @@ define([
         self.storageDriverGuids = [];
 
         // Handles
-        self.loadActions = undefined;
-        self.loadDisks   = undefined;
-        self.loadHandle  = undefined;
+        self.loadActions        = undefined;
+        self.loadDisks          = undefined;
+        self.loadLogFiles       = undefined;
+        self.loadHandle         = undefined;
+        self.loadUpdateMetadata = undefined;
 
         // External dependencies
         self.domains         = ko.observableArray([]);
@@ -38,38 +40,44 @@ define([
         self.vPools          = ko.observableArray([]);
 
         // Observables
-        self.backendRead         = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
-        self.backendWritten      = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
-        self.bandwidthSaved      = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
-        self.cacheHits           = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
-        self.cacheMisses         = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
-        self.disks               = ko.observableArray([]);
-        self.disksLoaded         = ko.observable(false);
-        self.domainGuids         = ko.observableArray([]);
-        self.downloadLogState    = ko.observable($.t('ovs:support.downloadlogs'));
-        self.edit                = ko.observable(false);
-        self.guid                = ko.observable(guid);
-        self.iops                = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
-        self.ipAddress           = ko.observable();
-        self.lastHeartbeat       = ko.observable();
-        self.loaded              = ko.observable(false);
-        self.loading             = ko.observable(false);
-        self.machineId           = ko.observable();
-        self.name                = ko.observable();
-        self.nodeType            = ko.observable();
-        self.recoveryDomainGuids = ko.observableArray([]);
-        self.rdmaCapable         = ko.observable(false);
-        self.readSpeed           = ko.observable().extend({smooth: {}}).extend({format: generic.formatSpeed});
-        self.saving              = ko.observable(false);
-        self.scrubCapable        = ko.observable(false);
-        self.status              = ko.observable();
-        self.storedData          = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
-        self.totalCacheHits      = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
-        self.updates             = ko.observable();
-        self.vDisks              = ko.observableArray([]);
-        self.versions            = ko.observable();
-        self.vPoolGuids          = ko.observableArray([]);
-        self.writeSpeed          = ko.observable().extend({smooth: {}}).extend({format: generic.formatSpeed});
+        self.backendRead          = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
+        self.backendWritten       = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
+        self.bandwidthSaved       = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
+        self.cacheHits            = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
+        self.cacheMisses          = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
+        self.componentFwk         = ko.observableArray([]);
+        self.componentFwkExpanded = ko.observable(false);
+        self.componentPlugins     = ko.observableArray([]);
+        self.componentSd          = ko.observableArray([]);
+        self.componentSdExpanded  = ko.observable(false);
+        self.disks                = ko.observableArray([]);
+        self.disksLoaded          = ko.observable(false);
+        self.domainGuids          = ko.observableArray([]);
+        self.downloadLogState     = ko.observable($.t('ovs:support.downloadlogs'));
+        self.edit                 = ko.observable(false);
+        self.expanded             = ko.observable(true);
+        self.guid                 = ko.observable(guid);
+        self.iops                 = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
+        self.ipAddress            = ko.observable();
+        self.lastHeartbeat        = ko.observable();
+        self.loaded               = ko.observable(false);
+        self.loading              = ko.observable(false);
+        self.machineId            = ko.observable();
+        self.name                 = ko.observable();
+        self.nodeType             = ko.observable();
+        self.recoveryDomainGuids  = ko.observableArray([]);
+        self.rdmaCapable          = ko.observable(false);
+        self.readSpeed            = ko.observable().extend({smooth: {}}).extend({format: generic.formatSpeed});
+        self.saving               = ko.observable(false);
+        self.scrubCapable         = ko.observable(false);
+        self.status               = ko.observable();
+        self.storedData           = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
+        self.totalCacheHits       = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
+        self.updateMetadata       = ko.observable();
+        self.vDisks               = ko.observableArray([]);
+        self.versions             = ko.observable();
+        self.vPoolGuids           = ko.observableArray([]);
+        self.writeSpeed           = ko.observable().extend({smooth: {}}).extend({format: generic.formatSpeed});
 
         // Computed
         self.bandwidth = ko.computed(function () {
@@ -91,27 +99,41 @@ define([
             }
             return 'lightgrey';
         });
+        self.updatesAvailable = ko.computed(function() {
+            if (self.componentFwk().length > 0 || self.componentSd().length > 0) {
+                return true;
+            }
+            var updatesFound = false;
+            $.each(self.componentPlugins(), function(index, item) {
+                if (item().packages().length > 0) {
+                    updatesFound = true;
+                    return false;
+                }
+            });
+            return updatesFound;
+        });
 
         // Functions
-        self.getUpdates = function () {
+        self.pluginExpanded = function(value, namespace) {
+            $.each(self.componentPlugins(), function(index, plugin) {
+                if (plugin().namespace === namespace) {
+                    generic.removeElement(self.componentPlugins(), plugin);
+                    plugin().expanded(value);
+                    self.componentPlugins.push(plugin);
+                }
+            });
+        };
+        self.getUpdateMetadata = function () {
             return $.Deferred(function (deferred) {
-                api.get('storagerouters/' + self.guid() + '/get_update_status')
-                    .then(self.shared.tasks.wait)
-                    .done(function (data) {
-                        if (data.framework.length > 0) {
-                            data.framework.sort(function (a, b) {
-                                return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
-                            });
-                        }
-                        if (data.volumedriver.length > 0) {
-                            data.volumedriver.sort(function (a, b) {
-                                return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
-                            });
-                        }
-                        self.updates(data);
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject);
+                if (generic.xhrCompleted(self.loadUpdateMetadata)) {
+                    self.loadUpdateMetadata = api.get('storagerouters/' + self.guid() + '/get_update_metadata')
+                        .then(self.shared.tasks.wait)
+                        .done(function (data) {
+                            self.updateMetadata(data);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                }
             }).promise();
         };
         self.getDisks = function () {
@@ -158,14 +180,16 @@ define([
         };
         self.downloadLogfiles = function () {
             self.downloadLogState($.t('ovs:support.downloadinglogs'));
-            api.get('storagerouters/' + self.guid() + '/get_logfiles')
-                .then(self.shared.tasks.wait)
-                .done(function (data) {
-                    window.location.href = 'downloads/' + data;
-                })
-                .always(function () {
-                    self.downloadLogState($.t('ovs:support.downloadlogs'));
-                });
+            if (generic.xhrCompleted(self.loadLogFiles)) {
+                self.loadLogFiles = api.get('storagerouters/' + self.guid() + '/get_logfiles')
+                    .then(self.shared.tasks.wait)
+                    .done(function (data) {
+                        window.location.href = 'downloads/' + data;
+                    })
+                    .always(function () {
+                        self.downloadLogState($.t('ovs:support.downloadlogs'));
+                    });
+            }
         };
         self.fillData = function (data) {
             if (self.edit()) {

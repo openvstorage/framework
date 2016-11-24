@@ -183,24 +183,25 @@ class Toolbox(object):
         status, _ = ServiceManager.get_service_status(name, client=client)
         if status is False and state in ['start', 'restart']:
             if logger is not None:
-                logger.debug('  {0:<15} - Starting service {1}'.format(client.ip, name))
+                logger.debug('{0}: Starting service {1}'.format(client.ip, name))
             ServiceManager.start_service(name, client=client)
-            action = 'started'
+            action = 'Started'
         elif status is True and state == 'stop':
             if logger is not None:
-                logger.debug('  {0:<15} - Stopping service {1}'.format(client.ip, name))
+                logger.debug('{0}: Stopping service {1}'.format(client.ip, name))
             ServiceManager.stop_service(name, client=client)
-            action = 'stopped'
+            action = 'Stopped'
         elif status is True and state == 'restart':
             if logger is not None:
-                logger.debug('  {0:<15} - Restarting service {1}'.format(client.ip, name))
+                logger.debug('{0}: Restarting service {1}'.format(client.ip, name))
             ServiceManager.restart_service(name, client=client)
-            action = 'restarted'
+            action = 'Restarted'
 
         if action is None:
             print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
         else:
-            logger.debug('  {0:<15} - Service {1} {2}'.format(client.ip, name, action))
+            if logger is not None:
+                logger.debug('{0}: {1} service {2}'.format(client.ip, action, name))
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
 
     @staticmethod
@@ -235,6 +236,11 @@ class Schedule(object):
         self.kwargs = kwargs
 
     def generate_schedule(self, name):
+        """
+        Kenneth's docstring: None
+        :param name: Also None
+        :return: And None here too
+        """
         try:
             schedules = Configuration.get('/ovs/framework/scheduling/celery', default={})
         except Exception as ex:
@@ -253,4 +259,3 @@ class Schedule(object):
         except Exception as ex:
             Schedule._logger.error('Could not generate crontab for {0} with data {1} {2}: {3}'.format(name, schedule, source, ex))
             return None, 'error in configuration'
-

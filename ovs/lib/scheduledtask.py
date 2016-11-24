@@ -481,9 +481,9 @@ class ScheduledTaskController(object):
         ScheduledTaskController._logger.info('Arakoon collapse finished')
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.gather_package_information', schedule=Schedule(minute='10', hour='*'))
-    @ensure_single(task_name='ovs.scheduled.gather_package_information')
-    def gather_package_information():
+    @celery.task(name='ovs.scheduled.refresh_package_information', schedule=Schedule(minute='10', hour='*'))
+    @ensure_single(task_name='ovs.scheduled.refresh_package_information', mode='DEDUPED')
+    def refresh_package_information():
         """
         Retrieve and store the package information of all StorageRouters
         :return: None
@@ -493,23 +493,40 @@ class ScheduledTaskController(object):
         information = {}
         all_storagerouters = StorageRouterList.get_storagerouters()
         for storagerouter in all_storagerouters:
-            information[storagerouter.ip] = {'framework': {},
-                                             'storagedriver': {}}
+            information[storagerouter.ip] = {'framework': [],
+                                             'storagedriver': []}
             try:
                 client = SSHClient(endpoint=storagerouter, username='root')
             except UnableToConnectException:
                 ScheduledTaskController._logger.warning('StorageRouter {0} with IP {1} is inaccessible'.format(storagerouter.name, storagerouter.ip))
                 continue
 
-            for function in Toolbox.fetch_hooks('update', 'package_info'):
+            for function in Toolbox.fetch_hooks('update', 'get_package_info_multi'):
                 thread = Thread(target=function,
                                 args=(client, information))
                 thread.start()
                 threads.append(thread)
 
+        for function in Toolbox.fetch_hooks('update', 'get_package_info_single'):
+            thread = Thread(target=function,
+                            args=(information,))
+            thread.start()
+            threads.append(thread)
+
         for thread in threads:
             thread.join()
 
+        errors = []
+        copy_information = copy.deepcopy(information)
+        for ip, info in information.iteritems():
+            if len(info.get('errors', [])) > 0:
+                errors.extend(['{0}: {1}'.format(ip, error) for error in info['errors']])
+                copy_information.pop(ip)
+
         for storagerouter in all_storagerouters:
-            storagerouter.package_information = information[storagerouter.ip]
+            storagerouter.package_information = copy_information.get(storagerouter.ip, {})
             storagerouter.save()
+
+        if len(errors) > 0:
+            errors = [str(error) for error in set(errors)]
+            raise Exception(' - {0}'.format('\n - '.join(errors)))

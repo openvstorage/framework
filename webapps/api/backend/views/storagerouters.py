@@ -23,7 +23,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action, link
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, return_list, return_object, return_task, return_simple, load, log
-from api.backend.exceptions import HttpGoneException, HttpNotAcceptableException
+from api.backend.exceptions import HttpNotAcceptableException
 from api.backend.serializers.serializers import FullSerializer
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.domain import Domain
@@ -33,8 +33,10 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.disk import DiskController
 from ovs.lib.mdsservice import MDSServiceController
+from ovs.lib.scheduledtask import ScheduledTaskController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.storagerouter import StorageRouterController
+from ovs.lib.update import UpdateController
 from ovs.lib.vdisk import VDiskController
 
 
@@ -203,32 +205,6 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read'])
     @return_task()
-    @load(StorageRouter, max_version=5)
-    def check_s3(self, host, port, accesskey, secretkey):
-        """
-        Validates whether connection to a given S3 backend can be made
-        :param host: The host of an S3 endpoint
-        :type host: str
-        :param port: The port of an S3 endpoint
-        :type port: int
-        :param accesskey: The accesskey to be used when validating the S3 endpoint
-        :type accesskey: str
-        :param secretkey: The secretkey to be used when validating the S3 endpoint
-        :type secretkey: str
-        """
-        parameters = {'host': host,
-                      'port': port,
-                      'accesskey': accesskey,
-                      'secretkey': secretkey}
-        for field in parameters:
-            if not isinstance(parameters[field], int):
-                parameters[field] = str(parameters[field])
-        return StorageRouterController.check_s3.delay(**parameters)
-
-    @action()
-    @log()
-    @required_roles(['read'])
-    @return_task()
     @load(StorageRouter)
     def check_mtpt(self, storagerouter, name):
         """
@@ -357,25 +333,30 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def get_update_status(self, storagerouter):
+    def get_update_metadata(self, storagerouter):
         """
-        Return available updates for framework, volumedriver, ...
-        :param storagerouter: StorageRouter to get the update information from
+        Returns metadata required for updating
+          - Checks if 'at' can be used properly
+          - Checks if ongoing updates are busy
+        :param storagerouter: StorageRouter to get the update metadata from
         :type storagerouter: StorageRouter
         """
-        return StorageRouterController.get_update_status.delay(storagerouter.ip)
+        return UpdateController.get_update_metadata.delay(storagerouter.ip)
 
     @action()
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def update_framework(self, storagerouter):
+    def update_framework(self, storagerouter, max_version=6):
         """
         Initiate a task on the given StorageRouter to update the framework on ALL StorageRouters
         :param storagerouter: StorageRouter to start the update on
         :type storagerouter: StorageRouter
+        :param max_version: Maximum API version to be able to use this API call
+        :type max_version: int
         """
+        _ = max_version
         return StorageRouterController.update_framework.delay(storagerouter.ip)
 
     @action()
@@ -383,13 +364,29 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def update_volumedriver(self, storagerouter):
+    def update_volumedriver(self, storagerouter, max_version=6):
         """
         Initiate a task on the given StorageRouter to update the volumedriver on ALL StorageRouters
         :param storagerouter: StorageRouter to start the update on
         :type storagerouter: StorageRouter
+        :param max_version: Maximum API version to be able to use this API call
+        :type max_version: int
         """
+        _ = max_version
         return StorageRouterController.update_volumedriver.delay(storagerouter.ip)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def update_all(self, components):
+        """
+        Initiate a task on a StorageRouter to update the specified components on ALL StorageRouters
+        :param components: Components to update
+        :type components: list
+        """
+        return UpdateController.update_all.delay(components=components)
 
     @action()
     @log()
@@ -493,3 +490,41 @@ class StorageRouterViewSet(viewsets.ViewSet):
             cache.set(StorageRouterViewSet.DOMAIN_CHANGE_KEY, async_mds_result.id, 600)  # Store the task id
             cache.set(StorageRouterViewSet.RECOVERY_DOMAIN_CHANGE_KEY, async_dtl_result.id, 600)  # Store the task id
             storagerouter.invalidate_dynamics(['regular_domains', 'recovery_domains'])
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def merge_package_information(self):
+        """
+        Retrieve the package information from the model for both StorageRouters and ALBA Nodes and merge it
+        """
+        return UpdateController.merge_package_information.delay()
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def refresh_package_information(self):
+        """
+        Refresh the updates for all StorageRouters
+        """
+        return ScheduledTaskController.refresh_package_information.delay()
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def get_update_information(self):
+        """
+        Retrieve the update information for all StorageRouters
+        This contains information about
+            - downtime of model, GUI, vPools, proxies, ...
+            - services that will be restarted
+            - packages that will be updated
+            - prerequisites that have not been met
+        """
+        return UpdateController.get_update_information_all.delay()

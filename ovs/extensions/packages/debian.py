@@ -18,7 +18,6 @@
 Debian Package module
 """
 
-import time
 from subprocess import check_output, CalledProcessError
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
@@ -80,48 +79,38 @@ class DebianPackage(object):
         return versions
 
     @staticmethod
-    def install(package_name, client, force=False):
+    def install(package_name, client):
         """
         Install the specified package
         :param package_name: Name of the package to install
         :type package_name: str
         :param client: Root client on which to execute the installation of the package
         :type client: SSHClient
-        :param force: Flag indicating to use the '--force-yes' flag
-        :type force: bool
         :return: None
         """
         if client.username != 'root':
             raise RuntimeError('Only the "root" user can install packages')
 
-        force_text = '--force-yes' if force is True else ''
-        counter = 0
-        max_counter = 5
-        last_exception = None
-        success = False
-        while counter < max_counter:
-            counter += 1
-            try_again = ', trying again' if counter < max_counter else ''
-            try:
-                client.run(['apt-get', 'install', '-y', force_text, package_name])
-                installed, candidate = DebianPackage._get_installed_candidate_version(package_name, client=client)
-                if installed == candidate:
-                    success = True
-                    break
-                else:
-                    last_exception = RuntimeError('"apt-get install" succeeded, but upgrade not visible in "apt-cache policy"')
-                    DebianPackage._logger.error('Failure: Upgrade not visible{0}'.format(try_again))
-            except CalledProcessError as cpe:
-                DebianPackage._logger.error('Install failed{0}: {1}'.format(try_again, cpe.output))
-                if cpe.output and 'You may want to run apt-get update' in cpe.output[0] and counter != max_counter:
-                    DebianPackage.update(client)
-                last_exception = cpe
-            except Exception as ex:
-                DebianPackage._logger.error('Install failed{0}: {1}'.format(try_again, ex))
-                last_exception = ex
-            time.sleep(1)
-        if success is False:
-            raise last_exception
+        installed = DebianPackage.get_installed_versions(client=client, package_names=[package_name])[package_name]
+        candidate = DebianPackage.get_candidate_versions(client=client, package_names=[package_name])[package_name]
+
+        if installed == candidate:
+            return
+
+        command = 'aptdcon --hide-terminal --allow-unauthenticated --install {0}'.format(package_name)
+        DebianPackage._logger.debug('{0}: Installing package {1}'.format(client.ip, package_name))
+        try:
+            output = client.run('yes | {0}'.format(command), allow_insecure=True)
+            if 'ERROR' in output:
+                raise Exception('Installing package {0} failed. Command used: "{1}". Output returned: {2}'.format(package_name, command, output))
+            DebianPackage._logger.debug('{0}: Installed package {1}'.format(client.ip, package_name))
+        except CalledProcessError as cpe:
+            DebianPackage._logger.warning('{0}: Install failed, trying to reconfigure the packages: {1}'.format(client.ip, cpe.output))
+            client.run(['aptdcon', '--fix-install', '--hide-terminal', '--allow-unauthenticated'])
+            DebianPackage._logger.debug('{0}: Trying to install the package again'.format(client.ip))
+            output = client.run('yes | {0}'.format(command), allow_insecure=True)
+            if 'ERROR' in output:
+                raise Exception('Installing package {0} failed. Command used: "{1}". Output returned: {2}'.format(package_name, command, output))
 
     @staticmethod
     def update(client):
@@ -133,39 +122,14 @@ class DebianPackage(object):
         """
         if client.username != 'root':
             raise RuntimeError('Only the "root" user can update packages')
-
+        try:
+            client.run(['which', 'aptdcon'])
+        except CalledProcessError:
+            raise Exception('APT Daemon package is not correctly installed')
         try:
             client.run(['aptdcon', '--refresh', '--sources-file=ovsaptrepo.list'])
-        except CalledProcessError:
-            DebianPackage._logger.error('Failed to update the packages on StorageRouter with IP {0}'.format(client.ip))
-
-    @staticmethod
-    def verify_update_required(packages, services, client):
-        """
-        :param packages:
-        :param services:
-        :param client:
-        :return:
-        """
-        services_checked = []
-        update_info = {'version': '',
-                       'packages': [],
-                       'services': []}
-        for package_name in packages:
-            installed, candidate = DebianPackage._get_installed_candidate_version(package_name, client=client)
-
-            if installed is not None and candidate != installed:
-                update_info['packages'].append(package_name)
-                update_info['services'] = services
-                update_info['version'] = candidate
-            else:
-                for service in services:
-                    if service in services_checked:
-                        continue
-                    services_checked.append(service)
-                    if client.file_exists('/opt/OpenvStorage/run/{0}.version'.format(service)):
-                        running_version = client.file_read('/opt/OpenvStorage/run/{0}.version'.format(service)).strip()
-                        if running_version != candidate:
-                            update_info['services'].append(service)
-                            update_info['version'] = candidate
-        return update_info
+        except CalledProcessError as cpe:
+            DebianPackage._logger.warning('{0}: Update package cache failed, trying to reconfigure the packages: {1}'.format(client.ip, cpe.output))
+            client.run(['aptdcon', '--fix-install', '--hide-terminal', '--allow-unauthenticated'])
+            DebianPackage._logger.debug('{0}: Trying to update the package cache again'.format(client.ip))
+            client.run(['aptdcon', '--refresh', '--sources-file=ovsaptrepo.list'])
