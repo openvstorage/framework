@@ -622,7 +622,7 @@ class SetupController(object):
                 raise RuntimeError("Removing the only node is not possible")
 
             if node_ip in storage_router_master_ips and len(storage_router_master_ips) == 1:
-                raise RuntimeError("Removing the only master node it not possible")
+                raise RuntimeError("Removing the only master node is not possible")
 
             if System.get_my_storagerouter() == storage_router_to_remove:
                 raise RuntimeError('The node to be removed cannot be identical to the node on which the removal is initiated')
