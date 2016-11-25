@@ -602,72 +602,76 @@ class SetupController(object):
         ###############
         # VALIDATIONS #
         ###############
-        node_ip = node_ip.strip()
-        if not isinstance(node_ip, str):
-            raise ValueError('Node IP must be a string')
-        if not re.match(SSHClient.IP_REGEX, node_ip):
-            raise ValueError('Invalid IP {0} specified'.format(node_ip))
+        try:
+            node_ip = node_ip.strip()
+            if not isinstance(node_ip, str):
+                raise ValueError('Node IP must be a string')
+            if not re.match(SSHClient.IP_REGEX, node_ip):
+                raise ValueError('Invalid IP {0} specified'.format(node_ip))
 
-        storage_router_all = StorageRouterList.get_storagerouters()
-        storage_router_masters = StorageRouterList.get_masters()
-        storage_router_all_ips = set([storage_router.ip for storage_router in storage_router_all])
-        storage_router_master_ips = set([storage_router.ip for storage_router in storage_router_masters])
-        storage_router_to_remove = StorageRouterList.get_by_ip(node_ip)
+            storage_router_all = StorageRouterList.get_storagerouters()
+            storage_router_masters = StorageRouterList.get_masters()
+            storage_router_all_ips = set([storage_router.ip for storage_router in storage_router_all])
+            storage_router_master_ips = set([storage_router.ip for storage_router in storage_router_masters])
+            storage_router_to_remove = StorageRouterList.get_by_ip(node_ip)
 
-        if node_ip not in storage_router_all_ips:
-            raise ValueError('Unknown IP specified\nKnown in model:\n - {0}\nSpecified for removal:\n - {1}'.format('\n - '.join(storage_router_all_ips), node_ip))
+            if node_ip not in storage_router_all_ips:
+                raise ValueError('Unknown IP specified\nKnown in model:\n - {0}\nSpecified for removal:\n - {1}'.format('\n - '.join(storage_router_all_ips), node_ip))
 
-        if len(storage_router_all_ips) == 1:
-            raise RuntimeError("Removing the only node wouldn't be very smart now, would it?")
+            if len(storage_router_all_ips) == 1:
+                raise RuntimeError("Removing the only node is not possible")
 
-        if node_ip in storage_router_master_ips and len(storage_router_master_ips) == 1:
-            raise RuntimeError("Removing the only master node wouldn't be very smart now, would it?")
+            if node_ip in storage_router_master_ips and len(storage_router_master_ips) == 1:
+                raise RuntimeError("Removing the only master node is not possible")
 
-        if System.get_my_storagerouter() == storage_router_to_remove:
-            raise RuntimeError('The node to be removed cannot be identical to the node on which the removal is initiated')
+            if System.get_my_storagerouter() == storage_router_to_remove:
+                raise RuntimeError('The node to be removed cannot be identical to the node on which the removal is initiated')
 
-        SetupController._log(messages='Creating SSH connections to remaining master nodes')
-        master_ip = None
-        ip_client_map = {}
-        storage_routers_offline = []
-        storage_router_to_remove_online = True
-        for storage_router in storage_router_all:
-            try:
-                client = SSHClient(storage_router, username='root')
-                if client.run(['pwd']):
-                    SetupController._log(messages='  Node with IP {0:<15} successfully connected to'.format(storage_router.ip))
-                    ip_client_map[storage_router.ip] = client
-                    if storage_router != storage_router_to_remove and storage_router.node_type == 'MASTER':
-                        master_ip = storage_router.ip
-            except UnableToConnectException:
-                SetupController._log(messages='  Node with IP {0:<15} is unreachable'.format(storage_router.ip))
-                storage_routers_offline.append(storage_router)
-                if storage_router == storage_router_to_remove:
-                    storage_router_to_remove_online = False
+            SetupController._log(messages='Creating SSH connections to remaining master nodes')
+            master_ip = None
+            ip_client_map = {}
+            storage_routers_offline = []
+            storage_router_to_remove_online = True
+            for storage_router in storage_router_all:
+                try:
+                    client = SSHClient(storage_router, username='root')
+                    if client.run(['pwd']):
+                        SetupController._log(messages='  Node with IP {0:<15} successfully connected to'.format(storage_router.ip))
+                        ip_client_map[storage_router.ip] = client
+                        if storage_router != storage_router_to_remove and storage_router.node_type == 'MASTER':
+                            master_ip = storage_router.ip
+                except UnableToConnectException:
+                    SetupController._log(messages='  Node with IP {0:<15} is unreachable'.format(storage_router.ip))
+                    storage_routers_offline.append(storage_router)
+                    if storage_router == storage_router_to_remove:
+                        storage_router_to_remove_online = False
 
-        if len(ip_client_map) == 0 or master_ip is None:
-            raise RuntimeError('Could not connect to any master node in the cluster')
+            if len(ip_client_map) == 0 or master_ip is None:
+                raise RuntimeError('Could not connect to any master node in the cluster')
 
-        storage_router_to_remove.invalidate_dynamics('vdisks_guids')
-        if len(storage_router_to_remove.vdisks_guids) > 0:  # vDisks are supposed to be moved away manually before removing a node
-            raise RuntimeError("Still vDisks attached to Storage Router {0}".format(storage_router_to_remove.name))
+            storage_router_to_remove.invalidate_dynamics('vdisks_guids')
+            if len(storage_router_to_remove.vdisks_guids) > 0:  # vDisks are supposed to be moved away manually before removing a node
+                raise RuntimeError("Still vDisks attached to Storage Router {0}".format(storage_router_to_remove.name))
 
-        internal_memcached = SetupController._is_internally_managed(service='memcached')
-        internal_rabbit_mq = SetupController._is_internally_managed(service='rabbitmq')
-        memcached_endpoints = Configuration.get(key='/ovs/framework/memcache|endpoints')
-        rabbit_mq_endpoints = Configuration.get(key='/ovs/framework/messagequeue|endpoints')
-        copy_memcached_endpoints = list(memcached_endpoints)
-        copy_rabbit_mq_endpoints = list(rabbit_mq_endpoints)
-        for endpoint in memcached_endpoints:
-            if endpoint.startswith(storage_router_to_remove.ip):
-                copy_memcached_endpoints.remove(endpoint)
-        for endpoint in rabbit_mq_endpoints:
-            if endpoint.startswith(storage_router_to_remove.ip):
-                copy_rabbit_mq_endpoints.remove(endpoint)
-        if len(copy_memcached_endpoints) == 0 and internal_memcached is True:
-            raise RuntimeError('Removal of provided nodes will result in a complete removal of the memcached service')
-        if len(copy_rabbit_mq_endpoints) == 0 and internal_rabbit_mq is True:
-            raise RuntimeError('Removal of provided nodes will result in a complete removal of the messagequeue service')
+            internal_memcached = SetupController._is_internally_managed(service='memcached')
+            internal_rabbit_mq = SetupController._is_internally_managed(service='rabbitmq')
+            memcached_endpoints = Configuration.get(key='/ovs/framework/memcache|endpoints')
+            rabbit_mq_endpoints = Configuration.get(key='/ovs/framework/messagequeue|endpoints')
+            copy_memcached_endpoints = list(memcached_endpoints)
+            copy_rabbit_mq_endpoints = list(rabbit_mq_endpoints)
+            for endpoint in memcached_endpoints:
+                if endpoint.startswith(storage_router_to_remove.ip):
+                    copy_memcached_endpoints.remove(endpoint)
+            for endpoint in rabbit_mq_endpoints:
+                if endpoint.startswith(storage_router_to_remove.ip):
+                    copy_rabbit_mq_endpoints.remove(endpoint)
+            if len(copy_memcached_endpoints) == 0 and internal_memcached is True:
+                raise RuntimeError('Removal of provided nodes will result in a complete removal of the memcached service')
+            if len(copy_rabbit_mq_endpoints) == 0 and internal_rabbit_mq is True:
+                raise RuntimeError('Removal of provided nodes will result in a complete removal of the messagequeue service')
+        except Exception as exception:
+            SetupController._log(messages=[str(exception)], boxed=True, loglevel='exception')
+            sys.exit(1)
 
         #################
         # CONFIRMATIONS #
