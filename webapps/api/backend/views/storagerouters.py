@@ -30,6 +30,7 @@ from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.extensions.generic.system import System
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.disk import DiskController
 from ovs.lib.mdsservice import MDSServiceController
@@ -205,6 +206,32 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read'])
     @return_task()
+    @load(StorageRouter, max_version=5)
+    def check_s3(self, host, port, accesskey, secretkey):
+        """
+        Validates whether connection to a given S3 backend can be made
+        :param host: The host of an S3 endpoint
+        :type host: str
+        :param port: The port of an S3 endpoint
+        :type port: int
+        :param accesskey: The accesskey to be used when validating the S3 endpoint
+        :type accesskey: str
+        :param secretkey: The secretkey to be used when validating the S3 endpoint
+        :type secretkey: str
+        """
+        parameters = {'host': host,
+                      'port': port,
+                      'accesskey': accesskey,
+                      'secretkey': secretkey}
+        for field in parameters:
+            if not isinstance(parameters[field], int):
+                parameters[field] = str(parameters[field])
+        return StorageRouterController.check_s3.delay(**parameters)
+
+    @action()
+    @log()
+    @required_roles(['read'])
+    @return_task()
     @load(StorageRouter)
     def check_mtpt(self, storagerouter, name):
         """
@@ -347,32 +374,26 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
-    @load(StorageRouter)
-    def update_framework(self, storagerouter, max_version=6):
+    @load(StorageRouter, max_version=6)
+    def update_framework(self, storagerouter):
         """
         Initiate a task on the given StorageRouter to update the framework on ALL StorageRouters
         :param storagerouter: StorageRouter to start the update on
         :type storagerouter: StorageRouter
-        :param max_version: Maximum API version to be able to use this API call
-        :type max_version: int
         """
-        _ = max_version
         return StorageRouterController.update_framework.delay(storagerouter.ip)
 
     @action()
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
-    @load(StorageRouter)
-    def update_volumedriver(self, storagerouter, max_version=6):
+    @load(StorageRouter, max_version=6)
+    def update_volumedriver(self, storagerouter):
         """
         Initiate a task on the given StorageRouter to update the volumedriver on ALL StorageRouters
         :param storagerouter: StorageRouter to start the update on
         :type storagerouter: StorageRouter
-        :param max_version: Maximum API version to be able to use this API call
-        :type max_version: int
         """
-        _ = max_version
         return StorageRouterController.update_volumedriver.delay(storagerouter.ip)
 
     @action()

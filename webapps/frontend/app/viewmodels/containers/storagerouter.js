@@ -36,6 +36,7 @@ define([
 
         // External dependencies
         self.domains         = ko.observableArray([]);
+        self.packageInfo     = ko.observableArray([]);
         self.recoveryDomains = ko.observableArray([]);
         self.vPools          = ko.observableArray([]);
 
@@ -45,11 +46,6 @@ define([
         self.bandwidthSaved       = ko.observable().extend({smooth: {}}).extend({format: generic.formatBytes});
         self.cacheHits            = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
         self.cacheMisses          = ko.observable().extend({smooth: {}}).extend({format: generic.formatNumber});
-        self.componentFwk         = ko.observableArray([]);
-        self.componentFwkExpanded = ko.observable(false);
-        self.componentPlugins     = ko.observableArray([]);
-        self.componentSd          = ko.observableArray([]);
-        self.componentSdExpanded  = ko.observable(false);
         self.disks                = ko.observableArray([]);
         self.disksLoaded          = ko.observable(false);
         self.domainGuids          = ko.observableArray([]);
@@ -100,12 +96,9 @@ define([
             return 'lightgrey';
         });
         self.updatesAvailable = ko.computed(function() {
-            if (self.componentFwk().length > 0 || self.componentSd().length > 0) {
-                return true;
-            }
             var updatesFound = false;
-            $.each(self.componentPlugins(), function(index, item) {
-                if (item().packages().length > 0) {
+            $.each(self.packageInfo(), function(index, comp) {
+                if (comp.packages().length > 0) {
                     updatesFound = true;
                     return false;
                 }
@@ -114,15 +107,6 @@ define([
         });
 
         // Functions
-        self.pluginExpanded = function(value, namespace) {
-            $.each(self.componentPlugins(), function(index, plugin) {
-                if (plugin().namespace === namespace) {
-                    generic.removeElement(self.componentPlugins(), plugin);
-                    plugin().expanded(value);
-                    self.componentPlugins.push(plugin);
-                }
-            });
-        };
         self.getUpdateMetadata = function () {
             return $.Deferred(function (deferred) {
                 if (generic.xhrCompleted(self.loadUpdateMetadata)) {

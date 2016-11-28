@@ -33,6 +33,7 @@ define([
         self.componentSd               = ko.observable();
         self.loadingInformationFailure = ko.observable(false);
         self.loadingInformation        = ko.observable(false);
+        self.updateInformation         = ko.observableArray([]);
 
         // Handles
         self.loadUpdateInformation = undefined;
@@ -56,9 +57,9 @@ define([
                     }
                 }
                 $.each(self.componentPlugins(), function(index, plugin) {
-                    if (plugin().checked() === true) {
+                    if (plugin.checked() === true) {
                         anyPluginChecked = true;
-                        if (plugin().prerequisites.length > 0) {
+                        if (plugin.prerequisites.length > 0) {
                             reasons.push($.t('ovs:wizards.update.prerequisites_unmet'))
                         }
                     }
@@ -132,18 +133,18 @@ define([
             var messages = {};
             $.each(self.componentPlugins(), function(index, plugin) {
                 var downtimes = [], prerequisites = [];
-                $.each(plugin().downtime, function (index, downtime) {
+                $.each(plugin.downtime, function (index, downtime) {
                     if (downtime[1] === null) {
-                        downtimes.push($.t(plugin().name + ':wizards.update.downtime.' + downtime[0]))
+                        downtimes.push($.t(plugin.name + ':wizards.update.downtime.' + downtime[0]))
                     } else {
-                        downtimes.push($.t(plugin().name + ':wizards.update.downtime.' + downtime[0]) + ': ' + downtime[1])
+                        downtimes.push($.t(plugin.name + ':wizards.update.downtime.' + downtime[0]) + ': ' + downtime[1])
                     }
                 });
-                $.each(plugin().prerequisites, function (index, prereq) {
+                $.each(plugin.prerequisites, function (index, prereq) {
                     if (prereq[1] === null) {
-                        prerequisites.push($.t(plugin().name + ':wizards.update.prerequisites.' + prereq[0]))
+                        prerequisites.push($.t(plugin.name + ':wizards.update.prerequisites.' + prereq[0]))
                     } else {
-                        prerequisites.push($.t(plugin().name + ':wizards.update.prerequisites.' + prereq[0]) + ': ' + prereq[1])
+                        prerequisites.push($.t(plugin.name + ':wizards.update.prerequisites.' + prereq[0]) + ': ' + prereq[1])
                     }
                 });
                 downtimes = generic.arrayFilterUnique(downtimes);
@@ -154,12 +155,11 @@ define([
                 prerequisites.sort(function(prerequisite1, prerequisite2) {
                     return prerequisite1 < prerequisite2 ? -1 : 1;
                 });
-                messages[plugin().name] = {downtimes: downtimes,
-                                           prerequisites: prerequisites};
+                messages[plugin.name] = {downtimes: downtimes,
+                                         prerequisites: prerequisites};
             });
             return messages;
         });
-
 
         // Functions
         self.finish = function() {
@@ -172,8 +172,8 @@ define([
                     components.push('storagedriver');
                 }
                 $.each(self.componentPlugins(), function(index, plugin) {
-                    if (plugin().checked() === true) {
-                        components.push(plugin().name);
+                    if (plugin.checked() === true) {
+                        components.push(plugin.name);
                     }
                 });
                 api.post('storagerouters/' + self.data.storageRouter().guid() + '/update_all', { queryparams: { components: JSON.stringify(components) } })
@@ -203,30 +203,19 @@ define([
                 self.loadUpdateInformation = api.get('storagerouters/' + self.data.storageRouter().guid() + '/get_update_information')
                     .then(self.shared.tasks.wait)
                     .done(function(data) {
-                        if (data.hasOwnProperty('framework')) {
-                            if (data.framework.packages.length > 0 || data.framework.services_stop_start.length > 0 || data.framework.services_post_update.length > 0) {
-                                data.framework.name = 'framework';
-                                data.framework.checked = ko.observable(true);
-                                self.componentFwk(data.framework);
-                            }
-                            delete data.framework;
-                        }
-                        if (data.hasOwnProperty('storagedriver')) {
-                            if (data.storagedriver.packages.length > 0 || data.storagedriver.services_stop_start.length > 0 || data.storagedriver.services_post_update.length > 0) {
-                                data.storagedriver.name = 'storagedriver';
-                                data.storagedriver.checked = ko.observable(false);
-                                self.componentSd(data.storagedriver);
-                            }
-                            delete data.storagedriver;
-                        }
-                        var plugin = undefined;
-                        $.each(data, function(namespace, info) {
-                            if (info.packages.length > 0 || info.services_post_update.length > 0 || info.services_stop_start.length > 0) {
-                                info.name = namespace;
+                        $.each(data, function(component, info) {
+                            info.name = component;
+                            if (component === 'framework') {
+                                info.checked = ko.observable(true);
+                                self.componentFwk(info);
+                            } else if (component === 'storagedriver') {
                                 info.checked = ko.observable(false);
-                                plugin = ko.observable(info);
-                                self.componentPlugins.push(plugin);
+                                self.componentSd(info);
+                            } else {
+                                info.checked = ko.observable(false);
+                                self.componentPlugins.push(info);
                             }
+
                         });
 
                         // Attempt to have 1 component 'checked'
@@ -235,7 +224,7 @@ define([
                                 self.componentSd().checked(true);
                             } else {
                                 if (self.componentSd() === undefined && self.componentPlugins().length === 1) {
-                                    self.componentPlugins()[0]().checked(true);
+                                    self.componentPlugins()[0].checked(true);
                                 }
                             }
                         }

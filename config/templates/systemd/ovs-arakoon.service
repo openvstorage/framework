@@ -8,7 +8,7 @@ User=ovs
 Group=ovs
 Environment=PYTHONPATH=/opt/OpenvStorage
 WorkingDirectory=/opt/OpenvStorage
-ExecStartPre=/bin/bash -c "if [ ! -d /opt/OpenvStorage/run ]; then mkdir /opt/OpenvStorage/run; chown ovs:ovs /opt/OpenvStorage/run; fi; echo `arakoon --version | grep version: | awk '{print $2}'` > /opt/OpenvStorage/run/<SERVICE_NAME>.version"
+ExecStartPre=/bin/bash -c "if [ ! -d /opt/OpenvStorage/run ]; then mkdir /opt/OpenvStorage/run; chown ovs:ovs /opt/OpenvStorage/run; fi; echo \"arakoon=`arakoon --version | grep version: | awk '{print $2}'`;<ALBA_VERSION_CMD>\" > /opt/OpenvStorage/run/<SERVICE_NAME>.version"
 ExecStart=/usr/bin/arakoon --node <NODE_ID> -config <CONFIG_PATH> -autofix -start
 Restart=on-failure
 RestartSec=5

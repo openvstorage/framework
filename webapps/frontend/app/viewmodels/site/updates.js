@@ -31,16 +31,17 @@ define([
         self.widgets   = [];
 
         // Handles
-        self.loadStorageNodes         = undefined;
+        self.mergePackageInfo         = undefined;
         self.loadStorageRoutersHandle = undefined;
         self.refreshPackageInfoHandle = undefined;
 
         // Observables
-        self.expandedAll    = ko.observable(false);
-        self.loadedInfo     = ko.observable(false);
-        self.refreshing     = ko.observable(false);
-        self.storageNodes   = ko.observableArray([]);
-        self.storageRouters = ko.observableArray([]);
+        self.expanded        = ko.observable(false);
+        self.loadedInfo      = ko.observable(false);
+        self.refreshing      = ko.observable(false);
+        self.storageNodes    = ko.observableArray([]);
+        self.storageRouters  = ko.observableArray([]);
+        self.updateInitiated = ko.observable(false);
 
         // Functions
         self.loadStorageRouters = function() {
@@ -74,156 +75,129 @@ define([
         };
         self.mergePackageInformation = function() {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadStorageNodes)) {
-                    self.loadStorageNodes = api.get('storagerouters/' + self.storageRouters()[0].guid() + '/merge_package_information')
+                if (generic.xhrCompleted(self.mergePackageInfo)) {
+                    self.mergePackageInfo = api.get('storagerouters/' + self.storageRouters()[0].guid() + '/merge_package_information')
                         .then(self.shared.tasks.wait)
                         .done(function(data) {
                             $.each(self.storageRouters(), function(index, sr) {
                                 if (data.hasOwnProperty(sr.ipAddress())) {
-                                    var packageNames = [], srData = data[sr.ipAddress()];
+                                    var packageInfo = [], expandedMap = {}, srData = data[sr.ipAddress()], packages = ko.observableArray([]);
+                                    $.each(sr.packageInfo(), function(index, comp) {
+                                        expandedMap[comp.component] = comp.expanded;
+                                    });
                                     if (srData.hasOwnProperty('framework')) {
-                                        sr.componentFwk([]);
-                                        $.each(srData.framework, function(index, pkgInfo) {
-                                            if (!packageNames.contains(pkgInfo.name)) {
-                                                packageNames.push(pkgInfo.name);
-                                                sr.componentFwk.push(pkgInfo);
-                                            }
+                                        $.each(srData.framework, function(packageName, packageInfo) {
+                                            var pkg = {};
+                                            pkg.name = packageName;
+                                            pkg.candidate = packageInfo.candidate;
+                                            pkg.installed = packageInfo.installed;
+                                            packages.push(pkg);
                                         });
-                                        sr.componentFwk.sort(function(package1, package2) {
-                                            return package1.name < package2.name ? -1 : 1;
+                                        packages.sort(function(pkg1, pkg2) {
+                                            return pkg1.name < pkg2.name ? -1 : 1;
                                         });
+                                        var framework = {};
+                                        framework.expanded = expandedMap.hasOwnProperty('framework') ? expandedMap.framework : ko.observable(false);
+                                        framework.packages = packages;
+                                        framework.namespace = 'ovs';
+                                        framework.component = 'framework';
+                                        packageInfo.push(framework);
                                         delete srData.framework;
                                     }
                                     if (srData.hasOwnProperty('storagedriver')) {
-                                        packageNames = [];
-                                        sr.componentSd([]);
-                                        $.each(srData.storagedriver, function(index, pkgInfo) {
-                                            if (!packageNames.contains(pkgInfo.name)) {
-                                                packageNames.push(pkgInfo.name);
-                                                sr.componentSd.push(pkgInfo);
-                                            }
+                                        packages = ko.observableArray([]);
+                                        $.each(srData.storagedriver, function(packageName, packageInfo) {
+                                            var pkg = {};
+                                            pkg.name = packageName;
+                                            pkg.candidate = packageInfo.candidate;
+                                            pkg.installed = packageInfo.installed;
+                                            packages.push(pkg);
                                         });
-                                        sr.componentSd.sort(function(package1, package2) {
-                                            return package1.name < package2.name ? -1 : 1;
+                                        packages.sort(function(pkg1, pkg2) {
+                                            return pkg1.name < pkg2.name ? -1 : 1;
                                         });
+                                        var storagedriver = {};
+                                        storagedriver.expanded = expandedMap.hasOwnProperty('storagedriver') ? expandedMap.storagedriver : ko.observable(false);
+                                        storagedriver.packages = packages;
+                                        storagedriver.namespace = 'ovs';
+                                        storagedriver.component = 'storagedriver';
+                                        packageInfo.push(storagedriver);
                                         delete srData.storagedriver;
                                     }
-                                    var i, j, currentKeyList = [],
-                                        newKeyList = generic.keys(srData);
-                                    for (i = 0; i < sr.componentPlugins().length; i += 1) {
-                                        currentKeyList.push(sr.componentPlugins()[i]().namespace);
-                                    }
-                                    for (i = 0; i < newKeyList.length; i += 1) {
-                                        if (!currentKeyList.contains(newKeyList[i]) && srData[newKeyList[i]].length) {
-                                            var plugin = {};
-                                            plugin.expanded = ko.observable(false);
-                                            plugin.packages = ko.observableArray(srData[newKeyList[i]]);
-                                            plugin.namespace = newKeyList[i];
-                                            sr.componentPlugins.push(ko.observable(plugin));
-                                        }
-                                    }
-                                    for (i = 0; i < currentKeyList.length; i += 1) {
-                                        if (!newKeyList.contains(currentKeyList[i])) {
-                                            for (j = 0; j < sr.componentPlugins().length; j += 1) {
-                                                if (sr.componentPlugins()[j].namespace === currentKeyList[i]) {
-                                                    sr.componentPlugins.splice(j, 1);
-                                                    break;
-                                                }
-                                            }
-                                        } else {
-                                            $.each(sr.componentPlugins(), function(index, plugin) {
-                                                if (plugin().namespace === currentKeyList[i]) {
-                                                    generic.removeElement(sr.componentPlugins(), plugin);
-                                                    var temp = plugin();
-                                                    temp.packages = ko.observableArray(srData[currentKeyList[i]]);
-                                                    plugin(temp);
-                                                    sr.componentPlugins.push(plugin);
-                                                }
-                                            });
-                                        }
-                                    }
-                                    $.each(sr.componentPlugins(), function(index, plugin) {
-                                        plugin().packages().sort(function(package1, package2) {
-                                            return package1.name < package2.name ? -1 : 1;
+                                    var plugins = [];
+                                    $.each(srData, function(pluginName, pluginInfo) {
+                                        packages = ko.observableArray([]);
+                                        $.each(pluginInfo, function(packageName, packageInfo) {
+                                            var pkg = {};
+                                            pkg.name = packageName;
+                                            pkg.candidate = packageInfo.candidate;
+                                            pkg.installed = packageInfo.installed;
+                                            packages.push(pkg);
                                         });
+                                        packages.sort(function(pkg1, pkg2) {
+                                            return pkg1.name < pkg2.name ? -1 : 1;
+                                        });
+                                        var plugin = {};
+                                        plugin.expanded = expandedMap.hasOwnProperty(pluginName) ? expandedMap[pluginName] : ko.observable(false);
+                                        plugin.packages = packages;
+                                        plugin.namespace = pluginName;
+                                        plugin.component = pluginName;
+                                        plugins.push(plugin);
+                                    });
+                                    plugins.sort(function(plugin1, plugin2) {
+                                        return plugin1.namespace < plugin2.namespace ? -1 : 1;
+                                    });
+                                    $.each(plugins, function(index, plugin) {
+                                        packageInfo.push(plugin);
                                     });
                                     delete data[sr.ipAddress()];
+                                    sr.packageInfo(packageInfo);
                                 }
                             });
+
                             // Leftovers in data are storage nodes (SDM nodes)
-                            var i, j, currentIPList = [],
-                                newIPList = generic.keys(data);
-                            for (i = 0; i < self.storageNodes().length; i += 1) {
-                                currentIPList.push(self.storageNodes()[i]().ip);
-                            }
-                            for (i = 0; i < newIPList.length; i += 1) {
-                                if (!currentIPList.contains(newIPList[i])) {
-                                    var temp = {}, plugins = ko.observableArray([]), sdmNode = ko.observable();
-                                    $.each(data[newIPList[i]], function(namespace, pkgInfo) {
-                                        if (pkgInfo.length > 0) {
-                                            var plugin = {};
-                                            plugin.expanded = ko.observable(false);
-                                            plugin.packages = ko.observableArray(pkgInfo);
-                                            plugin.namespace = namespace;
-                                            plugins.push(plugin);
-                                        }
+                            var expandedMap = {};
+                            $.each(self.storageNodes(), function(index, sdmNode) {
+                                expandedMap[sdmNode.ip] = sdmNode.expanded;
+                                $.each(sdmNode.plugins(), function(jndex, plugin) {
+                                    expandedMap[sdmNode.ip + plugin.namespace] = plugin.expanded;
+                                })
+                            });
+                            var sdmNodes = [];
+                            $.each(data, function(ip, nodeInfo) {
+                                var plugins = ko.observableArray([]);
+                                $.each(nodeInfo, function(pluginName, pluginInfo) {
+                                    var packages = ko.observableArray([]);
+                                    $.each(pluginInfo, function(packageName, packageInfo) {
+                                        var pkg = {};
+                                        pkg.name = packageName;
+                                        pkg.candidate = packageInfo.candidate;
+                                        pkg.installed = packageInfo.installed;
+                                        packages.push(pkg);
                                     });
-                                    temp.ip = newIPList[i];
-                                    temp.plugins = plugins;
-                                    temp.expanded = ko.observable(true);
-                                    sdmNode(temp);
-                                    self.storageNodes.push(sdmNode);
-                                }
-                            }
-                            for (i = 0; i < currentIPList.length; i += 1) {
-                                if (!newIPList.contains(currentIPList[i])) {
-                                    for (j = 0; j < self.storageNodes().length; j += 1) {
-                                        if (self.storageNodes()[j].ip === currentIPList[i]) {
-                                            self.storageNodes.splice(j, 1);
-                                            break;
-                                        }
-                                    }
-                                } else {
-                                    $.each(self.storageNodes(), function(index, sdmNode) {
-                                        if (sdmNode().ip === currentIPList[i]) {
-                                            var expanded = sdmNode().expanded(), expandedMap = {}, plugins = ko.observableArray([]);
-                                            $.each(sdmNode().plugins(), function(index, plugin) {
-                                                expandedMap[plugin.namespace] = plugin.expanded();
-                                            });
-                                            generic.removeElement(self.storageNodes(), sdmNode);
-                                            var temp = sdmNode();
-                                            $.each(data[currentIPList[i]], function(namespace, pkgInfo) {
-                                                if (pkgInfo.length > 0) {
-                                                    var plugin = {};
-                                                    plugin.expanded = ko.observable(expandedMap.hasOwnProperty(namespace) ? expandedMap[namespace] : false);
-                                                    plugin.packages = ko.observableArray(pkgInfo);
-                                                    plugin.namespace = namespace;
-                                                    plugins.push(plugin);
-                                                }
-                                            });
-                                            temp.plugins = plugins;
-                                            temp.expanded = ko.observable(expanded);
-                                            sdmNode(temp);
-                                            self.storageNodes.push(sdmNode);
-                                        }
+                                    packages.sort(function(pkg1, pkg2) {
+                                        return pkg1.name < pkg2.name ? -1 : 1;
                                     });
-                                }
-                            }
-                            $.each(self.storageNodes(), function(index, sn) {
-                                // Sort plugins
-                                sn().plugins().sort(function (plugin1, plugin2) {
+                                    var plugin = {};
+                                    plugin.expanded = expandedMap.hasOwnProperty(ip + pluginName) ? expandedMap[ip + pluginName] : ko.observable(false);
+                                    plugin.packages = packages;
+                                    plugin.namespace = pluginName;
+                                    plugin.component = pluginName;
+                                    plugins.push(plugin);
+                                });
+                                plugins.sort(function(plugin1, plugin2) {
                                     return plugin1.namespace < plugin2.namespace ? -1 : 1;
                                 });
-                                // Sort packages
-                                $.each(sn().plugins(), function (index, plugin) {
-                                    plugin.packages.sort(function (package1, package2) {
-                                        return package1.name < package2.name ? -1 : 1;
-                                    });
-                                });
+                                var sdmNode = {};
+                                sdmNode.ip = ip;
+                                sdmNode.plugins = plugins;
+                                sdmNode.expanded = expandedMap.hasOwnProperty(ip) ? expandedMap[ip] : ko.observable(true);
+                                sdmNodes.push(sdmNode);
                             });
+                            self.storageNodes(sdmNodes);
                             // Sort nodes by IP
                             self.storageNodes.sort(function(sn1, sn2) {
-                                return sn1().ip < sn2().ip ? -1 : 1;
+                                return sn1.ip < sn2.ip ? -1 : 1;
                             });
                             deferred.resolve();
                         })
@@ -246,6 +220,7 @@ define([
                             $.t('ovs:updates.refresh.success'),
                             $.t('ovs:updates.refresh.success_msg')
                         );
+                        self.mergePackageInformation();
                     })
                     .fail(function (error) {
                         error = generic.extractErrorMessage(error);
@@ -266,19 +241,17 @@ define([
         self.expandCollapseAll = function(value) {
             $.each(self.storageRouters(), function(index, sr) {
                 sr.expanded(value);
-                sr.componentSdExpanded(value);
-                sr.componentFwkExpanded(value);
-                $.each(sr.componentPlugins(), function(jndex, plugin) {
-                    plugin().expanded(value);
+                $.each(sr.packageInfo(), function(index, comp) {
+                    comp.expanded(value);
                 });
             });
             $.each(self.storageNodes(), function(index, sn) {
-                sn().expanded(value);
-                $.each(sn().plugins(), function(index, plugin) {
+                sn.expanded(value);
+                $.each(sn.plugins(), function(index, plugin) {
                     plugin.expanded(value);
                 });
             });
-            self.expandedAll(value);
+            self.expanded(value);
         };
         self.collectiveStatus = function() {
             var atFunctional = true, updatesOngoing = false, updatesChecking = false, updatesAvailable = false;
@@ -290,6 +263,7 @@ define([
                         atFunctional = false;
                     }
                     if (sr.updateMetadata().update_ongoing === true) {
+                        self.updateInitiated(false);
                         updatesOngoing = true;
                     }
                 }
@@ -298,7 +272,7 @@ define([
                 }
             });
             $.each(self.storageNodes(), function(index, sn) {
-                $.each(sn().plugins(), function(jndex, plugin) {
+                $.each(sn.plugins(), function(jndex, plugin) {
                     if (plugin.packages().length > 0) {
                         updatesAvailable = true;
                         return false;
@@ -314,10 +288,14 @@ define([
                     'updatesAvailable': updatesAvailable};
         };
         self.showUpdateWizard = function() {
-            dialog.show(new UpdateWizard({
+            var wizard = new UpdateWizard({
                 modal: true,
                 storagerouter: self.storageRouters()[0]
-            }));
+            });
+            wizard.finishing.always(function() {
+                self.updateInitiated(true);
+            });
+            dialog.show(wizard);
         };
 
         // Durandal

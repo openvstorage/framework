@@ -981,17 +981,18 @@
             "component_plugins": "Plugin",
             "component_storagedriver": "StorageDriver",
             "downtime": {
+                "api": "API",
                 "general": "Following services will experience downtime:",
-                "gui": "GUI availability",
+                "gui": "GUI",
                 "none": "No components will experience downtime",
-                "ovsdb": "Model availability",
+                "ovsdb": "Model",
                 "proxy": "Proxy service for vPool",
-                "voldrv": "Storage Driver availability"
+                "voldrv": "Storage Driver Registry"
             },
             "failure": "Update failed to launch: __why__",
             "general_info": "Updating can take up to 30 minutes",
-            "loading_information": "Loading update information",
-            "loading_information_failure": "Failed to load the update information. Cannot proceed",
+            "loading_information": "Calculating update impact",
+            "loading_information_failure": "Failed to calculate the impact of the update. Cannot proceed",
             "prerequisites": {
                 "general": "Following prerequisites are unmet:",
                 "node_down": "Unresponsive StorageRouter",

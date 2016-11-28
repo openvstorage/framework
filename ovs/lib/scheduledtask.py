@@ -493,8 +493,7 @@ class ScheduledTaskController(object):
         information = {}
         all_storagerouters = StorageRouterList.get_storagerouters()
         for storagerouter in all_storagerouters:
-            information[storagerouter.ip] = {'framework': [],
-                                             'storagedriver': []}
+            information[storagerouter.ip] = {}
             try:
                 client = SSHClient(endpoint=storagerouter, username='root')
             except UnableToConnectException:
@@ -524,7 +523,10 @@ class ScheduledTaskController(object):
                 copy_information.pop(ip)
 
         for storagerouter in all_storagerouters:
-            storagerouter.package_information = copy_information.get(storagerouter.ip, {})
+            info = copy_information.get(storagerouter.ip, {})
+            if 'errors' in info:
+                info.pop('errors')
+            storagerouter.package_information = info
             storagerouter.save()
 
         if len(errors) > 0:

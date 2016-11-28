@@ -232,6 +232,7 @@ class ArakoonClusterConfig(object):
         if internal_name not in ['ovsdb', 'voldrv']:
             return internal_name
 
+
 class ArakoonInstaller(object):
     """
     class to dynamically install/(re)configure arakoon cluster
@@ -494,23 +495,6 @@ class ArakoonInstaller(object):
         return restart_ips
 
     @staticmethod
-    def deploy_cluster(cluster_name, node_ip, filesystem=False):
-        """
-        (Re)deploys a given cluster
-        :param cluster_name: Name of the cluster to (re)deploy
-        :type cluster_name: str
-        :param node_ip: IP address of one of the cluster's nodes
-        :type node_ip: str
-        :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
-        :type filesystem: bool
-        :return: None
-        """
-        ArakoonInstaller._logger.debug('(Re)deploying cluster {0} from {1}'.format(cluster_name, node_ip))
-        config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(node_ip)
-        ArakoonInstaller._deploy(config, filesystem=filesystem)
-
-    @staticmethod
     def get_unused_arakoon_metadata_and_claim(cluster_type, locked=True):
         """
         Retrieve arakoon cluster information based on its type
@@ -611,7 +595,7 @@ class ArakoonInstaller(object):
         """
         if os.environ.get('RUNNING_UNITTESTS') == 'True':
             if filesystem is True:
-                raise NotImplementedError('At this moment, there is no support for unittesting filesystem backend Arakoon clusters')
+                raise NotImplementedError('At this moment, there is no support for unit-testing filesystem backend Arakoon clusters')
 
         ArakoonInstaller._logger.debug('Deploying cluster {0}'.format(config.cluster_id))
         if offline_nodes is None:
@@ -646,7 +630,8 @@ class ArakoonInstaller(object):
             ServiceManager.add_service(base_name, root_client,
                                        params={'CLUSTER': config.cluster_id,
                                                'NODE_ID': node.name,
-                                               'CONFIG_PATH': config_path},
+                                               'CONFIG_PATH': config_path,
+                                               'ALBA_VERSION_CMD': "alba=`alba version --terse`" if config.export()['global']['plugins'] else ""},
                                        target_name=target_name,
                                        startup_dependency='ovs-watcher-config' if filesystem is False else None)
             ArakoonInstaller._logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
