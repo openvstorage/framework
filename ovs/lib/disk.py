@@ -75,8 +75,14 @@ class DiskController(object):
 
         # Parse 'lsblk' output
         # --exclude 1 for RAM devices, 2 for floppy devices, 11 for CD-ROM devices (See https://www.kernel.org/doc/Documentation/devices.txt)
-        devices = client.run('lsblk --pairs --bytes --noheadings --exclude 1,2,11 --output=KNAME,SIZE,MODEL,STATE,MAJ:MIN,FSTYPE,TYPE,ROTA,MOUNTPOINT,LOG-SEC').splitlines()
-        device_regex = re.compile('^KNAME="(?P<name>.*)" SIZE="(?P<size>\d*)" MODEL="(?P<model>.*)" STATE="(?P<state>.*)" MAJ:MIN="(?P<dev_nr>.*)" FSTYPE="(?P<fstype>.*)" TYPE="(?P<type>.*)" ROTA="(?P<rota>[0,1])" MOUNTPOINT="(?P<mtpt>.*)" LOG-SEC="(?P<sector_size>\d*)"$')
+        devices = client.run(['lsblk',
+                              '--pairs',
+                              '--bytes',
+                              '--noheadings',
+                              '--exclude',
+                              '1,2,11',
+                              '--output=KNAME,SIZE,MODEL,STATE,MAJ:MIN,FSTYPE,TYPE,ROTA,MOUNTPOINT,LOG-SEC,SERIAL']).splitlines()
+        device_regex = re.compile('^KNAME="(?P<name>.*)" SIZE="(?P<size>\d*)" MODEL="(?P<model>.*)" STATE="(?P<state>.*)" MAJ:MIN="(?P<dev_nr>.*)" FSTYPE="(?P<fstype>.*)" TYPE="(?P<type>.*)" ROTA="(?P<rota>[0,1])" MOUNTPOINT="(?P<mtpt>.*)" LOG-SEC="(?P<sector_size>\d*)" SERIAL="(?P<serial>.*)"$')
         configuration = {}
         parsed_devices = []
         for device in devices:
@@ -91,6 +97,7 @@ class DiskController(object):
             model = groupdict['model'].strip()
             state = groupdict['state'].strip()
             dev_nr = groupdict['dev_nr'].strip()
+            serial = groupdict['serial'].strip()
             fs_type = groupdict['fstype'].strip()
             dev_type = groupdict['type'].strip()
             rotational = groupdict['rota'].strip()
@@ -113,6 +120,7 @@ class DiskController(object):
                 configuration[name] = {'name': name,
                                        'size': int(size),
                                        'model': model if model != '' else None,
+                                       'serial': serial if serial != '' else None,
                                        'state': device_state,
                                        'is_ssd': rotational == '0',
                                        'aliases': system_aliases,
@@ -140,7 +148,9 @@ class DiskController(object):
                 partition_state = Disk.STATES.OK if current_device_state == Disk.STATES.OK else Disk.STATES.FAILURE
                 if mount_point is not None and fs_type != 'swap':
                     try:
-                        client.run('touch {0}/{1}; rm {0}/{1}'.format(mount_point, str(time.time())))
+                        filename = '{0}/{1}'.format(mount_point, str(time.time()))
+                        client.run(['touch', filename])
+                        client.run(['rm', filename])
                     except Exception:
                         partition_state = Disk.STATES.FAILURE
 
@@ -240,7 +250,7 @@ class DiskController(object):
         """
         Updates a disk
         """
-        for prop in ['state', 'aliases', 'is_ssd', 'model', 'size', 'name']:
+        for prop in ['state', 'aliases', 'is_ssd', 'model', 'size', 'name', 'serial']:
             if prop in container:
                 setattr(disk, prop, container[prop])
         disk.save()

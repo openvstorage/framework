@@ -1,8 +1,6 @@
 [Unit]
 Description=Open vStorage distributed transaction log
-Requires=<ADDITIONAL_DEPENDENCIES>
-Wants=ovs-watcher-volumedriver<_SERVICE_SUFFIX_>.service
-After=ovs-watcher-volumedriver<_SERVICE_SUFFIX_>.service
+After=local-fs.target network-online.target ovs-watcher-volumedriver.service
 
 [Service]
 Type=simple
@@ -13,4 +11,4 @@ TimeoutStopSec=60
 LimitNOFILE=4096
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.target ovs-watcher-volumedriver.service

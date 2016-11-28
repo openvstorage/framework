@@ -1,6 +1,6 @@
 [Unit]
 Description=Arakoon service for cluster <CLUSTER>
-After=ovs-watcher-config<_SERVICE_SUFFIX_>.service
+After=local-fs.target network-online.target <STARTUP_DEPENDENCY>
 
 [Service]
 Type=simple
@@ -15,4 +15,4 @@ RestartSec=5
 TimeoutStopSec=60
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.target <STARTUP_DEPENDENCY>

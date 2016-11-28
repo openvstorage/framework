@@ -31,6 +31,7 @@ class Disk(DataObject):
 
     __properties = [Property('aliases', list, doc='The device aliases'),
                     Property('model', str, mandatory=False, doc='The disks model'),
+                    Property('serial', str, mandatory=False, doc='The disks serial number, if available'),
                     Property('state', STATES.keys(), doc='The state of the disk'),
                     Property('name', str, doc='Name of the disk (e.g. sda)'),
                     Property('size', int, doc='Size of the disk, in bytes'),

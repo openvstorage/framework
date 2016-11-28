@@ -41,13 +41,13 @@ class DebianPackage(object):
         command = "dpkg -s {0} 2> /dev/null | grep Version | cut -d ' ' -f 2".format(package_name)
         if client is None:
             return check_output(command, shell=True).strip()
-        return client.run(command).strip()
+        return client.run(command, allow_insecure=True).strip()
 
     @staticmethod
     def _get_installed_candidate_version(package_name, client):
         installed = None
         candidate = None
-        for line in client.run('apt-cache policy {0} {1}'.format(package_name, DebianPackage.APT_CONFIG_STRING)).splitlines():
+        for line in client.run(['apt-cache', 'policy', package_name, DebianPackage.APT_CONFIG_STRING]).splitlines():
             line = line.strip()
             if line.startswith('Installed:'):
                 installed = Toolbox.remove_prefix(line, 'Installed:').strip()
@@ -77,7 +77,7 @@ class DebianPackage(object):
             counter += 1
             try_again = ', trying again' if counter < max_counter else ''
             try:
-                client.run('apt-get install -y {0} {1}'.format(force_text, package_name))
+                client.run(['apt-get', 'install', '-y', force_text, package_name])
                 installed, candidate = DebianPackage._get_installed_candidate_version(package_name, client=client)
                 if installed == candidate:
                     success = True
@@ -104,7 +104,7 @@ class DebianPackage(object):
         while True and counter < max_counter:
             counter += 1
             try:
-                client.run('apt-get update {0}'.format(DebianPackage.APT_CONFIG_STRING))
+                client.run(['apt-get', 'update', DebianPackage.APT_CONFIG_STRING])
                 break
             except CalledProcessError as cpe:
                 if cpe.output and 'Could not get lock' in cpe.output[0] and counter != max_counter:

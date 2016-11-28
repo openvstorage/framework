@@ -223,7 +223,6 @@ class ArakoonInstaller(object):
     ARAKOON_BASE_DIR = '{0}/arakoon'
     ARAKOON_HOME_DIR = '{0}/arakoon/{1}/db'
     ARAKOON_TLOG_DIR = '{0}/arakoon/{1}/tlogs'
-    ARAKOON_CATCHUP_COMMAND = 'arakoon --node {0} -config {1} -catchup-only'
     CONFIG_ROOT = '/ovs/arakoon'
     CONFIG_KEY = CONFIG_ROOT + '/{0}/config'
     SSHCLIENT_USER = 'ovs'
@@ -270,7 +269,7 @@ class ArakoonInstaller(object):
                     dirs_with_files[directory] = file_names
                 for file_name in file_names:
                     try:
-                        open_files = root_client.run('lsof {0}'.format(file_name))
+                        open_files = root_client.run(['lsof', file_name])
                         if open_files != '':
                             open_file_errors.append('Open file {0} detected in directory {1}'.format(os.path.basename(file_name), directory))
                     except CalledProcessError:
@@ -617,10 +616,9 @@ class ArakoonInstaller(object):
             if node.crash_log_sinks.startswith('/'):
                 abs_paths.add(os.path.dirname(os.path.abspath(node.crash_log_sinks)))
             abs_paths = list(abs_paths)
-            if not root_client.dir_exists(abs_paths):
-                root_client.dir_create(abs_paths)
-                root_client.dir_chmod(abs_paths, 0755, recursive=True)
-                root_client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
+            root_client.dir_create(abs_paths)
+            root_client.dir_chmod(abs_paths, 0755, recursive=True)
+            root_client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
 
             # Creates services for/on all nodes in the config
             if config.filesystem is True:
@@ -632,9 +630,9 @@ class ArakoonInstaller(object):
             ServiceManager.add_service(base_name, root_client,
                                        params={'CLUSTER': config.cluster_id,
                                                'NODE_ID': node.name,
-                                               'CONFIG_PATH': config_path,
-                                               'STARTUP_DEPENDENCY': 'started ovs-watcher-config' if filesystem is False else '(local-filesystems and started networking)'},
-                                       target_name=target_name)
+                                               'CONFIG_PATH': config_path},
+                                       target_name=target_name,
+                                       startup_dependency='ovs-watcher-config' if filesystem is False else None)
             ArakoonInstaller._logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
 
     @staticmethod
@@ -812,7 +810,7 @@ class ArakoonInstaller(object):
                 config_path = config.config_path
             else:
                 config_path = Configuration.get_configuration_path(config.config_path)
-            client.run(ArakoonInstaller.ARAKOON_CATCHUP_COMMAND.format(node_name, config_path))
+            client.run(['arakoon', '--node', node_name, '-config', config_path, '-catchup-only'])
             ArakoonInstaller._logger.debug('Catching up new node {0} for cluster {1} completed'.format(new_ip, cluster_name))
 
         threshold = 2 if new_ip in current_ips else 1
