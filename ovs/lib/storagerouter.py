@@ -875,17 +875,18 @@ class StorageRouterController(object):
 
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Checking availability of related Storage Routers'.format(storage_driver.guid, storage_driver.name))
         client = None
-        temp_client = None
         errors_found = False
         storage_router = storage_driver.storagerouter
         storage_drivers_left = False
         storage_router_online = True
         storage_routers_offline = [StorageRouter(storage_router_guid) for storage_router_guid in offline_storage_router_guids]
         available_storage_drivers = []
+        all_storage_drivers = []
         for sd in vpool.storagedrivers:
             sr = sd.storagerouter
             if sr != storage_router:
                 storage_drivers_left = True
+            all_storage_drivers.append(sd)
             try:
                 temp_client = SSHClient(sr, username='root')
                 if sr in storage_routers_offline:
@@ -893,11 +894,17 @@ class StorageRouterController(object):
                 with remote(temp_client.ip, [LocalStorageRouterClient]) as rem:
                     sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
                     if Configuration.exists(sd_key) is True:
-                        path = Configuration.get_configuration_path(sd_key)
-                        lsrc = rem.LocalStorageRouterClient(path)
-                        lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
-                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Available Storage Driver for migration - {1}'.format(storage_driver.guid, sd.name))
-                        available_storage_drivers.append(sd)
+                        try:
+                            path = Configuration.get_configuration_path(sd_key)
+                            lsrc = rem.LocalStorageRouterClient(path)
+                            lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
+                            StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Available Storage Driver for migration - {1}'.format(storage_driver.guid, sd.name))
+                            available_storage_drivers.append(sd)
+                        except Exception as ex:
+                            if 'ClusterNotReachableException' in str(ex):
+                                pass
+                            else:
+                                raise
                 client = temp_client
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Router {1} with IP {2} is online'.format(storage_driver.guid, sr.name, sr.ip))
             except UnableToConnectException:
@@ -907,24 +914,13 @@ class StorageRouterController(object):
                         storage_router_online = False
                 else:
                     raise RuntimeError('Not all StorageRouters are reachable')
-            except Exception as ex:
-                if 'ClusterNotReachableException' in str(ex):
-                    if sd != storage_driver:
-                        raise RuntimeError('Not all StorageDrivers are reachable, please (re)start them and try again')
-                    if client is None:
-                        client = temp_client
-                else:
-                    raise
 
         if client is None:
-            raise RuntimeError('Could not found any responsive node in the cluster')
+            raise RuntimeError('Could not find any responsive node in the cluster')
 
         storage_driver.invalidate_dynamics('vdisks_guids')
         if len(storage_driver.vdisks_guids) > 0:
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
-
-        if storage_drivers_left and len(available_storage_drivers) == 0:
-            raise RuntimeError('vPool is spread over several other Storage Drivers, but none of them are responsive')
 
         # Start removal
         if storage_drivers_left is True:
@@ -935,6 +931,9 @@ class StorageRouterController(object):
 
         available_sr_names = [sd.storagerouter.name for sd in available_storage_drivers]
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Routers on which an available Storage Driver runs: {1}'.format(storage_driver.guid, ', '.join(available_sr_names)))
+
+        offline_storagedrivers_names = [sd.storagerouter.name for sd in all_storage_drivers if sd not in available_storage_drivers]
+        StorageRouterController._logger.warning('Remove Storage Driver - Guid {0} - Storage Routers on which a Storage Driver is unavailable: {1}'.format(storage_driver.guid, ', '.join(offline_storagedrivers_names)))
 
         # Remove stale vDisks
         voldrv_vdisks = [entry.object_id() for entry in vpool.objectregistry_client.get_all_registrations()]
@@ -1046,7 +1045,7 @@ class StorageRouterController(object):
             if storage_drivers_left is True:
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Reconfiguring volumedriver arakoon cluster'.format(storage_driver.guid))
                 node_configs = []
-                for sd in available_storage_drivers:
+                for sd in all_storage_drivers:
                     if sd != storage_driver:
                         node_configs.append(ClusterNodeConfig(**sd.cluster_node_config))
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Node configs - \n{1}'.format(storage_driver.guid, '\n'.join([str(config) for config in node_configs])))
