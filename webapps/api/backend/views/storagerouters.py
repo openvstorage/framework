@@ -359,6 +359,53 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
+    @load(StorageRouter, max_version=6)
+    def get_update_status(self, storagerouter):
+        """
+        Return available updates for framework, volumedriver, ...
+        :param storagerouter: StorageRouter to get the update information from
+        :type storagerouter: StorageRouter
+        """
+        update_info = UpdateController.get_update_information_core({})
+        framework_info = update_info.pop('framework', None)
+        storagedriver_info = update_info.pop('storagedriver', None)
+
+        return_value = {'upgrade_ongoing': UpdateController.get_update_metadata(storagerouter_ip=storagerouter.ip)['update_ongoing']}
+        if framework_info is not None and framework_info['packages']:
+            return_value['framework'] = []
+            for pkg_name, pkg_info in framework_info['packages'].iteritems():
+                return_value['framework'].append({'to': pkg_info['candidate'],
+                                                  'name': pkg_name,
+                                                  'gui_down': True,
+                                                  'downtime': framework_info['downtime'],
+                                                  'namespace': 'ovs',
+                                                  'prerequisites': framework_info['prerequisites']})
+        if storagedriver_info is not None and storagedriver_info['packages']:
+            return_value['storagedriver'] = []
+            for pkg_name, pkg_info in storagedriver_info['packages'].iteritems():
+                return_value['storagedriver'].append({'to': pkg_info['candidate'],
+                                                      'name': pkg_name,
+                                                      'gui_down': False,
+                                                      'downtime': storagedriver_info['downtime'],
+                                                      'namespace': 'ovs',
+                                                      'prerequisites': storagedriver_info['prerequisites']})
+
+        for plugin_name, info in update_info.iteritems():
+            if info['packages']:
+                return_value[plugin_name] = []
+                for pkg_name, pkg_info in info['packages'].iteritems():
+                    return_value[plugin_name].append({'to': pkg_info['candidate'],
+                                                      'name': pkg_name,
+                                                      'gui_down': False,
+                                                      'downtime': info['downtime'],
+                                                      'namespace': plugin_name,
+                                                      'prerequisites': info['prerequisites']})
+        return return_value
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
     @load(StorageRouter)
     def get_update_metadata(self, storagerouter):
         """
@@ -381,7 +428,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :param storagerouter: StorageRouter to start the update on
         :type storagerouter: StorageRouter
         """
-        return StorageRouterController.update_framework.delay(storagerouter.ip)
+        _ = storagerouter
+        return UpdateController.update_components.delay(components=['framework'])
 
     @action()
     @log()
@@ -394,20 +442,21 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :param storagerouter: StorageRouter to start the update on
         :type storagerouter: StorageRouter
         """
-        return StorageRouterController.update_volumedriver.delay(storagerouter.ip)
+        _ = storagerouter
+        return UpdateController.update_components.delay(components=['storagedriver'])
 
     @action()
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def update_all(self, components):
+    def update_components(self, components):
         """
         Initiate a task on a StorageRouter to update the specified components on ALL StorageRouters
         :param components: Components to update
         :type components: list
         """
-        return UpdateController.update_all.delay(components=components)
+        return UpdateController.update_components.delay(components=components)
 
     @action()
     @log()

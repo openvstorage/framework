@@ -312,7 +312,7 @@ class ArakoonInstaller(object):
         :param base_dir: Base directory that should contain the data and tlogs
         :type base_dir: str
         :param plugins: Plugins that should be added to the configuration file
-        :type plugins: list
+        :type plugins: dict
         :param locked: Indicates whether the create should run in a locked context (e.g. to prevent port conflicts)
         :type locked: bool
         :param internal: Is cluster internally managed by OVS
@@ -351,7 +351,7 @@ class ArakoonInstaller(object):
                 port_mutex.acquire(wait=60)
             if ports is None:
                 ports = ArakoonInstaller._get_free_ports(client)
-            config = ArakoonClusterConfig(cluster_name, filesystem, plugins)
+            config = ArakoonClusterConfig(cluster_name, filesystem, plugins.keys() if plugins is not None else None)
             config.nodes.append(ArakoonNodeConfig(name=node_name,
                                                   ip=ip,
                                                   client_port=ports[0],
@@ -364,7 +364,7 @@ class ArakoonInstaller(object):
                         'cluster_name': cluster_name,
                         'cluster_type': cluster_type.upper(),
                         'in_use': False}
-            ArakoonInstaller._deploy(config, filesystem=filesystem)
+            ArakoonInstaller._deploy(config, filesystem=filesystem, plugins=plugins.values() if plugins is not None else None)
         finally:
             if port_mutex is not None:
                 port_mutex.release()
@@ -589,7 +589,7 @@ class ArakoonInstaller(object):
         ArakoonInstaller._logger.debug('Destroy node {0} in cluster {1} completed'.format(node.ip, config.cluster_id))
 
     @staticmethod
-    def _deploy(config, filesystem, offline_nodes=None):
+    def _deploy(config, filesystem, offline_nodes=None, plugins=None):
         """
         Deploys a complete cluster: Distributing the configuration files, creating directories and services
         """
@@ -627,11 +627,14 @@ class ArakoonInstaller(object):
                 config_path = Configuration.get_configuration_path(config.config_path)
             base_name = 'ovs-arakoon'
             target_name = 'ovs-arakoon-{0}'.format(config.cluster_id)
+            extra_version_cmd = ''
+            if plugins is not None:
+                extra_version_cmd = ';'.join(plugins)
             ServiceManager.add_service(base_name, root_client,
                                        params={'CLUSTER': config.cluster_id,
                                                'NODE_ID': node.name,
                                                'CONFIG_PATH': config_path,
-                                               'ALBA_VERSION_CMD': "alba=`alba version --terse`" if config.export()['global']['plugins'] else ""},
+                                               'EXTRA_VERSION_CMD': extra_version_cmd},
                                        target_name=target_name,
                                        startup_dependency='ovs-watcher-config' if filesystem is False else None)
             ArakoonInstaller._logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))

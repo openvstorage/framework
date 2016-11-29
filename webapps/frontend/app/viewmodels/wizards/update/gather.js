@@ -176,7 +176,7 @@ define([
                         components.push(plugin.name);
                     }
                 });
-                api.post('storagerouters/' + self.data.storageRouter().guid() + '/update_all', { queryparams: { components: JSON.stringify(components) } })
+                api.post('storagerouters/' + self.data.storageRouter().guid() + '/update_components', { queryparams: { components: JSON.stringify(components) } })
                     .then(function(taskID) {
                         generic.alertInfo(
                             $.t('ovs:wizards.update.started'),
@@ -215,9 +215,7 @@ define([
                                 info.checked = ko.observable(false);
                                 self.componentPlugins.push(info);
                             }
-
                         });
-
                         // Attempt to have 1 component 'checked'
                         if (self.componentFwk() === undefined) {
                             if (self.componentPlugins().length === 0) {

@@ -112,7 +112,7 @@ class RpmPackage(object):
     @staticmethod
     def update(client):
         """
-        Run the 'aptdcon --refresh' command on the specified node to update the package information
+        Run the 'yum check-update' command on the specified node to update the package information
         :param client: Root client on which to update the package information
         :type client: SSHClient
         :return: None
