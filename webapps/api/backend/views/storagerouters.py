@@ -47,7 +47,6 @@ class StorageRouterViewSet(viewsets.ViewSet):
     base_name = 'storagerouters'
 
     DOMAIN_CHANGE_KEY = 'ovs_dedupe_domain_change'
-    RECOVERY_DOMAIN_CHANGE_KEY = 'ovs_dedupe_recovery_domain_change'
 
     @log()
     @required_roles(['read', 'manage'])
@@ -482,14 +481,12 @@ class StorageRouterViewSet(viewsets.ViewSet):
         # Schedule a task to run after 60 seconds, re-schedule task if another identical task gets triggered
         if change is True:
             cache = VolatileFactory.get_client()
-            task_id_domain = cache.get(StorageRouterViewSet.DOMAIN_CHANGE_KEY)
-            task_id_backup = cache.get(StorageRouterViewSet.RECOVERY_DOMAIN_CHANGE_KEY)
-            if task_id_domain:
-                revoke(task_id_domain)  # If key exists, task was already scheduled. If task is already running, the revoke message will be ignored
-            if task_id_backup:
-                revoke(task_id_backup)
-            async_mds_result = MDSServiceController.mds_checkup.s().apply_async(countdown=60)
-            async_dtl_result = VDiskController.dtl_checkup.s().apply_async(countdown=60)
-            cache.set(StorageRouterViewSet.DOMAIN_CHANGE_KEY, async_mds_result.id, 600)  # Store the task id
-            cache.set(StorageRouterViewSet.RECOVERY_DOMAIN_CHANGE_KEY, async_dtl_result.id, 600)  # Store the task id
+            task_ids = cache.get(StorageRouterViewSet.DOMAIN_CHANGE_KEY)
+            if task_ids:
+                for task_id in task_ids:
+                    revoke(task_id)
+            task_ids = [MDSServiceController.mds_checkup.s().apply_async(countdown=60).id,
+                        VDiskController.dtl_checkup.s().apply_async(countdown=60).id,
+                        StorageDriverController.cluster_registry_checkup.s().apply_async(countdown=60).id]
+            cache.set(StorageRouterViewSet.DOMAIN_CHANGE_KEY, task_ids, 600)  # Store the task ids
             storagerouter.invalidate_dynamics(['regular_domains', 'recovery_domains'])

@@ -187,6 +187,28 @@ class StorageDriver(DataObject):
         """
         from ovs.extensions.generic.configuration import Configuration
         rdma = Configuration.get('/ovs/framework/rdma')
+        distance_map = {}
+        primary_domains = []
+        secondary_domains = []
+        for junction in self.storagerouter.domains:
+            if junction.backup is False:
+                primary_domains.append(junction.domain_guid)
+            else:
+                secondary_domains.append(junction.domain_guid)
+        for sd in self.vpool.storagedrivers:
+            if sd.guid == self.guid:
+                continue
+            if len(primary_domains) == 0:
+                distance_map[str(sd.storagedriver_id)] = 0
+            else:
+                distance = 20000
+                for junction in sd.storagerouter.domains:
+                    if junction.backup is False:
+                        if junction.domain_guid in secondary_domains:
+                            distance = min(distance, 10000)
+                        if junction.domain_guid in primary_domains:
+                            distance = min(distance, 0)
+                distance_map[str(sd.storagedriver_id)] = distance
         return {'vrouter_id': self.storagedriver_id,
                 'host': self.storage_ip,
                 'message_port': self.ports['management'],
@@ -196,4 +218,14 @@ class StorageDriver(DataObject):
                 'failovercache_port': self.ports['dtl'],
                 'network_server_uri': '{0}://{1}:{2}'.format('rdma' if rdma else 'tcp',
                                                              self.storage_ip,
-                                                             self.ports['edge'])}
+                                                             self.ports['edge']),
+                'node_distance_map': distance_map}
+
+    def reload_client(self, client):
+        """
+        Reloads the StorageDriverClient or ObjectRegistryClient
+        """
+        if self.vpool_guid:
+            self._frozen = False
+
+            self._frozen = True
