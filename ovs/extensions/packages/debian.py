@@ -46,7 +46,7 @@ class DebianPackage(object):
         if package_names is None:
             package_names = DebianPackage.OVS_PACKAGE_NAMES
         for package_name in package_names:
-            command = "dpkg -s {0} | grep Version | awk '{{print $2}}'".format(package_name.replace(r"'", r"'\''"))
+            command = "dpkg -s '{0}' | grep Version | awk '{{print $2}}'".format(package_name.replace(r"'", r"'\''"))
             if client is None:
                 versions[package_name] = check_output(command, shell=True).strip()
             else:
@@ -97,7 +97,7 @@ class DebianPackage(object):
         if installed == candidate:
             return
 
-        command = 'aptdcon --hide-terminal --allow-unauthenticated --install {0}'.format(package_name.replace(r"'", r"'\''"))
+        command = "aptdcon --hide-terminal --allow-unauthenticated --install '{0}'".format(package_name.replace(r"'", r"'\''"))
         DebianPackage._logger.debug('{0}: Installing package {1}'.format(client.ip, package_name))
         try:
             output = client.run('yes | {0}'.format(command), allow_insecure=True)

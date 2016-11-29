@@ -237,9 +237,9 @@ class Schedule(object):
 
     def generate_schedule(self, name):
         """
-        Kenneth's docstring: None
-        :param name: Also None
-        :return: And None here too
+        Generate a schedule
+        :param name: Name to generate
+        :return: Crontab and additional information about scheduling
         """
         try:
             schedules = Configuration.get('/ovs/framework/scheduling/celery', default={})

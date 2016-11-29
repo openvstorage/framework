@@ -43,7 +43,7 @@ class RpmPackage(object):
         if package_names is None:
             package_names = RpmPackage.OVS_PACKAGE_NAMES
         for package_name in package_names:
-            command = "yum info {0} | grep Version | cut -d ':' -f 2 || true".format(package_name.replace(r"'", r"'\''"))
+            command = "yum info '{0}' | grep Version | cut -d ':' -f 2 || true".format(package_name.replace(r"'", r"'\''"))
             if client is None:
                 version_info = check_output(command, shell=True).strip()
             else:
