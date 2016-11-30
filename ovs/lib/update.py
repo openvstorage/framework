@@ -338,7 +338,7 @@ class UpdateController(object):
         if 'framework' in components:
             services_to_restart.update(update_information.get('framework', {}).get('services_post_update', set()))
 
-        for service_name in services_to_restart:
+        for service_name in sorted(services_to_restart):
             if not service_name.startswith('ovs-arakoon-'):
                 UpdateController.change_services_state(services=[service_name], ssh_clients=[client], action='restart')
             else:
