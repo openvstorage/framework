@@ -23,18 +23,21 @@ from rest_framework import viewsets
 from rest_framework.decorators import action, link
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, return_list, return_object, return_task, return_simple, load, log
-from api.backend.exceptions import HttpGoneException, HttpNotAcceptableException
+from api.backend.exceptions import HttpNotAcceptableException
 from api.backend.serializers.serializers import FullSerializer
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.extensions.generic.system import System
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.disk import DiskController
 from ovs.lib.mdsservice import MDSServiceController
+from ovs.lib.scheduledtask import ScheduledTaskController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.storagerouter import StorageRouterController
+from ovs.lib.update import UpdateController
 from ovs.lib.vdisk import VDiskController
 
 
@@ -356,40 +359,104 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
-    @load(StorageRouter)
+    @load(StorageRouter, max_version=6)
     def get_update_status(self, storagerouter):
         """
         Return available updates for framework, volumedriver, ...
         :param storagerouter: StorageRouter to get the update information from
         :type storagerouter: StorageRouter
         """
-        return StorageRouterController.get_update_status.delay(storagerouter.ip)
+        update_info = UpdateController.get_update_information_core({})
+        framework_info = update_info.pop('framework', None)
+        storagedriver_info = update_info.pop('storagedriver', None)
+
+        return_value = {'upgrade_ongoing': UpdateController.get_update_metadata(storagerouter_ip=storagerouter.ip)['update_ongoing']}
+        if framework_info is not None and framework_info['packages']:
+            return_value['framework'] = []
+            for pkg_name, pkg_info in framework_info['packages'].iteritems():
+                return_value['framework'].append({'to': pkg_info['candidate'],
+                                                  'name': pkg_name,
+                                                  'gui_down': True,
+                                                  'downtime': framework_info['downtime'],
+                                                  'namespace': 'ovs',
+                                                  'prerequisites': framework_info['prerequisites']})
+        if storagedriver_info is not None and storagedriver_info['packages']:
+            return_value['storagedriver'] = []
+            for pkg_name, pkg_info in storagedriver_info['packages'].iteritems():
+                return_value['storagedriver'].append({'to': pkg_info['candidate'],
+                                                      'name': pkg_name,
+                                                      'gui_down': False,
+                                                      'downtime': storagedriver_info['downtime'],
+                                                      'namespace': 'ovs',
+                                                      'prerequisites': storagedriver_info['prerequisites']})
+
+        for plugin_name, info in update_info.iteritems():
+            if info['packages']:
+                return_value[plugin_name] = []
+                for pkg_name, pkg_info in info['packages'].iteritems():
+                    return_value[plugin_name].append({'to': pkg_info['candidate'],
+                                                      'name': pkg_name,
+                                                      'gui_down': False,
+                                                      'downtime': info['downtime'],
+                                                      'namespace': plugin_name,
+                                                      'prerequisites': info['prerequisites']})
+        return return_value
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def get_update_metadata(self, storagerouter):
+        """
+        Returns metadata required for updating
+          - Checks if 'at' can be used properly
+          - Checks if ongoing updates are busy
+        :param storagerouter: StorageRouter to get the update metadata from
+        :type storagerouter: StorageRouter
+        """
+        return UpdateController.get_update_metadata.delay(storagerouter.ip)
 
     @action()
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
-    @load(StorageRouter)
+    @load(StorageRouter, max_version=6)
     def update_framework(self, storagerouter):
         """
         Initiate a task on the given StorageRouter to update the framework on ALL StorageRouters
         :param storagerouter: StorageRouter to start the update on
         :type storagerouter: StorageRouter
         """
-        return StorageRouterController.update_framework.delay(storagerouter.ip)
+        _ = storagerouter
+        return UpdateController.update_components.delay(components=['framework'])
 
     @action()
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
-    @load(StorageRouter)
+    @load(StorageRouter, max_version=6)
     def update_volumedriver(self, storagerouter):
         """
         Initiate a task on the given StorageRouter to update the volumedriver on ALL StorageRouters
         :param storagerouter: StorageRouter to start the update on
         :type storagerouter: StorageRouter
         """
-        return StorageRouterController.update_volumedriver.delay(storagerouter.ip)
+        _ = storagerouter
+        return UpdateController.update_components.delay(components=['storagedriver'])
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def update_components(self, components):
+        """
+        Initiate a task on a StorageRouter to update the specified components on ALL StorageRouters
+        :param components: Components to update
+        :type components: list
+        """
+        return UpdateController.update_components.delay(components=components)
 
     @action()
     @log()
@@ -493,3 +560,41 @@ class StorageRouterViewSet(viewsets.ViewSet):
             cache.set(StorageRouterViewSet.DOMAIN_CHANGE_KEY, async_mds_result.id, 600)  # Store the task id
             cache.set(StorageRouterViewSet.RECOVERY_DOMAIN_CHANGE_KEY, async_dtl_result.id, 600)  # Store the task id
             storagerouter.invalidate_dynamics(['regular_domains', 'recovery_domains'])
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def merge_package_information(self):
+        """
+        Retrieve the package information from the model for both StorageRouters and ALBA Nodes and merge it
+        """
+        return UpdateController.merge_package_information.delay()
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def refresh_package_information(self):
+        """
+        Refresh the updates for all StorageRouters
+        """
+        return ScheduledTaskController.refresh_package_information.delay()
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def get_update_information(self):
+        """
+        Retrieve the update information for all StorageRouters
+        This contains information about
+            - downtime of model, GUI, vPools, proxies, ...
+            - services that will be restarted
+            - packages that will be updated
+            - prerequisites that have not been met
+        """
+        return UpdateController.get_update_information_all.delay()

@@ -18,66 +18,161 @@ but WITHOUT ANY WARRANTY of any kind.
 <section>
     <div>
         <h2 class="pull-left" data-i18n="ovs:updates.title"></h2>
-    </div>
-    <div data-bind="pager: { loadData: loadStorageRouters, headers: storageRouterHeaders, refreshInterval: 30000, controls: true, container: storageRouters }" style="clear: both;">
-        <table data-dummy="dummy">
-            <tr data-part="vitem">
-                <td style="position: relative;">
-                    <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
-                       <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
-                    </span>
-                    <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
-                </td>
-                <td>
-                    <span data-bind="lazyloader: { item: updates, undefinedLoading: true }">
-                        <span data-part="lazy-entry">
-                            <span data-bind="visible: item() === undefined || item().framework.length === 0,
-                                             translate: 'ovs:updates.noupdates'"></span>
-                            <span data-bind="if: item() !== undefined && item().framework.length > 0">
-                                <span data-bind="foreach: item().framework"><span data-bind="visible: $index() > 0">,</span>
-                                    <span data-bind="translate: $data.namespace + ':packages.' + $data.name"></span> (<span data-bind="text: $data.to"></span>)</span>
-                            </span>
-                        </span>
-                    </span>
-                </td>
-                <td><span data-bind="lazyloader: { item: updates, undefinedLoading: true }">
-                        <span data-part="lazy-entry">
-                            <span data-bind="visible: item() === undefined || item().volumedriver.length === 0,
-                                             translate: 'ovs:updates.noupdates'"></span>
-                            <span data-bind="if: item() !== undefined && item().volumedriver.length > 0">
-                                <span data-bind="foreach: item().volumedriver">
-                                    <span data-bind="visible: $index() > 0">,</span>
-                                    <span data-bind="translate: $data.namespace + ':packages.' + $data.name"></span> (<span data-bind="text: $data.to"></span>)
-                                </span>
-                            </span>
-                        </span>
-                    </span>
-                </td>
-            </tr>
+        <button class="btn btn-default pull-right" id="buttonRefreshUpdates"
+                data-bind="click: refresh,
+                           enable: $root.shared.user.roles().contains('manage') &&
+                                   refreshing() === false && loadedInfo() === true &&
+                                   updateInitiated() === false &&
+                                   collectiveStatus().updatesOngoing === false &&
+                                   collectiveStatus().updatesChecking === false"
+                style="margin-top: 20px;">
+            <span class="fa" data-i18n="[html]ovs:icons.load"></span>&nbsp;
+            <span data-i18n="ovs:generic.refresh"></span>
+        </button>
+        <table class="table table-striped table-hover" style="clear: both;">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">
+                        <span class="hand fa" data-i18n="[html]ovs:icons.collapse"
+                              data-bind="visible: $root.expanded() && $root.collectiveStatus().updatesAvailable, click: function() { $root.expandCollapseAll(!$root.expanded()); }"></span>
+                        <span class="hand fa" data-i18n="[html]ovs:icons.expand"
+                              data-bind="visible: !$root.expanded() && $root.collectiveStatus().updatesAvailable, click: function() { $root.expandCollapseAll(!$root.expanded()); }"></span>
+                    </th>
+                    <th style="width: 20%;" colspan="2" data-i18n="ovs:updates.node_name"></th>
+                    <th style="width: 75%;" colspan="4" data-i18n="ovs:updates.information"></th>
+                </tr>
+            </thead>
+            <tbody data-bind="visible: loadedInfo() === true">
+                <!-- ko foreach: storageRouters -->
+                    <tr>
+                        <td>
+                            <span class="hand fa" data-i18n="[html]ovs:icons.collapse"
+                                  data-bind="visible: expanded() && updatesAvailable(), click: function() { expanded(!expanded()); }"></span>
+                            <span class="hand fa" data-i18n="[html]ovs:icons.expand"
+                                  data-bind="visible: !expanded() && updatesAvailable(), click: function() { expanded(!expanded()); }"></span>
+                        </td>
+                        <td colspan="2">
+                            <a class="hand" data-bind="text: name, attr: {href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid})}"></a>
+                        </td>
+                        <td colspan="4"><i data-bind="translate: 'ovs:updates.updates_available_' + (updatesAvailable() === true ? 'yes' : 'no'), visible: updatesAvailable() === false || expanded() === false"></i></td>
+                    </tr>
+                    <!-- ko foreach: packageInfo -->
+                        <tr data-bind="visible: $parent.expanded()">
+                            <td></td>
+                            <td style="width: 5%;">
+                                <span class="hand fa" data-i18n="[html]ovs:icons.collapse"
+                                      data-bind="visible: expanded(), click: function() { expanded(!expanded()); }"></span>
+                                <span class="hand fa" data-i18n="[html]ovs:icons.expand"
+                                      data-bind="visible: !expanded(), click: function() { expanded(!expanded()); }"></span>
+                            </td>
+                            <td style="width: 15%;">
+                                <span data-bind="visible: namespace !== 'ovs'" data-i18n="ovs:updates.plugin"></span>
+                                <span data-bind="translate: namespace + ':updates.component_' + component"></span>
+                            </td>
+                            <!-- ko if: expanded() === true -->
+                                <td style="width: 30%;"><span data-bind="text: packages()[0].name"></span></td>
+                            <!-- /ko -->
+                            <!-- ko if: expanded() === false -->
+                                <td style="width: 30%;"><i data-i18n="ovs:updates.updates_available_yes"></i></td>
+                            <!-- /ko -->
+                            <td style="width: 20%;"><span data-bind="text: packages()[0].installed, visible: expanded()"></span></td>
+                            <td style="width: 5%;"><span class="fa" data-i18n="[html]ovs:icons.arrow_right" data-bind="visible: expanded()"></span></td>
+                            <td style="width: 20%;"><span data-bind="text: packages()[0].candidate, visible: expanded()"></span></td>
+                        </tr>
+                        <!-- ko foreach: packages -->
+                            <!-- ko if: $index() !== 0 -->
+                                <tr data-bind="visible: $parent.expanded() && $parents[1].expanded()">
+                                    <td colspan="3"></td>
+                                    <td><span data-bind="text: name"></span></td>
+                                    <td><span data-bind="text: installed"></span></td>
+                                    <td><span class="fa" data-i18n="[html]ovs:icons.arrow_right"></span></td>
+                                    <td><span data-bind="text: candidate"></span></td>
+                                </tr>
+                            <!-- /ko -->
+                        <!-- /ko -->
+                    <!-- /ko -->
+                <!-- /ko -->
+                <!-- ko foreach: storageNodes -->
+                    <tr>
+                        <td>
+                            <span class="hand fa" data-i18n="[html]ovs:icons.collapse"
+                                  data-bind="visible: expanded() && plugins().length > 0, click: function() { expanded(!expanded()); }"></span>
+                            <span class="hand fa" data-i18n="[html]ovs:icons.expand"
+                                  data-bind="visible: !expanded() && plugins().length > 0, click: function() { expanded(!expanded()); }"></span>
+                        </td>
+                        <td colspan="2" data-bind="text: ip"></td>
+                        <td colspan="4"><i data-bind="translate: 'ovs:updates.updates_available_' + (plugins().length > 0 ? 'yes' : 'no'), visible: plugins().length === 0 || expanded() === false"></i></td>
+                    </tr>
+                    <!-- ko foreach: plugins -->
+                        <tr data-bind="visible: $parent.expanded()">
+                            <td></td>
+                            <td style="width: 5%;">
+                                <span class="hand fa" data-i18n="[html]ovs:icons.collapse"
+                                      data-bind="visible: expanded(), click: function() { expanded(!expanded()); }"></span>
+                                <span class="hand fa" data-i18n="[html]ovs:icons.expand"
+                                      data-bind="visible: !expanded(), click: function() { expanded(!expanded()); }"></span>
+                            </td>
+                            <td style="width: 15%;">
+                                <span data-bind="visible: namespace !== 'ovs'" data-i18n="ovs:updates.plugin"></span>
+                                <span data-bind="translate: namespace + ':updates.component_' + component"></span>
+                            </td>
+                            <!-- ko if: expanded() === true -->
+                                <td style="width: 30%;"><span data-bind="text: packages()[0].name"></span></td>
+                            <!-- /ko -->
+                            <!-- ko if: expanded() === false -->
+                                <td style="width: 30%;"><i data-i18n="ovs:updates.updates_available_yes"></i></td>
+                            <!-- /ko -->
+                            <td style="width: 20%;"><span data-bind="text: packages()[0].installed, visible: expanded()"></span></td>
+                            <td style="width: 5%;"><span class="fa" data-i18n="[html]ovs:icons.arrow_right" data-bind="visible: expanded()"></span></td>
+                            <td style="width: 20%;"><span data-bind="text: packages()[0].candidate, visible: expanded()"></span></td>
+                        </tr>
+                        <!-- ko foreach: packages -->
+                            <!-- ko if: $index() !== 0 -->
+                                <tr data-bind="visible: $parent.expanded() && $parents[1].expanded()">
+                                    <td colspan="3"></td>
+                                    <td><span data-bind="text: name"></span></td>
+                                    <td><span data-bind="text: installed"></span></td>
+                                    <td><span class="fa" data-i18n="[html]ovs:icons.arrow_right"></span></td>
+                                    <td><span data-bind="text: candidate"></span></td>
+                                </tr>
+                            <!-- /ko -->
+                        <!-- /ko -->
+                    <!-- /ko -->
+                <!-- /ko -->
+            </tbody>
         </table>
     </div>
     <div>
-        <button class="btn btn-default"
-                data-bind="click: updateFramework,
-                           enable: $root.shared.user.roles().contains('manage') && frameworkUpdate() === true && upgradeOngoing() === false,
-                           visible: upgradeOngoing() === undefined || upgradeOngoing() === false"
-                id="buttonUpdateFramework"
+        <button class="btn btn-default hand"
+                data-bind="click: showUpdateWizard,
+                           enable: $root.shared.user.roles().contains('manage') &&
+                                   collectiveStatus().updatesOngoing === false &&
+                                   collectiveStatus().updatesAvailable === true &&
+                                   refreshing() === false && loadedInfo() === true,
+                           visible: collectiveStatus().atFunctional === true &&
+                                    collectiveStatus().updatesChecking === false &&
+                                    collectiveStatus().updatesOngoing === false &&
+                                    updateInitiated() === false &&
+                                    loadedInfo() === true"
+                id="buttonUpdate"
                 style="margin-top: 20px;">
-            <span data-i18n="ovs:updates.buttons.framework"></span>
+            <span data-i18n="ovs:updates.button" class="hand"></span>
         </button>
     </div>
-    <div>
-        <button class="btn btn-default"
-                data-bind="click: updateVolumedriver,
-                           enable: $root.shared.user.roles().contains('manage') && volumedriverUpdate() === true && upgradeOngoing() === false,
-                           visible: upgradeOngoing() === undefined || upgradeOngoing() === false"
-                id="buttonUpdateVolumedriver"
-                style="margin-top: 10px;">
-            <span data-i18n="ovs:updates.buttons.volumedriver"></span>
-        </button>
-    </div>
-    <div data-bind="visible: upgradeOngoing() === true" class="alert alert-info" style="margin-top: 20px;">
+    <div data-bind="visible: loadedInfo() === false" class="alert alert-info" style="margin-top: 20px;">
         <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
-        <span data-i18n="ovs:updates.ongoing"></span>
+        <span data-i18n="ovs:updates.loading_information"></span>
+    </div>
+    <div data-bind="visible: loadedInfo() === true">
+        <div data-bind="visible: collectiveStatus().updatesChecking === true" class="alert alert-info" style="margin-top: 20px;">
+            <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
+            <span data-i18n="ovs:updates.collective_updates_checking"></span>
+        </div>
+        <div data-bind="visible: collectiveStatus().updatesChecking === false && (collectiveStatus().updatesOngoing === true || updateInitiated() === true)" class="alert alert-info" style="margin-top: 20px;">
+            <span data-i18n="ovs:updates.collective_updates_ongoing"></span>
+        </div>
+        <div data-bind="visible: collectiveStatus().updatesChecking === false && collectiveStatus().atFunctional === false" class="alert alert-danger" style="margin-top: 20px;">
+            <span data-i18n="ovs:updates.collective_updates_at_broke"></span>
+        </div>
     </div>
 </section>

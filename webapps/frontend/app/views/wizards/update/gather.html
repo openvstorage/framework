@@ -1,0 +1,123 @@
+<!--
+Copyright (C) 2016 iNuron NV
+
+This file is part of Open vStorage Open Source Edition (OSE),
+as available from
+
+      http://www.openvstorage.org and
+      http://www.openvstorage.com.
+
+This file is free software; you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License v3 (GNU AGPLv3)
+as published by the Free Software Foundation, in version 3 as it comes
+in the LICENSE.txt file of the Open vStorage OSE distribution.
+
+Open vStorage is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY of any kind.
+-->
+<div>
+    <div class="form-group">
+        <!-- framework part -->
+        <div class="col-lg-12" data-bind="if: componentFwk() !== undefined">
+            <input type="checkbox" id="framework" data-bind="checked: componentFwk().checked">
+            <label for="framework" class="help-block" data-i18n="ovs:wizards.update.component_framework" style="padding-left: 10px; display: inline-block;"></label>
+        </div>
+        <div class="col-lg-1" data-bind="visible: componentFwk() !== undefined"></div>
+        <div class="col-lg-11" data-bind="visible: componentFwk() !== undefined">
+            <ul>
+                <li data-bind="visible: frameworkMessages().prerequisites.length > 0">
+                    <span data-i18n="ovs:wizards.update.prerequisites.general"></span>
+                    <ul data-bind="foreach: frameworkMessages().prerequisites">
+                       <li data-bind="text: $data"></li>
+                   </ul>
+                </li>
+                <li data-bind="visible: frameworkMessages().downtimes.length > 0">
+                    <span data-i18n="ovs:wizards.update.downtime.general"></span>
+                    <ul data-bind="foreach: frameworkMessages().downtimes">
+                       <li data-bind="text: $data"></li>
+                   </ul>
+                </li>
+                <li data-i18n="ovs:wizards.update.prerequisites.none"
+                    data-bind="visible: frameworkMessages().prerequisites.length === 0 && frameworkMessages().downtimes.length === 0">
+                </li>
+                <li data-i18n="ovs:wizards.update.downtime.none"
+                    data-bind="visible: frameworkMessages().prerequisites.length === 0 && frameworkMessages().downtimes.length === 0">
+                </li>
+            </ul>
+        </div>
+        <!-- storagedriver part -->
+        <div class="col-lg-12" data-bind="if: componentSd() !== undefined">
+            <input type="checkbox" id="storagedriver" data-bind="checked: componentSd().checked">
+            <label for="storagedriver" class="help-block" data-i18n="ovs:wizards.update.component_storagedriver" style="padding-left: 10px; display: inline-block;"></label>
+        </div>
+        <div class="col-lg-1" data-bind="visible: componentSd() !== undefined"></div>
+        <div class="col-lg-11" data-bind="visible: componentSd() !== undefined">
+            <ul>
+                <li data-bind="visible: storagedriverMessages().prerequisites.length > 0">
+                    <span data-i18n="ovs:wizards.update.prerequisites.general"></span>
+                    <ul data-bind="foreach: storagedriverMessages().prerequisites">
+                       <li data-bind="text: $data"></li>
+                   </ul>
+                </li>
+                <li data-bind="visible: storagedriverMessages().downtimes.length > 0">
+                    <span data-i18n="ovs:wizards.update.downtime.general"></span>
+                    <ul data-bind="foreach: storagedriverMessages().downtimes">
+                       <li data-bind="text: $data"></li>
+                   </ul>
+                </li>
+                <li data-i18n="ovs:wizards.update.prerequisites.none"
+                    data-bind="visible: storagedriverMessages().prerequisites.length === 0 && storagedriverMessages().downtimes.length === 0">
+                </li>
+                <li data-i18n="ovs:wizards.update.downtime.none"
+                    data-bind="visible: storagedriverMessages().prerequisites.length === 0 && storagedriverMessages().downtimes.length === 0">
+                </li>
+            </ul>
+        </div>
+        <!-- plugins part -->
+        <!-- ko foreach: componentPlugins -->
+            <div class="col-lg-12">
+                <input type="checkbox" id=$data.name data-bind="checked: $data.checked">
+                <label for=$data.name class="help-block" style="padding-left: 10px; display: inline-block;">
+                    <span data-i18n="ovs:wizards.update.component_plugins"></span>&nbsp;<span data-bind="translate: $data.name + ':updates.title'"></span>
+                </label>
+            </div>
+            <div class="col-lg-1"></div>
+            <div class="col-lg-11">
+                <ul>
+                    <li data-bind="visible: $parent.pluginMessages()[$data.name].prerequisites.length > 0">
+                        <span data-i18n="ovs:wizards.update.prerequisites.general"></span>
+                        <ul data-bind="foreach: $parent.pluginMessages()[$data.name].prerequisites">
+                           <li data-bind="text: $data"></li>
+                       </ul>
+                    </li>
+                    <li data-bind="visible: $parent.pluginMessages()[$data.name].downtimes.length > 0">
+                        <span data-i18n="ovs:wizards.update.downtime.general"></span>
+                        <ul data-bind="foreach: $parent.pluginMessages()[$data.name].downtimes">
+                           <li data-bind="text: $data"></li>
+                       </ul>
+                    </li>
+                    <li data-i18n="ovs:wizards.update.prerequisites.none"
+                        data-bind="visible: $parent.pluginMessages()[$data.name].prerequisites.length === 0 && $parent.pluginMessages()[$data.name].downtimes.length === 0">
+                    </li>
+                    <li data-i18n="ovs:wizards.update.downtime.none"
+                        data-bind="visible: $parent.pluginMessages()[$data.name].prerequisites.length === 0 && $parent.pluginMessages()[$data.name].downtimes.length === 0">
+                    </li>
+                </ul>
+            </div>
+        <!-- /ko -->
+    </div>
+    <div class="alert alert-info" data-bind="visible: loadingInformation() === true || canContinue().value === true">
+        <p data-bind="visible: loadingInformation() === true">
+            <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></span>&nbsp;
+            <span data-i18n="ovs:wizards.update.loading_information"></span>
+        </p>
+        <p data-bind="visible: loadingInformation() === false && canContinue().value === true" data-i18n="ovs:wizards.update.general_info"></p>
+    </div>
+    <div class="alert alert-danger" data-bind="visible: loadingInformation() === false && !canContinue().value" style="margin-bottom: -10px;">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>

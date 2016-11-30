@@ -65,12 +65,6 @@
             "deletefailed": "Could not delete the Domain: __why__"
         }
     },
-    "downtime": {
-        "general": "Following service__multiple__ will experience downtime:",
-        "ovsdb": "Model availability",
-        "proxy": "Proxy service for vpool",
-        "voldrv": "Storage Driver availability"
-    },
     "generic": {
         "about": "About",
         "accept": "Accept",
@@ -200,6 +194,7 @@
         "read": "Read",
         "read_speed": "Read Speed",
         "recovery_domains": "Recovery Domains",
+        "refresh": "Refresh",
         "reload": "Reload",
         "remove_snapshot": "Remove Snapshot",
         "rescan": "Rescan",
@@ -319,6 +314,7 @@
     "icons": {
         "add": "&#xf067;",
         "archive": "&#xf187;",
+        "arrow_right": "&#xf061;",
         "ban": "&#xf05e;",
         "cancel": "&#xf00d;",
         "cancel_circle": "&#xf057;",
@@ -385,10 +381,6 @@
         "arakoon": "Arakoon",
         "ovs": "Core",
         "volumedriver": "Storage Driver"
-    },
-    "prerequisites": {
-        "multiple": "The following prerequisites are unmet",
-        "singular": "The following prerequisite is unmet"
     },
     "storagerouters": {
         "detail": {
@@ -534,24 +526,26 @@
     },
     "title": "Open vStorage",
     "updates": {
-        "buttons": {"framework": "Update Framework",
-                    "volumedriver": "Update Storage Driver"},
-        "failed": "Update failed: __why__",
-        "framework": {
-            "gui_unavailable": "The GUI will become unavailable. If the GUI is not available after 10 minutes, please contact support or check the logs",
-            "start_update_question": "Are you sure you want to start the __what__ update?__guidown____downtime____prerequisites__",
-            "title": "Framework"
+        "button": "Update",
+        "collective_updates_at_broke": "Update functionality depends on 'at' to be running properly. This appears not to be the case on all StorageRouters",
+        "collective_updates_checking": "Checking if any updates are in progress",
+        "collective_updates_ongoing": "An update is in progress",
+        "component_framework": "Framework",
+        "component_storagedriver": "StorageDriver",
+        "loading_information": "Loading information",
+        "information": "Update information",
+        "node_name": "Node",
+        "plugin": "Plugin",
+        "refresh": {
+            "failure_msg": "Failed to refresh the updates: __error__",
+            "started": "Started",
+            "started_msg": "Updates are being refreshed",
+            "success": "Success",
+            "success_msg": "Updates have been refreshed"
         },
-        "name": "Name",
-        "noupdates": "No updates available",
-        "ongoing": "An upgrade is in progress",
-        "start_update": "Started",
-        "start_update_extra": "Update has been initiated",
         "title": "Updates",
-        "volumedriver": {
-            "start_update_question": "Are you sure you want to start the __what__ update?__downtime____prerequisites__",
-            "title": "Storage Driver"
-        }
+        "updates_available_no": "No Updates Available",
+        "updates_available_yes": "Updates Available"
     },
     "users": {
         "clients": {
@@ -977,13 +971,37 @@
                 "snapshotstarted": "Snapshot started",
                 "inprogress": "Snapshotting in progress...",
                 "failed": "Snapshot failed.",
-                "success": "Snapshot successfully.",
                 "name": "Snapshot name",
                 "consistent": "Label as Consistent Snapshot"
             }
         },
         "update": {
-            "title": "Update __what__"
+            "component_choose": "Please choose at least 1 component to update",
+            "component_framework": "Framework",
+            "component_plugins": "Plugin",
+            "component_storagedriver": "StorageDriver",
+            "downtime": {
+                "api": "API",
+                "general": "Following services will experience downtime:",
+                "gui": "GUI",
+                "none": "No components will experience downtime",
+                "ovsdb": "Model",
+                "proxy": "Proxy service for vPool",
+                "voldrv": "Storage Driver Registry"
+            },
+            "failure": "Update failed to launch: __why__",
+            "general_info": "Updating can take up to 30 minutes",
+            "loading_information": "Calculating update impact",
+            "loading_information_failure": "Failed to calculate the impact of the update. Cannot proceed",
+            "prerequisites": {
+                "general": "Following prerequisites are unmet:",
+                "node_down": "Unresponsive StorageRouter",
+                "none": "All prerequisites have been met"
+            },
+            "prerequisites_unmet": "Not all prerequisites have been met",
+            "started": "Started",
+            "started_msg": "Update has been initiated",
+            "title": "Update"
         },
         "vdisk_move": {
             "confirm": {
