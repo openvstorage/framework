@@ -47,7 +47,7 @@ class UpdateController(object):
     """
     _logger = LogHandler.get('update', name='core')
     _logger.logger.propagate = False
-    _update_file = '/etc/ready_for_update'
+    _update_file = '/etc/ready_for_upgrade'
     _update_ongoing_file = '/etc/update_ongoing'
 
     framework_packages = {'arakoon', 'openvstorage'}
@@ -64,7 +64,7 @@ class UpdateController(object):
         Called by ScheduledTaskController.refresh_package_information() every hour
 
         Retrieve information about the currently installed versions of the core packages
-        Retrieve information about the versions to which each package can potentially be upgraded
+        Retrieve information about the versions to which each package can potentially be updated
         If installed version is different from candidate version --> store this information in model
 
         Additionally check the services with a 'run' file
