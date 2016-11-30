@@ -34,12 +34,11 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration, ClusterNodeConfig, LocalStorageRouterClient
 from ovs.lib.helpers.decorators import add_hooks, ensure_single, log
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
-from volumedriver.storagerouter.storagerouterclient import ArakoonNodeConfig, ClusterNodeConfig, ClusterRegistry, LocalStorageRouterClient
 
 
 class StorageDriverController(object):
@@ -84,53 +83,67 @@ class StorageDriverController(object):
     @celery.task(name='ovs.storagedriver.cluster_registry_checkup', schedule=Schedule(minute='0', hour='0'))
     @ensure_single(task_name='ovs.storagedriver.cluster_registry_checkup', mode='CHAINED')
     def cluster_registry_checkup():
+        changed_vpools = {}
         for vpool in VPoolList.get_vpools():
+            changed_vpools[vpool.guid] = {'changes': False,
+                                          'success': True}
             try:
                 StorageDriverController._logger.info('Validating cluster registry settings for Vpool {0}'.format(vpool.guid))
 
                 current_configs = vpool.clusterregistry_client.get_node_configs()
-                current_configs_dict = {}
-                changes = False
-                all_storagedrivers = []
-                for sd in vpool.storagedrivers:
-                    all_storagedrivers.append(sd)
-
-                available_storagedrivers = []
-                for sd in vpool.storagedrivers:
-                    storagerouter = sd.storagerouter
-                    try:
-                        SSHClient(storagerouter, username='root')
-                        with remote(storagerouter.ip, [LocalStorageRouterClient]) as rem:
-                            sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
-                            if Configuration.exists(sd_key) is True:
-                                path = Configuration.get_configuration_path(sd_key)
-                                lsrc = rem.LocalStorageRouterClient(path)
-                                lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
-                                available_storagedrivers.append(sd)
-                    except UnableToConnectException:
-                        StorageDriverController._logger.warning('StorageRouter {0} not available.'.format(storagerouter.name))
-                    except Exception as ex:
-                        if 'ClusterNotReachableException' in str(ex):
-                            StorageDriverController._logger.warning('StorageDriver {0} on StorageRouter {1} not available.'.format(
-                                sd.guid, storagerouter.name
-                            ))
-                        else:
-                            StorageDriverController._logger.exception('Got exception when validating StorageDriver {0} on StorageRouter {1}.'.format(
-                                sd.guid, storagerouter.name
-                            ))
-
+                changes = len(current_configs) == 0
                 node_configs = []
-                for sd in all_storagedrivers:
-                    node_configs.append(ClusterNodeConfig(**sd.cluster_node_config))
-                StorageDriverController._logger.info('Updating cluster node configs for VPool {0}'.format(vpool.guid))
-                vpool.clusterregistry_client.set_node_configs(node_configs)
-                srclient = StorageDriverClient.load(vpool)
-                for sd in available_storagedrivers:
-                    StorageDriverController._logger.info('Trigger config reload for StorageDriver {0}'.format(sd.guid))
-                    srclient.update_cluster_node_configs(str(sd.storagedriver_id))
-                StorageDriverController._logger.info('Updating cluster node configs for Vpool {0} completed'.format(vpool.guid))
-            except Exception:
+                for sd in vpool.storagedrivers:
+                    sd.invalidate_dynamics(['cluster_node_config'])
+                    new_config = sd.cluster_node_config
+                    node_configs.append(ClusterNodeConfig(**new_config))
+                    current_node_configs = [config for config in current_configs if config.vrouter_id == sd.storagedriver_id]
+                    if len(current_node_configs) == 1:
+                        current_node_config = current_node_configs[0]
+                        for key in new_config:
+                            changes = changes or getattr(current_node_config, key) != new_config[key]
+                changed_vpools[vpool.guid]['changes'] = changes
+
+                if changes is True:
+                    StorageDriverController._logger.info('Cluster registry settings for Vpool {0} needs to be updated'.format(vpool.guid))
+                    available_storagedrivers = []
+                    for sd in vpool.storagedrivers:
+                        storagerouter = sd.storagerouter
+                        try:
+                            SSHClient(storagerouter, username='root')
+                            with remote(storagerouter.ip, [LocalStorageRouterClient]) as rem:
+                                sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
+                                if Configuration.exists(sd_key) is True:
+                                    path = Configuration.get_configuration_path(sd_key)
+                                    lsrc = rem.LocalStorageRouterClient(path)
+                                    lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
+                                    available_storagedrivers.append(sd)
+                        except UnableToConnectException:
+                            StorageDriverController._logger.warning('StorageRouter {0} not available.'.format(storagerouter.name))
+                        except Exception as ex:
+                            if 'ClusterNotReachableException' in str(ex):
+                                StorageDriverController._logger.warning('StorageDriver {0} on StorageRouter {1} not available.'.format(
+                                    sd.guid, storagerouter.name
+                                ))
+                            else:
+                                StorageDriverController._logger.exception('Got exception when validating StorageDriver {0} on StorageRouter {1}.'.format(
+                                    sd.guid, storagerouter.name
+                                ))
+
+                    StorageDriverController._logger.info('Updating cluster node configs for VPool {0}'.format(vpool.guid))
+                    vpool.clusterregistry_client.set_node_configs(node_configs)
+                    srclient = StorageDriverClient.load(vpool)
+                    for sd in available_storagedrivers:
+                        StorageDriverController._logger.info('Trigger config reload for StorageDriver {0}'.format(sd.guid))
+                        srclient.update_cluster_node_configs(str(sd.storagedriver_id))
+                    StorageDriverController._logger.info('Updating cluster node configs for Vpool {0} completed'.format(vpool.guid))
+                else:
+                    StorageDriverController._logger.info('Cluster registry settings for Vpool {0} is up to date'.format(vpool.guid))
+            except Exception as ex:
                 StorageDriverController._logger.exception('Got exception when validating cluster registry settings for Vpool {0}.'.format(vpool.name))
+                changed_vpools[vpool.guid]['success'] = False
+                changed_vpools[vpool.guid]['error'] = ex.message
+        return changed_vpools
 
     @staticmethod
     @add_hooks('setup', 'demote')

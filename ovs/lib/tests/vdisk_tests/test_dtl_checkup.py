@@ -29,10 +29,10 @@ from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.services.tests.upstart import Upstart
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, DTLMode
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
-from volumedriver.storagerouter.storagerouterclient import DTLConfig, DTLConfigMode, DTLMode
 
 
 class DTLCheckup(unittest.TestCase):

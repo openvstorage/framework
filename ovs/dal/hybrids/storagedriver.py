@@ -32,6 +32,8 @@ class StorageDriver(DataObject):
     The StorageDriver class represents a Storage Driver. A Storage Driver is an application
     on a Storage Router to which the vDisks connect. The Storage Driver is the gateway to the Storage Backend.
     """
+    DISTANCES = DataObject.enumerator('Distance', {'NEAR': 0, 'FAR': 10000, 'INFINITE': 20000})
+
     _logger = LogHandler.get('dal', name='hybrid')
 
     __properties = [Property('name', str, doc='Name of the Storage Driver.'),
@@ -199,15 +201,15 @@ class StorageDriver(DataObject):
             if sd.guid == self.guid:
                 continue
             if len(primary_domains) == 0:
-                distance_map[str(sd.storagedriver_id)] = 0
+                distance_map[str(sd.storagedriver_id)] = StorageDriver.DISTANCES.NEAR
             else:
-                distance = 20000
+                distance = StorageDriver.DISTANCES.INFINITE
                 for junction in sd.storagerouter.domains:
                     if junction.backup is False:
                         if junction.domain_guid in secondary_domains:
-                            distance = min(distance, 10000)
+                            distance = min(distance, StorageDriver.DISTANCES.FAR)
                         if junction.domain_guid in primary_domains:
-                            distance = min(distance, 0)
+                            distance = min(distance, StorageDriver.DISTANCES.NEAR)
                 distance_map[str(sd.storagedriver_id)] = distance
         return {'vrouter_id': self.storagedriver_id,
                 'host': self.storage_ip,
@@ -220,12 +222,3 @@ class StorageDriver(DataObject):
                                                              self.storage_ip,
                                                              self.ports['edge']),
                 'node_distance_map': distance_map}
-
-    def reload_client(self, client):
-        """
-        Reloads the StorageDriverClient or ObjectRegistryClient
-        """
-        if self.vpool_guid:
-            self._frozen = False
-
-            self._frozen = True

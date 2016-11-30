@@ -22,8 +22,7 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration
-from volumedriver.storagerouter.storagerouterclient import ArakoonNodeConfig, ClusterRegistry
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration, ArakoonNodeConfig, ClusterRegistry
 
 
 class VPool(DataObject):
