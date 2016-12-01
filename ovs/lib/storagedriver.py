@@ -97,11 +97,14 @@ class StorageDriverController(object):
                     sd.invalidate_dynamics(['cluster_node_config'])
                     new_config = sd.cluster_node_config
                     node_configs.append(ClusterNodeConfig(**new_config))
-                    current_node_configs = [config for config in current_configs if config.vrouter_id == sd.storagedriver_id]
-                    if len(current_node_configs) == 1:
-                        current_node_config = current_node_configs[0]
-                        for key in new_config:
-                            changes = changes or getattr(current_node_config, key) != new_config[key]
+                    if changes is False:
+                        current_node_configs = [config for config in current_configs if config.vrouter_id == sd.storagedriver_id]
+                        if len(current_node_configs) == 1:
+                            current_node_config = current_node_configs[0]
+                            for key in new_config:
+                                if getattr(current_node_config, key) != new_config[key]:
+                                    changes = True
+                                    break
                 changed_vpools[vpool.guid]['changes'] = changes
 
                 if changes is True:
@@ -132,10 +135,9 @@ class StorageDriverController(object):
 
                     StorageDriverController._logger.info('Updating cluster node configs for VPool {0}'.format(vpool.guid))
                     vpool.clusterregistry_client.set_node_configs(node_configs)
-                    srclient = StorageDriverClient.load(vpool)
                     for sd in available_storagedrivers:
                         StorageDriverController._logger.info('Trigger config reload for StorageDriver {0}'.format(sd.guid))
-                        srclient.update_cluster_node_configs(str(sd.storagedriver_id))
+                        vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id))
                     StorageDriverController._logger.info('Updating cluster node configs for Vpool {0} completed'.format(vpool.guid))
                 else:
                     StorageDriverController._logger.info('Cluster registry settings for Vpool {0} is up to date'.format(vpool.guid))

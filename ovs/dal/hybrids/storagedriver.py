@@ -206,10 +206,11 @@ class StorageDriver(DataObject):
                 distance = StorageDriver.DISTANCES.INFINITE
                 for junction in sd.storagerouter.domains:
                     if junction.backup is False:
-                        if junction.domain_guid in secondary_domains:
-                            distance = min(distance, StorageDriver.DISTANCES.FAR)
                         if junction.domain_guid in primary_domains:
                             distance = min(distance, StorageDriver.DISTANCES.NEAR)
+                            break  # We can break here since we reached the minimum distance
+                        elif junction.domain_guid in secondary_domains:
+                            distance = min(distance, StorageDriver.DISTANCES.FAR)
                 distance_map[str(sd.storagedriver_id)] = distance
         return {'vrouter_id': self.storagedriver_id,
                 'host': self.storage_ip,
