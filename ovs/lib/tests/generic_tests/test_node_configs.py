@@ -59,6 +59,7 @@ class NodeConfigTest(unittest.TestCase):
         # Cleaning storage
         self.volatile.clean()
         self.persistent.clean()
+        self.maxDiff = None
         StorageRouterClient.clean()
 
     @classmethod

@@ -50,7 +50,7 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient, ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient, ClusterNodeConfig, LocalStorageRouterClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks, ensure_single
@@ -472,10 +472,8 @@ class StorageRouterController(object):
         config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
         config.load_config()
         arakoon_nodes = []
-        arakoon_node_configs = []
         for node in config.nodes:
             arakoon_nodes.append({'node_id': node.name, 'host': node.ip, 'port': node.client_port})
-            arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
         node_configs = []
         for existing_storagedriver in StorageDriverList.get_storagedrivers():
             if existing_storagedriver.vpool_guid == vpool.guid:
@@ -485,8 +483,7 @@ class StorageRouterController(object):
         node_configs.append(ClusterNodeConfig(**storagedriver.cluster_node_config))
 
         try:
-            vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
-            vrouter_clusterregistry.set_node_configs(node_configs)
+            vpool.clusterregistry_client.set_node_configs(node_configs)
         except:
             vpool.status = VPool.STATUSES.FAILURE
             vpool.save()
@@ -820,11 +817,10 @@ class StorageRouterController(object):
                 storagedriver_config.save(node_client)
 
         # Everything's reconfigured, refresh new cluster configuration
-        sd_client = StorageDriverClient.load(vpool)
         for current_storagedriver in vpool.storagedrivers:
             if current_storagedriver.storagerouter.ip not in ip_client_map:
                 continue
-            sd_client.update_cluster_node_configs(str(current_storagedriver.storagedriver_id))
+            vpool.storagedriver_client.update_cluster_node_configs(str(current_storagedriver.storagedriver_id))
 
         # Fill vPool size
         with remote(root_client.ip, [os], 'root') as rem:
@@ -962,18 +958,6 @@ class StorageRouterController(object):
                     except Exception:
                         StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed'.format(storage_driver.guid, vdisk.guid, vdisk.name))
 
-        arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
-        config.load_config()
-        arakoon_node_configs = []
-        offline_node_ips = [sr.ip for sr in storage_routers_offline]
-        for node in config.nodes:
-            if node.ip in offline_node_ips or (node.ip == storage_router.ip and storage_router_online is False):
-                continue
-            arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
-        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Arakoon node configs - \n{1}'.format(storage_driver.guid, '\n'.join([str(config) for config in arakoon_node_configs])))
-        vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
-
         # Disable and stop DTL, voldrv and albaproxy services
         if storage_router_online is True:
             dtl_service = 'dtl_{0}'.format(vpool.name)
@@ -1027,7 +1011,7 @@ class StorageRouterController(object):
                                 raise
 
                     # noinspection PyArgumentList
-                    vrouter_clusterregistry.erase_node_configs()
+                    vpool.clusterregistry_client.erase_node_configs()
                 except RuntimeError:
                     StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs failed'.format(storage_driver.guid))
                     errors_found = True
@@ -1050,12 +1034,11 @@ class StorageRouterController(object):
                     if sd != storage_driver:
                         node_configs.append(ClusterNodeConfig(**sd.cluster_node_config))
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Node configs - \n{1}'.format(storage_driver.guid, '\n'.join([str(config) for config in node_configs])))
-                vrouter_clusterregistry.set_node_configs(node_configs)
-                srclient = StorageDriverClient.load(vpool)
+                vpool.clusterregistry_client.set_node_configs(node_configs)
                 for sd in available_storage_drivers:
                     if sd != storage_driver:
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Driver {1} {2} - Updating cluster node configs'.format(storage_driver.guid, sd.guid, sd.name))
-                        srclient.update_cluster_node_configs(str(sd.storagedriver_id))
+                        vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id))
         except Exception:
             StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Reconfiguring volumedriver arakoon cluster failed'.format(storage_driver.guid))
             errors_found = True
