@@ -18,44 +18,84 @@
 Rpm Package module
 """
 import time
+from subprocess import check_output, CalledProcessError
 from ovs.log.log_handler import LogHandler
-from subprocess import check_output
-from subprocess import CalledProcessError
 
 
 class RpmPackage(object):
     """
     Contains all logic related to Rpm packages (used in e.g. Centos)
     """
-    _logger = LogHandler.get('lib', name='packager')
-    OVS_PACKAGE_NAMES = ['openvstorage', 'openvstorage-core', 'openvstorage-webapps', 'openvstorage-sdm',
-                         'openvstorage-backend', 'openvstorage-backend-core', 'openvstorage-backend-webapps', 'openvstorage-cinder-plugin',
-                         'volumedriver-server', 'volumedriver-base', 'volumedriver-no-dedup-server', 'volumedriver-no-dedup-base',
-                         'alba', 'arakoon']
+    _logger = LogHandler.get('lib', name='package-manager-rpm')
 
     @staticmethod
-    def _get_version(package_name, client):
-        command = "yum info {0} | grep Version | cut -d ':' -f 2 || true".format(package_name)
-        if client is None:
-            return check_output(command, shell=True).strip()
-        return client.run(command, allow_insecure=True).strip()
-
-    @staticmethod
-    def get_versions(client):
+    def get_installed_versions(client=None, package_names=None):
+        """
+        Retrieve currently installed versions of all packages
+        :param client: Client on which to check the installed versions
+        :type client: SSHClient
+        :param package_names: Name of the packages to check
+        :type package_names: list
+        :return: Package installed versions
+        :rtype: dict
+        """
         versions = {}
-        for package_name in RpmPackage.OVS_PACKAGE_NAMES:
-            version_info = RpmPackage._get_version(package_name, client)
+        if package_names is None:
+            package_names = RpmPackage.OVS_PACKAGE_NAMES
+        for package_name in package_names:
+            command = "yum info '{0}' | grep Version | cut -d ':' -f 2 || true".format(package_name.replace(r"'", r"'\''"))
+            if client is None:
+                version_info = check_output(command, shell=True).strip()
+            else:
+                version_info = client.run(command, allow_insecure=True).strip()
             if version_info:
                 versions[package_name] = version_info
         return versions
 
     @staticmethod
-    def install(package_name, client, force=False):
-        _ = force
+    def get_candidate_versions(client, package_names):
+        """
+        Retrieve the versions candidate for installation of all packages
+        :param client: Root client on which to check the candidate versions
+        :type client: SSHClient
+        :param package_names: Name of the packages to check
+        :type package_names: list
+        :return: Package candidate versions
+        :rtype: dict
+        """
+        RpmPackage.update(client=client)
+        versions = {}
+        for package_name in package_names:
+            installed = None
+            candidate = None
+            versions[package_name] = ''
+            for line in client.run(['yum', 'list', package_name]).splitlines():
+                if line.startswith(package_name):
+                    version = line.split()
+                    if len(version) > 1:
+                        if installed is None:
+                            candidate = version[1]
+                        else:
+                            candidate = version[1]
+            versions[package_name] = candidate
+        return versions
+
+    @staticmethod
+    def install(package_name, client):
+        """
+        Install the specified package
+        :param package_name: Name of the package to install
+        :type package_name: str
+        :param client: Root client on which to execute the installation of the package
+        :type client: SSHClient
+        :return: None
+        """
+        if client.username != 'root':
+            raise RuntimeError('Only the "root" user can install packages')
+
         counter = 0
         max_counter = 3
         while counter < max_counter:
-            counter += 1
             try:
                 client.run(['yum', 'update', '-y', package_name])
                 break
@@ -66,10 +106,19 @@ class RpmPackage(object):
                     raise cpe
             except Exception as ex:
                 raise ex
+            counter += 1
             time.sleep(1)
 
     @staticmethod
     def update(client):
+        """
+        Run the 'yum check-update' command on the specified node to update the package information
+        :param client: Root client on which to update the package information
+        :type client: SSHClient
+        :return: None
+        """
+        if client.username != 'root':
+            raise RuntimeError('Only the "root" user can update packages')
         try:
             client.run(['yum', 'check-update'])
         except CalledProcessError as cpe:
@@ -77,40 +126,3 @@ class RpmPackage(object):
             if cpe.returncode != 100:
                 RpmPackage._logger.error('Update failed. Error: {0}'.format(cpe.output))
                 raise cpe
-
-    @staticmethod
-    def verify_update_required(packages, services, client):
-        services_checked = []
-        update_info = {'version': '',
-                       'packages': [],
-                       'services': []}
-        for package_name in packages:
-            installed = None
-            candidate = None
-            for line in client.run(['yum', 'list', package_name]).splitlines():
-                if line.startswith(package_name):
-                    version = line.split()
-                    if len(version) > 1:
-                        if not installed:
-                            installed = version[1]
-                        else:
-                            candidate = version[1]
-
-                if installed is not None and candidate is not None:
-                    break
-
-            if candidate is not None and candidate != installed:
-                update_info['packages'].append(package_name)
-                update_info['services'] = services
-                update_info['version'] = candidate
-            else:
-                for service in services:
-                    if service in services_checked:
-                        continue
-                    services_checked.append(service)
-                    if client.file_exists('/opt/OpenvStorage/run/{0}.version'.format(service)):
-                        running_version = client.file_read('/opt/OpenvStorage/run/{0}.version'.format(service)).strip()
-                        if candidate is not None and running_version not in candidate:
-                            update_info['services'].append(service)
-                            update_info['version'] = candidate
-        return update_info

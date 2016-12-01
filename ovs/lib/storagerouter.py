@@ -41,7 +41,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.api.client import OVSClient
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.remote import remote
@@ -53,7 +53,7 @@ from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient, ClusterNodeConfig, LocalStorageRouterClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
-from ovs.lib.helpers.decorators import add_hooks, ensure_single
+from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
@@ -1156,7 +1156,7 @@ class StorageRouterController(object):
         """
         client = SSHClient(StorageRouter(storagerouter_guid))
         return {'storagerouter_guid': storagerouter_guid,
-                'versions': PackageManager.get_versions(client)}
+                'versions': PackageManager.get_installed_versions(client)}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_support_info')
@@ -1253,213 +1253,6 @@ class StorageRouterController(object):
         """
         client = SSHClient(StorageRouter(storagerouter_guid))
         return client.dir_exists(directory='/mnt/{0}'.format(name))
-
-    @staticmethod
-    @celery.task(name='ovs.storagerouter.get_update_status')
-    def get_update_status(storagerouter_ip):
-        """
-        Checks for new updates
-        :param storagerouter_ip: IP of the Storage Router to check for updates
-        :type storagerouter_ip: str
-        :return: Update status for specified storage router
-        :rtype: dict
-        """
-        # Check plugin requirements
-        root_client = SSHClient(storagerouter_ip,
-                                username='root')
-        required_plugin_params = {'name': (str, None),             # Name of a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
-                                  'version': (str, None),          # Available version to be installed
-                                  'namespace': (str, None),        # Name of the plugin and is used for translation in html. Eg: ALBA:packages.sdm
-                                  'services': (list, str),         # Services which the plugin depends upon and should be stopped during update
-                                  'packages': (list, str),         # Packages which contain the plugin code and should be updated
-                                  'downtime': (list, tuple),       # Information about crucial services which will go down during the update
-                                  'prerequisites': (list, tuple)}  # Information about prerequisites which are unmet (eg running vms for storage driver update)
-        package_map = {}
-        plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
-        for function in plugin_functions:
-            output = function(root_client)
-            if not isinstance(output, dict):
-                raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
-
-            for key, value in output.iteritems():
-                for out in value:
-                    Toolbox.verify_required_params(required_plugin_params, out)
-                if key not in package_map:
-                    package_map[key] = []
-                package_map[key] += value
-
-        # Update apt (only our ovs apt repo)
-        PackageManager.update(client=root_client)
-
-        # Compare installed and candidate versions
-        return_value = {'upgrade_ongoing': os.path.exists('/etc/upgrade_ongoing')}
-        for gui_name, package_information in package_map.iteritems():
-            return_value[gui_name] = []
-            for package_info in package_information:
-                version = package_info['version']
-                if version:
-                    gui_down = 'watcher-framework' in package_info['services'] or 'nginx' in package_info['services']
-                    info_added = False
-                    for index, item in enumerate(return_value[gui_name]):
-                        if item['name'] == package_info['name']:
-                            return_value[gui_name][index]['downtime'].extend(package_info['downtime'])
-                            info_added = True
-                            if gui_down is True and return_value[gui_name][index]['gui_down'] is False:
-                                return_value[gui_name][index]['gui_down'] = True
-                    if info_added is False:  # Some plugins can have same package dependencies as core and we only want to show each package once in GUI (Eg: Arakoon for core and ALBA)
-                        return_value[gui_name].append({'to': version,
-                                                       'name': package_info['name'],
-                                                       'gui_down': gui_down,
-                                                       'downtime': package_info['downtime'],
-                                                       'namespace': package_info['namespace'],
-                                                       'prerequisites': package_info['prerequisites']})
-        return return_value
-
-    @staticmethod
-    @add_hooks('update', 'metadata')
-    def get_metadata_framework(client):
-        """
-        Retrieve packages and services on which the framework depends
-        :param client: SSHClient on which to retrieve the metadata
-        :type client: SSHClient
-        :return: List of dictionaries which contain services to restart,
-                                                    packages to update,
-                                                    information about potential downtime
-                                                    information about unmet prerequisites
-        :rtype: list
-        """
-        this_sr = StorageRouterList.get_by_ip(client.ip)
-        srs = StorageRouterList.get_storagerouters()
-        downtime = []
-        fwk_cluster_name = Configuration.get('/ovs/framework/arakoon_clusters|ovsdb')
-        metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=fwk_cluster_name)
-        if metadata is None:
-            raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found None'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
-
-        if metadata['internal'] is True:
-            ovsdb_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == ServiceType.SERVICE_TYPES.ARAKOON and ser.name == 'arakoon-ovsdb']
-            downtime = [('ovs', 'ovsdb', None)] if len(ovsdb_cluster) < 3 and this_sr.guid in ovsdb_cluster else []
-
-        ovs_info = PackageManager.verify_update_required(packages=['openvstorage-core', 'openvstorage-webapps', 'openvstorage-cinder-plugin'],
-                                                         services=['watcher-framework', 'memcached'],
-                                                         client=client)
-        arakoon_info = PackageManager.verify_update_required(packages=['arakoon'],
-                                                             services=['arakoon-ovsdb'],
-                                                             client=client)
-
-        return {'framework': [{'name': 'ovs',
-                               'version': ovs_info['version'],
-                               'services': ovs_info['services'],
-                               'packages': ovs_info['packages'],
-                               'downtime': [],
-                               'namespace': 'ovs',
-                               'prerequisites': []},
-                              {'name': 'arakoon',
-                               'version': arakoon_info['version'],
-                               'services': arakoon_info['services'],
-                               'packages': arakoon_info['packages'],
-                               'downtime': downtime,
-                               'namespace': 'ovs',
-                               'prerequisites': []}]}
-
-    @staticmethod
-    @add_hooks('update', 'metadata')
-    def get_metadata_volumedriver(client):
-        """
-        Retrieve packages and services on which the volumedriver depends
-        :param client: SSHClient on which to retrieve the metadata
-        :type client: SSHClient
-        :return: List of dictionaries which contain services to restart,
-                                                    packages to update,
-                                                    information about potential downtime
-                                                    information about unmet prerequisites
-        :rtype: list
-        """
-        srs = StorageRouterList.get_storagerouters()
-        this_sr = StorageRouterList.get_by_ip(client.ip)
-        downtime = []
-        key = '/ovs/framework/arakoon_clusters|voldrv'
-        if Configuration.exists(key):
-            sd_cluster_name = Configuration.get(key)
-            metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=sd_cluster_name)
-            if metadata is None:
-                raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found None'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
-
-            if metadata['internal'] is True:
-                voldrv_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == ServiceType.SERVICE_TYPES.ARAKOON and ser.name == 'arakoon-voldrv']
-                downtime = [('ovs', 'voldrv', None)] if len(voldrv_cluster) < 3 and this_sr.guid in voldrv_cluster else []
-
-        alba_proxies = []
-        alba_downtime = []
-        for sr in srs:
-            for service in sr.services:
-                if service.type.name == ServiceType.SERVICE_TYPES.ALBA_PROXY and service.storagerouter_guid == this_sr.guid:
-                    alba_proxies.append(service.alba_proxy)
-                    alba_downtime.append(('ovs', 'proxy', service.alba_proxy.storagedriver.vpool.name))
-
-        prerequisites = []
-        volumedriver_services = ['ovs-volumedriver_{0}'.format(sd.vpool.name)
-                                 for sd in this_sr.storagedrivers]
-        volumedriver_services.extend(['ovs-dtl_{0}'.format(sd.vpool.name)
-                                      for sd in this_sr.storagedrivers])
-        voldrv_info = PackageManager.verify_update_required(packages=['volumedriver-base', 'volumedriver-server',
-                                                                      'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server'],
-                                                            services=volumedriver_services,
-                                                            client=client)
-        alba_info = PackageManager.verify_update_required(packages=['alba'],
-                                                          services=[service.service.name for service in alba_proxies],
-                                                          client=client)
-        arakoon_info = PackageManager.verify_update_required(packages=['arakoon'],
-                                                             services=['arakoon-voldrv'],
-                                                             client=client)
-
-        return {'volumedriver': [{'name': 'volumedriver',
-                                  'version': voldrv_info['version'],
-                                  'services': voldrv_info['services'],
-                                  'packages': voldrv_info['packages'],
-                                  'downtime': alba_downtime,
-                                  'namespace': 'ovs',
-                                  'prerequisites': prerequisites},
-                                 {'name': 'alba',
-                                  'version': alba_info['version'],
-                                  'services': alba_info['services'],
-                                  'packages': alba_info['packages'],
-                                  'downtime': alba_downtime,
-                                  'namespace': 'ovs',
-                                  'prerequisites': prerequisites},
-                                 {'name': 'arakoon',
-                                  'version': arakoon_info['version'],
-                                  'services': arakoon_info['services'],
-                                  'packages': arakoon_info['packages'],
-                                  'downtime': downtime,
-                                  'namespace': 'ovs',
-                                  'prerequisites': []}]}
-
-    @staticmethod
-    @celery.task(name='ovs.storagerouter.update_framework')
-    def update_framework(storagerouter_ip):
-        """
-        Launch the update_framework method in setup.py
-        :param storagerouter_ip: IP of the Storage Router to update the framework packages on
-        :type storagerouter_ip: str
-        :return: None
-        """
-        root_client = SSHClient(storagerouter_ip,
-                                username='root')
-        root_client.run(['ovs', 'update', 'framework'])
-
-    @staticmethod
-    @celery.task(name='ovs.storagerouter.update_volumedriver')
-    def update_volumedriver(storagerouter_ip):
-        """
-        Launch the update_volumedriver method in setup.py
-        :param storagerouter_ip: IP of the Storage Router to update the volumedriver packages on
-        :type storagerouter_ip: str
-        :return: None
-        """
-        root_client = SSHClient(storagerouter_ip,
-                                username='root')
-        root_client.run(['ovs', 'update', 'volumedriver'])
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.refresh_hardware')

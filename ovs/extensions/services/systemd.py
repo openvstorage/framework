@@ -135,6 +135,9 @@ class Systemd(object):
         :return: None
         """
         name = Systemd._get_name(name, client)
+        run_file_name = '/opt/OpenvStorage/run/{0}.version'.format(Toolbox.remove_prefix(name, 'ovs-'))
+        if client.file_exists(run_file_name):
+            client.file_delete(run_file_name)
         try:
             client.run(['systemctl', 'disable', '{0}.service'.format(name)])
         except CalledProcessError:
@@ -156,6 +159,11 @@ class Systemd(object):
         status, output = Systemd.get_service_status(name, client)
         if status is True:
             return output
+        try:
+            # When service files have been adjusted, a reload is required for these changes to take effect
+            client.run(['systemctl', 'daemon-reload'])
+        except CalledProcessError:
+            pass
         try:
             name = Systemd._get_name(name, client)
             output = client.run(['systemctl', 'start', '{0}.service'.format(name)])
@@ -197,6 +205,11 @@ class Systemd(object):
         :return: The output of the restart command
         :rtype: str
         """
+        try:
+            # When service files have been adjusted, a reload is required for these changes to take effect
+            client.run(['systemctl', 'daemon-reload'])
+        except CalledProcessError:
+            pass
         try:
             name = Systemd._get_name(name, client)
             output = client.run(['systemctl', 'restart', '{0}.service'.format(name)])

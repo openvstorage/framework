@@ -441,8 +441,10 @@ define(['jquery', 'jqp/pnotify'], function($) {
         var date = new Date(timestamp * 1000);
         return date.toLocaleTimeString();
     }
-    function arrayFilterUnique(value, index, array) {
-        return array.indexOf(value) === index;
+    function arrayFilterUnique(array) {
+        return array.filter(function(item, pos, self) {
+            return self.indexOf(item) == pos;
+        });
     }
     function getHash(length) {
         if (length === undefined) {
