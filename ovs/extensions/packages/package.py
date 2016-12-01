@@ -17,19 +17,20 @@
 """
 Package Factory module
 """
-
+import os
 from subprocess import check_output
 from ovs.extensions.packages.debian import DebianPackage
 from ovs.extensions.packages.rpm import RpmPackage
-from ovs.log.log_handler import LogHandler
 
 
 class PackageManager(object):
     """
     Factory class returning specialized classes
     """
-    _logger = LogHandler.get('extensions', name='packagemanager')
     ImplementationClass = None
+    OVS_PACKAGE_NAMES = ['alba', 'arakoon',
+                         'openvstorage', 'openvstorage-backend', 'openvstorage-sdm',
+                         'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server']
 
     class MetaClass(type):
         """
@@ -42,19 +43,22 @@ class PackageManager(object):
             """
             _ = cls
             if PackageManager.ImplementationClass is None:
-                try:
+                distributor = None
+                check_lsb = check_output('which lsb_release 2>&1 || true', shell=True).strip()
+                if "no lsb_release in" in check_lsb:
+                    if os.path.exists('/etc/centos-release'):
+                        distributor = 'CentOS'
+                else:
                     distributor = check_output('lsb_release -i', shell=True)
                     distributor = distributor.replace('Distributor ID:', '').strip()
-                    # All *Package classes used in below code should share the exact same interface!
-                    if distributor in ['Ubuntu']:
-                        PackageManager.ImplementationClass = DebianPackage
-                    elif distributor in ['CentOS']:
-                        PackageManager.ImplementationClass = RpmPackage
-                    else:
-                        raise RuntimeError('There is no handler for Distributor ID: {0}'.format(distributor))
-                except Exception as ex:
-                    PackageManager._logger.exception('Error loading Distributor ID: {0}'.format(ex))
-                    raise
+                # All *Package classes used in below code should share the exact same interface!
+                if distributor in ['Ubuntu']:
+                    PackageManager.ImplementationClass = DebianPackage
+                elif distributor in ['CentOS']:
+                    PackageManager.ImplementationClass = RpmPackage
+                else:
+                    raise RuntimeError('There is no handler for Distributor ID: {0}'.format(distributor))
+                PackageManager.ImplementationClass.OVS_PACKAGE_NAMES = PackageManager.OVS_PACKAGE_NAMES
             return getattr(PackageManager.ImplementationClass, item)
 
     __metaclass__ = MetaClass

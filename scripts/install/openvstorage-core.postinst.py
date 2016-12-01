@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     # TODO: set owner:group only where it is really needed
     check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
-    # Cleanup *.pyc files to make sure that on upgrade old obsolete pyc files are removed
+    # Cleanup *.pyc files to make sure that on update old obsolete pyc files are removed
     check_output('find /opt/OpenvStorage -name *.pyc -exec rm -f {} \;', shell=True)
 
     # Configure logging

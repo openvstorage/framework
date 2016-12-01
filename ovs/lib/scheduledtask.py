@@ -42,7 +42,7 @@ from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
 from ovs.lib.helpers.decorators import ensure_single
-from ovs.lib.helpers.toolbox import Schedule
+from ovs.lib.helpers.toolbox import Schedule, Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
@@ -479,3 +479,56 @@ class ScheduledTaskController(object):
                 ScheduledTaskController._logger.error('  Could not collapse any cluster on {0} (not reachable)'.format(storagerouter.name))
 
         ScheduledTaskController._logger.info('Arakoon collapse finished')
+
+    @staticmethod
+    @celery.task(name='ovs.scheduled.refresh_package_information', schedule=Schedule(minute='10', hour='*'))
+    @ensure_single(task_name='ovs.scheduled.refresh_package_information', mode='DEDUPED')
+    def refresh_package_information():
+        """
+        Retrieve and store the package information of all StorageRouters
+        :return: None
+        """
+        ScheduledTaskController._logger.info('Updating package information')
+        threads = []
+        information = {}
+        all_storagerouters = StorageRouterList.get_storagerouters()
+        for storagerouter in all_storagerouters:
+            information[storagerouter.ip] = {}
+            try:
+                client = SSHClient(endpoint=storagerouter, username='root')
+            except UnableToConnectException:
+                ScheduledTaskController._logger.warning('StorageRouter {0} with IP {1} is inaccessible'.format(storagerouter.name, storagerouter.ip))
+                continue
+
+            for function in Toolbox.fetch_hooks('update', 'get_package_info_multi'):
+                thread = Thread(target=function,
+                                args=(client, information))
+                thread.start()
+                threads.append(thread)
+
+        for function in Toolbox.fetch_hooks('update', 'get_package_info_single'):
+            thread = Thread(target=function,
+                            args=(information,))
+            thread.start()
+            threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
+        errors = []
+        copy_information = copy.deepcopy(information)
+        for ip, info in information.iteritems():
+            if len(info.get('errors', [])) > 0:
+                errors.extend(['{0}: {1}'.format(ip, error) for error in info['errors']])
+                copy_information.pop(ip)
+
+        for storagerouter in all_storagerouters:
+            info = copy_information.get(storagerouter.ip, {})
+            if 'errors' in info:
+                info.pop('errors')
+            storagerouter.package_information = info
+            storagerouter.save()
+
+        if len(errors) > 0:
+            errors = [str(error) for error in set(errors)]
+            raise Exception(' - {0}'.format('\n - '.join(errors)))

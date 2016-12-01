@@ -137,6 +137,9 @@ class Upstart(object):
         :return: None
         """
         name = Upstart._get_name(name, client)
+        run_file_name = '/opt/OpenvStorage/run/{0}.version'.format(Toolbox.remove_prefix(name, 'ovs-'))
+        if client.file_exists(run_file_name):
+            client.file_delete(run_file_name)
         client.file_delete('/etc/init/{0}.conf'.format(name))
 
     @staticmethod
