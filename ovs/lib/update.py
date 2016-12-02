@@ -554,7 +554,7 @@ class UpdateController(object):
                             function(package_info=packages_to_update)
                             UpdateController._logger.debug('{0}: Executed hook {1}'.format(local_ip, function.__name__))
                         except Exception as ex:
-                            UpdateController._logger.error('{0}: Package installation hook {1} failed with error: {2}'.format(local_ip, function.__name__, ex))
+                            UpdateController._logger.exception('{0}: Package installation hook {1} failed with error: {2}'.format(local_ip, function.__name__, ex))
                             failures = True
 
                 if failures is True:
@@ -617,7 +617,7 @@ class UpdateController(object):
                         function(client=client, components=components)
                         UpdateController._logger.debug('{0}: Executed hook {1}'.format(client.ip, function.__name__))
                     except Exception as ex:
-                        UpdateController._logger.error('{0}: Post update hook {1} failed with error: {2}'.format(client.ip, function.__name__, ex))
+                        UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(client.ip, function.__name__, ex))
 
             for function in Toolbox.fetch_hooks('update', 'post_update_single'):
                 try:
@@ -625,7 +625,7 @@ class UpdateController(object):
                     function(components=components)
                     UpdateController._logger.debug('{0}: Executed hook {1}'.format(local_ip, function.__name__))
                 except Exception as ex:
-                    UpdateController._logger.error('{0}: Post update hook {1} failed with error: {2}'.format(local_ip, function.__name__, ex))
+                    UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(local_ip, function.__name__, ex))
 
             # Start services
             UpdateController.change_services_state(services=services_stop_start,
@@ -637,7 +637,7 @@ class UpdateController(object):
         except NoLockAvailableException:
             UpdateController._logger.debug('Another update is currently in progress!')
         except Exception as ex:
-            UpdateController._logger.error('Error during update: {0}'.format(ex))
+            UpdateController._logger.exception('Error during update: {0}'.format(ex))
             UpdateController._recover_from_failed_update(local_client_ip=local_ip,
                                                          ssh_clients=ssh_clients,
                                                          services_to_start_again=services_stop_start)
