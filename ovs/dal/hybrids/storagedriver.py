@@ -32,6 +32,8 @@ class StorageDriver(DataObject):
     The StorageDriver class represents a Storage Driver. A Storage Driver is an application
     on a Storage Router to which the vDisks connect. The Storage Driver is the gateway to the Storage Backend.
     """
+    DISTANCES = DataObject.enumerator('Distance', {'NEAR': 0, 'FAR': 10000, 'INFINITE': 20000})
+
     _logger = LogHandler.get('dal', name='hybrid')
 
     __properties = [Property('name', str, doc='Name of the Storage Driver.'),
@@ -187,6 +189,29 @@ class StorageDriver(DataObject):
         """
         from ovs.extensions.generic.configuration import Configuration
         rdma = Configuration.get('/ovs/framework/rdma')
+        distance_map = {}
+        primary_domains = []
+        secondary_domains = []
+        for junction in self.storagerouter.domains:
+            if junction.backup is False:
+                primary_domains.append(junction.domain_guid)
+            else:
+                secondary_domains.append(junction.domain_guid)
+        for sd in self.vpool.storagedrivers:
+            if sd.guid == self.guid:
+                continue
+            if len(primary_domains) == 0:
+                distance_map[str(sd.storagedriver_id)] = StorageDriver.DISTANCES.NEAR
+            else:
+                distance = StorageDriver.DISTANCES.INFINITE
+                for junction in sd.storagerouter.domains:
+                    if junction.backup is False:
+                        if junction.domain_guid in primary_domains:
+                            distance = min(distance, StorageDriver.DISTANCES.NEAR)
+                            break  # We can break here since we reached the minimum distance
+                        elif junction.domain_guid in secondary_domains:
+                            distance = min(distance, StorageDriver.DISTANCES.FAR)
+                distance_map[str(sd.storagedriver_id)] = distance
         return {'vrouter_id': self.storagedriver_id,
                 'host': self.storage_ip,
                 'message_port': self.ports['management'],
@@ -196,4 +221,5 @@ class StorageDriver(DataObject):
                 'failovercache_port': self.ports['dtl'],
                 'network_server_uri': '{0}://{1}:{2}'.format('rdma' if rdma else 'tcp',
                                                              self.storage_ip,
-                                                             self.ports['edge'])}
+                                                             self.ports['edge']),
+                'node_distance_map': distance_map}
