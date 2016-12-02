@@ -40,13 +40,12 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration, DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, SRCObjectNotFoundException
 from ovs.lib.helpers.decorators import ensure_single, log
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
-from volumedriver.storagerouter.storagerouterclient import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, ObjectNotFoundException as SRCObjectNotFoundException
 
 
 class VDiskController(object):

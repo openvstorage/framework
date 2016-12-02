@@ -36,13 +36,11 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.storageserver.storagedriver import MetadataServerClient
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import MetadataServerClient, StorageDriverConfiguration, MDSMetaDataBackendConfig, MDSNodeConfig, SRCObjectNotFoundException
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig, ObjectNotFoundException as SRCObjectNotFoundException
 
 
 class MDSServiceController(object):

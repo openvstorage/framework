@@ -26,11 +26,21 @@ from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import ClusterContact, DTLMode, MDSNodeConfig, ReadCacheBehaviour, ReadCacheMode, Statistics, VolumeInfo, Role
+from volumedriver.storagerouter.storagerouterclient import \
+    ClusterContact, ClusterNodeConfig, \
+    DTLConfig, DTLConfigMode, DTLMode, \
+    MDSMetaDataBackendConfig,  MDSNodeConfig, \
+    ObjectNotFoundException as SRCObjectNotFoundException, \
+    ReadCacheBehaviour, ReadCacheMode, \
+    Role, Statistics, VolumeInfo
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
-    from ovs.extensions.storageserver.tests.mockups import ArakoonNodeConfig, LocalStorageRouterClient, MDSClient, StorageRouterClient, ObjectRegistryClient as ORClient
+    from ovs.extensions.storageserver.tests.mockups import \
+        ArakoonNodeConfig, ClusterRegistry, LocalStorageRouterClient, \
+        MDSClient, ObjectRegistryClient as ORClient, StorageRouterClient
 else:
-    from volumedriver.storagerouter.storagerouterclient import ArakoonNodeConfig, LocalStorageRouterClient, MDSClient, StorageRouterClient, ObjectRegistryClient as ORClient
+    from volumedriver.storagerouter.storagerouterclient import \
+        ArakoonNodeConfig, ClusterRegistry, LocalStorageRouterClient, \
+        MDSClient, ObjectRegistryClient as ORClient, StorageRouterClient
 
 client_vpool_cache = {}
 oclient_vpool_cache = {}
