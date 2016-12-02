@@ -20,9 +20,7 @@ VPool module
 import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
-from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration, ArakoonNodeConfig, ClusterRegistry
+from ovs.extensions.storageserver.storagedriver import ClusterRegistryClient, StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration
 
 
 class VPool(DataObject):
@@ -157,11 +155,5 @@ class VPool(DataObject):
         elif client == 'objectregistry':
             self._objectregistry_client = ObjectRegistryClient.load(self)
         elif client == 'clusterregistry':
-            arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
-            config.load_config()
-            arakoon_node_configs = []
-            for node in config.nodes:
-                arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
-            self._clusterregistry_client = ClusterRegistry(str(self.guid), arakoon_cluster_name, arakoon_node_configs)
+            self._clusterregistry_client = ClusterRegistryClient.load(self)
         self._frozen = True

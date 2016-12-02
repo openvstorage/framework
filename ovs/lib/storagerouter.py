@@ -746,14 +746,13 @@ class StorageRouterController(object):
                                                        events_amqp_uris=queue_urls)
         storagedriver_config.configure_threadpool_component(num_threads=16)
         storagedriver_config.configure_network_interface(network_max_neighbour_distance=StorageDriver.DISTANCES.FAR - 1)
-        storagedriver_config.save(client, reload_config=False)
+        storagedriver_config.save(client)
 
         DiskController.sync_with_reality(storagerouter.guid)
 
         MDSServiceController.prepare_mds_service(storagerouter=storagerouter,
                                                  vpool=vpool,
-                                                 fresh_only=True,
-                                                 reload_config=False)
+                                                 fresh_only=True)
 
         ##################
         # START SERVICES #
@@ -898,9 +897,7 @@ class StorageRouterController(object):
                             StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Available Storage Driver for migration - {1}'.format(storage_driver.guid, sd.name))
                             available_storage_drivers.append(sd)
                         except Exception as ex:
-                            if 'ClusterNotReachableException' in str(ex):
-                                pass
-                            else:
+                            if 'ClusterNotReachableException' not in str(ex):
                                 raise
                 client = temp_client
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Router {1} with IP {2} is online'.format(storage_driver.guid, sr.name, sr.ip))

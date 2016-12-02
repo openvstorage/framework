@@ -44,6 +44,7 @@ else:
 
 client_vpool_cache = {}
 oclient_vpool_cache = {}
+crclient_vpool_cache = {}
 mdsclient_service_cache = {}
 
 
@@ -212,6 +213,38 @@ class MetadataServerClient(object):
         return mdsclient_service_cache[key]
 
 
+class ClusterRegistryClient(object):
+    """
+    Builds a CRClient
+    """
+    def __init__(self):
+        """
+        Dummy init method
+        """
+        pass
+
+    @staticmethod
+    def load(vpool):
+        """
+        Initializes the wrapper for a given vpool
+        :param vpool: vPool for which the ClusterRegistryClient needs to be loaded
+        """
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            return ClusterRegistry(str(vpool.guid), None, None)
+
+        key = vpool.identifier
+        if key not in crclient_vpool_cache:
+            arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
+            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
+            config.load_config()
+            arakoon_node_configs = []
+            for node in config.nodes:
+                arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
+            client = ClusterRegistry(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
+            crclient_vpool_cache[key] = client
+        return crclient_vpool_cache[key]
+
+
 class StorageDriverConfiguration(object):
     """
     StorageDriver configuration class
@@ -248,30 +281,44 @@ class StorageDriverConfiguration(object):
             self._logger.debug('Could not find config {0}, a new one will be created'.format(self.key))
         self.dirty_entries = []
 
-    def save(self, client=None, reload_config=True):
+    def save(self, client=None):
         """
         Saves the configuration to a given file, optionally a remote one
         :param client: If provided, save remote configuration
-        :param reload_config: Reload the running Storage Driver configuration
         """
         Configuration.set(self.key, json.dumps(self.configuration, indent=4), raw=True)
-        if self.config_type == 'storagedriver' and reload_config is True:
+        if self.config_type == 'storagedriver':
             if len(self.dirty_entries) > 0:
+                reloaded = False
+                changes = []
                 if client is None:
                     self._logger.info('Applying local storagedriver configuration changes')
-                    changes = LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path)
+                    try:
+                        changes = LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path)
+                        reloaded = True
+                    except Exception as ex:
+                        if 'ClusterNotReachableException' not in str(ex):
+                            raise
                 else:
                     self._logger.info('Applying storagedriver configuration changes on {0}'.format(client.ip))
-                    with remote(client.ip, [LocalStorageRouterClient]) as rem:
-                        changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
-                for change in changes:
-                    if change['param_name'] not in self.dirty_entries:
-                        raise RuntimeError('Unexpected configuration change: {0}'.format(change['param_name']))
-                    self._logger.info('Changed {0} from "{1}" to "{2}"'.format(change['param_name'], change['old_value'], change['new_value']))
-                    self.dirty_entries.remove(change['param_name'])
-                self._logger.info('Changes applied')
-                if len(self.dirty_entries) > 0:
-                    self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self.dirty_entries)))
+                    try:
+                        with remote(client.ip, [LocalStorageRouterClient]) as rem:
+                            changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
+                            reloaded = True
+                    except Exception as ex:
+                        if 'ClusterNotReachableException' not in str(ex):
+                            raise
+                if reloaded is True:
+                    for change in changes:
+                        if change['param_name'] not in self.dirty_entries:
+                            raise RuntimeError('Unexpected configuration change: {0}'.format(change['param_name']))
+                        self._logger.info('Changed {0} from "{1}" to "{2}"'.format(change['param_name'], change['old_value'], change['new_value']))
+                        self.dirty_entries.remove(change['param_name'])
+                    self._logger.info('Changes applied')
+                    if len(self.dirty_entries) > 0:
+                        self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self.dirty_entries)))
+                else:
+                    self._logger.warning('Changes were not applied since storagedriver is unavailable')
             else:
                 self._logger.debug('No need to apply changes, nothing changed')
         self.is_new = False
