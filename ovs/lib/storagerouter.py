@@ -657,6 +657,7 @@ class StorageRouterController(object):
                 'manifest_cache_size': manifest_cache_size,
                 'fragment_cache': ['none'],
                 'transport': 'tcp',
+                'read_preference': read_preferences,
                 'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
             }, indent=4), raw=True)
 
@@ -1015,7 +1016,6 @@ class StorageRouterController(object):
                             storagedriver_client.destroy_filesystem()
                         except RuntimeError as rte:
                             # If backend has already been deleted, we cannot delete the filesystem anymore --> storage leak!!!
-                            # @TODO: Find better way for catching this error
                             if 'MasterLookupResult.Error' not in rte.message:
                                 raise
 

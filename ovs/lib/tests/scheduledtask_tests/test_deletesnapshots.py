@@ -35,7 +35,7 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.vdisk import VDiskController
-from ovs.lib.scheduledtask import ScheduledTaskController
+from ovs.lib.generic import GenericController
 
 
 class DeleteSnapshots(unittest.TestCase):
@@ -188,7 +188,7 @@ class DeleteSnapshots(unittest.TestCase):
                                                       'machineguid': None})
 
         base_timestamp = self._make_timestamp(base, day * 2)
-        ScheduledTaskController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+        GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
         self.assertIn(base_snapshot_guid, [snap['guid'] for snap in vdisk_1_1.snapshots], 'Snapshot was deleted while there are still clones of it')
 
     def test_happypath(self):
@@ -252,7 +252,7 @@ class DeleteSnapshots(unittest.TestCase):
 
             # At the start of the day, delete snapshot policy runs at 00:30
             self._print_message('- Deleting snapshots')
-            ScheduledTaskController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
+            GenericController.delete_snapshots(timestamp=base_timestamp + (minute * 30))
 
             # Validate snapshots
             self._print_message('- Validating snapshots')

@@ -30,11 +30,10 @@ from ovs.dal.hybrids.domain import Domain
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.generic.system import System
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.disk import DiskController
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.lib.scheduledtask import ScheduledTaskController
+from ovs.lib.generic import GenericController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.update import UpdateController
@@ -578,7 +577,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Refresh the updates for all StorageRouters
         """
-        return ScheduledTaskController.refresh_package_information.delay()
+        return GenericController.refresh_package_information.delay()
 
     @link()
     @log()
