@@ -37,7 +37,7 @@ from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
-from ovs.lib.scheduledtask import ScheduledTaskController
+from ovs.lib.generic import GenericController
 from ovs.log.log_handler import LogHandler
 
 
@@ -61,7 +61,7 @@ class UpdateController(object):
     @add_hooks('update', 'get_package_info_multi')
     def get_package_information_core(client, package_info):
         """
-        Called by ScheduledTaskController.refresh_package_information() every hour
+        Called by GenericController.refresh_package_information() every hour
 
         Retrieve information about the currently installed versions of the core packages
         Retrieve information about the versions to which each package can potentially be updated
@@ -685,7 +685,7 @@ class UpdateController(object):
         counter = 1
         while counter < 6:
             try:
-                ScheduledTaskController.refresh_package_information()
+                GenericController.refresh_package_information()
                 return
             except NoLockAvailableException:
                 UpdateController._logger.debug('{0}: Attempt {1}: Could not refresh the update information, trying again'.format(local_ip, counter))

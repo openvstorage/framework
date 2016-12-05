@@ -1222,7 +1222,7 @@ class VDiskController(object):
         :type storagerouter_guid: str
         :return: None
         """
-        from ovs.lib.scheduledtask import ScheduledTaskController
+        from ovs.lib.generic import GenericController
 
         vdisk = VDisk(vdisk_guid)
         storagerouter = StorageRouter(storagerouter_guid)
@@ -1235,7 +1235,7 @@ class VDiskController(object):
         scrub_info = {'scrub_path': str(partition.folder),
                       'storage_router': storagerouter}
         error_messages = []
-        ScheduledTaskController.execute_scrub_work(queue, vdisk.vpool, scrub_info, error_messages)
+        GenericController.execute_scrub_work(queue, vdisk.vpool, scrub_info, error_messages)
         if len(error_messages) > 0:
             raise RuntimeError('Error when scrubbing vDisk {0}:\n- {1}'.format(vdisk.guid, '\n- '.join(error_messages)))
 

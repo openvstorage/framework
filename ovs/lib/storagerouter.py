@@ -379,6 +379,7 @@ class StorageRouterController(object):
             metadata_map['backend_aa_{0}'.format(storagerouter.guid)] = {'backend_info': backend_info_aa,
                                                                          'connection_info': connection_info_aa}
 
+        read_preferences = []
         fragment_cache_on_read = parameters['fragment_cache_on_read']
         fragment_cache_on_write = parameters['fragment_cache_on_write']
         for key, metadata in metadata_map.iteritems():
@@ -390,7 +391,7 @@ class StorageRouterController(object):
             alba_backend_guid = metadata['backend_info']['alba_backend_guid']
             arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(backend_guid=alba_backend_guid, ovs_client=ovs_client)
             try:
-                backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend'})
+                backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend,remote_stack'})
                 preset_info = dict((preset['name'], preset) for preset in backend_dict['presets'])
                 if preset_name not in preset_info:
                     raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_dict['name']))
@@ -401,6 +402,12 @@ class StorageRouterController(object):
                 vpool.status = VPool.STATUSES.FAILURE
                 vpool.save()
                 raise
+
+            # Calculate ALBA local read preference
+            if backend_dict['scaling'] == 'GLOBAL' and metadata['connection_info']['local'] is True:
+                for node_id, value in backend_dict['remote_stack'].iteritems():
+                    if value.get('domain') is not None and value['domain']['guid'] in storagerouter.regular_domains:
+                        read_preferences.append(node_id)
 
             policies = []
             for policy_info in preset_info[preset_name]['policies']:
@@ -640,6 +647,7 @@ class StorageRouterController(object):
                 'manifest_cache_size': manifest_cache_size,
                 'fragment_cache': fragment_cache_info,
                 'transport': 'tcp',
+                'read_preference': read_preferences,
                 'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
             }, indent=4), raw=True)
             Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({
@@ -649,6 +657,7 @@ class StorageRouterController(object):
                 'manifest_cache_size': manifest_cache_size,
                 'fragment_cache': ['none'],
                 'transport': 'tcp',
+                'read_preference': read_preferences,
                 'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
             }, indent=4), raw=True)
 
@@ -1003,7 +1012,6 @@ class StorageRouterController(object):
                             storagedriver_client.destroy_filesystem()
                         except RuntimeError as rte:
                             # If backend has already been deleted, we cannot delete the filesystem anymore --> storage leak!!!
-                            # @TODO: Find better way for catching this error
                             if 'MasterLookupResult.Error' not in rte.message:
                                 raise
 

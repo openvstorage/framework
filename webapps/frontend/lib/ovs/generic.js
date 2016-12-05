@@ -19,13 +19,6 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function getTimestamp() {
         return new Date().getTime();
     }
-    function buildString(value, times) {
-        var i, returnvalue = '';
-        for (i = 0; i < times; i += 1) {
-            returnvalue += value.toString();
-        }
-        return returnvalue;
-    }
     function deg2rad(deg) {
         return deg * Math.PI / 180;
     }
@@ -43,7 +36,11 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
 
         if (parts.length === 1) {
-            parts.push(buildString('0', decimals));
+            var i, newString = '';
+            for (i = 0; i < decimals; i += 1) {
+                newString += '0';
+            }
+            parts.push(newString);
         }
         while (parts[1].length < decimals) {
             parts[1] = parts[1] + '0';
@@ -86,23 +83,6 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.units.' + units[counter] + 's');
     }
-    function formatRatio(value) {
-        return setDecimals(round(value, 2), 2) + ' %';
-    }
-    function formatShort(value) {
-        var units, counter, returnValue;
-        units = ['k', 'm', 'g', 't'];
-        counter = 0;
-        while (value >= 1000) {
-            value = value / 1000;
-            counter += 1;
-        }
-        returnValue = setDecimals(round(value, 2), 2);
-        if (counter > 0) {
-            returnValue += ' ' + $.t('ovs:generic.units.' + units[counter - 1]);
-        }
-        return returnValue;
-    }
     function formatNumber(value) {
         if (value !== undefined) {
             value = round(value).toString();
@@ -121,12 +101,6 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function padRight(value, character, length) {
         while (value.length < length) {
             value += character;
-        }
-        return value;
-    }
-    function padLeft(value, character, length) {
-        while (value.length < length) {
-            value = character + value;
         }
         return value;
     }
@@ -152,8 +126,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         var data = {
             title: title,
             text: message,
-            nonblock: true,
-            delay: 3000
+            delay: 6000
         };
         if (type !== undefined) {
             data.type = type;
@@ -165,6 +138,9 @@ define(['jquery', 'jqp/pnotify'], function($) {
     }
     function alertSuccess(title, message) {
         return alert(title, message, 'success');
+    }
+    function alertWarning(title, message) {
+        return alert(title, message, 'notice');
     }
     function alertError(title, message) {
         return alert(title, message, 'error');
@@ -262,69 +238,6 @@ define(['jquery', 'jqp/pnotify'], function($) {
             }
         }
     }
-    function syncObservableArray(newArray, objectList, key, clean) {
-        var i, j, newKeyList = [], currentKeyList = [];
-        for (i = 0; i < objectList().length; i += 1) {
-            currentKeyList.push(objectList()[i].key);
-        }
-        for (i = 0; i < newArray.length; i += 1) {
-            newKeyList.push(newArray[i].key);
-        }
-        for (i = 0; i < newKeyList.length; i += 1) {
-            if ($.inArray(newKeyList[i], currentKeyList) === -1) {
-                // One of the new keys is not yet in our current key list. This means
-                // we'll have to load the object.
-                objectList.push(newArray[i]);
-            }
-        }
-        if (clean !== false) {
-            for (i = 0; i < currentKeyList.length; i += 1) {
-                if ($.inArray(currentKeyList[i], newKeyList) === -1) {
-                    // One of the existing keys is not in the new key list anymore. This means
-                    // we'll have to remove the object
-                    for (j = 0; j < objectList().length; j += 1) {
-                        if (objectList()[j].key === currentKeyList[i]) {
-                            objectList.splice(j, 1);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    function numberSort(itemA, itemB) {
-        if ((itemA === undefined || itemA === null) && (itemB !== undefined && itemB !== null)) {
-            return -1;
-        }
-        if ((itemA === undefined || itemA === null) && (itemB === undefined || itemB === null)) {
-            return 0;
-        }
-        if ((itemA !== undefined && itemA !== null) && (itemB === undefined || itemB === null)) {
-            return 1;
-        }
-        var regexAlpha = /[\d]+/g,
-        regexNumber = /[^\d]+/g,
-        partA = itemA.replace(regexAlpha, ''),
-        partB = itemB.replace(regexAlpha, '');
-        if (partA === partB) {
-            partA = parseInt(itemA.replace(regexNumber, ''), 10);
-            partB = parseInt(itemB.replace(regexNumber, ''), 10);
-            return partA === partB ? 0 : (partA > partB ? 1 : -1);
-        }
-        return partA > partB ? 1 : -1;
-    }
-    function advancedSort(list, properties) {
-        list.sort(function(a, b) {
-            var i, result;
-            for (i = 0; i < properties.length; i += 1) {
-                result = numberSort(a[properties[i]](), b[properties[i]]());
-                if (result !== 0) {
-                    return result;
-                }
-            }
-            return 0;
-        });
-    }
     function validate(nodes) {
         var i, node, check, checkAndRedirect;
         check = function(node) {
@@ -352,17 +265,6 @@ define(['jquery', 'jqp/pnotify'], function($) {
                     location.reload(true);
                 }, 5000);
             });
-    }
-    function overlap(array1, array2) {
-        var i, j;
-        for (i = 0; i < array1.length; i += 1) {
-            for (j = 0; j < array2.length; j += 1) {
-                if (array1[i] === array2[j]) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
     function merge(originalObject, newObject, targetObject, keys) {
         // If the target equals the original, the target wasn't updated, so it can updated with the new.
@@ -424,22 +326,6 @@ define(['jquery', 'jqp/pnotify'], function($) {
             }
         }
         return false;
-    }
-    function arrayIsIn(array1, array2) {
-        var i;
-        for (i = 0; i < array2.length; i += 1) {
-            if (arrayEquals(array1, array2[i])) {
-                return true;
-            }
-        }
-        return false;
-    }
-    function stringStartsWith(string1, string2) {
-        return string1.indexOf(string2) === 0;
-    }
-    function getLocalTime(timestamp) {
-        var date = new Date(timestamp * 1000);
-        return date.toLocaleTimeString();
     }
     function arrayFilterUnique(array) {
         return array.filter(function(item, pos, self) {
@@ -584,50 +470,41 @@ define(['jquery', 'jqp/pnotify'], function($) {
     Array.prototype.equals = function(array) {
         return arrayEquals(this, array);
     };
-    Array.prototype.nestedIn = function(array) {
-        return arrayIsIn(this, array);
-    };
     Array.prototype.contains = function(element) {
         return arrayHasElement(this, element);
     };
     Array.prototype.remove = function(element) {
         return removeElement(this, element);
     };
-    String.prototype.startsWith = function(searchString) {
-        return stringStartsWith(this, searchString);
-    };
 
     return {
-        advancedSort: advancedSort,
         alert: alert,
         alertError: alertError,
         alertInfo: alertInfo,
         alertSuccess: alertSuccess,
+        alertWarning: alertWarning,
         arrayFilterUnique: arrayFilterUnique,
         arrayHasElementWithProperty: arrayHasElementWithProperty,
-        buildString: buildString,
         ceil: ceil,
         cleanDeviceName: cleanDeviceName,
         crossFiller: crossFiller,
         deg2rad: deg2rad,
+        extract: extract,
         extractErrorMessage: extractErrorMessage,
         formatBytes: formatBytes,
         formatNumber: formatNumber,
         formatPercentage: formatPercentage,
-        formatRatio: formatRatio,
-        formatShort: formatShort,
         formatSpeed: formatSpeed,
         getColor: getColor,
         getCookie: getCookie,
         getHash: getHash,
-        getLocalTime: getLocalTime,
         getTimestamp: getTimestamp,
+        isEmpty: isEmpty,
         keys: keys,
+        log: log,
         lower: lower,
         merge: merge,
-        numberSort: numberSort,
-        overlap: overlap,
-        padLeft: padLeft,
+        objectEquals: objectEquals,
         padRight: padRight,
         removeCookie: removeCookie,
         removeElement: removeElement,
@@ -635,15 +512,10 @@ define(['jquery', 'jqp/pnotify'], function($) {
         setCookie: setCookie,
         setDecimals: setDecimals,
         smooth: smooth,
-        syncObservableArray: syncObservableArray,
         tryGet: tryGet,
         trySet: trySet,
         validate: validate,
         xhrAbort: xhrAbort,
-        xhrCompleted: xhrCompleted,
-        isEmpty: isEmpty,
-        extract: extract,
-        log: log,
-        objectEquals: objectEquals
+        xhrCompleted: xhrCompleted
     };
 });
