@@ -52,7 +52,8 @@ define(['jquery'], function($){
         self.run = function() {
             var chainDeferred = $.Deferred(), chainPromise = chainDeferred.promise();
             chainDeferred.resolve();
-            chainPromise.then(function() {
+            chainPromise
+                .then(function() {
                     self.running = true;
                 })
                 .then(self.load)

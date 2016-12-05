@@ -34,6 +34,7 @@ from ovs.dal.hybrids.user import User
 from ovs.dal.hybrids.j_backendclient import BackendClient
 from ovs.dal.hybrids.j_backenddomain import BackendDomain
 from ovs.dal.hybrids.j_backenduser import BackendUser
+from ovs.lib.generic import GenericController
 
 
 class BackendViewSet(viewsets.ViewSet):
@@ -139,6 +140,7 @@ class BackendViewSet(viewsets.ViewSet):
             junction.backend = backend
             junction.save()
         backend.invalidate_dynamics(['regular_domains'])
+        GenericController.run_backend_domain_hooks.delay(backend_guid=backend.guid)
 
     @action()
     @log()

@@ -37,6 +37,12 @@ class LocalStorageRouterClient(object):
         """
         self.path = path
 
+    def server_revision(self):
+        exception = StorageRouterClient.exceptions.get('server_revision', {}).get(self.path)
+        if exception is not None:
+            raise exception
+        return 0
+
     def update_configuration(self, path):
         """
         Update configuration mock
@@ -69,9 +75,11 @@ class StorageRouterClient(object):
     _metadata_backend_config = {}
     _snapshots = {}
     volumes = {}
+    exceptions = {}
     vrouter_id = {}
     object_type = {}
     mds_recording = []
+    node_config_recordings = []
     synced = True
 
     def __init__(self, vpool_guid, arakoon_contacts):
@@ -386,6 +394,13 @@ class StorageRouterClient(object):
             raise ValueError('Failed to retrieve storagedriver with ID {0}'.format(node_id))
         StorageRouterClient.vrouter_id[self.vpool_guid][volume_id] = node_id
 
+    def update_cluster_node_configs(self, vrouter_id):
+        """
+        Dummy update_cluster_node_configs
+        """
+        _ = self
+        StorageRouterClient.node_config_recordings.append(vrouter_id)
+
     EMPTY_INFO = empty_info
 
 
@@ -623,3 +638,22 @@ class ArakoonNodeConfig(object):
     """
     def __init__(self, *args, **kwargs):
         _ = args, kwargs
+
+
+class ClusterRegistry(object):
+    """
+    Mocked ClusterRegistry
+    """
+    _registry = {}
+
+    def __init__(self, vfs_cluster_id, ara_cluster_id, ara_node_configs, ara_timeout_secs=None):
+        _ = ara_cluster_id, ara_node_configs, ara_timeout_secs
+        self._cluster_id = vfs_cluster_id
+        if self._cluster_id not in ClusterRegistry._registry:
+            ClusterRegistry._registry[self._cluster_id] = {'node_configs': []}
+
+    def get_node_configs(self):
+        return ClusterRegistry._registry[self._cluster_id]['node_configs']
+
+    def set_node_configs(self, configs):
+        ClusterRegistry._registry[self._cluster_id]['node_configs'] = configs

@@ -69,7 +69,7 @@ class SupportAgent(object):
 
         try:
             # Versions
-            data['metadata']['versions'] = PackageManager.get_versions(None)  # Fallback to check_output
+            data['metadata']['versions'] = PackageManager.get_installed_versions()  # Fallback to check_output
         except Exception, ex:
             data['errors'].append(str(ex))
         try:
