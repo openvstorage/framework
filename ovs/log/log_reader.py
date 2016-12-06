@@ -24,6 +24,7 @@ from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.log.log_handler import LogHandler
 
 
 class LogFileTimeParser(object):
@@ -59,6 +60,8 @@ class LogFileTimeParser(object):
 
     # Timeout for ssh: 0.0 means no timeout
     TIMEOUT = 0.0
+
+    logger = LogHandler.get('log', name='log_reader')
 
     @staticmethod
     def _get_execution_mode():
@@ -176,7 +179,7 @@ class LogFileTimeParser(object):
         :return:
         """
         # Supports Aug 16 14:59:01 , 2016-08-16 09:23:09 Jun 1 2005  1:33:06PM (with or without seconds, microseconds)
-        # Supports datetime objects aswell, no need to convert others to strings
+        # Supports datetime objects as well, no need to convert others to strings
         if isinstance(text, datetime):
             return text
         for fmt in ('%Y-%m-%d %H:%M:%S %f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M',
@@ -243,7 +246,7 @@ class LogFileTimeParser(object):
             cleaned = cleaned.encode('ascii', 'ignore')
             return cleaned
         except UnicodeDecodeError:
-            SSHClient._logger.error('UnicodeDecodeError with output: {0}'.format(text))
+            LogFileTimeParser.logger.error('UnicodeDecodeError with output: {0}'.format(text))
             raise
 
     @staticmethod
@@ -294,7 +297,7 @@ class LogFileTimeParser(object):
         :param host: ip of the node
         :type host: str
         :param suppress_return: only write to file and not return contents
-        :type suppress_return: Boolean
+        :type suppress_return: bool
         :return: Output of a file as string
         """
         for search_location in search_locations:
