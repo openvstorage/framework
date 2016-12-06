@@ -525,9 +525,3 @@ class LogFileTimeParser(object):
         else:
             return LogFileTimeParser.get_lines_between_timestamps(start, end, paths_to_file, errors_patterns, host, suppress_return)
 
-
-if __name__ == '__main__':
-    # Import to fix __module__ attribute
-    from ovs.log.log_reader import LogFileTimeParser
-    LogFileTimeParser.execute_search_on_remote(hosts=["10.100.199.151"], username="root", password="rooter")
-
