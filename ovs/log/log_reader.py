@@ -15,19 +15,20 @@
 # but WITHOUT ANY WARRANTY of any kind.
 import os
 import re
-import time
+import stat
 import platform
 import subprocess
-from stat import *
+import unicodedata
 from datetime import date, datetime, timedelta
 from ovs.extensions.generic.remote import remote
+from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.system import System
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 
 
 class LogFileTimeParser(object):
     """
     # @TODO Support for rotated log files
-    # @TODO Support Ubuntu 16.04 journalctl
 
     Extracts parts of a log file based on a start and end date
     Uses binary search logic to speed up searching
@@ -38,46 +39,33 @@ class LogFileTimeParser(object):
 
     Common usage: validate log files during testing
     """
-    version = "0.02"
-
     # Set some initial values
     BUF_SIZE = 4096  # handle long lines, but put a limit to them
     REWIND = 100  # arbitrary, the optimal value is highly dependent on the structure of the file
     LIMIT = 75  # arbitrary, allow for a VERY large file, but stop it if it runs away
     PATHS_TO_FILES = ['/var/log/ovs/lib.log', '/var/log/ovs/extensions.log']
 
-    INTERNAL_MAPPING = {
-        "ovs-workers": {
-            "file": "/var/log/upstart/ovs-workers.log",
-            "journal": "ovs-workers.service"
-        },
-        "ovs-webapp-api": {
-            "file": "/var/log/upstart/ovs-webapp-api.log",
-            "journal": "ovs-webapp-api.service"
-        },
-    }
+    INTERNAL_MAPPING = {'ovs-workers': {'file': '/var/log/upstart/ovs-workers.log',
+                                        'journal': 'ovs-workers.service'},
+                        'ovs-webapp-api': {'file': '/var/log/upstart/ovs-webapp-api.log',
+                                           'journal': 'ovs-webapp-api.service'}}
     FILE_PATH = '/tmp/file_reader_cache'
     FILE_PATH_REMOTE = '/tmp/file_reader_cache_all'
     TEMP_FILE_PATH = '/tmp/file_reader.py'
     POSSIBLE_MODES = ['search', 'error-search']
 
-    SUPPORTED_VERSIONS = {
-        "Ubuntu": {
-            "14.04": "file",
-            "16.04": "journal"
-        }
-    }
+    SUPPORTED_VERSIONS = {'Ubuntu': {'14.04': 'file',
+                                     '16.04': 'journal'}}
 
     # Timeout for ssh: 0.0 means no timeout
-    TIME_OUT = 0.0
+    TIMEOUT = 0.0
 
     @staticmethod
-    def _get_exection_mode():
+    def _get_execution_mode():
         """
         Determines the execution mode: 14.04 -> log files 16.04 -> journal
         :return: execution mode
         """
-        execution_mode = None
         os_info = platform.linux_distribution()
         if os_info[0] in LogFileTimeParser.SUPPORTED_VERSIONS:
             if os_info[1] in LogFileTimeParser.SUPPORTED_VERSIONS[os_info[0]]:
@@ -89,33 +77,17 @@ class LogFileTimeParser(object):
         return execution_mode
 
     @staticmethod
-    def _execute_command(command, wait=True, shell=True):
-        """
-        Lent from ci.tests.general to make it standalone
-        Execute a command on local node
-        :param command: Command to execute
-        :param wait: Wait for command to finish
-        :param shell: Use shell
-        :return: Output, error code
-        """
-        child_process = subprocess.Popen(command, shell=shell, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        if not wait:
-            return child_process.pid
-        out, error = child_process.communicate()
-        return out, error, child_process.returncode
-
-    @staticmethod
     def _check_available_space(hosts, username, password):
         required_space = 0
-        output_dir = "/".join(LogFileTimeParser.FILE_PATH_REMOTE.strip("/").split('/')[:1])
-        get_space_command = "df /tmp | cut -d ' ' -f 10 | grep -Eo [0-9]*"
-        available_space = LogFileTimeParser._execute_command(get_space_command)
-        from ovs.extensions.generic.sshclient import SSHClient
+        output_dir = '/'.join(LogFileTimeParser.FILE_PATH_REMOTE.strip('/').rsplit('/', 1)[0])
+        get_space_command = 'df /tmp | cut -d ' ' -f 10 | grep -Eo [0-9]*'
+        local_client = SSHClient(System.get_my_storagerouter().ip, username=username, password=password)
+        available_space = local_client.run(get_space_command, allow_insecure=True)
+
         for host in hosts:
             ssh_client = SSHClient(host, username=username, password=password)
-            for f in LogFileTimeParser.PATHS_TO_FILES:
-                command = "ls -al {0} | cut -d ' ' -f 5".format(f)
+            for file_path in LogFileTimeParser.PATHS_TO_FILES:
+                command = 'ls -al {0} | cut -d ' ' -f 5'.format(file_path)
                 try:
                     required_space += int(ssh_client.run(command, allow_insecure=True))
                 except ValueError:
@@ -131,10 +103,10 @@ class LogFileTimeParser(object):
         :type start: str / Datetime
         :param end: End date
         :type end: str / Datetime
-        :param search_locations: List of paths of files / servicenames that will be searched on all nodes
-        :type search_locations: List of str
+        :param search_locations: list of paths of files / servicenames that will be searched on all nodes
+        :type search_locations: list of str
         :param hosts: Ip of the nodes
-        :type hosts: List of str
+        :type hosts: list of str
         :param mode: Search mode
         :type mode: str
         :param python_error: Whether only python errors should be checked
@@ -149,26 +121,25 @@ class LogFileTimeParser(object):
         """
         # Validate parameter
         if mode not in LogFileTimeParser.POSSIBLE_MODES:
-            raise ValueError("Mode '{0}' is not supported. Possible modes are {1}".format(mode, ', '.join(LogFileTimeParser.POSSIBLE_MODES)))
+            raise ValueError('Mode "{0}" is not supported. Possible modes are {1}'.format(mode, ', '.join(LogFileTimeParser.POSSIBLE_MODES)))
 
         # Clear cache
         open(LogFileTimeParser.FILE_PATH_REMOTE, 'w').close()
 
         # Setup default times
         if not start:
-            start = (datetime.today() - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+            start = (datetime.today() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
         if not end:
-            end = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            end = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
 
         if search_locations is None:
-            execution_mode = LogFileTimeParser._get_exection_mode()
-            # search_locations = LogFileTimeParser.PATHS_TO_FILES
+            execution_mode = LogFileTimeParser._get_execution_mode()
             search_locations = []
             for service, info in LogFileTimeParser.INTERNAL_MAPPING.iteritems():
                 search_locations.append(info.get(execution_mode))
 
         if not hosts:
-            hosts = [LogFileTimeParser._clean_text(sr.ip) for sr in StorageRouterList.get_storagerouters()]
+            hosts = [sr.ip for sr in StorageRouterList.get_storagerouters()]
         LogFileTimeParser._check_available_space(hosts, username, password)
 
         # Setup remote instances
@@ -178,30 +149,30 @@ class LogFileTimeParser(object):
                 if mode == 'search':
                     # Execute search
                     results = remotes[host].LogFileTimeParser.get_lines_between_timestamps(start=start, end=end,
-                                                                                             search_locations=search_locations,
-                                                                                             search_patterns=search_patterns,
-                                                                                             host=host)
+                                                                                           search_locations=search_locations,
+                                                                                           search_patterns=search_patterns,
+                                                                                           host=host)
                 elif mode == 'error-search':
                     # Execute search
                     results = remotes[host].LogFileTimeParser.search_for_errors(start=start, end=end,
-                                                                                  paths_to_file=search_locations,
-                                                                                  host=host,
-                                                                                  python_error=python_error)
+                                                                                search_locations=search_locations,
+                                                                                host=host,
+                                                                                python_error=python_error)
                 # Append output to cache
-                with open(LogFileTimeParser.FILE_PATH_REMOTE, 'a') as f2:
-                    f2.write(str(results))
+                with open(LogFileTimeParser.FILE_PATH_REMOTE, 'a') as output_file:
+                    output_file.write(str(results))
         if not suppress_return:
-            with open(LogFileTimeParser.FILE_PATH_REMOTE, 'r') as f:
-                return f.read()
+            with open(LogFileTimeParser.FILE_PATH_REMOTE, 'r') as output_file:
+                return output_file.read()
 
     @staticmethod
     def _parse_date(text, validate=True):
         """
-
+        Parses strings to datetime objects
         :param text: A date
         :type text: str / Datetime
         :param validate: Check to throw errors on malformatted input or not
-        :type validate: Boolean
+        :type validate: bool
         :return:
         """
         # Supports Aug 16 14:59:01 , 2016-08-16 09:23:09 Jun 1 2005  1:33:06PM (with or without seconds, microseconds)
@@ -223,7 +194,7 @@ class LogFileTimeParser(object):
                 return datetime.min
                 # Happens for weirdly formatted strings without escaped chars
         if validate:
-            raise ValueError("No valid date format found for '{0}'".format(text))
+            raise ValueError('No valid date format found for "{0}"'.format(text))
         else:
             # Cannot use NoneType to compare date times. Using minimum instead
             return datetime.min
@@ -240,15 +211,13 @@ class LogFileTimeParser(object):
             # readline() reads a single line at the time
             line = opened_file.readline(buf_size)
         except:
-            raise IOError("File I/O Error")
-        if line == '':
-            raise EOFError("EOF reached")
+            raise IOError('File I/O Error')
         # Remove \n from read lines.
         line = line.rstrip('\n')
         words = line.split(' ')
         # This results into Jan 1 01:01:01 000000 or 1970-01-01 01:01:01 000000 or just plain text sentences
         if len(words) >= 3:
-            line_date = LogFileTimeParser._parse_date(words[0] + " " + words[1] + " " + words[2], False)
+            line_date = LogFileTimeParser._parse_date(words[0] + ' ' + words[1] + ' ' + words[2], False)
         else:
             line_date = LogFileTimeParser._parse_date('', False)
         return line_date, line
@@ -257,18 +226,25 @@ class LogFileTimeParser(object):
     def _clean_text(text):
         if type(text) is list:
             text = '\n'.join(line.rstrip() for line in text)
-        # This strip is absolutely necessary. Without it, channel.communicate() is never executed (odd but true)
         try:
-            cleaned = text.strip().decode('utf-8', 'replace')
+            # This strip is absolutely necessary. Without it, channel.communicate() is never executed (odd but true)
+            cleaned = text.strip()
+            # I ? unicode
+            if not isinstance(text, unicode):
+                cleaned = unicode(cleaned.decode('utf-8', 'replace'))
             for old, new in {u'\u2018': "'",
+                             u'\u2019': "'",
                              u'\u201a': "'",
                              u'\u201e': '"',
-                             u'\u201c': '"'}.iteritems():
+                             u'\u201c': '"',
+                             u'\u25cf': '*'}.iteritems():
                 cleaned = cleaned.replace(old, new)
+            cleaned = unicodedata.normalize('NFKD', cleaned)
+            cleaned = cleaned.encode('ascii', 'ignore')
             return cleaned
         except UnicodeDecodeError:
-            print 'UnicodeDecodeError with output: {0}'.format(text)
-        raise
+            SSHClient._logger.error('UnicodeDecodeError with output: {0}'.format(text))
+            raise
 
     @staticmethod
     def get_lines_between_timestamps(start, end, search_locations=None, search_patterns=None, host=None, suppress_return=False):
@@ -278,24 +254,24 @@ class LogFileTimeParser(object):
         :param end: End date
         :type end: str / Datetime
         :param search_patterns: What error patterns should be recognized
-        :type search_patterns: List of str
-        :param search_locations: List of paths of files that will be searched on all nodes
-        :type search_locations: List of str
+        :type search_patterns: list of str
+        :param search_locations: list of paths of files that will be searched on all nodes
+        :type search_locations: list of str
         :param host: ip of the node
         :type host: str
         :param suppress_return: only write to file and not return contents
-        :type suppress_return: Boolean
+        :type suppress_return: bool
         :return: Output of a file as string
         """
         # Clear the file cache
         open(LogFileTimeParser.FILE_PATH, 'w').close()
 
-        execution_mode = LogFileTimeParser._get_exection_mode()
+        execution_mode = LogFileTimeParser._get_execution_mode()
 
         if not start:
-            start = (datetime.today() - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+            start = (datetime.today() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
         if not end:
-            end = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            end = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
 
         if execution_mode == 'file':
             return LogFileTimeParser._search_files(start, end, search_locations, search_patterns, host, suppress_return)
@@ -312,9 +288,9 @@ class LogFileTimeParser(object):
         :param end: End date
         :type end: str / Datetime
         :param search_patterns: What error patterns should be recognized
-        :type search_patterns: List of str
-        :param search_locations: List of paths of files that will be searched on all nodes
-        :type search_locations: List of str
+        :type search_patterns: list of str
+        :param search_locations: list of paths of files that will be searched on all nodes
+        :type search_locations: list of str
         :param host: ip of the node
         :type host: str
         :param suppress_return: only write to file and not return contents
@@ -371,13 +347,13 @@ class LogFileTimeParser(object):
         :param end: End date
         :type end: str / Datetime
         :param search_patterns: What error patterns should be recognized
-        :type search_patterns: List of str
-        :param search_locations: List of paths of files that will be searched on all nodes
-        :type search_locations: List of str
+        :type search_patterns: list of str
+        :param search_locations: list of paths of files that will be searched on all nodes
+        :type search_locations: list of str
         :param host: ip of the node
         :type host: str
         :param suppress_return: only write to file and not return contents
-        :type suppress_return: Boolean
+        :type suppress_return: bool
         :return: Output of a file as string
         """
         for path_to_file in search_locations:
@@ -389,7 +365,7 @@ class LogFileTimeParser(object):
             line_date = ''
             line = None
 
-            size = os.stat(path_to_file)[ST_SIZE]
+            size = os.stat(path_to_file)[stat.ST_SIZE]
 
             begin_range = 0
             mid_range = size / 2
@@ -398,9 +374,9 @@ class LogFileTimeParser(object):
             pos = 0
             # Set the default writing prefix
             if host:
-                write_prefix = "{0} - {1}: ".format(host, path_to_file)
+                write_prefix = '{0} - {1}: '.format(host, path_to_file)
             else:
-                write_prefix = "{0}: ".format(path_to_file)
+                write_prefix = '{0}: '.format(path_to_file)
 
             # Test for times to be properly formatted, allow hh:mm or hh:mm:ss
             pattern = re.compile(r'(^[2][0-3]|[0-1][0-9]):[0-5][0-9](:[0-5][0-9])?$')
@@ -408,9 +384,9 @@ class LogFileTimeParser(object):
             # If only hours are supplied, match them to a day
             if pattern.match(start) or pattern.match(end):
                 # Determine Time Range
-                yesterday = date.fromordinal(date.today().toordinal() - 1).strftime("%Y-%m-%d")
-                today = datetime.now().strftime("%Y-%m-%d")
-                now = datetime.now().strftime("%R")
+                yesterday = date.fromordinal(date.today().toordinal() - 1).strftime('%Y-%m-%d')
+                today = datetime.now().strftime('%Y-%m-%d')
+                now = datetime.now().strftime('%R')
                 if start > now or start > end:
                     search_start = yesterday
                 else:
@@ -419,8 +395,8 @@ class LogFileTimeParser(object):
                     search_end = yesterday
                 else:
                     search_end = today
-                search_start = LogFileTimeParser._parse_date(search_start + " " + start)
-                search_end = LogFileTimeParser._parse_date(search_end + " " + end)
+                search_start = LogFileTimeParser._parse_date(search_start + ' ' + start)
+                search_end = LogFileTimeParser._parse_date(search_end + ' ' + end)
             else:
                 # Set dates
                 search_start = LogFileTimeParser._parse_date(start)
@@ -446,7 +422,7 @@ class LogFileTimeParser(object):
                         old_mid_range = mid_range
                         mid_range = (begin_range + end_range) / 2
                         if count > limit:
-                            raise IndexError("ERROR: ITERATION LIMIT EXCEEDED")
+                            raise IndexError('ERROR: ITERATION LIMIT EXCEEDED')
                     # Rewind a bit to make sure we didn't miss any
                     seek = old_mid_range
                     while line_date >= search_start and seek > 0:
@@ -490,24 +466,24 @@ class LogFileTimeParser(object):
                 return f.read()
 
     @staticmethod
-    def search_for_errors(start, end, python_error, paths_to_file, host, suppress_return):
+    def search_for_errors(start, end, python_error, search_locations, host, suppress_return):
         """
         :param start: Starting date
         :type start: str / Datetime
         :param end: End date
         :type end: str / Datetime
         :param python_error: Whether only python errors should be checked
-        :type python_error: Boolean
-        :param paths_to_file: List of paths of files that will be searched on all nodes
-        :type paths_to_file: List of str
+        :type python_error: bool
+        :param search_locations: list of paths of files that will be searched on all nodes
+        :type search_locations: list of str
         :param host: ip of the node
         :type host: str
         :param suppress_return: only write to file and not return contents
-        :type suppress_return: Boolean
+        :type suppress_return: bool
         :return: Output of a file as string
         """
         if not start:
-            start = (datetime.today() - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+            start = (datetime.today() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
         if not end:
             end = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
         python_errors = ['Exception', 'StopIteration', 'StandardError', 'BufferError', 'ArithmeticError',
@@ -521,7 +497,7 @@ class LogFileTimeParser(object):
         errors_patterns = ['not found', 'error', 'something went wrong', ' has no attribute',
                            'referenced before assignment', 'timeout', 'raised exception']
         if python_error:
-            return LogFileTimeParser.get_lines_between_timestamps(start, end, paths_to_file, python_errors, host, suppress_return)
+            return LogFileTimeParser.get_lines_between_timestamps(start, end, search_locations, python_errors, host, suppress_return)
         else:
-            return LogFileTimeParser.get_lines_between_timestamps(start, end, paths_to_file, errors_patterns, host, suppress_return)
+            return LogFileTimeParser.get_lines_between_timestamps(start, end, search_locations, errors_patterns, host, suppress_return)
 
