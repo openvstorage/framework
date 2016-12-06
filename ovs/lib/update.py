@@ -17,16 +17,27 @@
 """
 Module for UpdateController
 """
-
-import subprocess
+import copy
+import time
+from subprocess import CalledProcessError
+from ovs.celery_run import celery
+from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.filemutex import NoLockAvailableException
 from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.toolbox import Toolbox as ExtensionToolbox
+from ovs.extensions.generic.system import System
 from ovs.extensions.migration.migrator import Migrator
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
+from ovs.lib.generic import GenericController
 from ovs.log.log_handler import LogHandler
 
 
@@ -34,349 +45,619 @@ class UpdateController(object):
     """
     This class contains all logic for updating an environment
     """
-    _logger = LogHandler.get('lib', name='update')
+    _logger = LogHandler.get('update', name='core')
     _logger.logger.propagate = False
-    model_services = ['memcached', 'arakoon-ovsdb']
+    _update_file = '/etc/ready_for_upgrade'
+    _update_ongoing_file = '/etc/update_ongoing'
+
+    framework_packages = {'arakoon', 'openvstorage'}
+    volumedriver_packages = {'alba', 'arakoon', 'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server'}
+    all_core_packages = framework_packages.union(volumedriver_packages)
+
+    #########
+    # HOOKS #
+    #########
+    @staticmethod
+    @add_hooks('update', 'get_package_info_multi')
+    def get_package_information_core(client, package_info):
+        """
+        Called by GenericController.refresh_package_information() every hour
+
+        Retrieve information about the currently installed versions of the core packages
+        Retrieve information about the versions to which each package can potentially be updated
+        If installed version is different from candidate version --> store this information in model
+
+        Additionally check the services with a 'run' file
+        Verify whether the running version is up-to-date with the candidate version
+        If different --> store this information in the model
+
+        Result: Every package with updates or which requires services to be restarted is stored in the model
+
+        :param client: Client on which to collect the version information
+        :type client: SSHClient
+        :param package_info: Dictionary passed in by the thread calling this function
+        :type package_info: dict
+        :return: Package information
+        :rtype: dict
+        """
+        try:
+            if client.username != 'root':
+                raise RuntimeError('Only the "root" user can retrieve the package information')
+
+            installed = PackageManager.get_installed_versions(client=client, package_names=UpdateController.all_core_packages)
+            candidate = PackageManager.get_candidate_versions(client=client, package_names=UpdateController.all_core_packages)
+            if set(installed.keys()) != set(UpdateController.all_core_packages) or set(candidate.keys()) != set(UpdateController.all_core_packages):
+                raise RuntimeError('Failed to retrieve the installed and candidate versions for packages: {0}'.format(', '.join(UpdateController.all_core_packages)))
+
+            # Retrieve Arakoon information
+            cacc_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name='cacc', filesystem=True, ip=client.ip)
+            voldrv_cluster = ArakoonClusterConfig.get_cluster_name('voldrv')
+            framework_arakoons = ['arakoon-{0}'.format(cacc_metadata['cluster_name']),
+                                  'arakoon-{0}'.format(ArakoonClusterConfig.get_cluster_name('ovsdb'))]
+            storagedriver_arakoons = [] if voldrv_cluster is None else ['arakoon-{0}'.format(voldrv_cluster)]
+
+            storagerouter = StorageRouterList.get_by_ip(client.ip)
+            alba_proxies = []
+            for service in storagerouter.services:
+                if service.type.name == ServiceType.SERVICE_TYPES.ALBA_PROXY:
+                    alba_proxies.append(service.name)
+
+            default_entry = {'candidate': None,
+                             'installed': None,
+                             'services_to_restart': []}
+
+            #                       component:   package_name: services_with_run_file
+            for component, info in {'framework': {'arakoon': framework_arakoons,
+                                                  'openvstorage': []},
+                                    'storagedriver': {'alba': alba_proxies,
+                                                      'arakoon': storagedriver_arakoons,
+                                                      'volumedriver-no-dedup-base': [],
+                                                      'volumedriver-no-dedup-server': []}}.iteritems():
+                component_info = {}
+                for package_name, services in info.iteritems():
+                    for service in services:
+                        service = ExtensionToolbox.remove_prefix(service, 'ovs-')
+                        version_file = '/opt/OpenvStorage/run/{0}.version'.format(service)
+                        if not client.file_exists(version_file):
+                            UpdateController._logger.warning('{0}: Failed to find a version file in /opt/OpenvStorage/run for service {1}'.format(client.ip, service))
+                            continue
+                        running_versions = client.file_read(version_file).strip()
+                        for version in running_versions.split(';'):
+                            version = version.strip()
+                            running_version = None
+                            if '=' in version:
+                                package_name = version.split('=')[0]
+                                running_version = version.split('=')[1]
+                                if package_name not in UpdateController.all_core_packages:
+                                    raise ValueError('Unknown package dependency found in {0}'.format(version_file))
+                            elif version:
+                                running_version = version
+
+                            if running_version is not None and running_version != candidate[package_name]:
+                                if package_name not in component_info:
+                                    component_info[package_name] = copy.deepcopy(default_entry)
+                                component_info[package_name]['installed'] = running_version
+                                component_info[package_name]['candidate'] = candidate[package_name]
+                                component_info[package_name]['services_to_restart'].append('ovs-{0}'.format(service))
+
+                    if installed[package_name] != candidate[package_name] and package_name not in component_info:
+                        component_info[package_name] = copy.deepcopy(default_entry)
+                        component_info[package_name]['installed'] = installed[package_name]
+                        component_info[package_name]['candidate'] = candidate[package_name]
+                if component_info:
+                    if component not in package_info[client.ip]:
+                        package_info[client.ip][component] = {}
+                    package_info[client.ip][component].update(component_info)
+        except Exception as ex:
+            if 'errors' not in package_info[client.ip]:
+                package_info[client.ip]['errors'] = []
+            package_info[client.ip]['errors'].append(ex)
+        return package_info
 
     @staticmethod
-    def update_framework():
+    @add_hooks('update', 'information')
+    def get_update_information_core(information):
         """
-        Update the framework
+        Called when the 'Update' button in the GUI is pressed
+        This call collects additional information about the packages which can be updated
+        Eg:
+            * Downtime for Arakoons
+            * Downtime for StorageDrivers
+            * Prerequisites that haven't been met
+            * Services which will be stopped during update
+            * Services which will be restarted after update
+        """
+        # Verify arakoon info
+        arakoon_ovs_info = {'down': False,
+                            'name': None,
+                            'internal': False}
+        arakoon_cacc_info = {'down': False,
+                             'name': None,
+                             'internal': False}
+        arakoon_voldrv_info = {'down': False,
+                               'name': None,
+                               'internal': False}
+        for cluster in ['cacc', 'ovsdb', 'voldrv']:
+            cluster_name = ArakoonClusterConfig.get_cluster_name(cluster)
+            if cluster_name is None:
+                continue
+
+            if cluster == 'cacc':
+                arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, filesystem=True, ip=System.get_my_storagerouter().ip)
+            else:
+                arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+
+            if arakoon_metadata['internal'] is True:
+                config = ArakoonClusterConfig(cluster_id=cluster_name, filesystem=(cluster == 'cacc'))
+                config.load_config(System.get_my_storagerouter().ip if cluster == 'cacc' else None)
+                if cluster == 'ovsdb':
+                    arakoon_ovs_info['down'] = len(config.nodes) < 3
+                    arakoon_ovs_info['name'] = arakoon_metadata['cluster_name']
+                    arakoon_ovs_info['internal'] = True
+                elif cluster == 'voldrv':
+                    arakoon_voldrv_info['down'] = len(config.nodes) < 3
+                    arakoon_voldrv_info['name'] = arakoon_metadata['cluster_name']
+                    arakoon_voldrv_info['internal'] = True
+                else:
+                    arakoon_cacc_info['name'] = arakoon_metadata['cluster_name']
+                    arakoon_cacc_info['internal'] = True
+
+        # Verify StorageRouter downtime
+        prerequisites = []
+        all_storagerouters = StorageRouterList.get_storagerouters()
+        for storagerouter in all_storagerouters:
+            try:
+                SSHClient(endpoint=storagerouter, username='root')
+            except UnableToConnectException:
+                prerequisites.append(['node_down', storagerouter.name])
+
+        for key in ['framework', 'storagedriver']:
+            if key not in information:
+                information[key] = {'packages': {},
+                                    'downtime': [],
+                                    'prerequisites': prerequisites,
+                                    'services_stop_start': set(),
+                                    'services_post_update': set()}
+
+            for storagerouter in all_storagerouters:
+                if key not in storagerouter.package_information:
+                    continue
+
+                # Retrieve ALBA proxy issues
+                alba_services = []
+                alba_downtime = []
+                for service in storagerouter.services:
+                    if service.type.name != ServiceType.SERVICE_TYPES.ALBA_PROXY or service.alba_proxy is None:
+                        continue
+                    alba_services.append(service.name)
+                    alba_downtime.append(['proxy', service.alba_proxy.storagedriver.vpool.name])
+
+                # Retrieve StorageDriver issues
+                storagedriver_downtime = []
+                storagedriver_services = []
+                for sd in storagerouter.storagedrivers:
+                    # Order of services is important, first we want to stop all volume-drivers, then DTLs
+                    storagedriver_services.append('ovs-volumedriver_{0}'.format(sd.vpool.name))
+                for sd in storagerouter.storagedrivers:
+                    storagedriver_services.append('ovs-dtl_{0}'.format(sd.vpool.name))
+                    if len(sd.vdisks_guids) > 0:
+                        storagedriver_downtime.append(['voldrv', sd.vpool.name])
+
+                # Retrieve the actual update information
+                for package_name, package_info in storagerouter.package_information[key].iteritems():
+                    if package_name not in UpdateController.all_core_packages:
+                        continue  # Only gather information for the core packages
+
+                    information[key]['services_post_update'].update(package_info.pop('services_to_restart'))
+                    if package_name not in information[key]['packages']:
+                        information[key]['packages'][package_name] = {}
+                    information[key]['packages'][package_name].update(package_info)
+
+                    if package_name == 'openvstorage':
+                        if ['gui', None] not in information[key]['downtime']:
+                            information[key]['downtime'].append(['gui', None])
+                        if ['api', None] not in information[key]['downtime']:
+                            information[key]['downtime'].append(['api', None])
+                        information[key]['services_stop_start'].update({'watcher-framework', 'memcached'})
+                    elif package_name == 'alba':
+                        for down in alba_downtime:
+                            if down not in information[key]['downtime']:
+                                information[key]['downtime'].append(down)
+                        information[key]['services_post_update'].update(alba_services)
+                    elif package_name == 'volumedriver-no-dedup-base':
+                        for down in storagedriver_downtime:
+                            if down not in information[key]['downtime']:
+                                information[key]['downtime'].append(down)
+                        information[key]['services_stop_start'].update(storagedriver_services)
+                    elif package_name == 'volumedriver-no-dedup-server':
+                        for down in storagedriver_downtime:
+                            if down not in information[key]['downtime']:
+                                information[key]['downtime'].append(down)
+                        information[key]['services_stop_start'].update(storagedriver_services)
+                    elif package_name == 'arakoon':
+                        if key == 'framework':
+                            framework_arakoons = set()
+                            if arakoon_ovs_info['internal'] is True:
+                                framework_arakoons.add('ovs-arakoon-{0}'.format(arakoon_ovs_info['name']))
+                            if arakoon_cacc_info['internal'] is True:
+                                framework_arakoons.add('ovs-arakoon-{0}'.format(arakoon_cacc_info['name']))
+
+                            information[key]['services_post_update'].update(framework_arakoons)
+                            if arakoon_ovs_info['down'] is True and ['ovsdb', None] not in information[key]['downtime']:
+                                information[key]['downtime'].append(['ovsdb', None])
+                        elif arakoon_voldrv_info['internal'] is True:
+                            information[key]['services_post_update'].update({'ovs-arakoon-{0}'.format(arakoon_voldrv_info['name'])})
+                            if arakoon_voldrv_info['down'] is True and ['voldrv', None] not in information[key]['downtime']:
+                                information[key]['downtime'].append(['voldrv', None])
+        return information
+
+    @staticmethod
+    @add_hooks('update', 'package_install_multi')
+    def package_install_core(client, package_info):
+        """
+        Update the core packages
+        :param client: Client on which to execute update the packages
+        :type client: SSHClient
+        :param package_info: Information about the packages (installed, candidate)
+        :type package_info: dict
         :return: None
         """
+        for pkg_name, pkg_info in package_info.iteritems():
+            if pkg_name in UpdateController.all_core_packages:
+                UpdateController._logger.debug('{0}: Updating core package {1} ({2} --> {3})'.format(client.ip, pkg_name, pkg_info['installed'], pkg_info['candidate']))
+                PackageManager.install(package_name=pkg_name, client=client)
+                UpdateController._logger.debug('{0}: Updated core package {1}'.format(client.ip, pkg_name))
+
+    @staticmethod
+    @add_hooks('update', 'post_update_multi')
+    def post_update_core(client, components):
+        """
+        Execute functionality after the openvstorage core packages have been updated
+        For framework:
+            * Restart support-agent on every client
+            * Restart arakoon-ovsdb on every client (if present and required)
+        For storagedriver:
+            * ALBA proxies on every client
+            * Restart arakoon-voldrv on every client (if present and required)
+        :param client: Client on which to execute this post update functionality
+        :type client: SSHClient
+        :param components: Update components which have been executed
+        :type components: list
+        :return: None
+        """
+        if 'framework' not in components and 'storagedriver' not in components:
+            return
+
+        if 'framework' in components:
+            UpdateController.change_services_state(services=['support-agent'], ssh_clients=[client], action='restart')
+
+        update_information = UpdateController.get_update_information_core({})
+        services_to_restart = set()
+        if 'storagedriver' in components:
+            services_to_restart.update(update_information.get('storagedriver', {}).get('services_post_update', set()))
+        if 'framework' in components:
+            services_to_restart.update(update_information.get('framework', {}).get('services_post_update', set()))
+
+        for service_name in sorted(services_to_restart):
+            if not service_name.startswith('ovs-arakoon-'):
+                UpdateController.change_services_state(services=[service_name], ssh_clients=[client], action='restart')
+            else:
+                cluster_name = ArakoonClusterConfig.get_cluster_name(ExtensionToolbox.remove_prefix(service_name, 'ovs-arakoon-'))
+                if cluster_name == 'cacc':
+                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, filesystem=True, ip=System.get_my_storagerouter().ip)
+                else:
+                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+                if arakoon_metadata['internal'] is True:
+                    UpdateController._logger.debug('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
+                    ArakoonInstaller.restart_node(cluster_name=cluster_name,
+                                                  client=client)
+
+    ################
+    # CELERY TASKS #
+    ################
+    @staticmethod
+    @celery.task(name='ovs.update.merge_package_information')
+    def merge_package_information():
+        """
+        Retrieve the package information from the model for both StorageRouters and ALBA Nodes and merge it
+        :return: Package information for all StorageRouters and ALBA nodes
+        :rtype: dict
+        """
+        package_info = dict((storagerouter.ip, storagerouter.package_information) for storagerouter in StorageRouterList.get_storagerouters())
+        for function in Toolbox.fetch_hooks('update', 'merge_package_info'):
+            output = function()
+            for ip in output:
+                if ip in package_info:
+                    package_info[ip].update(output[ip])
+                else:
+                    package_info[ip] = output[ip]
+        return package_info
+
+    @staticmethod
+    @celery.task(name='ovs.update.get_update_metadata')
+    def get_update_metadata(storagerouter_ip):
+        """
+        Returns metadata required for updating
+          - Checks if 'at' is installed properly
+          - Checks if ongoing updates are busy
+          - Check if StorageRouter is reachable
+        :param storagerouter_ip: IP of the Storage Router to check the metadata for
+        :type storagerouter_ip: str
+        :return: Update status for specified storage router
+        :rtype: dict
+        """
+        at_ok = True
+        reachable = True
+        root_client = None
+        update_ongoing = False
+        try:
+            root_client = SSHClient(endpoint=storagerouter_ip, username='root')
+            update_ongoing = root_client.file_exists(filename='/etc/update_ongoing')
+            root_client.run(['which',  'at'])
+            root_client.run('echo "echo test > /tmp/test_at_2" > /tmp/test_at_1', allow_insecure=True)
+            root_client.run(['at', '-f', '/tmp/test_at_1', 'now'])
+            counter = 0
+            while counter < 10:
+                if root_client.file_exists('/tmp/test_at_2'):
+                    at_ok = True
+                    if root_client.file_read('/tmp/test_at_2').strip() != 'test':
+                        at_ok = False
+                    break
+                at_ok = False
+                time.sleep(0.1)
+                counter += 1
+        except UnableToConnectException:
+            UpdateController._logger.warning('StorageRouter with IP {0} could not be checked'.format(storagerouter_ip))
+            reachable = False
+        except CalledProcessError:
+            UpdateController._logger.exception('Verifying "at" dependency on StorageRouter with IP {0} failed'.format(storagerouter_ip))
+            at_ok = False
+        finally:
+            if root_client is not None:
+                root_client.file_delete(['/tmp/test_at_2', '/tmp/test_at_1'])
+
+        return {'at_ok': at_ok,
+                'reachable': reachable,
+                'update_ongoing': update_ongoing}
+
+    @staticmethod
+    @celery.task(name='ovs.update.get_update_information')
+    def get_update_information_all():
+        """
+        Retrieve the update information for all StorageRouters
+        This contains information about
+            - downtime of model, GUI, vPools, proxies, ...
+            - services that will be restarted
+            - packages that will be updated
+            - prerequisites that have not been met
+        :return: Information about the update
+        :rtype: dict
+        """
+        information = {}
+        for function in Toolbox.fetch_hooks('update', 'information'):
+            function(information=information)
+
+        for component, info in copy.deepcopy(information).iteritems():
+            if len(info['packages']) == 0:
+                information.pop(component)
+        return information
+
+    @staticmethod
+    @celery.task(name='ovs.update.update_components')
+    def update_components(components):
+        """
+        Initiate the update through commandline for all StorageRouters
+        This is called upon by the API
+        :return: None
+        """
+        components = [component.strip() for component in components]
+        root_client = SSHClient(endpoint=System.get_my_storagerouter(),
+                                username='root')
+        root_client.run(['ovs', 'update', ','.join(components)])
+
+    #############
+    # FUNCTIONS #
+    #############
+    @staticmethod
+    def execute_update(components):
+        """
+        Update the specified components on all StorageRouters
+        This is called upon by 'at'
+        :return: None
+        """
+        this_sr = System.get_my_storagerouter()
+        local_ip = None
         filemutex = file_mutex('system_update', wait=2)
-        upgrade_file = '/etc/ready_for_upgrade'
-        upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
         ssh_clients = []
+        services_stop_start = set()
         try:
             filemutex.acquire()
-            UpdateController._log_message('+++ Starting framework update +++')
+            UpdateController._logger.debug('+++ Starting update +++')
 
             from ovs.dal.lists.storagerouterlist import StorageRouterList
 
-            UpdateController._log_message('Generating SSH client connections for each storage router')
-            upgrade_file = '/etc/ready_for_upgrade'
-            upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
+            # Create SSHClients to all nodes
+            UpdateController._logger.debug('Generating SSH client connections for each storage router')
             storage_routers = StorageRouterList.get_storagerouters()
-            ssh_clients = []
             master_ips = []
             extra_ips = []
             for sr in storage_routers:
-                ssh_clients.append(SSHClient(sr.ip, username='root'))
-                if sr.node_type == 'MASTER':
-                    master_ips.append(sr.ip)
-                elif sr.node_type == 'EXTRA':
-                    extra_ips.append(sr.ip)
-            this_client = [client for client in ssh_clients if client.is_local is True][0]
+                if sr == this_sr:
+                    local_ip = sr.ip
+                try:
+                    ssh_clients.append(SSHClient(sr.ip, username='root'))
+                    if sr.node_type == 'MASTER':
+                        master_ips.append(sr.ip)
+                    elif sr.node_type == 'EXTRA':
+                        extra_ips.append(sr.ip)
+                except UnableToConnectException:
+                    raise Exception('Update is only allowed on systems where all nodes are online and fully functional')
 
             # Create locks
-            UpdateController._log_message('Creating lock files', client_ip=this_client.ip)
             for client in ssh_clients:
-                client.run(['touch', upgrade_file])  # Prevents manual install or upgrade individual packages
-                client.run(['touch', upgrade_ongoing_check_file])  # Prevents clicking x times on 'Update' btn
+                UpdateController._logger.debug('{0}: Creating lock files'.format(client.ip))
+                client.run(['touch', UpdateController._update_file])  # Prevents manual install or update individual packages
+                client.run(['touch', UpdateController._update_ongoing_file])
 
             # Check requirements
-            packages_to_update = set()
-            all_services_to_restart = []
-            for client in ssh_clients:
-                for function in Toolbox.fetch_hooks('update', 'metadata'):
-                    UpdateController._log_message('Executing function {0}'.format(function.__name__),
-                                                  client_ip=client.ip)
-                    output = function(client)
-                    for key, value in output.iteritems():
-                        if key != 'framework':
-                            continue
-                        for package_info in value:
-                            packages_to_update.update(package_info['packages'])
-                            all_services_to_restart += package_info['services']
+            packages_to_update = {}
+            services_post_update = set()
+            update_information = UpdateController.get_update_information_all()
+            for component, component_info in update_information.iteritems():
+                if component in components:
+                    UpdateController._logger.debug('{0}: Verifying update information for component: {1}'.format(local_ip, component.upper()))
+                    Toolbox.verify_required_params(actual_params=component_info,
+                                                   required_params={'downtime': (list, None),
+                                                                    'packages': (dict, None),
+                                                                    'prerequisites': (list, None),
+                                                                    'services_stop_start': (set, None),
+                                                                    'services_post_update': (set, None)})
+                    if len(component_info['prerequisites']) > 0:
+                        raise Exception('Update is only allowed when all prerequisites have been met')
 
-            services_to_restart = []
-            for service in all_services_to_restart:
-                if service not in services_to_restart:
-                    services_to_restart.append(service)  # Filter out duplicates maintaining the order of services (eg: watcher-framework before memcached)
-
-            UpdateController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
-            UpdateController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
+                    packages_to_update.update(component_info['packages'])
+                    services_stop_start.update(component_info['services_stop_start'])
+                    services_post_update.update(component_info['services_post_update'])
+            if len(packages_to_update) > 0:
+                UpdateController._logger.debug('{0}: Packages to be updated: {1}'.format(local_ip, ', '.join(sorted(packages_to_update.keys()))))
+            if len(services_stop_start) > 0:
+                UpdateController._logger.debug('{0}: Services to stop before package update: {1}'.format(local_ip, ', '.join(sorted(services_stop_start))))
+            if len(services_post_update) > 0:
+                UpdateController._logger.debug('{0}: Services which will be restarted after update: {1}'.format(local_ip, ', '.join(sorted(services_post_update))))
 
             # Stop services
-            if UpdateController._change_services_state(services=services_to_restart,
-                                                       ssh_clients=ssh_clients,
-                                                       action='stop') is False:
-                UpdateController._log_message('Stopping all services on every node failed, cannot continue',
-                                              client_ip=this_client.ip, severity='warning')
-                UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
+            if UpdateController.change_services_state(services=services_stop_start,
+                                                      ssh_clients=ssh_clients,
+                                                      action='stop') is False:
+                raise Exception('Stopping all services on every node failed, cannot continue')
 
-                # Start services again if a service could not be stopped
-                UpdateController._log_message('Attempting to start the services again', client_ip=this_client.ip)
-                UpdateController._change_services_state(services=services_to_restart,
-                                                        ssh_clients=ssh_clients,
-                                                        action='start')
+            # Install packages
+            # First install packages on all StorageRouters individually
+            if packages_to_update:
+                failures = False
+                for client in ssh_clients:
+                    UpdateController._logger.debug('{0}: Installing packages'.format(client.ip))
+                    for function in Toolbox.fetch_hooks('update', 'package_install_multi'):
+                        try:
+                            UpdateController._logger.debug('{0}: Executing hook {1}'.format(client.ip, function.__name__))
+                            function(client=client, package_info=packages_to_update)
+                            UpdateController._logger.debug('{0}: Executed hook {1}'.format(client.ip, function.__name__))
+                        except Exception as ex:
+                            UpdateController._logger.error('{0}: Package installation hook {1} failed with error: {2}'.format(client.ip, function.__name__, ex))
+                            failures = True
 
-                UpdateController._log_message('Failed to stop all required services, aborting update',
-                                              client_ip=this_client.ip, severity='error')
-                return
+                if set(components).difference({'framework', 'storagedriver'}):
+                    # Second install packages on all ALBA nodes
+                    for function in Toolbox.fetch_hooks('update', 'package_install_single'):
+                        try:
+                            UpdateController._logger.debug('{0}: Executing hook {1}'.format(local_ip, function.__name__))
+                            function(package_info=packages_to_update)
+                            UpdateController._logger.debug('{0}: Executed hook {1}'.format(local_ip, function.__name__))
+                        except Exception as ex:
+                            UpdateController._logger.exception('{0}: Package installation hook {1} failed with error: {2}'.format(local_ip, function.__name__, ex))
+                            failures = True
 
-            # Update packages
-            failed_clients = []
+                if failures is True:
+                    raise Exception('Installing the packages failed on 1 or more nodes')
+
+            # Remove update file
             for client in ssh_clients:
-                PackageManager.update(client=client)
-                try:
-                    UpdateController._log_message('Installing latest packages', client.ip)
-                    for package in packages_to_update:
-                        UpdateController._log_message('Installing {0}'.format(package), client.ip)
-                        PackageManager.install(package_name=package,
-                                               client=client,
-                                               force=True)
-                        UpdateController._log_message('Installed {0}'.format(package), client.ip)
-                    client.file_delete(upgrade_file)
-                except subprocess.CalledProcessError as cpe:
-                    UpdateController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip,
-                                                  'error')
-                    failed_clients.append(client)
-                    break
-
-            if failed_clients:
-                UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-                UpdateController._log_message('Error occurred. Attempting to start all services again',
-                                              client_ip=this_client.ip, severity='error')
-                UpdateController._change_services_state(services=services_to_restart,
-                                                        ssh_clients=ssh_clients,
-                                                        action='start')
-                UpdateController._log_message('Failed to upgrade following nodes:\n - {0}\nPlease check the logs on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients]), this_client.ip),
-                                              this_client.ip,
-                                              'error')
-                return
+                client.file_delete(UpdateController._update_file)
 
             # Migrate code
-            for client in ssh_clients:
-                try:
-                    UpdateController._log_message('Started code migration', client.ip)
+            if 'framework' in components:
+                failures = []
+                for client in ssh_clients:
+                    UpdateController._logger.debug('{0}: Verifying extensions code migration is required'.format(client.ip))
                     try:
-                        with remote(client.ip, [Migrator]) as rem:
-                            rem.Migrator.migrate(master_ips, extra_ips)
-                    except EOFError as eof:
-                        UpdateController._log_message('EOFError during code migration, retrying {0}'.format(eof), client.ip, 'warning')
-                        with remote(client.ip, [Migrator]) as rem:
-                            rem.Migrator.migrate(master_ips, extra_ips)
-                    UpdateController._log_message('Finished code migration', client.ip)
-                except Exception as ex:
-                    UpdateController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
-                    UpdateController._log_message('Code migration failed with error: {0}'.format(ex), client.ip, 'error')
-                    return
+                        key = '/ovs/framework/hosts/{0}/versions'.format(System.get_my_machine_id(client=client))
+                        old_versions = Configuration.get(key) if Configuration.exists(key) else {}
+                        try:
+                            with remote(client.ip, [Migrator]) as rem:
+                                rem.Migrator.migrate(master_ips, extra_ips)
+                        except EOFError as eof:
+                            UpdateController._logger.warning('{0}: EOFError during code migration, retrying {1}'.format(client.ip, eof))
+                            with remote(client.ip, [Migrator]) as rem:
+                                rem.Migrator.migrate(master_ips, extra_ips)
+                        new_versions = Configuration.get(key) if Configuration.exists(key) else {}
+                        if old_versions != new_versions:
+                            UpdateController._logger.debug('{0}: Finished extensions code migration. Old versions: {1} --> New versions: {2}'.format(client.ip, old_versions, new_versions))
+                    except Exception as ex:
+                        failures.append('{0}: {1}'.format(client.ip, str(ex)))
+                if len(failures) > 0:
+                    raise Exception('Failed to run the extensions migrate code on all nodes. Errors found:\n\n{0}'.format('\n\n'.join(failures)))
 
-            # Start services
-            UpdateController._log_message('Starting services', client_ip=this_client.ip)
-            model_services = []
-            if 'arakoon-ovsdb' in services_to_restart:
-                model_services.append('arakoon-ovsdb')
-                services_to_restart.remove('arakoon-ovsdb')
-            if 'memcached' in services_to_restart:
-                model_services.append('memcached')
-                services_to_restart.remove('memcached')
-            UpdateController._change_services_state(services=model_services,
-                                                    ssh_clients=ssh_clients,
-                                                    action='start')
+            # Start memcached
+            if 'memcached' in services_stop_start:
+                services_stop_start.remove('memcached')
+                UpdateController._logger.debug('{0}: Starting memcached'.format(local_ip))
+                UpdateController.change_services_state(services=['memcached'],
+                                                       ssh_clients=ssh_clients,
+                                                       action='start')
 
             # Migrate model
-            UpdateController._log_message('Started model migration', client_ip=this_client.ip)
-            try:
+            if 'framework' in components:
+                UpdateController._logger.debug('{0}: Verifying DAL code migration is required'.format(local_ip))
+                old_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
+
                 from ovs.dal.helpers import Migration
                 with remote(ssh_clients[0].ip, [Migration]) as rem:
                     rem.Migration.migrate()
-                UpdateController._log_message('Finished model migration', client_ip=this_client.ip)
-            except Exception as ex:
-                UpdateController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
-                UpdateController._log_message('An unexpected error occurred: {0}'.format(ex), client_ip=this_client.ip,
-                                              severity='error')
-                return
 
-            # Post upgrade actions
-            UpdateController._log_message('Executing post upgrade actions', client_ip=this_client.ip)
+                new_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
+                if old_versions != new_versions:
+                    UpdateController._logger.debug('{0}: Finished DAL code migration. Old versions: {1} --> New versions: {2}'.format(local_ip, old_versions, new_versions))
+
+            # Post update actions
             for client in ssh_clients:
-                with remote(client.ip, [Toolbox, SSHClient]) as rem:
-                    for function in rem.Toolbox.fetch_hooks('update', 'postupgrade'):
-                        UpdateController._log_message('Executing action {0}'.format(function.__name__),
-                                                      client_ip=client.ip)
-                        try:
-                            function(rem.SSHClient(client.ip, username='root'))
-                            UpdateController._log_message('Executing action {0} completed'.format(function.__name__),
-                                                          client_ip=client.ip)
-                        except Exception as ex:
-                            UpdateController._log_message('Post upgrade action failed with error: {0}'.format(ex),
-                                                          client.ip, 'error')
-
-            # Start watcher and restart support-agent
-            UpdateController._change_services_state(services=services_to_restart,
-                                                    ssh_clients=ssh_clients,
-                                                    action='start')
-            UpdateController._change_services_state(services=['support-agent'],
-                                                    ssh_clients=ssh_clients,
-                                                    action='restart')
-
-            UpdateController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
-            UpdateController._log_message('+++ Finished updating +++')
-        except RuntimeError as rte:
-            UpdateController._log_message('Error during framework update: {0}'.format(rte), severity='error')
-            UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-        except NoLockAvailableException:
-            UpdateController._log_message('Another framework update is currently in progress!')
-        except Exception as ex:
-            UpdateController._log_message('Error during framework update: {0}'.format(ex), severity='error')
-            UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-        finally:
-            filemutex.release()
-
-    @staticmethod
-    def update_volumedriver():
-        """
-        Update the volumedriver
-        :return: None
-        """
-        filemutex = file_mutex('system_update', wait=2)
-        upgrade_file = '/etc/ready_for_upgrade'
-        upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
-        ssh_clients = []
-        try:
-            filemutex.acquire()
-            UpdateController._log_message('+++ Starting volumedriver update +++')
-
-            from ovs.dal.lists.storagerouterlist import StorageRouterList
-
-            UpdateController._log_message('Generating SSH client connections for each storage router')
-            storage_routers = StorageRouterList.get_storagerouters()
-            ssh_clients = [SSHClient(storage_router.ip, 'root') for storage_router in storage_routers]
-            this_client = [client for client in ssh_clients if client.is_local is True][0]
-
-            # Commence update !!!!!!!
-            # 0. Create locks
-            UpdateController._log_message('Creating lock files', client_ip=this_client.ip)
-            for client in ssh_clients:
-                client.run(['touch', upgrade_file])  # Prevents manual install or upgrade individual packages
-                client.run(['touch', upgrade_ongoing_check_file])  # Prevents clicking x times on 'Update' btn
-
-            # 1. Check requirements
-            packages_to_update = set()
-            all_services_to_restart = []
-            for client in ssh_clients:
-                for function in Toolbox.fetch_hooks('update', 'metadata'):
-                    UpdateController._log_message('Executing function {0}'.format(function.__name__),
-                                                  client_ip=client.ip)
-                    output = function(client)
-                    for key, value in output.iteritems():
-                        if key != 'volumedriver':
-                            continue
-                        for package_info in value:
-                            packages_to_update.update(package_info['packages'])
-                            all_services_to_restart += package_info['services']
-
-            services_to_restart = []
-            for service in all_services_to_restart:
-                if service not in services_to_restart:
-                    services_to_restart.append(service)  # Filter out duplicates keeping the order of services (eg: watcher-framework before memcached)
-
-            UpdateController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
-            UpdateController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
-
-            # 1. Stop services
-            if UpdateController._change_services_state(services=services_to_restart,
-                                                       ssh_clients=ssh_clients,
-                                                       action='stop') is False:
-                UpdateController._log_message('Stopping all services on every node failed, cannot continue',
-                                              client_ip=this_client.ip, severity='warning')
-                UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-
-                UpdateController._log_message('Attempting to start the services again', client_ip=this_client.ip)
-                UpdateController._change_services_state(services=services_to_restart,
-                                                        ssh_clients=ssh_clients,
-                                                        action='start')
-                UpdateController._log_message('Failed to stop all required services, update aborted',
-                                              client_ip=this_client.ip, severity='error')
-                return
-
-            # 2. Update packages
-            failed_clients = []
-            for client in ssh_clients:
-                PackageManager.update(client=client)
-                try:
-                    for package_name in packages_to_update:
-                        UpdateController._log_message('Installing {0}'.format(package_name), client.ip)
-                        PackageManager.install(package_name=package_name,
-                                               client=client,
-                                               force=True)
-                        UpdateController._log_message('Installed {0}'.format(package_name), client.ip)
-                    client.file_delete(upgrade_file)
-                except subprocess.CalledProcessError as cpe:
-                    UpdateController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip,
-                                                  'error')
-                    failed_clients.append(client)
-                    break
-
-            if failed_clients:
-                UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-                UpdateController._log_message('Error occurred. Attempting to start all services again',
-                                              client_ip=this_client.ip, severity='error')
-                UpdateController._change_services_state(services=services_to_restart,
-                                                        ssh_clients=ssh_clients,
-                                                        action='start')
-                UpdateController._log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients]), this_client.ip),
-                                              this_client.ip,
-                                              'error')
-                return
-
-            # 3. Post upgrade actions
-            UpdateController._log_message('Executing post upgrade actions', client_ip=this_client.ip)
-            for client in ssh_clients:
-                for function in Toolbox.fetch_hooks('update', 'postupgrade'):
-                    UpdateController._log_message('Executing action: {0}'.format(function.__name__), client_ip=client.ip)
+                UpdateController._logger.debug('{0}: Executing post-update actions'.format(client.ip))
+                for function in Toolbox.fetch_hooks('update', 'post_update_multi'):
                     try:
-                        function(client)
+                        UpdateController._logger.debug('{0}: Executing hook {1}'.format(client.ip, function.__name__))
+                        function(client=client, components=components)
+                        UpdateController._logger.debug('{0}: Executed hook {1}'.format(client.ip, function.__name__))
                     except Exception as ex:
-                        UpdateController._log_message('Post upgrade action failed with error: {0}'.format(ex),
-                                                      client.ip, 'error')
+                        UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(client.ip, function.__name__, ex))
 
-            # 4. Start services
-            UpdateController._log_message('Starting services', client_ip=this_client.ip)
-            UpdateController._change_services_state(services=services_to_restart,
-                                                    ssh_clients=ssh_clients,
-                                                    action='start')
+            for function in Toolbox.fetch_hooks('update', 'post_update_single'):
+                try:
+                    UpdateController._logger.debug('{0}: Executing hook {1}'.format(local_ip, function.__name__))
+                    function(components=components)
+                    UpdateController._logger.debug('{0}: Executed hook {1}'.format(local_ip, function.__name__))
+                except Exception as ex:
+                    UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(local_ip, function.__name__, ex))
 
-            UpdateController._remove_lock_files([upgrade_ongoing_check_file], ssh_clients)
-            UpdateController._log_message('+++ Finished updating +++')
-        except RuntimeError as rte:
-            UpdateController._log_message('Error during volumedriver update: {0}'.format(rte), severity='error')
-            UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
+            # Start services
+            UpdateController.change_services_state(services=services_stop_start,
+                                                   ssh_clients=ssh_clients,
+                                                   action='start')
+
+            UpdateController._refresh_package_information(local_ip=local_ip)
+            UpdateController._logger.debug('+++ Finished updating +++')
         except NoLockAvailableException:
-            UpdateController._log_message('Another volumedriver update is currently in progress!')
+            UpdateController._logger.debug('Another update is currently in progress!')
         except Exception as ex:
-            UpdateController._log_message('Error during volumedriver update: {0}'.format(ex), severity='error')
-            UpdateController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
+            UpdateController._logger.exception('Error during update: {0}'.format(ex))
+            UpdateController._recover_from_failed_update(local_client_ip=local_ip,
+                                                         ssh_clients=ssh_clients,
+                                                         services_to_start_again=services_stop_start)
         finally:
             filemutex.release()
+            for ssh_client in ssh_clients:
+                for file_name in [UpdateController._update_file, UpdateController._update_ongoing_file]:
+                    try:
+                        if ssh_client.file_exists(file_name):
+                            ssh_client.file_delete(file_name)
+                    except:
+                        UpdateController._logger.warning('[0}: Failed to remove lock file {1}'.format(ssh_client.ip, file_name))
 
     @staticmethod
-    def _log_message(message, client_ip=None, severity='info'):
-        if client_ip is not None:
-            message = '{0:<15}: {1}'.format(client_ip, message)
-        if severity == 'info':
-            UpdateController._logger.info(message, print_msg=True)
-        elif severity == 'warning':
-            UpdateController._logger.warning(message, print_msg=True)
-        elif severity == 'error':
-            UpdateController._logger.error(message, print_msg=True)
-
-    @staticmethod
-    def _remove_lock_files(files, ssh_clients):
-        for ssh_client in ssh_clients:
-            for file_name in files:
-                if ssh_client.file_exists(file_name):
-                    ssh_client.file_delete(file_name)
-
-    @staticmethod
-    def _change_services_state(services, ssh_clients, action):
+    def change_services_state(services, ssh_clients, action):
         """
         Stop/start services on SSH clients
         If action is start, we ignore errors and try to start other services on other nodes
         """
+        services = list(services)
         if action == 'start':
             services.reverse()  # Start services again in reverse order of stopping
         for service_name in services:
@@ -384,15 +665,40 @@ class UpdateController(object):
                 description = 'stopping' if action == 'stop' else 'starting' if action == 'start' else 'restarting'
                 try:
                     if ServiceManager.has_service(service_name, client=ssh_client):
-                        UpdateController._log_message('{0} service {1}'.format(description.capitalize(), service_name),
-                                                      ssh_client.ip)
                         Toolbox.change_service_state(client=ssh_client,
                                                      name=service_name,
                                                      state=action,
                                                      logger=UpdateController._logger)
-                        UpdateController._log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started' if action == 'start' else 'Restarted', service_name), ssh_client.ip)
                 except Exception as exc:
-                    UpdateController._log_message('Something went wrong {0} service {1}: {2}'.format(description, service_name, exc), ssh_client.ip, severity='warning')
+                    UpdateController._logger.warning('{0}: Something went wrong {1} service {2}: {3}'.format(ssh_client.ip, description, service_name, exc))
                     if action == 'stop':
                         return False
         return True
+
+    ###########
+    # HELPERS #
+    ###########
+    @staticmethod
+    def _refresh_package_information(local_ip):
+        # Refresh updates
+        UpdateController._logger.debug('{0}: Refreshing package information'.format(local_ip))
+        counter = 1
+        while counter < 6:
+            try:
+                GenericController.refresh_package_information()
+                return
+            except NoLockAvailableException:
+                UpdateController._logger.debug('{0}: Attempt {1}: Could not refresh the update information, trying again'.format(local_ip, counter))
+                time.sleep(6)  # Wait 30 seconds max in total
+            counter += 1
+            if counter == 6:
+                raise Exception('Could not refresh the update information')
+
+    @staticmethod
+    def _recover_from_failed_update(local_client_ip, ssh_clients, services_to_start_again):
+        if len(ssh_clients) > 0:
+            UpdateController.change_services_state(services=services_to_start_again,
+                                                   ssh_clients=ssh_clients,
+                                                   action='start')
+            UpdateController._refresh_package_information(local_ip=local_client_ip)
+            UpdateController._logger.error('{0}: Failed to update. Please check all the logs for more information'.format(local_client_ip))

@@ -36,13 +36,11 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.storageserver.storagedriver import MetadataServerClient
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import MetadataServerClient, StorageDriverConfiguration, MDSMetaDataBackendConfig, MDSNodeConfig, SRCObjectNotFoundException
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig, ObjectNotFoundException as SRCObjectNotFoundException
 
 
 class MDSServiceController(object):
@@ -56,26 +54,19 @@ class MDSServiceController(object):
     storagerouterclient.Logger.enableLogging()
 
     @staticmethod
-    def prepare_mds_service(storagerouter, vpool, fresh_only, reload_config):
+    def prepare_mds_service(storagerouter, vpool, fresh_only):
         """
         Prepares an MDS service:
         * Creates the required configuration
         * Sets up the service files
-
         Assumes the StorageRouter and VPool are already configured with a StorageDriver and that all model-wise
         configuration regarding both is completed.
         :param storagerouter: Storagerouter on which MDS service will be created
         :type storagerouter: StorageRouter
-
         :param vpool: The vPool for which the MDS service will be created
         :type vpool: VPool
-
         :param fresh_only: If True and no current mds services exist for this vpool on this storagerouter, a new 1 will be created
         :type fresh_only: bool
-
-        :param reload_config: If True, the volumedriver's updated configuration will be reloaded
-        :type reload_config: bool
-
         :return: Newly created service
         :rtype: MDSService
         """
@@ -164,7 +155,7 @@ class MDSServiceController(object):
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
         storagedriver_config.load()
         storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
-        storagedriver_config.save(client, reload_config=reload_config)
+        storagedriver_config.save(client)
 
         return mds_service
 
@@ -225,7 +216,7 @@ class MDSServiceController(object):
                 storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
                 storagedriver_config.load()
                 storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
-                storagedriver_config.save(client, reload_config=reconfigure)
+                storagedriver_config.save(client)
 
             tries = 5
             while tries > 0:
@@ -791,8 +782,7 @@ class MDSServiceController(object):
                 if has_room is False and client is not None:
                     mds_service = MDSServiceController.prepare_mds_service(storagerouter=storagerouter,
                                                                            vpool=vpool,
-                                                                           fresh_only=False,
-                                                                           reload_config=True)
+                                                                           fresh_only=False)
                     if mds_service is None:
                         raise RuntimeError('Could not add MDS node')
                     mds_services.append(mds_service)

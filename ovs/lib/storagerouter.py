@@ -41,7 +41,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.api.client import OVSClient
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.disk import DiskTools
 from ovs.extensions.generic.remote import remote
@@ -50,17 +50,16 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient, ClusterNodeConfig, LocalStorageRouterClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
-from ovs.lib.helpers.decorators import add_hooks, ensure_single
+from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import ArakoonNodeConfig, ClusterNodeConfig, ClusterRegistry, LocalStorageRouterClient
 
 
 class StorageRouterController(object):
@@ -380,6 +379,7 @@ class StorageRouterController(object):
             metadata_map['backend_aa_{0}'.format(storagerouter.guid)] = {'backend_info': backend_info_aa,
                                                                          'connection_info': connection_info_aa}
 
+        read_preferences = []
         fragment_cache_on_read = parameters['fragment_cache_on_read']
         fragment_cache_on_write = parameters['fragment_cache_on_write']
         for key, metadata in metadata_map.iteritems():
@@ -391,7 +391,7 @@ class StorageRouterController(object):
             alba_backend_guid = metadata['backend_info']['alba_backend_guid']
             arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(backend_guid=alba_backend_guid, ovs_client=ovs_client)
             try:
-                backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend'})
+                backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend,remote_stack'})
                 preset_info = dict((preset['name'], preset) for preset in backend_dict['presets'])
                 if preset_name not in preset_info:
                     raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_dict['name']))
@@ -402,6 +402,12 @@ class StorageRouterController(object):
                 vpool.status = VPool.STATUSES.FAILURE
                 vpool.save()
                 raise
+
+            # Calculate ALBA local read preference
+            if backend_dict['scaling'] == 'GLOBAL' and metadata['connection_info']['local'] is True:
+                for node_id, value in backend_dict['remote_stack'].iteritems():
+                    if value.get('domain') is not None and value['domain']['guid'] in storagerouter.regular_domains:
+                        read_preferences.append(node_id)
 
             policies = []
             for policy_info in preset_info[preset_name]['policies']:
@@ -468,35 +474,33 @@ class StorageRouterController(object):
         storagedriver.description = storagedriver.name
         storagedriver.storagerouter = storagerouter
         storagedriver.storagedriver_id = vrouter_id
+        storagedriver.save()
 
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
         config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
         config.load_config()
         arakoon_nodes = []
-        arakoon_node_configs = []
         for node in config.nodes:
             arakoon_nodes.append({'node_id': node.name, 'host': node.ip, 'port': node.client_port})
-            arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
         node_configs = []
-        for existing_storagedriver in StorageDriverList.get_storagedrivers():
-            if existing_storagedriver.vpool_guid == vpool.guid:
-                existing_storagedriver.invalidate_dynamics('cluster_node_config')
-                node_configs.append(ClusterNodeConfig(**existing_storagedriver.cluster_node_config))
-        storagedriver.invalidate_dynamics('cluster_node_config')
-        node_configs.append(ClusterNodeConfig(**storagedriver.cluster_node_config))
+        existing_storagedrivers = []
+        for sd in vpool.storagedrivers:
+            if sd != storagedriver:
+                existing_storagedrivers.append(sd)
+            sd.invalidate_dynamics('cluster_node_config')
+            node_configs.append(ClusterNodeConfig(**sd.cluster_node_config))
 
         try:
-            vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
-            vrouter_clusterregistry.set_node_configs(node_configs)
+            vpool.clusterregistry_client.set_node_configs(node_configs)
+            for sd in existing_storagedrivers:
+                vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id))
         except:
+            storagedriver.delete()
             vpool.status = VPool.STATUSES.FAILURE
             vpool.save()
             if new_vpool is True:
                 vpool.delete()
             raise
-
-        # Store the model
-        storagedriver.save()
 
         ##############################
         # CREATE PARTITIONS IN MODEL #
@@ -643,6 +647,7 @@ class StorageRouterController(object):
                 'manifest_cache_size': manifest_cache_size,
                 'fragment_cache': fragment_cache_info,
                 'transport': 'tcp',
+                'read_preference': read_preferences,
                 'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
             }, indent=4), raw=True)
             Configuration.set('/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid), json.dumps({
@@ -652,6 +657,7 @@ class StorageRouterController(object):
                 'manifest_cache_size': manifest_cache_size,
                 'fragment_cache': ['none'],
                 'transport': 'tcp',
+                'read_preference': read_preferences,
                 'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
             }, indent=4), raw=True)
 
@@ -721,8 +727,8 @@ class StorageRouterController(object):
                          'vrouter_min_workers': 4,
                          'vrouter_max_workers': 16,
                          'vrouter_sco_multiplier': sco_size * 1024 / cluster_size,  # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB),
-                         'vrouter_backend_sync_timeout_ms': 5000,
-                         'vrouter_migrate_timeout_ms': 5000,
+                         'vrouter_backend_sync_timeout_ms': 60000,
+                         'vrouter_migrate_timeout_ms': 60000,
                          'vrouter_use_fencing': True}
 
         storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
@@ -748,14 +754,14 @@ class StorageRouterController(object):
         storagedriver_config.configure_event_publisher(events_amqp_routing_key=Configuration.get('/ovs/framework/messagequeue|queues.storagedriver'),
                                                        events_amqp_uris=queue_urls)
         storagedriver_config.configure_threadpool_component(num_threads=16)
-        storagedriver_config.save(client, reload_config=False)
+        storagedriver_config.configure_network_interface(network_max_neighbour_distance=StorageDriver.DISTANCES.FAR - 1)
+        storagedriver_config.save(client)
 
         DiskController.sync_with_reality(storagerouter.guid)
 
         MDSServiceController.prepare_mds_service(storagerouter=storagerouter,
                                                  vpool=vpool,
-                                                 fresh_only=True,
-                                                 reload_config=False)
+                                                 fresh_only=True)
 
         ##################
         # START SERVICES #
@@ -784,7 +790,7 @@ class StorageRouterController(object):
         ServiceManager.start_service(dtl_service, client=root_client)
         ServiceManager.add_service(name='ovs-albaproxy', params=alba_proxy_params, client=root_client, target_name=alba_proxy_service)
         ServiceManager.start_service(alba_proxy_service, client=root_client)
-        ServiceManager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client, target_name=sd_service, additional_dependencies=[alba_proxy_service])
+        ServiceManager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client, target_name=sd_service)
 
         storagedriver = StorageDriver(storagedriver.guid)
         current_startup_counter = storagedriver.startup_counter
@@ -820,11 +826,10 @@ class StorageRouterController(object):
                 storagedriver_config.save(node_client)
 
         # Everything's reconfigured, refresh new cluster configuration
-        sd_client = StorageDriverClient.load(vpool)
         for current_storagedriver in vpool.storagedrivers:
             if current_storagedriver.storagerouter.ip not in ip_client_map:
                 continue
-            sd_client.update_cluster_node_configs(str(current_storagedriver.storagedriver_id))
+            vpool.storagedriver_client.update_cluster_node_configs(str(current_storagedriver.storagedriver_id))
 
         # Fill vPool size
         with remote(root_client.ip, [os], 'root') as rem:
@@ -875,17 +880,18 @@ class StorageRouterController(object):
 
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Checking availability of related Storage Routers'.format(storage_driver.guid, storage_driver.name))
         client = None
-        temp_client = None
         errors_found = False
         storage_router = storage_driver.storagerouter
         storage_drivers_left = False
         storage_router_online = True
         storage_routers_offline = [StorageRouter(storage_router_guid) for storage_router_guid in offline_storage_router_guids]
         available_storage_drivers = []
+        all_storage_drivers = []
         for sd in vpool.storagedrivers:
             sr = sd.storagerouter
             if sr != storage_router:
                 storage_drivers_left = True
+            all_storage_drivers.append(sd)
             try:
                 temp_client = SSHClient(sr, username='root')
                 if sr in storage_routers_offline:
@@ -893,11 +899,15 @@ class StorageRouterController(object):
                 with remote(temp_client.ip, [LocalStorageRouterClient]) as rem:
                     sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
                     if Configuration.exists(sd_key) is True:
-                        path = Configuration.get_configuration_path(sd_key)
-                        lsrc = rem.LocalStorageRouterClient(path)
-                        lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
-                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Available Storage Driver for migration - {1}'.format(storage_driver.guid, sd.name))
-                        available_storage_drivers.append(sd)
+                        try:
+                            path = Configuration.get_configuration_path(sd_key)
+                            lsrc = rem.LocalStorageRouterClient(path)
+                            lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
+                            StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Available Storage Driver for migration - {1}'.format(storage_driver.guid, sd.name))
+                            available_storage_drivers.append(sd)
+                        except Exception as ex:
+                            if 'ClusterNotReachableException' not in str(ex):
+                                raise
                 client = temp_client
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Router {1} with IP {2} is online'.format(storage_driver.guid, sr.name, sr.ip))
             except UnableToConnectException:
@@ -907,24 +917,13 @@ class StorageRouterController(object):
                         storage_router_online = False
                 else:
                     raise RuntimeError('Not all StorageRouters are reachable')
-            except Exception as ex:
-                if 'ClusterNotReachableException' in str(ex):
-                    if sd != storage_driver:
-                        raise RuntimeError('Not all StorageDrivers are reachable, please (re)start them and try again')
-                    if client is None:
-                        client = temp_client
-                else:
-                    raise
 
         if client is None:
-            raise RuntimeError('Could not found any responsive node in the cluster')
+            raise RuntimeError('Could not find any responsive node in the cluster')
 
         storage_driver.invalidate_dynamics('vdisks_guids')
         if len(storage_driver.vdisks_guids) > 0:
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
-
-        if storage_drivers_left and len(available_storage_drivers) == 0:
-            raise RuntimeError('vPool is spread over several other Storage Drivers, but none of them are responsive')
 
         # Start removal
         if storage_drivers_left is True:
@@ -935,6 +934,9 @@ class StorageRouterController(object):
 
         available_sr_names = [sd.storagerouter.name for sd in available_storage_drivers]
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Routers on which an available Storage Driver runs: {1}'.format(storage_driver.guid, ', '.join(available_sr_names)))
+
+        offline_storagedrivers_names = [sd.storagerouter.name for sd in all_storage_drivers if sd not in available_storage_drivers]
+        StorageRouterController._logger.warning('Remove Storage Driver - Guid {0} - Storage Routers on which a Storage Driver is unavailable: {1}'.format(storage_driver.guid, ', '.join(offline_storagedrivers_names)))
 
         # Remove stale vDisks
         voldrv_vdisks = [entry.object_id() for entry in vpool.objectregistry_client.get_all_registrations()]
@@ -961,18 +963,6 @@ class StorageRouterController(object):
                                                            excluded_storagerouters=[storage_router] + storage_routers_offline)
                     except Exception:
                         StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Virtual Disk {1} {2} - Ensuring MDS safety failed'.format(storage_driver.guid, vdisk.guid, vdisk.name))
-
-        arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
-        config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
-        config.load_config()
-        arakoon_node_configs = []
-        offline_node_ips = [sr.ip for sr in storage_routers_offline]
-        for node in config.nodes:
-            if node.ip in offline_node_ips or (node.ip == storage_router.ip and storage_router_online is False):
-                continue
-            arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
-        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Arakoon node configs - \n{1}'.format(storage_driver.guid, '\n'.join([str(config) for config in arakoon_node_configs])))
-        vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
 
         # Disable and stop DTL, voldrv and albaproxy services
         if storage_router_online is True:
@@ -1022,12 +1012,11 @@ class StorageRouterController(object):
                             storagedriver_client.destroy_filesystem()
                         except RuntimeError as rte:
                             # If backend has already been deleted, we cannot delete the filesystem anymore --> storage leak!!!
-                            # @TODO: Find better way for catching this error
                             if 'MasterLookupResult.Error' not in rte.message:
                                 raise
 
                     # noinspection PyArgumentList
-                    vrouter_clusterregistry.erase_node_configs()
+                    vpool.clusterregistry_client.erase_node_configs()
                 except RuntimeError:
                     StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs failed'.format(storage_driver.guid))
                     errors_found = True
@@ -1041,23 +1030,26 @@ class StorageRouterController(object):
                 StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, albaproxy_service))
                 errors_found = True
 
-        # Reconfigure volumedriver arakoon cluster
+        # Reconfigure cluster node configs
         try:
             if storage_drivers_left is True:
-                StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Reconfiguring volumedriver arakoon cluster'.format(storage_driver.guid))
+                StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Reconfiguring cluster node configs'.format(storage_driver.guid))
                 node_configs = []
-                for sd in available_storage_drivers:
+                for sd in all_storage_drivers:
                     if sd != storage_driver:
-                        node_configs.append(ClusterNodeConfig(**sd.cluster_node_config))
+                        sd.invalidate_dynamics(['cluster_node_config'])
+                        config = sd.cluster_node_config
+                        if storage_driver.storagedriver_id in config['node_distance_map']:
+                            del config['node_distance_map'][storage_driver.storagedriver_id]
+                        node_configs.append(ClusterNodeConfig(**config))
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Node configs - \n{1}'.format(storage_driver.guid, '\n'.join([str(config) for config in node_configs])))
-                vrouter_clusterregistry.set_node_configs(node_configs)
-                srclient = StorageDriverClient.load(vpool)
+                vpool.clusterregistry_client.set_node_configs(node_configs)
                 for sd in available_storage_drivers:
                     if sd != storage_driver:
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Driver {1} {2} - Updating cluster node configs'.format(storage_driver.guid, sd.guid, sd.name))
-                        srclient.update_cluster_node_configs(str(sd.storagedriver_id))
+                        vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id))
         except Exception:
-            StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Reconfiguring volumedriver arakoon cluster failed'.format(storage_driver.guid))
+            StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Reconfiguring cluster node configs failed'.format(storage_driver.guid))
             errors_found = True
 
         # Removing MDS services
@@ -1173,7 +1165,7 @@ class StorageRouterController(object):
         """
         client = SSHClient(StorageRouter(storagerouter_guid))
         return {'storagerouter_guid': storagerouter_guid,
-                'versions': PackageManager.get_versions(client)}
+                'versions': PackageManager.get_installed_versions(client)}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_support_info')
@@ -1270,213 +1262,6 @@ class StorageRouterController(object):
         """
         client = SSHClient(StorageRouter(storagerouter_guid))
         return client.dir_exists(directory='/mnt/{0}'.format(name))
-
-    @staticmethod
-    @celery.task(name='ovs.storagerouter.get_update_status')
-    def get_update_status(storagerouter_ip):
-        """
-        Checks for new updates
-        :param storagerouter_ip: IP of the Storage Router to check for updates
-        :type storagerouter_ip: str
-        :return: Update status for specified storage router
-        :rtype: dict
-        """
-        # Check plugin requirements
-        root_client = SSHClient(storagerouter_ip,
-                                username='root')
-        required_plugin_params = {'name': (str, None),             # Name of a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
-                                  'version': (str, None),          # Available version to be installed
-                                  'namespace': (str, None),        # Name of the plugin and is used for translation in html. Eg: ALBA:packages.sdm
-                                  'services': (list, str),         # Services which the plugin depends upon and should be stopped during update
-                                  'packages': (list, str),         # Packages which contain the plugin code and should be updated
-                                  'downtime': (list, tuple),       # Information about crucial services which will go down during the update
-                                  'prerequisites': (list, tuple)}  # Information about prerequisites which are unmet (eg running vms for storage driver update)
-        package_map = {}
-        plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
-        for function in plugin_functions:
-            output = function(root_client)
-            if not isinstance(output, dict):
-                raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
-
-            for key, value in output.iteritems():
-                for out in value:
-                    Toolbox.verify_required_params(required_plugin_params, out)
-                if key not in package_map:
-                    package_map[key] = []
-                package_map[key] += value
-
-        # Update apt (only our ovs apt repo)
-        PackageManager.update(client=root_client)
-
-        # Compare installed and candidate versions
-        return_value = {'upgrade_ongoing': os.path.exists('/etc/upgrade_ongoing')}
-        for gui_name, package_information in package_map.iteritems():
-            return_value[gui_name] = []
-            for package_info in package_information:
-                version = package_info['version']
-                if version:
-                    gui_down = 'watcher-framework' in package_info['services'] or 'nginx' in package_info['services']
-                    info_added = False
-                    for index, item in enumerate(return_value[gui_name]):
-                        if item['name'] == package_info['name']:
-                            return_value[gui_name][index]['downtime'].extend(package_info['downtime'])
-                            info_added = True
-                            if gui_down is True and return_value[gui_name][index]['gui_down'] is False:
-                                return_value[gui_name][index]['gui_down'] = True
-                    if info_added is False:  # Some plugins can have same package dependencies as core and we only want to show each package once in GUI (Eg: Arakoon for core and ALBA)
-                        return_value[gui_name].append({'to': version,
-                                                       'name': package_info['name'],
-                                                       'gui_down': gui_down,
-                                                       'downtime': package_info['downtime'],
-                                                       'namespace': package_info['namespace'],
-                                                       'prerequisites': package_info['prerequisites']})
-        return return_value
-
-    @staticmethod
-    @add_hooks('update', 'metadata')
-    def get_metadata_framework(client):
-        """
-        Retrieve packages and services on which the framework depends
-        :param client: SSHClient on which to retrieve the metadata
-        :type client: SSHClient
-        :return: List of dictionaries which contain services to restart,
-                                                    packages to update,
-                                                    information about potential downtime
-                                                    information about unmet prerequisites
-        :rtype: list
-        """
-        this_sr = StorageRouterList.get_by_ip(client.ip)
-        srs = StorageRouterList.get_storagerouters()
-        downtime = []
-        fwk_cluster_name = Configuration.get('/ovs/framework/arakoon_clusters|ovsdb')
-        metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=fwk_cluster_name)
-        if metadata is None:
-            raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found None'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK))
-
-        if metadata['internal'] is True:
-            ovsdb_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == ServiceType.SERVICE_TYPES.ARAKOON and ser.name == 'arakoon-ovsdb']
-            downtime = [('ovs', 'ovsdb', None)] if len(ovsdb_cluster) < 3 and this_sr.guid in ovsdb_cluster else []
-
-        ovs_info = PackageManager.verify_update_required(packages=['openvstorage-core', 'openvstorage-webapps', 'openvstorage-cinder-plugin'],
-                                                         services=['watcher-framework', 'memcached'],
-                                                         client=client)
-        arakoon_info = PackageManager.verify_update_required(packages=['arakoon'],
-                                                             services=['arakoon-ovsdb'],
-                                                             client=client)
-
-        return {'framework': [{'name': 'ovs',
-                               'version': ovs_info['version'],
-                               'services': ovs_info['services'],
-                               'packages': ovs_info['packages'],
-                               'downtime': [],
-                               'namespace': 'ovs',
-                               'prerequisites': []},
-                              {'name': 'arakoon',
-                               'version': arakoon_info['version'],
-                               'services': arakoon_info['services'],
-                               'packages': arakoon_info['packages'],
-                               'downtime': downtime,
-                               'namespace': 'ovs',
-                               'prerequisites': []}]}
-
-    @staticmethod
-    @add_hooks('update', 'metadata')
-    def get_metadata_volumedriver(client):
-        """
-        Retrieve packages and services on which the volumedriver depends
-        :param client: SSHClient on which to retrieve the metadata
-        :type client: SSHClient
-        :return: List of dictionaries which contain services to restart,
-                                                    packages to update,
-                                                    information about potential downtime
-                                                    information about unmet prerequisites
-        :rtype: list
-        """
-        srs = StorageRouterList.get_storagerouters()
-        this_sr = StorageRouterList.get_by_ip(client.ip)
-        downtime = []
-        key = '/ovs/framework/arakoon_clusters|voldrv'
-        if Configuration.exists(key):
-            sd_cluster_name = Configuration.get(key)
-            metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=sd_cluster_name)
-            if metadata is None:
-                raise ValueError('Expected exactly 1 arakoon cluster of type {0}, found None'.format(ServiceType.ARAKOON_CLUSTER_TYPES.SD))
-
-            if metadata['internal'] is True:
-                voldrv_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == ServiceType.SERVICE_TYPES.ARAKOON and ser.name == 'arakoon-voldrv']
-                downtime = [('ovs', 'voldrv', None)] if len(voldrv_cluster) < 3 and this_sr.guid in voldrv_cluster else []
-
-        alba_proxies = []
-        alba_downtime = []
-        for sr in srs:
-            for service in sr.services:
-                if service.type.name == ServiceType.SERVICE_TYPES.ALBA_PROXY and service.storagerouter_guid == this_sr.guid:
-                    alba_proxies.append(service.alba_proxy)
-                    alba_downtime.append(('ovs', 'proxy', service.alba_proxy.storagedriver.vpool.name))
-
-        prerequisites = []
-        volumedriver_services = ['ovs-volumedriver_{0}'.format(sd.vpool.name)
-                                 for sd in this_sr.storagedrivers]
-        volumedriver_services.extend(['ovs-dtl_{0}'.format(sd.vpool.name)
-                                      for sd in this_sr.storagedrivers])
-        voldrv_info = PackageManager.verify_update_required(packages=['volumedriver-base', 'volumedriver-server',
-                                                                      'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server'],
-                                                            services=volumedriver_services,
-                                                            client=client)
-        alba_info = PackageManager.verify_update_required(packages=['alba'],
-                                                          services=[service.service.name for service in alba_proxies],
-                                                          client=client)
-        arakoon_info = PackageManager.verify_update_required(packages=['arakoon'],
-                                                             services=['arakoon-voldrv'],
-                                                             client=client)
-
-        return {'volumedriver': [{'name': 'volumedriver',
-                                  'version': voldrv_info['version'],
-                                  'services': voldrv_info['services'],
-                                  'packages': voldrv_info['packages'],
-                                  'downtime': alba_downtime,
-                                  'namespace': 'ovs',
-                                  'prerequisites': prerequisites},
-                                 {'name': 'alba',
-                                  'version': alba_info['version'],
-                                  'services': alba_info['services'],
-                                  'packages': alba_info['packages'],
-                                  'downtime': alba_downtime,
-                                  'namespace': 'ovs',
-                                  'prerequisites': prerequisites},
-                                 {'name': 'arakoon',
-                                  'version': arakoon_info['version'],
-                                  'services': arakoon_info['services'],
-                                  'packages': arakoon_info['packages'],
-                                  'downtime': downtime,
-                                  'namespace': 'ovs',
-                                  'prerequisites': []}]}
-
-    @staticmethod
-    @celery.task(name='ovs.storagerouter.update_framework')
-    def update_framework(storagerouter_ip):
-        """
-        Launch the update_framework method in setup.py
-        :param storagerouter_ip: IP of the Storage Router to update the framework packages on
-        :type storagerouter_ip: str
-        :return: None
-        """
-        root_client = SSHClient(storagerouter_ip,
-                                username='root')
-        root_client.run(['ovs', 'update', 'framework'])
-
-    @staticmethod
-    @celery.task(name='ovs.storagerouter.update_volumedriver')
-    def update_volumedriver(storagerouter_ip):
-        """
-        Launch the update_volumedriver method in setup.py
-        :param storagerouter_ip: IP of the Storage Router to update the volumedriver packages on
-        :type storagerouter_ip: str
-        :return: None
-        """
-        root_client = SSHClient(storagerouter_ip,
-                                username='root')
-        root_client.run(['ovs', 'update', 'volumedriver'])
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.refresh_hardware')

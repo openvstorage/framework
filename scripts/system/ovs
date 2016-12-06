@@ -37,8 +37,7 @@ function show_help {
     echo "    - ovs setup demote                Demote this node (master -> extra)"
     echo ""
     echo "  * Update options:"
-    echo "    - ovs update framework            Update framework components on all nodes in cluster"
-    echo "    - ovs update volumedriver         Update volumedriver components on all nodes in cluster"
+    echo "    - ovs update <components>         Update specified components on all nodes in cluster (comma-separated list)"
     echo ""
     echo "  * Remove options:"
     echo "    - ovs remove node <ip>            Remove node from cluster"
@@ -81,12 +80,19 @@ elif [ "$1" = "setup" ] ; then
         show_help
     fi
 elif [ "$1" = "update" ] ; then
-    if [ "$2" = "framework" ] ; then
-        echo 'date >> /var/log/ovs/update.log; python -c "from ovs.lib.update import UpdateController; UpdateController.update_framework()" &>> /var/log/ovs/update.log; echo "done" >> /var/log/ovs/update.log' > /tmp/update
-        at -f /tmp/update now
-        rm /tmp/update
-    elif [ "$2" = "volumedriver" ] ; then
-        echo 'date >> /var/log/ovs/update.log; python -c "from ovs.lib.update import UpdateController; UpdateController.update_volumedriver()" &>> /var/log/ovs/update.log; echo "done" >> /var/log/ovs/update.log' > /tmp/update
+    if [ "$#" -eq 2 ] ; then
+        IFS=',' read -r -a components <<< "$2"
+        comp_string="["
+        for i in ${components[@]}; do
+            if [ ${i} == ${components[-1]} ]; then
+                comp_string="$comp_string'$i'"
+            else
+                comp_string="$comp_string'$i',"
+            fi
+        done
+        comp_string=${comp_string}"]"
+
+        echo 'date >> /var/log/ovs/update.log; python -c "from ovs.lib.update import UpdateController; UpdateController.execute_update('${comp_string}')" &>> /var/log/ovs/update.log; echo "done" >> /var/log/ovs/update.log' > /tmp/update
         at -f /tmp/update now
         rm /tmp/update
     else
@@ -150,6 +156,7 @@ elif [ "$1" = "collect" ] ; then
         LOGFILE=/tmp/ovs-`hostname`-`date "+%Y%m%d%H%M%S"`-logs.tar
         rm -f ${LOGFILE}
         rm -f ${LOGFILE}.gz
+        journalctl -u ovs-* -u asd-* -u alba-* --no-pager > /var/log/ovs_journald.log 2>&1 || true
         touch ${LOGFILE}
         tar uvf ${LOGFILE} /var/log/arakoon* > /dev/null 2>&1
         tar uvf ${LOGFILE} /var/log/nginx* > /dev/null 2>&1

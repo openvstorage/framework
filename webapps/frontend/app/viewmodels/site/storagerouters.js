@@ -31,7 +31,7 @@ define([
         self.widgets               = [];
         self.storageRoutersHeaders = [
             { key: 'status',         value: '',                                  width: 30        },
-            { key: 'name',           value: $.t('ovs:generic.name'),             width: 125       },
+            { key: 'name',           value: $.t('ovs:generic.name'),             width: 180       },
             { key: 'ip',             value: $.t('ovs:generic.ip'),               width: 125       },
             { key: 'vdisks',         value: $.t('ovs:generic.vdisks'),           width: 60        },
             { key: 'iops',           value: $.t('ovs:generic.iops'),             width: 60        },

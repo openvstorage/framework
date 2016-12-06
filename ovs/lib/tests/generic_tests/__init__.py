@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Copyright (C) 2016 iNuron NV
 #
 # This file is part of Open vStorage Open Source Edition (OSE),
@@ -15,8 +14,6 @@
 # Open vStorage is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY of any kind.
 
-if [[ ! -z "$2" && ! -f /etc/ready_for_upgrade ]]
-then
-    echo -e '\n\nPlease start update through GUI because all nodes in the cluster need to be updated simultaneously!!!!!\n\n'
-    exit 1
-fi
+"""
+Unit test module for generic library tests
+"""

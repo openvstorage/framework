@@ -20,7 +20,7 @@ VPool module
 import time
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Dynamic, Property
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import ClusterRegistryClient, StorageDriverClient, ObjectRegistryClient, StorageDriverConfiguration
 
 
 class VPool(DataObject):
@@ -43,7 +43,7 @@ class VPool(DataObject):
     __dynamics = [Dynamic('configuration', dict, 3600),
                   Dynamic('statistics', dict, 4),
                   Dynamic('identifier', str, 120)]
-    _fixed_properties = ['storagedriver_client', 'objectregistry_client']
+    _fixed_properties = ['storagedriver_client', 'objectregistry_client', 'clusterregistry_client']
 
     def __init__(self, *args, **kwargs):
         """
@@ -53,6 +53,7 @@ class VPool(DataObject):
         self._frozen = False
         self._storagedriver_client = None
         self._objectregistry_client = None
+        self._clusterregistry_client = None
         self._frozen = True
 
     @property
@@ -74,6 +75,16 @@ class VPool(DataObject):
         if self._objectregistry_client is None:
             self.reload_client('objectregistry')
         return self._objectregistry_client
+
+    @property
+    def clusterregistry_client(self):
+        """
+        Client used for making changes to the StorageDriver's Cluster Registry
+        :return: ClusterRegistry client
+        """
+        if self._clusterregistry_client is None:
+            self.reload_client('clusterregistry')
+        return self._clusterregistry_client
 
     def _configuration(self):
         """
@@ -136,11 +147,13 @@ class VPool(DataObject):
 
     def reload_client(self, client):
         """
-        Reloads the StorageDriverClient or ObjectRegistryClient
+        Reloads the StorageDriverClient, ObjectRegistryClient or ClusterRegistry client
         """
         self._frozen = False
         if client == 'storagedriver':
             self._storagedriver_client = StorageDriverClient.load(self)
         elif client == 'objectregistry':
             self._objectregistry_client = ObjectRegistryClient.load(self)
+        elif client == 'clusterregistry':
+            self._clusterregistry_client = ClusterRegistryClient.load(self)
         self._frozen = True

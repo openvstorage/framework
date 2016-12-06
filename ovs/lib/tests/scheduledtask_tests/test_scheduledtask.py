@@ -25,7 +25,7 @@ from ovs.extensions.generic.threadhelpers import Waiter
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.tests.mockups import LockedClient, StorageRouterClient
-from ovs.lib.scheduledtask import ScheduledTaskController
+from ovs.lib.generic import GenericController
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.tests.helpers import Helper
 
@@ -145,7 +145,7 @@ class ScheduledTaskTest(unittest.TestCase):
 
         # Execute scrubbing a 1st time
         with self.assertRaises(Exception) as raise_info:
-            ScheduledTaskController.execute_scrub()
+            GenericController.execute_scrub()
         for vdisk in failed_vdisks:
             self.assertIn(vdisk.name, raise_info.exception.message)
 
@@ -166,7 +166,7 @@ class ScheduledTaskTest(unittest.TestCase):
         for vdisk_id in sorted(vdisks):
             vdisk = vdisks[vdisk_id]
             LockedClient.scrub_controller['volumes'][vdisk.volume_id]['success'] = True
-        ScheduledTaskController.execute_scrub()
+        GenericController.execute_scrub()
         for vdisk in vdisks.values():
             with vdisk.storagedriver_client.make_locked_client(vdisk.volume_id) as locked_client:
                 self.assertEqual(first=len(locked_client.get_scrubbing_workunits()),
@@ -201,7 +201,7 @@ class ScheduledTaskTest(unittest.TestCase):
             vdisk = vdisks[vdisk_id]
             LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                          'scrub_work': range(vdisk_id)}
-        ScheduledTaskController.execute_scrub()
+        GenericController.execute_scrub()
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=0,
                          msg='Not all threads have been used in the process')
@@ -236,7 +236,7 @@ class ScheduledTaskTest(unittest.TestCase):
             vdisk = vdisks[vdisk_id]
             LockedClient.scrub_controller['volumes'][vdisk.volume_id] = {'success': True,
                                                                          'scrub_work': range(vdisk_id)}
-        ScheduledTaskController.execute_scrub()
+        GenericController.execute_scrub()
         self.assertEqual(first=len(LockedClient.thread_names),
                          second=9,  # 5 srs * 3 vps = 15 threads, but only 2 will be spawned per vPool --> 15 - 6 = 9 left
                          msg='Not all threads have been used in the process')
