@@ -76,7 +76,7 @@ class remote(object):
             self.connections = self.ips
         else:
             self.connections = [server.classic_connect() for server in self.servers]
-        if len(self.connections) == 1 and self.direct_mode is True:
+        if self.direct_mode is True:
             return self._build_remote_module(self.connections[0])
         return self
 
