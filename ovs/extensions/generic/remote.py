@@ -41,8 +41,10 @@ class remote(object):
         Initializes the context
         """
         self.ips = []
+        self.direct_mode = False
         if isinstance(ip_info, basestring):
             self.ips = [ip_info]
+            self.direct_mode = True
         elif isinstance(ip_info, list):
             self.ips = ip_info
         else:
@@ -74,7 +76,7 @@ class remote(object):
             self.connections = self.ips
         else:
             self.connections = [server.classic_connect() for server in self.servers]
-        if len(self.connections) == 1:
+        if self.direct_mode is True:
             return self._build_remote_module(self.connections[0])
         return self
 

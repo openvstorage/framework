@@ -1558,6 +1558,7 @@ class SetupController(object):
             offline_node_ips = []
         memcached = 'memcached'
         watcher = 'watcher-framework'
+        support_agent = 'support-agent'
         for ip in masters + slaves:
             if ip not in offline_node_ips:
                 if ServiceManager.has_service(watcher, clients[ip]):
@@ -1569,6 +1570,8 @@ class SetupController(object):
             if ip not in offline_node_ips:
                 if ServiceManager.has_service(watcher, clients[ip]):
                     Toolbox.change_service_state(clients[ip], watcher, 'start', SetupController._logger)
+                if ServiceManager.has_service(support_agent, clients[ip]):
+                    Toolbox.change_service_state(clients[ip], support_agent, 'restart', SetupController._logger)
         VolatileFactory.store = None
 
     @staticmethod

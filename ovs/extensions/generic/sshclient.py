@@ -228,14 +228,15 @@ class SSHClient(object):
             raise
 
     @connected()
-    def run(self, command, debug=False, suppress_logging=False, allow_nonzero=False, allow_insecure=False):
+    def run(self, command, debug=False, suppress_logging=False, allow_nonzero=False, allow_insecure=False, return_stderr=False):
         """
         Executes a shell command
         :param suppress_logging: Do not log anything
         :param command: Command to execute
-        :param debug: Extended logging and stderr output returned
+        :param debug: Extended logging
         :param allow_nonzero: Allow non-zero exit code
         :param allow_insecure: Allow string commands (which might be inproper escaped)
+        :param return_stderr: Return stderr
         """
         if self._unittest_mode is True:
             _command = command
@@ -267,9 +268,10 @@ class SSHClient(object):
                 exit_code = channel.returncode
                 if exit_code != 0 and allow_nonzero is False:  # Raise same error as check_output
                     raise CalledProcessError(exit_code, command, stdout)
-                if debug:
+                if debug is True:
                     SSHClient._logger.debug('stdout: {0}'.format(stdout))
                     SSHClient._logger.debug('stderr: {0}'.format(stderr))
+                if return_stderr is True:
                     return stdout, stderr
                 else:
                     return stdout
@@ -289,7 +291,7 @@ class SSHClient(object):
                     SSHClient._logger.error('Command "{0}" failed with output "{1}" and error "{2}"'
                                             .format(command, output, error))
                 raise CalledProcessError(exit_code, command, output)
-            if debug:
+            if return_stderr is True:
                 return output, error
             else:
                 return output
