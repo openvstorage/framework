@@ -44,7 +44,7 @@ class LogFileTimeParser(object):
     BUF_SIZE = 4096  # handle long lines, but put a limit to them
     REWIND = 100  # arbitrary, the optimal value is highly dependent on the structure of the file
     LIMIT = 75  # arbitrary, allow for a VERY large file, but stop it if it runs away
-    PATHS_TO_FILES = ['/var/log/ovs/lib.log', '/var/log/ovs/extensions.log']
+    STANDARD_SEARCH_LOCATIONS = ['/var/log/ovs/lib.log', '/var/log/ovs/extensions.log']
 
     INTERNAL_MAPPING = {'ovs-workers': {'file': '/var/log/upstart/ovs-workers.log',
                                         'journal': 'ovs-workers.service'},
@@ -83,14 +83,14 @@ class LogFileTimeParser(object):
     def _check_available_space(hosts, username, password):
         required_space = 0
         output_dir = '/'.join(LogFileTimeParser.FILE_PATH_REMOTE.strip('/').rsplit('/', 1)[0])
-        get_space_command = 'df /tmp | cut -d ' ' -f 10 | grep -Eo [0-9]*'
+        get_space_command = 'df /tmp | cut -d " " -f 10 | grep -Eo [0-9]*'
         local_client = SSHClient(System.get_my_storagerouter().ip, username=username, password=password)
         available_space = local_client.run(get_space_command, allow_insecure=True)
 
         for host in hosts:
             ssh_client = SSHClient(host, username=username, password=password)
-            for file_path in LogFileTimeParser.PATHS_TO_FILES:
-                command = 'ls -al {0} | cut -d ' ' -f 5'.format(file_path)
+            for file_path in LogFileTimeParser.STANDARD_SEARCH_LOCATIONS:
+                command = 'ls -al {0} | cut -d " " -f 5'.format(file_path)
                 try:
                     required_space += int(ssh_client.run(command, allow_insecure=True))
                 except ValueError:
@@ -99,13 +99,15 @@ class LogFileTimeParser(object):
             raise OverflowError('Would not be able to allocate {0} in {1}'.format(required_space, output_dir))
 
     @staticmethod
-    def execute_search_on_remote(start=None, end=None, search_locations=None, hosts=None,  python_error=False,
+    def execute_search_on_remote(since=None, until=None, search_locations=None, hosts=None, python_error=False,
                                  mode='search', username='root', password=None, suppress_return=False, search_patterns=None):
         """
-        :param start: Starting date
-        :type start: str / Datetime
-        :param end: End date
-        :type end: str / Datetime
+        Searches all hosts for entries between given dates.
+        Can be used standalone on the execution machine
+        :param since: Starting date
+        :type since: str / Datetime
+        :param until: End date
+        :type until: str / Datetime
         :param search_locations: list of paths of files / servicenames that will be searched on all nodes
         :type search_locations: list of str
         :param hosts: Ip of the nodes
@@ -129,21 +131,7 @@ class LogFileTimeParser(object):
         # Clear cache
         open(LogFileTimeParser.FILE_PATH_REMOTE, 'w').close()
 
-        # Setup default times
-        if not start:
-            start = (datetime.today() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
-        if not end:
-            end = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
-
-        if search_locations is None:
-            execution_mode = LogFileTimeParser._get_execution_mode()
-            search_locations = []
-            for service, info in LogFileTimeParser.INTERNAL_MAPPING.iteritems():
-                search_locations.append(info.get(execution_mode))
-
-        if not hosts:
-            hosts = [sr.ip for sr in StorageRouterList.get_storagerouters()]
-        LogFileTimeParser._check_available_space(hosts, username, password)
+        since, until, search_locations, hosts = LogFileTimeParser._default_starting_values(since, until, search_locations, hosts)
 
         # Setup remote instances
         with remote(hosts, [LogFileTimeParser], username=username, password=password) as remotes:
@@ -151,13 +139,13 @@ class LogFileTimeParser(object):
                 results = ''
                 if mode == 'search':
                     # Execute search
-                    results = remotes[host].LogFileTimeParser.get_lines_between_timestamps(start=start, end=end,
+                    results = remotes[host].LogFileTimeParser.get_lines_between_timestamps(since=since, until=until,
                                                                                            search_locations=search_locations,
                                                                                            search_patterns=search_patterns,
                                                                                            host=host)
                 elif mode == 'error-search':
                     # Execute search
-                    results = remotes[host].LogFileTimeParser.search_for_errors(start=start, end=end,
+                    results = remotes[host].LogFileTimeParser.search_for_errors(since=since, until=until,
                                                                                 search_locations=search_locations,
                                                                                 host=host,
                                                                                 python_error=python_error)
@@ -169,7 +157,7 @@ class LogFileTimeParser(object):
                 return output_file.read()
 
     @staticmethod
-    def _parse_date(text, validate=True):
+    def _parse_date(text, validate=True, to_string=False):
         """
         Parses strings to datetime objects
         :param text: A date
@@ -178,52 +166,96 @@ class LogFileTimeParser(object):
         :type validate: bool
         :return:
         """
-        # Supports Aug 16 14:59:01 , 2016-08-16 09:23:09 Jun 1 2005  1:33:06PM (with or without seconds, microseconds)
-        # Supports datetime objects as well, no need to convert others to strings
-        if isinstance(text, datetime):
-            return text
-        for fmt in ('%Y-%m-%d %H:%M:%S %f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M',
-                    '%b %d %H:%M:%S %f', '%b %d %H:%M', '%b %d %H:%M:%S',
-                    '%b %d %Y %H:%M:%S %f', '%b %d %Y %H:%M', '%b %d %Y %H:%M:%S',
-                    '%b %d %Y %I:%M:%S%p', '%b %d %Y %I:%M%p', '%b %d %Y %I:%M:%S%p %f'):
-            try:
-                # Add a year stamp to Jan 01 formats -- else we get default 1900
-                if fmt in ['%b %d %H:%M:%S %f', '%b %d %H:%M', '%b %d %H:%M:%S']:
-                    return datetime.strptime(text, fmt).replace(datetime.now().year)
-                return datetime.strptime(text, fmt)
-            except ValueError:
-                pass
-            except TypeError:
+        def _get_datetime(text, validate):
+            # Supports Aug 16 14:59:01 , 2016-08-16 09:23:09 Jun 1 2005  1:33:06PM (with or without seconds, microseconds)
+            # Supports datetime objects as well, no need to convert others to strings
+            if isinstance(text, datetime):
+                return text
+            for fmt in ('%Y-%m-%d %H:%M:%S %f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M',
+                        '%b %d %H:%M:%S %f', '%b %d %H:%M', '%b %d %H:%M:%S',
+                        '%b %d %Y %H:%M:%S %f', '%b %d %Y %H:%M', '%b %d %Y %H:%M:%S',
+                        '%b %d %Y %I:%M:%S%p', '%b %d %Y %I:%M%p', '%b %d %Y %I:%M:%S%p %f'):
+                try:
+                    # Add a year stamp to Jan 01 formats -- else we get default 1900
+                    if fmt in ['%b %d %H:%M:%S %f', '%b %d %H:%M', '%b %d %H:%M:%S']:
+                        return datetime.strptime(text, fmt).replace(datetime.now().year)
+                    return datetime.strptime(text, fmt)
+                except ValueError:
+                    pass
+                except TypeError:
+                    return datetime.min
+                    # Happens for weirdly formatted strings without escaped chars
+            if validate:
+                raise ValueError('No valid date format found for "{0}"'.format(text))
+            else:
+                # Cannot use NoneType to compare date times. Using minimum instead
                 return datetime.min
-                # Happens for weirdly formatted strings without escaped chars
-        if validate:
-            raise ValueError('No valid date format found for "{0}"'.format(text))
+        if to_string is True:
+            return _get_datetime(text, validate).strftime('%Y-%m-%d %H:%M:%S')
         else:
-            # Cannot use NoneType to compare date times. Using minimum instead
-            return datetime.min
+            return _get_datetime(text, validate)
 
     # Function to read lines from file and extract the date and time
     @staticmethod
-    def _read_line(opened_file, buf_size=BUF_SIZE):
+    def _read_line(opened_file, buf_size=BUF_SIZE, tail_amount=0):
         """
         Read a line from a file
         Return a tuple containing:
             the date/time in a format supported in parse_date om the line itself
+        :param tail_amount: amount of lines to read from the end
+        :type tail_amount: int
         """
-        try:
-            # readline() reads a single line at the time
-            line = opened_file.readline(buf_size)
-        except:
-            raise IOError('File I/O Error')
-        # Remove \n from read lines.
-        line = line.rstrip('\n')
-        words = line.split(' ')
-        # This results into Jan 1 01:01:01 000000 or 1970-01-01 01:01:01 000000 or just plain text sentences
-        if len(words) >= 3:
-            line_date = LogFileTimeParser._parse_date(words[0] + ' ' + words[1] + ' ' + words[2], False)
+        if tail_amount == 0:
+            try:
+                # readline() reads a single line at the time
+                line = opened_file.readline(buf_size)
+            except:
+                raise IOError('File I/O Error')
+            if line == "":
+                # End of file reached
+                raise EOFError("End of file.")
+            # Remove \n from read lines.
+            line = line.rstrip('\n')
+            words = line.split(' ')
+            # This results into Jan 1 01:01:01 000000 or 1970-01-01 01:01:01 000000 or just plain text sentences
+            if len(words) >= 3:
+                line_date = LogFileTimeParser._parse_date(words[0] + ' ' + words[1] + ' ' + words[2], False)
+            else:
+                line_date = LogFileTimeParser._parse_date('', False)
+            return line_date, line
         else:
-            line_date = LogFileTimeParser._parse_date('', False)
-        return line_date, line
+            opened_file.seek(0, 2)
+            bytes = opened_file.tell()
+            size = tail_amount + 1
+            block = -1
+            data = []
+            while size > 0 and bytes > 0:
+                if bytes - buf_size > 0:
+                    # Seek back one whole BUFSIZ
+                    opened_file.seek(block * buf_size, 2)
+                    # read BUFFER
+                    data.insert(0, opened_file.read(buf_size))
+                else:
+                    # file too small, start from begining
+                    opened_file.seek(0, 0)
+                    # only read what was not read
+                    data.insert(0, opened_file.read(bytes))
+                lines_found = data[0].count('\n')
+                size -= lines_found
+                bytes -= buf_size
+                block -= 1
+            # Extract line dates
+            output = []
+            lines = ''.join(data).splitlines()[-tail_amount:]
+            for line in lines:
+                words = line.split(' ')
+                # This results into Jan 1 01:01:01 000000 or 1970-01-01 01:01:01 000000 or just plain text sentences
+                if len(words) >= 3:
+                    line_date = LogFileTimeParser._parse_date(words[0] + ' ' + words[1] + ' ' + words[2], False)
+                else:
+                    line_date = LogFileTimeParser._parse_date('', False)
+                output.append((line_date, line))
+            return output
 
     @staticmethod
     def _clean_text(text):
@@ -250,12 +282,14 @@ class LogFileTimeParser(object):
             raise
 
     @staticmethod
-    def get_lines_between_timestamps(start, end, search_locations=None, search_patterns=None, host=None, suppress_return=False):
+    def get_lines_between_timestamps(since=None, until=None, search_locations=None, search_patterns=None, host=None, suppress_return=False):
         """
-        :param start: Starting date
-        :type start: str / Datetime
-        :param end: End date
-        :type end: str / Datetime
+        Searches the given searchlocations for entires.
+        Can be used standalone on the execution machine
+        :param since: Starting date
+        :type since: str / Datetime
+        :param until: End date
+        :type until: str / Datetime
         :param search_patterns: What error patterns should be recognized
         :type search_patterns: list of str
         :param search_locations: list of paths of files that will be searched on all nodes
@@ -269,212 +303,183 @@ class LogFileTimeParser(object):
         # Clear the file cache
         open(LogFileTimeParser.FILE_PATH, 'w').close()
 
-        execution_mode = LogFileTimeParser._get_execution_mode()
+        since, until, search_locations, _ = LogFileTimeParser._default_starting_values(since, until, search_locations)
 
-        if not start:
-            start = (datetime.today() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
-        if not end:
-            end = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+        for search_location in search_locations:
+            if os.path.isfile(search_location):
+                LogFileTimeParser._search_file(since, until, search_location, search_patterns, host)
+            else:
+                LogFileTimeParser._search_journal(since, until, search_location, search_patterns, host)
 
-        if execution_mode == 'file':
-            return LogFileTimeParser._search_files(start, end, search_locations, search_patterns, host, suppress_return)
-        elif execution_mode == 'journal':
-            return LogFileTimeParser._search_journal(start, end, search_locations, search_patterns, host, suppress_return)
-        else:
-            raise RuntimeError('Mode {0} not supported.'.format(execution_mode))
+        # Return the contents of the file
+        if not suppress_return and host is not None:
+            with open(LogFileTimeParser.FILE_PATH, 'r') as f:
+                # Check if first line isn't empty
+                f.seek(0)
+                if f.readline() == '':
+                    return None
+                return f.read()
 
     @staticmethod
-    def _search_journal(start, end, search_locations, search_patterns, host, suppress_return):
+    def _search_journal(since, until, search_location, search_patterns, host):
         """
-        :param start: Starting date
-        :type start: str / Datetime
-        :param end: End date
-        :type end: str / Datetime
+        Searches journal for entries between specified dates
+        :param since: Starting date
+        :type since: str / Datetime
+        :param until: End date
+        :type until: str / Datetime
         :param search_patterns: What error patterns should be recognized
         :type search_patterns: list of str
-        :param search_locations: list of paths of files that will be searched on all nodes
-        :type search_locations: list of str
+        :param search_location: path of file that will be searched on all nodes
+        :type search_location: str
         :param host: ip of the node
         :type host: str
-        :param suppress_return: only write to file and not return contents
-        :type suppress_return: bool
         :return: Output of a file as string
         """
-        for search_location in search_locations:
-            # Set the default writing prefix
-            if host:
-                write_prefix = "{0} - {1}: ".format(host, search_location)
-            else:
-                write_prefix = "{0}: ".format(search_location)
+        # Set the default writing prefix
+        if host:
+            write_prefix = "{0} - {1}: ".format(host, search_location)
+        else:
+            write_prefix = "{0}: ".format(search_location)
 
-            cmd = [
-                "journalctl",
-                "--unit",
-                search_location,
-                "--since",
-                start,
-                "--until",
-                end,
-                "--output",
-                "cat",
-                "--no-pager"
-            ]
-            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            stdout = p.stdout.read()
-            stderr = p.stderr.read()
-            if stderr != "":
-                raise RuntimeError("Error occurred. Got {0}.".format(stderr))
-            for line in stdout.splitlines():
-                if search_patterns:
-                    if any(pattern.lower() in line.lower() for pattern in search_patterns):
-                        # Write to file to save memory and finally return its contents
-                        with open(LogFileTimeParser.FILE_PATH, 'a') as f:
-                            f.write(str(write_prefix + LogFileTimeParser._clean_text(line) + '\n'))
-                else:
+        since = LogFileTimeParser._parse_date(since, to_string=True)
+        until = LogFileTimeParser._parse_date(until, to_string=True)
+        print since
+        print until
+        cmd = [
+            "journalctl",
+            "--unit",
+            search_location,
+            "--since",
+            since,
+            "--until",
+            until,
+            "--output",
+            "cat",
+            "--no-pager"
+        ]
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout = p.stdout.read()
+        stderr = p.stderr.read()
+        if stderr != "":
+            raise RuntimeError("Error occurred. Got {0}.".format(stderr))
+        for line in stdout.splitlines():
+            if search_patterns:
+                if any(pattern.lower() in line.lower() for pattern in search_patterns):
                     # Write to file to save memory and finally return its contents
                     with open(LogFileTimeParser.FILE_PATH, 'a') as f:
                         f.write(str(write_prefix + LogFileTimeParser._clean_text(line) + '\n'))
-        if not suppress_return:
-            with open(LogFileTimeParser.FILE_PATH, 'r') as f:
-                # Check if first line isn't empty
-                f.seek(0)
-                if f.readline() == '':
-                    return None
-                return f.read()
+            else:
+                # Write to file to save memory and finally return its contents
+                with open(LogFileTimeParser.FILE_PATH, 'a') as f:
+                    f.write(str(write_prefix + LogFileTimeParser._clean_text(line) + '\n'))
 
     @staticmethod
-    def _search_files(start, end, search_locations, search_patterns, host, suppress_return, limit=LIMIT, rewind=REWIND):
+    def _search_file(since, until, search_location, search_patterns, host, limit=LIMIT, rewind=REWIND):
         """
-        :param start: Starting date
-        :type start: str / Datetime
-        :param end: End date
-        :type end: str / Datetime
+        Seaches a file for entries between the given dates
+        :param since: Starting date
+        :type since: str / Datetime
+        :param until: End date
+        :type until: str / Datetime
         :param search_patterns: What error patterns should be recognized
         :type search_patterns: list of str
-        :param search_locations: list of paths of files that will be searched on all nodes
-        :type search_locations: list of str
+        :param search_location: path of file that will be searched on all nodes
+        :type search_location: str
         :param host: ip of the node
         :type host: str
-        :param suppress_return: only write to file and not return contents
-        :type suppress_return: bool
         :return: Output of a file as string
         """
-        for path_to_file in search_locations:
-            # validate if file is present
-            if not os.path.isfile(path_to_file):
-                continue
-            # Set some initial values
-            count = 0
-            line_date = ''
-            line = None
+        # validate if file is present
+        if not os.path.isfile(search_location):
+            return
+        # Set some initial values
+        count = 0
+        line_date = None
+        line = None
 
-            size = os.stat(path_to_file)[stat.ST_SIZE]
+        size = os.stat(search_location)[stat.ST_SIZE]
 
-            begin_range = 0
-            mid_range = size / 2
-            old_mid_range = mid_range
-            end_range = size
-            pos = 0
-            # Set the default writing prefix
-            if host:
-                write_prefix = '{0} - {1}: '.format(host, path_to_file)
-            else:
-                write_prefix = '{0}: '.format(path_to_file)
+        begin_range = 0
+        mid_range = size / 2
+        old_mid_range = mid_range
+        end_range = size
+        pos = 0
+        # Set the default writing prefix
+        if host:
+            write_prefix = '{0} - {1}: '.format(host, search_location)
+        else:
+            write_prefix = '{0}: '.format(search_location)
 
-            # Test for times to be properly formatted, allow hh:mm or hh:mm:ss
-            pattern = re.compile(r'(^[2][0-3]|[0-1][0-9]):[0-5][0-9](:[0-5][0-9])?$')
-
-            # If only hours are supplied, match them to a day
-            if pattern.match(start) or pattern.match(end):
-                # Determine Time Range
-                yesterday = date.fromordinal(date.today().toordinal() - 1).strftime('%Y-%m-%d')
-                today = datetime.now().strftime('%Y-%m-%d')
-                now = datetime.now().strftime('%R')
-                if start > now or start > end:
-                    search_start = yesterday
-                else:
-                    search_start = today
-                if end > start > now:
-                    search_end = yesterday
-                else:
-                    search_end = today
-                search_start = LogFileTimeParser._parse_date(search_start + ' ' + start)
-                search_end = LogFileTimeParser._parse_date(search_end + ' ' + end)
-            else:
-                # Set dates
-                search_start = LogFileTimeParser._parse_date(start)
-                search_end = LogFileTimeParser._parse_date(end)
-
-            # Start with reading - open file
-            with open(path_to_file, 'r') as opened_file:
-                # Seek using binary search -- ONLY WORKS ON FILES WHO ARE SORTED BY DATES (should be true for log files)
-                try:
-                    while pos != end_range and old_mid_range != 0 and line_date != search_start:
-                        opened_file.seek(mid_range)
-                        # sync to line ending
+        # Start with reading - open file
+        with open(search_location, 'r') as opened_file:
+            # Seek using binary search -- ONLY WORKS ON FILES WHO ARE SORTED BY DATES (should be true for log files)
+            try:
+                last_date, line = LogFileTimeParser._read_line(opened_file, tail_amount=1)[0]
+                if last_date < since:
+                    return
+                while pos != end_range and old_mid_range != 0 and line_date != since:
+                    # Check whether the since date in even in the file.
+                    opened_file.seek(0, 2)
+                    opened_file.seek(mid_range)
+                    # sync to line ending
+                    line_date, line = LogFileTimeParser._read_line(opened_file)
+                    pos = opened_file.tell()
+                    # if not beginning of file, discard first read due to potential wrong dates
+                    if mid_range > 0:
                         line_date, line = LogFileTimeParser._read_line(opened_file)
-                        pos = opened_file.tell()
-                        # if not beginning of file, discard first read
-                        if mid_range > 0:
-                            line_date, line = LogFileTimeParser._read_line(opened_file)
-                        count += 1
-                        if search_start > line_date:
-                            begin_range = mid_range
-                        else:
-                            end_range = mid_range
-                        old_mid_range = mid_range
-                        mid_range = (begin_range + end_range) / 2
-                        if count > limit:
-                            raise IndexError('ERROR: ITERATION LIMIT EXCEEDED')
-                    # Rewind a bit to make sure we didn't miss any
-                    seek = old_mid_range
-                    while line_date >= search_start and seek > 0:
-                        if seek < rewind:
-                            seek = 0
-                        else:
-                            seek -= rewind
-                        opened_file.seek(seek)
-                        # sync to line ending
-                        line_date, line = LogFileTimeParser._read_line(opened_file)
+                    count += 1
+                    if since > line_date:
+                        begin_range = mid_range
+                    else:
+                        end_range = mid_range
+                    old_mid_range = mid_range
+                    mid_range = (begin_range + end_range) / 2
+                    if count > limit:
+                        raise IndexError('ERROR: ITERATION LIMIT EXCEEDED')
+                # Go back some steps and check if we did not miss any lines
+                seek = old_mid_range
+                while line_date >= since and seek > 0:
+                    "Scanning backwards"
+                    if seek < rewind:
+                        seek = 0
+                    else:
+                        seek -= rewind
+                    opened_file.seek(seek)
+                    # sync to line ending
+                    line_date, line = LogFileTimeParser._read_line(opened_file)
 
-                    # Scan forward
-                    while line_date < search_start:
-                        line_date, line = LogFileTimeParser._read_line(opened_file)
+                # Scan forward in the current section
+                while line_date < since:
+                    line_date, line = LogFileTimeParser._read_line(opened_file)
 
-                    # Now that the preliminaries are out of the way, we just loop,
-                    # Reading lines and printing them until they are beyond the end of the range we want
-                    while line_date <= search_end:
-                        # Search for the search patterns before printing
-                        if search_patterns:
-                            if any(pattern.lower() in line.lower() for pattern in search_patterns):
-                                # Write to file to save memory and finally return its contents
-                                with open(LogFileTimeParser.FILE_PATH, 'a') as f:
-                                    f.write(str(write_prefix + LogFileTimeParser._clean_text(line) + '\n'))
-                        else:
+                # Now that the preliminaries are out of the way, we just loop,
+                # Reading lines and printing them until they are beyond the until of the range we want
+                while line_date <= until:
+                    # Search for the search patterns before printing
+                    if search_patterns:
+                        if any(pattern.lower() in line.lower() for pattern in search_patterns):
                             # Write to file to save memory and finally return its contents
                             with open(LogFileTimeParser.FILE_PATH, 'a') as f:
                                 f.write(str(write_prefix + LogFileTimeParser._clean_text(line) + '\n'))
-                        line_date, line = LogFileTimeParser._read_line(opened_file)
-                # Do not display EOFErrors:
-                except EOFError:
-                    pass
-
-        # Return the contents of the file
-        if not suppress_return:
-            with open(LogFileTimeParser.FILE_PATH, 'r') as f:
-                # Check if first line isn't empty
-                f.seek(0)
-                if f.readline() == '':
-                    return None
-                return f.read()
+                    else:
+                        # Write to file to save memory and finally return its contents
+                        with open(LogFileTimeParser.FILE_PATH, 'a') as f:
+                            f.write(str(write_prefix + LogFileTimeParser._clean_text(line) + '\n'))
+                    line_date, line = LogFileTimeParser._read_line(opened_file)
+            # Do not display EOFErrors:
+            except EOFError:
+                pass
 
     @staticmethod
-    def search_for_errors(start, end, python_error, search_locations, host, suppress_return):
+    def search_for_errors(since=None, until=None, python_error=False, search_locations=None, host=None, suppress_return=False):
         """
-        :param start: Starting date
-        :type start: str / Datetime
-        :param end: End date
-        :type end: str / Datetime
+        Searches for errors in the supplied files.
+        Can be used standalone on the execution machine
+        :param since: Starting date
+        :type since: str / Datetime
+        :param until: End date
+        :type until: str / Datetime
         :param python_error: Whether only python errors should be checked
         :type python_error: bool
         :param search_locations: list of paths of files that will be searched on all nodes
@@ -485,10 +490,7 @@ class LogFileTimeParser(object):
         :type suppress_return: bool
         :return: Output of a file as string
         """
-        if not start:
-            start = (datetime.today() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
-        if not end:
-            end = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+        since, until, search_locations, _ = LogFileTimeParser._default_starting_values(since, until, search_locations)
         python_errors = ['Exception', 'StopIteration', 'StandardError', 'BufferError', 'ArithmeticError',
                          'FloatingPointError', 'OverflowError', 'ZeroDivisionError', 'AssertionError', 'AttributeError',
                          'EnvironmentError', 'IOError', 'OSError', 'WindowsError', 'VMSError', 'EOFError',
@@ -500,7 +502,49 @@ class LogFileTimeParser(object):
         errors_patterns = ['not found', 'error', 'something went wrong', ' has no attribute',
                            'referenced before assignment', 'timeout', 'raised exception']
         if python_error:
-            return LogFileTimeParser.get_lines_between_timestamps(start, end, search_locations, python_errors, host, suppress_return)
+            return LogFileTimeParser.get_lines_between_timestamps(since, until, search_locations, python_errors, host, suppress_return)
         else:
-            return LogFileTimeParser.get_lines_between_timestamps(start, end, search_locations, errors_patterns, host, suppress_return)
+            return LogFileTimeParser.get_lines_between_timestamps(since, until, search_locations, errors_patterns, host, suppress_return)
 
+    @staticmethod
+    def _default_starting_values(since=None, until=None, search_locations=None, hosts=None):
+
+        if until and since is not None and isinstance(since, str) and isinstance(until, str):
+            # Test for times to be properly formatted, allow hh:mm or hh:mm:ss
+            pattern = re.compile(r'(^[2][0-3]|[0-1][0-9]):[0-5][0-9](:[0-5][0-9])?$')
+            # If only hours are supplied, match them to a day
+            if pattern.match(since) or pattern.match(until):
+                # Determine Time Range
+                yesterday = date.fromordinal(date.today().toordinal() - 1).strftime('%Y-%m-%d')
+                today = datetime.now().strftime('%Y-%m-%d')
+                now = datetime.now().strftime('%R')
+                if since > now or since > until:
+                    search_start = yesterday
+                else:
+                    search_start = today
+                if until > since > now:
+                    search_end = yesterday
+                else:
+                    search_end = today
+                since = LogFileTimeParser._parse_date(search_start + ' ' + since)
+                until = LogFileTimeParser._parse_date(search_end + ' ' + until)
+            else:
+                # Set dates
+                since = LogFileTimeParser._parse_date(since)
+                until = LogFileTimeParser._parse_date(until)
+        # Setup default times
+        if since is None:
+            since = (datetime.today() - timedelta(hours=1))
+        if until is None:
+            until = datetime.today()
+
+        if search_locations is None:
+            execution_mode = LogFileTimeParser._get_execution_mode()
+            search_locations = LogFileTimeParser.STANDARD_SEARCH_LOCATIONS
+            for service, info in LogFileTimeParser.INTERNAL_MAPPING.iteritems():
+                search_locations.append(info.get(execution_mode))
+
+        if not hosts:
+            hosts = [sr.ip for sr in StorageRouterList.get_storagerouters()]
+
+        return since, until, search_locations, hosts
