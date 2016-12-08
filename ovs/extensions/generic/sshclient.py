@@ -235,7 +235,7 @@ class SSHClient(object):
         :param command: Command to execute
         :param debug: Extended logging
         :param allow_nonzero: Allow non-zero exit code
-        :param allow_insecure: Allow string commands (which might be inproper escaped)
+        :param allow_insecure: Allow string commands (which might be improperly escaped)
         :param return_stderr: Return stderr
         """
         if self._unittest_mode is True:
