@@ -90,11 +90,22 @@ class UpdateController(object):
                 raise RuntimeError('Failed to retrieve the installed and candidate versions for packages: {0}'.format(', '.join(UpdateController.all_core_packages)))
 
             # Retrieve Arakoon information
-            cacc_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name='cacc', filesystem=True, ip=client.ip)
-            voldrv_cluster = ArakoonClusterConfig.get_cluster_name('voldrv')
-            framework_arakoons = ['arakoon-{0}'.format(cacc_metadata['cluster_name']),
-                                  'arakoon-{0}'.format(ArakoonClusterConfig.get_cluster_name('ovsdb'))]
-            storagedriver_arakoons = [] if voldrv_cluster is None else ['arakoon-{0}'.format(voldrv_cluster)]
+            framework_arakoons = []
+            storagedriver_arakoons = []
+            for cluster, arakoon_list in {'cacc': framework_arakoons,
+                                          'ovsdb': framework_arakoons,
+                                          'voldrv': storagedriver_arakoons}.iteritems():
+                cluster_name = ArakoonClusterConfig.get_cluster_name(cluster)
+                if cluster_name is None:
+                    continue
+
+                if cluster == 'cacc':
+                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, filesystem=True, ip=client.ip)
+                else:
+                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+
+                if arakoon_metadata['internal'] is True:
+                    arakoon_list.append(ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_metadata['cluster_name']))
 
             storagerouter = StorageRouterList.get_by_ip(client.ip)
             alba_proxies = []

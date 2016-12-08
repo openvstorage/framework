@@ -20,10 +20,6 @@ Generic system module, executing statements on local node
 
 import os
 import re
-import time
-import uuid
-from ConfigParser import RawConfigParser
-from StringIO import StringIO
 from subprocess import check_output
 
 
