@@ -261,10 +261,8 @@ class ArakoonInstaller(object):
         Delete existing arakoon data
         :param ip: IP on which to check for existing data
         :type ip: str
-
         :param directories: Directories to delete
         :type directories: list
-
         :return: None
         """
         if os.environ.get('RUNNING_UNITTESTS') == 'True':
@@ -364,7 +362,10 @@ class ArakoonInstaller(object):
                         'cluster_name': cluster_name,
                         'cluster_type': cluster_type.upper(),
                         'in_use': False}
-            ArakoonInstaller._deploy(config, filesystem=filesystem, plugins=plugins.values() if plugins is not None else None)
+            service_metadata = ArakoonInstaller._deploy(config=config,
+                                                        filesystem=filesystem,
+                                                        plugins=plugins.values() if plugins is not None else None,
+                                                        delay_service_registration=cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG)[ip]
         finally:
             if port_mutex is not None:
                 port_mutex.release()
@@ -372,7 +373,8 @@ class ArakoonInstaller(object):
         ArakoonInstaller._logger.debug('Creating cluster {0} on {1} completed'.format(cluster_name, ip))
         return {'metadata': metadata,
                 'client_port': ports[0],
-                'messaging_port': ports[1]}
+                'messaging_port': ports[1],
+                'service_metadata': service_metadata}
 
     @staticmethod
     def delete_cluster(cluster_name, ip, filesystem=False):
@@ -389,10 +391,18 @@ class ArakoonInstaller(object):
         ArakoonInstaller._logger.debug('Deleting cluster {0} on {1}'.format(cluster_name, ip))
         config = ArakoonClusterConfig(cluster_name, filesystem)
         config.load_config(ip)
+        cluster_type = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=config.cluster_id, filesystem=filesystem, ip=ip)['cluster_type']
+
+        service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=config.cluster_id)
+        for node in config.nodes:
+            try:
+                ServiceManager.unregister_service(service_name=service_name, node_name=node.name)
+            except:
+                ArakoonInstaller._logger.exception('Un-registering service {0} on {1} failed'.format(service_name, ip))
 
         # Cleans up a complete cluster (remove services, directories and configuration files)
         for node in config.nodes:
-            ArakoonInstaller._destroy_node(config, node)
+            ArakoonInstaller._destroy_node(config, node, delay_unregistration=cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG)
             config.delete_config(ip)
 
         ArakoonInstaller._logger.debug('Deleting cluster {0} on {1} completed'.format(cluster_name, ip))
@@ -423,6 +433,7 @@ class ArakoonInstaller(object):
 
         config = ArakoonClusterConfig(cluster_name, filesystem)
         config.load_config(master_ip)
+        cluster_type = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=config.cluster_id, filesystem=filesystem, ip=master_ip)['cluster_type']
 
         client = SSHClient(new_ip, username=ArakoonInstaller.SSHCLIENT_USER)
         node_name = System.get_my_machine_id(client)
@@ -448,7 +459,9 @@ class ArakoonInstaller(object):
                                                       crash_log_sinks=LogHandler.get_sink_path('arakoon_server_crash'),
                                                       home=home_dir,
                                                       tlog_dir=tlog_dir))
-            ArakoonInstaller._deploy(config, filesystem=filesystem)
+            service_metadata = ArakoonInstaller._deploy(config=config,
+                                                        filesystem=filesystem,
+                                                        delay_service_registration=cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG)[new_ip]
         finally:
             if port_mutex is not None:
                 port_mutex.release()
@@ -456,42 +469,70 @@ class ArakoonInstaller(object):
         ArakoonInstaller._logger.debug('Extending cluster {0} from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
         return {'client_port': ports[0],
                 'messaging_port': ports[1],
+                'service_metadata': service_metadata,
                 'ips': [node.ip for node in config.nodes]}
 
     @staticmethod
-    def shrink_cluster(deleted_node_ip, remaining_node_ip, cluster_name, offline_nodes=None, filesystem=False):
+    def shrink_cluster(deleted_node_ip, remaining_node_ips, cluster_name, offline_nodes=None, filesystem=False):
         """
         Removes a node from a cluster, the old node will become a slave
         :param deleted_node_ip: The ip of the node that should be deleted
         :type deleted_node_ip: str
-        :param remaining_node_ip: The ip of one of the remaining nodes
-        :type remaining_node_ip: str
+        :param remaining_node_ips: The IPs of the remaining nodes
+        :type remaining_node_ips: list
         :param cluster_name: The name of the cluster to shrink
         :type cluster_name: str
         :param offline_nodes: Storage Routers which are offline
         :type offline_nodes: list
         :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
         :type filesystem: bool
-        :return: None
+        :return: Remaining running arakoon IPs
+        :rtype: list
         """
         ArakoonInstaller._logger.debug('Shrinking cluster {0} from {1}'.format(cluster_name, deleted_node_ip))
         config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(remaining_node_ip)
+        config.load_config(remaining_node_ips[0])
+        cluster_type = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=config.cluster_id, filesystem=filesystem, ip=remaining_node_ips[0])['cluster_type']
 
         if offline_nodes is None:
             offline_nodes = []
 
+        removal_node = None
         for node in config.nodes[:]:
             if node.ip == deleted_node_ip:
                 config.nodes.remove(node)
+                removal_node = node
                 if node.ip not in offline_nodes:
-                    ArakoonInstaller._destroy_node(config, node)
+                    ArakoonInstaller._destroy_node(config, node, delay_unregistration=cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG)
                     if filesystem is True:
                         config.delete_config(node.ip)
-        ArakoonInstaller._deploy(config, filesystem=filesystem, offline_nodes=offline_nodes)
+        ArakoonInstaller._deploy(config=config,
+                                 filesystem=filesystem,
+                                 offline_nodes=offline_nodes,
+                                 delay_service_registration=cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG)
         restart_ips = [node.ip for node in config.nodes if node.ip != deleted_node_ip and node.ip not in offline_nodes]
-
         ArakoonInstaller._logger.debug('Shrinking cluster {0} from {1} completed'.format(cluster_name, deleted_node_ip))
+
+        ArakoonInstaller._logger.debug('Restart sequence (remove) for {0}'.format(cluster_name))
+        ArakoonInstaller._logger.debug('Remaining ips: {0}'.format(', '.join(restart_ips)))
+        for ip in restart_ips:
+            client = SSHClient(ip, username='root')
+            ArakoonInstaller.stop(cluster_name, client=client)
+            ArakoonInstaller.start(cluster_name, client=client)
+            ArakoonInstaller._logger.debug('  Restarted node {0} for cluster {1}'.format(client.ip, cluster_name))
+            if len(restart_ips) > 2:  # A two node cluster needs all nodes running
+                ArakoonInstaller.wait_for_cluster(cluster_name, restart_ips[0], filesystem)
+        ArakoonInstaller.wait_for_cluster(cluster_name, restart_ips[0], filesystem)
+        config = ArakoonClusterConfig(cluster_name, filesystem)
+        config.load_config(restart_ips[0])
+        arakoon_client = ArakoonInstaller.build_client(config)
+        arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, config.export_ini())
+        if removal_node is not None:
+            # noinspection PyUnresolvedReferences
+            ServiceManager.unregister_service(node_name=removal_node.name,
+                                              service_name=ArakoonInstaller.get_service_name_for_cluster(cluster_name=config.cluster_id))
+        ArakoonInstaller._logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))
+
         return restart_ips
 
     @staticmethod
@@ -568,7 +609,7 @@ class ArakoonInstaller(object):
         return ports
 
     @staticmethod
-    def _destroy_node(config, node):
+    def _destroy_node(config, node, delay_unregistration=False):
         """
         Cleans up a single node (remove services, directories and configuration files)
         """
@@ -577,7 +618,7 @@ class ArakoonInstaller(object):
         # Removes services for a cluster on a given node
         root_client = SSHClient(node.ip, username='root')
         ArakoonInstaller.stop(config.cluster_id, client=root_client)
-        ArakoonInstaller.remove(config.cluster_id, client=root_client)
+        ArakoonInstaller.remove(config.cluster_id, client=root_client, delay_unregistration=delay_unregistration)
 
         # Cleans all directories on a given node
         abs_paths = {node.tlog_dir, node.home}  # That's a set
@@ -589,7 +630,7 @@ class ArakoonInstaller(object):
         ArakoonInstaller._logger.debug('Destroy node {0} in cluster {1} completed'.format(node.ip, config.cluster_id))
 
     @staticmethod
-    def _deploy(config, filesystem, offline_nodes=None, plugins=None):
+    def _deploy(config, filesystem, offline_nodes=None, plugins=None, delay_service_registration=False):
         """
         Deploys a complete cluster: Distributing the configuration files, creating directories and services
         """
@@ -600,6 +641,8 @@ class ArakoonInstaller(object):
         ArakoonInstaller._logger.debug('Deploying cluster {0}'.format(config.cluster_id))
         if offline_nodes is None:
             offline_nodes = []
+
+        service_metadata = {}
         for node in config.nodes:
             if node.ip in offline_nodes:
                 continue
@@ -625,19 +668,21 @@ class ArakoonInstaller(object):
                 config_path = config.config_path
             else:
                 config_path = Configuration.get_configuration_path(config.config_path)
-            base_name = 'ovs-arakoon'
-            target_name = 'ovs-arakoon-{0}'.format(config.cluster_id)
             extra_version_cmd = ''
             if plugins is not None:
                 extra_version_cmd = ';'.join(plugins)
-            ServiceManager.add_service(base_name, root_client,
-                                       params={'CLUSTER': config.cluster_id,
-                                               'NODE_ID': node.name,
-                                               'CONFIG_PATH': config_path,
-                                               'EXTRA_VERSION_CMD': extra_version_cmd},
-                                       target_name=target_name,
-                                       startup_dependency='ovs-watcher-config' if filesystem is False else None)
+            metadata = ServiceManager.add_service(name='ovs-arakoon',
+                                                  client=root_client,
+                                                  params={'CLUSTER': config.cluster_id,
+                                                          'NODE_ID': node.name,
+                                                          'CONFIG_PATH': config_path,
+                                                          'EXTRA_VERSION_CMD': extra_version_cmd},
+                                                  target_name='ovs-arakoon-{0}'.format(config.cluster_id),
+                                                  startup_dependency=('ovs-watcher-config' if filesystem is False else None),
+                                                  delay_registration=delay_service_registration)
+            service_metadata[node.ip] = metadata
             ArakoonInstaller._logger.debug('  Deploying cluster {0} on {1} completed'.format(config.cluster_id, node.ip))
+        return service_metadata
 
     @staticmethod
     def start(cluster_name, client):
@@ -645,14 +690,13 @@ class ArakoonInstaller(object):
         Starts an arakoon cluster
         :param cluster_name: The name of the cluster service to start
         :type cluster_name: str
-
         :param client: Client on which to start the service
         :type client: SSHClient
-
         :return: None
         """
-        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
-            ServiceManager.start_service('arakoon-{0}'.format(cluster_name), client=client)
+        service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
+        if ServiceManager.has_service(name=service_name, client=client) is True:
+            ServiceManager.start_service(name=service_name, client=client)
 
     @staticmethod
     def stop(cluster_name, client):
@@ -660,14 +704,13 @@ class ArakoonInstaller(object):
         Stops an arakoon service
         :param cluster_name: The name of the cluster service to stop
         :type cluster_name: str
-
         :param client: Client on which to stop the service
         :type client: SSHClient
-
         :return: None
         """
-        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
-            ServiceManager.stop_service('arakoon-{0}'.format(cluster_name), client=client)
+        service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
+        if ServiceManager.has_service(name=service_name, client=client) is True:
+            ServiceManager.stop_service(name=service_name, client=client)
 
     @staticmethod
     def is_running(cluster_name, client):
@@ -675,30 +718,30 @@ class ArakoonInstaller(object):
         Checks if arakoon service is running
         :param cluster_name: The name of the cluster service to check
         :type cluster_name: str
-
         :param client: Client on which to check the service
         :type client: SSHClient
-
         :return: None
         """
-        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client):
-            return ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client)[0]
+        service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
+        if ServiceManager.has_service(name=service_name, client=client):
+            return ServiceManager.get_service_status(name=service_name, client=client)[0]
         return False
 
     @staticmethod
-    def remove(cluster_name, client):
+    def remove(cluster_name, client, delay_unregistration=False):
         """
         Removes an arakoon service
         :param cluster_name: The name of the cluster service to remove
         :type cluster_name: str
-
         :param client: Client on which to remove the service
         :type client: SSHClient
-
+        :param delay_unregistration: Un-register the service right away or not
+        :type delay_unregistration: bool
         :return: None
         """
-        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
-            ServiceManager.remove_service('arakoon-{0}'.format(cluster_name), client=client)
+        service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
+        if ServiceManager.has_service(name=service_name, client=client) is True:
+            ServiceManager.remove_service(name=service_name, client=client, delay_unregistration=delay_unregistration)
 
     @staticmethod
     def wait_for_cluster(cluster_name, node_ip, filesystem=False):
@@ -818,38 +861,10 @@ class ArakoonInstaller(object):
         ArakoonInstaller._logger.debug('Started node {0} for cluster {1}'.format(new_ip, cluster_name))
 
     @staticmethod
-    def restart_cluster_remove(cluster_name, remaining_ips, filesystem):
-        """
-        Execute a restart sequence after removing a node from a cluster
-        :param cluster_name: Name of the cluster to restart
-        :type cluster_name: str
-        :param remaining_ips: IPs of the remaining nodes after shrink
-        :type remaining_ips: list
-        :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
-        :type filesystem: bool
-        :return: None
-        """
-        ArakoonInstaller._logger.debug('Restart sequence (remove) for {0}'.format(cluster_name))
-        ArakoonInstaller._logger.debug('Remaining ips: {0}'.format(', '.join(remaining_ips)))
-        for ip in remaining_ips:
-            client = SSHClient(ip, username='root')
-            ArakoonInstaller.stop(cluster_name, client=client)
-            ArakoonInstaller.start(cluster_name, client=client)
-            ArakoonInstaller._logger.debug('  Restarted node {0} for cluster {1}'.format(client.ip, cluster_name))
-            if len(remaining_ips) > 2:  # A two node cluster needs all nodes running
-                ArakoonInstaller.wait_for_cluster(cluster_name, remaining_ips[0], filesystem)
-        ArakoonInstaller.wait_for_cluster(cluster_name, remaining_ips[0], filesystem)
-        config = ArakoonClusterConfig(cluster_name, filesystem)
-        config.load_config(remaining_ips[0])
-        arakoon_client = ArakoonInstaller.build_client(config)
-        arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, config.export_ini())
-        ArakoonInstaller._logger.debug('Restart sequence (remove) for {0} completed'.format(cluster_name))
-
-    @staticmethod
     def claim_cluster(cluster_name, master_ip, filesystem, metadata=None):
         """
         Claims the cluster
-        :param cluster_name: Name of the cluster to restart
+        :param cluster_name: Name of the cluster to claim
         :type cluster_name: str
         :param master_ip: IP of one of the cluster nodes
         :type master_ip: str
@@ -871,7 +886,7 @@ class ArakoonInstaller(object):
     def unclaim_cluster(cluster_name, master_ip, filesystem, metadata=None):
         """
         Un-claims the cluster
-        :param cluster_name: Name of the cluster to restart
+        :param cluster_name: Name of the cluster to un-claim
         :type cluster_name: str
         :param master_ip: IP of one of the cluster nodes
         :type master_ip: str
@@ -906,3 +921,14 @@ class ArakoonInstaller(object):
         for node in config.nodes:
             nodes[node.name] = ([node.ip], node.client_port)
         return PyrakoonClient(config.cluster_id, nodes)
+
+    @staticmethod
+    def get_service_name_for_cluster(cluster_name):
+        """
+        Retrieve the arakoon service name for the cluster specified
+        :param cluster_name: Name of the Arakoon cluster
+        :type cluster_name: str
+        :return: Name of the arakoon service known on the system
+        :rtype: str
+        """
+        return 'arakoon-{0}'.format(cluster_name)
