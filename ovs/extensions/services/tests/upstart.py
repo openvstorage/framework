@@ -106,6 +106,20 @@ class Upstart(object):
         return name in Upstart.services.get(key, {})
 
     @staticmethod
+    def register_service(node_name, service_metadata):
+        """
+        Register a service in the configuration management
+        """
+        _ = node_name, service_metadata
+
+    @staticmethod
+    def unregister_service(node_name, service_name):
+        """
+        Un-register a service from the configuration management
+        """
+        _ = node_name, service_name
+
+    @staticmethod
     def _service_exists(name, client, path):
         """
         Verify whether a mocked service exists
