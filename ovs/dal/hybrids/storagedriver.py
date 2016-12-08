@@ -81,7 +81,7 @@ class StorageDriver(DataObject):
         """
         clients = []
         try:
-            for item in self.vpool.storagedriver_client.list_client_connections(str(self.storagedriver_id)):
+            for item in self.vpool.storagedriver_client.list_client_connections(str(self.storagedriver_id), req_timeout_secs=2):
                 clients.append({'key': '{0}:{1}'.format(item.ip, item.port),
                                 'object_id': item.object_id,
                                 'ip': item.ip,
@@ -109,7 +109,7 @@ class StorageDriver(DataObject):
         # Load data from volumedriver
         if self.storagedriver_id and self.vpool:
             try:
-                sdstats = self.vpool.storagedriver_client.statistics_node(str(self.storagedriver_id))
+                sdstats = self.vpool.storagedriver_client.statistics_node(str(self.storagedriver_id), req_timeout_secs=2)
             except Exception as ex:
                 StorageDriver._logger.error('Error loading statistics_node from {0}: {1}'.format(self.storagedriver_id, ex))
                 sdstats = StorageDriverClient.EMPTY_STATISTICS()

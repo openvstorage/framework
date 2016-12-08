@@ -70,13 +70,11 @@ class VDiskController(object):
         """
         if vpool_guid is not None:
             vpool = VPool(vpool_guid)
-            storagedriver_client = StorageDriverClient.load(vpool)
-            response = storagedriver_client.list_volumes()
+            response = vpool.storagedriver_client.list_volumes(req_timeout_secs=5)
         else:
             response = []
             for vpool in VPoolList.get_vpools():
-                storagedriver_client = StorageDriverClient.load(vpool)
-                response.extend(storagedriver_client.list_volumes())
+                response.extend(vpool.storagedriver_client.list_volumes(req_timeout_secs=5))
         return response
 
     @staticmethod
@@ -365,7 +363,8 @@ class VDiskController(object):
                         continue
                 vdisk.storagedriver_client.create_snapshot(volume_id=str(vdisk.volume_id),
                                                            snapshot_id=str(snapshot_id),
-                                                           metadata=metadata)
+                                                           metadata=metadata,
+                                                           req_timeout_secs=10)
                 vdisk.invalidate_dynamics(['snapshots'])
                 results[guid] = [True, snapshot_id]
             except Exception as ex:
@@ -413,7 +412,7 @@ class VDiskController(object):
                     continue
 
                 VDiskController._logger.info('Deleting snapshot {0} from vDisk {1}'.format(snapshot_id, vdisk.name))
-                vdisk.storagedriver_client.delete_snapshot(str(vdisk.volume_id), str(snapshot_id))
+                vdisk.storagedriver_client.delete_snapshot(str(vdisk.volume_id), str(snapshot_id), req_timeout_secs=10)
                 vdisk.invalidate_dynamics(['snapshots'])
                 results[vdisk_guid] = [True, snapshot_id]
             except Exception as ex:
@@ -438,7 +437,7 @@ class VDiskController(object):
 
         VDiskController._logger.info('Converting vDisk {0} into vTemplate'.format(vdisk.name))
         try:
-            vdisk.storagedriver_client.set_volume_as_template(str(vdisk.volume_id))
+            vdisk.storagedriver_client.set_volume_as_template(str(vdisk.volume_id), req_timeout_secs=30)
         except Exception:
             VDiskController._logger.exception('Failed to convert vDisk {0} into vTemplate'.format(vdisk.name))
             raise Exception('Converting vDisk {0} into vTemplate failed'.format(vdisk.name))
@@ -546,7 +545,8 @@ class VDiskController(object):
             volume_id = vdisk.storagedriver_client.create_clone_from_template(target_path=devicename,
                                                                               metadata_backend_config=MDSMetaDataBackendConfig([backend_config]),
                                                                               parent_volume_id=str(vdisk.volume_id),
-                                                                              node_id=str(storagedriver.storagedriver_id))
+                                                                              node_id=str(storagedriver.storagedriver_id),
+                                                                              req_timeout_secs=30)
         except Exception as ex:
             VDiskController._logger.error('Cloning vTemplate {0} failed: {1}'.format(vdisk.name, str(ex)))
             raise
@@ -611,7 +611,8 @@ class VDiskController(object):
             volume_id = vpool.storagedriver_client.create_volume(target_path=devicename,
                                                                  metadata_backend_config=backend_config,
                                                                  volume_size="{0}B".format(volume_size),
-                                                                 node_id=str(storagedriver.storagedriver_id))
+                                                                 node_id=str(storagedriver.storagedriver_id),
+                                                                 req_timeout_secs=30)
         except Exception as ex:
             VDiskController._logger.error('Creating new vDisk {0} failed: {1}'.format(volume_name, str(ex)))
             raise
@@ -658,11 +659,11 @@ class VDiskController(object):
 
         volume_id = str(vdisk.volume_id)
         try:
-            sco_size = vdisk.storagedriver_client.get_sco_multiplier(volume_id) / 1024 * 4
-            dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id)
-            tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id)
-            non_disposable_sco_factor = vdisk.storagedriver_client.get_sco_cache_max_non_disposable_factor(volume_id)
-            metadata_cache_capacity = vdisk.storagedriver_client.get_metadata_cache_capacity(volume_id)
+            sco_size = vdisk.storagedriver_client.get_sco_multiplier(volume_id, req_timeout_secs=10) / 1024 * 4
+            dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id, req_timeout_secs=10)
+            tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id, req_timeout_secs=10)
+            non_disposable_sco_factor = vdisk.storagedriver_client.get_sco_cache_max_non_disposable_factor(volume_id, req_timeout_secs=10)
+            metadata_cache_capacity = vdisk.storagedriver_client.get_metadata_cache_capacity(volume_id, req_timeout_secs=10)
         except Exception:
             VDiskController._logger.exception('Failed to retrieve configuration parameters for vDisk {0}'.format(vdisk.name))
             raise Exception('Retrieving configuration for vDisk {0} failed'.format(vdisk.name))
@@ -729,9 +730,9 @@ class VDiskController(object):
             sco_factor = write_buffer / tlog_multiplier / new_sco_size
             try:
                 VDiskController._logger.info('Updating property sco_size on vDisk {0} to {1}'.format(vdisk.name, new_sco_size))
-                vdisk.storagedriver_client.set_sco_multiplier(volume_id, new_sco_size / 4 * 1024)
-                vdisk.storagedriver_client.set_tlog_multiplier(volume_id, tlog_multiplier)
-                vdisk.storagedriver_client.set_sco_cache_max_non_disposable_factor(volume_id, sco_factor)
+                vdisk.storagedriver_client.set_sco_multiplier(volume_id, new_sco_size / 4 * 1024, req_timeout_secs=10)
+                vdisk.storagedriver_client.set_tlog_multiplier(volume_id, tlog_multiplier, req_timeout_secs=10)
+                vdisk.storagedriver_client.set_sco_cache_max_non_disposable_factor(volume_id, sco_factor, req_timeout_secs=10)
                 VDiskController._logger.info('Updated property sco_size')
             except Exception as ex:
                 VDiskController._logger.error('Error updating "sco_size": {0}'.format(ex))
@@ -749,7 +750,7 @@ class VDiskController(object):
             if old_dtl_mode != new_dtl_mode:
                 VDiskController._logger.info('Disabling DTL for vDisk {0}'.format(vdisk.name))
                 try:
-                    vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
+                    vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None, req_timeout_secs=10)
                 except Exception:
                     VDiskController._logger.exception('Failed to disable DTL for vDisk {0}'.format(vdisk.name))
                     raise Exception('Disabling DTL for vDisk {0} failed'.format(vdisk.name))
@@ -804,7 +805,7 @@ class VDiskController(object):
                 raise ValueError('Cannot reconfigure DTL to StorageRouter {0} because the vDisk is hosted on this StorageRouter'.format(storagerouter.name))
 
             try:
-                current_dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id)
+                current_dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id, req_timeout_secs=10)
             except Exception:
                 VDiskController._logger.exception('Failed to retrieve current DTL configuration for vDisk {0}'.format(vdisk.name))
                 raise Exception('Retrieving current DTL configuration failed for vDisk {0}'.format(vdisk.name))
@@ -815,7 +816,7 @@ class VDiskController(object):
                 for storagerouter in possible_storagerouters:
                     for sd in storagerouter.storagedrivers:  # DTL can reside on any node in the cluster running a volumedriver and having a DTL process running
                         dtl_config = DTLConfig(str(sd.storage_ip), sd.ports['dtl'], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
-                        vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
+                        vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config, req_timeout_secs=10)
                         vdisk.invalidate_dynamics(['dtl_status'])
                         break
                     if dtl_config is not None:
@@ -836,11 +837,11 @@ class VDiskController(object):
                 if new_value != old_value:
                     VDiskController._logger.info('Updating property {0} on vDisk {1} from to {2}'.format(key, vdisk.name, new_value))
                     if key == 'write_buffer':
-                        tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id) or StorageDriverClient.TLOG_MULTIPLIER_MAP[new_sco_size]
+                        tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id, req_timeout_secs=5) or StorageDriverClient.TLOG_MULTIPLIER_MAP[new_sco_size]
                         sco_factor = float(new_value) / tlog_multiplier / new_sco_size
-                        vdisk.storagedriver_client.set_sco_cache_max_non_disposable_factor(volume_id, sco_factor)
+                        vdisk.storagedriver_client.set_sco_cache_max_non_disposable_factor(volume_id, sco_factor, req_timeout_secs=10)
                     elif key == 'metadata_cache_size':
-                        vdisk.storagedriver_client.set_metadata_cache_capacity(volume_id, new_value / StorageDriverClient.METADATA_CACHE_PAGE_SIZE)
+                        vdisk.storagedriver_client.set_metadata_cache_capacity(volume_id, new_value / StorageDriverClient.METADATA_CACHE_PAGE_SIZE, req_timeout_secs=10)
                     else:
                         raise KeyError('Unsupported property provided: "{0}"'.format(key))
                     VDiskController._logger.info('Updated property {0}'.format(key))
@@ -917,8 +918,8 @@ class VDiskController(object):
                     dtl_vpool_enabled = vpool_config['dtl_enabled']
                     dtl_vpool_config_mode = vpool_config['dtl_config_mode']
                     try:
-                        current_dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id)
-                        current_dtl_config_mode = vdisk.storagedriver_client.get_dtl_config_mode(volume_id)
+                        current_dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id, req_timeout_secs=5)
+                        current_dtl_config_mode = vdisk.storagedriver_client.get_dtl_config_mode(volume_id, req_timeout_secs=5)
                     except Exception:
                         # Can occur when a volume has not been stolen yet from a dead node
                         VDiskController._logger.exception('    VDisk {0} with guid {1}: Failed to retrieve the DTL configuration from storage driver'.format(vdisk.name, vdisk.guid))
@@ -963,7 +964,7 @@ class VDiskController(object):
                         VDiskController._logger.info('    DTL is globally disabled for vPool {0} with guid {1}'.format(vpool.name, vpool.guid))
                         try:
                             with volatile_mutex(lock_key, wait=time_to_wait_for_lock):
-                                vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
+                                vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None, req_timeout_secs=10)
                                 vdisk.invalidate_dynamics(['dtl_status'])
                         except NoLockAvailableException:
                             VDiskController._logger.info('    Could not acquire lock, continuing with next vDisk')
@@ -1045,7 +1046,7 @@ class VDiskController(object):
                         VDiskController._logger.info('    No Storage Routers could be found as valid DTL target, setting DTL for vDisk to STANDALONE')
                         try:
                             with volatile_mutex(lock_key, wait=time_to_wait_for_lock):
-                                vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None)
+                                vdisk.storagedriver_client.set_manual_dtl_config(volume_id, None, req_timeout_secs=10)
                                 vdisk.invalidate_dynamics(['dtl_status'])
                         except NoLockAvailableException:
                             VDiskController._logger.info('    Could not acquire lock, continuing with next vDisk')
@@ -1115,7 +1116,7 @@ class VDiskController(object):
                         dtl_config = DTLConfig(str(ip), port, StorageDriverClient.VDISK_DTL_MODE_MAP[dtl_mode])
                         try:
                             with volatile_mutex(lock_key, wait=time_to_wait_for_lock):
-                                vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config)
+                                vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config, req_timeout_secs=10)
                                 vdisk.invalidate_dynamics(['dtl_status'])
                         except NoLockAvailableException:
                             VDiskController._logger.info('    Could not acquire lock, continuing with next vDisk')
@@ -1187,7 +1188,7 @@ class VDiskController(object):
         """
         vdisk = VDisk(vdisk_guid)
         try:
-            return vdisk.storagedriver_client.is_volume_synced_up_to_tlog(str(vdisk.volume_id), str(tlog_name))
+            return vdisk.storagedriver_client.is_volume_synced_up_to_tlog(str(vdisk.volume_id), str(tlog_name), req_timeout_secs=10)
         except Exception:
             VDiskController._logger.exception('Failed to verify whether vDisk {0} is synced up to tlog'.format(vdisk.name))
             raise Exception('Verifying if vDisk {0} is synced up to tlog failed'.format(vdisk.name))
@@ -1206,7 +1207,7 @@ class VDiskController(object):
         """
         vdisk = VDisk(vdisk_guid)
         try:
-            return vdisk.storagedriver_client.is_volume_synced_up_to_snapshot(str(vdisk.volume_id), str(snapshot_id))
+            return vdisk.storagedriver_client.is_volume_synced_up_to_snapshot(str(vdisk.volume_id), str(snapshot_id), req_timeout_secs=10)
         except Exception:
             VDiskController._logger.exception('Failed to verify whether vDisk {0} is synced up to snapshot'.format(vdisk.name))
             raise Exception('Verifying if vDisk {0} is synced up to snapshot failed'.format(vdisk.name))
@@ -1267,7 +1268,7 @@ class VDiskController(object):
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
         cache_capacity = int(min(vdisk.size, 2 * 1024 ** 4) / float(metadata_page_capacity * cluster_size))
         VDiskController._logger.info('Setting metadata page cache size for vdisk {0} to {1}'.format(vdisk.name, cache_capacity))
-        vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), cache_capacity)
+        vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), cache_capacity, req_timeout_secs=10)
 
     @staticmethod
     def clean_devicename(name):
