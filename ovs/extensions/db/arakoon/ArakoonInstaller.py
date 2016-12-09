@@ -799,14 +799,14 @@ class ArakoonInstaller(object):
         """
         ArakoonInstaller._logger.debug('Restart sequence for {0} via {1}'.format(cluster_name, client.ip))
 
-        config = ArakoonClusterConfig(cluster_name, False)
-        config.load_config()
+        config = ArakoonClusterConfig(cluster_name, cluster_name == 'config')
+        config.load_config(ip=client.ip)
 
         if len(config.nodes) > 0:
             ArakoonInstaller.stop(cluster_name, client)
             ArakoonInstaller.start(cluster_name, client)
             ArakoonInstaller._logger.debug('Restarted node {0} on cluster {1}'.format(client.ip, cluster_name))
-            ArakoonInstaller.wait_for_cluster(cluster_name, config.nodes[0].ip, False)
+            ArakoonInstaller.wait_for_cluster(cluster_name, config.nodes[0].ip, cluster_name == 'config')
 
     @staticmethod
     def restart_cluster_add(cluster_name, current_ips, new_ip, filesystem):
