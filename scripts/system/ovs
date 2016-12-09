@@ -92,7 +92,7 @@ elif [ "$1" = "update" ] ; then
         done
         comp_string=${comp_string}"]"
 
-        echo 'date >> /var/log/ovs/update.log; python -c "from ovs.lib.update import UpdateController; UpdateController.execute_update('${comp_string}')" &>> /var/log/ovs/update.log; echo "done" >> /var/log/ovs/update.log' > /tmp/update
+        echo 'python -c "from ovs.lib.update import UpdateController; UpdateController.execute_update('${comp_string}')" &>> /var/log/ovs/update.log;' > /tmp/update
         at -f /tmp/update now
         rm /tmp/update
     else

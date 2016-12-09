@@ -27,16 +27,15 @@ class DebianPackage(object):
     """
     Contains all logic related to Debian packages (used in e.g. Debian, Ubuntu)
     """
-
     APT_CONFIG_STRING = '-o Dir::Etc::sourcelist="sources.list.d/ovsaptrepo.list"'
-    _logger = LogHandler.get('lib', name='package-manager-debian')
+    _logger = LogHandler.get('update', name='package-manager-debian')
 
     @staticmethod
     def get_installed_versions(client=None, package_names=None):
         """
-        Retrieve currently installed versions of all packages
+        Retrieve currently installed versions of the packages provided (or all if none provided)
         :param client: Client on which to check the installed versions
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :param package_names: Name of the packages to check
         :type package_names: list
         :return: Package installed versions
@@ -56,9 +55,9 @@ class DebianPackage(object):
     @staticmethod
     def get_candidate_versions(client, package_names):
         """
-        Retrieve the versions candidate for installation of all packages
+        Retrieve the versions candidate for installation of the packages provided
         :param client: Root client on which to check the candidate versions
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :param package_names: Name of the packages to check
         :type package_names: list
         :return: Package candidate versions
@@ -79,13 +78,36 @@ class DebianPackage(object):
         return versions
 
     @staticmethod
+    def get_binary_versions(client, package_names):
+        """
+        Retrieve the versions for the binaries related to the package_names
+        :param client: Root client on which to retrieve the binary versions
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :param package_names: Names of the packages
+        :type package_names: list
+        :return: Binary versions
+        :rtype: dict
+        """
+        versions = {}
+        for package_name in package_names:
+            if package_name == 'alba':
+                versions[package_name] = client.run(DebianPackage.GET_VERSION_ALBA, allow_insecure=True)
+            elif package_name == 'arakoon':
+                versions[package_name] = client.run(DebianPackage.GET_VERSION_ARAKOON, allow_insecure=True)
+            elif package_name == 'volumedriver-no-dedup-server':
+                versions[package_name] = client.run(DebianPackage.GET_VERSION_STORAGEDRIVER, allow_insecure=True)
+            else:
+                raise ValueError('Only the following packages in the OpenvStorage repository have a binary file: "{0}"'.format('", "'.join(DebianPackage.OVS_PACKAGES_WITH_BINARIES)))
+        return versions
+
+    @staticmethod
     def install(package_name, client):
         """
         Install the specified package
         :param package_name: Name of the package to install
         :type package_name: str
         :param client: Root client on which to execute the installation of the package
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: None
         """
         if client.username != 'root':
@@ -117,7 +139,7 @@ class DebianPackage(object):
         """
         Run the 'aptdcon --refresh' command on the specified node to update the package information
         :param client: Root client on which to update the package information
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: None
         """
         if client.username != 'root':

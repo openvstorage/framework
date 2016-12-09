@@ -31,6 +31,11 @@ class PackageManager(object):
     OVS_PACKAGE_NAMES = ['alba', 'arakoon',
                          'openvstorage', 'openvstorage-backend', 'openvstorage-sdm',
                          'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server']
+    OVS_PACKAGES_WITH_BINARIES = ['alba', 'arakoon', 'volumedriver-no-dedup-server']
+
+    GET_VERSION_ALBA = 'alba version --terse'
+    GET_VERSION_ARAKOON = "arakoon --version | grep version: | awk '{print $2}'"
+    GET_VERSION_STORAGEDRIVER = "volumedriver_fs --version | grep version: | awk '{print $2}'"
 
     class MetaClass(type):
         """
@@ -59,6 +64,11 @@ class PackageManager(object):
                 else:
                     raise RuntimeError('There is no handler for Distributor ID: {0}'.format(distributor))
                 PackageManager.ImplementationClass.OVS_PACKAGE_NAMES = PackageManager.OVS_PACKAGE_NAMES
+                PackageManager.ImplementationClass.OVS_PACKAGES_WITH_BINARIES = PackageManager.OVS_PACKAGES_WITH_BINARIES
+
+                PackageManager.ImplementationClass.GET_VERSION_ALBA = PackageManager.GET_VERSION_ALBA
+                PackageManager.ImplementationClass.GET_VERSION_ARAKOON = PackageManager.GET_VERSION_ARAKOON
+                PackageManager.ImplementationClass.GET_VERSION_STORAGEDRIVER = PackageManager.GET_VERSION_STORAGEDRIVER
             return getattr(PackageManager.ImplementationClass, item)
 
     __metaclass__ = MetaClass

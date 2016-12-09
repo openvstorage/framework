@@ -26,7 +26,7 @@ class RpmPackage(object):
     """
     Contains all logic related to Rpm packages (used in e.g. Centos)
     """
-    _logger = LogHandler.get('lib', name='package-manager-rpm')
+    _logger = LogHandler.get('update', name='package-manager-rpm')
 
     @staticmethod
     def get_installed_versions(client=None, package_names=None):
@@ -78,6 +78,29 @@ class RpmPackage(object):
                         else:
                             candidate = version[1]
             versions[package_name] = candidate
+        return versions
+
+    @staticmethod
+    def get_binary_versions(client, package_names):
+        """
+        Retrieve the versions for the binaries related to the package_names
+        :param client: Root client on which to retrieve the binary versions
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :param package_names: Names of the packages
+        :type package_names: list
+        :return: Binary versions
+        :rtype: dict
+        """
+        versions = {}
+        for package_name in package_names:
+            if package_name == 'alba':
+                versions[package_name] = client.run(RpmPackage.GET_VERSION_ALBA, allow_insecure=True)
+            elif package_name == 'arakoon':
+                versions[package_name] = client.run(RpmPackage.GET_VERSION_ARAKOON, allow_insecure=True)
+            elif package_name == 'volumedriver-no-dedup-server':
+                versions[package_name] = client.run(RpmPackage.GET_VERSION_STORAGEDRIVER, allow_insecure=True)
+            else:
+                raise ValueError('Only the following packages in the OpenvStorage repository have a binary file: "{0}"'.format('", "'.join(RpmPackage.OVS_PACKAGES_WITH_BINARIES)))
         return versions
 
     @staticmethod
