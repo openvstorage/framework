@@ -26,7 +26,7 @@ class RpmPackage(object):
     """
     Contains all logic related to Rpm packages (used in e.g. Centos)
     """
-    _logger = LogHandler.get('lib', name='package-manager-rpm')
+    _logger = LogHandler.get('update', name='package-manager-rpm')
 
     @staticmethod
     def get_installed_versions(client=None, package_names=None):
