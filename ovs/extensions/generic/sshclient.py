@@ -27,8 +27,10 @@ import glob
 import json
 import time
 import types
+import random
 import select
 import socket
+import string
 import logging
 import tempfile
 import unicodedata
@@ -97,7 +99,7 @@ class SSHClient(object):
     _run_returns = {}
     _run_recordings = []
 
-    def __init__(self, endpoint, username='ovs', password=None):
+    def __init__(self, endpoint, username='ovs', password=None, cached=True):
         """
         Initializes an SSHClient
         """
@@ -143,7 +145,11 @@ class SSHClient(object):
 
         if not self.is_local:
             logging.getLogger('paramiko').setLevel(logging.WARNING)
-            key = '{0}@{1}'.format(self.ip, self.username)
+            if cached is True:
+                key = '{0}@{1}'.format(self.ip, self.username)
+            else:
+                random_name = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
+                key = '{0}@{1}{2}'.format(self.ip, self.username, random_name)
             if key not in SSHClient.client_cache:
                 import paramiko
                 client = paramiko.SSHClient()
