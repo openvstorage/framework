@@ -97,7 +97,7 @@ class SSHClient(object):
     _run_returns = {}
     _run_recordings = []
 
-    def __init__(self, endpoint, username='ovs', password=None):
+    def __init__(self, endpoint, username='ovs', password=None, cached=True):
         """
         Initializes an SSHClient
         """
@@ -143,14 +143,22 @@ class SSHClient(object):
 
         if not self.is_local:
             logging.getLogger('paramiko').setLevel(logging.WARNING)
-            key = '{0}@{1}'.format(self.ip, self.username)
-            if key not in SSHClient.client_cache:
+            key = None
+            create_new = True
+            if cached is True:
+                key = '{0}@{1}'.format(self.ip, self.username)
+                if key in SSHClient.client_cache:
+                    create_new = False
+                    self._client = SSHClient.client_cache[key]
+
+            if create_new is True:
                 import paramiko
                 client = paramiko.SSHClient()
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.is_connected = types.MethodType(is_connected, client)
-                SSHClient.client_cache[key] = client
-            self._client = SSHClient.client_cache[key]
+                if cached is True:
+                    SSHClient.client_cache[key] = client
+                self._client = client
         self._connect()
 
     def __del__(self):

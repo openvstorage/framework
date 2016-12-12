@@ -495,13 +495,13 @@ class GenericController(object):
         all_storagerouters = StorageRouterList.get_storagerouters()
         for storagerouter in all_storagerouters:
             information[storagerouter.ip] = {}
-            try:
-                client = SSHClient(endpoint=storagerouter, username='root')
-            except UnableToConnectException:
-                GenericController._logger.warning('StorageRouter {0} with IP {1} is inaccessible'.format(storagerouter.name, storagerouter.ip))
-                continue
-
             for function in Toolbox.fetch_hooks('update', 'get_package_info_multi'):
+                try:
+                    # We make use of these clients in Threads --> cached = False
+                    client = SSHClient(endpoint=storagerouter, username='root', cached=False)
+                except UnableToConnectException:
+                    information[storagerouter.ip]['errors'] = ['StorageRouter {0} is inaccessible'.format(storagerouter.name)]
+                    break
                 thread = Thread(target=function,
                                 args=(client, information))
                 thread.start()
