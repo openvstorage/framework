@@ -27,10 +27,8 @@ import glob
 import json
 import time
 import types
-import random
 import select
 import socket
-import string
 import logging
 import tempfile
 import unicodedata
@@ -145,18 +143,22 @@ class SSHClient(object):
 
         if not self.is_local:
             logging.getLogger('paramiko').setLevel(logging.WARNING)
+            key = None
+            create_new = True
             if cached is True:
                 key = '{0}@{1}'.format(self.ip, self.username)
-            else:
-                random_name = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
-                key = '{0}@{1}{2}'.format(self.ip, self.username, random_name)
-            if key not in SSHClient.client_cache:
+                if key in SSHClient.client_cache:
+                    create_new = False
+                    self._client = SSHClient.client_cache[key]
+
+            if create_new is True:
                 import paramiko
                 client = paramiko.SSHClient()
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.is_connected = types.MethodType(is_connected, client)
-                SSHClient.client_cache[key] = client
-            self._client = SSHClient.client_cache[key]
+                if cached is True:
+                    SSHClient.client_cache[key] = client
+                self._client = client
         self._connect()
 
     def __del__(self):
