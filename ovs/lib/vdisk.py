@@ -298,10 +298,10 @@ class VDiskController(object):
                     new_vdisk = VDisk()
                     new_vdisk.volume_id = volume_id
                     new_vdisk.size = vdisk.size
-                    new_vdisk.name = name
                     new_vdisk.description = name
                     new_vdisk.devicename = devicename
                     new_vdisk.vpool = vdisk.vpool
+            new_vdisk.name = name
             new_vdisk.parent_vdisk = vdisk
             new_vdisk.parentsnapshot = snapshot_id
             new_vdisk.save()
@@ -563,10 +563,10 @@ class VDiskController(object):
                     new_vdisk = VDisk()
                     new_vdisk.volume_id = volume_id
                     new_vdisk.size = vdisk.size
-                    new_vdisk.name = name
                     new_vdisk.description = name
                     new_vdisk.devicename = devicename
                     new_vdisk.vpool = vdisk.vpool
+            new_vdisk.name = name
             new_vdisk.parent_vdisk = vdisk
             new_vdisk.save()
 
@@ -633,10 +633,10 @@ class VDiskController(object):
                     new_vdisk.size = volume_size
                     new_vdisk.vpool = vpool
                     new_vdisk.devicename = devicename
-                    new_vdisk.name = volume_name
                     new_vdisk.description = volume_name
                     new_vdisk.volume_id = volume_id
-                    new_vdisk.save()
+            new_vdisk.name = volume_name
+            new_vdisk.save()
 
         VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
         try:
