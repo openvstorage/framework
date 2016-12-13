@@ -291,15 +291,20 @@ class VDiskController(object):
             raise
 
         with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
-            new_vdisk = VDisk()
-            new_vdisk.size = vdisk.size
+            new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+            if new_vdisk is None:
+                new_vdisk = VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool)
+                if new_vdisk is None:
+                    new_vdisk = VDisk()
+                    new_vdisk.name = VDiskController.extract_volumename(devicename)
+                    new_vdisk.volume_id = volume_id
+                    new_vdisk.size = vdisk.size
+                    new_vdisk.name = name
+                    new_vdisk.description = name
+                    new_vdisk.devicename = devicename
+                    new_vdisk.vpool = vdisk.vpool
             new_vdisk.parent_vdisk = vdisk
-            new_vdisk.name = name
-            new_vdisk.description = name
-            new_vdisk.devicename = devicename
             new_vdisk.parentsnapshot = snapshot_id
-            new_vdisk.vpool = vdisk.vpool
-            new_vdisk.volume_id = volume_id
             new_vdisk.save()
 
         VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
@@ -552,14 +557,19 @@ class VDiskController(object):
             raise
 
         with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
-            new_vdisk = VDisk()
-            new_vdisk.size = vdisk.size
-            new_vdisk.vpool = vdisk.vpool
-            new_vdisk.devicename = devicename
+            new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+            if new_vdisk is None:
+                new_vdisk = VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool)
+                if new_vdisk is None:
+                    new_vdisk = VDisk()
+                    new_vdisk.name = VDiskController.extract_volumename(devicename)
+                    new_vdisk.volume_id = volume_id
+                    new_vdisk.size = vdisk.size
+                    new_vdisk.name = name
+                    new_vdisk.description = name
+                    new_vdisk.devicename = devicename
+                    new_vdisk.vpool = vdisk.vpool
             new_vdisk.parent_vdisk = vdisk
-            new_vdisk.name = name
-            new_vdisk.description = name
-            new_vdisk.volume_id = volume_id
             new_vdisk.save()
 
         VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
@@ -617,14 +627,18 @@ class VDiskController(object):
             raise
 
         with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
-            new_vdisk = VDisk()
-            new_vdisk.size = volume_size
-            new_vdisk.vpool = vpool
-            new_vdisk.devicename = devicename
-            new_vdisk.name = volume_name
-            new_vdisk.description = volume_name
-            new_vdisk.volume_id = volume_id
-            new_vdisk.save()
+            new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+            if new_vdisk is None:
+                new_vdisk = VDiskList.get_by_devicename_and_vpool(devicename, vpool)
+                if new_vdisk is None:
+                    new_vdisk = VDisk()
+                    new_vdisk.size = volume_size
+                    new_vdisk.vpool = vpool
+                    new_vdisk.devicename = devicename
+                    new_vdisk.name = volume_name
+                    new_vdisk.description = volume_name
+                    new_vdisk.volume_id = volume_id
+                    new_vdisk.save()
 
         VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
         try:
