@@ -296,7 +296,6 @@ class VDiskController(object):
                 new_vdisk = VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool)
                 if new_vdisk is None:
                     new_vdisk = VDisk()
-                    new_vdisk.name = VDiskController.extract_volumename(devicename)
                     new_vdisk.volume_id = volume_id
                     new_vdisk.size = vdisk.size
                     new_vdisk.name = name
@@ -562,7 +561,6 @@ class VDiskController(object):
                 new_vdisk = VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool)
                 if new_vdisk is None:
                     new_vdisk = VDisk()
-                    new_vdisk.name = VDiskController.extract_volumename(devicename)
                     new_vdisk.volume_id = volume_id
                     new_vdisk.size = vdisk.size
                     new_vdisk.name = name
