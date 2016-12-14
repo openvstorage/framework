@@ -37,16 +37,21 @@ class LocalStorageRouterClient(object):
         """
         self.path = path
 
-    def server_revision(self):
+    def server_revision(self, req_timeout_secs=None):
+        """
+        Returns a fake revision
+        """
+        _ = req_timeout_secs
         exception = StorageRouterClient.exceptions.get('server_revision', {}).get(self.path)
         if exception is not None:
             raise exception
         return 0
 
-    def update_configuration(self, path):
+    def update_configuration(self, path, req_timeout_secs=None):
         """
         Update configuration mock
         """
+        _ = req_timeout_secs
         from ovs.extensions.generic.configuration import Configuration
         if path != self.path:
             raise RuntimeError('Unexpected path passed. Not an issue, but unexpected. This (unittest) code might need to be adapted.')
@@ -119,20 +124,21 @@ class StorageRouterClient(object):
                     else:
                         item[this_vpool_guid] = {}
 
-    def create_clone(self, target_path, metadata_backend_config, parent_volume_id, parent_snapshot_id, node_id):
+    def create_clone(self, target_path, metadata_backend_config, parent_volume_id, parent_snapshot_id, node_id, req_timeout_secs=None):
         """
         Create a mocked clone
         """
-        _ = parent_snapshot_id
+        _ = parent_snapshot_id, req_timeout_secs
         if parent_volume_id not in StorageRouterClient.volumes[self.vpool_guid]:
             raise RuntimeError('Could not find volume {0}'.format(parent_volume_id))
         volume_size = StorageRouterClient.volumes[self.vpool_guid][parent_volume_id]['volume_size']
         return self.create_volume(target_path, metadata_backend_config, volume_size, node_id)
 
-    def create_clone_from_template(self, target_path, metadata_backend_config, parent_volume_id, node_id):
+    def create_clone_from_template(self, target_path, metadata_backend_config, parent_volume_id, node_id, req_timeout_secs=None):
         """
         Create a vDisk from a vTemplate
         """
+        _ = req_timeout_secs
         if parent_volume_id not in StorageRouterClient.volumes[self.vpool_guid]:
             raise RuntimeError('Could not find volume {0}'.format(parent_volume_id))
         parent_volume = StorageRouterClient.volumes[self.vpool_guid][parent_volume_id]
@@ -140,10 +146,11 @@ class StorageRouterClient(object):
             raise ValueError('Can only clone from a template')
         return self.create_volume(target_path, metadata_backend_config, parent_volume['volume_size'], node_id)
 
-    def create_snapshot(self, volume_id, snapshot_id, metadata):
+    def create_snapshot(self, volume_id, snapshot_id, metadata, req_timeout_secs=None):
         """
         Create snapshot mockup
         """
+        _ = req_timeout_secs
         snapshots = StorageRouterClient._snapshots[self.vpool_guid].get(volume_id, {})
         snapshots[snapshot_id] = Snapshot(metadata)
         StorageRouterClient._snapshots[self.vpool_guid][volume_id] = snapshots
@@ -156,12 +163,12 @@ class StorageRouterClient(object):
             raise RuntimeError('Could not find volume {0}'.format(volume_id))
         StorageRouterClient._snapshots[self.vpool_guid][volume_id][snapshot_id].in_backend = in_backend
 
-    def create_volume(self, target_path, metadata_backend_config, volume_size, node_id):
+    def create_volume(self, target_path, metadata_backend_config, volume_size, node_id, req_timeout_secs=None):
         """
         Create a mocked volume
         """
+        _ = req_timeout_secs
         from ovs.dal.lists.storagedriverlist import StorageDriverList
-
         volume_id = str(uuid.uuid4())
         storagedriver = StorageDriverList.get_by_storagedriver_id(node_id)
         if storagedriver is None:
@@ -181,87 +188,93 @@ class StorageRouterClient(object):
             raise RuntimeError('Could not find volume {0}'.format(volume_id))
         StorageRouterClient.object_type[self.vpool_guid][volume_id] = object_type
 
-    def delete_snapshot(self, volume_id, snapshot_id):
+    def delete_snapshot(self, volume_id, snapshot_id, req_timeout_secs=None):
         """
         Delete snapshot mockup
         """
+        _ = req_timeout_secs
         del StorageRouterClient._snapshots[self.vpool_guid][volume_id][snapshot_id]
 
-    def empty_info(self):
+    def empty_info(self, req_timeout_secs=None):
         """
         Returns an empty info object
         """
-        _ = self
+        _ = self, req_timeout_secs
         return type('Info', (), {'cluster_multiplier': 0,
                                  'lba_size': 0,
                                  'metadata_backend_config': property(lambda s: None),
                                  'object_type': property(lambda s: 'BASE'),
                                  'vrouter_id': property(lambda s: None)})()
 
-    def get_dtl_config(self, volume_id):
+    def get_dtl_config(self, volume_id, req_timeout_secs=None):
         """
         Retrieve a fake DTL configuration
         """
+        _ = req_timeout_secs
         return StorageRouterClient._dtl_config_cache[self.vpool_guid].get(volume_id)
 
-    def get_dtl_config_mode(self, volume_id):
+    def get_dtl_config_mode(self, volume_id, req_timeout_secs=None):
         """
         Retrieve a fake DTL configuration mode
         """
+        _ = req_timeout_secs
         if volume_id in StorageRouterClient._dtl_config_cache[self.vpool_guid]:
             if StorageRouterClient._dtl_config_cache[self.vpool_guid][volume_id] is None:
                 return DTLConfigMode.MANUAL
             return StorageRouterClient._dtl_config_cache[self.vpool_guid][volume_id].dtl_config_mode
         return DTLConfigMode.AUTOMATIC
 
-    def get_metadata_cache_capacity(self, volume_id):
+    def get_metadata_cache_capacity(self, volume_id, req_timeout_secs=None):
         """
         Retrieve the metadata cache capacity for volume
         """
-        _ = self
+        _ = self, req_timeout_secs
         return StorageRouterClient._config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('metadata_cache_capacity', 8192)
 
-    def get_sco_cache_max_non_disposable_factor(self, volume_id):
+    def get_sco_cache_max_non_disposable_factor(self, volume_id, req_timeout_secs=None):
         """
         Retrieve the SCO cache multiplier for a volume
         """
-        _ = self
+        _ = self, req_timeout_secs
         return StorageRouterClient._config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('sco_cache_non_disposable_factor', 12)
 
-    def get_sco_multiplier(self, volume_id):
+    def get_sco_multiplier(self, volume_id, req_timeout_secs=None):
         """
         Retrieve the SCO multiplier for volume
         """
-        _ = self
+        _ = self, req_timeout_secs
         return StorageRouterClient._config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('sco_multiplier', 1024)
 
-    def get_tlog_multiplier(self, volume_id):
+    def get_tlog_multiplier(self, volume_id, req_timeout_secs=None):
         """
         Retrieve the TLOG multiplier for volume
         """
-        _ = self
+        _ = self, req_timeout_secs
         return StorageRouterClient._config_cache.get(self.vpool_guid, {}).get(volume_id, {}).get('tlog_multiplier', 16)
 
-    def info_snapshot(self, volume_id, snapshot_id):
+    def info_snapshot(self, volume_id, snapshot_id, req_timeout_secs=None):
         """
         Info snapshot mockup
         """
+        _ = req_timeout_secs
         return StorageRouterClient._snapshots[self.vpool_guid][volume_id][snapshot_id]
 
-    def info_volume(self, volume_id):
+    def info_volume(self, volume_id, req_timeout_secs=None):
         """
         Info volume mockup
         """
+        _ = req_timeout_secs
         return type('Info', (), {'cluster_multiplier': property(lambda s: 8),
                                  'lba_size': property(lambda s: 512),
                                  'metadata_backend_config': property(lambda s: StorageRouterClient._metadata_backend_config[self.vpool_guid].get(volume_id)),
                                  'object_type': property(lambda s: StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')),
                                  'vrouter_id': property(lambda s: StorageRouterClient.vrouter_id[self.vpool_guid].get(volume_id))})()
 
-    def is_volume_synced_up_to_snapshot(self, volume_id, snapshot_id):
+    def is_volume_synced_up_to_snapshot(self, volume_id, snapshot_id, req_timeout_secs=None):
         """
         Is volume synced up to specified snapshot mockup
         """
+        _ = req_timeout_secs
         snapshot = StorageRouterClient._snapshots[self.vpool_guid].get(volume_id, {}).get(snapshot_id)
         if snapshot is not None:
             if StorageRouterClient.synced is False:
@@ -269,79 +282,87 @@ class StorageRouterClient(object):
             return snapshot.in_backend
         return True
 
-    def list_snapshots(self, volume_id):
+    def list_snapshots(self, volume_id, req_timeout_secs=None):
         """
         Return fake info
         """
+        _ = req_timeout_secs
         return StorageRouterClient._snapshots[self.vpool_guid].get(volume_id, {}).keys()
 
-    def list_volumes(self):
+    def list_volumes(self, req_timeout_secs=None):
         """
         Return a list of volumes
         """
+        _ = req_timeout_secs
         return [volume_id for volume_id in StorageRouterClient.volumes[self.vpool_guid].iterkeys()]
 
-    def make_locked_client(self, volume_id):
+    def make_locked_client(self, volume_id, req_timeout_secs=None):
         """
         Retrieve a mocked locked client connection for the specified volume
         """
-        _ = self
+        _ = self, req_timeout_secs
         return LockedClient(volume_id)
 
-    def set_manual_dtl_config(self, volume_id, config):
+    def set_manual_dtl_config(self, volume_id, config, req_timeout_secs=None):
         """
         Set a fake DTL configuration
         """
+        _ = req_timeout_secs
         if config is None:
             dtl_config = None
         else:
             dtl_config = DTLConfig(host=config.host, mode=config.mode, port=config.port)
         StorageRouterClient._dtl_config_cache[self.vpool_guid][volume_id] = dtl_config
 
-    def set_metadata_cache_capacity(self, volume_id, num_pages):
+    def set_metadata_cache_capacity(self, volume_id, num_pages, req_timeout_secs=None):
         """
         Set the metadata cache capacity for volume
         """
+        _ = req_timeout_secs
         if self.vpool_guid not in StorageRouterClient._config_cache:
             StorageRouterClient._config_cache[self.vpool_guid] = {}
         if volume_id not in StorageRouterClient._config_cache[self.vpool_guid]:
             StorageRouterClient._config_cache[self.vpool_guid][volume_id] = {}
         StorageRouterClient._config_cache[self.vpool_guid][volume_id]['metadata_cache_capacity'] = num_pages
 
-    def set_sco_cache_max_non_disposable_factor(self, volume_id, factor):
+    def set_sco_cache_max_non_disposable_factor(self, volume_id, factor, req_timeout_secs=None):
         """
         Retrieve the SCO cache multiplier for a volume
         """
+        _ = req_timeout_secs
         if self.vpool_guid not in StorageRouterClient._config_cache:
             StorageRouterClient._config_cache[self.vpool_guid] = {}
         if volume_id not in StorageRouterClient._config_cache[self.vpool_guid]:
             StorageRouterClient._config_cache[self.vpool_guid][volume_id] = {}
         StorageRouterClient._config_cache[self.vpool_guid][volume_id]['sco_cache_non_disposable_factor'] = factor
 
-    def set_sco_multiplier(self, volume_id, multiplier):
+    def set_sco_multiplier(self, volume_id, multiplier, req_timeout_secs=None):
         """
         Set the SCO multiplier for volume
         """
+        _ = req_timeout_secs
         if self.vpool_guid not in StorageRouterClient._config_cache:
             StorageRouterClient._config_cache[self.vpool_guid] = {}
         if volume_id not in StorageRouterClient._config_cache[self.vpool_guid]:
             StorageRouterClient._config_cache[self.vpool_guid][volume_id] = {}
         StorageRouterClient._config_cache[self.vpool_guid][volume_id]['sco_multiplier'] = multiplier
 
-    def set_tlog_multiplier(self, volume_id, multiplier):
+    def set_tlog_multiplier(self, volume_id, multiplier, req_timeout_secs=None):
         """
         Retrieve the TLOG multiplier for volume
         """
+        _ = req_timeout_secs
         if self.vpool_guid not in StorageRouterClient._config_cache:
             StorageRouterClient._config_cache[self.vpool_guid] = {}
         if volume_id not in StorageRouterClient._config_cache[self.vpool_guid]:
             StorageRouterClient._config_cache[self.vpool_guid][volume_id] = {}
         StorageRouterClient._config_cache[self.vpool_guid][volume_id]['tlog_multiplier'] = multiplier
 
-    def set_volume_as_template(self, volume_id):
+    def set_volume_as_template(self, volume_id, req_timeout_secs=None):
         """
         Set a volume as a template
         """
+        _ = req_timeout_secs
         # Converting to template results in only latest snapshot to be kept
         timestamp = 0
         newest_snap_id = None
@@ -356,19 +377,21 @@ class StorageRouterClient(object):
                     StorageRouterClient._snapshots[self.vpool_guid][volume_id].pop(snap_id)
         StorageRouterClient.object_type[self.vpool_guid][volume_id] = 'TEMPLATE'
 
-    def unlink(self, devicename):
+    def unlink(self, devicename, req_timeout_secs=None):
         """
         Delete a volume
         """
+        _ = req_timeout_secs
         for volume_id, volume_info in StorageRouterClient.volumes[self.vpool_guid].iteritems():
             if volume_info['target_path'] == devicename:
                 StorageRouterClient.clean(self.vpool_guid, volume_id)
                 break
 
-    def update_metadata_backend_config(self, volume_id, metadata_backend_config):
+    def update_metadata_backend_config(self, volume_id, metadata_backend_config, req_timeout_secs=None):
         """
         Stores the given config
         """
+        _ = req_timeout_secs
         from ovs.extensions.storageserver.storagedriver import MetadataServerClient
         StorageRouterClient._metadata_backend_config[self.vpool_guid][volume_id] = metadata_backend_config
         config_stream = []
@@ -382,11 +405,11 @@ class StorageRouterClient(object):
         client = MDSClient(master)
         client.set_role(volume_id, MetadataServerClient.MDS_ROLE.MASTER, _internal=True)
 
-    def migrate(self, volume_id, node_id, force_restart):
+    def migrate(self, volume_id, node_id, force_restart, req_timeout_secs=None):
         """
         Dummy migrate method
         """
-        _ = force_restart
+        _ = force_restart, req_timeout_secs
         from ovs.dal.lists.storagedriverlist import StorageDriverList
 
         storagedriver = StorageDriverList.get_by_storagedriver_id(node_id)
@@ -394,11 +417,11 @@ class StorageRouterClient(object):
             raise ValueError('Failed to retrieve storagedriver with ID {0}'.format(node_id))
         StorageRouterClient.vrouter_id[self.vpool_guid][volume_id] = node_id
 
-    def update_cluster_node_configs(self, vrouter_id):
+    def update_cluster_node_configs(self, vrouter_id, req_timeout_secs=None):
         """
         Dummy update_cluster_node_configs
         """
-        _ = self
+        _ = self, req_timeout_secs
         StorageRouterClient.node_config_recordings.append(vrouter_id)
 
     EMPTY_INFO = empty_info

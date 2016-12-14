@@ -493,7 +493,7 @@ class StorageRouterController(object):
         try:
             vpool.clusterregistry_client.set_node_configs(node_configs)
             for sd in existing_storagedrivers:
-                vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id))
+                vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id), req_timeout_secs=10)
         except:
             storagedriver.delete()
             vpool.status = VPool.STATUSES.FAILURE
@@ -829,7 +829,7 @@ class StorageRouterController(object):
         for current_storagedriver in vpool.storagedrivers:
             if current_storagedriver.storagerouter.ip not in ip_client_map:
                 continue
-            vpool.storagedriver_client.update_cluster_node_configs(str(current_storagedriver.storagedriver_id))
+            vpool.storagedriver_client.update_cluster_node_configs(str(current_storagedriver.storagedriver_id), req_timeout_secs=10)
 
         # Fill vPool size
         with remote(root_client.ip, [os], 'root') as rem:
@@ -1047,7 +1047,7 @@ class StorageRouterController(object):
                 for sd in available_storage_drivers:
                     if sd != storage_driver:
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Driver {1} {2} - Updating cluster node configs'.format(storage_driver.guid, sd.guid, sd.name))
-                        vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id))
+                        vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id), req_timeout_secs=10)
         except Exception:
             StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Reconfiguring cluster node configs failed'.format(storage_driver.guid))
             errors_found = True

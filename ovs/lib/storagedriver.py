@@ -142,7 +142,7 @@ class StorageDriverController(object):
                     vpool.clusterregistry_client.set_node_configs(node_configs)
                     for sd in available_storagedrivers:
                         StorageDriverController._logger.info('Trigger config reload for StorageDriver {0}'.format(sd.guid))
-                        vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id))
+                        vpool.storagedriver_client.update_cluster_node_configs(str(sd.storagedriver_id), req_timeout_secs=10)
                     StorageDriverController._logger.info('Updating cluster node configs for Vpool {0} completed'.format(vpool.guid))
                 else:
                     StorageDriverController._logger.info('Cluster registry settings for Vpool {0} is up to date'.format(vpool.guid))

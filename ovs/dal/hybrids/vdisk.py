@@ -128,11 +128,11 @@ class VDisk(DataObject):
         if self.volume_id and self.vpool:
             volume_id = str(self.volume_id)
             try:
-                voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id)
+                voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
             except:
                 voldrv_snapshots = []
             for snap_id in voldrv_snapshots:
-                snapshot = self.storagedriver_client.info_snapshot(volume_id, snap_id)
+                snapshot = self.storagedriver_client.info_snapshot(volume_id, snap_id, req_timeout_secs=2)
                 if snapshot.metadata:
                     metadata = pickle.loads(snapshot.metadata)
                     if isinstance(metadata, dict):
@@ -161,7 +161,7 @@ class VDisk(DataObject):
         """
         if self.volume_id and self.vpool:
             try:
-                vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id))
+                vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id), req_timeout_secs=2)
             except:
                 vdiskinfo = StorageDriverClient.EMPTY_INFO()
         else:
@@ -247,7 +247,7 @@ class VDisk(DataObject):
         # Load data from volumedriver
         if self.volume_id and self.vpool:
             try:
-                vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id))
+                vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id), req_timeout_secs=2)
             except Exception as ex:
                 VDisk._logger.error('Error loading statistics_volume from {0}: {1}'.format(self.volume_id, ex))
                 vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
