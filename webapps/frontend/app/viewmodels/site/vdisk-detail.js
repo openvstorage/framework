@@ -117,22 +117,24 @@ define([
                                     ddata[item.guid] = item;
                                 }
                             });
+
                             self.vDisk().domainsPresent(domainsPresent);
-                            self.vDisk().dtlTargets(guids);
                             generic.crossFiller(
                                 guids, self.domains,
                                 function(guid) {
-                                    return new Domain(guid);
+                                    var domain = new Domain(guid);
+                                    if (!self.domainCache.hasOwnProperty(guid)) {
+                                        self.domainCache[guid] = domain;
+                                    }
+                                    return domain;
                                 }, 'guid'
                             );
                             $.each(self.domains(), function(index, domain) {
-                                if (!self.domainCache.hasOwnProperty(domain.guid())) {
-                                    self.domainCache[domain.guid()] = domain;
-                                }
                                 if (ddata.hasOwnProperty(domain.guid())) {
                                     domain.fillData(ddata[domain.guid()]);
                                 }
                             });
+                            self.vDisk().dtlTargets(guids);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
