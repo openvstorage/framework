@@ -100,7 +100,7 @@ class SetupController(object):
                 external_config = config.get('external_config')
                 config_mgmt_type = config.get('config_mgmt_type')
                 if execute_rollback is False:  # Only overrule cmdline if setting was not passed
-                    execute_rollback = config.get('break_even_more_in_case_of_failure', False)
+                    execute_rollback = config.get('rollback', False)
                 enable_heartbeats = config.get('enable_heartbeats', enable_heartbeats)
 
             # Support resume setup - store entered parameters so when retrying, we have the values
@@ -1999,7 +1999,7 @@ class SetupController(object):
         errors = []
         config = config['setup']
         actual_keys = config.keys()
-        expected_keys = ['break_even_more_in_case_of_failure', 'cluster_ip', 'config_mgmt_type', 'enable_heartbeats', 'external_config', 'master_ip', 'master_password', 'node_type', 'rdma']
+        expected_keys = ['cluster_ip', 'config_mgmt_type', 'enable_heartbeats', 'external_config', 'master_ip', 'master_password', 'node_type', 'rollback', 'rdma']
         for key in actual_keys:
             if key not in expected_keys:
                 errors.append('Key {0} is not supported by OpenvStorage to be used in the pre-configuration JSON'.format(key))
@@ -2007,13 +2007,13 @@ class SetupController(object):
             raise ValueError('\nErrors found while verifying pre-configuration:\n - {0}\n\nAllowed keys:\n - {1}'.format('\n - '.join(errors), '\n - '.join(expected_keys)))
 
         Toolbox.verify_required_params(actual_params=config,
-                                       required_params={'break_even_more_in_case_of_failure': (bool, None, False),
-                                                        'cluster_ip': (str, Toolbox.regex_ip, False),
+                                       required_params={'cluster_ip': (str, Toolbox.regex_ip, False),
                                                         'enable_heartbeats': (bool, None, False),
                                                         'external_config': (str, None, False),
                                                         'master_ip': (str, Toolbox.regex_ip),
                                                         'master_password': (str, None),
                                                         'node_type': (str, ['master', 'extra'], False),
+                                                        'rollback': (bool, None, False),
                                                         'rdma': (bool, None, False),
                                                         'logging_target': (dict, None, False)})
         # Parameters only required for 1st node
