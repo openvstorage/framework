@@ -397,6 +397,8 @@ class SetupController(object):
                         SetupController._log(messages=['Failed to setup first node', ex], loglevel='exception')
                         if execute_rollback is True:
                             SetupController.rollback_setup(target_client=ip_client_map[cluster_ip])
+                        else:
+                            root_client.file_write('/tmp/ovs_rollback', 'rollback')
                         raise
                 else:
                     # Deciding master/extra
@@ -409,6 +411,8 @@ class SetupController(object):
                         SetupController._log(messages=['Failed to setup extra node', ex], loglevel='exception')
                         if execute_rollback is True:
                             SetupController.rollback_setup(target_client=ip_client_map[cluster_ip])
+                        else:
+                            root_client.file_write('/tmp/ovs_rollback', 'rollback')
                         raise
 
                     if promote_completed is False:
@@ -436,6 +440,8 @@ class SetupController(object):
                                                                  unique_id=unique_id,
                                                                  unconfigure_memcached=configure_memcached,
                                                                  unconfigure_rabbitmq=configure_rabbitmq)
+                                else:
+                                    root_client.file_write('/tmp/ovs_rollback', 'demote')
                                 raise
 
             root_client.file_delete(resume_config_file)
@@ -514,18 +520,18 @@ class SetupController(object):
             master_ip = None
             offline_nodes = []
 
+            online = True
+            target_client = None
             if node_action == 'demote' and cluster_ip:  # Demote an offline node
                 from ovs.dal.lists.storagerouterlist import StorageRouterList
                 from ovs.lib.storagedriver import StorageDriverController
 
                 ip = cluster_ip
-                online = True
                 unique_id = None
                 ip_client_map = {}
                 for storage_router in StorageRouterList.get_storagerouters():
                     try:
                         client = SSHClient(storage_router.ip, username='root')
-                        client.run(['pwd'])
                         if storage_router.node_type == 'MASTER':
                             master_ip = storage_router.ip
                         ip_client_map[storage_router.ip] = client
@@ -587,6 +593,8 @@ class SetupController(object):
                                                      unconfigure_memcached=configure_memcached,
                                                      unconfigure_rabbitmq=configure_rabbitmq,
                                                      offline_nodes=offline_nodes)
+                    elif target_client is not None:
+                        target_client.file_write('/tmp/ovs_rollback', 'demote')
                     raise
             else:
                 try:
@@ -605,6 +613,8 @@ class SetupController(object):
                                                       unique_id=unique_id,
                                                       configure_memcached=configure_memcached,
                                                       configure_rabbitmq=configure_rabbitmq)
+                    elif target_client is not None:
+                        target_client.file_write('/tmp/ovs_rollback', 'promote')
                     raise
 
             SetupController._log(messages='\n')
@@ -1057,6 +1067,14 @@ class SetupController(object):
         if target_client is None:
             target_client = SSHClient(endpoint=System.get_my_storagerouter(), username='root')
 
+        if not target_client.file_exists('/tmp/ovs_rollback'):
+            SetupController._log(messages='Cannot rollback on nodes which have been successfully installed. Please use "ovs remove node" instead', boxed=True, loglevel='error')
+            sys.exit(1)
+        mode = target_client.file_read('/tmp/ovs_rollback').strip()
+        if mode != 'rollback':
+            SetupController._log(messages='Rolling back is only supported when installation issues occurred, please execute "ovs setup {0}" first'.format(mode), boxed=True, loglevel='error')
+            sys.exit(1)
+
         cluster_ip = target_client.ip
         machine_id = System.get_my_machine_id(target_client)
         config_store = Configuration.get_store()
@@ -1219,6 +1237,8 @@ class SetupController(object):
             from ovs.extensions.db.etcd.installer import EtcdInstaller
             SetupController._log(messages='Removing Etcd proxy')
             EtcdInstaller.remove_proxy('config', cluster_ip)
+
+        target_client.file_delete('/tmp/ovs_rollback')
 
     @staticmethod
     def _setup_extra_node(cluster_ip, master_ip, unique_id, ip_client_map):
@@ -1440,6 +1460,10 @@ class SetupController(object):
         Configuration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'MASTER')
         target_client.run(['chown', '-R', 'ovs:ovs', '/opt/OpenvStorage/config'])
         Configuration.set('/ovs/framework/hosts/{0}/promotecompleted'.format(machine_id), True)
+
+        if target_client.file_exists('/tmp/ovs_rollback'):
+            target_client.file_delete('/tmp/ovs_rollback')
+
         SetupController._log(messages='Promote complete')
 
     @staticmethod
@@ -1528,6 +1552,7 @@ class SetupController(object):
                 if service.name == 'arakoon-ovsdb':
                     service.delete()
 
+        target_client = None
         if storagerouter in offline_nodes:
             if unconfigure_rabbitmq is True:
                 SetupController._log(messages='Removing/unconfiguring offline RabbitMQ node', loglevel='debug')
@@ -1605,6 +1630,10 @@ class SetupController(object):
             if SetupController._avahi_installed(target_client) is True:
                 SetupController._configure_avahi(target_client, node_name, 'extra')
         Configuration.set('/ovs/framework/hosts/{0}/type'.format(storagerouter.machine_id), 'EXTRA')
+
+        if target_client is not None and target_client.file_exists('/tmp/ovs_rollback'):
+            target_client.file_write('/tmp/ovs_rollback', 'rollback')
+
         SetupController._log(messages='Demote complete', title=True)
 
     @staticmethod
