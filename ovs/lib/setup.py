@@ -53,7 +53,7 @@ class SetupController(object):
     host_ips = set()
 
     @staticmethod
-    def setup_node(node_type=None):
+    def setup_node(node_type=None, execute_rollback=False):
         """
         Sets up a node.
         1. Some magic figuring out here:
@@ -65,12 +65,15 @@ class SetupController(object):
 
         :param node_type: Type of node to install (master or extra node)
         :type node_type: str
-
+        :param execute_rollback: In case of failure revert the changes made
+        :type execute_rollback: bool
         :return: None
         """
         SetupController._log(messages='Open vStorage Setup', boxed=True)
-        Toolbox.verify_required_params(actual_params={'node_type': node_type},
-                                       required_params={'node_type': (str, ['master', 'extra'], False)})
+        Toolbox.verify_required_params(actual_params={'node_type': node_type,
+                                                      'execute_rollback': execute_rollback},
+                                       required_params={'node_type': (str, ['master', 'extra'], False),
+                                                        'execute_rollback': (bool, None)})
 
         rdma = None
         master_ip = None
@@ -93,9 +96,11 @@ class SetupController(object):
                 rdma = config.get('rdma', False)
                 node_type = config.get('node_type', node_type)
                 cluster_ip = config.get('cluster_ip', master_ip)  # If cluster_ip not provided, we assume 1st node installation
-                config_mgmt_type = config.get('config_mgmt_type')
                 logging_target = config.get('logging_target', logging_target)
                 external_config = config.get('external_config')
+                config_mgmt_type = config.get('config_mgmt_type')
+                if execute_rollback is False:  # Only overrule cmdline if setting was not passed
+                    execute_rollback = config.get('rollback', False)
                 enable_heartbeats = config.get('enable_heartbeats', enable_heartbeats)
 
             # Support resume setup - store entered parameters so when retrying, we have the values
@@ -141,6 +146,7 @@ class SetupController(object):
                 cluster_ip = resume_config.get('cluster_ip', cluster_ip)
                 external_config = resume_config.get('external_config', external_config)
                 config_mgmt_type = resume_config.get('config_mgmt_type', config_mgmt_type)
+                execute_rollback = resume_config.get('execute_rollback', execute_rollback)
                 enable_heartbeats = resume_config.get('enable_heartbeats', enable_heartbeats)
 
                 if config is None:  # Non-automated install
@@ -370,6 +376,7 @@ class SetupController(object):
                 resume_config['cluster_name'] = cluster_name
                 resume_config['external_config'] = external_config
                 resume_config['config_mgmt_type'] = config_mgmt_type
+                resume_config['execute_rollback'] = execute_rollback
                 resume_config['enable_heartbeats'] = enable_heartbeats
                 with open(resume_config_file, 'w') as resume_cfg:
                     resume_cfg.write(json.dumps(resume_config))
@@ -388,8 +395,10 @@ class SetupController(object):
                                                           rdma=rdma)
                     except Exception as ex:
                         SetupController._log(messages=['Failed to setup first node', ex], loglevel='exception')
-                        SetupController._rollback_setup(target_client=ip_client_map[cluster_ip],
-                                                        first_node=True)
+                        if execute_rollback is True:
+                            SetupController.rollback_setup(target_client=ip_client_map[cluster_ip])
+                        else:
+                            root_client.file_write('/tmp/ovs_rollback', 'rollback')
                         raise
                 else:
                     # Deciding master/extra
@@ -400,8 +409,10 @@ class SetupController(object):
                                                           ip_client_map=ip_client_map)
                     except Exception as ex:
                         SetupController._log(messages=['Failed to setup extra node', ex], loglevel='exception')
-                        SetupController._rollback_setup(target_client=ip_client_map[cluster_ip],
-                                                        first_node=False)
+                        if execute_rollback is True:
+                            SetupController.rollback_setup(target_client=ip_client_map[cluster_ip])
+                        else:
+                            root_client.file_write('/tmp/ovs_rollback', 'rollback')
                         raise
 
                     if promote_completed is False:
@@ -421,13 +432,16 @@ class SetupController(object):
                                                               configure_memcached=configure_memcached,
                                                               configure_rabbitmq=configure_rabbitmq)
                             except Exception as ex:
-                                SetupController._log(messages=['\nFailed to promote node, rolling back', ex], loglevel='exception')
-                                SetupController._demote_node(cluster_ip=cluster_ip,
-                                                             master_ip=master_ip,
-                                                             ip_client_map=ip_client_map,
-                                                             unique_id=unique_id,
-                                                             unconfigure_memcached=configure_memcached,
-                                                             unconfigure_rabbitmq=configure_rabbitmq)
+                                if execute_rollback is True:
+                                    SetupController._log(messages=['\nFailed to promote node, rolling back', ex], loglevel='exception')
+                                    SetupController._demote_node(cluster_ip=cluster_ip,
+                                                                 master_ip=master_ip,
+                                                                 ip_client_map=ip_client_map,
+                                                                 unique_id=unique_id,
+                                                                 unconfigure_memcached=configure_memcached,
+                                                                 unconfigure_rabbitmq=configure_rabbitmq)
+                                else:
+                                    root_client.file_write('/tmp/ovs_rollback', 'demote')
                                 raise
 
             root_client.file_delete(resume_config_file)
@@ -465,13 +479,15 @@ class SetupController(object):
             sys.exit(1)
 
     @staticmethod
-    def promote_or_demote_node(node_action, cluster_ip=None):
+    def promote_or_demote_node(node_action, cluster_ip=None, execute_rollback=False):
         """
         Promotes or demotes the local node
         :param node_action: Demote or promote
         :type node_action: str
         :param cluster_ip: IP of node to promote or demote
         :type cluster_ip: str
+        :param execute_rollback: In case of failure revert the changes made
+        :type execute_rollback: bool
         :return: None
         """
 
@@ -504,18 +520,18 @@ class SetupController(object):
             master_ip = None
             offline_nodes = []
 
+            online = True
+            target_client = None
             if node_action == 'demote' and cluster_ip:  # Demote an offline node
                 from ovs.dal.lists.storagerouterlist import StorageRouterList
                 from ovs.lib.storagedriver import StorageDriverController
 
                 ip = cluster_ip
-                online = True
                 unique_id = None
                 ip_client_map = {}
                 for storage_router in StorageRouterList.get_storagerouters():
                     try:
                         client = SSHClient(storage_router.ip, username='root')
-                        client.run(['pwd'])
                         if storage_router.node_type == 'MASTER':
                             master_ip = storage_router.ip
                         ip_client_map[storage_router.ip] = client
@@ -561,20 +577,45 @@ class SetupController(object):
             configure_rabbitmq = SetupController._is_internally_managed(service='rabbitmq')
             configure_memcached = SetupController._is_internally_managed(service='memcached')
             if node_action == 'promote':
-                SetupController._promote_node(cluster_ip=ip,
-                                              master_ip=master_ip,
-                                              ip_client_map=ip_client_map,
-                                              unique_id=unique_id,
-                                              configure_memcached=configure_memcached,
-                                              configure_rabbitmq=configure_rabbitmq)
+                try:
+                    SetupController._promote_node(cluster_ip=ip,
+                                                  master_ip=master_ip,
+                                                  ip_client_map=ip_client_map,
+                                                  unique_id=unique_id,
+                                                  configure_memcached=configure_memcached,
+                                                  configure_rabbitmq=configure_rabbitmq)
+                except Exception:
+                    if execute_rollback is True:
+                        SetupController._demote_node(cluster_ip=ip,
+                                                     master_ip=master_ip,
+                                                     ip_client_map=ip_client_map,
+                                                     unique_id=unique_id,
+                                                     unconfigure_memcached=configure_memcached,
+                                                     unconfigure_rabbitmq=configure_rabbitmq,
+                                                     offline_nodes=offline_nodes)
+                    elif target_client is not None:
+                        target_client.file_write('/tmp/ovs_rollback', 'demote')
+                    raise
             else:
-                SetupController._demote_node(cluster_ip=ip,
-                                             master_ip=master_ip,
-                                             ip_client_map=ip_client_map,
-                                             unique_id=unique_id,
-                                             unconfigure_memcached=configure_memcached,
-                                             unconfigure_rabbitmq=configure_rabbitmq,
-                                             offline_nodes=offline_nodes)
+                try:
+                    SetupController._demote_node(cluster_ip=ip,
+                                                 master_ip=master_ip,
+                                                 ip_client_map=ip_client_map,
+                                                 unique_id=unique_id,
+                                                 unconfigure_memcached=configure_memcached,
+                                                 unconfigure_rabbitmq=configure_rabbitmq,
+                                                 offline_nodes=offline_nodes)
+                except Exception:
+                    if execute_rollback is True:
+                        SetupController._promote_node(cluster_ip=ip,
+                                                      master_ip=master_ip,
+                                                      ip_client_map=ip_client_map,
+                                                      unique_id=unique_id,
+                                                      configure_memcached=configure_memcached,
+                                                      configure_rabbitmq=configure_rabbitmq)
+                    elif target_client is not None:
+                        target_client.file_write('/tmp/ovs_rollback', 'promote')
+                    raise
 
             SetupController._log(messages='\n')
             SetupController._log(messages='{0} complete.'.format(node_action.capitalize()), boxed=True)
@@ -1011,13 +1052,28 @@ class SetupController(object):
         SetupController._log(messages='First node complete')
 
     @staticmethod
-    def _rollback_setup(target_client, first_node):
+    def rollback_setup(target_client=None):
         """
         Rollback a failed setup
+        :param target_client: Client on which to perform the rollback
+        :type target_client: ovs.extensions.generic.sshclient.SSHClient
         """
         import etcd
         from ovs.dal.lists.servicetypelist import ServiceTypeList
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
         SetupController._log(messages='Rolling back setup of current node', title=True)
+
+        single_node = len(StorageRouterList.get_storagerouters()) == 1
+        if target_client is None:
+            target_client = SSHClient(endpoint=System.get_my_storagerouter(), username='root')
+
+        if not target_client.file_exists('/tmp/ovs_rollback'):
+            SetupController._log(messages='Cannot rollback on nodes which have been successfully installed. Please use "ovs remove node" instead', boxed=True, loglevel='error')
+            sys.exit(1)
+        mode = target_client.file_read('/tmp/ovs_rollback').strip()
+        if mode != 'rollback':
+            SetupController._log(messages='Rolling back is only supported when installation issues occurred, please execute "ovs setup {0}" first'.format(mode), boxed=True, loglevel='error')
+            sys.exit(1)
 
         cluster_ip = target_client.ip
         machine_id = System.get_my_machine_id(target_client)
@@ -1119,13 +1175,13 @@ class SetupController(object):
                         storagerouter.delete()
                     except Exception as ex:
                         SetupController._log(messages='Cleaning up model failed with error: {0}'.format(ex), loglevel='error')
-                if first_node is True:
+                if single_node is True:
                     try:
                         for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:  # Externally managed Arakoon services not linked to the storagerouter
                             service.delete()
                     except Exception as ex:
                         SetupController._log(messages='Cleaning up services failed with error: {0}'.format(ex), loglevel='error')
-            if first_node is True:
+            if single_node is True:
                 for key in Configuration.base_config.keys() + ['install_time', 'plugins']:
                     try:
                         Configuration.delete(key='/ovs/framework/{0}'.format(key))
@@ -1150,7 +1206,7 @@ class SetupController(object):
                 if ServiceManager.has_service(service, client=target_client):
                     Toolbox.change_service_state(target_client, service, 'stop', SetupController._logger)
 
-            if first_node is True:
+            if single_node is True:
                 SetupController._log(messages='Unconfigure Arakoon')
                 if metadata is not None and metadata['internal'] is True:
                     try:
@@ -1167,9 +1223,9 @@ class SetupController(object):
                     except Exception as ex:
                         SetupController._log(messages=['Failed to clean Arakoon data', ex])
 
-            SetupController._log(messages='Unconfigure Etcd')
             if external_config is None:
                 if config_store == 'etcd':
+                    SetupController._log(messages='Unconfigure Etcd')
                     from ovs.extensions.db.etcd.installer import EtcdInstaller
                     SetupController._log(messages='Removing Etcd cluster')
                     try:
@@ -1181,6 +1237,8 @@ class SetupController(object):
             from ovs.extensions.db.etcd.installer import EtcdInstaller
             SetupController._log(messages='Removing Etcd proxy')
             EtcdInstaller.remove_proxy('config', cluster_ip)
+
+        target_client.file_delete('/tmp/ovs_rollback')
 
     @staticmethod
     def _setup_extra_node(cluster_ip, master_ip, unique_id, ip_client_map):
@@ -1402,6 +1460,10 @@ class SetupController(object):
         Configuration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'MASTER')
         target_client.run(['chown', '-R', 'ovs:ovs', '/opt/OpenvStorage/config'])
         Configuration.set('/ovs/framework/hosts/{0}/promotecompleted'.format(machine_id), True)
+
+        if target_client.file_exists('/tmp/ovs_rollback'):
+            target_client.file_delete('/tmp/ovs_rollback')
+
         SetupController._log(messages='Promote complete')
 
     @staticmethod
@@ -1490,6 +1552,7 @@ class SetupController(object):
                 if service.name == 'arakoon-ovsdb':
                     service.delete()
 
+        target_client = None
         if storagerouter in offline_nodes:
             if unconfigure_rabbitmq is True:
                 SetupController._log(messages='Removing/unconfiguring offline RabbitMQ node', loglevel='debug')
@@ -1567,6 +1630,10 @@ class SetupController(object):
             if SetupController._avahi_installed(target_client) is True:
                 SetupController._configure_avahi(target_client, node_name, 'extra')
         Configuration.set('/ovs/framework/hosts/{0}/type'.format(storagerouter.machine_id), 'EXTRA')
+
+        if target_client is not None and target_client.file_exists('/tmp/ovs_rollback'):
+            target_client.file_write('/tmp/ovs_rollback', 'rollback')
+
         SetupController._log(messages='Demote complete', title=True)
 
     @staticmethod
@@ -1961,7 +2028,7 @@ class SetupController(object):
         errors = []
         config = config['setup']
         actual_keys = config.keys()
-        expected_keys = ['cluster_ip', 'config_mgmt_type', 'enable_heartbeats', 'external_config', 'master_ip', 'master_password', 'node_type', 'rdma']
+        expected_keys = ['cluster_ip', 'config_mgmt_type', 'enable_heartbeats', 'external_config', 'master_ip', 'master_password', 'node_type', 'rollback', 'rdma']
         for key in actual_keys:
             if key not in expected_keys:
                 errors.append('Key {0} is not supported by OpenvStorage to be used in the pre-configuration JSON'.format(key))
@@ -1975,6 +2042,7 @@ class SetupController(object):
                                                         'master_ip': (str, Toolbox.regex_ip),
                                                         'master_password': (str, None),
                                                         'node_type': (str, ['master', 'extra'], False),
+                                                        'rollback': (bool, None, False),
                                                         'rdma': (bool, None, False),
                                                         'logging_target': (dict, None, False)})
         # Parameters only required for 1st node
