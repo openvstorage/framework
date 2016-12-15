@@ -26,7 +26,6 @@ import random
 import string
 import inspect
 import subprocess
-from paramiko import AuthenticationException
 from celery.schedules import crontab
 from ovs.dal.helpers import Toolbox as HelperToolbox
 from ovs.extensions.generic.configuration import Configuration
@@ -337,6 +336,8 @@ class Toolbox(object):
         :type previous: str
         :return: None
         """
+        from paramiko import AuthenticationException
+
         while True:
             try:
                 try:
