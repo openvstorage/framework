@@ -29,6 +29,8 @@ import subprocess
 from celery.schedules import crontab
 from ovs.dal.helpers import Toolbox as HelperToolbox
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.interactive import Interactive
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.service import ServiceManager
 from ovs.log.log_handler import LogHandler
 
@@ -45,11 +47,15 @@ class Toolbox(object):
     compiled_regex_type = type(re.compile('some_regex'))
 
     @staticmethod
-    def fetch_hooks(hook_type, hook):
+    def fetch_hooks(component, sub_component):
         """
         Load hooks
-        :param hook_type: Type of hook, can be update, setup, license
-        :param hook: Sub-component of hook type, Eg: pre-install, post-install, ...
+        :param component: Type of hook, can be update, setup, ...
+        :type component: str
+        :param sub_component: Sub-component of hook type, Eg: pre-install, post-install, ...
+        :type sub_component: str
+        :return: The functions found decorated with the specified hooks
+        :rtype: list
         """
         functions = []
         path = '{0}/../'.format(os.path.dirname(__file__))
@@ -64,11 +70,35 @@ class Toolbox(object):
                         for submember in inspect.getmembers(member[1]):
                             if hasattr(submember[1], 'hooks') \
                                     and isinstance(submember[1].hooks, dict) \
-                                    and hook_type in submember[1].hooks \
-                                    and isinstance(submember[1].hooks[hook_type], list) \
-                                    and hook in submember[1].hooks[hook_type]:
+                                    and component in submember[1].hooks \
+                                    and isinstance(submember[1].hooks[component], list) \
+                                    and sub_component in submember[1].hooks[component]:
                                 functions.append(submember[1])
         return functions
+
+    @staticmethod
+    def run_hooks(component, sub_component, logger=None, **kwargs):
+        """
+        Execute hooks
+        :param component: Name of the component, eg: update, setup
+        :type component: str
+        :param sub_component: Name of the sub-component, eg: pre-install, post-install
+        :type sub_component: str
+        :param logger: Logger object to use for logging
+        :type logger: ovs.log.log_handler.LogHandler
+        :param kwargs: Additional named arguments
+        :type kwargs: dict
+        :return: Amount of functions executed
+        """
+        functions = Toolbox.fetch_hooks(component=component, sub_component=sub_component)
+        functions_found = len(functions) > 0
+        if logger is not None and functions_found is True:
+            Toolbox.log(logger=logger, messages='Running "{0} - {1}" hooks'.format(component, sub_component), title=True)
+        for function in functions:
+            if logger is not None:
+                Toolbox.log(logger=logger, messages='Executing {0}.{1}'.format(function.__module__, function.__name__))
+            function(**kwargs)
+        return functions_found
 
     @staticmethod
     def verify_required_params(required_params, actual_params, exact_match=False):
@@ -223,6 +253,117 @@ class Toolbox(object):
         service_status, output = ServiceManager.get_service_status(name, client)
         if service_status != status:
             raise RuntimeError('Service {0} does not have expected status: {1}'.format(name, output))
+
+    @staticmethod
+    def log(logger, messages, title=False, boxed=False, loglevel='info', silent=False):
+        """
+        Print a message on stdout and log to file
+        :param logger: Logger object to use for the logging
+        :type logger: ovs.log.log_handler.LogHandler
+        :param messages: Messages to print and log
+        :type messages: str or list
+        :param title: If True some extra chars will be pre- and appended
+        :type title: bool
+        :param boxed: Use the Interactive boxed message print option
+        :type boxed: bool
+        :param loglevel: level to log on
+        :type loglevel: str
+        :param silent: If set to True, the messages will only be logged to file
+        :type silent: bool
+        :return: None
+        """
+        if type(messages) in (str, basestring, unicode):
+            messages = [messages]
+        if silent is False:
+            if boxed is True:
+                print Interactive.boxed_message(lines=messages)
+            else:
+                for message in messages:
+                    if title is True:
+                        message = '\n+++ {0} +++\n'.format(message)
+                    if loglevel in ['error', 'exception']:
+                        message = 'ERROR: {0}'.format(message)
+                    print message
+
+        for message in messages:
+            getattr(logger, loglevel)(message)
+
+    @staticmethod
+    def is_service_internally_managed(service):
+        """
+        Validate whether the service is internally or externally managed
+        :param service: Service to verify
+        :type service: str
+        :return: True if internally managed, False otherwise
+        :rtype: bool
+        """
+        if service not in ['memcached', 'rabbitmq']:
+            raise ValueError('Can only check memcached or rabbitmq')
+
+        service_name_map = {'memcached': 'memcache',
+                            'rabbitmq': 'messagequeue'}[service]
+        config_key = '/ovs/framework/{0}'.format(service_name_map)
+        if not Configuration.exists(key=config_key):
+            return True
+
+        if not Configuration.exists(key='{0}|metadata'.format(config_key)):
+            raise ValueError('Not all required keys ({0}) for {1} are present in the configuration management'.format(config_key, service))
+        metadata = Configuration.get('{0}|metadata'.format(config_key))
+        if 'internal' not in metadata:
+            raise ValueError('Internal flag not present in metadata for {0}.\nPlease provide a key: {1} and value "metadata": {{"internal": True/False}}'.format(service, config_key))
+
+        internal = metadata['internal']
+        if internal is False:
+            if not Configuration.exists(key='{0}|endpoints'.format(config_key)):
+                raise ValueError('Externally managed {0} cluster must have "endpoints" information\nPlease provide a key: {1} and value "endpoints": [<ip:port>]'.format(service, config_key))
+            endpoints = Configuration.get(key='{0}|endpoints'.format(config_key))
+            if not isinstance(endpoints, list) or len(endpoints) == 0:
+                raise ValueError('The endpoints for {0} cannot be empty and must be a list'.format(service))
+        return internal
+
+    @staticmethod
+    def ask_validate_password(ip, logger, username='root', previous=None):
+        """
+        Asks a user to enter the password for a given user on a given ip and validates it
+        If previous is provided, we first attempt to login using the previous password, if successful, we don't ask for a password
+        :param ip: IP of the node on which we want to validate / ask the password
+        :type ip: str
+        :param logger: Logger object to use for the logging
+        :type logger: ovs.log.log_handler.LogHandler
+        :param username: Username to login with
+        :type username: str
+        :param previous: Previously used password for another node in the cluster
+        :type previous: str
+        :return: None
+        """
+        from paramiko import AuthenticationException
+
+        while True:
+            try:
+                try:
+                    SSHClient(ip, username)
+                    return None
+                except AuthenticationException:
+                    pass
+                if previous is not None:
+                    try:
+                        SSHClient(ip, username=username, password=previous)
+                        return previous
+                    except:
+                        pass
+                node_string = 'this node' if ip == '127.0.0.1' else ip
+                password = Interactive.ask_password('Enter the {0} password for {1}'.format(username, node_string))
+                if password in ['', None]:
+                    continue
+                SSHClient(ip, username=username, password=password)
+                return password
+            except KeyboardInterrupt:
+                raise
+            except UnableToConnectException:
+                raise
+            except:
+                previous = None
+                Toolbox.log(logger=logger, messages='Password invalid or could not connect to this node')
 
 
 class Schedule(object):
