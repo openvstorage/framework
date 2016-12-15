@@ -376,3 +376,34 @@ class Upstart(object):
         :return: None
         """
         Configuration.delete(key='/ovs/framework/hosts/{0}/services/{1}'.format(node_name, Toolbox.remove_prefix(service_name, 'ovs-')))
+
+    @staticmethod
+    def is_rabbitmq_running(client):
+        """
+        Check if rabbitmq is correctly running
+        :param client: Client on which to check the rabbitmq process
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :return: The PID of the process and a bool indicating everything runs as expected
+        :rtype: tuple
+        """
+        rabbitmq_running = False
+        rabbitmq_pid_ctl = -1
+        rabbitmq_pid_sm = -1
+        output = client.run(['rabbitmqctl', 'status'], allow_nonzero=True)
+        if output:
+            match = re.search('\{pid,(?P<pid>\d+?)\}', output)
+            if match is not None:
+                match_groups = match.groupdict()
+                if 'pid' in match_groups:
+                    rabbitmq_running = True
+                    rabbitmq_pid_ctl = match_groups['pid']
+
+        if Upstart.has_service('rabbitmq-server', client) and Upstart.get_service_status('rabbitmq-server', client)[0] is True:
+            rabbitmq_running = True
+            rabbitmq_pid_sm = Upstart.get_service_pid('rabbitmq-server', client)
+
+        same_process = rabbitmq_pid_ctl == rabbitmq_pid_sm
+        Upstart._logger.debug('Rabbitmq is reported {0}running, pids: {1} and {2}'.format('' if rabbitmq_running else 'not ',
+                                                                                          rabbitmq_pid_ctl,
+                                                                                          rabbitmq_pid_sm))
+        return rabbitmq_running, same_process

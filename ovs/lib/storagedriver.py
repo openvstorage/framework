@@ -153,7 +153,7 @@ class StorageDriverController(object):
         return changed_vpools
 
     @staticmethod
-    @add_hooks('setup', 'demote')
+    @add_hooks('nodetype', 'demote')
     def on_demote(cluster_ip, master_ip, offline_node_ips=None):
         """
         Handles the demote for the StorageDrivers
@@ -190,7 +190,7 @@ class StorageDriverController(object):
             StorageDriverController._configure_arakoon_to_volumedriver(cluster_name=cluster_name)
 
     @staticmethod
-    @add_hooks('setup', 'remove')
+    @add_hooks('noderemoval', 'remove')
     def on_remove(cluster_ip, complete_removal):
         """
         Handles the StorageDriver removal part of a node
