@@ -708,20 +708,21 @@ class StorageRouterController(object):
         for current_storagerouter in StorageRouterList.get_masters():
             queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(mq_protocol, mq_user, mq_password, current_storagerouter.ip)})
 
-        backend_connection_manager = {'alba_connection_hosts': [{'alba_connection_host': storagedriver.storage_ip,
-                                                                 'alba_connection_port': proxy.service.ports[0],
-                                                                 'alba_connection_preset': vpool.metadata['backend']['backend_info']['preset'],
-                                                                 'alba_connection_timeout': 15,
-                                                                 'alba_connection_transport': 'TCP'}
-                                                                for proxy in storagedriver.alba_proxies],
-                                      'backend_type': 'ALBA',
-                                      'backend_interface_retries_on_error': 5,
-                                      'backend_interface_retry_interval_secs': 1,
-                                      'backend_interface_retry_backoff_multiplier': 2.0}
+        backend_connection_manager = {'backend_type': 'MULTI'}
         has_rdma = Configuration.get('/ovs/framework/rdma')
-        if use_accelerated_alba is False and has_rdma is True:
-            backend_connection_manager['alba_connection_rora_manifest_cache_capacity'] = manifest_cache_size
-            backend_connection_manager['alba_connection_use_rora'] = True
+        for index, proxy in enumerate(storagedriver.alba_proxies):
+            backend_connection_manager[str(index)] = {'alba_connection_host': storagedriver.storage_ip,
+                                                      'alba_connection_port': proxy.service.ports[0],
+                                                      'alba_connection_preset': vpool.metadata['backend']['backend_info']['preset'],
+                                                      'alba_connection_timeout': 15,
+                                                      'alba_connection_transport': 'TCP',
+                                                      'backend_type': 'ALBA',
+                                                      'backend_interface_retries_on_error': 5,
+                                                      'backend_interface_retry_interval_secs': 1,
+                                                      'backend_interface_retry_backoff_multiplier': 2.0}
+            if use_accelerated_alba is False and has_rdma is True:
+                backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = manifest_cache_size
+                backend_connection_manager[str(index)]['alba_connection_use_rora'] = True
 
         volume_router = {'vrouter_id': vrouter_id,
                          'vrouter_redirect_timeout_ms': '5000',
