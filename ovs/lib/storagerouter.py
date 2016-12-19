@@ -1030,6 +1030,7 @@ class StorageRouterController(object):
                 except RuntimeError:
                     StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs failed'.format(storage_driver.guid))
                     errors_found = True
+            service_name = 'unknown'
             try:
                 for proxy in storage_driver.alba_proxies:
                     service_name = proxy.service.name
@@ -1039,7 +1040,7 @@ class StorageRouterController(object):
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service_name))
                         ServiceManager.remove_service(service_name, client=client)
             except Exception:
-                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping services failed'.format(storage_driver.guid))
+                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service_name))
                 errors_found = True
 
         # Reconfigure cluster node configs
