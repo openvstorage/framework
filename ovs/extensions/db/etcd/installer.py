@@ -22,6 +22,7 @@ import re
 import etcd
 import time
 from subprocess import CalledProcessError
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
@@ -55,16 +56,12 @@ class EtcdInstaller(object):
         Creates a cluster
         :param cluster_name: Name of the cluster
         :type cluster_name: str
-
         :param ip: IP address of the first node of the new cluster
         :type ip: str
-
         :param server_port: Port to be used by server
         :type server_port: int
-
         :param client_port: Port to be used by client
         :type client_port: int
-
         :return: None
         """
         EtcdInstaller._logger.debug('Creating cluster "{0}" on {1}'.format(cluster_name, ip))
@@ -85,22 +82,24 @@ class EtcdInstaller(object):
         client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
 
         base_name = 'ovs-etcd'
-        ServiceManager.add_service(base_name, client,
-                                   params={'CLUSTER': cluster_name,
-                                           'NODE_ID': node_name,
-                                           'DATA_DIR': data_dir,
-                                           'WAL_DIR': wal_dir,
-                                           'SERVER_URL': EtcdInstaller.SERVER_URL.format(ip, server_port),
-                                           'CLIENT_URL': EtcdInstaller.CLIENT_URL.format(ip, client_port),
-                                           'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1', client_port),
-                                           'INITIAL_CLUSTER': '{0}={1}'.format(node_name, EtcdInstaller.SERVER_URL.format(ip, server_port)),
-                                           'INITIAL_STATE': 'new',
-                                           'INITIAL_PEERS': '-initial-advertise-peer-urls {0}'.format(EtcdInstaller.SERVER_URL.format(ip, server_port))},
-                                   target_name=target_name)
+        params = ServiceManager.add_service(name=base_name,
+                                            client=client,
+                                            target_name=target_name,
+                                            delay_registration=True,
+                                            params={'CLUSTER': cluster_name,
+                                                    'NODE_ID': node_name,
+                                                    'DATA_DIR': data_dir,
+                                                    'WAL_DIR': wal_dir,
+                                                    'SERVER_URL': EtcdInstaller.SERVER_URL.format(ip, server_port),
+                                                    'CLIENT_URL': EtcdInstaller.CLIENT_URL.format(ip, client_port),
+                                                    'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1', client_port),
+                                                    'INITIAL_CLUSTER': '{0}={1}'.format(node_name, EtcdInstaller.SERVER_URL.format(ip, server_port)),
+                                                    'INITIAL_STATE': 'new',
+                                                    'INITIAL_PEERS': '-initial-advertise-peer-urls {0}'.format(EtcdInstaller.SERVER_URL.format(ip, server_port))})
         EtcdInstaller.start(cluster_name, client)
         EtcdInstaller.wait_for_cluster(cluster_name, client, client_port=client_port)
-
         EtcdInstaller._logger.debug('Creating cluster "{0}" on {1} completed'.format(cluster_name, ip))
+        ServiceManager.register_service(service_metadata=params, node_name=node_name)
 
     @staticmethod
     def extend_cluster(master_ip, new_ip, cluster_name, server_port=DEFAULT_SERVER_PORT, client_port=DEFAULT_CLIENT_PORT):
@@ -108,16 +107,12 @@ class EtcdInstaller(object):
         Extends a cluster to a given new node
         :param master_ip: IP of one of the already existing nodes
         :type master_ip: str
-
         :param new_ip: IP address of the node to be added
         :type new_ip: str
-
         :param cluster_name: Name of the cluster to be extended
         :type cluster_name: str
-
         :param server_port: Port to be used by server
         :type server_port: int
-
         :param client_port: Port to be used by client
         :type client_port: int
         """
@@ -157,18 +152,20 @@ class EtcdInstaller(object):
         base_name = 'ovs-etcd'
         target_name = 'ovs-etcd-{0}'.format(cluster_name)
         EtcdInstaller.stop(cluster_name, new_client)  # Stop a possible proxy service
-        ServiceManager.add_service(base_name, new_client,
-                                   params={'CLUSTER': cluster_name,
-                                           'NODE_ID': node_name,
-                                           'DATA_DIR': data_dir,
-                                           'WAL_DIR': wal_dir,
-                                           'SERVER_URL': new_server_url,
-                                           'CLIENT_URL': EtcdInstaller.CLIENT_URL.format(new_ip, client_port),
-                                           'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1', client_port),
-                                           'INITIAL_CLUSTER': ','.join(current_cluster),
-                                           'INITIAL_STATE': 'existing',
-                                           'INITIAL_PEERS': ''},
-                                   target_name=target_name)
+        params = ServiceManager.add_service(name=base_name,
+                                            client=new_client,
+                                            target_name=target_name,
+                                            delay_registration=True,
+                                            params={'CLUSTER': cluster_name,
+                                                    'NODE_ID': node_name,
+                                                    'DATA_DIR': data_dir,
+                                                    'WAL_DIR': wal_dir,
+                                                    'SERVER_URL': new_server_url,
+                                                    'CLIENT_URL': EtcdInstaller.CLIENT_URL.format(new_ip, client_port),
+                                                    'LOCAL_CLIENT_URL': EtcdInstaller.CLIENT_URL.format('127.0.0.1', client_port),
+                                                    'INITIAL_CLUSTER': ','.join(current_cluster),
+                                                    'INITIAL_STATE': 'existing',
+                                                    'INITIAL_PEERS': ''})
 
         add_command = ['etcdctl', 'member', 'add', node_name, new_server_url]
         if client_port != EtcdInstaller.DEFAULT_CLIENT_PORT:
@@ -176,7 +173,7 @@ class EtcdInstaller(object):
         master_client.run(add_command)
         EtcdInstaller.start(cluster_name, new_client)
         EtcdInstaller.wait_for_cluster(cluster_name, new_client, client_port=client_port)
-
+        ServiceManager.register_service(service_metadata=params, node_name=node_name)
         EtcdInstaller._logger.debug('Extending cluster "{0}" from {1} to {2} completed'.format(cluster_name, master_ip, new_ip))
 
     @staticmethod
@@ -185,19 +182,14 @@ class EtcdInstaller(object):
         Removes a node from a cluster, the old node will become a slave
         :param remaining_node_ip: The ip of a remaining node in the cluster
         :type remaining_node_ip: str
-
         :param ip_to_remove: The ip of the node that should be removed from the cluster
         :type ip_to_remove: str
-
         :param cluster_name: The name of the cluster to shrink
         :type cluster_name: str
-
         :param offline_node_ips: IPs of offline nodes
         :type offline_node_ips: list
-
         :param client_port: Port to be used by client
         :type client_port: int
-
         :return: None
         """
         EtcdInstaller._logger.debug('Shrinking cluster "{0}" from {1}'.format(cluster_name, ip_to_remove))
@@ -232,10 +224,8 @@ class EtcdInstaller(object):
         Verify if IP has an ETCD cluster with 'cluster_name' running
         :param ip: IP on which to check for the ETCD cluster
         :type ip: str
-
         :param cluster_name: Name of the ETCD cluster
         :type cluster_name: str
-
         :return: True or False
         :rtype: bool
         """
@@ -281,13 +271,10 @@ class EtcdInstaller(object):
         Setup proxy for external etcd
         :param external: External etcd info
         :type external: str
-
         :param slave_ip: IP of slave
         :type slave_ip: str
-
         :param cluster_name: Name of cluster
         :type cluster_name: str
-
         :return: None
         """
         EtcdInstaller._logger.debug('Setting up proxy "{0}" from {1} to {2}'.format(cluster_name, external, slave_ip))
@@ -300,10 +287,8 @@ class EtcdInstaller(object):
         Remove a proxy
         :param cluster_name: Name of cluster
         :type cluster_name: str
-
         :param ip: IP of the node on which to remove the proxy
         :type ip: str
-
         :return: None
         """
         root_client = SSHClient(ip, username='root')
@@ -345,10 +330,8 @@ class EtcdInstaller(object):
         Starts an etcd cluster
         :param cluster_name: The name of the cluster service to start
         :type cluster_name: str
-
         :param client: Client on which to start the service
         :type client: SSHClient
-
         :return: None
         """
         if ServiceManager.has_service('etcd-{0}'.format(cluster_name), client=client) is True:
@@ -360,10 +343,8 @@ class EtcdInstaller(object):
         Stops an etcd service
         :param cluster_name: The name of the cluster service to stop
         :type cluster_name: str
-
         :param client: Client on which to stop the service
         :type client: SSHClient
-
         :return: None
         """
         if ServiceManager.has_service('etcd-{0}'.format(cluster_name), client=client) is True:
@@ -375,10 +356,8 @@ class EtcdInstaller(object):
         Removes an etcd service
         :param cluster_name: The name of the cluster service to remove
         :type cluster_name: str
-
         :param client: Client on which to remove the service
         :type client: SSHClient
-
         :return: None
         """
         if ServiceManager.has_service('etcd-{0}'.format(cluster_name), client=client) is True:
@@ -390,13 +369,10 @@ class EtcdInstaller(object):
         Validates the health of the etcd cluster is healthy
         :param cluster_name: Name of the cluster
         :type cluster_name: str
-
         :param client: The client on which to validate the cluster
         :type client: SSHClient
-
         :param client_port: Port to be used by client
         :type client_port: int
-
         :return: None
         """
         EtcdInstaller._logger.debug('Waiting for cluster "{0}"'.format(cluster_name))
@@ -416,10 +392,8 @@ class EtcdInstaller(object):
         Indicates whether a given cluster is healthy
         :param cluster_name: name of the cluster
         :type cluster_name: str
-
         :param client: client on which to check
         :type client: SSHClient
-
         :return: True or False
         :rtype: bool
         """

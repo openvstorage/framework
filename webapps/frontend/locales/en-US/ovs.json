@@ -967,12 +967,13 @@
                 "noname": "No name was entered"
             },
             "confirm": {
-                "title": "Verify the entered information",
-                "snapshotstarted": "Snapshot started",
+                "consistent": "Label as Consistent Snapshot",
+                "failed": "Snapshot failed",
                 "inprogress": "Snapshotting in progress...",
-                "failed": "Snapshot failed.",
                 "name": "Snapshot name",
-                "consistent": "Label as Consistent Snapshot"
+                "snapshotstarted": "Snapshot started",
+                "success": "Successfully created snapshot",
+                "title": "Verify the entered information"
             }
         },
         "update": {

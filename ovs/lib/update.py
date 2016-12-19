@@ -19,6 +19,7 @@ Module for UpdateController
 """
 import copy
 import time
+import inspect
 from subprocess import CalledProcessError
 from ovs.celery_run import celery
 from ovs.dal.hybrids.servicetype import ServiceType
@@ -53,6 +54,7 @@ class UpdateController(object):
     framework_packages = {'arakoon', 'openvstorage'}
     volumedriver_packages = {'alba', 'arakoon', 'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server'}
     all_core_packages = framework_packages.union(volumedriver_packages)
+    core_packages_with_binaries = {'alba', 'arakoon', 'volumedriver-no-dedup-server'}
 
     #########
     # HOOKS #
@@ -84,23 +86,40 @@ class UpdateController(object):
             if client.username != 'root':
                 raise RuntimeError('Only the "root" user can retrieve the package information')
 
+            binaries = PackageManager.get_binary_versions(client=client, package_names=UpdateController.core_packages_with_binaries)
             installed = PackageManager.get_installed_versions(client=client, package_names=UpdateController.all_core_packages)
             candidate = PackageManager.get_candidate_versions(client=client, package_names=UpdateController.all_core_packages)
             if set(installed.keys()) != set(UpdateController.all_core_packages) or set(candidate.keys()) != set(UpdateController.all_core_packages):
                 raise RuntimeError('Failed to retrieve the installed and candidate versions for packages: {0}'.format(', '.join(UpdateController.all_core_packages)))
 
             # Retrieve Arakoon information
-            cacc_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name='cacc', filesystem=True, ip=client.ip)
-            voldrv_cluster = ArakoonClusterConfig.get_cluster_name('voldrv')
-            framework_arakoons = ['arakoon-{0}'.format(cacc_metadata['cluster_name']),
-                                  'arakoon-{0}'.format(ArakoonClusterConfig.get_cluster_name('ovsdb'))]
-            storagedriver_arakoons = [] if voldrv_cluster is None else ['arakoon-{0}'.format(voldrv_cluster)]
+            framework_arakoons = []
+            storagedriver_arakoons = []
+            for cluster, arakoon_list in {'cacc': framework_arakoons,
+                                          'ovsdb': framework_arakoons,
+                                          'voldrv': storagedriver_arakoons}.iteritems():
+                cluster_name = ArakoonClusterConfig.get_cluster_name(cluster)
+                if cluster_name is None:
+                    continue
+
+                if cluster == 'cacc':
+                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, filesystem=True, ip=client.ip)
+                else:
+                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+
+                if arakoon_metadata['internal'] is True:
+                    arakoon_list.append(ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_metadata['cluster_name']))
 
             storagerouter = StorageRouterList.get_by_ip(client.ip)
             alba_proxies = []
             for service in storagerouter.services:
                 if service.type.name == ServiceType.SERVICE_TYPES.ALBA_PROXY:
                     alba_proxies.append(service.name)
+
+            storagedriver_services = []
+            for sd in storagerouter.storagedrivers:
+                storagedriver_services.append('ovs-dtl_{0}'.format(sd.vpool.name))
+                storagedriver_services.append('ovs-volumedriver_{0}'.format(sd.vpool.name))
 
             default_entry = {'candidate': None,
                              'installed': None,
@@ -112,15 +131,16 @@ class UpdateController(object):
                                     'storagedriver': {'alba': alba_proxies,
                                                       'arakoon': storagedriver_arakoons,
                                                       'volumedriver-no-dedup-base': [],
-                                                      'volumedriver-no-dedup-server': []}}.iteritems():
+                                                      'volumedriver-no-dedup-server': storagedriver_services}}.iteritems():
                 component_info = {}
-                for package_name, services in info.iteritems():
+                for package, services in info.iteritems():
                     for service in services:
                         service = ExtensionToolbox.remove_prefix(service, 'ovs-')
                         version_file = '/opt/OpenvStorage/run/{0}.version'.format(service)
                         if not client.file_exists(version_file):
                             UpdateController._logger.warning('{0}: Failed to find a version file in /opt/OpenvStorage/run for service {1}'.format(client.ip, service))
                             continue
+                        package_name = package
                         running_versions = client.file_read(version_file).strip()
                         for version in running_versions.split(';'):
                             version = version.strip()
@@ -128,22 +148,25 @@ class UpdateController(object):
                             if '=' in version:
                                 package_name = version.split('=')[0]
                                 running_version = version.split('=')[1]
-                                if package_name not in UpdateController.all_core_packages:
-                                    raise ValueError('Unknown package dependency found in {0}'.format(version_file))
                             elif version:
                                 running_version = version
 
-                            if running_version is not None and running_version != candidate[package_name]:
+                            if package_name not in UpdateController.all_core_packages:
+                                raise ValueError('Unknown package dependency found in {0}'.format(version_file))
+                            if package_name not in binaries:
+                                raise RuntimeError('Binary version for package {0} was not retrieved'.format(package_name))
+
+                            if running_version is not None and running_version != binaries[package_name]:
                                 if package_name not in component_info:
                                     component_info[package_name] = copy.deepcopy(default_entry)
                                 component_info[package_name]['installed'] = running_version
-                                component_info[package_name]['candidate'] = candidate[package_name]
+                                component_info[package_name]['candidate'] = binaries[package_name]
                                 component_info[package_name]['services_to_restart'].append('ovs-{0}'.format(service))
 
-                    if installed[package_name] != candidate[package_name] and package_name not in component_info:
-                        component_info[package_name] = copy.deepcopy(default_entry)
-                        component_info[package_name]['installed'] = installed[package_name]
-                        component_info[package_name]['candidate'] = candidate[package_name]
+                    if installed[package] != candidate[package] and package not in component_info:
+                        component_info[package] = copy.deepcopy(default_entry)
+                        component_info[package]['installed'] = installed[package]
+                        component_info[package]['candidate'] = candidate[package]
                 if component_info:
                     if component not in package_info[client.ip]:
                         package_info[client.ip][component] = {}
@@ -268,12 +291,12 @@ class UpdateController(object):
                         for down in storagedriver_downtime:
                             if down not in information[key]['downtime']:
                                 information[key]['downtime'].append(down)
-                        information[key]['services_stop_start'].update(storagedriver_services)
+                        information[key]['services_post_update'].update(storagedriver_services)
                     elif package_name == 'volumedriver-no-dedup-server':
                         for down in storagedriver_downtime:
                             if down not in information[key]['downtime']:
                                 information[key]['downtime'].append(down)
-                        information[key]['services_stop_start'].update(storagedriver_services)
+                        information[key]['services_post_update'].update(storagedriver_services)
                     elif package_name == 'arakoon':
                         if key == 'framework':
                             framework_arakoons = set()
@@ -293,20 +316,33 @@ class UpdateController(object):
 
     @staticmethod
     @add_hooks('update', 'package_install_multi')
-    def package_install_core(client, package_info):
+    def package_install_core(client, package_info, components):
         """
         Update the core packages
         :param client: Client on which to execute update the packages
         :type client: SSHClient
         :param package_info: Information about the packages (installed, candidate)
         :type package_info: dict
+        :param components: Components which have been selected for update
+        :type components: list
         :return: None
         """
+        if 'framework' not in components and 'storagedriver' not in components:
+            return
+
+        packages_to_install = {}
         for pkg_name, pkg_info in package_info.iteritems():
             if pkg_name in UpdateController.all_core_packages:
-                UpdateController._logger.debug('{0}: Updating core package {1} ({2} --> {3})'.format(client.ip, pkg_name, pkg_info['installed'], pkg_info['candidate']))
-                PackageManager.install(package_name=pkg_name, client=client)
-                UpdateController._logger.debug('{0}: Updated core package {1}'.format(client.ip, pkg_name))
+                packages_to_install[pkg_name] = pkg_info
+        if not packages_to_install:
+            return
+
+        UpdateController._logger.debug('{0}: Executing hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
+        for pkg_name, pkg_info in packages_to_install.iteritems():
+            UpdateController._logger.debug('{0}: Updating core package {1} ({2} --> {3})'.format(client.ip, pkg_name, pkg_info['installed'], pkg_info['candidate']))
+            PackageManager.install(package_name=pkg_name, client=client)
+            UpdateController._logger.debug('{0}: Updated core package {1}'.format(client.ip, pkg_name))
+        UpdateController._logger.debug('{0}: Executed hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
 
     @staticmethod
     @add_hooks('update', 'post_update_multi')
@@ -328,29 +364,30 @@ class UpdateController(object):
         if 'framework' not in components and 'storagedriver' not in components:
             return
 
-        if 'framework' in components:
-            UpdateController.change_services_state(services=['support-agent'], ssh_clients=[client], action='restart')
-
         update_information = UpdateController.get_update_information_core({})
         services_to_restart = set()
         if 'storagedriver' in components:
             services_to_restart.update(update_information.get('storagedriver', {}).get('services_post_update', set()))
         if 'framework' in components:
             services_to_restart.update(update_information.get('framework', {}).get('services_post_update', set()))
+            services_to_restart.add('support-agent')
 
-        for service_name in sorted(services_to_restart):
-            if not service_name.startswith('ovs-arakoon-'):
-                UpdateController.change_services_state(services=[service_name], ssh_clients=[client], action='restart')
-            else:
-                cluster_name = ArakoonClusterConfig.get_cluster_name(ExtensionToolbox.remove_prefix(service_name, 'ovs-arakoon-'))
-                if cluster_name == 'cacc':
-                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, filesystem=True, ip=System.get_my_storagerouter().ip)
+        if services_to_restart:
+            UpdateController._logger.debug('{0}: Executing hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
+            for service_name in sorted(services_to_restart):
+                if not service_name.startswith('ovs-arakoon-'):
+                    UpdateController.change_services_state(services=[service_name], ssh_clients=[client], action='restart')
                 else:
-                    arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
-                if arakoon_metadata['internal'] is True:
-                    UpdateController._logger.debug('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
-                    ArakoonInstaller.restart_node(cluster_name=cluster_name,
-                                                  client=client)
+                    cluster_name = ArakoonClusterConfig.get_cluster_name(ExtensionToolbox.remove_prefix(service_name, 'ovs-arakoon-'))
+                    if cluster_name == 'config':
+                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name='cacc', filesystem=True, ip=System.get_my_storagerouter().ip)
+                    else:
+                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+                    if arakoon_metadata['internal'] is True:
+                        UpdateController._logger.debug('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
+                        ArakoonInstaller.restart_node(cluster_name=cluster_name,
+                                                      client=client)
+            UpdateController._logger.debug('{0}: Executed hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
 
     ################
     # CELERY TASKS #
@@ -465,8 +502,6 @@ class UpdateController(object):
         This is called upon by 'at'
         :return: None
         """
-        this_sr = System.get_my_storagerouter()
-        local_ip = None
         filemutex = file_mutex('system_update', wait=2)
         ssh_clients = []
         services_stop_start = set()
@@ -482,8 +517,6 @@ class UpdateController(object):
             master_ips = []
             extra_ips = []
             for sr in storage_routers:
-                if sr == this_sr:
-                    local_ip = sr.ip
                 try:
                     ssh_clients.append(SSHClient(sr.ip, username='root'))
                     if sr.node_type == 'MASTER':
@@ -505,7 +538,7 @@ class UpdateController(object):
             update_information = UpdateController.get_update_information_all()
             for component, component_info in update_information.iteritems():
                 if component in components:
-                    UpdateController._logger.debug('{0}: Verifying update information for component: {1}'.format(local_ip, component.upper()))
+                    UpdateController._logger.debug('Verifying update information for component: {0}'.format(component.upper()))
                     Toolbox.verify_required_params(actual_params=component_info,
                                                    required_params={'downtime': (list, None),
                                                                     'packages': (dict, None),
@@ -519,11 +552,11 @@ class UpdateController(object):
                     services_stop_start.update(component_info['services_stop_start'])
                     services_post_update.update(component_info['services_post_update'])
             if len(packages_to_update) > 0:
-                UpdateController._logger.debug('{0}: Packages to be updated: {1}'.format(local_ip, ', '.join(sorted(packages_to_update.keys()))))
+                UpdateController._logger.debug('Packages to be updated: {0}'.format(', '.join(sorted(packages_to_update.keys()))))
             if len(services_stop_start) > 0:
-                UpdateController._logger.debug('{0}: Services to stop before package update: {1}'.format(local_ip, ', '.join(sorted(services_stop_start))))
+                UpdateController._logger.debug('Services to stop before package update: {0}'.format(', '.join(sorted(services_stop_start))))
             if len(services_post_update) > 0:
-                UpdateController._logger.debug('{0}: Services which will be restarted after update: {1}'.format(local_ip, ', '.join(sorted(services_post_update))))
+                UpdateController._logger.debug('Services which will be restarted after update: {0}'.format(', '.join(sorted(services_post_update))))
 
             # Stop services
             if UpdateController.change_services_state(services=services_stop_start,
@@ -539,9 +572,7 @@ class UpdateController(object):
                     UpdateController._logger.debug('{0}: Installing packages'.format(client.ip))
                     for function in Toolbox.fetch_hooks('update', 'package_install_multi'):
                         try:
-                            UpdateController._logger.debug('{0}: Executing hook {1}'.format(client.ip, function.__name__))
-                            function(client=client, package_info=packages_to_update)
-                            UpdateController._logger.debug('{0}: Executed hook {1}'.format(client.ip, function.__name__))
+                            function(client=client, package_info=packages_to_update, components=components)
                         except Exception as ex:
                             UpdateController._logger.error('{0}: Package installation hook {1} failed with error: {2}'.format(client.ip, function.__name__, ex))
                             failures = True
@@ -550,11 +581,9 @@ class UpdateController(object):
                     # Second install packages on all ALBA nodes
                     for function in Toolbox.fetch_hooks('update', 'package_install_single'):
                         try:
-                            UpdateController._logger.debug('{0}: Executing hook {1}'.format(local_ip, function.__name__))
-                            function(package_info=packages_to_update)
-                            UpdateController._logger.debug('{0}: Executed hook {1}'.format(local_ip, function.__name__))
+                            function(package_info=packages_to_update, components=components)
                         except Exception as ex:
-                            UpdateController._logger.exception('{0}: Package installation hook {1} failed with error: {2}'.format(local_ip, function.__name__, ex))
+                            UpdateController._logger.exception('Package installation hook {0} failed with error: {1}'.format(function.__name__, ex))
                             failures = True
 
                 if failures is True:
@@ -590,14 +619,14 @@ class UpdateController(object):
             # Start memcached
             if 'memcached' in services_stop_start:
                 services_stop_start.remove('memcached')
-                UpdateController._logger.debug('{0}: Starting memcached'.format(local_ip))
+                UpdateController._logger.debug('Starting memcached')
                 UpdateController.change_services_state(services=['memcached'],
                                                        ssh_clients=ssh_clients,
                                                        action='start')
 
             # Migrate model
             if 'framework' in components:
-                UpdateController._logger.debug('{0}: Verifying DAL code migration is required'.format(local_ip))
+                UpdateController._logger.debug('Verifying DAL code migration is required')
                 old_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
 
                 from ovs.dal.helpers import Migration
@@ -606,41 +635,40 @@ class UpdateController(object):
 
                 new_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
                 if old_versions != new_versions:
-                    UpdateController._logger.debug('{0}: Finished DAL code migration. Old versions: {1} --> New versions: {2}'.format(local_ip, old_versions, new_versions))
+                    UpdateController._logger.debug('Finished DAL code migration. Old versions: {0} --> New versions: {1}'.format(old_versions, new_versions))
 
             # Post update actions
             for client in ssh_clients:
                 UpdateController._logger.debug('{0}: Executing post-update actions'.format(client.ip))
                 for function in Toolbox.fetch_hooks('update', 'post_update_multi'):
                     try:
-                        UpdateController._logger.debug('{0}: Executing hook {1}'.format(client.ip, function.__name__))
                         function(client=client, components=components)
-                        UpdateController._logger.debug('{0}: Executed hook {1}'.format(client.ip, function.__name__))
                     except Exception as ex:
                         UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(client.ip, function.__name__, ex))
 
             for function in Toolbox.fetch_hooks('update', 'post_update_single'):
                 try:
-                    UpdateController._logger.debug('{0}: Executing hook {1}'.format(local_ip, function.__name__))
                     function(components=components)
-                    UpdateController._logger.debug('{0}: Executed hook {1}'.format(local_ip, function.__name__))
                 except Exception as ex:
-                    UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(local_ip, function.__name__, ex))
+                    UpdateController._logger.exception('Post update hook {0} failed with error: {1}'.format(function.__name__, ex))
 
             # Start services
             UpdateController.change_services_state(services=services_stop_start,
                                                    ssh_clients=ssh_clients,
                                                    action='start')
 
-            UpdateController._refresh_package_information(local_ip=local_ip)
+            UpdateController._refresh_package_information()
             UpdateController._logger.debug('+++ Finished updating +++')
         except NoLockAvailableException:
             UpdateController._logger.debug('Another update is currently in progress!')
         except Exception as ex:
             UpdateController._logger.exception('Error during update: {0}'.format(ex))
-            UpdateController._recover_from_failed_update(local_client_ip=local_ip,
-                                                         ssh_clients=ssh_clients,
-                                                         services_to_start_again=services_stop_start)
+            if len(ssh_clients) > 0:
+                UpdateController.change_services_state(services=services_stop_start,
+                                                       ssh_clients=ssh_clients,
+                                                       action='start')
+                UpdateController._refresh_package_information()
+                UpdateController._logger.error('Failed to update. Please check all the logs for more information')
         finally:
             filemutex.release()
             for ssh_client in ssh_clients:
@@ -679,26 +707,17 @@ class UpdateController(object):
     # HELPERS #
     ###########
     @staticmethod
-    def _refresh_package_information(local_ip):
+    def _refresh_package_information():
         # Refresh updates
-        UpdateController._logger.debug('{0}: Refreshing package information'.format(local_ip))
+        UpdateController._logger.debug('Refreshing package information')
         counter = 1
         while counter < 6:
             try:
                 GenericController.refresh_package_information()
                 return
             except NoLockAvailableException:
-                UpdateController._logger.debug('{0}: Attempt {1}: Could not refresh the update information, trying again'.format(local_ip, counter))
+                UpdateController._logger.debug('Attempt {0}: Could not refresh the update information, trying again'.format(counter))
                 time.sleep(6)  # Wait 30 seconds max in total
             counter += 1
             if counter == 6:
                 raise Exception('Could not refresh the update information')
-
-    @staticmethod
-    def _recover_from_failed_update(local_client_ip, ssh_clients, services_to_start_again):
-        if len(ssh_clients) > 0:
-            UpdateController.change_services_state(services=services_to_start_again,
-                                                   ssh_clients=ssh_clients,
-                                                   action='start')
-            UpdateController._refresh_package_information(local_ip=local_client_ip)
-            UpdateController._logger.error('{0}: Failed to update. Please check all the logs for more information'.format(local_client_ip))

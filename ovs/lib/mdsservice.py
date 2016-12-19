@@ -623,9 +623,11 @@ class MDSServiceController(object):
         try:
             if len(configs_no_ex_master) != len(configs_all):
                 vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
-                                                                          metadata_backend_config=MDSMetaDataBackendConfig(configs_no_ex_master))
+                                                                          metadata_backend_config=MDSMetaDataBackendConfig(configs_no_ex_master),
+                                                                          req_timeout_secs=5)
             vdisk.storagedriver_client.update_metadata_backend_config(volume_id=str(vdisk.volume_id),
-                                                                      metadata_backend_config=MDSMetaDataBackendConfig(configs_all))
+                                                                      metadata_backend_config=MDSMetaDataBackendConfig(configs_all),
+                                                                      req_timeout_secs=5)
         except Exception:
             MDSServiceController._logger.exception('MDS safety: vDisk {0}: Failed to update the metadata backend configuration'.format(vdisk.guid))
             raise Exception('MDS configuration for volume {0} with guid {1} could not be changed'.format(vdisk.name, vdisk.guid))

@@ -17,10 +17,11 @@
 """
 Upstart module
 """
-
 import re
 import time
 from subprocess import CalledProcessError, check_output
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 
@@ -54,49 +55,47 @@ class Upstart(object):
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
-    def add_service(name, client, params=None, target_name=None, startup_dependency=None):
+    def add_service(name, client, params=None, target_name=None, startup_dependency=None, delay_registration=False):
         """
         Add a service
-        :param name: Name of the service to add
+        :param name: Template name of the service to add
         :type name: str
         :param client: Client on which to add the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :param params: Additional information about the service
         :type params: dict or None
         :param target_name: Overrule default name of the service with this name
         :type target_name: str or None
         :param startup_dependency: Additional startup dependency
         :type startup_dependency: str or None
-        :return: None
+        :param delay_registration: Register the service parameters in the config management right away or not
+        :type delay_registration: bool
+        :return: Parameters used by the service
+        :rtype: dict
         """
         if params is None:
             params = {}
 
-        name = Upstart._get_name(name, client, '/opt/OpenvStorage/config/templates/upstart/')
-        template_conf = '/opt/OpenvStorage/config/templates/upstart/{0}.conf'
+        service_name = Upstart._get_name(name, client, '/opt/OpenvStorage/config/templates/upstart/')
+        template_file = '/opt/OpenvStorage/config/templates/upstart/{0}.conf'.format(service_name)
 
-        if not client.file_exists(template_conf.format(name)):
-            # Given template doesn't exist so we are probably using system
-            # init scripts
+        if not client.file_exists(template_file):
+            # Given template doesn't exist so we are probably using system init scripts
             return
 
-        template_file = client.file_read(template_conf.format(name))
+        if target_name is not None:
+            service_name = target_name
 
+        params.update({'SERVICE_NAME': Toolbox.remove_prefix(service_name, 'ovs-'),
+                       'STARTUP_DEPENDENCY': '' if startup_dependency is None else 'started {0}'.format(startup_dependency)})
+        template_content = client.file_read(template_file)
         for key, value in params.iteritems():
-            template_file = template_file.replace('<{0}>'.format(key), value)
-        if '<SERVICE_NAME>' in template_file:
-            service_name = name if target_name is None else target_name
-            template_file = template_file.replace('<SERVICE_NAME>', Toolbox.remove_prefix(service_name, 'ovs-'))
+            template_content = template_content.replace('<{0}>'.format(key), value)
+        client.file_write('/etc/init/{0}.conf'.format(service_name), template_content)
 
-        dependency = ''
-        if startup_dependency:
-            dependency = 'started {0}'.format(startup_dependency)
-        template_file = template_file.replace('<STARTUP_DEPENDENCY>', dependency)
-
-        if target_name is None:
-            client.file_write('/etc/init/{0}.conf'.format(name), template_file)
-        else:
-            client.file_write('/etc/init/{0}.conf'.format(target_name), template_file)
+        if delay_registration is False:
+            Upstart.register_service(service_metadata=params, node_name=System.get_my_machine_id(client))
+        return params
 
     @staticmethod
     def get_service_status(name, client):
@@ -105,7 +104,7 @@ class Upstart(object):
         :param name: Name of the service to retrieve the status of
         :type name: str
         :param client: Client on which to retrieve the status
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: The status of the service and the output of the command
         :rtype: tuple
         """
@@ -127,13 +126,15 @@ class Upstart(object):
             raise Exception('Retrieving status for service "{0}" failed'.format(name))
 
     @staticmethod
-    def remove_service(name, client):
+    def remove_service(name, client, delay_unregistration=False):
         """
         Remove a service
         :param name: Name of the service to remove
         :type name: str
         :param client: Client on which to remove the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :param delay_unregistration: Un-register the service parameters in the config management right away or not
+        :type delay_unregistration: bool
         :return: None
         """
         name = Upstart._get_name(name, client)
@@ -142,6 +143,9 @@ class Upstart(object):
             client.file_delete(run_file_name)
         client.file_delete('/etc/init/{0}.conf'.format(name))
 
+        if delay_unregistration is False:
+            Upstart.unregister_service(service_name=name, node_name=System.get_my_machine_id(client))
+
     @staticmethod
     def start_service(name, client):
         """
@@ -149,7 +153,7 @@ class Upstart(object):
         :param name: Name of the service to start
         :type name: str
         :param client: Client on which to start the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: The output of the start command
         :rtype: str
         """
@@ -183,7 +187,7 @@ class Upstart(object):
         :param name: Name of the service to stop
         :type name: str
         :param client: Client on which to stop the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: The output of the stop command
         :rtype: str
         """
@@ -217,7 +221,7 @@ class Upstart(object):
         :param name: Name of the service to restart
         :type name: str
         :param client: Client on which to restart the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: The output of the restart command
         :rtype: str
         """
@@ -231,7 +235,7 @@ class Upstart(object):
         :param name: Name of the service to verify
         :type name: str
         :param client: Client on which to check for the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: Whether the service exists
         :rtype: bool
         """
@@ -248,7 +252,7 @@ class Upstart(object):
         :param name: Name of the service to retrieve the PID for
         :type name: str
         :param client: Client on which to retrieve the PID for the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: The PID of the service or 0 if no PID found
         :rtype: int
         """
@@ -277,7 +281,7 @@ class Upstart(object):
         :param signal: Signal to pass on to the service
         :type signal: int
         :param client: Client on which to send a signal to the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: None
         """
         name = Upstart._get_name(name, client)
@@ -291,8 +295,8 @@ class Upstart(object):
         """
         List all created services on a system
         :param client: Client on which to list all the services
-        :type client: SSHClient
-        :return: List of all services which have been created on some point
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :return: List of all services which have been created at some point
         :rtype: generator
         """
         for filename in client.dir_list('/etc/init'):
@@ -346,3 +350,60 @@ class Upstart(object):
                 time.sleep(1)
         except KeyboardInterrupt:
             pass
+
+    @staticmethod
+    def register_service(node_name, service_metadata):
+        """
+        Register the metadata of the service to the configuration management
+        :param node_name: Name of the node on which the service is running
+        :type node_name: str
+        :param service_metadata: Metadata of the service
+        :type service_metadata: dict
+        :return: None
+        """
+        service_name = service_metadata['SERVICE_NAME']
+        Configuration.set(key='/ovs/framework/hosts/{0}/services/{1}'.format(node_name, Toolbox.remove_prefix(service_name, 'ovs-')),
+                          value=service_metadata)
+
+    @staticmethod
+    def unregister_service(node_name, service_name):
+        """
+        Un-register the metadata of a service from the configuration management
+        :param service_name: Name of the service to clean from the configuration management
+        :type service_name: str
+        :param node_name: Name of the node on which to un-register the service
+        :type node_name: str
+        :return: None
+        """
+        Configuration.delete(key='/ovs/framework/hosts/{0}/services/{1}'.format(node_name, Toolbox.remove_prefix(service_name, 'ovs-')))
+
+    @staticmethod
+    def is_rabbitmq_running(client):
+        """
+        Check if rabbitmq is correctly running
+        :param client: Client on which to check the rabbitmq process
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :return: The PID of the process and a bool indicating everything runs as expected
+        :rtype: tuple
+        """
+        rabbitmq_running = False
+        rabbitmq_pid_ctl = -1
+        rabbitmq_pid_sm = -1
+        output = client.run(['rabbitmqctl', 'status'], allow_nonzero=True)
+        if output:
+            match = re.search('\{pid,(?P<pid>\d+?)\}', output)
+            if match is not None:
+                match_groups = match.groupdict()
+                if 'pid' in match_groups:
+                    rabbitmq_running = True
+                    rabbitmq_pid_ctl = match_groups['pid']
+
+        if Upstart.has_service('rabbitmq-server', client) and Upstart.get_service_status('rabbitmq-server', client)[0] is True:
+            rabbitmq_running = True
+            rabbitmq_pid_sm = Upstart.get_service_pid('rabbitmq-server', client)
+
+        same_process = rabbitmq_pid_ctl == rabbitmq_pid_sm
+        Upstart._logger.debug('Rabbitmq is reported {0}running, pids: {1} and {2}'.format('' if rabbitmq_running else 'not ',
+                                                                                          rabbitmq_pid_ctl,
+                                                                                          rabbitmq_pid_sm))
+        return rabbitmq_running, same_process

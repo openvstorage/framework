@@ -52,7 +52,7 @@ define([
                     .then(function(taskID) {
                         generic.alertInfo(
                             $.t('ovs:wizards.rollback.gather.rollbackstarted'),
-                            $.t('ovs:wizards.rollback.gather.inprogress' + self.data.type, { what: self.data.velement().name() })
+                            $.t('ovs:wizards.rollback.gather.inprogress', { what: self.data.velement().name() })
                         );
                         deferred.resolve();
                         return taskID;
@@ -61,13 +61,13 @@ define([
                     .done(function() {
                         generic.alertSuccess(
                             $.t('ovs:generic.finished'),
-                            $.t('ovs:wizards.rollback.gather.success' + self.data.type, { what: self.data.velement().name() })
+                            $.t('ovs:wizards.rollback.gather.success', { what: self.data.velement().name() })
                         );
                     })
                     .fail(function(error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:wizards.rollback.gather.failed' + self.data.type, { what: self.data.velement().name() })
+                            $.t('ovs:wizards.rollback.gather.failed', { what: self.data.velement().name() })
                         );
                         deferred.resolve(error);
                     });

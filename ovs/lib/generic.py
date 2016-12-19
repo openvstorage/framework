@@ -40,6 +40,7 @@ from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.toolbox import Toolbox as ExtensionToolbox
 from ovs.extensions.services.service import ServiceManager
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.toolbox import Schedule, Toolbox
@@ -443,7 +444,7 @@ class GenericController(object):
             if service.is_internal is True and service.type.name in (ServiceType.SERVICE_TYPES.ARAKOON,
                                                                      ServiceType.SERVICE_TYPES.NS_MGR,
                                                                      ServiceType.SERVICE_TYPES.ALBA_MGR):
-                cluster = service.name.replace('arakoon-', '')
+                cluster = ExtensionToolbox.remove_prefix(service.name, 'arakoon-')
                 if cluster in cluster_names:
                     continue
                 cluster_names.append(cluster)
@@ -494,13 +495,13 @@ class GenericController(object):
         all_storagerouters = StorageRouterList.get_storagerouters()
         for storagerouter in all_storagerouters:
             information[storagerouter.ip] = {}
-            try:
-                client = SSHClient(endpoint=storagerouter, username='root')
-            except UnableToConnectException:
-                GenericController._logger.warning('StorageRouter {0} with IP {1} is inaccessible'.format(storagerouter.name, storagerouter.ip))
-                continue
-
             for function in Toolbox.fetch_hooks('update', 'get_package_info_multi'):
+                try:
+                    # We make use of these clients in Threads --> cached = False
+                    client = SSHClient(endpoint=storagerouter, username='root', cached=False)
+                except UnableToConnectException:
+                    information[storagerouter.ip]['errors'] = ['StorageRouter {0} is inaccessible'.format(storagerouter.name)]
+                    break
                 thread = Thread(target=function,
                                 args=(client, information))
                 thread.start()

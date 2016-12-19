@@ -188,10 +188,7 @@ class ArakoonInstallerTester(unittest.TestCase):
                                                '2', storagerouters[2].ip, 20000, base_dir2, '2', 20001
                                            ))
         self.assertEqual(Configuration.get(ArakoonInstaller.CONFIG_KEY.format('test'), raw=True), expected)
-        # @TODO: assert service availability here. It should be stopped
-
-        ArakoonInstaller.restart_cluster_remove('test', [storagerouters[2].ip], filesystem=False)
-        # @TODO: assert the service is running
+        # @TODO: assert service availability here. It should have been stopped and started again
 
         config = ArakoonClusterConfig('test', filesystem=False)
         config.load_config(storagerouters[2].ip)

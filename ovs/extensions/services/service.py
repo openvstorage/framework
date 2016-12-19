@@ -18,8 +18,7 @@
 Service Factory module
 """
 import os
-import time
-from subprocess import check_output, CalledProcessError
+from subprocess import check_output
 from ovs.log.log_handler import LogHandler
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     from ovs.extensions.services.tests.upstart import Upstart
@@ -71,4 +70,8 @@ class ServiceManager(object):
 
     @staticmethod
     def reload():
+        """
+        Reset the ImplementationClass
+        :return: None
+        """
         ServiceManager.ImplementationClass = None

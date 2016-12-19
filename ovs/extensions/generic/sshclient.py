@@ -97,7 +97,7 @@ class SSHClient(object):
     _run_returns = {}
     _run_recordings = []
 
-    def __init__(self, endpoint, username='ovs', password=None):
+    def __init__(self, endpoint, username='ovs', password=None, cached=True):
         """
         Initializes an SSHClient
         """
@@ -143,14 +143,22 @@ class SSHClient(object):
 
         if not self.is_local:
             logging.getLogger('paramiko').setLevel(logging.WARNING)
-            key = '{0}@{1}'.format(self.ip, self.username)
-            if key not in SSHClient.client_cache:
+            key = None
+            create_new = True
+            if cached is True:
+                key = '{0}@{1}'.format(self.ip, self.username)
+                if key in SSHClient.client_cache:
+                    create_new = False
+                    self._client = SSHClient.client_cache[key]
+
+            if create_new is True:
                 import paramiko
                 client = paramiko.SSHClient()
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 client.is_connected = types.MethodType(is_connected, client)
-                SSHClient.client_cache[key] = client
-            self._client = SSHClient.client_cache[key]
+                if cached is True:
+                    SSHClient.client_cache[key] = client
+                self._client = client
         self._connect()
 
     def __del__(self):
@@ -228,14 +236,15 @@ class SSHClient(object):
             raise
 
     @connected()
-    def run(self, command, debug=False, suppress_logging=False, allow_nonzero=False, allow_insecure=False):
+    def run(self, command, debug=False, suppress_logging=False, allow_nonzero=False, allow_insecure=False, return_stderr=False):
         """
         Executes a shell command
         :param suppress_logging: Do not log anything
         :param command: Command to execute
-        :param debug: Extended logging and stderr output returned
+        :param debug: Extended logging
         :param allow_nonzero: Allow non-zero exit code
-        :param allow_insecure: Allow string commands (which might be inproper escaped)
+        :param allow_insecure: Allow string commands (which might be improperly escaped)
+        :param return_stderr: Return stderr
         """
         if self._unittest_mode is True:
             _command = command
@@ -267,9 +276,10 @@ class SSHClient(object):
                 exit_code = channel.returncode
                 if exit_code != 0 and allow_nonzero is False:  # Raise same error as check_output
                     raise CalledProcessError(exit_code, command, stdout)
-                if debug:
+                if debug is True:
                     SSHClient._logger.debug('stdout: {0}'.format(stdout))
                     SSHClient._logger.debug('stderr: {0}'.format(stderr))
+                if return_stderr is True:
                     return stdout, stderr
                 else:
                     return stdout
@@ -289,7 +299,7 @@ class SSHClient(object):
                     SSHClient._logger.error('Command "{0}" failed with output "{1}" and error "{2}"'
                                             .format(command, output, error))
                 raise CalledProcessError(exit_code, command, output)
-            if debug:
+            if return_stderr is True:
                 return output, error
             else:
                 return output

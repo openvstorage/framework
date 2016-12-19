@@ -17,8 +17,11 @@
 """
 Systemd module
 """
+import re
 import time
 from subprocess import CalledProcessError, check_output
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 
@@ -52,58 +55,54 @@ class Systemd(object):
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
-    def add_service(name, client, params=None, target_name=None, startup_dependency=None):
+    def add_service(name, client, params=None, target_name=None, startup_dependency=None, delay_registration=False):
         """
         Add a service
-        :param name: Name of the service to add
+        :param name: Template name of the service to add
         :type name: str
         :param client: Client on which to add the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :param params: Additional information about the service
         :type params: dict or None
         :param target_name: Overrule default name of the service with this name
         :type target_name: str or None
         :param startup_dependency: Additional startup dependency
         :type startup_dependency: str or None
-        :return: None
+        :param delay_registration: Register the service parameters in the config management right away or not
+        :type delay_registration: bool
+        :return: Parameters used by the service
+        :rtype: dict
         """
         if params is None:
             params = {}
 
-        name = Systemd._get_name(name, client, '/opt/OpenvStorage/config/templates/systemd/')
-        template_service = '/opt/OpenvStorage/config/templates/systemd/{0}.service'
+        service_name = Systemd._get_name(name, client, '/opt/OpenvStorage/config/templates/systemd/')
+        template_file = '/opt/OpenvStorage/config/templates/systemd/{0}.service'.format(service_name)
 
-        if not client.file_exists(template_service.format(name)):
-            # Given template doesn't exist so we are probably using system
-            # init scripts
+        if not client.file_exists(template_file):
+            # Given template doesn't exist so we are probably using system init scripts
             return
 
-        template_file = client.file_read(template_service.format(name))
+        if target_name is not None:
+            service_name = target_name
 
+        params.update({'SERVICE_NAME': Toolbox.remove_prefix(service_name, 'ovs-'),
+                       'STARTUP_DEPENDENCY': '' if startup_dependency is None else '{0}.service'.format(startup_dependency)})
+        template_content = client.file_read(template_file)
         for key, value in params.iteritems():
-            template_file = template_file.replace('<{0}>'.format(key), value)
-        if '<SERVICE_NAME>' in template_file:
-            service_name = name if target_name is None else target_name
-            template_file = template_file.replace('<SERVICE_NAME>', Toolbox.remove_prefix(service_name, 'ovs-'))
-
-        dependency = ''
-        if startup_dependency:
-            dependency = '{0}.service'.format(startup_dependency)
-        template_file = template_file.replace('<STARTUP_DEPENDENCY>', dependency)
-
-        if target_name is None:
-            client.file_write('/lib/systemd/system/{0}.service'.format(name), template_file)
-        else:
-            client.file_write('/lib/systemd/system/{0}.service'.format(target_name), template_file)
-            name = target_name
+            template_content = template_content.replace('<{0}>'.format(key), value)
+        client.file_write('/lib/systemd/system/{0}.service'.format(service_name), template_content)
 
         try:
             client.run(['systemctl', 'daemon-reload'])
-            client.run(['systemctl', 'enable', '{0}.service'.format(name)])
+            client.run(['systemctl', 'enable', '{0}.service'.format(service_name)])
         except CalledProcessError as cpe:
-            output = cpe.output
-            Systemd._logger.exception('Add {0}.service failed, {1}'.format(name, output))
-            raise Exception('Add {0}.service failed, {1}'.format(name, output))
+            Systemd._logger.exception('Add {0}.service failed, {1}'.format(service_name, cpe.output))
+            raise Exception('Add {0}.service failed, {1}'.format(service_name, cpe.output))
+
+        if delay_registration is False:
+            Systemd.register_service(service_metadata=params, node_name=System.get_my_machine_id(client))
+        return params
 
     @staticmethod
     def get_service_status(name, client):
@@ -112,7 +111,7 @@ class Systemd(object):
         :param name: Name of the service to retrieve the status of
         :type name: str
         :param client: Client on which to retrieve the status
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: The status of the service and the output of the command
         :rtype: tuple
         """
@@ -125,13 +124,15 @@ class Systemd(object):
         return False, output
 
     @staticmethod
-    def remove_service(name, client):
+    def remove_service(name, client, delay_unregistration=False):
         """
         Remove a service
         :param name: Name of the service to remove
         :type name: str
         :param client: Client on which to remove the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :param delay_unregistration: Un-register the service parameters in the config management right away or not
+        :type delay_unregistration: bool
         :return: None
         """
         name = Systemd._get_name(name, client)
@@ -145,6 +146,9 @@ class Systemd(object):
         client.file_delete('/lib/systemd/system/{0}.service'.format(name))
         client.run(['systemctl', 'daemon-reload'])
 
+        if delay_unregistration is False:
+            Systemd.unregister_service(service_name=name, node_name=System.get_my_machine_id(client))
+
     @staticmethod
     def start_service(name, client):
         """
@@ -152,7 +156,7 @@ class Systemd(object):
         :param name: Name of the service to start
         :type name: str
         :param client: Client on which to start the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: The output of the start command
         :rtype: str
         """
@@ -179,7 +183,7 @@ class Systemd(object):
         :param name: Name of the service to stop
         :type name: str
         :param client: Client on which to stop the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: The output of the stop command
         :rtype: str
         """
@@ -201,7 +205,7 @@ class Systemd(object):
         :param name: Name of the service to restart
         :type name: str
         :param client: Client on which to restart the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: The output of the restart command
         :rtype: str
         """
@@ -225,7 +229,7 @@ class Systemd(object):
         :param name: Name of the service to verify
         :type name: str
         :param client: Client on which to check for the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: Whether the service exists
         :rtype: bool
         """
@@ -242,7 +246,7 @@ class Systemd(object):
         :param name: Name of the service to retrieve the PID for
         :type name: str
         :param client: Client on which to retrieve the PID for the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: The PID of the service or 0 if no PID found
         :rtype: int
         """
@@ -265,7 +269,7 @@ class Systemd(object):
         :param signal: Signal to pass on to the service
         :type signal: int
         :param client: Client on which to send a signal to the service
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: None
         """
         name = Systemd._get_name(name, client)
@@ -279,7 +283,7 @@ class Systemd(object):
         """
         List all created services on a system
         :param client: Client on which to list all the services
-        :type client: SSHClient
+        :type client: ovs.extensions.generic.sshclient.SSHClient
         :return: List of all services which have been created at some point
         :rtype: generator
         """
@@ -334,3 +338,60 @@ class Systemd(object):
                 time.sleep(1)
         except KeyboardInterrupt:
             pass
+
+    @staticmethod
+    def register_service(node_name, service_metadata):
+        """
+        Register the metadata of the service to the configuration management
+        :param node_name: Name of the node on which the service is running
+        :type node_name: str
+        :param service_metadata: Metadata of the service
+        :type service_metadata: dict
+        :return: None
+        """
+        service_name = service_metadata['SERVICE_NAME']
+        Configuration.set(key='/ovs/framework/hosts/{0}/services/{1}'.format(node_name, Toolbox.remove_prefix(service_name, 'ovs-')),
+                          value=service_metadata)
+
+    @staticmethod
+    def unregister_service(node_name, service_name):
+        """
+        Un-register the metadata of a service from the configuration management
+        :param node_name: Name of the node on which to un-register the service
+        :type node_name: str
+        :param service_name: Name of the service to clean from the configuration management
+        :type service_name: str
+        :return: None
+        """
+        Configuration.delete(key='/ovs/framework/hosts/{0}/services/{1}'.format(node_name, Toolbox.remove_prefix(service_name, 'ovs-')))
+
+    @staticmethod
+    def is_rabbitmq_running(client):
+        """
+        Check if rabbitmq is correctly running
+        :param client: Client on which to check the rabbitmq process
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :return: The PID of the process and a bool indicating everything runs as expected
+        :rtype: tuple
+        """
+        rabbitmq_running = False
+        rabbitmq_pid_ctl = -1
+        rabbitmq_pid_sm = -1
+        output = client.run(['rabbitmqctl', 'status'], allow_nonzero=True)
+        if output:
+            match = re.search('\{pid,(?P<pid>\d+?)\}', output)
+            if match is not None:
+                match_groups = match.groupdict()
+                if 'pid' in match_groups:
+                    rabbitmq_running = True
+                    rabbitmq_pid_ctl = match_groups['pid']
+
+        if Systemd.has_service('rabbitmq-server', client) and Systemd.get_service_status('rabbitmq-server', client)[0] is True:
+            rabbitmq_running = True
+            rabbitmq_pid_sm = Systemd.get_service_pid('rabbitmq-server', client)
+
+        same_process = rabbitmq_pid_ctl == rabbitmq_pid_sm
+        Systemd._logger.debug('Rabbitmq is reported {0}running, pids: {1} and {2}'.format('' if rabbitmq_running else 'not ',
+                                                                                          rabbitmq_pid_ctl,
+                                                                                          rabbitmq_pid_sm))
+        return rabbitmq_running, same_process
