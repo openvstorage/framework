@@ -806,9 +806,6 @@ class StorageRouterController(object):
         current_startup_counter = storagedriver.startup_counter
         ServiceManager.start_service(sd_service, client=root_client)
         tries = 60
-        # REMOVE THIS vvvv
-        storagedriver.startup_counter += 1
-        # REMOVE THIS ^^^^
         while storagedriver.startup_counter == current_startup_counter and tries > 0:
             StorageRouterController._logger.debug('Waiting for the StorageDriver to start up...')
             if ServiceManager.get_service_status(sd_service, client=root_client)[0] is False:
