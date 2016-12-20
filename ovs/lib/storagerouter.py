@@ -630,6 +630,7 @@ class StorageRouterController(object):
                 config.write(config_io)
                 Configuration.set(config_tree.format(metadata_keys[metadata_key]), config_io.getvalue(), raw=True)
 
+            fragment_cache_scrub_info = ['none']
             if fragment_cache_on_read is False and fragment_cache_on_write is False:
                 fragment_cache_info = ['none']
             elif use_accelerated_alba is True:
@@ -639,6 +640,10 @@ class StorageRouterController(object):
                                                 'manifest_cache_size': 16 * 1024 * 1024 * 1024,
                                                 'cache_on_read': fragment_cache_on_read,
                                                 'cache_on_write': fragment_cache_on_write}]
+                if fragment_cache_on_write is True:
+                    # The scrubbers want only cache-on-write.
+                    fragment_cache_scrub_info = copy.deepcopy(fragment_cache_info)
+                    fragment_cache_scrub_info[1]['cache_on_read'] = False
             else:
                 fragment_cache_info = ['local', {'path': sdp_frag.path,
                                                  'max_size': frag_size,
@@ -660,7 +665,7 @@ class StorageRouterController(object):
                 'port': 0,  # Will be overruled by the scrubber scheduled task
                 'ips': ['127.0.0.1'],
                 'manifest_cache_size': manifest_cache_size,
-                'fragment_cache': ['none'],
+                'fragment_cache': fragment_cache_scrub_info,
                 'transport': 'tcp',
                 'read_preference': read_preferences,
                 'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm'))
