@@ -27,10 +27,10 @@ class AlbaProxy(DataObject):
     """
     The AlbaProxy class represents the junction table between the (alba)Service and VPool.
     Examples:
-    * my_vpool.alba_proxies[0].service
-    * my_service.alba_proxy.vpool
+    * my_storagedriver.alba_proxies[0].service
+    * my_service.alba_proxy.storagedriver
     """
     __properties = []
-    __relations = [Relation('storagedriver', StorageDriver, 'alba_proxy', onetoone=True),
+    __relations = [Relation('storagedriver', StorageDriver, 'alba_proxies'),
                    Relation('service', Service, 'alba_proxy', onetoone=True)]
     __dynamics = []

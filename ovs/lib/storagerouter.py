@@ -197,7 +197,8 @@ class StorageRouterController(object):
                                                       'port': (int, None),
                                                       'client_id': (str, None),
                                                       'client_secret': (str, None),
-                                                      'local': (bool, None, False)})}
+                                                      'local': (bool, None, False)}),
+                           'parallelism': (int, {'min': 1, 'max': 16}, False)}
 
         ########################
         # VALIDATIONS (PART 1) #
@@ -224,6 +225,8 @@ class StorageRouterController(object):
         if new_vpool is False:
             if vpool.status != VPool.STATUSES.RUNNING:
                 raise ValueError('VPool should be in {0} status'.format(VPool.STATUSES.RUNNING))
+
+        parallelism = parameters.get('parallelism', 8)
 
         # Check storagerouter existence
         storagerouter = StorageRouterList.get_by_ip(client.ip)
@@ -452,8 +455,8 @@ class StorageRouterController(object):
             if port_storagedriver.storagerouter_guid == storagerouter.guid:
                 # Local storagedrivers
                 model_ports_in_use += port_storagedriver.ports.values()
-                if port_storagedriver.alba_proxy is not None:
-                    model_ports_in_use.append(port_storagedriver.alba_proxy.service.ports[0])
+                for proxy in port_storagedriver.alba_proxies:
+                    model_ports_in_use.append(proxy.service.ports[0])
 
         # Connection information is Storage Driver related information
         ports = StorageRouterController._get_free_ports(client, model_ports_in_use, 4)
@@ -597,19 +600,21 @@ class StorageRouterController(object):
         ############################
         config_dir = '{0}/storagedriver/storagedriver'.format(Configuration.get('/ovs/framework/paths|cfgdir'))
         client.dir_create(config_dir)
-        alba_proxy = storagedriver.alba_proxy
         manifest_cache_size = 16 * 1024 * 1024 * 1024
-        if alba_proxy is None:
+
+        for proxy_id in xrange(parallelism):
             service = DalService()
             service.storagerouter = storagerouter
             service.ports = [StorageRouterController._get_free_ports(client, model_ports_in_use, 1)]
-            service.name = 'albaproxy_{0}'.format(vpool_name)
+            service.name = 'albaproxy_{0}_{1}'.format(vpool_name, proxy_id)
             service.type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ALBA_PROXY)
             service.save()
             alba_proxy = AlbaProxy()
             alba_proxy.service = service
             alba_proxy.storagedriver = storagedriver
             alba_proxy.save()
+
+            model_ports_in_use += service.ports
 
             config_tree = '/ovs/vpools/{0}/proxies/{1}/config/{{0}}'.format(vpool.guid, alba_proxy.guid)
             metadata_keys = {'backend': 'abm'} if use_accelerated_alba is False else {'backend': 'abm',
@@ -703,19 +708,21 @@ class StorageRouterController(object):
         for current_storagerouter in StorageRouterList.get_masters():
             queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(mq_protocol, mq_user, mq_password, current_storagerouter.ip)})
 
-        backend_connection_manager = {'alba_connection_host': storagedriver.storage_ip,
-                                      'alba_connection_port': alba_proxy.service.ports[0],
-                                      'alba_connection_preset': vpool.metadata['backend']['backend_info']['preset'],
-                                      'alba_connection_timeout': 15,
-                                      'alba_connection_transport': 'TCP',
-                                      'backend_type': 'ALBA',
-                                      'backend_interface_retries_on_error': 5,
-                                      'backend_interface_retry_interval_secs': 1,
-                                      'backend_interface_retry_backoff_multiplier': 2.0}
+        backend_connection_manager = {'backend_type': 'MULTI'}
         has_rdma = Configuration.get('/ovs/framework/rdma')
-        if use_accelerated_alba is False and has_rdma is True:
-            backend_connection_manager['alba_connection_rora_manifest_cache_capacity'] = manifest_cache_size
-            backend_connection_manager['alba_connection_use_rora'] = True
+        for index, proxy in enumerate(storagedriver.alba_proxies):
+            backend_connection_manager[str(index)] = {'alba_connection_host': storagedriver.storage_ip,
+                                                      'alba_connection_port': proxy.service.ports[0],
+                                                      'alba_connection_preset': vpool.metadata['backend']['backend_info']['preset'],
+                                                      'alba_connection_timeout': 15,
+                                                      'alba_connection_transport': 'TCP',
+                                                      'backend_type': 'ALBA',
+                                                      'backend_interface_retries_on_error': 5,
+                                                      'backend_interface_retry_interval_secs': 1,
+                                                      'backend_interface_retry_backoff_multiplier': 2.0}
+            if use_accelerated_alba is False and has_rdma is True:
+                backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = manifest_cache_size
+                backend_connection_manager[str(index)]['alba_connection_use_rora'] = True
 
         volume_router = {'vrouter_id': vrouter_id,
                          'vrouter_redirect_timeout_ms': '5000',
@@ -778,18 +785,21 @@ class StorageRouterController(object):
                       'DTL_PORT': str(storagedriver.ports['dtl']),
                       'DTL_TRANSPORT': 'RSocket' if has_rdma else 'TCP',
                       'LOG_SINK': LogHandler.get_sink_path('storagedriver')}
-        alba_proxy_params = {'VPOOL_NAME': vpool_name,
-                             'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
-                             'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid,
-                                                                                                                                  storagedriver.alba_proxy_guid))}
+
         sd_service = 'ovs-volumedriver_{0}'.format(vpool.name)
         dtl_service = 'ovs-dtl_{0}'.format(vpool.name)
-        alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
 
         ServiceManager.add_service(name='ovs-dtl', params=dtl_params, client=root_client, target_name=dtl_service)
         ServiceManager.start_service(dtl_service, client=root_client)
-        ServiceManager.add_service(name='ovs-albaproxy', params=alba_proxy_params, client=root_client, target_name=alba_proxy_service)
-        ServiceManager.start_service(alba_proxy_service, client=root_client)
+
+        for proxy in storagedriver.alba_proxies:
+            alba_proxy_params = {'VPOOL_NAME': vpool_name,
+                                 'LOG_SINK': LogHandler.get_sink_path('alba_proxy'),
+                                 'CONFIG_PATH': Configuration.get_configuration_path('/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, proxy.guid))}
+            alba_proxy_service = 'ovs-{0}'.format(proxy.service.name)
+            ServiceManager.add_service(name='ovs-albaproxy', params=alba_proxy_params, client=root_client, target_name=alba_proxy_service)
+            ServiceManager.start_service(alba_proxy_service, client=root_client)
+
         ServiceManager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client, target_name=sd_service)
 
         storagedriver = StorageDriver(storagedriver.guid)
@@ -968,7 +978,6 @@ class StorageRouterController(object):
         if storage_router_online is True:
             dtl_service = 'dtl_{0}'.format(vpool.name)
             voldrv_service = 'volumedriver_{0}'.format(vpool.name)
-            albaproxy_service = 'albaproxy_{0}'.format(vpool.name)
             client = SSHClient(storage_router, username='root')
 
             for service in [voldrv_service, dtl_service]:
@@ -985,24 +994,25 @@ class StorageRouterController(object):
             sd_config_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, storage_driver.storagedriver_id)
             if storage_drivers_left is False and Configuration.exists(sd_config_key):
                 try:
-                    if ServiceManager.has_service(albaproxy_service, client=client):
-                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Starting Alba proxy'.format(storage_driver.guid))
-                        ServiceManager.start_service(albaproxy_service, client=client)
-                        tries = 10
-                        running = False
-                        port = storage_driver.alba_proxy.service.ports[0]
-                        while running is False and tries > 0:
-                            StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Waiting for the Alba proxy to start up'.format(storage_driver.guid))
-                            tries -= 1
-                            time.sleep(10 - tries)
-                            try:
-                                client.run(['alba', 'proxy-statistics', '--host', storage_driver.storage_ip, '--port', str(port)])
-                                running = True
-                            except CalledProcessError as ex:
-                                StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Fetching alba proxy-statistics failed with error (but ignoring): {1}'.format(storage_driver.guid, ex))
-                        if running is False:
-                            raise RuntimeError('Alba proxy failed to start')
-                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Alba proxy running'.format(storage_driver.guid))
+                    for proxy in storage_driver.alba_proxies:
+                        if ServiceManager.has_service(proxy.service.name, client=client):
+                            StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Starting proxy {1}'.format(storage_driver.guid, proxy.service.name))
+                            ServiceManager.start_service(proxy.service.name, client=client)
+                            tries = 10
+                            running = False
+                            port = proxy.service.ports[0]
+                            while running is False and tries > 0:
+                                StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Waiting for the proxy {1} to start up'.format(storage_driver.guid, proxy.service.name))
+                                tries -= 1
+                                time.sleep(10 - tries)
+                                try:
+                                    client.run(['alba', 'proxy-statistics', '--host', storage_driver.storage_ip, '--port', str(port)])
+                                    running = True
+                                except CalledProcessError as ex:
+                                    StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Fetching alba proxy-statistics failed with error (but ignoring): {1}'.format(storage_driver.guid, ex))
+                            if running is False:
+                                raise RuntimeError('Alba proxy {0} failed to start'.format(proxy.service.name))
+                            StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Alba proxy {0} running'.format(storage_driver.guid, proxy.service.name))
 
                     StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs'.format(storage_driver.guid))
                     with remote(client.ip, [LocalStorageRouterClient], username='root') as rem:
@@ -1020,14 +1030,17 @@ class StorageRouterController(object):
                 except RuntimeError:
                     StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs failed'.format(storage_driver.guid))
                     errors_found = True
+            service_name = 'unknown'
             try:
-                if ServiceManager.has_service(albaproxy_service, client=client):
-                    StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Stopping service {1}'.format(storage_driver.guid, albaproxy_service))
-                    ServiceManager.stop_service(albaproxy_service, client=client)
-                    StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, albaproxy_service))
-                    ServiceManager.remove_service(albaproxy_service, client=client)
+                for proxy in storage_driver.alba_proxies:
+                    service_name = proxy.service.name
+                    if ServiceManager.has_service(service_name, client=client):
+                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Stopping service {1}'.format(storage_driver.guid, service_name))
+                        ServiceManager.stop_service(service_name, client=client)
+                        StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service_name))
+                        ServiceManager.remove_service(service_name, client=client)
             except Exception:
-                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, albaproxy_service))
+                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service_name))
                 errors_found = True
 
         # Reconfigure cluster node configs
@@ -1072,8 +1085,8 @@ class StorageRouterController(object):
             dirs_to_remove.append(sd_partition.path)
             sd_partition.delete()
 
-        if storage_driver.alba_proxy is not None:
-            config_tree = '/ovs/vpools/{0}/proxies/{1}'.format(vpool.guid, storage_driver.alba_proxy.guid)
+        for proxy in storage_driver.alba_proxies:
+            config_tree = '/ovs/vpools/{0}/proxies/{1}'.format(vpool.guid, proxy.guid)
             Configuration.delete(config_tree)
 
         if storage_router_online is True:
@@ -1102,10 +1115,10 @@ class StorageRouterController(object):
 
         # Model cleanup
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Cleaning up model'.format(storage_driver.guid))
-        if storage_driver.alba_proxy is not None:
+        for proxy in storage_driver.alba_proxies:
             StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing alba proxy service from model'.format(storage_driver.guid))
-            service = storage_driver.alba_proxy.service
-            storage_driver.alba_proxy.delete()
+            service = proxy.service
+            proxy.delete()
             service.delete()
 
         sd_can_be_deleted = True
