@@ -223,10 +223,8 @@
             "backend": {
                 "failure": "Failure",
                 "installing": "Installing",
-                "new": "New",
                 "running": "Running",
-                "stopped": "Stopped",
-                "unknown": "Unknown"
+                "warning": "Warning"
             },
             "disk": {
                 "failure": "Failure",

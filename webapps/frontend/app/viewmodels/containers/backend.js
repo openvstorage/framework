@@ -35,6 +35,7 @@ define([
         self.domainGuids     = ko.observableArray([]);
         self.edit            = ko.observable(false);
         self.guid            = ko.observable(guid);
+        self.liveStatus      = ko.observable();
         self.loaded          = ko.observable(false);
         self.loading         = ko.observable(false);
         self.name            = ko.observable();
@@ -48,8 +49,9 @@ define([
                 return;
             }
             self.name(data.name);
+            generic.trySet(self.liveStatus, data, 'live_status');
             generic.trySet(self.backendTypeGuid, data, 'backend_type_guid');
-            self.status(data.status !== undefined ? data.status.toLowerCase() : 'unknown');
+            self.status(data.status.toLowerCase());
             if (data.hasOwnProperty('regular_domains')) {
                 self.domainGuids(data.regular_domains);
             }
@@ -62,11 +64,15 @@ define([
             self.loaded(true);
             self.loading(false);
         };
-        self.load = function() {
+        self.load = function(options) {
+            var contents = '_relations,regular_domains,access_rights';
+            if (options !== undefined) {
+                contents += ',' + options;
+            }
             return $.Deferred(function(deferred) {
                 self.loading(true);
                 if (generic.xhrCompleted(self.loadHandle)) {
-                    self.loadHandle = api.get('backends/' + self.guid(), { queryparams: { contents: '_relations,regular_domains,access_rights' } })
+                    self.loadHandle = api.get('backends/' + self.guid(), { queryparams: { contents: contents } })
                         .done(function(data) {
                             self.fillData(data);
                             deferred.resolve(data);

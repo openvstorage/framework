@@ -56,7 +56,7 @@ define([
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.backendsHandle[options.page])) {
                     options.sort = 'name';
-                    options.contents = '_relations,regular_domains';
+                    options.contents = '_relations,regular_domains,live_status';
                     self.backendsHandle[options.page] = api.get('backends', { queryparams: options })
                         .done(function(data) {
                             deferred.resolve({

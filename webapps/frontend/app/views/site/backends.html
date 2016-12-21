@@ -34,14 +34,13 @@ but WITHOUT ANY WARRANTY of any kind.
                     </span>
                     <div data-bind="status: {
                                         colors: {
-                                            blue: status() === 'new',
-                                            green: status() === 'running',
-                                            orange: status() === 'installing',
-                                            red: status() === 'failure',
-                                            black: status() === 'stopped'
+                                            blue: liveStatus() === 'installing',
+                                            green: liveStatus() === 'running',
+                                            orange: liveStatus() === 'warning',
+                                            red: liveStatus() === 'failure'
                                         },
                                         defaultColor: 'lightgrey'
-                                    }, tooltip: 'ovs:generic.states.backend.' + status()"
+                                    }, tooltip: 'ovs:generic.states.backend.' + liveStatus()"
                          style="width: 14px; height: 14px; margin-top: 1px;"></div>
                 </td>
                 <td>

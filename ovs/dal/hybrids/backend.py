@@ -27,12 +27,13 @@ class Backend(DataObject):
     A Backend represents an instance of the supported backend types that has been setup with the OVS GUI
     """
     __properties = [Property('name', str, unique=True, doc='Name of the Backend.'),
-                    Property('status', ['NEW', 'INSTALLING', 'RUNNING', 'STOPPED', 'FAILURE', 'UNKNOWN'], default='NEW', doc='State of the backend')]
+                    Property('status', ['INSTALLING', 'RUNNING', 'FAILURE', 'WARNING'], default='INSTALLING', doc='State of the backend')]
     __relations = [Relation('backend_type', BackendType, 'backends', doc='Type of the backend.')]
     __dynamics = [Dynamic('linked_guid', str, 3600),
                   Dynamic('available', bool, 60),
                   Dynamic('regular_domains', list, 60),
-                  Dynamic('access_rights', dict, 3600)]
+                  Dynamic('access_rights', dict, 3600),
+                  Dynamic('live_status', str, 30)]
 
     def _linked_guid(self):
         """
@@ -74,3 +75,16 @@ class Backend(DataObject):
         for client_right in self.client_rights:
             data['clients'][client_right.client_guid] = client_right.grant
         return data
+
+    def _live_status(self):
+        """
+        Retrieve the actual status from the Backend
+        :return: Status reported by the plugin
+        """
+        if self.backend_type.has_plugin is False:
+            return 'running'
+
+        linked_backend = getattr(self, '{0}_backend'.format(self.backend_type.code))
+        if linked_backend is not None:
+            return linked_backend.live_status
+        return 'running'
