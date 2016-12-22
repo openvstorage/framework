@@ -30,8 +30,8 @@ from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.filemutex import NoLockAvailableException
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.toolbox import Toolbox as ExtensionToolbox
 from ovs.extensions.generic.system import System
+from ovs.extensions.generic.toolbox import Toolbox as ExtensionToolbox
 from ovs.extensions.migration.migrator import Migrator
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
@@ -516,9 +516,12 @@ class UpdateController(object):
             storage_routers = StorageRouterList.get_storagerouters()
             master_ips = []
             extra_ips = []
+            local_ip = None
             for sr in storage_routers:
                 try:
                     ssh_clients.append(SSHClient(sr.ip, username='root'))
+                    if sr == System.get_my_storagerouter():
+                        local_ip = sr.ip
                     if sr.node_type == 'MASTER':
                         master_ips.append(sr.ip)
                     elif sr.node_type == 'EXTRA':
@@ -619,7 +622,6 @@ class UpdateController(object):
             # Start memcached
             if 'memcached' in services_stop_start:
                 services_stop_start.remove('memcached')
-                UpdateController._logger.debug('Starting memcached')
                 UpdateController.change_services_state(services=['memcached'],
                                                        ssh_clients=ssh_clients,
                                                        action='start')
@@ -640,17 +642,19 @@ class UpdateController(object):
             # Post update actions
             for client in ssh_clients:
                 UpdateController._logger.debug('{0}: Executing post-update actions'.format(client.ip))
-                for function in Toolbox.fetch_hooks('update', 'post_update_multi'):
-                    try:
-                        function(client=client, components=components)
-                    except Exception as ex:
-                        UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(client.ip, function.__name__, ex))
+                with remote(client.ip, [Toolbox]) as rem:
+                    for function in rem.Toolbox.fetch_hooks('update', 'post_update_multi'):
+                        try:
+                            function(client=client, components=components)
+                        except Exception as ex:
+                            UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(client.ip, function.__name__, ex))
 
-            for function in Toolbox.fetch_hooks('update', 'post_update_single'):
-                try:
-                    function(components=components)
-                except Exception as ex:
-                    UpdateController._logger.exception('Post update hook {0} failed with error: {1}'.format(function.__name__, ex))
+            with remote(local_ip, [Toolbox]) as rem:
+                for function in rem.Toolbox.fetch_hooks('update', 'post_update_single'):
+                    try:
+                        function(components=components)
+                    except Exception as ex:
+                        UpdateController._logger.exception('Post update hook {0} failed with error: {1}'.format(function.__name__, ex))
 
             # Start services
             UpdateController.change_services_state(services=services_stop_start,
