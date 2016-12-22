@@ -117,7 +117,7 @@ class StorageRouterController(object):
                     claimed_space_by_fwk += storagedriver_partition.size if storagedriver_partition.size is not None else 0
                     if client.dir_exists(storagedriver_partition.path):
                         try:
-                            used_space_by_system += int(client.run('du -B 1 -d 0 {0}'.format(storagedriver_partition.path)).split('\t')[0])
+                            used_space_by_system += int(client.run(['du', '-B', '1', '-d', '0', storagedriver_partition.path]).split('\t')[0])
                         except Exception as ex:
                             StorageRouterController._logger.warning('Failed to get directory usage for {0}. {1}'.format(storagedriver_partition.path, ex))
 
@@ -126,7 +126,7 @@ class StorageRouterController(object):
                         StorageRouterController._logger.info('Verifying disk partition usage by checking path {0}'.format(alias))
                         disk_partition_device = client.file_read_link(path=alias)
                         try:
-                            available_space_by_system = int(client.run('df -B 1 --output=avail {0}'.format(disk_partition_device)).splitlines()[-1])
+                            available_space_by_system = int(client.run(['df', '-B', '1', '--output=avail', disk_partition_device]).splitlines()[-1])
                             break
                         except Exception as ex:
                             StorageRouterController._logger.warning('Failed to get partition usage for {0}. {1}'.format(disk_partition.mountpoint, ex))
