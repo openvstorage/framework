@@ -65,18 +65,6 @@ define([
                 return self._enable();
             }
         });
-        self.version = ko.computed(function() {
-            var versions = [];
-            $.each(self.storageRouters(), function(index, storageRouter) {
-                if (storageRouter.versions() !== undefined && $.inArray(storageRouter.versions().openvstorage, versions) === -1) {
-                    versions.push(storageRouter.versions().openvstorage);
-                }
-            });
-            if (versions.length > 0) {
-                return versions.join(',');
-            }
-            return '';
-        });
         self.lastHeartbeat = ko.computed(function() {
             var timestamp = undefined, currentTimestamp;
             $.each(self.storageRouters(), function(index, storageRouter) {
@@ -135,6 +123,8 @@ define([
                                 var sr = new StorageRouter(guid);
                                 sr.nodeid = ko.observable();
                                 sr.metadata = ko.observable('');
+                                sr.versions = ko.observable({});
+                                sr.packageNames = ko.observableArray([]);
                                 return sr;
                             }, 'guid'
                         );
@@ -169,7 +159,11 @@ define([
                                 self.versionInfoHandle[storageRouter.guid()] = api.get('storagerouters/' + storageRouter.guid() + '/get_version_info')
                                     .then(self.shared.tasks.wait)
                                     .then(function (data) {
+                                        storageRouter.packageNames(generic.keys(data.versions));
                                         storageRouter.versions(data.versions);
+                                        storageRouter.packageNames.sort(function(name1, name2) {
+                                            return name1 < name2 ? -1 : 1;
+                                        });
                                     });
                                 calls.push(self.versionInfoHandle[storageRouter.guid()]);
                             }
