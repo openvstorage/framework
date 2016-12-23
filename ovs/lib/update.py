@@ -373,6 +373,7 @@ class UpdateController(object):
             services_to_restart.add('support-agent')
 
         if services_to_restart:
+            local_ip = System.get_my_storagerouter().ip
             UpdateController._logger.debug('{0}: Executing hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
             for service_name in sorted(services_to_restart):
                 if not service_name.startswith('ovs-arakoon-'):
@@ -380,13 +381,19 @@ class UpdateController(object):
                 else:
                     cluster_name = ArakoonClusterConfig.get_cluster_name(ExtensionToolbox.remove_prefix(service_name, 'ovs-arakoon-'))
                     if cluster_name == 'config':
-                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name='cacc', filesystem=True, ip=System.get_my_storagerouter().ip)
+                        filesystem = True
+                        arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name='cacc', filesystem=True, ip=local_ip)
                     else:
+                        filesystem = True
                         arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
                     if arakoon_metadata['internal'] is True:
-                        UpdateController._logger.debug('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
-                        ArakoonInstaller.restart_node(cluster_name=cluster_name,
-                                                      client=client)
+                        master_ip = StorageRouterList.get_masters()[0].ip  # Any master node should be part of the internal 'cacc' cluster
+                        config = ArakoonClusterConfig(cluster_id=cluster_name, filesystem=filesystem)
+                        config.load_config(ip=master_ip)
+                        if local_ip in [node.ip for node in config.nodes]:
+                            UpdateController._logger.debug('{0}: Restarting arakoon node {1}'.format(client.ip, cluster_name))
+                            ArakoonInstaller.restart_node(cluster_name=cluster_name,
+                                                          client=client)
             UpdateController._logger.debug('{0}: Executed hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
 
     ################
@@ -719,7 +726,7 @@ class UpdateController(object):
             try:
                 GenericController.refresh_package_information()
                 return
-            except NoLockAvailableException:
+            except Exception:
                 UpdateController._logger.debug('Attempt {0}: Could not refresh the update information, trying again'.format(counter))
                 time.sleep(6)  # Wait 30 seconds max in total
             counter += 1

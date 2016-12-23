@@ -90,7 +90,7 @@ define([
                                             var pkg = {};
                                             pkg.name = packageName;
                                             pkg.candidate = packageInfo.candidate;
-                                            pkg.installed = packageInfo.installed;
+                                            pkg.installed = packageInfo.installed.replace('-reboot', '');
                                             packages.push(pkg);
                                         });
                                         packages.sort(function(pkg1, pkg2) {
@@ -110,7 +110,7 @@ define([
                                             var pkg = {};
                                             pkg.name = packageName;
                                             pkg.candidate = packageInfo.candidate;
-                                            pkg.installed = packageInfo.installed;
+                                            pkg.installed = packageInfo.installed.replace('-reboot', '');
                                             packages.push(pkg);
                                         });
                                         packages.sort(function(pkg1, pkg2) {
@@ -131,7 +131,7 @@ define([
                                             var pkg = {};
                                             pkg.name = packageName;
                                             pkg.candidate = packageInfo.candidate;
-                                            pkg.installed = packageInfo.installed;
+                                            pkg.installed = packageInfo.installed.replace('-reboot', '');
                                             packages.push(pkg);
                                         });
                                         packages.sort(function(pkg1, pkg2) {
@@ -172,7 +172,7 @@ define([
                                         var pkg = {};
                                         pkg.name = packageName;
                                         pkg.candidate = packageInfo.candidate;
-                                        pkg.installed = packageInfo.installed;
+                                        pkg.installed = packageInfo.installed.replace('-reboot', '');
                                         packages.push(pkg);
                                     });
                                     packages.sort(function(pkg1, pkg2) {
