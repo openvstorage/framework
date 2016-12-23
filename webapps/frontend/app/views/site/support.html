@@ -83,42 +83,15 @@ but WITHOUT ANY WARRANTY of any kind.
                     <b data-i18n="ovs:support.installedproducts"></b>
                 </div>
                 <div class="panel-body">
-                    <span data-i18n="ovs:generic.storagerouters">:</span><br />
                     <ul data-bind="foreach: storageRouters">
                         <li>
                             <span data-bind="text: name"></span>
-                            <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading" data-bind="if: versions() === undefined"
+                            <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading" data-bind="visible: packageNames().length === 0"
                                style="margin-left: 10px;"></i>
-                            <ul data-bind="if: versions() !== undefined">
+                            <ul data-bind="foreach: packageNames">
                                 <li>
-                                    <span data-i18n="ovs:support.openvstorage"></span>
-                                    <span data-bind="text: versions().openvstorage"></span>
-                                </li>
-                                <li>
-                                    <span data-i18n="ovs:support.openvstoragebackend"></span>
-                                    <span data-bind="text: versions()['openvstorage-backend']"></span>
-                                </li>
-                                <li>
-                                    <span data-i18n="ovs:support.openvstoragesdm"></span>
-                                    <span data-bind="text: versions()['openvstorage-sdm']"></span>
-                                </li>
-                                <li>
-                                    <span data-i18n="ovs:support.volumedriverbase"></span>
-                                    <span data-bind="text: versions()['volumedriver-base']"></span>
-                                    <span data-bind="text: versions()['volumedriver-no-dedup-base']"></span>
-                                </li>
-                                <li>
-                                    <span data-i18n="ovs:support.volumedriverserver"></span>
-                                    <span data-bind="text: versions()['volumedriver-server']"></span>
-                                    <span data-bind="text: versions()['volumedriver-no-dedup-server']"></span>
-                                </li>
-                                <li>
-                                    <span data-i18n="ovs:support.alba"></span>
-                                    <span data-bind="text: versions().alba"></span>
-                                </li>
-                                <li>
-                                    <span data-i18n="ovs:support.arakoon"></span>
-                                    <span data-bind="text: versions().arakoon"></span>
+                                    <span data-bind="translate: 'ovs:support.' + $data"></span>:
+                                    <span data-bind="text: $parent.versions()[$data]"></span>
                                 </li>
                             </ul>
                         </li>

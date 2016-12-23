@@ -134,9 +134,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         :param storagerouter: StorageRouter to get the versions from
         :type storagerouter: StorageRouter
         """
-        return StorageRouterController.get_version_info.s(storagerouter.guid).apply_async(
-            routing_key='sr.{0}'.format(storagerouter.machine_id)
-        )
+        return StorageRouterController.get_version_info.delay(storagerouter.guid)
 
     @link()
     @log()

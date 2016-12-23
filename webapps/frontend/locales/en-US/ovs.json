@@ -360,10 +360,6 @@
         "vpools": "&#xf0c2;",
         "warning": "&#xf071;"
     },
-    "licenses": {
-        "add": "Add license",
-        "title": "Licenses"
-    },
     "login": {
         "introduction": "Please provide the required credentials to log in into your Open vStorage management center.",
         "invalidcredentials": "The username/password combination were invalid or could not be validated.",
@@ -474,7 +470,7 @@
         }
     },
     "support": {
-        "alba": "Alba:",
+        "alba": "Alba",
         "arakoon": "Arakoon",
         "callhome": "Call Home settings",
         "clusterid": "Cluster ID:",
@@ -482,8 +478,6 @@
         "commercialsupporturl": "https://www.openvstorage.com",
         "communitysupport": "Community support:",
         "communitysupporturl": "https://groups.google.com/forum/#!forum/open-vstorage",
-        "companywebsite": "Company Website:",
-        "companywebsiteurl": "https://www.openvstorage.com",
         "description": "Open vStorage has the option to send regular heartbeats with metadata to a centralized server. The heartbeat data can be inspected at the bottom of this page. Additionally, you can enable remote access which enables the Open vStorage support team to access your environment upon your request through a secured tunnel.",
         "downloadinglogs": "collecting...",
         "downloadlogs": "download logfiles",
@@ -491,7 +485,6 @@
         "enablesupport": "Remote Access enabled",
         "failed": "Error",
         "failedmsg": "Error while applying your settings",
-        "identification": "Identification parameters",
         "importantwebsites": "Important Websites",
         "information": "Support information",
         "installedproducts": "Installed Packages",
@@ -500,13 +493,9 @@
         "nodeid": "Node ID",
         "nodes": "Storage Routers:",
         "noheartbeat": "never",
-        "openvstorage": "Open vStorage:",
-        "openvstoragebackend": "Open vStorage - Backend:",
-        "openvstoragebackendcore": "Open vStorage - Backend - Core:",
-        "openvstoragebackendwebapps": "Open vStorage - Backend - Webapps:",
-        "openvstoragecore": "Open vStorage - Core:",
-        "openvstoragesdm": "Open vStorage - SDM:",
-        "openvstoragewebapps": "Open vStorage - Webapps:",
+        "openvstorage": "Open vStorage",
+        "openvstorage-backend": "Open vStorage - Backend",
+        "openvstorage-sdm": "Open vStorage - SDM",
         "product": "Open vStorage",
         "projectwebsite": "Project Website:",
         "projectwebsiteurl": "http://www.openvstorage.org",
@@ -519,8 +508,8 @@
         "sourcecode": "Source Code:",
         "sourcecodeurl": "https://github.com/openvstorage",
         "title": "Support",
-        "volumedriverbase": "Storage Driver - Base:",
-        "volumedriverserver": "Storage Driver - Server:"
+        "volumedriver-no-dedup-base": "Storage Driver - Base",
+        "volumedriver-no-dedup-server": "Storage Driver - Server"
     },
     "title": "Open vStorage",
     "updates": {
