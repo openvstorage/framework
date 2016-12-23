@@ -715,19 +715,23 @@ class StorageRouterController(object):
 
         backend_connection_manager = {'backend_type': 'MULTI'}
         has_rdma = Configuration.get('/ovs/framework/rdma')
+        rora_usage = False
+        rora_cache = 0
+        if use_accelerated_alba is False and has_rdma is True:
+            rora_usage = True
+            rora_cache = manifest_cache_size
         for index, proxy in enumerate(storagedriver.alba_proxies):
             backend_connection_manager[str(index)] = {'alba_connection_host': storagedriver.storage_ip,
                                                       'alba_connection_port': proxy.service.ports[0],
                                                       'alba_connection_preset': vpool.metadata['backend']['backend_info']['preset'],
                                                       'alba_connection_timeout': 15,
+                                                      'alba_connection_use_rora': rora_usage,
                                                       'alba_connection_transport': 'TCP',
                                                       'backend_type': 'ALBA',
                                                       'backend_interface_retries_on_error': 5,
                                                       'backend_interface_retry_interval_secs': 1,
-                                                      'backend_interface_retry_backoff_multiplier': 2.0}
-            if use_accelerated_alba is False and has_rdma is True:
-                backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = manifest_cache_size
-                backend_connection_manager[str(index)]['alba_connection_use_rora'] = True
+                                                      'backend_interface_retry_backoff_multiplier': 2.0,
+                                                      'alba_connection_rora_manifest_cache_capacity': rora_cache}
 
         volume_router = {'vrouter_id': vrouter_id,
                          'vrouter_redirect_timeout_ms': '5000',
@@ -1341,6 +1345,7 @@ class StorageRouterController(object):
         :type roles: list
         :return: None
         """
+        # Validations
         storagerouter = StorageRouter(storagerouter_guid)
         for role in roles:
             if role not in DiskPartition.ROLES or role == DiskPartition.ROLES.BACKEND:
@@ -1348,6 +1353,11 @@ class StorageRouterController(object):
         disk = Disk(disk_guid)
         if disk.storagerouter_guid != storagerouter_guid:
             raise RuntimeError('The given Disk is not on the given StorageRouter')
+        for partition in disk.partitions:
+            if DiskPartition.ROLES.BACKEND in partition.roles:
+                raise RuntimeError('The given Disk is in use by a Backend')
+
+        # Create partition
         if partition_guid is None:
             StorageRouterController._logger.debug('Creating new partition - Offset: {0} bytes - Size: {1} bytes - Roles: {2}'.format(offset, size, roles))
             with remote(storagerouter.ip, [DiskTools], username='root') as rem:
@@ -1376,6 +1386,8 @@ class StorageRouterController(object):
                 raise RuntimeError('The given DiskPartition is not on the given Disk')
             if partition.filesystem in ['swap', 'linux_raid_member', 'LVM2_member']:
                 raise RuntimeError("It is not allowed to assign roles on partitions of type: ['swap', 'linux_raid_member', 'LVM2_member']")
+
+        # Add filesystem
         if partition.filesystem is None or partition_guid is None:
             StorageRouterController._logger.debug('Creating filesystem')
             if len(partition.aliases) == 0:
@@ -1387,6 +1399,8 @@ class StorageRouterController(object):
             if partition.filesystem not in ['ext4', 'xfs']:
                 raise RuntimeError('Unexpected filesystem')
             StorageRouterController._logger.debug('Filesystem created')
+
+        # Mount the partition and add to FSTab
         if partition.mountpoint is None:
             StorageRouterController._logger.debug('Configuring mountpoint')
             with remote(storagerouter.ip, [DiskTools], username='root') as rem:
