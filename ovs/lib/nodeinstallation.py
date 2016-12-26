@@ -45,7 +45,6 @@ class NodeInstallationController(object):
     _logger = LogHandler.get('lib', name='node-installation')
     _logger.logger.propagate = False
 
-    avahi_filename = '/etc/avahi/services/ovs_cluster.service'
     nodes = {}
     host_ips = set()
 
@@ -185,11 +184,11 @@ class NodeInstallationController(object):
                     if NodeTypeController.avahi_installed(client=root_client, logger=NodeInstallationController._logger) is True:
                         Toolbox.change_service_state(root_client, 'dbus', 'start', NodeInstallationController._logger)
                         Toolbox.change_service_state(root_client, 'avahi-daemon', 'start', NodeInstallationController._logger)
-                        for entry in root_client.run('timeout -k 60 45 avahi-browse -artp 2> /dev/null | grep ovs_cluster || true', allow_insecure=True).splitlines():
+                        for entry in root_client.run('timeout -k 60 45 avahi-browse -artp 2> /dev/null | egrep "ovs_cl_|ovs_cluster_" || true', allow_insecure=True).splitlines():
                             entry_parts = entry.split(';')
                             if entry_parts[0] == '=' and entry_parts[2] == 'IPv4' and entry_parts[7] not in NodeInstallationController.host_ips:
-                                # =;eth0;IPv4;ovs_cluster_kenneth_ovs100;_ovs_master_node._tcp;local;ovs100.local;172.22.1.10;443;
-                                # split(';') -> [3]  = ovs_cluster_kenneth_ovs100
+                                # =;eth0;IPv4;ovs_cl_kenneth_ovs100;_ovs_master_node._tcp;local;ovs100.local;172.22.1.10;443;
+                                # split(';') -> [3]  = ovs_cl_kenneth_ovs100
                                 #               [4]  = _ovs_master_node._tcp -> contains _ovs_<type>_node
                                 #               [7]  = 172.22.1.10 (ip)
                                 # split('_') -> [-1] = ovs100 (node name)
@@ -216,14 +215,19 @@ class NodeInstallationController(object):
                     if cluster_name == new_cluster:  # Create a new OVS cluster
                         first_node = True
                         while True:
+                            master_ip = Interactive.ask_choice(NodeInstallationController.host_ips, 'Select the public IP address of {0}'.format(node_name))
                             cluster_name = Interactive.ask_string(message='Please enter the cluster name',
                                                                   regex_info={'regex': '^[0-9a-zA-Z]+(\-[0-9a-zA-Z]+)*$',
                                                                               'message': 'The new cluster name can only contain numbers, letters and dashes.'})
                             if cluster_name in discovery_result:
                                 Toolbox.log(logger=NodeInstallationController._logger, messages='The new cluster name should be unique.')
                                 continue
+                            valid_avahi = NodeTypeController.validate_avahi_cluster_name(ip=master_ip, cluster_name=cluster_name, node_name=node_name)
+                            if valid_avahi[0] is False:
+                                Toolbox.log(logger=NodeInstallationController._logger, messages=valid_avahi[1])
+                                continue
                             break
-                        master_ip = Interactive.ask_choice(NodeInstallationController.host_ips, 'Select the public IP address of {0}'.format(node_name))
+
                         cluster_ip = master_ip
                         NodeInstallationController.nodes = {node_name: {'ip': master_ip,
                                                                         'type': 'master'}}

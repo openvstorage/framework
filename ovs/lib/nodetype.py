@@ -686,6 +686,27 @@ class NodeTypeController(object):
             return True
 
     @staticmethod
+    def validate_avahi_cluster_name(ip, cluster_name, node_name):
+        """
+        Validate whether the provided cluster_name is good enough for Avahi
+        :param ip: IP address on which to configure Avahi
+        :type ip: str
+        :param cluster_name: Name of the cluster to configure
+        :type cluster_name: str
+        :param node_name: Name of the node to set in Avahi
+        :type node_name: str
+        :return: A boolean indicating a valid name and the actual name or an error message
+        :rtype: tuple
+        """
+        # 'ovs_cl_' is 7 characters, '_<ip>' is max 16 characters
+        # Avahi allows 63 characters ==> 63 - 7 - 16 = 40 for '<node_name>_<cluster_name>'
+        # So if we allow a node_name of maximum 24 characters, we can always allow a cluster_name of at least 15 characters
+        avahi_name = 'ovs_cl_{0}_{1}_{2}'.format(cluster_name, node_name[-24:], ip.replace('.', '_'))
+        if len(avahi_name) > 63:
+            return False, 'The Avahi cluster name should be limited to {0} characters'.format(63 - (len(avahi_name) - len(cluster_name)))
+        return True, avahi_name
+
+    @staticmethod
     def configure_avahi(client, node_name, node_type, logger):
         """
         Configure Avahi
@@ -699,19 +720,23 @@ class NodeTypeController(object):
         :type logger: ovs.log.log_handler.LogHandler
         :return: None
         """
-        cluster_name = Configuration.get('/ovs/framework/cluster_name')
+        valid_avahi = NodeTypeController.validate_avahi_cluster_name(ip=client.ip,
+                                                                     cluster_name=Configuration.get('/ovs/framework/cluster_name'),
+                                                                     node_name=node_name)
+        if valid_avahi[0] is False:
+            raise RuntimeError(valid_avahi[1])
         Toolbox.log(logger=logger, messages='Announcing service')
         client.file_write(NodeTypeController.avahi_filename, """<?xml version="1.0" standalone='no'?>
 <!--*-nxml-*-->
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
 <!-- $Id$ -->
 <service-group>
-    <name replace-wildcards="yes">ovs_cluster_{0}_{1}_{3}</name>
+    <name replace-wildcards="yes">{0}</name>
     <service>
-        <type>_ovs_{2}_node._tcp</type>
+        <type>_ovs_{1}_node._tcp</type>
         <port>443</port>
     </service>
-</service-group>""".format(cluster_name, node_name, node_type, client.ip.replace('.', '_')))
+</service-group>""".format(valid_avahi[1], node_type))
         Toolbox.change_service_state(client, 'avahi-daemon', 'restart', NodeTypeController._logger)
 
     @staticmethod
