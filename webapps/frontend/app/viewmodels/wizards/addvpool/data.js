@@ -83,23 +83,18 @@ define(['jquery', 'knockout'], function($, ko){
             backend:                 ko.observable(),
             backendAA:               ko.observable(),
             backends:                ko.observableArray([]),
-            backendsAA:              ko.observableArray([]),
             clientID:                ko.observable('').extend({removeWhiteSpaces: null}),
             clientIDAA:              ko.observable('').extend({removeWhiteSpaces: null}),
             clientSecret:            ko.observable('').extend({removeWhiteSpaces: null}),
             clientSecretAA:          ko.observable('').extend({removeWhiteSpaces: null}),
             clusterSize:             ko.observable(4),
-            clusterSizes:            ko.observableArray([4, 8, 16, 32, 64]),
             dtlEnabled:              ko.observable(true),
             dtlMode:                 ko.observable(),
-            dtlModes:                ko.observableArray([{name: 'no_sync', disabled: false}, {name: 'a_sync', disabled: false}, {name: 'sync', disabled: false}]),
             dtlTransportMode:        ko.observable({name: 'tcp'}),
-            dtlTransportModes:       ko.observableArray([{name: 'tcp', disabled: false}, {name: 'rdma', disabled: true}]),
             fragmentCacheOnRead:     ko.observable(true),
             fragmentCacheOnWrite:    ko.observable(true),
             host:                    ko.observable('').extend({regex: hostRegex}),
             hostAA:                  ko.observable('').extend({regex: hostRegex}),
-            ipAddresses:             ko.observableArray([]),
             localHost:               ko.observable(true),
             localHostAA:             ko.observable(true),
             name:                    ko.observable('').extend({regex: nameRegex}),
@@ -109,9 +104,7 @@ define(['jquery', 'knockout'], function($, ko){
             preset:                  ko.observable(),
             presetAA:                ko.observable(),
             proxyAmount:             ko.observable(8).extend({numeric: {min: 1, max: 16}}),
-            scrubAvailable:          ko.observable(false),
             scoSize:                 ko.observable(4),
-            scoSizes:                ko.observableArray([4, 8, 16, 32, 64, 128]),
             storageIP:               ko.observable().extend({regex: ipRegex, identifier: 'storageip'}),
             storageRouter:           ko.observable(),
             storageRoutersAvailable: ko.observableArray([]),
@@ -122,39 +115,7 @@ define(['jquery', 'knockout'], function($, ko){
             writeBufferGlobal:       ko.observable().extend({numeric: {min: 1, max: 10240, allowUndefined: true}}),
             writeBufferGlobalMax:    ko.observable(),
             writeBufferVolume:       ko.observable(128).extend({numeric: {min: 128, max: 10240}})
-        }, resetBackends = function() {
-            wizardData.backends([]);
-            wizardData.backend(undefined);
-            wizardData.preset(undefined);
-        }, resetBackendsAA = function() {
-            wizardData.backendsAA([]);
-            wizardData.backendAA(undefined);
-            wizardData.presetAA(undefined);
         };
-
-        wizardData.clientID.subscribe(resetBackends);
-        wizardData.clientSecret.subscribe(resetBackends);
-        wizardData.host.subscribe(resetBackends);
-        wizardData.port.subscribe(resetBackends);
-        wizardData.localHost.subscribe(function() {
-            wizardData.host('');
-            wizardData.port(80);
-            wizardData.clientID('');
-            wizardData.clientSecret('');
-            resetBackends();
-        });
-        wizardData.hostAA.subscribe(resetBackendsAA);
-        wizardData.portAA.subscribe(resetBackendsAA);
-        wizardData.clientIDAA.subscribe(resetBackendsAA);
-        wizardData.clientSecretAA.subscribe(resetBackendsAA);
-        wizardData.localHostAA.subscribe(function() {
-            wizardData.hostAA('');
-            wizardData.portAA(80);
-            wizardData.clientIDAA('');
-            wizardData.clientSecretAA('');
-            // self.data.reUsedStorageRouter(undefined);
-            resetBackendsAA();
-        });
 
         // Computed
         wizardData.vPoolAdd = ko.computed(function() {

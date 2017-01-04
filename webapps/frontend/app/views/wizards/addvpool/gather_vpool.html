@@ -41,7 +41,7 @@ but WITHOUT ANY WARRANTY of any kind.
             </div>
             <label class="col-lg-1 control-label" for="inputVpoolPort" data-i18n="ovs:wizards.add_vpool.gather_vpool.port"></label>
             <div class="col-lg-2">
-                <input type="text" id="inputVpoolPort" class="autofocus form-control" data-bind="value: data.port, disable: data.vPool() !== undefined" />
+                <input type="text" id="inputVpoolPort" class="autofocus form-control" data-bind="value: data.port, valueUpdate: 'input', disable: data.vPool() !== undefined" />
             </div>
         </div>
         <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
@@ -138,7 +138,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <div data-bind="visible: loadingMetadata()" style="padding-top: 6px;"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></div>
             <span data-bind="visible: !loadingMetadata(),
                              dropdown: {
-                                 items: data.ipAddresses,
+                                 items: ipAddresses,
                                  target: data.storageIP,
                                  emptyisloading: false
                              }"></span>

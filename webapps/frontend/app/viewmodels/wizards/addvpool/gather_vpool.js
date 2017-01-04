@@ -38,46 +38,13 @@ define([
         // Observables
         self.albaPresetMap         = ko.observable({});
         self.invalidAlbaInfo       = ko.observable(false);
+        self.ipAddresses           = ko.observableArray([]);
         self.loadingBackends       = ko.observable(false);
         self.loadingMetadata       = ko.observable(false);
         self.loadingPrevalidations = ko.observable(false);
         self.preValidateResult     = ko.observable({valid: true, reasons: [], fields: []});
+        self.scrubAvailable        = ko.observable(false);
         self.srMetadataMap         = ko.observable({});
-
-        // Subscriptions
-        self.scoSizeSubscription = self.data.scoSize.subscribe(function(size) {
-            if (size < 128) {
-                self.data.writeBufferVolume.min = 128;
-            } else {
-                self.data.writeBufferVolume.min = 256;
-            }
-            self.data.writeBufferVolume(self.data.writeBufferVolume());
-        });
-        self.storageRouterSubscription = self.data.storageRouter.subscribe(function (storageRouter) {
-            if (storageRouter == undefined) {
-                return;
-            }
-            self.loadingMetadata(true);
-            var map = self.srMetadataMap(), srGuid = storageRouter.guid();
-            if (!map.hasOwnProperty(srGuid)) {
-                self.srMetadataMap()[srGuid] = undefined;
-                generic.xhrAbort(self.loadSRMetadataHandle);
-                self.loadSRMetadataHandle = api.post('storagerouters/' + srGuid + '/get_metadata')
-                    .then(self.shared.tasks.wait)
-                    .done(function (srData) {
-                        self.srMetadataMap()[storageRouter.guid()] = srData;
-                        self.fillSRData(srData);
-                    });
-            } else if (map[srGuid] !== undefined) {
-                self.fillSRData(map[srGuid]);
-            }
-
-        });
-        self.localHostSubscription = self.data.localHost.subscribe(function (local) {
-            if (local === true && self.data.backends().length === 0) {
-                self.loadBackends();
-            }
-        });
 
         // Computed
         self.canContinue = ko.computed(function () {
@@ -126,7 +93,7 @@ define([
             if (self.loadingMetadata() === true) {
                 reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.metadata_loading'));
             } else {
-                if (self.data.scrubAvailable() === false) {
+                if (self.scrubAvailable() === false) {
                     reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', {what: 'SCRUB'}));
                 }
                 if (self.data.partitions() !== undefined) {
@@ -176,10 +143,15 @@ define([
         });
 
         // Functions
+        self.resetBackends = function() {
+            self.data.backends([]);
+            self.data.backend(undefined);
+            self.data.preset(undefined);
+        };
         self.fillSRData = function (srData) {
-            self.data.ipAddresses(srData.ipaddresses);
+            self.ipAddresses(srData.ipaddresses);
             self.data.partitions(srData.partitions);
-            self.data.scrubAvailable(srData.scrub_available);
+            self.scrubAvailable(srData.scrub_available);
             if (self.data.writeBufferGlobal() === 1) {
                 self.data.writeBufferGlobal(srData.writecache_size / 1024 / 1024 / 1024);
             }
@@ -213,18 +185,6 @@ define([
                     })
 
             }).promise();
-        };
-        self.next = function () {
-            $.each(self.data.storageRoutersAvailable(), function (index, storageRouter) {
-                if (storageRouter === self.data.storageRouter()) {
-                    $.each(self.data.dtlTransportModes(), function (i, key) {
-                        if (key.name === 'rdma') {
-                            self.data.dtlTransportModes()[i].disabled = storageRouter.rdmaCapable() === undefined ? true : !storageRouter.rdmaCapable();
-                            return false;
-                        }
-                    });
-                }
-            });
         };
         self.loadBackends = function () {
             return $.Deferred(function (albaDeferred) {
@@ -326,6 +286,48 @@ define([
                     });
             }).promise();
         };
+
+        // Subscriptions
+        self.hostSubscription = self.data.host.subscribe(self.resetBackends);
+        self.portSubscription = self.data.port.subscribe(self.resetBackends);
+        self.clientIDSubscription = self.data.clientID.subscribe(self.resetBackends);
+        self.clientSecretSubscription = self.data.clientSecret.subscribe(self.resetBackends);
+        self.localHostSubscription = self.data.localHost.subscribe(function(local) {
+            self.data.host('');
+            self.data.port(80);
+            self.data.clientID('');
+            self.data.clientSecret('');
+            if (local === true && self.data.backends().length === 0) {
+                self.loadBackends();
+            }
+        });
+        self.scoSizeSubscription = self.data.scoSize.subscribe(function(size) {
+            if (size < 128) {
+                self.data.writeBufferVolume.min = 128;
+            } else {
+                self.data.writeBufferVolume.min = 256;
+            }
+            self.data.writeBufferVolume(self.data.writeBufferVolume());
+        });
+        self.storageRouterSubscription = self.data.storageRouter.subscribe(function (storageRouter) {
+            if (storageRouter == undefined) {
+                return;
+            }
+            self.loadingMetadata(true);
+            var map = self.srMetadataMap(), srGuid = storageRouter.guid();
+            if (!map.hasOwnProperty(srGuid)) {
+                self.srMetadataMap()[srGuid] = undefined;
+                generic.xhrAbort(self.loadSRMetadataHandle);
+                self.loadSRMetadataHandle = api.post('storagerouters/' + srGuid + '/get_metadata')
+                    .then(self.shared.tasks.wait)
+                    .done(function (srData) {
+                        self.srMetadataMap()[storageRouter.guid()] = srData;
+                        self.fillSRData(srData);
+                    });
+            } else if (map[srGuid] !== undefined) {
+                self.fillSRData(map[srGuid]);
+            }
+        });
 
         // Durandal
         self.activate = function () {
@@ -442,8 +444,12 @@ define([
             }
         };
         self.deactivate = function() {
+            self.hostSubscription.dispose();
+            self.portSubscription.dispose();
             self.scoSizeSubscription.dispose();
+            self.clientIDSubscription.dispose();
             self.localHostSubscription.dispose();
+            self.clientSecretSubscription.dispose();
             self.storageRouterSubscription.dispose();
         }
     };

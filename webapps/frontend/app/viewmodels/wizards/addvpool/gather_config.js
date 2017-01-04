@@ -24,6 +24,12 @@ define([
         // Variables
         self.data = data;
 
+        // Observables
+        self.clusterSizes      = ko.observableArray([4, 8, 16, 32, 64]);
+        self.dtlModes          = ko.observableArray([{name: 'no_sync', disabled: false}, {name: 'a_sync', disabled: false}, {name: 'sync', disabled: false}]);
+        self.dtlTransportModes = ko.observableArray([{name: 'tcp', disabled: false}, {name: 'rdma', disabled: true}]);
+        self.scoSizes          = ko.observableArray([4, 8, 16, 32, 64, 128]);
+
         // Computed
         self.dtlMode = ko.computed({
             write: function(mode) {
@@ -81,5 +87,19 @@ define([
             }
             return { value: reasons.length === 0, reasons: reasons, fields: fields };
         });
+
+        // Durandal
+        self.activate = function() {
+            $.each(self.data.storageRoutersAvailable(), function (index, storageRouter) {
+                if (storageRouter === self.data.storageRouter()) {
+                    $.each(self.dtlTransportModes(), function (i, key) {
+                        if (key.name === 'rdma') {
+                            self.dtlTransportModes()[i].disabled = storageRouter.rdmaCapable() === undefined ? true : !storageRouter.rdmaCapable();
+                            return false;
+                        }
+                    });
+                }
+            });
+        };
     };
 });

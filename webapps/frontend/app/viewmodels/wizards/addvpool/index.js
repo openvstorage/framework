@@ -44,7 +44,6 @@ define([
         data.backend(undefined);
         data.backendAA(undefined);
         data.backends([]);
-        data.backendsAA([]);
         data.clientID('');
         data.clientIDAA('');
         data.clientSecret('');
@@ -57,7 +56,6 @@ define([
         data.fragmentCacheOnWrite(true);
         data.host('');
         data.hostAA('');
-        data.ipAddresses([]);
         data.localHost(true);
         data.localHostAA(true);
         data.name('');
@@ -68,7 +66,6 @@ define([
         data.presetAA(undefined);
         data.proxyAmount(8);
         data.scoSize(4);
-        data.scrubAvailable(false);
         data.storageIP(undefined);
         data.storageRoutersAvailable([]);
         data.storageRoutersUsed([]);

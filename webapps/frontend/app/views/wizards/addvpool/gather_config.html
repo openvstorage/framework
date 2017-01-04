@@ -31,7 +31,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <span id="dtlMode"
                   data-bind="dropdown: {
                                  enabled: data.vPoolAdd,
-                                 items: data.dtlModes,
+                                 items: dtlModes,
                                  target: dtlMode,
                                  text: function(item) {
                                      return $.t('ovs:storagedrivers.general.dtl_modes.' + item.name);
@@ -46,7 +46,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <span id="dtlTransport"
                   data-bind="dropdown: {
                                  enabled: data.vPoolAdd,
-                                 items: data.dtlTransportModes,
+                                 items: dtlTransportModes,
                                  target: data.dtlTransportMode,
                                  text: function(item) {
                                      return $.t('ovs:storagedrivers.general.dtl_transport_modes.' + item.name);
@@ -75,7 +75,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <span id="scoSize"
                   data-bind="dropdown: {
                                  enabled: data.vPoolAdd,
-                                 items: data.scoSizes,
+                                 items: scoSizes,
                                  target: data.scoSize,
                                  text: function(item) {
                                      if (item === undefined || item === null) {
@@ -93,7 +93,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <span id="clusterSize"
                   data-bind="dropdown: {
                                  enabled: data.vPoolAdd,
-                                 items: data.clusterSizes,
+                                 items: clusterSizes,
                                  target: data.clusterSize,
                                  text: function(item) {
                                      if (item === undefined || item === null) {
