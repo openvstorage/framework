@@ -17,7 +17,24 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
     <p data-i18n="ovs:wizards.add_vpool.gather_backend.basic_info"></p>
-
+    <div class="form-group">
+        <label class="col-lg-4 control-label" for="proxyAmount" data-i18n="ovs:wizards.add_vpool.gather_backend.proxy_amount"></label>
+        <div class="col-lg-3">
+            <div class="input-group">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="button" data-bind="click: function() { data.proxyAmount(Math.max(1, parseInt('0' + data.proxyAmount(), 10) - 1)); }">
+                        <span class="fa fa-minus"></span>
+                    </button>
+                </span>
+                <input type="text" id="proxyAmount" class="form-control" data-bind="value: data.proxyAmount">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="button" data-bind="click: function() { data.proxyAmount(parseInt('0' + data.proxyAmount(), 10) + 1); }">
+                        <span class="fa fa-plus"></span>
+                    </button>
+                </span>
+            </div>
+        </div>
+    </div>
     <div class="form-group">
         <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.fragment_cache" style="padding-top: 8px;"></label>
         <div class="col-lg-8">
@@ -31,7 +48,6 @@ but WITHOUT ANY WARRANTY of any kind.
             </span>
         </div>
     </div>
-
     <div data-bind="visible: data.fragmentCacheOnRead() || data.fragmentCacheOnWrite()">
         <div>
             <div class="form-group">
@@ -62,7 +78,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                          key: 'guid',
                                          keyisfunction: true,
                                          items: reUseableStorageRouters,
-                                         target: data.reUsedStorageRouter,
+                                         target: reUsedStorageRouter,
                                          text: function(item) {
                                              if (item !== undefined) {
                                                  return item.name();

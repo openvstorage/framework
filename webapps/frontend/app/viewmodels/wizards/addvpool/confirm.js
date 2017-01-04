@@ -60,6 +60,9 @@ define([
                             cluster_size: self.data.clusterSize(),
                             write_buffer: self.data.writeBufferVolume(),
                             dtl_transport: self.data.dtlTransportMode().name
+                        },
+                        parallelism: {
+                            proxies: self.data.proxyAmount()
                         }
                     }
                 };

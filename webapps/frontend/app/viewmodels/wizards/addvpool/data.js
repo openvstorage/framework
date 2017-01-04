@@ -108,7 +108,7 @@ define(['jquery', 'knockout'], function($, ko){
             portAA:                  ko.observable(80).extend({numeric: {min: 1, max: 65536}}),
             preset:                  ko.observable(),
             presetAA:                ko.observable(),
-            reUsedStorageRouter:     ko.observable(),  // Connection info for this storagerouter will be used for accelerated ALBA
+            proxyAmount:             ko.observable(8).extend({numeric: {min: 1, max: 16}}),
             scrubAvailable:          ko.observable(false),
             scoSize:                 ko.observable(4),
             scoSizes:                ko.observableArray([4, 8, 16, 32, 64, 128]),
@@ -152,33 +152,8 @@ define(['jquery', 'knockout'], function($, ko){
             wizardData.portAA(80);
             wizardData.clientIDAA('');
             wizardData.clientSecretAA('');
-            wizardData.reUsedStorageRouter(undefined);
+            // self.data.reUsedStorageRouter(undefined);
             resetBackendsAA();
-        });
-        wizardData.scoSize.subscribe(function(size) {
-            if (size < 128) {
-                wizardData.writeBufferVolume.min = 128;
-            } else {
-                wizardData.writeBufferVolume.min = 256;
-            }
-            wizardData.writeBufferVolume(wizardData.writeBufferVolume());
-        });
-        wizardData.reUsedStorageRouter.subscribe(function(sr) {
-            if (sr === undefined && !wizardData.localHost() && wizardData.storageRoutersUsed().length > 0) {
-                wizardData.hostAA('');
-                wizardData.portAA(80);
-                wizardData.clientIDAA('');
-                wizardData.clientSecretAA('');
-            }
-            if (sr !== undefined && wizardData.vPool() !== undefined && wizardData.vPool().metadata().hasOwnProperty('backend_aa_' + sr.guid())) {
-                var md = wizardData.vPool().metadata()['backend_aa_' + sr.guid()];
-                if (md.hasOwnProperty('connection_info')) {
-                    wizardData.hostAA(md.connection_info.host);
-                    wizardData.portAA(md.connection_info.port);
-                    wizardData.clientIDAA(md.connection_info.client_id);
-                    wizardData.clientSecretAA(md.connection_info.client_secret);
-                }
-            }
         });
 
         // Computed

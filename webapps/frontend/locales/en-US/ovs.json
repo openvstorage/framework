@@ -717,7 +717,7 @@
                 "configuration": "Validate the configuration settings.",
                 "creating": "creating the vPool",
                 "dtl_transport": "DTL Transport Mode:",
-                "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two.",
+                "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take several minutes.",
                 "fragment_cache_info": {
                     "true": "Active",
                     "false": "Inactive"
@@ -730,6 +730,7 @@
                 "ip_address": "Storage IP:",
                 "name": "Name:",
                 "port": "Port:",
+                "proxy_amount": "Amount of proxies",
                 "started": "Started creating",
                 "storagerouter_info": "Validate the Storage Router information.",
                 "success": "Creation of vPool __what__ finished."
@@ -755,6 +756,7 @@
                 "no_backends": "No backends found",
                 "no_credentials": "No credentials were entered",
                 "port": "Port:",
+                "proxy_amount": "Amount of proxies:",
                 "re_use_connection_info": "Re-use connection info:",
                 "use_backend_aa": "Use another Backend cache",
                 "use_local": "Use local disk"
@@ -764,6 +766,8 @@
                 "dtl": "Distributed Transaction Log Information",
                 "dtl_mode": "Mode:",
                 "dtl_transport": "Transport Mode:",
+                "fragment_cache_no_proxies": "No proxies can be deployed making use of local fragment cache with current Global Write Buffer size",
+                "fragment_cache_too_small": "Only __amount__ prox__multiple__ can be deployed making use of local fragment cache with current GLobal Write Buffer size",
                 "global_write_buffer": "Global Write Buffer:",
                 "global_write_buffer_available": "Dedicated global Write Buffer space:",
                 "information": "Information about the available space:",

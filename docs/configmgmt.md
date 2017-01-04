@@ -41,8 +41,7 @@ messagequeue = {"endpoints": ["$endpoint_3", "$endpoint_4"],
                 "password": "$unencrypted_password",
                 "queues": {"storagedriver": "volumerouter"},
                 "metadata": {"internal": True|False}}
-paths = {"cfgdir": "/opt/OpenvStorage/config",
-         "basedir": "/opt/OpenvStorage",
+paths = {"basedir": "/opt/OpenvStorage",
          "ovsdb": "/opt/OpenvStorage/db"}
 plugins/installed = {"backends": ["$plugin_a"],
                      "generic": ["$plugin_b", "$plugin_c"]},

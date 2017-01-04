@@ -35,15 +35,34 @@ define([
         self.fragmentCacheSettings = ko.observableArray(['write', 'read', 'rw', 'none']);
         self.invalidAlbaInfo       = ko.observable(false);
         self.loadingBackends       = ko.observable(false);
+        self.reUsedStorageRouter   = ko.observable();  // Connection info for this storagerouter will be used for accelerated ALBA
 
-        self.data.localHostAA.subscribe(function(local) {
+        // Subscriptions
+        self.localHostAASubscription = self.data.localHostAA.subscribe(function(local) {
             if (local === true && self.data.useAA() === true && self.data.backendsAA().length === 0) {
                 self.loadBackends();
             }
         });
-        self.data.useAA.subscribe(function(accelerated) {
+        self.useAASubscription = self.data.useAA.subscribe(function(accelerated) {
             if (accelerated === true && self.data.backendsAA().length === 0) {
                 self.loadBackends();
+            }
+        });
+        self.reUsedStorageRouterSubscription = self.reUsedStorageRouter.subscribe(function(sr) {
+            if (sr === undefined && !self.data.localHost() && self.data.storageRoutersUsed().length > 0) {
+                self.data.hostAA('');
+                self.data.portAA(80);
+                self.data.clientIDAA('');
+                self.data.clientSecretAA('');
+            }
+            if (sr !== undefined && self.data.vPool() !== undefined && self.data.vPool().metadata().hasOwnProperty('backend_aa_' + sr.guid())) {
+                var md = self.data.vPool().metadata()['backend_aa_' + sr.guid()];
+                if (md.hasOwnProperty('connection_info')) {
+                    self.data.hostAA(md.connection_info.host);
+                    self.data.portAA(md.connection_info.port);
+                    self.data.clientIDAA(md.connection_info.client_id);
+                    self.data.clientSecretAA(md.connection_info.client_secret);
+                }
             }
         });
 
@@ -246,5 +265,10 @@ define([
             }
             self.loadBackends();
         };
+        self.deactivate = function() {
+            self.useAASubscription.dispose();
+            self.localHostAASubscription.dispose();
+            self.reUsedStorageRouterSubscription.dispose();
+        }
     };
 });

@@ -26,9 +26,10 @@ from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
+# noinspection PyUnresolvedReferences
 from volumedriver.storagerouter.storagerouterclient import \
     ClusterContact, ClusterNodeConfig, \
-    DTLConfig, DTLConfigMode, DTLMode, \
+    DTLConfig, DTLConfigMode, DTLMode, Logger, \
     MDSMetaDataBackendConfig,  MDSNodeConfig, \
     ObjectNotFoundException as SRCObjectNotFoundException, \
     ReadCacheBehaviour, ReadCacheMode, \
@@ -309,12 +310,13 @@ class StorageDriverConfiguration(object):
                         if 'ClusterNotReachableException' not in str(ex):
                             raise
                 if reloaded is True:
-                    for change in changes:
-                        if change['param_name'] not in self.dirty_entries:
-                            raise RuntimeError('Unexpected configuration change: {0}'.format(change['param_name']))
-                        self._logger.info('Changed {0} from "{1}" to "{2}"'.format(change['param_name'], change['old_value'], change['new_value']))
-                        self.dirty_entries.remove(change['param_name'])
-                    self._logger.info('Changes applied')
+                    if isinstance(changes, dict):
+                        for change in changes:
+                            if change['param_name'] not in self.dirty_entries:
+                                raise RuntimeError('Unexpected configuration change: {0}'.format(change['param_name']))
+                            self._logger.info('Changed {0} from "{1}" to "{2}"'.format(change['param_name'], change['old_value'], change['new_value']))
+                            self.dirty_entries.remove(change['param_name'])
+                        self._logger.info('Changes applied')
                     if len(self.dirty_entries) > 0:
                         self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self.dirty_entries)))
                 else:

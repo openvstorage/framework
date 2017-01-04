@@ -44,7 +44,16 @@ define([
         self.preValidateResult     = ko.observable({valid: true, reasons: [], fields: []});
         self.srMetadataMap         = ko.observable({});
 
-        self.data.storageRouter.subscribe(function (storageRouter) {
+        // Subscriptions
+        self.scoSizeSubscription = self.data.scoSize.subscribe(function(size) {
+            if (size < 128) {
+                self.data.writeBufferVolume.min = 128;
+            } else {
+                self.data.writeBufferVolume.min = 256;
+            }
+            self.data.writeBufferVolume(self.data.writeBufferVolume());
+        });
+        self.storageRouterSubscription = self.data.storageRouter.subscribe(function (storageRouter) {
             if (storageRouter == undefined) {
                 return;
             }
@@ -62,8 +71,9 @@ define([
             } else if (map[srGuid] !== undefined) {
                 self.fillSRData(map[srGuid]);
             }
+
         });
-        self.data.localHost.subscribe(function (local) {
+        self.localHostSubscription = self.data.localHost.subscribe(function (local) {
             if (local === true && self.data.backends().length === 0) {
                 self.loadBackends();
             }
@@ -431,5 +441,10 @@ define([
                 }
             }
         };
+        self.deactivate = function() {
+            self.scoSizeSubscription.dispose();
+            self.localHostSubscription.dispose();
+            self.storageRouterSubscription.dispose();
+        }
     };
 });
