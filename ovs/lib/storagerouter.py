@@ -714,24 +714,18 @@ class StorageRouterController(object):
             queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(mq_protocol, mq_user, mq_password, current_storagerouter.ip)})
 
         backend_connection_manager = {'backend_type': 'MULTI'}
-        has_rdma = Configuration.get('/ovs/framework/rdma')
-        rora_usage = False
-        rora_cache = 0
-        if use_accelerated_alba is False and has_rdma is True:
-            rora_usage = True
-            rora_cache = manifest_cache_size
         for index, proxy in enumerate(storagedriver.alba_proxies):
             backend_connection_manager[str(index)] = {'alba_connection_host': storagedriver.storage_ip,
                                                       'alba_connection_port': proxy.service.ports[0],
                                                       'alba_connection_preset': vpool.metadata['backend']['backend_info']['preset'],
                                                       'alba_connection_timeout': 15,
-                                                      'alba_connection_use_rora': rora_usage,
+                                                      'alba_connection_use_rora': True,
                                                       'alba_connection_transport': 'TCP',
                                                       'backend_type': 'ALBA',
                                                       'backend_interface_retries_on_error': 5,
                                                       'backend_interface_retry_interval_secs': 1,
                                                       'backend_interface_retry_backoff_multiplier': 2.0,
-                                                      'alba_connection_rora_manifest_cache_capacity': rora_cache}
+                                                      'alba_connection_rora_manifest_cache_capacity': manifest_cache_size}
 
         volume_router = {'vrouter_id': vrouter_id,
                          'vrouter_redirect_timeout_ms': '5000',
@@ -782,6 +776,8 @@ class StorageRouterController(object):
         ##################
         # START SERVICES #
         ##################
+        has_rdma = Configuration.get('/ovs/framework/rdma')
+
         sd_params = {'KILL_TIMEOUT': '30',
                      'VPOOL_NAME': vpool_name,
                      'VPOOL_MOUNTPOINT': storagedriver.mountpoint,
