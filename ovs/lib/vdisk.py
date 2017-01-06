@@ -219,7 +219,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.clone')
-    def clone(vdisk_guid, name, snapshot_id=None, storagerouter_guid=None):
+    def clone(vdisk_guid, name, snapshot_id=None, storagerouter_guid=None, pagecache_ratio=None):
         """
         Clone a vDisk
         :param vdisk_guid: Guid of the vDisk to clone
@@ -230,6 +230,8 @@ class VDiskController(object):
         :type snapshot_id: str
         :param storagerouter_guid: Guid of the StorageRouter
         :type storagerouter_guid: str
+        :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
+        :type pagecache_ratio: float
         :return: Information about the cloned volume
         :rtype: dict
         """
@@ -247,6 +249,10 @@ class VDiskController(object):
             storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
             if storagedriver is None:
                 raise RuntimeError('Could not find StorageDriver with ID {0}'.format(vdisk.storagedriver_id))
+
+        if pagecache_ratio is not None:
+            if not 0 < pagecache_ratio <= 1:
+                raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)[0]
         if mds_service is None:
@@ -299,6 +305,7 @@ class VDiskController(object):
                     new_vdisk.description = name
                     new_vdisk.devicename = devicename
                     new_vdisk.vpool = vdisk.vpool
+            new_vdisk.pagecache_ratio = pagecache_ratio if pagecache_ratio is not None else vdisk.pagecache_ratio
             new_vdisk.name = name
             new_vdisk.parent_vdisk = vdisk
             new_vdisk.parentsnapshot = snapshot_id
@@ -508,7 +515,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_from_template')
-    def create_from_template(vdisk_guid, name, storagerouter_guid=None):
+    def create_from_template(vdisk_guid, name, storagerouter_guid=None, pagecache_ratio=None):
         """
         Create a vDisk from a template
         :param vdisk_guid: Guid of the vDisk
@@ -517,6 +524,8 @@ class VDiskController(object):
         :type name: str
         :param storagerouter_guid: Guid of the Storage Router on which the vDisk should be started
         :type storagerouter_guid: str
+        :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
+        :type pagecache_ratio: float
         :return: Information about the new volume (vdisk_guid, name, backingdevice)
         :rtype: dict
         """
@@ -536,6 +545,10 @@ class VDiskController(object):
             storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
             if storagedriver is None:
                 raise RuntimeError('Could not find StorageDriver with ID {0}'.format(vdisk.storagedriver_id))
+
+        if pagecache_ratio is not None:
+            if not 0 < pagecache_ratio <= 1:
+                raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)[0]
         if mds_service is None:
@@ -566,6 +579,7 @@ class VDiskController(object):
                     new_vdisk.description = name
                     new_vdisk.devicename = devicename
                     new_vdisk.vpool = vdisk.vpool
+            new_vdisk.pagecache_ratio = pagecache_ratio if pagecache_ratio is not None else vdisk.pagecache_ratio
             new_vdisk.name = name
             new_vdisk.parent_vdisk = vdisk
             new_vdisk.save()
@@ -608,6 +622,10 @@ class VDiskController(object):
             raise RuntimeError('A vDisk with this name already exists on vPool {0}'.format(vpool.name))
         if volume_size > 64 * 1024 ** 4:
             raise ValueError('Maximum volume size of 64TiB exceeded')
+
+        pagecache_ratio = float(pagecache_ratio)
+        if not 0 < pagecache_ratio <= 1:
+            raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
         if mds_service is None:
