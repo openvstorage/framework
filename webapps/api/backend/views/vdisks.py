@@ -167,7 +167,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :type storagerouter_guid: str
         :param snapshot_id: ID of the snapshot to clone from
         :type snapshot_id: str
-        :param pagecache_ratio: Ratio (0.1 - 1.0) of the pagecache size related to the size
+        :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
         :type pagecache_ratio: float
         """
         return VDiskController.clone.delay(vdisk_guid=vdisk.guid,
@@ -240,7 +240,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :type vpool_guid: str
         :param storagerouter_guid: Guid of the storagerouter to assign disk to
         :type storagerouter_guid: str
-        :param pagecache_ratio: Ratio (0.1 - 1.0) of the pagecache size related to the size
+        :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
         :type pagecache_ratio: float
         """
         storagerouter = StorageRouter(storagerouter_guid)
@@ -300,7 +300,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :type name: str
         :param storagerouter_guid: Guid of StorageRouter to create new vDisk on
         :type storagerouter_guid: str
-        :param pagecache_ratio: Ratio (0.1 - 1.0) of the pagecache size related to the size
+        :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
         :type pagecache_ratio: float
         """
         return VDiskController.create_from_template.delay(vdisk_guid=vdisk.guid,

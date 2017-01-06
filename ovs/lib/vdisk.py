@@ -740,9 +740,11 @@ class VDiskController(object):
                            'write_buffer': (int, {'min': 128, 'max': 10 * 1024})}
 
         if new_config_params.get('pagecache_ratio') is not None:
-            required_params.update({'pagecache_ratio': (float, {'min': 0.1, 'max': 1})})
+            required_params.update({'pagecache_ratio': (float, {'min': 0, 'max': 1})})
 
         Toolbox.verify_required_params(required_params, new_config_params)
+        if 'pagecache_ratio' in new_config_params and new_config_params['pagecache_ratio'] == 0:
+            raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
 
         errors = False
         vdisk = VDisk(vdisk_guid)
@@ -1290,15 +1292,15 @@ class VDiskController(object):
         Terminology:
         cache_capacity (the value set to set_metadata_cache_capacity) is the "number of pages to cache"
         one page can cache "metadata_page_capacity" entries
-        and entry addresses one cluster of a volume
+        an entry addresses one cluster of a volume
 
         Example:
         A volume has a cluster_size of 4k (default) and a metadata_page_capacity of 64. A single page addresses 4k * 64 = 256k of a volume
-        So if a volume's size is is 256M, the cache should have a capacity (cache_capacity) of 1024 to be in memory
+        So if a volume's size is 256M, the cache should have a capacity (cache_capacity) of 1024 to be completely in memory
 
         Example 2:
         A volume has a size of 256M, and a cluster_size of 4k, and a metadata_page_capacity of 64
-        If we want 10% of that volume to be caches we need 265M / (4k * 64 = 256k) = 1024 => a cache_capacity of 102
+        If we want 10% of that volume to be cached, we need 265M / (4k * 64 = 256k) = 1024 => a cache_capacity of 102
 
         :param vdisk: Object vDisk
         :type vdisk: VDisk
