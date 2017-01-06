@@ -219,7 +219,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.clone')
-    def clone(vdisk_guid, name, snapshot_id=None, storagerouter_guid=None):
+    def clone(vdisk_guid, name, snapshot_id=None, storagerouter_guid=None, pagecache_ratio=None):
         """
         Clone a vDisk
         :param vdisk_guid: Guid of the vDisk to clone
@@ -230,6 +230,8 @@ class VDiskController(object):
         :type snapshot_id: str
         :param storagerouter_guid: Guid of the StorageRouter
         :type storagerouter_guid: str
+        :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
+        :type pagecache_ratio: float
         :return: Information about the cloned volume
         :rtype: dict
         """
@@ -247,6 +249,10 @@ class VDiskController(object):
             storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
             if storagedriver is None:
                 raise RuntimeError('Could not find StorageDriver with ID {0}'.format(vdisk.storagedriver_id))
+
+        if pagecache_ratio is not None:
+            if not 0 < pagecache_ratio <= 1:
+                raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)[0]
         if mds_service is None:
@@ -299,6 +305,7 @@ class VDiskController(object):
                     new_vdisk.description = name
                     new_vdisk.devicename = devicename
                     new_vdisk.vpool = vdisk.vpool
+            new_vdisk.pagecache_ratio = pagecache_ratio if pagecache_ratio is not None else vdisk.pagecache_ratio
             new_vdisk.name = name
             new_vdisk.parent_vdisk = vdisk
             new_vdisk.parentsnapshot = snapshot_id
@@ -508,7 +515,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_from_template')
-    def create_from_template(vdisk_guid, name, storagerouter_guid=None):
+    def create_from_template(vdisk_guid, name, storagerouter_guid=None, pagecache_ratio=None):
         """
         Create a vDisk from a template
         :param vdisk_guid: Guid of the vDisk
@@ -517,6 +524,8 @@ class VDiskController(object):
         :type name: str
         :param storagerouter_guid: Guid of the Storage Router on which the vDisk should be started
         :type storagerouter_guid: str
+        :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
+        :type pagecache_ratio: float
         :return: Information about the new volume (vdisk_guid, name, backingdevice)
         :rtype: dict
         """
@@ -536,6 +545,10 @@ class VDiskController(object):
             storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
             if storagedriver is None:
                 raise RuntimeError('Could not find StorageDriver with ID {0}'.format(vdisk.storagedriver_id))
+
+        if pagecache_ratio is not None:
+            if not 0 < pagecache_ratio <= 1:
+                raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)[0]
         if mds_service is None:
@@ -566,6 +579,7 @@ class VDiskController(object):
                     new_vdisk.description = name
                     new_vdisk.devicename = devicename
                     new_vdisk.vpool = vdisk.vpool
+            new_vdisk.pagecache_ratio = pagecache_ratio if pagecache_ratio is not None else vdisk.pagecache_ratio
             new_vdisk.name = name
             new_vdisk.parent_vdisk = vdisk
             new_vdisk.save()
@@ -586,7 +600,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.create_new')
-    def create_new(volume_name, volume_size, storagedriver_guid):
+    def create_new(volume_name, volume_size, storagedriver_guid, pagecache_ratio=1.0):
         """
         Create a new vDisk/volume using hypervisor calls
         :param volume_name: Name of the vDisk (can be a filename or a user friendly name)
@@ -595,6 +609,8 @@ class VDiskController(object):
         :type volume_size: int
         :param storagedriver_guid: Guid of the Storagedriver
         :type storagedriver_guid: str
+        :param pagecache_ratio: Ratio of the pagecache size (compared to a 100% cache)
+        :type pagecache_ratio: float
         :return: Guid of the new vDisk
         :rtype: str
         """
@@ -606,6 +622,9 @@ class VDiskController(object):
             raise RuntimeError('A vDisk with this name already exists on vPool {0}'.format(vpool.name))
         if volume_size > 64 * 1024 ** 4:
             raise ValueError('Maximum volume size of 64TiB exceeded')
+
+        if not 0 < pagecache_ratio <= 1:
+            raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
 
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vpool)[0]
         if mds_service is None:
@@ -636,6 +655,7 @@ class VDiskController(object):
                     new_vdisk.devicename = devicename
                     new_vdisk.description = volume_name
                     new_vdisk.volume_id = volume_id
+            new_vdisk.pagecache_ratio = pagecache_ratio
             new_vdisk.name = volume_name
             new_vdisk.save()
 
@@ -663,9 +683,9 @@ class VDiskController(object):
         :rtype: dict
         """
         vdisk = VDisk(vdisk_guid)
-        vpool = VPool(vdisk.vpool_guid)
+        vpool = vdisk.vpool
 
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, vpool.storagedrivers[0].storagedriver_id)
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, vdisk.storagedriver_id)
         storagedriver_config.load()
         volume_manager = storagedriver_config.configuration.get('volume_manager', {})
 
@@ -675,15 +695,9 @@ class VDiskController(object):
             dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id, req_timeout_secs=10)
             tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id, req_timeout_secs=10)
             non_disposable_sco_factor = vdisk.storagedriver_client.get_sco_cache_max_non_disposable_factor(volume_id, req_timeout_secs=10)
-            metadata_cache_capacity = vdisk.storagedriver_client.get_metadata_cache_capacity(volume_id, req_timeout_secs=10)
         except Exception:
             VDiskController._logger.exception('Failed to retrieve configuration parameters for vDisk {0}'.format(vdisk.name))
             raise Exception('Retrieving configuration for vDisk {0} failed'.format(vdisk.name))
-
-        if not metadata_cache_capacity:
-            metadata_cache_size = StorageDriverClient.DEFAULT_METADATA_CACHE_SIZE
-        else:
-            metadata_cache_size = metadata_cache_capacity * StorageDriverClient.METADATA_CACHE_PAGE_SIZE
 
         dtl_target = []
         if dtl_config is None:
@@ -701,7 +715,7 @@ class VDiskController(object):
                 'dtl_mode': dtl_mode,
                 'write_buffer': int(tlog_multiplier * sco_size * non_disposable_sco_factor),
                 'dtl_target': dtl_target,
-                'metadata_cache_size': metadata_cache_size}
+                'pagecache_ratio': vdisk.pagecache_ratio}
 
     @staticmethod
     @celery.task(name='ovs.vdisk.set_config_params')
@@ -718,15 +732,20 @@ class VDiskController(object):
         new_config_params.pop('dedupe_mode', None)
         new_config_params.pop('cache_strategy', None)
         new_config_params.pop('readcache_limit', None)
+        new_config_params.pop('metadata_cache_size', None)
 
         required_params = {'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
                            'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
                            'dtl_target': (list, Toolbox.regex_guid),
                            'write_buffer': (int, {'min': 128, 'max': 10 * 1024})}
 
-        if new_config_params.get('metadata_cache_size') is not None:
-            required_params.update({'metadata_cache_size': (int, {'min': StorageDriverClient.METADATA_CACHE_PAGE_SIZE})})
+        if new_config_params.get('pagecache_ratio') is not None:
+            # noinspection PyTypeChecker
+            required_params.update({'pagecache_ratio': (float, {'min': 0, 'max': 1})})
+
         Toolbox.verify_required_params(required_params, new_config_params)
+        if 'pagecache_ratio' in new_config_params and new_config_params['pagecache_ratio'] == 0:
+            raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
 
         errors = False
         vdisk = VDisk(vdisk_guid)
@@ -852,8 +871,10 @@ class VDiskController(object):
                         tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id, req_timeout_secs=5) or StorageDriverClient.TLOG_MULTIPLIER_MAP[new_sco_size]
                         sco_factor = float(new_value) / tlog_multiplier / new_sco_size
                         vdisk.storagedriver_client.set_sco_cache_max_non_disposable_factor(volume_id, sco_factor, req_timeout_secs=10)
-                    elif key == 'metadata_cache_size':
-                        vdisk.storagedriver_client.set_metadata_cache_capacity(volume_id, new_value / StorageDriverClient.METADATA_CACHE_PAGE_SIZE, req_timeout_secs=10)
+                    elif key == 'pagecache_ratio':
+                        vdisk.pagecache_ratio = new_value
+                        vdisk.save()
+                        VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
                     else:
                         raise KeyError('Unsupported property provided: "{0}"'.format(key))
                     VDiskController._logger.info('Updated property {0}'.format(key))
@@ -1266,7 +1287,21 @@ class VDiskController(object):
     @staticmethod
     def _set_vdisk_metadata_pagecache_size(vdisk):
         """
-        Set metadata page cache size to ratio 1:500 of vdisk.size
+        Set metadata page cache size to configured ratio
+
+        Terminology:
+        cache_capacity (the value set to set_metadata_cache_capacity) is the "number of pages to cache"
+        one page can cache "metadata_page_capacity" entries
+        an entry addresses one cluster of a volume
+
+        Example:
+        A volume has a cluster_size of 4k (default) and a metadata_page_capacity of 64. A single page addresses 4k * 64 = 256k of a volume
+        So if a volume's size is 256M, the cache should have a capacity (cache_capacity) of 1024 to be completely in memory
+
+        Example 2:
+        A volume has a size of 256M, and a cluster_size of 4k, and a metadata_page_capacity of 64
+        If we want 10% of that volume to be cached, we need 256 / (4k * 64 = 256k) = 1024 => a cache_capacity of 102
+
         :param vdisk: Object vDisk
         :type vdisk: VDisk
         :return: None
@@ -1274,11 +1309,16 @@ class VDiskController(object):
         storagedriver_id = vdisk.storagedriver_id
         if storagedriver_id is None:
             raise SRCObjectNotFoundException()
+        ratio = vdisk.pagecache_ratio
         storagedriver_config = StorageDriverConfiguration('storagedriver', vdisk.vpool_guid, storagedriver_id)
         storagedriver_config.load()
-        metadata_page_capacity = 64  # "size" of a page = amount of entries in a page (addressable by 6 bits)
         cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
-        cache_capacity = int(min(vdisk.size, 2 * 1024 ** 4) / float(metadata_page_capacity * cluster_size))
+
+        metadata_page_size = float(StorageDriverClient.METADATA_PAGE_CAPACITY * cluster_size)
+        cache_capacity = int(vdisk.size / metadata_page_size * ratio)
+
+        max_cache_capacity = int(2 * 1024 ** 4 / metadata_page_size)
+        cache_capacity = min(max_cache_capacity, cache_capacity)
         VDiskController._logger.info('Setting metadata page cache size for vdisk {0} to {1}'.format(vdisk.name, cache_capacity))
         vdisk.storagedriver_client.set_metadata_cache_capacity(str(vdisk.volume_id), cache_capacity, req_timeout_secs=10)
 

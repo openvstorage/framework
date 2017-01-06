@@ -650,7 +650,7 @@ class MDSServiceController(object):
         :type vpool: VPool
 
         :return: Preferred MDS service (least loaded), current load on that MDS service
-        :rtype: tuple
+        :rtype: tuple(MDSService, float)
         """
         mds_service = (None, float('inf'))
         for current_mds_service in vpool.mds_services:

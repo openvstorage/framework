@@ -156,7 +156,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def clone(self, vdisk, name, storagerouter_guid, snapshot_id=None):
+    def clone(self, vdisk, name, storagerouter_guid, snapshot_id=None, pagecache_ratio=None):
         """
         Clones a vDisk
         :param vdisk: Guid of the virtual disk to clone
@@ -167,11 +167,14 @@ class VDiskViewSet(viewsets.ViewSet):
         :type storagerouter_guid: str
         :param snapshot_id: ID of the snapshot to clone from
         :type snapshot_id: str
+        :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
+        :type pagecache_ratio: float
         """
         return VDiskController.clone.delay(vdisk_guid=vdisk.guid,
                                            snapshot_id=snapshot_id,
                                            name=name,
-                                           storagerouter_guid=storagerouter_guid)
+                                           storagerouter_guid=storagerouter_guid,
+                                           pagecache_ratio=pagecache_ratio)
 
     @action()
     @log()
@@ -226,7 +229,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load()
-    def create(self, name, size, vpool_guid, storagerouter_guid):
+    def create(self, name, size, vpool_guid, storagerouter_guid, pagecache_ratio=1.0):
         """
         Create a new vdisk
         :param name: Name of the new vdisk
@@ -237,13 +240,16 @@ class VDiskViewSet(viewsets.ViewSet):
         :type vpool_guid: str
         :param storagerouter_guid: Guid of the storagerouter to assign disk to
         :type storagerouter_guid: str
+        :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
+        :type pagecache_ratio: float
         """
         storagerouter = StorageRouter(storagerouter_guid)
         for storagedriver in storagerouter.storagedrivers:
             if storagedriver.vpool_guid == vpool_guid:
                 return VDiskController.create_new.delay(volume_name=name,
                                                         volume_size=size,
-                                                        storagedriver_guid=storagedriver.guid)
+                                                        storagedriver_guid=storagedriver.guid,
+                                                        pagecache_ratio=pagecache_ratio)
         raise HttpNotAcceptableException(error_description='No storagedriver found for vPool: {0} and StorageRouter: {1}'.format(vpool_guid, storagerouter_guid),
                                          error='impossible_request')
 
@@ -285,7 +291,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def create_from_template(self, vdisk, name, storagerouter_guid):
+    def create_from_template(self, vdisk, name, storagerouter_guid, pagecache_ratio=None):
         """
         Create a new vdisk from a template vDisk
         :param vdisk: Guid of the template virtual disk
@@ -294,10 +300,13 @@ class VDiskViewSet(viewsets.ViewSet):
         :type name: str
         :param storagerouter_guid: Guid of StorageRouter to create new vDisk on
         :type storagerouter_guid: str
+        :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
+        :type pagecache_ratio: float
         """
         return VDiskController.create_from_template.delay(vdisk_guid=vdisk.guid,
                                                           name=name,
-                                                          storagerouter_guid=storagerouter_guid)
+                                                          storagerouter_guid=storagerouter_guid,
+                                                          pagecache_ratio=pagecache_ratio)
 
     @link()
     @log()
