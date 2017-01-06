@@ -740,6 +740,7 @@ class VDiskController(object):
                            'write_buffer': (int, {'min': 128, 'max': 10 * 1024})}
 
         if new_config_params.get('pagecache_ratio') is not None:
+            # noinspection PyTypeChecker
             required_params.update({'pagecache_ratio': (float, {'min': 0, 'max': 1})})
 
         Toolbox.verify_required_params(required_params, new_config_params)
@@ -748,7 +749,6 @@ class VDiskController(object):
 
         errors = False
         vdisk = VDisk(vdisk_guid)
-        vpool = vdisk.vpool
         volume_id = str(vdisk.volume_id)
         old_config_params = VDiskController.get_config_params(vdisk.guid)
 
@@ -1300,7 +1300,7 @@ class VDiskController(object):
 
         Example 2:
         A volume has a size of 256M, and a cluster_size of 4k, and a metadata_page_capacity of 64
-        If we want 10% of that volume to be cached, we need 265M / (4k * 64 = 256k) = 1024 => a cache_capacity of 102
+        If we want 10% of that volume to be cached, we need 256 / (4k * 64 = 256k) = 1024 => a cache_capacity of 102
 
         :param vdisk: Object vDisk
         :type vdisk: VDisk
