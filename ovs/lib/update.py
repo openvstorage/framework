@@ -118,8 +118,8 @@ class UpdateController(object):
 
             storagedriver_services = []
             for sd in storagerouter.storagedrivers:
-                storagedriver_services.append('ovs-dtl_{0}'.format(sd.vpool.name))
-                storagedriver_services.append('ovs-volumedriver_{0}'.format(sd.vpool.name))
+                storagedriver_services.append('dtl_{0}'.format(sd.vpool.name))
+                storagedriver_services.append('volumedriver_{0}'.format(sd.vpool.name))
 
             default_entry = {'candidate': None,
                              'installed': None,
@@ -135,7 +135,6 @@ class UpdateController(object):
                 component_info = {}
                 for package, services in info.iteritems():
                     for service in services:
-                        service = ExtensionToolbox.remove_prefix(service, 'ovs-')
                         version_file = '/opt/OpenvStorage/run/{0}.version'.format(service)
                         if not client.file_exists(version_file):
                             UpdateController._logger.warning('{0}: Failed to find a version file in /opt/OpenvStorage/run for service {1}'.format(client.ip, service))
@@ -161,7 +160,7 @@ class UpdateController(object):
                                     component_info[package_name] = copy.deepcopy(default_entry)
                                 component_info[package_name]['installed'] = running_version
                                 component_info[package_name]['candidate'] = binaries[package_name]
-                                component_info[package_name]['services_to_restart'].append('ovs-{0}'.format(service))
+                                component_info[package_name]['services_to_restart'].append(service)
 
                     if installed[package] != candidate[package] and package not in component_info:
                         component_info[package] = copy.deepcopy(default_entry)
@@ -260,9 +259,9 @@ class UpdateController(object):
                 storagedriver_services = []
                 for sd in storagerouter.storagedrivers:
                     # Order of services is important, first we want to stop all volume-drivers, then DTLs
-                    storagedriver_services.append('ovs-volumedriver_{0}'.format(sd.vpool.name))
+                    storagedriver_services.append('volumedriver_{0}'.format(sd.vpool.name))
                 for sd in storagerouter.storagedrivers:
-                    storagedriver_services.append('ovs-dtl_{0}'.format(sd.vpool.name))
+                    storagedriver_services.append('dtl_{0}'.format(sd.vpool.name))
                     if len(sd.vdisks_guids) > 0:
                         storagedriver_downtime.append(['voldrv', sd.vpool.name])
 
@@ -301,15 +300,15 @@ class UpdateController(object):
                         if key == 'framework':
                             framework_arakoons = set()
                             if arakoon_ovs_info['internal'] is True:
-                                framework_arakoons.add('ovs-arakoon-{0}'.format(arakoon_ovs_info['name']))
+                                framework_arakoons.add(ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_ovs_info['name']))
                             if arakoon_cacc_info['internal'] is True:
-                                framework_arakoons.add('ovs-arakoon-{0}'.format(arakoon_cacc_info['name']))
+                                framework_arakoons.add(ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_cacc_info['name']))
 
                             information[key]['services_post_update'].update(framework_arakoons)
                             if arakoon_ovs_info['down'] is True and ['ovsdb', None] not in information[key]['downtime']:
                                 information[key]['downtime'].append(['ovsdb', None])
                         elif arakoon_voldrv_info['internal'] is True:
-                            information[key]['services_post_update'].update({'ovs-arakoon-{0}'.format(arakoon_voldrv_info['name'])})
+                            information[key]['services_post_update'].update({ArakoonInstaller.get_service_name_for_cluster(cluster_name=arakoon_voldrv_info['name'])})
                             if arakoon_voldrv_info['down'] is True and ['voldrv', None] not in information[key]['downtime']:
                                 information[key]['downtime'].append(['voldrv', None])
         return information
@@ -376,10 +375,10 @@ class UpdateController(object):
             local_ip = System.get_my_storagerouter().ip
             UpdateController._logger.debug('{0}: Executing hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
             for service_name in sorted(services_to_restart):
-                if not service_name.startswith('ovs-arakoon-'):
+                if not service_name.startswith('arakoon-'):
                     UpdateController.change_services_state(services=[service_name], ssh_clients=[client], action='restart')
                 else:
-                    cluster_name = ArakoonClusterConfig.get_cluster_name(ExtensionToolbox.remove_prefix(service_name, 'ovs-arakoon-'))
+                    cluster_name = ArakoonClusterConfig.get_cluster_name(ExtensionToolbox.remove_prefix(service_name, 'arakoon-'))
                     if cluster_name == 'config':
                         filesystem = True
                         arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name='cacc', filesystem=True, ip=local_ip)
