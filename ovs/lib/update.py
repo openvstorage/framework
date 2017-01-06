@@ -363,6 +363,25 @@ class UpdateController(object):
         if 'framework' not in components and 'storagedriver' not in components:
             return
 
+        # Remove services which have been renamed in the migration code
+        local_sr = System.get_my_storagerouter()
+        local_ip = local_sr.ip
+        local_client = SSHClient(endpoint=local_sr, username='root')
+        for version_file in local_client.file_list(directory='/opt/OpenvStorage/run'):
+            if not version_file.endswith('.remove'):
+                continue
+            packages = set()
+            contents = local_client.file_read(filename='/opt/OpenvStorage/run/{0}'.format(version_file))
+            for part in contents.split(';'):
+                packages.add(part.split('=')[0])
+            if packages.issubset(UpdateController.volumedriver_packages) and 'storagedriver' in components:
+                service_name = version_file.replace('.remove', '').replace('.version', '')
+                UpdateController._logger.debug('{0}: Removing service {1}'.format(client.ip, service_name))
+                ServiceManager.stop_service(name=service_name, client=local_client)
+                ServiceManager.remove_service(name=service_name, client=local_client)
+                local_client.file_delete(filenames=['/opt/OpenvStorage/run/{0}'.format(version_file)])
+
+        # Verify whether certain services need to be restarted
         update_information = UpdateController.get_update_information_core({})
         services_to_restart = set()
         if 'storagedriver' in components:
@@ -371,8 +390,8 @@ class UpdateController(object):
             services_to_restart.update(update_information.get('framework', {}).get('services_post_update', set()))
             services_to_restart.add('support-agent')
 
+        # Restart the services
         if services_to_restart:
-            local_ip = System.get_my_storagerouter().ip
             UpdateController._logger.debug('{0}: Executing hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
             for service_name in sorted(services_to_restart):
                 if not service_name.startswith('arakoon-'):

@@ -276,8 +276,10 @@ class OVSMigrator(object):
             from ovs.dal.lists.storagedriverlist import StorageDriverList
             from ovs.extensions.generic.configuration import Configuration
             from ovs.extensions.services.service import ServiceManager
+            from ovs.extensions.services.systemd import Systemd
             from ovs.extensions.storage.persistentfactory import PersistentFactory
             from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+            from ovs.extensions.generic.toolbox import Toolbox
 
             # Clean up - removal of obsolete 'cfgdir'
             paths = Configuration.get(key='/ovs/framework/paths')
@@ -298,7 +300,6 @@ class OVSMigrator(object):
             sr_client_map = {}
             for storagedriver in StorageDriverList.get_storagedrivers():
                 vpool = storagedriver.vpool
-                ovs_client = None
                 root_client = None
                 for alba_proxy in storagedriver.alba_proxies:
                     # Rename alba_proxy service in model
@@ -311,37 +312,23 @@ class OVSMigrator(object):
                     service.save()
 
                     if storagedriver.storagerouter_guid not in sr_client_map:
-                        sr_client_map[storagedriver.storagerouter_guid] = {'ovs': SSHClient(endpoint=storagedriver.storagerouter, username='ovs'),
-                                                                           'root': SSHClient(endpoint=storagedriver.storagerouter, username='root')}
-                    ovs_client = sr_client_map[storagedriver.storagerouter_guid]['ovs']
-                    root_client = sr_client_map[storagedriver.storagerouter_guid]['root']
+                        sr_client_map[storagedriver.storagerouter_guid] = SSHClient(endpoint=storagedriver.storagerouter, username='root')
+                    root_client = sr_client_map[storagedriver.storagerouter_guid]
 
                     # Add '-reboot' to alba_proxy services (because of newly created services and removal of old service)
                     if not ServiceManager.has_service(name=old_service_name, client=root_client):
                         continue
                     old_configuration_key = '/ovs/framework/hosts/{0}/services/{1}'.format(storagedriver.storagerouter.machine_id, old_service_name)
-                    new_configuration_key = '/ovs/framework/hosts/{0}/services/{1}'.format(storagedriver.storagerouter.machine_id, new_service_name)
                     if not Configuration.exists(key=old_configuration_key):
                         continue
 
-                    old_run_file = '/opt/OpenvStorage/run/{0}.version'.format(old_service_name)
-                    new_run_file = '/opt/OpenvStorage/run/{0}.version'.format(new_service_name)
-                    if root_client.file_exists(filename=old_run_file):
-                        contents = root_client.file_read(old_run_file).strip()
-                        if '-reboot' not in contents:
-                            if '=' in contents:
-                                contents = ';'.join(['{0}-reboot'.format(part) for part in contents.split(';') if 'alba' in part])
-                            else:
-                                contents = '{0}-reboot'.format(contents)
-                            # Add something to the version, which makes sure it no longer matches the actually installed version
-                            ovs_client.file_write(filename=new_run_file, contents=contents)
+                    Toolbox.edit_version_file(client=root_client, package_name='alba', old_service_name=old_service_name, new_service_name=new_service_name)
 
                     # Register new service and remove old service
-                    service_params = Configuration.get(old_configuration_key)
-                    alba_proxy_service = 'ovs-{0}'.format(new_service_name)
-                    service_params = ServiceManager.add_service(name='ovs-albaproxy', client=root_client, params=service_params, target_name=alba_proxy_service)
-                    ServiceManager.remove_service(name=old_service_name, client=root_client)  # Remove old service after adding new 1
-                    Configuration.set(key=new_configuration_key, value=service_params)
+                    ServiceManager.add_service(name='ovs-albaproxy',
+                                               client=root_client,
+                                               params=Configuration.get(old_configuration_key),
+                                               target_name='ovs-{0}'.format(new_service_name))
 
                     # Update scrub proxy config
                     proxy_config_key = '/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, alba_proxy.guid)
@@ -375,14 +362,8 @@ class OVSMigrator(object):
                 storagedriver_config.save(root_client)
 
                 # Add '-reboot' to volumedriver services (because of updated 'backend_connection_manager' section)
-                run_file = '/opt/OpenvStorage/run/volumedriver_{0}.version'.format(vpool.name)
-                if root_client.file_exists(filename=run_file):
-                    contents = root_client.file_read(run_file).strip()
-                    if '=' in contents:
-                        contents = ';'.join(['{0}-reboot'.format(part) for part in contents.split(';') if 'volumedriver' in part])
-                    else:
-                        contents = '{0}-reboot'.format(contents)
-                    # Add something to the version, which makes sure it no longer matches the actually installed version
-                    ovs_client.file_write(filename=run_file, contents=contents)
+                Toolbox.edit_version_file(client=root_client, package_name='volumedriver', old_service_name='volumedriver_{0}'.format(vpool.name))
+                if ServiceManager.ImplementationClass == Systemd:
+                    root_client.run(['systemctl', 'daemon-reload'])
 
         return OVSMigrator.THIS_VERSION
