@@ -56,7 +56,6 @@ define([
         self.name               = ko.observable();
         self.rdmaEnabled        = ko.observable();
         self.readSpeed          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.size               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.status             = ko.observable();
         self.storageDriverGuids = ko.observableArray([]);
         self.storageRouterGuids = ko.observableArray([]);
@@ -79,7 +78,6 @@ define([
             options = options || {};
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.status, data, 'status');
-            generic.trySet(self.size, data, 'size');
             generic.trySet(self.metadata, data, 'metadata');
             generic.trySet(self.backendConnection, data, 'connection');
             generic.trySet(self.backendLogin, data, 'login');

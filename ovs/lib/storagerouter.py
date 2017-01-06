@@ -372,7 +372,7 @@ class StorageRouterController(object):
                 largest_sata = info['available']
                 largest_sata_write_partition = info['guid']
 
-        amount_of_proxies = parameters.get('parallelism', {}).get('proxies', 16)
+        amount_of_proxies = parameters.get('parallelism', {}).get('proxies', 2)
         fragment_cache_on_read = parameters['fragment_cache_on_read']
         fragment_cache_on_write = parameters['fragment_cache_on_write']
         largest_write_mountpoint = None
@@ -651,7 +651,7 @@ class StorageRouterController(object):
                 fragment_cache_info = ['alba', {'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_aa')),
                                                 'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
                                                                                'preset': vpool.metadata['backend_aa_{0}'.format(storagerouter.guid)]['backend_info']['preset']}],
-                                                'manifest_cache_size': 16 * 1024 * 1024 * 1024,
+                                                'manifest_cache_size': manifest_cache_size,
                                                 'cache_on_read': fragment_cache_on_read,
                                                 'cache_on_write': fragment_cache_on_write}]
                 if fragment_cache_on_write is True:
@@ -822,10 +822,10 @@ class StorageRouterController(object):
             ServiceManager.start_service(alba_proxy_service, client=root_client)
 
         ServiceManager.add_service(name='ovs-volumedriver', params=sd_params, client=root_client, target_name=sd_service)
-        ServiceManager.start_service(sd_service, client=root_client)
 
         storagedriver = StorageDriver(storagedriver.guid)
         current_startup_counter = storagedriver.startup_counter
+        ServiceManager.start_service(sd_service, client=root_client)
         tries = 60
         while storagedriver.startup_counter == current_startup_counter and tries > 0:
             StorageRouterController._logger.debug('Waiting for the StorageDriver to start up...')
@@ -1045,18 +1045,18 @@ class StorageRouterController(object):
                 except RuntimeError:
                     StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs failed'.format(storage_driver.guid))
                     errors_found = True
-            service_name = 'unknown'
-            try:
-                for proxy in storage_driver.alba_proxies:
-                    service_name = proxy.service.name
+
+            for proxy in storage_driver.alba_proxies:
+                service_name = proxy.service.name
+                try:
                     if ServiceManager.has_service(service_name, client=client):
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Stopping service {1}'.format(storage_driver.guid, service_name))
                         ServiceManager.stop_service(service_name, client=client)
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service_name))
                         ServiceManager.remove_service(service_name, client=client)
-            except Exception:
-                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service_name))
-                errors_found = True
+                except Exception:
+                    StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service_name))
+                    errors_found = True
 
         # Reconfigure cluster node configs
         try:
@@ -1096,7 +1096,7 @@ class StorageRouterController(object):
 
         # Clean up directories and files
         dirs_to_remove = [storage_driver.mountpoint]
-        for sd_partition in storage_driver.partitions:
+        for sd_partition in storage_driver.partitions[:]:
             dirs_to_remove.append(sd_partition.path)
             sd_partition.delete()
 

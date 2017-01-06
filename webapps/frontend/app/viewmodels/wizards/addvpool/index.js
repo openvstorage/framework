@@ -64,7 +64,7 @@ define([
         data.portAA(80);
         data.preset(undefined);
         data.presetAA(undefined);
-        data.proxyAmount(8);
+        data.proxyAmount(2);
         data.scoSize(4);
         data.storageIP(undefined);
         data.storageRoutersAvailable([]);

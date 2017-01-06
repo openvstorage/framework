@@ -40,12 +40,13 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient, StorageDriverConfiguration, DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, SRCObjectNotFoundException
+from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, Logger, MDSMetaDataBackendConfig, MDSNodeConfig, \
+                                                       SRCObjectNotFoundException, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single, log
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
-from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
+from volumedriver.storagerouter import VolumeDriverEvents_pb2
 
 
 class VDiskController(object):
@@ -54,9 +55,9 @@ class VDiskController(object):
     """
     _logger = LogHandler.get('lib', name='vdisk')
 
-    storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+    Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
     # noinspection PyArgumentList
-    storagerouterclient.Logger.enableLogging()
+    Logger.enableLogging()
 
     @staticmethod
     @celery.task(name='ovs.vdisk.list_volumes')
@@ -1109,8 +1110,7 @@ class VDiskController(object):
                     if reconfigure_required is True:
                         possible_srs = possible_primary_srs if len(vdisk.domains_dtl) > 0 else possible_secondary_srs if len(possible_secondary_srs) > 0 else possible_primary_srs
                         VDiskController._logger.info('        Reconfigure required, randomly choosing')
-                        index = random.randint(0, len(possible_srs) - 1)
-                        dtl_target = possible_srs[index]
+                        dtl_target = random.choice(possible_srs)
                         storage_drivers = [sd for sd in vpool.storagedrivers if sd.storagerouter == dtl_target]
                         if len(storage_drivers) == 0:
                             VDiskController._logger.error('Could not retrieve related storagedriver')

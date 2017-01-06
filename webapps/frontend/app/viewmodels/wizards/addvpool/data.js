@@ -103,7 +103,7 @@ define(['jquery', 'knockout'], function($, ko){
             portAA:                  ko.observable(80).extend({numeric: {min: 1, max: 65536}}),
             preset:                  ko.observable(),
             presetAA:                ko.observable(),
-            proxyAmount:             ko.observable(8).extend({numeric: {min: 1, max: 16}}),
+            proxyAmount:             ko.observable(2).extend({numeric: {min: 1, max: 16}}),
             scoSize:                 ko.observable(4),
             storageIP:               ko.observable().extend({regex: ipRegex, identifier: 'storageip'}),
             storageRouter:           ko.observable(),

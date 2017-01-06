@@ -17,7 +17,7 @@
 """
 OVS migration module
 """
-
+import copy
 import random
 import string
 import hashlib
@@ -29,7 +29,7 @@ class OVSMigrator(object):
     """
 
     identifier = 'ovs'
-    THIS_VERSION = 12
+    THIS_VERSION = 13
 
     def __init__(self):
         """ Init method """
@@ -180,14 +180,11 @@ class OVSMigrator(object):
             # Complete rework of the way we detect devices to assign roles or use as ASD
             # Allow loop-, raid-, nvme-, ??-devices and logical volumes as ASD (https://github.com/openvstorage/framework/issues/792)
             from ovs.dal.lists.storagerouterlist import StorageRouterList
-            from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+            from ovs.extensions.generic.sshclient import SSHClient
             from ovs.lib.disk import DiskController
 
             for storagerouter in StorageRouterList.get_storagerouters():
-                try:
-                    client = SSHClient(storagerouter, username='root')
-                except UnableToConnectException:
-                    raise
+                client = SSHClient(storagerouter, username='root')
 
                 # Retrieve all symlinks for all devices
                 # Example of name_alias_mapping:
@@ -235,7 +232,8 @@ class OVSMigrator(object):
 
             # Reformat the vpool.metadata information
             from ovs.dal.lists.vpoollist import VPoolList
-            for vpool in VPoolList.get_vpools():
+            vpools = VPoolList.get_vpools()
+            for vpool in vpools:
                 new_metadata = {}
                 for metadata_key, value in vpool.metadata.items():
                     new_info = {}
@@ -271,5 +269,120 @@ class OVSMigrator(object):
                 if 'READ' in partition.roles:
                     partition.roles.remove('READ')
                     partition.save()
+
+            ####################
+            # Multiple Proxies #
+            ####################
+            from ovs.dal.lists.storagedriverlist import StorageDriverList
+            from ovs.extensions.generic.configuration import Configuration
+            from ovs.extensions.services.service import ServiceManager
+            from ovs.extensions.storage.persistentfactory import PersistentFactory
+            from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+
+            # Clean up - removal of obsolete 'cfgdir'
+            paths = Configuration.get(key='/ovs/framework/paths')
+            if 'cfgdir' in paths:
+                paths.pop('cfgdir')
+                Configuration.set(key='/ovs/framework/paths', value=paths)
+
+            # Rewrite indices 'alba_proxy' --> 'alba_proxies'
+            persistent_client = PersistentFactory.get_client()
+            transaction = persistent_client.begin_transaction()
+            for old_key in persistent_client.prefix('ovs_reverseindex_storagedriver'):
+                if 'alba_proxy' in old_key:
+                    new_key = old_key.replace('alba_proxy', 'alba_proxies')
+                    persistent_client.set(key=new_key, value=0, transaction=transaction)
+                    persistent_client.delete(key=old_key, transaction=transaction)
+            persistent_client.apply_transaction(transaction=transaction)
+
+            sr_client_map = {}
+            for storagedriver in StorageDriverList.get_storagedrivers():
+                vpool = storagedriver.vpool
+                ovs_client = None
+                root_client = None
+                for alba_proxy in storagedriver.alba_proxies:
+                    # Rename alba_proxy service in model
+                    service = alba_proxy.service
+                    old_service_name = 'albaproxy_{0}'.format(vpool.name)
+                    new_service_name = 'albaproxy_{0}_0'.format(vpool.name)
+                    if old_service_name != service.name:
+                        continue
+                    service.name = new_service_name
+                    service.save()
+
+                    if storagedriver.storagerouter_guid not in sr_client_map:
+                        sr_client_map[storagedriver.storagerouter_guid] = {'ovs': SSHClient(endpoint=storagedriver.storagerouter, username='ovs'),
+                                                                           'root': SSHClient(endpoint=storagedriver.storagerouter, username='root')}
+                    ovs_client = sr_client_map[storagedriver.storagerouter_guid]['ovs']
+                    root_client = sr_client_map[storagedriver.storagerouter_guid]['root']
+
+                    # Add '-reboot' to alba_proxy services (because of newly created services and removal of old service)
+                    if not ServiceManager.has_service(name=old_service_name, client=root_client):
+                        continue
+                    old_configuration_key = '/ovs/framework/hosts/{0}/services/{1}'.format(storagedriver.storagerouter.machine_id, old_service_name)
+                    new_configuration_key = '/ovs/framework/hosts/{0}/services/{1}'.format(storagedriver.storagerouter.machine_id, new_service_name)
+                    if not Configuration.exists(key=old_configuration_key):
+                        continue
+
+                    old_run_file = '/opt/OpenvStorage/run/{0}.version'.format(old_service_name)
+                    new_run_file = '/opt/OpenvStorage/run/{0}.version'.format(new_service_name)
+                    if root_client.file_exists(filename=old_run_file):
+                        contents = root_client.file_read(old_run_file).strip()
+                        if '-reboot' not in contents:
+                            if '=' in contents:
+                                contents = ';'.join(['{0}-reboot'.format(part) for part in contents.split(';') if 'alba' in part])
+                            else:
+                                contents = '{0}-reboot'.format(contents)
+                            # Add something to the version, which makes sure it no longer matches the actually installed version
+                            ovs_client.file_write(filename=new_run_file, contents=contents)
+
+                    # Register new service and remove old service
+                    service_params = Configuration.get(old_configuration_key)
+                    alba_proxy_service = 'ovs-{0}'.format(new_service_name)
+                    service_params = ServiceManager.add_service(name='ovs-albaproxy', client=root_client, params=service_params, target_name=alba_proxy_service)
+                    ServiceManager.remove_service(name=old_service_name, client=root_client)  # Remove old service after adding new 1
+                    Configuration.set(key=new_configuration_key, value=service_params)
+
+                    # Update scrub proxy config
+                    proxy_config_key = '/ovs/vpools/{0}/proxies/{1}/config/main'.format(vpool.guid, alba_proxy.guid)
+                    proxy_config = None if Configuration.exists(key=proxy_config_key) is False else Configuration.get(proxy_config_key)
+                    if proxy_config is not None:
+                        fragment_cache = proxy_config.get('fragment_cache', ['none', {}])
+                        if fragment_cache[0] == 'alba' and fragment_cache[1].get('cache_on_write') is True:  # Accelerated ALBA configured
+                            fragment_cache_scrub_info = copy.deepcopy(fragment_cache)
+                            fragment_cache_scrub_info[1]['cache_on_read'] = False
+                            proxy_scrub_config_key = '/ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid)
+                            proxy_scrub_config = None if Configuration.exists(key=proxy_scrub_config_key) is False else Configuration.get(proxy_scrub_config_key)
+                            if proxy_scrub_config is not None and proxy_scrub_config['fragment_cache'] == ['none']:
+                                proxy_scrub_config['fragment_cache'] = fragment_cache_scrub_info
+                                Configuration.set(proxy_scrub_config_key, proxy_scrub_config)
+
+                # Update 'backend_connection_manager' section
+                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
+                storagedriver_config.load()
+                if 'backend_connection_manager' not in storagedriver_config.configuration or storagedriver_config.configuration.get('backend_connection_manager', {}).get('backend_type') == 'MULTI':
+                    continue
+
+                backend_connection_manager = {'backend_type': 'MULTI'}
+                for index, proxy in enumerate(sorted(storagedriver.alba_proxies, key=lambda pr: pr.service.ports[0])):
+                    backend_connection_manager[str(index)] = copy.deepcopy(storagedriver_config.configuration['backend_connection_manager'])
+                    # noinspection PyUnresolvedReferences
+                    backend_connection_manager[str(index)]['alba_connection_use_rora'] = True
+                    # noinspection PyUnresolvedReferences
+                    backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = 16 * 1024 ** 3
+                storagedriver_config.clear_backend_connection_manager()
+                storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
+                storagedriver_config.save(root_client)
+
+                # Add '-reboot' to volumedriver services (because of updated 'backend_connection_manager' section)
+                run_file = '/opt/OpenvStorage/run/volumedriver_{0}.version'.format(vpool.name)
+                if root_client.file_exists(filename=run_file):
+                    contents = root_client.file_read(run_file).strip()
+                    if '=' in contents:
+                        contents = ';'.join(['{0}-reboot'.format(part) for part in contents.split(';') if 'volumedriver' in part])
+                    else:
+                        contents = '{0}-reboot'.format(contents)
+                    # Add something to the version, which makes sure it no longer matches the actually installed version
+                    ovs_client.file_write(filename=run_file, contents=contents)
 
         return OVSMigrator.THIS_VERSION

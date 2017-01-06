@@ -17,6 +17,7 @@
 """
 OVS migration module
 """
+import os
 
 
 class OVSMigrator(object):
@@ -25,7 +26,7 @@ class OVSMigrator(object):
     """
 
     identifier = 'ovs'  # Used by migrator.py, so don't remove
-    THIS_VERSION = 11
+    THIS_VERSION = 12
 
     def __init__(self):
         """ Init method """
@@ -56,9 +57,11 @@ class OVSMigrator(object):
             from ovs.extensions.generic.sshclient import SSHClient
             from ovs.extensions.generic.system import System
             from ovs.extensions.services.service import ServiceManager
+            from ovs.extensions.services.systemd import Systemd
 
             local_sr = System.get_my_storagerouter()
             local_client = SSHClient(endpoint=local_sr, username='root')
+            service_manager = 'systemd' if ServiceManager.ImplementationClass == Systemd else 'upstart'
             for cluster_name in list(Configuration.list('/ovs/arakoon')) + ['cacc']:
                 # Retrieve metadata
                 try:
@@ -70,6 +73,22 @@ class OVSMigrator(object):
                     continue
 
                 cluster_name = metadata['cluster_name']
+                if service_manager == 'systemd':
+                    path = '/lib/systemd/system/ovs-arakoon-{0}.service'.format(cluster_name)
+                    check = 'LimitNOFILE=8192'
+                else:
+                    path = '/etc/init/ovs-arakoon-{0}.conf'.format(cluster_name)
+                    check = 'limit nofile 8192 8192'
+
+                restart_required = False
+                if os.path.exists(path):
+                    with open(path, 'r') as system_file:
+                        if check not in system_file.read():
+                            restart_required = True
+
+                if restart_required is False:
+                    continue
+
                 service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
                 configuration_key = '/ovs/framework/hosts/{0}/services/{1}'.format(local_sr.machine_id, service_name)
                 if Configuration.exists(configuration_key) and ServiceManager.has_service(name=service_name, client=local_client):
@@ -92,11 +111,16 @@ class OVSMigrator(object):
                     run_file = '/opt/OpenvStorage/run/{0}.version'.format(service_name)
                     if local_client.file_exists(filename=run_file):
                         contents = local_client.file_read(run_file).strip()
-                        if '=' in contents:
-                            contents = ';'.join(['{0}-reboot'.format(part) for part in contents.split(';') if 'arakoon' in part])
-                        else:
-                            contents = '{0}-reboot'.format(contents)
-                        # Add something to the version, which makes sure it no longer matches the actually installed version
-                        local_client.file_write(filename=run_file, contents=contents)
+                        if '-reboot' not in contents:
+                            if '=' in contents:
+                                contents = ';'.join(['{0}-reboot'.format(part) for part in contents.split(';') if 'arakoon' in part])
+                            else:
+                                contents = '{0}-reboot'.format(contents)
+                            # Add something to the version, which makes sure it no longer matches the actually installed version
+                            local_client.file_write(filename=run_file, contents=contents)
+
+            # Multiple Proxies
+            if local_client.dir_exists(directory='/opt/OpenvStorage/config/storagedriver/storagedriver'):
+                local_client.dir_delete(directories=['/opt/OpenvStorage/config/storagedriver/storagedriver'])
 
         return OVSMigrator.THIS_VERSION

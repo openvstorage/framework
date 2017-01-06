@@ -26,6 +26,9 @@ from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
+
+# Import below classes so the rest of the framework can always import from this module, so we can inject mocks
+# easier without having to make changes everywhere
 # noinspection PyUnresolvedReferences
 from volumedriver.storagerouter.storagerouterclient import \
     ClusterContact, ClusterNodeConfig, \
@@ -330,6 +333,9 @@ class StorageDriverConfiguration(object):
         if item.startswith('configure_'):
             section = Toolbox.remove_prefix(item, 'configure_')
             return lambda **kwargs: self._add(section, **kwargs)
+        if item.startswith('clear_'):
+            section = Toolbox.remove_prefix(item, 'clear_')
+            return lambda: self._delete(section)
 
     def _add(self, section, **kwargs):
         """
@@ -341,3 +347,10 @@ class StorageDriverConfiguration(object):
             if item not in self.configuration[section] or self.configuration[section][item] != value:
                 self.dirty_entries.append(item)
             self.configuration[section][item] = value
+
+    def _delete(self, section):
+        """
+        Removes a section from the configuration
+        """
+        if section in self.configuration:
+            del self.configuration[section]
