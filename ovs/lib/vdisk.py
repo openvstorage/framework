@@ -623,7 +623,6 @@ class VDiskController(object):
         if volume_size > 64 * 1024 ** 4:
             raise ValueError('Maximum volume size of 64TiB exceeded')
 
-        pagecache_ratio = float(pagecache_ratio)
         if not 0 < pagecache_ratio <= 1:
             raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
 
