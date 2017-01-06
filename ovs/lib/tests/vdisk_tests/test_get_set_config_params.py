@@ -94,19 +94,18 @@ class VDiskTest(unittest.TestCase):
         # Create vDisk and validate default configuration
         vdisk_1 = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 3, storagedriver_guid=storagedrivers[1].guid))
         configuration = VDiskController.get_config_params(vdisk_guid=vdisk_1.guid)
-        expected_keys = {'sco_size', 'dtl_mode', 'write_buffer', 'dtl_target', 'metadata_cache_size'}
+        expected_keys = {'sco_size', 'dtl_mode', 'write_buffer', 'dtl_target', 'pagecache_ratio'}
         self.assertEqual(first=expected_keys,
                          second=set(configuration.keys()),
                          msg='Keys returned by get_config_params do not match the expected keys')
         tlog_multiplier = vdisk_1.storagedriver_client.get_tlog_multiplier(vdisk_1.volume_id)
         default_sco_size = vdisk_1.storagedriver_client.get_sco_multiplier(vdisk_1.volume_id) / 1024 * 4
         non_disposable_sco_factor = vdisk_1.storagedriver_client.get_sco_cache_max_non_disposable_factor(vdisk_1.volume_id)
-        cache_capacity = 4096  # Based on 1GiB size and "metadata_page_capacity" of 64 (6 bits)
         default_values = {'sco_size': default_sco_size,
                           'dtl_mode': StorageDriverClient.FRAMEWORK_DTL_NO_SYNC,
                           'dtl_target': [],
                           'write_buffer': int(tlog_multiplier * default_sco_size * non_disposable_sco_factor),
-                          'metadata_cache_size': StorageDriverClient.METADATA_CACHE_PAGE_SIZE * cache_capacity}
+                          'pagecache_ratio': 1.0}
         for key, value in default_values.iteritems():
             self.assertEqual(first=configuration[key],
                              second=value,
@@ -121,7 +120,7 @@ class VDiskTest(unittest.TestCase):
                             'sco_size': list(set(range(257)).difference({4, 8, 16, 32, 64, 128})) + [-1],
                             'dtl_target': ['', {}, (), 0],
                             'write_buffer': [-1] + range(128) + range(10241, 10300),
-                            'metadata_cache_size': [-1] + range(256 * 24)}.iteritems():
+                            'pagecache_ratio': [-0.1, 0, 1.1]}.iteritems():
             for value in values:
                 config_params = copy.deepcopy(new_config_params)
                 config_params[key] = value
@@ -144,5 +143,16 @@ class VDiskTest(unittest.TestCase):
             self.assertEqual(first=set_config[key],
                              second=get_config[key],
                              msg='Actual value for key "{0}" differs from expected. Expected: {1}  -  Actual: {2}'.format(key, set_config[key], get_config[key]))
+
+        # Set pagecache_ratio
+        capacity = vdisk_1.storagedriver_client.get_metadata_cache_capacity(str(vdisk_1.volume_id))
+        self.assertEqual(capacity, 4096)  # 1GiB volume has by default 4096 pages cached
+        set_config = copy.deepcopy(new_config_params)
+        set_config['pagecache_ratio'] = 0.5
+        VDiskController.set_config_params(vdisk_guid=vdisk_1.guid, new_config_params=set_config)
+        get_config = VDiskController.get_config_params(vdisk_guid=vdisk_1.guid)
+        self.assertEqual(get_config['pagecache_ratio'], 0.5)
+        capacity = vdisk_1.storagedriver_client.get_metadata_cache_capacity(str(vdisk_1.volume_id))
+        self.assertEqual(capacity, 2048)
 
         # @TODO: Add much more functionality for set_config_params

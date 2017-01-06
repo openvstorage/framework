@@ -282,8 +282,8 @@ define([
                     self.loadConfigHandle = api.get('vdisks/' + self.guid() + '/get_config_params')
                         .then(self.shared.tasks.wait)
                         .done(function (data) {
-                            if (data.hasOwnProperty('metadata_cache_size')) {
-                                delete data['metadata_cache_size'];
+                            if (data.hasOwnProperty('pagecache_ratio')) {
+                                delete data['pagecache_ratio'];
                             }
                             self.dtlEnabled(data.dtl_mode !== 'no_sync');
                             self.configuration(data);

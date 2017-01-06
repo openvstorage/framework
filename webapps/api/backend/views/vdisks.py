@@ -226,7 +226,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load()
-    def create(self, name, size, vpool_guid, storagerouter_guid):
+    def create(self, name, size, vpool_guid, storagerouter_guid, pagecache_ratio=1.0):
         """
         Create a new vdisk
         :param name: Name of the new vdisk
@@ -237,13 +237,16 @@ class VDiskViewSet(viewsets.ViewSet):
         :type vpool_guid: str
         :param storagerouter_guid: Guid of the storagerouter to assign disk to
         :type storagerouter_guid: str
+        :param pagecache_ratio: Ratio (0.1 - 1.0) of the pagecache size related to the size
+        :type pagecache_ratio: float
         """
         storagerouter = StorageRouter(storagerouter_guid)
         for storagedriver in storagerouter.storagedrivers:
             if storagedriver.vpool_guid == vpool_guid:
                 return VDiskController.create_new.delay(volume_name=name,
                                                         volume_size=size,
-                                                        storagedriver_guid=storagedriver.guid)
+                                                        storagedriver_guid=storagedriver.guid,
+                                                        pagecache_ratio=pagecache_ratio)
         raise HttpNotAcceptableException(error_description='No storagedriver found for vPool: {0} and StorageRouter: {1}'.format(vpool_guid, storagerouter_guid),
                                          error='impossible_request')
 
