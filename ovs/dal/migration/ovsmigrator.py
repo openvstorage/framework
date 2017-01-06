@@ -290,7 +290,7 @@ class OVSMigrator(object):
             transaction = persistent_client.begin_transaction()
             for old_key in persistent_client.prefix('ovs_reverseindex_storagedriver'):
                 if 'alba_proxy' in old_key:
-                    new_key = old_key.replace('alba_proxy', 'alba_proxies')
+                    new_key = old_key.replace('|alba_proxy|', '|alba_proxies|')
                     persistent_client.set(key=new_key, value=0, transaction=transaction)
                     persistent_client.delete(key=old_key, transaction=transaction)
             persistent_client.apply_transaction(transaction=transaction)

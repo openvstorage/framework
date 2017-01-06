@@ -143,7 +143,7 @@ class MDSServiceController(object):
         # Volumedriver
         mds_nodes = []
         for sd_partition in storagedriver.partitions:
-            if sd_partition.mds_service is not None:
+            if sd_partition.role == DiskPartition.ROLES.DB and sd_partition.sub_role == StorageDriverPartition.SUBROLE.MDS and sd_partition.mds_service is not None:
                 service = sd_partition.mds_service.service
                 mds_nodes.append({'host': service.storagerouter.ip,
                                   'port': service.ports[0],
@@ -201,7 +201,7 @@ class MDSServiceController(object):
                 client = SSHClient(endpoint=storagerouter)
                 mds_nodes = []
                 for sd_partition in storagedriver.partitions:
-                    if sd_partition.mds_service is not None:
+                    if sd_partition.role == DiskPartition.ROLES.DB and sd_partition.sub_role == StorageDriverPartition.SUBROLE.MDS and sd_partition.mds_service is not None:
                         service = sd_partition.mds_service.service
                         mds_nodes.append({'host': service.storagerouter.ip,
                                           'port': service.ports[0],
