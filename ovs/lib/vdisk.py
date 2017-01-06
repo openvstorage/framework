@@ -733,11 +733,6 @@ class VDiskController(object):
         volume_id = str(vdisk.volume_id)
         old_config_params = VDiskController.get_config_params(vdisk.guid)
 
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, vdisk.storagedriver_id)
-        storagedriver_config.load()
-        volume_manager = storagedriver_config.configuration.get('volume_manager', {})
-        cluster_size = volume_manager.get('default_cluster_size', 4096)
-
         # 1st update SCO size, because this impacts TLOG multiplier which on its turn impacts write buffer
         new_sco_size = new_config_params['sco_size']
         old_sco_size = old_config_params['sco_size']
@@ -1273,7 +1268,7 @@ class VDiskController(object):
     @staticmethod
     def _set_vdisk_metadata_pagecache_size(vdisk):
         """
-        Set metadata page cache size to ratio configured ratio
+        Set metadata page cache size to configured ratio
 
         Terminology:
         cache_capacity (the value set to set_metadata_cache_capacity) is the "number of pages to cache"
