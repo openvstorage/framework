@@ -349,7 +349,7 @@ class GenericController(object):
                     GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deployed ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
 
                 backend_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
-                if backend_config['backend_type'] != 'MULTI':
+                if backend_config.get('backend_type') != 'MULTI':
                     backend_config['alba_connection_host'] = '127.0.0.1'
                     backend_config['alba_connection_port'] = scrub_config['port']
                 else:
@@ -358,7 +358,7 @@ class GenericController(object):
                             value['alba_connection_host'] = '127.0.0.1'
                             value['alba_connection_port'] = scrub_config['port']
                 Configuration.set(backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
-        except Exception:
+        except Exception as ex:
             message = 'Scrubber - vPool {0} - StorageRouter {1} - An error occurred deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service)
             error_messages.append(message)
             GenericController._logger.exception(message)
