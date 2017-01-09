@@ -403,7 +403,7 @@ class StorageRouterController(object):
             if new_vpool is True:
                 vpool.delete()
             else:
-                vpool.status = VPool.STATUSES.FAILURE
+                vpool.status = VPool.STATUSES.RUNNING
                 vpool.save()
             raise ValueError('Errors validating the specified parameters:\n - {0}'.format('\n - '.join(set(error_messages))))
 
@@ -733,7 +733,7 @@ class StorageRouterController(object):
                                                       'alba_connection_timeout': 15,
                                                       'alba_connection_use_rora': True,
                                                       'alba_connection_transport': 'TCP',
-                                                      'alba_connection_rora_manifest_cache_capacity': rora_cache,
+                                                      'alba_connection_rora_manifest_cache_capacity': manifest_cache_size,
                                                       'backend_type': 'ALBA',
                                                       'backend_interface_retries_on_error': 5,
                                                       'backend_interface_retry_interval_secs': 1,
