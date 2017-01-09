@@ -148,7 +148,7 @@ class NodeRemovalController(object):
                     remove_asd_manager = Interactive.ask_yesno(message='Do you also want to remove the ASD manager and related ASDs?', default_value=False)
 
             if remove_asd_manager is True or storage_router_to_remove_online is False:
-                for function in Toolbox.fetch_hooks('setup', 'validate_asd_removal'):
+                for function in Toolbox.fetch_hooks('noderemoval', 'validate_asd_removal'):
                     validation_output = function(storage_router_to_remove.ip)
                     if validation_output['confirm'] is True:
                         if Interactive.ask_yesno(message=validation_output['question'], default_value=False) is False:
