@@ -1015,12 +1015,14 @@ class NodeInstallationController(object):
     @staticmethod
     def _finalize_setup(client, node_name, node_type):
         # Configure Redis
+        cluster_ip = client.ip
+
         Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up Redis')
         client.run(['sed', '-i', 's/^# maxmemory <bytes>.*/maxmemory 128mb/g', '/etc/redis/redis.conf'])
         client.run(['sed', '-i', 's/^# maxmemory-policy .*/maxmemory-policy allkeys-lru/g', '/etc/redis/redis.conf'])
+        client.run(['sed', '-i', 's/^bind 127.0.0.1.*/bind {0}/g'.format(cluster_ip), '/etc/redis/redis.conf'])
         Toolbox.change_service_state(client, 'redis-server', 'restart', NodeInstallationController._logger)
 
-        cluster_ip = client.ip
         client.dir_create('/opt/OpenvStorage/webapps/frontend/logging')
         config_file = '/opt/OpenvStorage/webapps/frontend/logging/config.js'
         old_value = 'http://"+window.location.hostname+":9200'
