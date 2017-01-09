@@ -119,24 +119,27 @@ class StorageDriverController(object):
                         storagerouter = sd.storagerouter
                         try:
                             SSHClient(storagerouter, username='root')
-                            with remote(storagerouter.ip, [LocalStorageRouterClient]) as rem:
-                                sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
-                                if Configuration.exists(sd_key) is True:
-                                    path = Configuration.get_configuration_path(sd_key)
+                        except UnableToConnectException:
+                            StorageDriverController._logger.warning('StorageRouter {0} not available.'.format(storagerouter.name))
+                            continue
+
+                        with remote(storagerouter.ip, [LocalStorageRouterClient]) as rem:
+                            sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
+                            if Configuration.exists(sd_key) is True:
+                                path = Configuration.get_configuration_path(sd_key)
+                                try:
                                     lsrc = rem.LocalStorageRouterClient(path)
                                     lsrc.server_revision()  # 'Cheap' call to verify whether volumedriver is responsive
                                     available_storagedrivers.append(sd)
-                        except UnableToConnectException:
-                            StorageDriverController._logger.warning('StorageRouter {0} not available.'.format(storagerouter.name))
-                        except Exception as ex:
-                            if 'ClusterNotReachableException' in str(ex):
-                                StorageDriverController._logger.warning('StorageDriver {0} on StorageRouter {1} not available.'.format(
-                                    sd.guid, storagerouter.name
-                                ))
-                            else:
-                                StorageDriverController._logger.exception('Got exception when validating StorageDriver {0} on StorageRouter {1}.'.format(
-                                    sd.guid, storagerouter.name
-                                ))
+                                except Exception as ex:
+                                    if 'ClusterNotReachableException' in str(ex):
+                                        StorageDriverController._logger.warning('StorageDriver {0} on StorageRouter {1} not available.'.format(
+                                            sd.guid, storagerouter.name
+                                        ))
+                                    else:
+                                        StorageDriverController._logger.exception('Got exception when validating StorageDriver {0} on StorageRouter {1}.'.format(
+                                            sd.guid, storagerouter.name
+                                        ))
 
                     StorageDriverController._logger.info('Updating cluster node configs for VPool {0}'.format(vpool.guid))
                     vpool.clusterregistry_client.set_node_configs(node_configs)

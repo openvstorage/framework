@@ -326,15 +326,16 @@ class GenericController(object):
                     #  u'transport': u'tcp'}
 
                     # Backend config
-                    # {u'alba_connection_host': u'10.100.193.155',
-                    #  u'alba_connection_port': 26204,
-                    #  u'alba_connection_preset': u'preset',
-                    #  u'alba_connection_timeout': 15,
-                    #  u'alba_connection_transport': u'TCP',
-                    #  u'backend_interface_retries_on_error': 5,
-                    #  u'backend_interface_retry_backoff_multiplier': 2.0,
-                    #  u'backend_interface_retry_interval_secs': 1,
-                    #  u'backend_type': u'ALBA'}
+                    # {u'backend_type': u'MULTI',
+                    #  u'0': {u'alba_connection_host': u'10.100.193.155',
+                    #         u'alba_connection_port': 26204,
+                    #         u'alba_connection_preset': u'preset',
+                    #         u'alba_connection_timeout': 15,
+                    #         u'alba_connection_transport': u'TCP',
+                    #         u'backend_interface_retries_on_error': 5,
+                    #         u'backend_interface_retry_backoff_multiplier': 2.0,
+                    #         u'backend_interface_retry_interval_secs': 1,
+                    #         u'backend_type': u'ALBA'}}
                     scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid))
                     scrub_config['port'] = port
                     scrub_config['transport'] = 'tcp'
@@ -348,8 +349,14 @@ class GenericController(object):
                     GenericController._logger.info('Scrubber - vPool {0} - StorageRouter {1} - Deployed ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service))
 
                 backend_config = Configuration.get('ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, vpool.storagedrivers[0].storagedriver_id))['backend_connection_manager']
-                backend_config['alba_connection_host'] = '127.0.0.1'
-                backend_config['alba_connection_port'] = scrub_config['port']
+                if backend_config.get('backend_type') != 'MULTI':
+                    backend_config['alba_connection_host'] = '127.0.0.1'
+                    backend_config['alba_connection_port'] = scrub_config['port']
+                else:
+                    for value in backend_config.itervalues():
+                        if isinstance(value, dict):
+                            value['alba_connection_host'] = '127.0.0.1'
+                            value['alba_connection_port'] = scrub_config['port']
                 Configuration.set(backend_config_key, json.dumps({"backend_connection_manager": backend_config}, indent=4), raw=True)
         except Exception:
             message = 'Scrubber - vPool {0} - StorageRouter {1} - An error occurred deploying ALBA proxy {2}'.format(vpool.name, storagerouter.name, alba_proxy_service)

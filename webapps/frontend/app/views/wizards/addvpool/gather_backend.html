@@ -17,7 +17,24 @@ but WITHOUT ANY WARRANTY of any kind.
 -->
 <div>
     <p data-i18n="ovs:wizards.add_vpool.gather_backend.basic_info"></p>
-
+    <div class="form-group">
+        <label class="col-lg-4 control-label" for="proxyAmount" data-i18n="ovs:wizards.add_vpool.gather_backend.proxy_amount"></label>
+        <div class="col-lg-3">
+            <div class="input-group">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="button" data-bind="click: function() { data.proxyAmount(Math.max(1, parseInt('0' + data.proxyAmount(), 10) - 1)); }">
+                        <span class="fa fa-minus"></span>
+                    </button>
+                </span>
+                <input type="text" id="proxyAmount" class="form-control" data-bind="value: data.proxyAmount">
+                <span class="input-group-btn">
+                    <button class="btn btn-default" type="button" data-bind="click: function() { data.proxyAmount(parseInt('0' + data.proxyAmount(), 10) + 1); }">
+                        <span class="fa fa-plus"></span>
+                    </button>
+                </span>
+            </div>
+        </div>
+    </div>
     <div class="form-group">
         <label class="col-lg-4 control-label" data-i18n="ovs:wizards.add_vpool.gather_backend.fragment_cache" style="padding-top: 8px;"></label>
         <div class="col-lg-8">
@@ -31,7 +48,6 @@ but WITHOUT ANY WARRANTY of any kind.
             </span>
         </div>
     </div>
-
     <div data-bind="visible: data.fragmentCacheOnRead() || data.fragmentCacheOnWrite()">
         <div>
             <div class="form-group">
@@ -62,7 +78,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                          key: 'guid',
                                          keyisfunction: true,
                                          items: reUseableStorageRouters,
-                                         target: data.reUsedStorageRouter,
+                                         target: reUsedStorageRouter,
                                          text: function(item) {
                                              if (item !== undefined) {
                                                  return item.name();
@@ -83,7 +99,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 </div>
                 <label class="col-lg-1 control-label" for="inputBackendPort" data-i18n="ovs:wizards.add_vpool.gather_backend.port"></label>
                 <div class="col-lg-2">
-                    <input type="text" id="inputBackendPort" class="autofocus form-control" data-bind="value: data.portAA" />
+                    <input type="text" id="inputBackendPort" class="autofocus form-control" data-bind="value: data.portAA, valueUpdate: 'input'" />
                 </div>
             </div>
             <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
@@ -105,15 +121,15 @@ but WITHOUT ANY WARRANTY of any kind.
                 <!-- ko if: loadingBackends() === true -->
                     <span class="fa fa-spin" style="margin-top: 8px;" data-i18n="[html]ovs:icons.loading"></span>
                 <!-- /ko -->
-                <!-- ko if: loadingBackends() === false && (data.backendsAA() === undefined || data.backendsAA().length === 0) -->
+                <!-- ko if: loadingBackends() === false && (backendsAA() === undefined || backendsAA().length === 0) -->
                     <i data-i18n="[html]ovs:wizards.add_vpool.gather_backend.no_backends"
                        style="display: inline-block; margin-top: 7px;"></i>
                 <!-- /ko -->
-                <!-- ko if: loadingBackends() === false && (data.backendsAA() !== undefined && data.backendsAA().length > 0) -->
+                <!-- ko if: loadingBackends() === false && (backendsAA() !== undefined && backendsAA().length > 0) -->
                     <span data-bind="visible: (data.vPool() === undefined || data.backendAA() !== undefined),
                                      dropdown: {
                                          key: 'guid', keyisfunction: false,
-                                         items: data.backendsAA, target: data.backendAA,
+                                         items: backendsAA, target: data.backendAA,
                                          text: function(item) {
                                              if (item !== undefined) {
                                                  return item.name;
@@ -124,7 +140,7 @@ but WITHOUT ANY WARRANTY of any kind.
                 <!-- /ko -->
                 <button type ='button' class="btn btn-default"  style="margin-left: 10px;"
                         data-bind="click: loadBackends,
-                                   style: {'margin-top': (data.backendsAA() !== undefined && data.backendsAA().length > 0 ? '-26px' : '')},
+                                   style: {'margin-top': (backendsAA() !== undefined && backendsAA().length > 0 ? '-26px' : '')},
                                    enable: !loadingBackends(),
                                    visible: !data.localHostAA()">
                     <span class="fa fa-" data-bind="css: { 'fa-spin': loadingBackends() }" data-i18n="[html]ovs:icons.load"></span>

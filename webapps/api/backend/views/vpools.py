@@ -67,16 +67,12 @@ class VPoolViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(StorageRouter)
     @load(VPool)
-    def storagerouters(self, vpool, hints):
+    def storagerouters(self, vpool):
         """
         Retrieves a list of StorageRouters, serving a given vPool
         :param vpool: vPool to retrieve the storagerouter information for
         :type vpool: VPool
-        :param hints: Dictionary with hints
-        :type hints: dict
         """
-        if hints.get('full', False) is True:
-            return [storagedriver.storagerouter for storagedriver in vpool.storagedrivers]
         return [storagedriver.storagerouter_guid for storagedriver in vpool.storagedrivers]
 
     @action()
@@ -93,16 +89,11 @@ class VPoolViewSet(viewsets.ViewSet):
         :type storagerouter_guid: str
         """
         sr = StorageRouter(storagerouter_guid)
-        sd_guid = None
-        sd_guids = [storagedriver.guid for storagedriver in vpool.storagedrivers]
-        for storagedriver in sr.storagedrivers:
-            if storagedriver.guid in sd_guids:
-                sd_guid = storagedriver.guid
-                break
-        if sd_guid is None:
+        intersection = set(vpool.storagedrivers_guids).intersection(set(sr.storagedrivers_guids))
+        if not intersection:
             raise HttpNotAcceptableException(error_description='Storage Router {0} is not a member of vPool {1}'.format(sr.name, vpool.name),
                                              error='impossible_request')
-        return StorageRouterController.remove_storagedriver.delay(sd_guid)
+        return StorageRouterController.remove_storagedriver.delay(list(intersection)[0])
 
     @link()
     @log()
