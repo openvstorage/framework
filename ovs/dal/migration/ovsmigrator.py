@@ -18,6 +18,7 @@
 OVS migration module
 """
 import copy
+import json
 import random
 import string
 import hashlib
@@ -342,7 +343,7 @@ class OVSMigrator(object):
                             proxy_scrub_config = None if Configuration.exists(key=proxy_scrub_config_key) is False else Configuration.get(proxy_scrub_config_key)
                             if proxy_scrub_config is not None and proxy_scrub_config['fragment_cache'] == ['none']:
                                 proxy_scrub_config['fragment_cache'] = fragment_cache_scrub_info
-                                Configuration.set(proxy_scrub_config_key, proxy_scrub_config)
+                                Configuration.set(proxy_scrub_config_key, json.dumps(proxy_scrub_config, indent=4), raw=True)
 
                 # Update 'backend_connection_manager' section
                 storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
