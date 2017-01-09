@@ -235,6 +235,8 @@ class OVSMigrator(object):
             from ovs.dal.lists.vpoollist import VPoolList
             vpools = VPoolList.get_vpools()
             for vpool in vpools:
+                if vpool.metadata.get('backend', {}).get('backend_info', {}).get('name') is not None:  # Already new format
+                    continue
                 new_metadata = {}
                 for metadata_key, value in vpool.metadata.items():
                     new_info = {}
@@ -289,14 +291,17 @@ class OVSMigrator(object):
                 Configuration.set(key='/ovs/framework/paths', value=paths)
 
             # Rewrite indices 'alba_proxy' --> 'alba_proxies'
+            changes = False
             persistent_client = PersistentFactory.get_client()
             transaction = persistent_client.begin_transaction()
             for old_key in persistent_client.prefix('ovs_reverseindex_storagedriver'):
-                if 'alba_proxy' in old_key:
+                if '|alba_proxy|' in old_key:
+                    changes = True
                     new_key = old_key.replace('|alba_proxy|', '|alba_proxies|')
                     persistent_client.set(key=new_key, value=0, transaction=transaction)
                     persistent_client.delete(key=old_key, transaction=transaction)
-            persistent_client.apply_transaction(transaction=transaction)
+            if changes is True:
+                persistent_client.apply_transaction(transaction=transaction)
 
             sr_client_map = {}
             for storagedriver in StorageDriverList.get_storagedrivers():
