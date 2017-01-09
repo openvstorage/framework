@@ -40,13 +40,13 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, Logger, MDSMetaDataBackendConfig, MDSNodeConfig, \
+from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
                                                        SRCObjectNotFoundException, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single, log
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
-from volumedriver.storagerouter import VolumeDriverEvents_pb2
+from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
 
 
 class VDiskController(object):
@@ -55,9 +55,9 @@ class VDiskController(object):
     """
     _logger = LogHandler.get('lib', name='vdisk')
 
-    Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+    storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
     # noinspection PyArgumentList
-    Logger.enableLogging()
+    storagerouterclient.Logger.enableLogging()
 
     @staticmethod
     @celery.task(name='ovs.vdisk.list_volumes')

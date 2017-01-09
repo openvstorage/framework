@@ -36,10 +36,11 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.sshclient import UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.storageserver.storagedriver import Logger, MDSMetaDataBackendConfig, MDSNodeConfig, MetadataServerClient, SRCObjectNotFoundException, StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig, MetadataServerClient, SRCObjectNotFoundException, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.toolbox import Schedule
 from ovs.log.log_handler import LogHandler
+from volumedriver.storagerouter import storagerouterclient
 
 
 class MDSServiceController(object):
@@ -48,9 +49,9 @@ class MDSServiceController(object):
     """
     _logger = LogHandler.get('lib', name='mds')
 
-    Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+    storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
     # noinspection PyArgumentList
-    Logger.enableLogging()
+    storagerouterclient.Logger.enableLogging()
 
     @staticmethod
     def prepare_mds_service(storagerouter, vpool, fresh_only):
