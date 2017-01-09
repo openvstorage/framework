@@ -50,7 +50,7 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, Logger, StorageDriverConfiguration, StorageDriverClient
+from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import ensure_single
@@ -59,6 +59,7 @@ from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
+from volumedriver.storagerouter import storagerouterclient
 
 
 class StorageRouterController(object):
@@ -68,9 +69,9 @@ class StorageRouterController(object):
     _logger = LogHandler.get('lib', name='storagerouter')
     SUPPORT_AGENT = 'support-agent'
 
-    Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+    storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
     # noinspection PyArgumentList
-    Logger.enableLogging()
+    storagerouterclient.Logger.enableLogging()
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.ping')
