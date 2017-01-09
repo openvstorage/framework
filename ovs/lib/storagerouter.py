@@ -50,7 +50,7 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import volatile_mutex
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient, ClusterNodeConfig, LocalStorageRouterClient
+from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalStorageRouterClient, StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import ensure_single
@@ -198,7 +198,7 @@ class StorageRouterController(object):
                                                       'client_id': (str, None),
                                                       'client_secret': (str, None),
                                                       'local': (bool, None, False)}),
-                           'parallelism': (int, {'min': 1, 'max': 16}, False)}
+                           'parallelism': (dict, {'proxies': (int, {'min': 1, 'max': 16}, False)}, False)}
 
         ########################
         # VALIDATIONS (PART 1) #
@@ -225,8 +225,6 @@ class StorageRouterController(object):
         if new_vpool is False:
             if vpool.status != VPool.STATUSES.RUNNING:
                 raise ValueError('VPool should be in {0} status'.format(VPool.STATUSES.RUNNING))
-
-        parallelism = parameters.get('parallelism', 8)
 
         # Check storagerouter existence
         storagerouter = StorageRouterList.get_by_ip(client.ip)
@@ -360,6 +358,47 @@ class StorageRouterController(object):
                 if specified_value != current_value:
                     error_messages.append('Specified StorageDriver config "{0}" with value {1} does not match the value {2}'.format(key, specified_value, current_value))
 
+        # Verify fragment cache is large enough
+        largest_ssd_write_partition = None
+        largest_sata_write_partition = None
+        largest_ssd = 0
+        largest_sata = 0
+        total_available = 0
+        for info in partition_info.get(DiskPartition.ROLES.WRITE, []):
+            total_available += info['available']
+            if info['ssd'] is True and info['available'] > largest_ssd:
+                largest_ssd = info['available']
+                largest_ssd_write_partition = info['guid']
+            elif info['ssd'] is False and info['available'] > largest_sata:
+                largest_sata = info['available']
+                largest_sata_write_partition = info['guid']
+
+        amount_of_proxies = parameters.get('parallelism', {}).get('proxies', 2)
+        fragment_cache_on_read = parameters['fragment_cache_on_read']
+        fragment_cache_on_write = parameters['fragment_cache_on_write']
+        largest_write_mountpoint = None
+        mountpoint_fragment_cache = None
+        if largest_ssd_write_partition is None and largest_sata_write_partition is None:
+            error_messages.append('No WRITE partition found to put the local fragment cache on')
+        else:
+            largest_write_mountpoint = DiskPartition(largest_ssd_write_partition or largest_sata_write_partition)
+            if use_accelerated_alba is False:
+                mountpoint_fragment_cache = largest_write_mountpoint
+                if fragment_cache_on_read is True or fragment_cache_on_write is True:  # Local fragment caching
+                    one_gib = 1024 ** 3  # 1GiB
+                    proportion = float(largest_ssd or largest_sata) * 100.0 / total_available
+                    available = proportion * writecache_size_requested / 100 * 0.10  # Only 10% is used on the largest WRITE partition for fragment caching
+                    fragment_size = available / amount_of_proxies
+                    if fragment_size < one_gib:
+                        maximum = amount_of_proxies
+                        while True:
+                            if maximum == 0 or available / maximum > one_gib:
+                                break
+                            maximum -= 1
+                        error_messages.append('Fragment cache is too small to deploy {0} prox{1}. 1GiB is required per proxy and with an available size of {2:.2f}GiB, {3} prox{4} can be deployed'.format(
+                            amount_of_proxies, 'y' if amount_of_proxies == 1 else 'ies', available / 1024.0 ** 3, maximum, 'y' if maximum == 1 else 'ies')
+                        )
+
         if error_messages:
             if new_vpool is True:
                 vpool.delete()
@@ -383,8 +422,6 @@ class StorageRouterController(object):
                                                                          'connection_info': connection_info_aa}
 
         read_preferences = []
-        fragment_cache_on_read = parameters['fragment_cache_on_read']
-        fragment_cache_on_write = parameters['fragment_cache_on_write']
         for key, metadata in metadata_map.iteritems():
             ovs_client = OVSClient(ip=metadata['connection_info']['host'],
                                    port=metadata['connection_info']['port'],
@@ -508,32 +545,11 @@ class StorageRouterController(object):
         ##############################
         # CREATE PARTITIONS IN MODEL #
         ##############################
-
-        # Retrieve largest write mountpoint (SSD > SATA). We need largest SSD to put fragment cache on
-        largest_ssd_write_mountpoint = None
-        largest_sata_write_mountpoint = None
-        largest_ssd = 0
-        largest_sata = 0
-        for role, info in partition_info.iteritems():
-            if role == DiskPartition.ROLES.WRITE:
-                for part in info:
-                    if part['ssd'] is True and part['available'] > largest_ssd:
-                        largest_ssd = part['available']
-                        largest_ssd_write_mountpoint = part['guid']
-                    elif part['ssd'] is False and part['available'] > largest_sata:
-                        largest_sata = part['available']
-                        largest_sata_write_mountpoint = part['guid']
-
-        largest_write_mountpoint = DiskPartition(largest_ssd_write_mountpoint or largest_sata_write_mountpoint or partition_info[DiskPartition.ROLES.WRITE][0]['guid'])
-        mountpoint_fragment_cache = None
-        if use_accelerated_alba is False:
-            mountpoint_fragment_cache = largest_write_mountpoint
-
         # Calculate WRITE / FRAG cache
         frag_size = None
-        sdp_frag = None
-        dirs2create = list()
-        writecaches = list()
+        sdp_frags = []
+        dirs2create = []
+        writecaches = []
         writecache_information = partition_info[DiskPartition.ROLES.WRITE]
         total_available = sum([part['available'] for part in writecache_information])
         for writecache_info in writecache_information:
@@ -544,15 +560,17 @@ class StorageRouterController(object):
             if mountpoint_fragment_cache is not None and partition == mountpoint_fragment_cache:
                 frag_size = int(size_to_be_used * 0.10)  # Bytes
                 w_size = int(size_to_be_used * 0.88 / 1024 / 4096) * 4096  # KiB
-                sdp_frag = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
-                                                                                              'role': DiskPartition.ROLES.WRITE,
-                                                                                              'sub_role': StorageDriverPartition.SUBROLE.FCACHE,
-                                                                                              'partition': DiskPartition(writecache_info['guid'])})
                 sdp_write = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
                                                                                                'role': DiskPartition.ROLES.WRITE,
                                                                                                'sub_role': StorageDriverPartition.SUBROLE.SCO,
                                                                                                'partition': DiskPartition(writecache_info['guid'])})
-                dirs2create.append(sdp_frag.path)
+                for _ in xrange(amount_of_proxies):
+                    sdp_frag = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                                  'role': DiskPartition.ROLES.WRITE,
+                                                                                                  'sub_role': StorageDriverPartition.SUBROLE.FCACHE,
+                                                                                                  'partition': DiskPartition(writecache_info['guid'])})
+                    dirs2create.append(sdp_frag.path)
+                    sdp_frags.append(sdp_frag)
             else:
                 w_size = int(size_to_be_used * 0.98 / 1024 / 4096) * 4096
                 sdp_write = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': long(size_to_be_used),
@@ -598,11 +616,8 @@ class StorageRouterController(object):
         ############################
         # CONFIGURATION MANAGEMENT #
         ############################
-        config_dir = '{0}/storagedriver/storagedriver'.format(Configuration.get('/ovs/framework/paths|cfgdir'))
-        client.dir_create(config_dir)
         manifest_cache_size = 16 * 1024 * 1024 * 1024
-
-        for proxy_id in xrange(parallelism):
+        for proxy_id in xrange(amount_of_proxies):
             service = DalService()
             service.storagerouter = storagerouter
             service.ports = [StorageRouterController._get_free_ports(client, model_ports_in_use, 1)]
@@ -637,7 +652,7 @@ class StorageRouterController(object):
                 fragment_cache_info = ['alba', {'albamgr_cfg_url': Configuration.get_configuration_path(config_tree.format('abm_aa')),
                                                 'bucket_strategy': ['1-to-1', {'prefix': vpool.guid,
                                                                                'preset': vpool.metadata['backend_aa_{0}'.format(storagerouter.guid)]['backend_info']['preset']}],
-                                                'manifest_cache_size': 16 * 1024 * 1024 * 1024,
+                                                'manifest_cache_size': manifest_cache_size,
                                                 'cache_on_read': fragment_cache_on_read,
                                                 'cache_on_write': fragment_cache_on_write}]
                 if fragment_cache_on_write is True:
@@ -645,8 +660,8 @@ class StorageRouterController(object):
                     fragment_cache_scrub_info = copy.deepcopy(fragment_cache_info)
                     fragment_cache_scrub_info[1]['cache_on_read'] = False
             else:
-                fragment_cache_info = ['local', {'path': sdp_frag.path,
-                                                 'max_size': frag_size,
+                fragment_cache_info = ['local', {'path': sdp_frags[proxy_id].path,
+                                                 'max_size': frag_size / amount_of_proxies,
                                                  'cache_on_read': fragment_cache_on_read,
                                                  'cache_on_write': fragment_cache_on_write}]
 
@@ -674,9 +689,6 @@ class StorageRouterController(object):
         ###########################
         # CONFIGURE STORAGEDRIVER #
         ###########################
-        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
-        storagedriver_config.load()
-
         sco_size = sd_config_params['sco_size']
         dtl_mode = sd_config_params['dtl_mode']
         cluster_size = sd_config_params['cluster_size']
@@ -711,22 +723,21 @@ class StorageRouterController(object):
         mq_user = Configuration.get('/ovs/framework/messagequeue|user')
         mq_password = Configuration.get('/ovs/framework/messagequeue|password')
         for current_storagerouter in StorageRouterList.get_masters():
-            queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(mq_protocol, mq_user, mq_password, current_storagerouter.ip)})
+            queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}:5672'.format(mq_protocol, mq_user, mq_password, current_storagerouter.ip)})
 
         backend_connection_manager = {'backend_type': 'MULTI'}
-        for index, proxy in enumerate(storagedriver.alba_proxies):
+        for index, proxy in enumerate(sorted(storagedriver.alba_proxies, key=lambda k: k.service.ports[0])):
             backend_connection_manager[str(index)] = {'alba_connection_host': storagedriver.storage_ip,
                                                       'alba_connection_port': proxy.service.ports[0],
                                                       'alba_connection_preset': vpool.metadata['backend']['backend_info']['preset'],
                                                       'alba_connection_timeout': 15,
                                                       'alba_connection_use_rora': True,
                                                       'alba_connection_transport': 'TCP',
+                                                      'alba_connection_rora_manifest_cache_capacity': rora_cache,
                                                       'backend_type': 'ALBA',
                                                       'backend_interface_retries_on_error': 5,
                                                       'backend_interface_retry_interval_secs': 1,
-                                                      'backend_interface_retry_backoff_multiplier': 2.0,
-                                                      'alba_connection_rora_manifest_cache_capacity': manifest_cache_size}
-
+                                                      'backend_interface_retry_backoff_multiplier': 2.0}
         volume_router = {'vrouter_id': vrouter_id,
                          'vrouter_redirect_timeout_ms': '5000',
                          'vrouter_routing_retries': 10,
@@ -741,6 +752,8 @@ class StorageRouterController(object):
                          'vrouter_migrate_timeout_ms': 60000,
                          'vrouter_use_fencing': True}
 
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
+        storagedriver_config.load()
         storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
         storagedriver_config.configure_content_addressed_cache(serialize_read_cache=False,
                                                                read_cache_serialization_path=[])
@@ -834,11 +847,12 @@ class StorageRouterController(object):
             if sr.ip not in ip_client_map:
                 continue
             node_client = ip_client_map[sr.ip]['ovs']
-            storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
-            storagedriver_config.load()
-            if storagedriver_config.is_new is False:
-                storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
-                storagedriver_config.save(node_client)
+            for current_storagedriver in [sd for sd in sr.storagedrivers if sd.vpool_guid == vpool.guid]:
+                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, current_storagedriver.storagedriver_id)
+                storagedriver_config.load()
+                if storagedriver_config.is_new is False:
+                    storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
+                    storagedriver_config.save(node_client)
 
         # Everything's reconfigured, refresh new cluster configuration
         for current_storagedriver in vpool.storagedrivers:
@@ -846,13 +860,8 @@ class StorageRouterController(object):
                 continue
             vpool.storagedriver_client.update_cluster_node_configs(str(current_storagedriver.storagedriver_id), req_timeout_secs=10)
 
-        # Fill vPool size
-        with remote(root_client.ip, [os], 'root') as rem:
-            vfs_info = rem.os.statvfs('/mnt/{0}'.format(vpool_name))
-            vpool.size = vfs_info.f_blocks * vfs_info.f_bsize
-            vpool.status = VPool.STATUSES.RUNNING
-            vpool.save()
-
+        vpool.status = VPool.STATUSES.RUNNING
+        vpool.save()
         vpool.invalidate_dynamics(['configuration'])
         if offline_nodes_detected is True:
             try:
@@ -901,12 +910,10 @@ class StorageRouterController(object):
         storage_router_online = True
         storage_routers_offline = [StorageRouter(storage_router_guid) for storage_router_guid in offline_storage_router_guids]
         available_storage_drivers = []
-        all_storage_drivers = []
         for sd in vpool.storagedrivers:
             sr = sd.storagerouter
             if sr != storage_router:
                 storage_drivers_left = True
-            all_storage_drivers.append(sd)
             try:
                 temp_client = SSHClient(sr, username='root')
                 if sr in storage_routers_offline:
@@ -948,10 +955,10 @@ class StorageRouterController(object):
         vpool.save()
 
         available_sr_names = [sd.storagerouter.name for sd in available_storage_drivers]
+        unavailable_sr_names = [sd.storagerouter.name for sd in vpool.storagedrivers if sd not in available_storage_drivers]
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Storage Routers on which an available Storage Driver runs: {1}'.format(storage_driver.guid, ', '.join(available_sr_names)))
-
-        offline_storagedrivers_names = [sd.storagerouter.name for sd in all_storage_drivers if sd not in available_storage_drivers]
-        StorageRouterController._logger.warning('Remove Storage Driver - Guid {0} - Storage Routers on which a Storage Driver is unavailable: {1}'.format(storage_driver.guid, ', '.join(offline_storagedrivers_names)))
+        if unavailable_sr_names:
+            StorageRouterController._logger.warning('Remove Storage Driver - Guid {0} - Storage Routers on which a Storage Driver is unavailable: {1}'.format(storage_driver.guid, ', '.join(unavailable_sr_names)))
 
         # Remove stale vDisks
         voldrv_vdisks = [entry.object_id() for entry in vpool.objectregistry_client.get_all_registrations()]
@@ -1035,25 +1042,25 @@ class StorageRouterController(object):
                 except RuntimeError:
                     StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Destroying filesystem and erasing node configs failed'.format(storage_driver.guid))
                     errors_found = True
-            service_name = 'unknown'
-            try:
-                for proxy in storage_driver.alba_proxies:
-                    service_name = proxy.service.name
+
+            for proxy in storage_driver.alba_proxies:
+                service_name = proxy.service.name
+                try:
                     if ServiceManager.has_service(service_name, client=client):
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Stopping service {1}'.format(storage_driver.guid, service_name))
                         ServiceManager.stop_service(service_name, client=client)
                         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Removing service {1}'.format(storage_driver.guid, service_name))
                         ServiceManager.remove_service(service_name, client=client)
-            except Exception:
-                StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service_name))
-                errors_found = True
+                except Exception:
+                    StorageRouterController._logger.exception('Remove Storage Driver - Guid {0} - Disabling/stopping service {1} failed'.format(storage_driver.guid, service_name))
+                    errors_found = True
 
         # Reconfigure cluster node configs
         try:
             if storage_drivers_left is True:
                 StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Reconfiguring cluster node configs'.format(storage_driver.guid))
                 node_configs = []
-                for sd in all_storage_drivers:
+                for sd in vpool.storagedrivers:
                     if sd != storage_driver:
                         sd.invalidate_dynamics(['cluster_node_config'])
                         config = sd.cluster_node_config
@@ -1085,8 +1092,8 @@ class StorageRouterController(object):
                 errors_found = True
 
         # Clean up directories and files
-        dirs_to_remove = []
-        for sd_partition in storage_driver.partitions:
+        dirs_to_remove = [storage_driver.mountpoint]
+        for sd_partition in storage_driver.partitions[:]:
             dirs_to_remove.append(sd_partition.path)
             sd_partition.delete()
 
@@ -1097,8 +1104,6 @@ class StorageRouterController(object):
         if storage_router_online is True:
             # Cleanup directories/files
             StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Deleting vPool related directories and files'.format(storage_driver.guid))
-            dirs_to_remove.append(storage_driver.mountpoint)
-
             try:
                 mountpoints = StorageRouterController._get_mountpoints(client)
                 for dir_name in dirs_to_remove:

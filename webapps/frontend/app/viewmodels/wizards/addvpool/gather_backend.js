@@ -32,33 +32,29 @@ define([
 
         // Observables
         self.albaPresetMap         = ko.observable({});
+        self.backendsAA            = ko.observableArray([]);
         self.fragmentCacheSettings = ko.observableArray(['write', 'read', 'rw', 'none']);
         self.invalidAlbaInfo       = ko.observable(false);
         self.loadingBackends       = ko.observable(false);
-
-        self.data.localHostAA.subscribe(function(local) {
-            if (local === true && self.data.useAA() === true && self.data.backendsAA().length === 0) {
-                self.loadBackends();
-            }
-        });
-        self.data.useAA.subscribe(function(accelerated) {
-            if (accelerated === true && self.data.backendsAA().length === 0) {
-                self.loadBackends();
-            }
-        });
+        self.reUsedStorageRouter   = ko.observable();  // Connection info for this storagerouter will be used for accelerated ALBA
 
         // Computed
         self.localBackendsAvailable = ko.computed(function() {
-            if (self.data.localHost() && self.data.backends().length < 2) {
-                if (self.data.vPool() === undefined) {
+            if (self.data.localHost() === true) {  // Local host is true, so a local backend has already been chosen for usage, so we need another 1 for AA
+                if (self.data.backends().length >= 2) {
+                    return true;
+                } else {
                     self.data.localHostAA(false);
+                    return false;
                 }
-                return false;
+            } else {
+                if (self.data.backends().length >= 1) {
+                    return true;
+                } else {
+                    self.data.localHostAA(false);
+                    return false;
+                }
             }
-            if (self.data.vPool() === undefined) {
-                self.data.localHostAA(true);
-            }
-            return true;
         });
         self.isPresetAvailable = ko.computed(function() {
             var presetAvailable = true;
@@ -130,6 +126,11 @@ define([
         });
 
         // Functions
+        self.resetBackendsAA = function() {
+            self.backendsAA([]);
+            self.data.backendAA(undefined);
+            self.data.presetAA(undefined);
+        };
         self.shouldSkip = function() {
             return $.Deferred(function(deferred) {
                 if (self.data.vPool() !== undefined && !self.data.fragmentCacheOnRead() && !self.data.fragmentCacheOnWrite()) {
@@ -194,13 +195,13 @@ define([
                                     available_backends.sort(function(backend1, backend2) {
                                         return backend1.name.toLowerCase() < backend2.name.toLowerCase() ? -1 : 1;
                                     });
-                                    self.data.backendsAA(available_backends);
+                                    self.backendsAA(available_backends);
                                     if (self.data.backendAA() === undefined) {
                                         self.data.backendAA(available_backends[0]);
                                         self.data.presetAA(self.data.enhancedPresetsAA()[0]);
                                     }
                                 } else {
-                                    self.data.backendsAA([]);
+                                    self.backendsAA([]);
                                     self.data.backendAA(undefined);
                                     self.data.presetAA(undefined);
                                 }
@@ -208,7 +209,7 @@ define([
                             })
                             .done(albaDeferred.resolve)
                             .fail(function() {
-                                self.data.backendsAA([]);
+                                self.backendsAA([]);
                                 self.data.backendAA(undefined);
                                 self.data.presetAA(undefined);
                                 self.loadingBackends(false);
@@ -217,7 +218,7 @@ define([
                             });
                     })
                     .fail(function() {
-                        self.data.backendsAA([]);
+                        self.backendsAA([]);
                         self.data.backendAA(undefined);
                         self.data.presetAA(undefined);
                         self.loadingBackends(false);
@@ -227,24 +228,71 @@ define([
             }).promise();
         };
 
+        // Subscriptions
+        self.useAASubscription = self.data.useAA.subscribe(function(accelerated) {
+            if (accelerated === true && self.backendsAA().length === 0) {
+                self.loadBackends();
+            }
+        });
+        self.reUsedStorageRouterSubscription = self.reUsedStorageRouter.subscribe(function(sr) {
+            if (sr === undefined && !self.data.localHostAA() && self.data.storageRoutersUsed().length > 0) {
+                self.data.hostAA('');
+                self.data.portAA(80);
+                self.data.clientIDAA('');
+                self.data.clientSecretAA('');
+            }
+            if (sr !== undefined && self.data.vPool() !== undefined && self.data.vPool().metadata().hasOwnProperty('backend_aa_' + sr.guid())) {
+                var md = self.data.vPool().metadata()['backend_aa_' + sr.guid()];
+                if (md.hasOwnProperty('connection_info')) {
+                    self.data.hostAA(md.connection_info.host);
+                    self.data.portAA(md.connection_info.port);
+                    self.data.clientIDAA(md.connection_info.client_id);
+                    self.data.clientSecretAA(md.connection_info.client_secret);
+                }
+            }
+        });
+        self.hostAASubscription = self.data.hostAA.subscribe(self.resetBackendsAA);
+        self.portAASubscription = self.data.portAA.subscribe(self.resetBackendsAA);
+        self.clientIDAASubscription = self.data.clientIDAA.subscribe(self.resetBackendsAA);
+        self.clientSecretAASubscription = self.data.clientSecretAA.subscribe(self.resetBackendsAA);
+        self.localHostAASubscription = self.data.localHostAA.subscribe(function(local) {
+            self.data.hostAA('');
+            self.data.portAA(80);
+            self.data.clientIDAA('');
+            self.data.clientSecretAA('');
+            self.reUsedStorageRouter(undefined);
+            if (local === true && self.data.useAA() === true && self.backendsAA().length === 0) {
+                self.loadBackends();
+            }
+        });
+
         // Durandal
         self.activate = function() {
             if (self.data.backend() !== undefined && self.data.backendAA() !== undefined && self.data.backend().guid === self.data.backendAA().guid) {
-                self.data.backendsAA([]);
+                self.backendsAA([]);
                 $.each(self.data.backends(), function (_, backend) {
-                    if (backend !== self.data.backend() && !self.data.backendsAA().contains(backend)) {
-                        self.data.backendsAA().push(backend);
+                    if (backend !== self.data.backend() && !self.backendsAA().contains(backend)) {
+                        self.backendsAA().push(backend);
                     }
                 });
-                if (self.data.backendsAA().length === 0) {
+                if (self.backendsAA().length === 0) {
                     self.data.backendAA(undefined);
                     self.data.presetAA(undefined);
                 } else {
-                    self.data.backendAA(self.data.backendsAA()[0]);
+                    self.data.backendAA(self.backendsAA()[0]);
                     self.data.presetAA(self.data.enhancedPresetsAA()[0]);
                 }
             }
             self.loadBackends();
         };
+        self.deactivate = function() {
+            self.useAASubscription.dispose();
+            self.hostAASubscription.dispose();
+            self.portAASubscription.dispose();
+            self.clientIDAASubscription.dispose();
+            self.localHostAASubscription.dispose();
+            self.clientSecretAASubscription.dispose();
+            self.reUsedStorageRouterSubscription.dispose();
+        }
     };
 });

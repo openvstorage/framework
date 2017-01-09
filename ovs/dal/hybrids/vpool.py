@@ -32,7 +32,6 @@ class VPool(DataObject):
 
     __properties = [Property('name', str, unique=True, doc='Name of the vPool'),
                     Property('description', str, mandatory=False, doc='Description of the vPool'),
-                    Property('size', int, mandatory=False, doc='Size of the vPool expressed in Bytes. Set to zero if not applicable.'),
                     Property('login', str, mandatory=False, doc='Login/Username for the Storage BackendType.'),
                     Property('password', str, mandatory=False, doc='Password for the Storage BackendType.'),
                     Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domain name, Zone, ...) for the Storage BackendType.'),
