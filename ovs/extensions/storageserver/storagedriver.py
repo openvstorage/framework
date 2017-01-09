@@ -74,8 +74,7 @@ class StorageDriverClient(object):
     FRAMEWORK_DTL_TRANSPORT_TCP = 'tcp'
     FRAMEWORK_DTL_TRANSPORT_RSOCKET = 'rdma'
 
-    METADATA_CACHE_PAGE_SIZE = 256 * 24
-    DEFAULT_METADATA_CACHE_SIZE = 8192 * METADATA_CACHE_PAGE_SIZE
+    METADATA_PAGE_CAPACITY = 64   # "size" of a page = amount of entries in a page (addressable by 6 bits -> env var in service)
 
     VDISK_DTL_MODE_MAP = {FRAMEWORK_DTL_SYNC: DTLMode.SYNCHRONOUS,
                           FRAMEWORK_DTL_ASYNC: DTLMode.ASYNCHRONOUS,

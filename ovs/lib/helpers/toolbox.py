@@ -150,7 +150,7 @@ class Toolbox(object):
                             error_messages.append('{0} param "{1}" has an item "{2}" which does not match regex "{3}"'.format(mandatory_or_optional, required_key, item, expected_value.pattern))
             elif expected_type == dict:
                 Toolbox.verify_required_params(expected_value, actual_params[required_key])
-            elif expected_type == int:
+            elif expected_type == int or expected_type == float:
                 if isinstance(expected_value, list) and actual_value not in expected_value:
                     error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
                 if isinstance(expected_value, dict):
