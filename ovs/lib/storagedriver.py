@@ -19,6 +19,7 @@ StorageDriver module
 """
 
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
+from paramiko import AuthenticationException
 from ovs.celery_run import celery
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
@@ -210,7 +211,7 @@ class StorageDriverController(object):
             if ServiceManager.has_service(name=service_name, client=client):
                 ServiceManager.stop_service(name=service_name, client=client)
                 ServiceManager.remove_service(name=service_name, client=client)
-        except UnableToConnectException:
+        except (UnableToConnectException, AuthenticationException):
             pass
 
     @staticmethod

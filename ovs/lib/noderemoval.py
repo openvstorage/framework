@@ -21,6 +21,7 @@ Module for NodeRemovalController
 import os
 import re
 import sys
+from paramiko import AuthenticationException
 from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.interactive import Interactive
@@ -101,6 +102,9 @@ class NodeRemovalController(object):
                 except UnableToConnectException:
                     Toolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} is unreachable'.format(storage_router.ip))
                     storage_routers_offline.append(storage_router)
+                    if storage_router == storage_router_to_remove:
+                        storage_router_to_remove_online = False
+                except AuthenticationException:
                     if storage_router == storage_router_to_remove:
                         storage_router_to_remove_online = False
 
