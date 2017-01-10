@@ -284,49 +284,63 @@ class StorageDriverConfiguration(object):
             self._logger.debug('Could not find config {0}, a new one will be created'.format(self.key))
         self.dirty_entries = []
 
-    def save(self, client=None):
+    def save(self, client=None, force_reload=False):
         """
         Saves the configuration to a given file, optionally a remote one
         :param client: If provided, save remote configuration
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :param force_reload: Make sure the 'update_configuration' gets triggered. Should be used when configuration changes have been applied from 'outside'
+        :type force_reload: bool
+        :return: Changes to the configuration
+        :rtype: list
         """
+        changes = []
         Configuration.set(self.key, json.dumps(self.configuration, indent=4), raw=True)
-        if self.config_type == 'storagedriver':
-            if len(self.dirty_entries) > 0:
-                reloaded = False
-                changes = []
-                if client is None:
-                    self._logger.info('Applying local storagedriver configuration changes')
-                    try:
-                        changes = LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path)
-                        reloaded = True
-                    except Exception as ex:
-                        if 'ClusterNotReachableException' not in str(ex):
-                            raise
-                else:
-                    self._logger.info('Applying storagedriver configuration changes on {0}'.format(client.ip))
-                    try:
-                        with remote(client.ip, [LocalStorageRouterClient]) as rem:
-                            changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
-                            reloaded = True
-                    except Exception as ex:
-                        if 'ClusterNotReachableException' not in str(ex):
-                            raise
-                if reloaded is True:
-                    if isinstance(changes, dict):
-                        for change in changes:
-                            if change['param_name'] not in self.dirty_entries:
-                                raise RuntimeError('Unexpected configuration change: {0}'.format(change['param_name']))
-                            self._logger.info('Changed {0} from "{1}" to "{2}"'.format(change['param_name'], change['old_value'], change['new_value']))
-                            self.dirty_entries.remove(change['param_name'])
-                        self._logger.info('Changes applied')
-                    if len(self.dirty_entries) > 0:
-                        self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self.dirty_entries)))
-                else:
-                    self._logger.warning('Changes were not applied since storagedriver is unavailable')
+
+        # No changes detected in the configuration management
+        if len(self.dirty_entries) == 0 and force_reload is False:
+            self._logger.debug('No need to apply changes, nothing changed')
+            self.is_new = False
+            return changes
+
+        # Retrieve the changes from volumedriver
+        self._logger.info('Applying local storagedriver configuration changes{0}'.format('' if client is None else ' on {0}'.format(client.ip)))
+        try:
+            if client is None:
+                changes = LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path)
             else:
-                self._logger.debug('No need to apply changes, nothing changed')
+                with remote(client.ip, [LocalStorageRouterClient]) as rem:
+                    changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
+        except Exception as ex:
+            if 'ClusterNotReachableException' not in str(ex):
+                raise
+
+        # No changes
+        if len(changes) == 0:
+            self._logger.warning('Changes were not applied since storagedriver is unavailable')
+            self.is_new = False
+            self.dirty_entries = []
+            return changes
+
+        # Verify the output of the changes and log them
+        for change in changes:
+            if not isinstance(change, dict):
+                raise RuntimeError('Unexpected update_configuration output')
+            if 'param_name' not in change or 'old_value' not in change or 'new_value' not in change:
+                raise RuntimeError('Unexpected update_configuration output. Expected different keys, but got {0}'.format(', '.join(change.keys())))
+
+            param_name = change['param_name']
+            if force_reload is False:
+                if param_name not in self.dirty_entries:
+                    raise RuntimeError('Unexpected configuration change: {0}'.format(param_name))
+                self.dirty_entries.remove(param_name)
+            self._logger.info('Changed {0} from "{1}" to "{2}"'.format(param_name, change['old_value'], change['new_value']))
+        self._logger.info('Changes applied')
+        if len(self.dirty_entries) > 0:
+            self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self.dirty_entries)))
         self.is_new = False
         self.dirty_entries = []
+        return changes
 
     def __getattr__(self, item):
         if item.startswith('configure_'):
