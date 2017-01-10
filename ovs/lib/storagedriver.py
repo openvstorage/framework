@@ -188,9 +188,6 @@ class StorageDriverController(object):
         :rtype: int
         """
         storagedriver = StorageDriver(storagedriver_guid)
-        if storagedriver.vpool is None or storagedriver.storagedriver_id is None or storagedriver.storagerouter is None:
-            raise Exception('StorageDriver with guid {0} is not configured correctly'.format(storagedriver_guid))
-
         try:
             client = SSHClient(endpoint=storagedriver.storagerouter)
         except UnableToConnectException:

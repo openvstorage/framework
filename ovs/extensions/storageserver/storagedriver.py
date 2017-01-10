@@ -305,19 +305,25 @@ class StorageDriverConfiguration(object):
 
         # Retrieve the changes from volumedriver
         self._logger.info('Applying local storagedriver configuration changes{0}'.format('' if client is None else ' on {0}'.format(client.ip)))
+        reloaded = False
         try:
             if client is None:
                 changes = LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path)
             else:
                 with remote(client.ip, [LocalStorageRouterClient]) as rem:
                     changes = copy.deepcopy(rem.LocalStorageRouterClient(self.remote_path).update_configuration(self.remote_path))
+            reloaded = True
         except Exception as ex:
             if 'ClusterNotReachableException' not in str(ex):
                 raise
 
         # No changes
         if len(changes) == 0:
-            self._logger.warning('Changes were not applied since storagedriver is unavailable')
+            if reloaded is True:
+                if len(self.dirty_entries) > 0:
+                    self._logger.warning('Following changes were not applied: {0}'.format(', '.join(self.dirty_entries)))
+            else:
+                self._logger.warning('Changes were not applied since StorageDriver is unavailable')
             self.is_new = False
             self.dirty_entries = []
             return changes
