@@ -417,6 +417,9 @@ define(['jquery', 'jqp/pnotify'], function($) {
                 }
                 return error.responseText;
             } catch(exception) {
+                if (error.hasOwnProperty('status') && error.status === 404) {
+                    return $.t((namespace === undefined ? 'ovs' : namespace) + ':generic.api_errors.not_found');
+                }
                 return error;
             }
         }

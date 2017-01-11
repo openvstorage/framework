@@ -24,6 +24,7 @@ from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service
 from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -47,6 +48,9 @@ class StorageDriverController(object):
     """
     _logger = LogHandler.get('lib', name='storagedriver')
 
+    ################
+    # CELERY TASKS #
+    ################
     @staticmethod
     @celery.task(name='ovs.storagedriver.mark_offline')
     def mark_offline(storagerouter_guid):
@@ -156,6 +160,49 @@ class StorageDriverController(object):
         return changed_vpools
 
     @staticmethod
+    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=Schedule(minute='15', hour='*'))
+    def scheduled_voldrv_arakoon_checkup():
+        """
+        Makes sure the volumedriver arakoon is on all available master nodes
+        :return: None
+        """
+        StorageDriverController._voldrv_arakoon_checkup(False)
+
+    @staticmethod
+    @celery.task(name='ovs.storagedriver.manual_voldrv_arakoon_checkup')
+    def manual_voldrv_arakoon_checkup():
+        """
+        Creates a new Arakoon Cluster if required and extends cluster if possible on all available master nodes
+        :return: None
+        """
+        StorageDriverController._voldrv_arakoon_checkup(True)
+
+    @staticmethod
+    @celery.task(name='ovs.storagedriver.refresh_configuration')
+    def refresh_configuration(storagedriver_guid):
+        """
+        Refresh the StorageDriver's configuration (Configuration must have been updated manually)
+        :param storagedriver_guid: Guid of the StorageDriver
+        :type storagedriver_guid: str
+        :return: Amount of changes the volumedriver detected
+        :rtype: int
+        """
+        storagedriver = StorageDriver(storagedriver_guid)
+        try:
+            client = SSHClient(endpoint=storagedriver.storagerouter)
+        except UnableToConnectException:
+            raise Exception('StorageRouter with IP {0} is not reachable. Cannot refresh the configuration'.format(storagedriver.storagerouter.ip))
+
+        storagedriver_config = StorageDriverConfiguration(config_type='storagedriver',
+                                                          vpool_guid=storagedriver.vpool_guid,
+                                                          storagedriver_id=storagedriver.storagedriver_id)
+        storagedriver_config.load()
+        return len(storagedriver_config.save(client=client, force_reload=True))
+
+    #########
+    # HOOKS #
+    #########
+    @staticmethod
     @add_hooks('nodetype', 'demote')
     def on_demote(cluster_ip, master_ip, offline_node_ips=None):
         """
@@ -213,24 +260,43 @@ class StorageDriverController(object):
         except UnableToConnectException:
             pass
 
+    ####################
+    # PUBLIC FUNCTIONS #
+    ####################
     @staticmethod
-    @celery.task(name='ovs.storagedriver.scheduled_voldrv_arakoon_checkup', schedule=Schedule(minute='15', hour='*'))
-    def scheduled_voldrv_arakoon_checkup():
+    def add_storagedriverpartition(storagedriver, partition_info):
         """
-        Makes sure the volumedriver arakoon is on all available master nodes
-        :return: None
+        Stores new storagedriver partition object with correct number
+        :param storagedriver: Storagedriver to create the partition for
+        :type storagedriver: StorageDriver
+        :param partition_info: Partition information containing, role, size, sub_role, disk partition, MDS service
+        :type partition_info: dict
+        :return: Newly created storage driver partition
+        :rtype: StorageDriverPartition
         """
-        StorageDriverController._voldrv_arakoon_checkup(False)
+        role = partition_info['role']
+        size = partition_info.get('size')
+        sub_role = partition_info.get('sub_role')
+        partition = partition_info['partition']
+        mds_service = partition_info.get('mds_service')
+        highest_number = 0
+        for existing_sdp in storagedriver.partitions:
+            if existing_sdp.partition_guid == partition.guid and existing_sdp.role == role and existing_sdp.sub_role == sub_role:
+                highest_number = max(existing_sdp.number, highest_number)
+        sdp = StorageDriverPartition()
+        sdp.role = role
+        sdp.size = size
+        sdp.number = highest_number + 1
+        sdp.sub_role = sub_role
+        sdp.partition = partition
+        sdp.mds_service = mds_service
+        sdp.storagedriver = storagedriver
+        sdp.save()
+        return sdp
 
-    @staticmethod
-    @celery.task(name='ovs.storagedriver.manual_voldrv_arakoon_checkup')
-    def manual_voldrv_arakoon_checkup():
-        """
-        Creates a new Arakoon Cluster if required and extends cluster if possible on all available master nodes
-        :return: None
-        """
-        StorageDriverController._voldrv_arakoon_checkup(True)
-
+    #####################
+    # PRIVATE FUNCTIONS #
+    #####################
     @staticmethod
     @ensure_single(task_name='ovs.storagedriver.voldrv_arakoon_checkup')
     def _voldrv_arakoon_checkup(create_cluster):
@@ -343,34 +409,3 @@ class StorageDriverController(object):
                                                                           dls_arakoon_cluster_id=cluster_name,
                                                                           dls_arakoon_cluster_nodes=arakoon_nodes)
                     storagedriver_config.save()
-
-    @staticmethod
-    def add_storagedriverpartition(storagedriver, partition_info):
-        """
-        Stores new storagedriver partition object with correct number
-        :param storagedriver: Storagedriver to create the partition for
-        :type storagedriver: StorageDriver
-        :param partition_info: Partition information containing, role, size, sub_role, disk partition, MDS service
-        :type partition_info: dict
-        :return: Newly created storage driver partition
-        :rtype: StorageDriverPartition
-        """
-        role = partition_info['role']
-        size = partition_info.get('size')
-        sub_role = partition_info.get('sub_role')
-        partition = partition_info['partition']
-        mds_service = partition_info.get('mds_service')
-        highest_number = 0
-        for existing_sdp in storagedriver.partitions:
-            if existing_sdp.partition_guid == partition.guid and existing_sdp.role == role and existing_sdp.sub_role == sub_role:
-                highest_number = max(existing_sdp.number, highest_number)
-        sdp = StorageDriverPartition()
-        sdp.role = role
-        sdp.size = size
-        sdp.number = highest_number + 1
-        sdp.sub_role = sub_role
-        sdp.partition = partition
-        sdp.mds_service = mds_service
-        sdp.storagedriver = storagedriver
-        sdp.save()
-        return sdp

@@ -84,6 +84,7 @@
             "object_not_found": "The object could not be located",
             "no_ownership": "No access to this object",
             "not_authenticated": "Not authenticated",
+            "not_found": "API not found",
             "rate_limit_reached": "Reached API rate-limit",
             "rate_limit_timeout": "Waiting for API rate-limit lock to be released",
             "relay_error": "Error while relaying the call",
@@ -648,6 +649,19 @@
         "cluster_size": "Cluster Size",
         "configuration": "Configurations",
         "detail": {
+            "extend": "Extend",
+            "refresh": {
+                "failed_msg": "Refreshing configuration on StorageRouter __sr__ for vPool __vpool__ failed: __why__",
+                "started": "Refreshing",
+                "started_msg": "Refreshing configuration on StorageRouter __sr__ for vPool __vpool__",
+                "success": "Refreshed",
+                "success_msg": "Refreshed configuration on StorageRouter __sr__ for vPool __vpool__",
+                "warning": "Warning",
+                "warning_msg": "No configuration changes were detected on StorageRouter __sr__ for vPool __vpool__"
+            },
+            "refresh_config": "Refresh configuration",
+            "remove": "Remove",
+            "storagerouter_vpool_link": "Storage Routers serving this vPool",
             "title": "vPool"
         },
         "dtl": "DTL",
@@ -658,7 +672,6 @@
         "preset": "Preset",
         "sco_size": "SCO Size",
         "statistics": "Statistics",
-        "storagerouter_vpool_link": "Storage Routers serving this vPool",
         "title": "vPools",
         "volume_write_buffer": "Volume Write Buffer"
     },
