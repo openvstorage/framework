@@ -30,8 +30,6 @@ define([
         self.refresher = new Refresher();
 
         // Observables
-        self.storageNodeIPs = ko.observableArray([]);
-        self.storageNodeMap = ko.observable();
         self.storageRouters = ko.observableArray([]);
         self.clusterid      = ko.observable();
         self.dirty          = ko.observable(false);
@@ -39,7 +37,6 @@ define([
         self._enableSupport = ko.observable();
 
         // Handles
-        self.loadStorageNodeHandle = undefined;
         self.supportInfoHandle     = {};
         self.supportMetadataHandle = {};
         self.versionInfoHandle     = {};
@@ -109,9 +106,6 @@ define([
                     });
             }
         };
-        self.downloadLogfiles = function(nodeIP) {
-            var test = 0;
-        };
         self.loadStorageRouters = function() {
             return $.Deferred(function(deferred) {
                 var options = {
@@ -180,17 +174,6 @@ define([
                                     storageRouter.loading(false);
                                 })
                         });
-                        if (self.storageRouters().length > 0 && generic.xhrCompleted(self.loadStorageNodeHandle)) {
-                            self.loadStorageNodeHandle = api.get('storagerouters/' + self.storageRouters()[0].guid() + '/load_storage_nodes')
-                                .then(self.shared.tasks.wait)
-                                .done(function(data) {
-                                    self.storageNodeMap(data);
-                                    var ips = generic.keys(data);
-                                    ips.sort(generic.ipSort);
-                                    self.storageNodeIPs(ips);
-
-                                });
-                        }
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
@@ -199,6 +182,13 @@ define([
 
         // Durandal
         self.activate = function() {
+            $.each(shared.hooks.pages, function(pageType, pages) {
+                if (pageType === 'support') {
+                    $.each(pages, function(index, page) {
+                        page.activator.activateItem(page.module);
+                    })
+                }
+            });
             self.refresher.init(function() {
                 self.loadStorageRouters();
             }, 5000);
@@ -206,6 +196,13 @@ define([
             self.refresher.run();
         };
         self.deactivate = function() {
+            $.each(shared.hooks.pages, function(pageType, pages) {
+                if (pageType === 'support') {
+                    $.each(pages, function(index, page) {
+                        page.activator.deactivateItem(page.module);
+                    });
+                }
+            });
             $.each(self.widgets, function(i, item) {
                 item.deactivate();
             });

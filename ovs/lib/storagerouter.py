@@ -1427,18 +1427,6 @@ class StorageRouterController(object):
         StorageRouterController._logger.debug('Partition configured')
 
     @staticmethod
-    @celery.task(name='ovs.storagerouter.load_storage_nodes')
-    def load_storage_nodes():
-        """
-        Retrieve information about the storage nodes using 'hooks'
-        :return: None
-        """
-        output = {}
-        for function in Toolbox.fetch_hooks('storage_nodes', 'load'):
-            output.update(function())
-        return output
-
-    @staticmethod
     def _get_free_ports(client, ports_in_use, number):
         """
         Gets `number` free ports that are not in use and not reserved
