@@ -238,6 +238,39 @@ define(['jquery', 'jqp/pnotify'], function($) {
             }
         }
     }
+    function numberSort(itemA, itemB) {
+        if ((itemA === undefined || itemA === null) && (itemB !== undefined && itemB !== null)) {
+            return -1;
+        }
+        if ((itemA === undefined || itemA === null) && (itemB === undefined || itemB === null)) {
+            return 0;
+        }
+        if ((itemA !== undefined && itemA !== null) && (itemB === undefined || itemB === null)) {
+            return 1;
+        }
+        var regexAlpha = /[\d]+/g,
+        regexNumber = /[^\d]+/g,
+        partA = itemA.replace(regexAlpha, ''),
+        partB = itemB.replace(regexAlpha, '');
+        if (partA === partB) {
+            partA = parseInt(itemA.replace(regexNumber, ''), 10);
+            partB = parseInt(itemB.replace(regexNumber, ''), 10);
+            return partA === partB ? 0 : (partA > partB ? 1 : -1);
+        }
+        return partA > partB ? 1 : -1;
+    }
+    function ipSort(ipA, ipB) {
+        var i, result,
+            ipAParts = ipA.split('.'),
+            ipBParts = ipB.split('.');
+        for (i = 0; i < 4; i += 1) {
+            result = numberSort(ipAParts[i], ipBParts[i]);
+            if (result !== 0) {
+                return result;
+            }
+        }
+        return 0;
+    }
     function validate(nodes) {
         var i, node, check, checkAndRedirect;
         check = function(node) {
@@ -502,6 +535,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         getCookie: getCookie,
         getHash: getHash,
         getTimestamp: getTimestamp,
+        ipSort: ipSort,
         isEmpty: isEmpty,
         keys: keys,
         log: log,

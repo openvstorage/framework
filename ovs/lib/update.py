@@ -544,7 +544,7 @@ class UpdateController(object):
             local_ip = None
             for sr in storage_routers:
                 try:
-                    ssh_clients.append(SSHClient(sr.ip, username='root'))
+                    ssh_clients.append(SSHClient(sr, username='root'))
                     if sr == System.get_my_storagerouter():
                         local_ip = sr.ip
                     if sr.node_type == 'MASTER':
