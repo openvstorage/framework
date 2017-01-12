@@ -592,3 +592,14 @@ class StorageRouterViewSet(viewsets.ViewSet):
             - prerequisites that have not been met
         """
         return UpdateController.get_update_information_all.delay()
+
+    @link()
+    @log()
+    @required_roles(['read'])
+    @return_task()
+    @load(StorageRouter)
+    def load_storage_nodes(self):
+        """
+        Retrieve the names of the StorageNodes using hooks
+        """
+        return StorageRouterController.load_storage_nodes.delay()

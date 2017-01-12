@@ -508,6 +508,7 @@
         "savingmsg": "Your settings are being applied",
         "sourcecode": "Source Code:",
         "sourcecodeurl": "https://github.com/openvstorage",
+        "storage_nodes": "Storage Nodes:",
         "title": "Support",
         "volumedriver-no-dedup-base": "Storage Driver - Base",
         "volumedriver-no-dedup-server": "Storage Driver - Server"

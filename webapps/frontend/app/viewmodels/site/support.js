@@ -24,20 +24,25 @@ define([
         var self = this;
 
         // Variables
-        self.widgets               = [];
-        self.shared                = shared;
-        self.guard                 = { authenticated: true };
-        self.refresher             = new Refresher();
-        self.supportInfoHandle     = {};
-        self.supportMetadataHandle = {};
-        self.versionInfoHandle     = {};
+        self.widgets   = [];
+        self.shared    = shared;
+        self.guard     = { authenticated: true };
+        self.refresher = new Refresher();
 
         // Observables
+        self.storageNodeIPs = ko.observableArray([]);
+        self.storageNodeMap = ko.observable();
         self.storageRouters = ko.observableArray([]);
         self.clusterid      = ko.observable();
         self.dirty          = ko.observable(false);
         self._enable        = ko.observable();
         self._enableSupport = ko.observable();
+
+        // Handles
+        self.loadStorageNodeHandle = undefined;
+        self.supportInfoHandle     = {};
+        self.supportMetadataHandle = {};
+        self.versionInfoHandle     = {};
 
         // Computed
         self.enableSupport = ko.computed({
@@ -104,7 +109,10 @@ define([
                     });
             }
         };
-        self.fetchStorageRouters = function() {
+        self.downloadLogfiles = function(nodeIP) {
+            var test = 0;
+        };
+        self.loadStorageRouters = function() {
             return $.Deferred(function(deferred) {
                 var options = {
                     sort: 'name',
@@ -172,6 +180,17 @@ define([
                                     storageRouter.loading(false);
                                 })
                         });
+                        if (self.storageRouters().length > 0 && generic.xhrCompleted(self.loadStorageNodeHandle)) {
+                            self.loadStorageNodeHandle = api.get('storagerouters/' + self.storageRouters()[0].guid() + '/load_storage_nodes')
+                                .then(self.shared.tasks.wait)
+                                .done(function(data) {
+                                    self.storageNodeMap(data);
+                                    var ips = generic.keys(data);
+                                    ips.sort(generic.ipSort);
+                                    self.storageNodeIPs(ips);
+
+                                });
+                        }
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
@@ -181,7 +200,7 @@ define([
         // Durandal
         self.activate = function() {
             self.refresher.init(function() {
-                self.fetchStorageRouters();
+                self.loadStorageRouters();
             }, 5000);
             self.refresher.start();
             self.refresher.run();

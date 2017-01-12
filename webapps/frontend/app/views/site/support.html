@@ -37,6 +37,15 @@ but WITHOUT ANY WARRANTY of any kind.
                             </span>
                         </li>
                     </ul>
+                    <span data-i18n="ovs:support.storage_nodes" data-bind="visible: storageNodeMap() !== undefined"></span><br />
+                    <ul data-bind="foreach: storageNodeIPs">
+                        <li>
+                            <span data-bind="text: $data"></span>: <span data-bind="text: $root.storageNodeMap()[$data]"></span>
+                            <span data-bind="visible: $root.shared.user.roles().contains('manage')">
+                                &nbsp; &nbsp; (<a href="#" data-bind="click: function() {$root.downloadLogfiles($data)}, text: 'test'"></a>)
+                            </span>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>
