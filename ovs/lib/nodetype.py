@@ -225,25 +225,19 @@ class NodeTypeController(object):
 
         external_config = Configuration.get('/ovs/framework/external_config')
         if external_config is None:
-            config_store = Configuration.get_store()
-            if config_store == 'arakoon':
-                Toolbox.log(logger=NodeTypeController._logger, messages='Joining Arakoon configuration cluster')
-                metadata = ArakoonInstaller.extend_cluster(master_ip=master_ip,
-                                                           new_ip=cluster_ip,
-                                                           cluster_name='config',
-                                                           base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
-                                                           ports=[26400, 26401],
-                                                           filesystem=True)
-                ArakoonInstaller.restart_cluster_add(cluster_name='config',
-                                                     current_ips=metadata['ips'],
-                                                     new_ip=cluster_ip,
-                                                     filesystem=True)
-                ServiceManager.register_service(node_name=machine_id,
-                                                service_metadata=metadata['service_metadata'])
-            else:
-                from ovs.extensions.db.etcd.installer import EtcdInstaller
-                Toolbox.log(logger=NodeTypeController._logger, messages='Joining Etcd cluster')
-                EtcdInstaller.extend_cluster(master_ip, cluster_ip, 'config')
+            Toolbox.log(logger=NodeTypeController._logger, messages='Joining Arakoon configuration cluster')
+            metadata = ArakoonInstaller.extend_cluster(master_ip=master_ip,
+                                                       new_ip=cluster_ip,
+                                                       cluster_name='config',
+                                                       base_dir=Configuration.get('/ovs/framework/paths|ovsdb'),
+                                                       ports=[26400, 26401],
+                                                       filesystem=True)
+            ArakoonInstaller.restart_cluster_add(cluster_name='config',
+                                                 current_ips=metadata['ips'],
+                                                 new_ip=cluster_ip,
+                                                 filesystem=True)
+            ServiceManager.register_service(node_name=machine_id,
+                                            service_metadata=metadata['service_metadata'])
 
         # Find other (arakoon) master nodes
         arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|ovsdb'))
@@ -330,7 +324,7 @@ class NodeTypeController(object):
         NodeTypeController._configure_amqp_to_volumedriver()
 
         Toolbox.log(logger=NodeTypeController._logger, messages='Starting services')
-        services = ['memcached', 'arakoon-ovsdb', 'rabbitmq-server', 'etcd-config']
+        services = ['memcached', 'arakoon-ovsdb', 'rabbitmq-server']
         if arakoon_metadata['internal'] is True:
             services.remove('arakoon-ovsdb')
         for service in services:
@@ -400,18 +394,12 @@ class NodeTypeController(object):
         try:
             external_config = Configuration.get('/ovs/framework/external_config')
             if external_config is None:
-                config_store = Configuration.get_store()
-                if config_store == 'arakoon':
-                    Toolbox.log(logger=NodeTypeController._logger, messages='Leaving Arakoon config cluster')
-                    ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip,
-                                                    remaining_node_ips=master_node_ips,
-                                                    cluster_name='config',
-                                                    offline_nodes=offline_node_ips,
-                                                    filesystem=True)
-                else:
-                    from ovs.extensions.db.etcd.installer import EtcdInstaller
-                    Toolbox.log(logger=NodeTypeController._logger, messages='Leaving Etcd cluster')
-                    EtcdInstaller.shrink_cluster(master_ip, cluster_ip, 'config', offline_node_ips)
+                Toolbox.log(logger=NodeTypeController._logger, messages='Leaving Arakoon config cluster')
+                ArakoonInstaller.shrink_cluster(deleted_node_ip=cluster_ip,
+                                                remaining_node_ips=master_node_ips,
+                                                cluster_name='config',
+                                                offline_nodes=offline_node_ips,
+                                                filesystem=True)
         except Exception as ex:
             Toolbox.log(logger=NodeTypeController._logger, messages=['\nFailed to leave configuration cluster', ex], loglevel='exception')
 

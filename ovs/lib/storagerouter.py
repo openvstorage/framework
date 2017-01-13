@@ -255,7 +255,7 @@ class StorageRouterController(object):
                 ip_client_map[sr.ip] = {'ovs': SSHClient(sr.ip, username='ovs'),
                                         'root': SSHClient(sr.ip, username='root')}
             except UnableToConnectException:
-                offline_nodes_detected = True  # We currently want to allow offline nodes while setting up or extend a vpool (etcd implementation should prevent further failures)
+                offline_nodes_detected = True  # We currently want to allow offline nodes while setting up or extend a vpool
             except Exception as ex:
                 raise RuntimeError('Something went wrong building SSH connections. {0}'.format(ex))
 
