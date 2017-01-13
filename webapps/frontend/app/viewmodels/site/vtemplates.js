@@ -24,25 +24,25 @@ define([
         var self = this;
 
         // Variables
-        self.shared                  = shared;
-        self.guard                   = { authenticated: true };
-        self.refresher               = new Refresher();
-        self.widgets                 = [];
-        self.query                   = {
+        self.shared               = shared;
+        self.guard                = { authenticated: true };
+        self.refresher            = new Refresher();
+        self.widgets              = [];
+        self.query                = {
             type: 'AND',
             items: [['is_vtemplate', 'EQUALS', true]]
         };
-        self.vDiskTemplateHeaders    = [
+        self.vDiskTemplateHeaders = [
             { key: 'name',     value: $.t('ovs:generic.name'),     width: undefined },
             { key: 'children', value: $.t('ovs:generic.children'), width: 110       },
             { key: undefined,  value: $.t('ovs:generic.actions'),  width: 80        }
         ];
 
         // Observables
-        self.vDiskTemplates    = ko.observableArray([]);
+        self.vDiskTemplates = ko.observableArray([]);
 
         // Handles
-        self.vDiskTemplatesHandle    = {};
+        self.vDiskTemplatesHandle = {};
 
         // Functions
         self.loadVDiskTemplates = function(options) {
@@ -57,9 +57,6 @@ define([
                                 data: data,
                                 loader: function(guid) {
                                     return new VDisk(guid);
-                                },
-                                dependencyLoader: function(item) {
-                                    item.fetchChildrenGuids();
                                 }
                             });
                         })

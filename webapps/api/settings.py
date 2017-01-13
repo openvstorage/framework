@@ -33,7 +33,16 @@ APP_NAME = 'api'
 BASE_WWW_DIR = os.path.dirname(__file__)
 
 BASE_FOLDER = '/opt/OpenvStorage/webapps/{0}'.format(APP_NAME)
-VERSION = (2, 3, 4, 5, 6, 7)  # This tuple should contain all supported API versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
+VERSION = (2, 3, 4, 5, 6, 7, 8)  # This tuple should contain all supported API versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
+# 2016-02-12: * Introduced version 2
+# 2016-04-13: * Introduced version 3
+# 2016-06-23: * Introduced version 4
+# 2016-09-16: * Introduced version 5
+# 2016-10-24: * Removed version 1
+# 2016-11-07: * Introduced version 6
+# 2016-11-28: * Introduced version 7
+# 2017-01-13: * Introduced version 8
+#             * vdisks.get_children: Deprecated (max_version 7)
 
 BASE_LOG_DIR = '/var/log/ovs'
 LOG_FILENAME = '/django.log'
