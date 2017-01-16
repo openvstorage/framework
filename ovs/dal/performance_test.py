@@ -18,8 +18,13 @@
 """
 Performance unittest module
 """
-import time
 import sys
+import time
+import uuid
+import random
+
+sys.path.append('/opt/OpenvStorage')
+
 from ovs.dal.hybrids.t_testdisk import TestDisk
 from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.datalist import DataList
@@ -46,14 +51,22 @@ class LotsOfObjects(object):
         print ''
         print 'cleaning up'
         self._clean_all()
-        print 'start test'
-        tstart = time.time()
+        print 'preparing'
         if getattr(LotsOfObjects, 'amount_of_machines', None) is None:
             LotsOfObjects.amount_of_machines = 50
         if getattr(LotsOfObjects, 'amount_of_disks', None) is None:
             LotsOfObjects.amount_of_disks = 5
+        if getattr(LotsOfObjects, 'repetition_scan', None) is None:
+            LotsOfObjects.repetition_scan = 32
         load_data = True
         mguids = []
+        uuids = [str(uuid.uuid4()) for _ in xrange(int(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks))]
+        counter = 0
+        repetition = []
+        for i in xrange(LotsOfObjects.repetition_scan):
+            repetition.append([])
+        print 'start test'
+        tstart = time.time()
         if load_data:
             print '\nstart loading data'
             start = time.time()
@@ -65,11 +78,16 @@ class LotsOfObjects(object):
                 machine.save()
                 mguids.append(machine.guid)
                 for ii in xrange(0, int(LotsOfObjects.amount_of_disks)):
+                    current_uuid = uuids[counter]
                     disk = TestDisk()
                     disk.name = 'disk_{0}_{1}'.format(i, ii)
+                    disk.description = 'disk_{0}'.format(i)
                     disk.size = ii * 100
                     disk.machine = machine
+                    disk.something = current_uuid
                     disk.save()
+                    repetition[random.randint(0, LotsOfObjects.repetition_scan - 1)].append(current_uuid)
+                    counter += 1
                 avgitemspersec = ((i + 1) * LotsOfObjects.amount_of_disks) / (time.time() - start)
                 itemspersec = LotsOfObjects.amount_of_disks / (time.time() - mstart)
                 runtimes.append(itemspersec)
@@ -99,7 +117,7 @@ class LotsOfObjects(object):
                                         'items': [('size', DataList.operator.GT, 100),
                                                   ('size', DataList.operator.LT, (LotsOfObjects.amount_of_disks - 1) * 100)]})
             amount = len(dlist)
-            assert amount == (LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines, 'Incorrect amount of disks. Found {0} instead of {1}'.format(amount, int((LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines))
+            assert amount == (max(0, LotsOfObjects.amount_of_disks - 3)) * LotsOfObjects.amount_of_machines, 'Incorrect amount of disks. Found {0} instead of {1}'.format(amount, int((max(0, LotsOfObjects.amount_of_disks - 3)) * LotsOfObjects.amount_of_machines))
             seconds_passed = (time.time() - start)
             print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
 
@@ -118,7 +136,15 @@ class LotsOfObjects(object):
                                         'items': [('size', DataList.operator.GT, 100),
                                                   ('size', DataList.operator.LT, (LotsOfObjects.amount_of_disks - 1) * 100)]})
             amount = len(dlist)
-            assert amount == (LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines, 'Incorrect amount of disks. Found {0} instead of {1}'.format(amount, int((LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines))
+            assert amount == (max(0, LotsOfObjects.amount_of_disks - 3)) * LotsOfObjects.amount_of_machines, 'Incorrect amount of disks. Found {0} instead of {1}'.format(amount, int((max(0, LotsOfObjects.amount_of_disks - 3)) * LotsOfObjects.amount_of_machines))
+            seconds_passed = (time.time() - start)
+            print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
+
+            print '\nindexed single query'
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('something', DataList.operator.EQUALS, repetition[0][0])]})
+            start = time.time()
+            assert len(dlist) == 1, 'One disk should be found'
             seconds_passed = (time.time() - start)
             print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
 
@@ -138,6 +164,18 @@ class LotsOfObjects(object):
             dlist.sort(key=lambda a: Toolbox.extract_key(a, 'predictable'))
             seconds_passed = (time.time() - start)
             print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
+
+            print '\nrepetition scan'
+            start = time.time()
+            times = []
+            for i in xrange(LotsOfObjects.repetition_scan):
+                dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                            'items': [('something', DataList.operator.IN, repetition[i])]})
+                run_start = time.time()
+                assert len(repetition[i]) == len(dlist), 'Incorrect amount of found disks. Found {0} instead of {1}'.format(len(dlist), len(repetition[i]))
+                times.append(time.time() - run_start)
+            seconds_passed = time.time() - start
+            print 'completed ({0}s) in {1} seconds (run avg: {2}s, avg: {3} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(sum(times) / LotsOfObjects.repetition_scan, 2), round(LotsOfObjects.repetition_scan * LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
 
         clean_data = True
         if clean_data:
@@ -181,8 +219,9 @@ class LotsOfObjects(object):
                 machine.delete()
             except (ObjectNotFoundException, ValueError):
                 pass
-        for key in self.persistent.prefix('ovs_reverseindex_{0}'.format(machine._classname)):
-            self.persistent.delete(key)
+        for prefix in ['ovs_reverseindex_{0}', 'ovs_unique_{0}', 'ovs_index_{0}']:
+            for key in self.persistent.prefix(prefix.format(machine._classname)):
+                self.persistent.delete(key)
         disk = TestDisk()
         prefix = '{0}_{1}_'.format(DataObject.NAMESPACE, disk._classname)
         keys = self.persistent.prefix(prefix)
@@ -193,12 +232,15 @@ class LotsOfObjects(object):
                 disk.delete()
             except (ObjectNotFoundException, ValueError):
                 pass
-        for key in self.persistent.prefix('ovs_reverseindex_{0}'.format(disk._classname)):
-            self.persistent.delete(key)
+        for prefix in ['ovs_reverseindex_{0}', 'ovs_unique_{0}', 'ovs_index_{0}']:
+            for key in self.persistent.prefix(prefix.format(disk._classname)):
+                self.persistent.delete(key)
 
 if __name__ == '__main__':
     if len(sys.argv) >= 3:
         LotsOfObjects.amount_of_machines = float(sys.argv[1])
         LotsOfObjects.amount_of_disks = float(sys.argv[2])
+    if len(sys.argv) >= 4:
+        LotsOfObjects.repetition_scan = float(sys.argv[3])
     performance = LotsOfObjects()
     performance.test_lotsofobjects()

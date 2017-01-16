@@ -24,8 +24,7 @@ import random
 import hashlib
 from random import randint
 from ovs.dal.helpers import Descriptor, HybridRunner
-from ovs.dal.exceptions import ObjectNotFoundException, RaceConditionException
-from ovs.extensions.storage.exceptions import KeyNotFoundException
+from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.dal.relations import RelationMapper
@@ -92,6 +91,7 @@ class DataList(object):
         self._shallow_sort = True
 
         self.from_cache = None
+        self.from_index = 'none'
 
     @property
     def guids(self):
@@ -106,6 +106,121 @@ class DataList(object):
     # Query functionality #
     #######################
 
+    def _get_keys_from_index(self, indexed_properties, items, where_operator):
+        """
+        Builds a generator that only yields data filtered by possible indexes where possible.
+        :param indexed_properties: A list of all indexed properties
+        :param items: The query items
+        :param where_operator: The WHERE operator
+        """
+        if not self._can_use_indexes(indexed_properties, items, where_operator):
+            raise RuntimeError('A request for loading data from indexes is aborted since the query is not index-safe.')
+
+        base_index_prefix = 'ovs_index_{0}|{1}|{2}'
+        keys = None
+        for item in items[:]:
+            if isinstance(item, dict):
+                indexed_keys = self._get_keys_from_index(indexed_properties, item['items'], item['type'])
+                if indexed_keys is not None:
+                    if keys is None:
+                        keys = indexed_keys
+                    elif where_operator == DataList.where_operator.AND:
+                        keys &= indexed_keys
+                    else:
+                        keys |= indexed_keys
+                    if self.from_index == 'none':
+                        self.from_index = 'full'
+                elif self.from_index == 'full':
+                    self.from_index = 'partial'
+            else:
+                if item[0] in indexed_properties:
+                    if item[1] == DataList.operator.EQUALS:
+                        index_prefix = base_index_prefix.format(self._object_type.__name__.lower(), item[0],
+                                                                hashlib.sha1(str(item[2])).hexdigest())
+                        # [item for sublist in mainlist for item in sublist] - shitty nested list comprehensions
+                        indexed_keys = set(str(key)
+                                           for _, keys_set in self._persistent.prefix_entries(index_prefix)
+                                           if keys_set is not None
+                                           for key in keys_set)
+                        if keys is None:
+                            keys = indexed_keys
+                        elif where_operator == DataList.where_operator.AND:
+                            keys &= indexed_keys
+                        else:
+                            keys |= indexed_keys
+                        if self.from_index == 'none':
+                            self.from_index = 'full'
+                        items.remove(item)
+                    elif item[1] == DataList.operator.IN and isinstance(item[2], list):
+                        index_keys = [base_index_prefix.format(self._object_type.__name__.lower(), item[0],
+                                                               hashlib.sha1(str(sub_item)).hexdigest())
+                                      for sub_item in item[2]]
+                        # [item for sublist in mainlist for item in sublist] - shitty nested list comprehensions
+                        indexed_keys = set(str(key)
+                                           for keys_set in self._persistent.get_multi(index_keys, must_exist=False)
+                                           if keys_set is not None
+                                           for key in keys_set)
+                        if keys is None:
+                            keys = indexed_keys
+                        elif where_operator == DataList.where_operator.AND:
+                            keys &= indexed_keys
+                        else:
+                            keys |= indexed_keys
+                        if self.from_index == 'none':
+                            self.from_index = 'full'
+                        items.remove(item)
+                    elif self.from_index == 'full':
+                        self.from_index = 'partial'
+                elif self.from_index == 'full':
+                    self.from_index = 'partial'
+        return keys
+
+    def _can_use_indexes(self, indexed_properties, query_items, where_operator):
+        """
+        Validates the given query to decide whether it's possible to use indexes.
+        Indexes are possible UNLESS there is a query to a non-indexed property inside an OR block
+        :param indexed_properties: The names of all indexed properties
+        :param query_items: The query items
+        :param where_operator: The WHERE operator
+        :return: Whether or not it's possible to use indexes
+        """
+        if where_operator not in [DataList.where_operator.AND, DataList.where_operator.OR]:
+            raise NotImplementedError('Invalid where operator specified')
+
+        for item in query_items:
+            if isinstance(item, dict):
+                possible = self._can_use_indexes(indexed_properties, item['items'], item['type'])
+                if possible is False:
+                    return False
+            elif item[0] not in indexed_properties and where_operator == DataList.where_operator.OR:
+                return False
+        return True
+
+    def _data_generator(self, prefix, query_items, query_type):
+        """
+        Generator that yields key-value pairs for the given prefix. If indexes are available an can be
+        used, it yields only the relevant data that is referred to by the indexes
+        :param prefix: The prefix to be returned, if not using indexes
+        :param query_items: The query items
+        :param query_type: The WHERE operator
+        :return: A generator that yields key-value pairs for the data to be filtered
+        """
+        indexed_properties = [prop.name for prop in self._object_type._properties if prop.indexed is True]
+        use_indexes = self._can_use_indexes(indexed_properties, query_items, query_type)
+        if use_indexes is True:
+            keys = self._get_keys_from_index(indexed_properties, query_items, query_type)
+            if keys is not None:
+                if self.from_index == 'none':
+                    self.from_index = 'full'
+                keys = list(keys)
+                for index, value in enumerate(self._persistent.get_multi(keys)):
+                    yield keys[index], value
+            else:
+                use_indexes = False
+        if use_indexes is False:
+            for item in self._persistent.prefix_entries(prefix):
+                yield item
+
     def _filter(self, instance, items, where_operator):
         """
         Executes a given set of query items against the instance in an "AND" scope
@@ -116,6 +231,8 @@ class DataList(object):
         """
         if where_operator not in [DataList.where_operator.AND, DataList.where_operator.OR]:
             raise NotImplementedError('Invalid where operator specified')
+        if len(items) == 0:
+            return True, instance
         return_value = where_operator == DataList.where_operator.OR
         for item in items:
             if isinstance(item, dict):
@@ -173,14 +290,14 @@ class DataList(object):
         if item[1] == DataList.operator.LT:
             return value < item[2], instance
         if item[1] == DataList.operator.IN:
-            if ignorecase:
+            if ignorecase is True:
                 if isinstance(item[2], list):
                     return value.lower() in [x.lower() for x in item[2]], instance
                 else:
                     return value.lower() in item[2].lower(), instance
             return value in item[2], instance
         if item[1] == DataList.operator.CONTAINS:
-            if ignorecase:
+            if ignorecase is True:
                 return item[2].lower() in value.lower(), instance
             return item[2] in value, instance
         raise NotImplementedError('Invalid operator specified')
@@ -211,25 +328,16 @@ class DataList(object):
 
         if self._guids is not None:
             keys = ['{0}{1}'.format(prefix, guid) for guid in self._guids]
-            successful = False
-            tries = 0
-            entries = []
-            while successful is False:
-                tries += 1
-                if tries > 5:
-                    raise RaceConditionException()
-                try:
-                    entries = list(self._persistent.get_multi(keys))
-                    successful = True
-                except KeyNotFoundException as knfe:
-                    keys.remove(knfe.message)
-                    self._guids.remove(knfe.message.replace(prefix, ''))
+            entries = list(self._persistent.get_multi(keys, must_exist=False))
 
             self._data = {}
             self._objects = {}
-            for index, guid in enumerate(self._guids):
-                self._data[guid] = {'data': entries[index],
-                                    'guid': guid}
+            for index, guid in enumerate(self._guids[:]):
+                if entries[index] is None:
+                    self._guids.remove(guid)
+                else:
+                    self._data[guid] = {'data': entries[index],
+                                        'guid': guid}
             self._executed = True
             return
 
@@ -253,7 +361,7 @@ class DataList(object):
             self._data = {}
             self._objects = {}
             elements = 0
-            for key, data in self._persistent.prefix_entries(prefix):
+            for key, data in self._data_generator(prefix, query_items, query_type):
                 elements += 1
                 try:
                     guid = key.replace(prefix, '')
@@ -283,26 +391,16 @@ class DataList(object):
             self._guids = cached_data
 
             keys = ['{0}{1}'.format(prefix, guid) for guid in self._guids]
-            successful = False
-            tries = 0
-            entries = []
-            while successful is False:
-                tries += 1
-                if tries > 5:
-                    raise RaceConditionException()
-                try:
-                    entries = list(self._persistent.get_multi(keys))
-                    successful = True
-                except KeyNotFoundException as knfe:
-                    keys.remove(knfe.message)
-                    self._guids.remove(knfe.message.replace(prefix, ''))
+            entries = list(self._persistent.get_multi(keys, must_exist=False))
 
             self._data = {}
             self._objects = {}
-            for index in xrange(len(self._guids)):
-                guid = self._guids[index]
-                self._data[guid] = {'data': entries[index],
-                                    'guid': guid}
+            for index, guid in enumerate(self._guids[:]):
+                if entries[index] is None:
+                    self._guids.remove(guid)
+                else:
+                    self._data[guid] = {'data': entries[index],
+                                        'guid': guid}
             self._executed = True
 
     @staticmethod
@@ -335,7 +433,7 @@ class DataList(object):
                         # The guid is a final value which can't be changed so it shouldn't be taken into account
                         break
                     elif pitem in (prop.name for prop in value._properties):
-                        # The pitem is in the blueprint, so it's a simple property (e.g. vmachine.name)
+                        # The pitem is in the properties, so it's a simple property (e.g. vmachine.name)
                         add(class_name, pitem)
                         break
                     elif pitem in (relation.name for relation in value._relations):
@@ -353,7 +451,7 @@ class DataList(object):
                         # The pitem is a dynamic property, which will be ignored anyway
                         break
                     else:
-                        # No blueprint and no relation, it might be a foreign relation (e.g. vmachine.vdisks)
+                        # No property and no relation, it might be a foreign relation (e.g. vmachine.vdisks)
                         # this means the pitem most likely contains an index
                         cleaned_pitem = pitem.split('[')[0]
                         relations = RelationMapper.load_foreign_relations(value)

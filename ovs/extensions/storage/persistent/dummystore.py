@@ -73,7 +73,7 @@ class DummyPersistentStore(object):
         else:
             raise KeyNotFoundException(key)
 
-    def get_multi(self, keys):
+    def get_multi(self, keys, must_exist=True):
         """
         Retrieves values for all given keys
         """
@@ -81,8 +81,10 @@ class DummyPersistentStore(object):
         for key in keys:
             if key in data:
                 yield copy.deepcopy(data[key])
-            else:
+            elif must_exist is True:
                 raise KeyNotFoundException(key)
+            else:
+                yield None
 
     def prefix(self, key):
         """

@@ -31,6 +31,8 @@ class TestDisk(DataObject):
                     Property('description', str, mandatory=False, doc='Description of the test disk'),
                     Property('size', float, default=0, doc='Size of the test disk'),
                     Property('order', int, default=0, doc='Order of the test disk'),
+                    Property('something', str, mandatory=False, indexed=True, doc='Some property that can be set'),
+                    Property('something2', str, mandatory=False, indexed=True, doc='Some other property that can be set'),
                     Property('type', ['ONE', 'TWO'], mandatory=False, doc='Type of the test disk')]
     __relations = [Relation('machine', TestMachine, 'disks', mandatory=False),
                    Relation('storage', TestMachine, 'stored_disks', mandatory=False),
