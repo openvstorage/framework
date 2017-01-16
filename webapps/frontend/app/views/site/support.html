@@ -30,13 +30,21 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span data-i18n="ovs:support.clusterid"></span> <span data-bind="text: clusterid"></span><br />
                     <span data-i18n="ovs:support.nodes"></span><br />
                     <ul data-bind="foreach: storageRouters">
-                        <li>
-                            <span data-bind="text: name"></span>: <span data-bind="text: nodeid"></span>
-                            <span data-bind="visible: $root.shared.user.roles().contains('manage')">
-                                &nbsp; &nbsp; (<a href="#" data-bind="click: downloadLogfiles, text: downloadLogState"></a>)
-                            </span>
+                         <li style="margin-top: 2px;">
+                            <span data-bind="text: name"></span>&nbsp; &nbsp;
+                            <button type="button" class="btn btn-mini btn-default hand" id="buttonDownload"
+                                    data-bind="click: downloadLogfiles,
+                                               enable: $root.shared.user.roles().contains('manage') && downLoadingLogs() === false,
+                                               tooltip: downloadLogState()">
+                                <span class="hand fa" data-bind="visible: downLoadingLogs() === false" data-i18n="[html]ovs:icons.download"></span>
+                                <span class="hand fa fa-spin" data-bind="visible: downLoadingLogs() === true" data-i18n="[html]ovs:icons.loading"></span>
+                            </button>
                         </li>
                     </ul>
+                    <!-- Support page for plugins -->
+                    <!-- ko foreach: shared.hooks.pages['support'] -->
+                        <div data-bind="compose: $data.activator"></div>
+                    <!-- /ko -->
                 </div>
             </div>
         </div>

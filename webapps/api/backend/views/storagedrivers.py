@@ -21,11 +21,12 @@ StorageDriver API module
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
-from api.backend.decorators import required_roles, load, return_list, return_object, return_simple, log
+from api.backend.decorators import load, log, required_roles, return_list, return_object, return_simple, return_task
 from api.backend.exceptions import HttpNotAcceptableException
-from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs.lib.storagedriver import StorageDriverController
 
 
 class StorageDriverViewSet(viewsets.ViewSet):
@@ -81,3 +82,16 @@ class StorageDriverViewSet(viewsets.ViewSet):
             raise HttpNotAcceptableException(error_description='Only available in API versions 1 to 4',
                                              error='invalid_version')
         return not any(vdisk for vdisk in storagedriver.vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageDriver)
+    def refresh_configuration(self, storagedriver):
+        """
+        Refresh the configuration of the StorageDriver
+        :param storagedriver: Guid of the Storage Driver
+        :type storagedriver: StorageDriver
+        """
+        return StorageDriverController.refresh_configuration.delay(storagedriver_guid=storagedriver.guid)

@@ -309,6 +309,8 @@ class NodeInstallationController(object):
 
                 if cluster_ip is None or master_ip is None:  # Master IP and cluster IP must be known by now, cluster_ip == master_ip for 1st node
                     raise ValueError('Something must have gone wrong retrieving IP information')
+                if first_node is False and cluster_ip in [node['ip'] for node in NodeInstallationController.nodes.itervalues()]:
+                    raise ValueError('Node with public IP {0} is already part of cluster {1}'.format(cluster_ip, cluster_name))
 
                 if node_name != fqdn_name:
                     ip_hostname_map = {cluster_ip: [fqdn_name, node_name]}
