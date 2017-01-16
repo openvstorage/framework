@@ -1587,6 +1587,8 @@ class Basic(unittest.TestCase):
         disk1.something = 'one'
         disk1.save()
         _validate_index({one_hash: 1})
+        disk1.save()
+        _validate_index({one_hash: 1})
         disk2 = TestDisk()
         disk2.name = 'disk2'
         disk2.something = 'two'
@@ -1604,6 +1606,9 @@ class Basic(unittest.TestCase):
         disk2.save()
         _validate_index({one_hash: 1,
                          two_hash: 1})
+        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                    'items': [('something2', DataList.operator.EQUALS, None)]})
+        self.assertEqual(len(dlist), 2)
         disk2.delete()
         _validate_index({one_hash: 1})
         disk1.delete()

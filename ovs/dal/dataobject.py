@@ -616,16 +616,17 @@ class DataObject(object):
                                 self._persistent.delete(index_key, transaction=transaction)
                             else:
                                 self._persistent.set(index_key, indexed_keys, transaction=transaction)
-                    new_value = self._data[key]
-                    index_key = base_index_key.format(classname, key, hashlib.sha1(str(new_value)).hexdigest())
-                    indexed_keys = list(self._persistent.get_multi([index_key], must_exist=False))[0]
-                    if indexed_keys is None:
-                        self._persistent.assert_value(index_key, None, transaction=transaction)
-                        self._persistent.set(index_key, [self._key], transaction=transaction)
-                    else:
-                        self._persistent.assert_value(index_key, indexed_keys[:], transaction=transaction)
-                        indexed_keys.append(self._key)
-                        self._persistent.set(index_key, indexed_keys, transaction=transaction)
+                    if self._new is True or key in changed_fields:
+                        new_value = self._data[key]
+                        index_key = base_index_key.format(classname, key, hashlib.sha1(str(new_value)).hexdigest())
+                        indexed_keys = list(self._persistent.get_multi([index_key], must_exist=False))[0]
+                        if indexed_keys is None:
+                            self._persistent.assert_value(index_key, None, transaction=transaction)
+                            self._persistent.set(index_key, [self._key], transaction=transaction)
+                        elif self._key not in indexed_keys:
+                            self._persistent.assert_value(index_key, indexed_keys[:], transaction=transaction)
+                            indexed_keys.append(self._key)
+                            self._persistent.set(index_key, indexed_keys, transaction=transaction)
 
             # Update reverse index
             base_reverse_key = 'ovs_reverseindex_{0}_{1}|{2}|{3}'

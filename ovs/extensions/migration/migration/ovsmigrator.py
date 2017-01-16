@@ -60,15 +60,16 @@ class OVSMigrator(object):
             from ovs.extensions.services.service import ServiceManager
             from ovs.extensions.services.systemd import Systemd
 
-            local_sr = System.get_my_storagerouter()
-            local_client = SSHClient(endpoint=local_sr, username='root')
+            local_machine_id = System.get_my_machine_id()
+            local_ip = Configuration.get('/ovs/framework/hosts/{0}/ip'.format(local_machine_id))
+            local_client = SSHClient(endpoint=local_ip, username='root')
             service_manager = 'systemd' if ServiceManager.ImplementationClass == Systemd else 'upstart'
             for cluster_name in list(Configuration.list('/ovs/arakoon')) + ['cacc']:
                 # Retrieve metadata
                 try:
                     metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
                 except NotFoundException:
-                    metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, filesystem=True, ip=local_sr.ip)
+                    metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name, filesystem=True, ip=local_ip)
 
                 if metadata['internal'] is False:
                     continue
@@ -91,7 +92,7 @@ class OVSMigrator(object):
                     continue
 
                 service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
-                configuration_key = '/ovs/framework/hosts/{0}/services/{1}'.format(local_sr.machine_id, service_name)
+                configuration_key = '/ovs/framework/hosts/{0}/services/{1}'.format(local_machine_id, service_name)
                 if Configuration.exists(configuration_key) and ServiceManager.has_service(name=service_name, client=local_client):
                     # Rewrite the service file
                     service_params = Configuration.get(configuration_key)
