@@ -65,6 +65,7 @@ class LotsOfObjects(object):
         repetition = []
         for i in xrange(LotsOfObjects.repetition_scan):
             repetition.append([])
+        dguids = []
         print 'start test'
         tstart = time.time()
         if load_data:
@@ -86,6 +87,7 @@ class LotsOfObjects(object):
                     disk.machine = machine
                     disk.something = current_uuid
                     disk.save()
+                    dguids.append(disk.guid)
                     random.choice(repetition).append(current_uuid)
                     counter += 1
                 avgitemspersec = ((i + 1) * LotsOfObjects.amount_of_disks) / (time.time() - start)
@@ -176,6 +178,15 @@ class LotsOfObjects(object):
                 times.append(time.time() - run_start)
             seconds_passed = time.time() - start
             print 'completed ({0}s) in {1} seconds (run avg: {2}s, avg: {3} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(sum(times) / LotsOfObjects.repetition_scan, 2), round(LotsOfObjects.repetition_scan * LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
+
+            print '\nguid index query'
+            start = time.time()
+            guids = dguids[len(dguids)/2:]
+            dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                        'items': [('guid', DataList.operator.IN, guids)]})
+            assert len(dlist) == len(guids), 'Incorrect amount of found disks. Found {0} instead of {1}'.format(len(dlist), len(guids))
+            seconds_passed = (time.time() - start)
+            print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
 
         clean_data = True
         if clean_data:

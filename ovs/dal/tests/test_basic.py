@@ -1758,3 +1758,36 @@ class Basic(unittest.TestCase):
                                     'items': [('something', DataList.operator.EQUALS, 'one')]})
         self.assertEqual(len(dlist), 1)
         self.assertEqual(dlist.from_index, 'full')
+
+    def test_indexed_guid(self):
+        """"
+        Validates whether the 'guid' is an implicitly indexed property
+        """
+        Basic._called = None
+
+        def _uses_indexes(datalist_object):
+            """
+            Sets a flag
+            """
+            _ = datalist_object
+            Basic._called = True
+
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.save()
+        DataList.test_hooks['data_generator'] = _uses_indexes
+        Basic._called = False
+        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                    'items': [('guid', DataList.operator.IN, [disk1.guid])]})
+        self.assertEqual(len(dlist), 1)
+        self.assertTrue(Basic._called)
+        self.assertEqual(dlist.from_index, 'full')
+        Basic._called = False
+        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                    'items': [('guid', DataList.operator.EQUALS, disk1.guid)]})
+        self.assertEqual(len(dlist), 1)
+        self.assertTrue(Basic._called)
+        self.assertEqual(dlist.from_index, 'full')
