@@ -109,7 +109,7 @@ class Upstart(object):
         :param target_name: The current service name eg ovs-volumedriver_flash01.service
         :type target_name: str
         :return: None
-        :rtype NoneType
+        :rtype: NoneType
         """
         configuration_key = Upstart.SERVICE_CONFIG_KEY.format(System.get_my_machine_id(client), Toolbox.remove_prefix(target_name, 'ovs-'))
         # If the entry is stored in arakoon, it means the service file was previously made
