@@ -87,7 +87,6 @@ class Configuration(object):
     def get_configuration_path(key):
         """
         Retrieve the configuration path
-        For etcd: 'etcd://127.0.0.1:2379{0}'.format(key)
         For arakoon: 'arakoon://cluster_id/{0}?ini=/path/to/arakoon_cacc.ini:{0}'.format(key)
         :param key: Key to retrieve the full configuration path for
         :type key: str
@@ -101,6 +100,13 @@ class Configuration(object):
 
     @staticmethod
     def extract_key_from_path(path):
+        """
+        Used in unittests to retrieve last key from a path
+        :param path: Path to extract key from
+        :type path: str
+        :return: The last part of the path
+        :rtype: str
+        """
         if os.environ.get('RUNNING_UNITTESTS') == 'True':
             return path.split('=')[-1]
         raise NotImplementedError()
@@ -397,15 +403,6 @@ class Configuration(object):
     @staticmethod
     def _passthrough(method, *args, **kwargs):
         store = Configuration.get_store()
-        if store == 'etcd':
-            import etcd
-            from ovs.extensions.db.etcd.configuration import EtcdConfiguration
-            try:
-                return getattr(EtcdConfiguration, method)(*args, **kwargs)
-            except etcd.EtcdKeyNotFound as ex:
-                raise NotFoundException(ex.message)
-            except (etcd.EtcdConnectionFailed, etcd.EtcdException) as ex:
-                raise ConnectionException(ex.message)
         if store == 'arakoon':
             from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import ArakoonNotFound
             from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
@@ -418,7 +415,7 @@ class Configuration(object):
     @staticmethod
     def get_store():
         """
-        Retrieve the configuration store method. This can either be 'etcd' or 'arakoon'
+        Retrieve the configuration store method. This can currently only be 'arakoon'
         :return: Store method
         :rtype: str
         """

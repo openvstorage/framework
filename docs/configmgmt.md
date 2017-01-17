@@ -1,11 +1,10 @@
 ## Configuration Management
 As Open vStorage is completely distributed it uses a distributed configuration management system.
-There are 2 option as configuration management system:
-* Arakoon, the preferred and advised system.
-* ETCD
+There is currently only 1 option as configuration management system:
+* Arakoon
 
 ### The main configuration file 
-The main config file `/opt/OpenvStorage/config/framework.json` contains the json `{"configuration_store": "arakoon|etcd"}` and must be available on all Open vStorage nodes. 
+The main config file `/opt/OpenvStorage/config/framework.json` contains the json `{"configuration_store": "arakoon"}` and must be available on all Open vStorage nodes. 
 In case of Arakoon there's the above `arakoon_cacc.ini` file available on all Open vStorage nodes and ALBA backend nodes. 
 This file might be provided by external means (unattended setup) during setup, but is afterwards maintained by the Open vStorage cluster. 
 Whoever is responsible for managing this cluster should make sure that the key `__ovs_config` contains a raw dump of it's config file. 
@@ -29,7 +28,6 @@ All framework keys stated below are relative to ```/ovs/framework```. E.g. ```cl
 arakoon_clusters = {"ovsdb": "$framework_arakoon_cluster_name",
                     "voldrv": "$storagedriver_arakoon_cluster_name"}
 cluster_id = "$cluster_id"
-external_etcd = "$external_etcd"
 install_time = "$epoch"
 rdma = true|false
 logging = {"type": "console|file|redis"}

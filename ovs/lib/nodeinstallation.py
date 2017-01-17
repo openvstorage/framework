@@ -78,14 +78,13 @@ class NodeInstallationController(object):
         logging_target = None
         external_config = None
         master_password = None
-        config_mgmt_type = None
         enable_heartbeats = True
 
         try:
             preconfig = '/opt/OpenvStorage/config/preconfig.json'
             if os.path.exists(preconfig):
                 config = {}
-                with open(preconfig, 'r') as pre_config:
+                with open(preconfig) as pre_config:
                     try:
                         config = json.loads(pre_config.read())
                     except Exception as ex:
@@ -96,7 +95,7 @@ class NodeInstallationController(object):
 
                 errors = []
                 config = config['setup']
-                expected_keys = ['cluster_ip', 'config_mgmt_type', 'enable_heartbeats', 'external_config', 'logging_target', 'master_ip', 'master_password', 'node_type', 'rdma', 'rollback']
+                expected_keys = ['cluster_ip', 'enable_heartbeats', 'external_config', 'logging_target', 'master_ip', 'master_password', 'node_type', 'rdma', 'rollback']
                 for key in config:
                     if key not in expected_keys:
                         errors.append('Key {0} is not supported by OpenvStorage to be used in the pre-configuration JSON'.format(key))
@@ -113,10 +112,6 @@ class NodeInstallationController(object):
                                                                 'node_type': (str, ['master', 'extra'], False),
                                                                 'rdma': (bool, None, False),
                                                                 'rollback': (bool, None, False)})
-                # Parameters only required for 1st node
-                if 'cluster_ip' not in config or config['master_ip'] == config['cluster_ip']:
-                    Toolbox.verify_required_params(actual_params=config,
-                                                   required_params={'config_mgmt_type': (str, ['arakoon', 'etcd'])})
 
                 # Required fields
                 master_ip = config['master_ip']
@@ -128,7 +123,6 @@ class NodeInstallationController(object):
                 cluster_ip = config.get('cluster_ip', master_ip)  # If cluster_ip not provided, we assume 1st node installation
                 logging_target = config.get('logging_target')
                 external_config = config.get('external_config')
-                config_mgmt_type = config.get('config_mgmt_type')
                 enable_heartbeats = config.get('enable_heartbeats', enable_heartbeats)
                 if execute_rollback is False:  # Only overrule cmdline if setting was not passed
                     execute_rollback = config.get('rollback', False)
@@ -137,7 +131,7 @@ class NodeInstallationController(object):
             resume_config = {}
             resume_config_file = '/opt/OpenvStorage/config/openvstorage_resumeconfig.json'
             if os.path.exists(resume_config_file):
-                with open(resume_config_file, 'r') as resume_cfg:
+                with open(resume_config_file) as resume_cfg:
                     resume_config = json.loads(resume_cfg.read())
 
             # Create connection to target node
@@ -173,7 +167,6 @@ class NodeInstallationController(object):
                 master_ip = resume_config.get('master_ip', master_ip)
                 cluster_ip = resume_config.get('cluster_ip', cluster_ip)
                 external_config = resume_config.get('external_config', external_config)
-                config_mgmt_type = resume_config.get('config_mgmt_type', config_mgmt_type)
                 execute_rollback = resume_config.get('execute_rollback', execute_rollback)
                 enable_heartbeats = resume_config.get('enable_heartbeats', enable_heartbeats)
 
@@ -436,7 +429,6 @@ class NodeInstallationController(object):
                 resume_config['cluster_ip'] = cluster_ip
                 resume_config['cluster_name'] = cluster_name
                 resume_config['external_config'] = external_config
-                resume_config['config_mgmt_type'] = config_mgmt_type
                 resume_config['execute_rollback'] = execute_rollback
                 resume_config['enable_heartbeats'] = enable_heartbeats
                 with open(resume_config_file, 'w') as resume_cfg:
@@ -449,8 +441,7 @@ class NodeInstallationController(object):
                                                                      cluster_name=cluster_name,
                                                                      node_name=node_name,
                                                                      enable_heartbeats=enable_heartbeats,
-                                                                     external_config={'type': config_mgmt_type,
-                                                                                      'external': external_config},
+                                                                     external_config=external_config,
                                                                      logging_target=logging_target,
                                                                      rdma=rdma)
                     except Exception as ex:
@@ -546,7 +537,6 @@ class NodeInstallationController(object):
         :param target_client: Client on which to perform the rollback
         :type target_client: ovs.extensions.generic.sshclient.SSHClient
         """
-        import etcd
         from ovs.dal.lists.servicetypelist import ServiceTypeList
         from ovs.dal.lists.storagerouterlist import StorageRouterList
         Toolbox.log(logger=NodeInstallationController._logger, messages='Rolling back setup of current node', title=True)
@@ -565,33 +555,19 @@ class NodeInstallationController(object):
 
         cluster_ip = target_client.ip
         machine_id = System.get_my_machine_id(target_client)
-        config_store = Configuration.get_store()
-        cfg_mgmt_running = True
-        if config_store == 'etcd':
-            from ovs.extensions.db.etcd.installer import EtcdInstaller
-            try:
-                EtcdInstaller.wait_for_cluster(cluster_name='a_name_that_does_not_matter_at_all', client=target_client)
-            except etcd.EtcdConnectionFailed:
-                cfg_mgmt_running = False
-        unconfigure_rabbitmq = False
-        unconfigure_memcached = False
-
         required_info = {'/ovs/framework/memcache': None,
                          '/ovs/framework/paths|ovsdb': '',
-                         '/ovs/framework/external_config': None,
                          '/ovs/framework/memcache|endpoints': [],
                          '/ovs/framework/arakoon_clusters|ovsdb': None,
                          '/ovs/framework/messagequeue|endpoints': []}
 
-        Toolbox.log(logger=NodeInstallationController._logger, messages='Config management is{0} running'.format('' if cfg_mgmt_running is True else ' NOT'))
-        if cfg_mgmt_running is True:
-            for key in required_info:
-                try:
-                    required_info[key] = Configuration.get(key=key)
-                except (etcd.EtcdKeyNotFound, KeyError):
-                    pass
-            unconfigure_rabbitmq = Toolbox.is_service_internally_managed(service='rabbitmq')
-            unconfigure_memcached = Toolbox.is_service_internally_managed(service='memcached')
+        for key in required_info:
+            try:
+                required_info[key] = Configuration.get(key=key)
+            except KeyError:
+                pass
+        unconfigure_rabbitmq = Toolbox.is_service_internally_managed(service='rabbitmq')
+        unconfigure_memcached = Toolbox.is_service_internally_managed(service='memcached')
 
         target_client.dir_delete('/opt/OpenvStorage/webapps/frontend/logging')
 
@@ -600,27 +576,26 @@ class NodeInstallationController(object):
             if ServiceManager.has_service(service, client=target_client):
                 Toolbox.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
 
-        if cfg_mgmt_running is True:
-            endpoints = required_info['/ovs/framework/messagequeue|endpoints']
-            if len(endpoints) > 0 and unconfigure_rabbitmq is True:
-                Toolbox.log(logger=NodeInstallationController._logger, messages='Unconfiguring RabbitMQ')
-                try:
-                    if ServiceManager.is_rabbitmq_running(client=target_client)[0] is True:
-                        Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeInstallationController._logger)
-                    target_client.file_delete('/etc/rabbitmq/rabbitmq.config')
-                except Exception as ex:
-                    Toolbox.log(logger=NodeInstallationController._logger, messages=['Failed to unconfigure RabbitMQ', ex], loglevel='exception')
+        endpoints = required_info['/ovs/framework/messagequeue|endpoints']
+        if len(endpoints) > 0 and unconfigure_rabbitmq is True:
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configuring RabbitMQ')
+            try:
+                if ServiceManager.is_rabbitmq_running(client=target_client)[0] is True:
+                    Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeInstallationController._logger)
+                target_client.file_delete('/etc/rabbitmq/rabbitmq.config')
+            except Exception as ex:
+                Toolbox.log(logger=NodeInstallationController._logger, messages=['Failed to un-configure RabbitMQ', ex], loglevel='exception')
 
-                for endpoint in endpoints:
-                    if endpoint.startswith(target_client.ip):
-                        endpoints.remove(endpoint)
-                        break
-                if len(endpoints) == 0:
-                    Configuration.delete('/ovs/framework/messagequeue')
-                else:
-                    Configuration.set('/ovs/framework/messagequeue|endpoints', endpoints)
+            for endpoint in endpoints:
+                if endpoint.startswith(target_client.ip):
+                    endpoints.remove(endpoint)
+                    break
+            if len(endpoints) == 0:
+                Configuration.delete('/ovs/framework/messagequeue')
+            else:
+                Configuration.set('/ovs/framework/messagequeue|endpoints', endpoints)
 
-            Toolbox.log(logger=NodeInstallationController._logger, messages='Unconfiguring Memcached')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configuring Memcached')
             endpoints = required_info['/ovs/framework/memcache|endpoints']
             if len(endpoints) > 0 and unconfigure_memcached is True:
                 ServiceManager.stop_service('memcached', target_client)
@@ -640,93 +615,76 @@ class NodeInstallationController(object):
             ServiceManager.stop_service(service, client=target_client)
             ServiceManager.remove_service(service, client=target_client)
 
-        if cfg_mgmt_running is True:
-            external_config = required_info['/ovs/framework/external_config']
-            Toolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up model')
-            #  Model is completely cleaned up when the arakoon cluster is destroyed
-            memcache_configured = required_info['/ovs/framework/memcache']
-            storagerouter = None
-            if memcache_configured is not None:
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up model')
+        #  Model is completely cleaned up when the arakoon cluster is destroyed
+        memcache_configured = required_info['/ovs/framework/memcache']
+        storagerouter = None
+        if memcache_configured is not None:
+            try:
+                storagerouter = System.get_my_storagerouter()
+            except Exception as ex:
+                Toolbox.log(logger=NodeInstallationController._logger, messages='Retrieving StorageRouter information failed with error: {0}'.format(ex), loglevel='error')
+
+            if storagerouter is not None:  # StorageRouter will be None if StorageRouter not yet modeled
                 try:
-                    storagerouter = System.get_my_storagerouter()
+                    for service in storagerouter.services:
+                        service.delete()
+                    for disk in storagerouter.disks:
+                        for partition in disk.partitions:
+                            partition.delete()
+                        disk.delete()
+                    if storagerouter.alba_node is not None:
+                        storagerouter.alba_node.delete()
+                    storagerouter.delete()
                 except Exception as ex:
-                    Toolbox.log(logger=NodeInstallationController._logger, messages='Retrieving storagerouter information failed with error: {0}'.format(ex), loglevel='error')
-
-                if storagerouter is not None:  # StorageRouter will be None if storagerouter not yet modeled
-                    try:
-                        for service in storagerouter.services:
-                            service.delete()
-                        for disk in storagerouter.disks:
-                            for partition in disk.partitions:
-                                partition.delete()
-                            disk.delete()
-                        if storagerouter.alba_node is not None:
-                            storagerouter.alba_node.delete()
-                        storagerouter.delete()
-                    except Exception as ex:
-                        Toolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up model failed with error: {0}'.format(ex), loglevel='error')
-                if single_node is True:
-                    try:
-                        for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:  # Externally managed Arakoon services not linked to the storagerouter
-                            service.delete()
-                    except Exception as ex:
-                        Toolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up services failed with error: {0}'.format(ex), loglevel='error')
+                    Toolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up model failed with error: {0}'.format(ex), loglevel='error')
             if single_node is True:
-                for key in Configuration.base_config.keys() + ['install_time', 'plugins']:
-                    try:
-                        Configuration.delete(key='/ovs/framework/{0}'.format(key))
-                    except (etcd.EtcdKeyNotFound, etcd.EtcdConnectionFailed, KeyError):
-                        pass
+                try:
+                    for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:  # Externally managed Arakoon services not linked to the StorageRouter
+                        service.delete()
+                except Exception as ex:
+                    Toolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up services failed with error: {0}'.format(ex), loglevel='error')
+        if single_node is True:
+            for key in Configuration.base_config.keys() + ['install_time', 'plugins']:
+                try:
+                    Configuration.delete(key='/ovs/framework/{0}'.format(key))
+                except KeyError:
+                    pass
 
-            try:
-                Configuration.delete(key='/ovs/framework/hosts/{0}'.format(machine_id))
-            except (etcd.EtcdKeyNotFound, etcd.EtcdConnectionFailed, KeyError):
-                pass
+        try:
+            Configuration.delete(key='/ovs/framework/hosts/{0}'.format(machine_id))
+        except KeyError:
+            pass
 
-            #  Memcached, Arakoon and ETCD must be the last services to be removed
-            services = ['memcached']
-            cluster_name = required_info['/ovs/framework/arakoon_clusters|ovsdb']
-            try:
-                metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
-            except ValueError:
-                metadata = None
+        #  Memcached and Arakoon must be the last services to be removed
+        services = ['memcached']
+        cluster_name = required_info['/ovs/framework/arakoon_clusters|ovsdb']
+        try:
+            metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name=cluster_name)
+        except ValueError:
+            metadata = None
+        if metadata is not None and metadata['internal'] is True:
+            services.append(ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name))
+        for service in services:
+            if ServiceManager.has_service(service, client=target_client):
+                Toolbox.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
+
+        if single_node is True:
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configure Arakoon')
             if metadata is not None and metadata['internal'] is True:
-                services.append(ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name))
-            for service in services:
-                if ServiceManager.has_service(service, client=target_client):
-                    Toolbox.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
-
-            if single_node is True:
-                Toolbox.log(logger=NodeInstallationController._logger, messages='Unconfigure Arakoon')
-                if metadata is not None and metadata['internal'] is True:
-                    try:
-                        ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
-                    except Exception as ex:
-                        Toolbox.log(logger=NodeInstallationController._logger, messages=['\nFailed to delete cluster', ex], loglevel='exception')
-                    base_dir = required_info['/ovs/framework/paths|ovsdb']
-                    #  ArakoonInstall.delete_cluster calls destroy_node which removes these directories already
-                    directory_info = [ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name),
-                                      ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)]
-                    try:
-                        ArakoonInstaller.clean_leftover_arakoon_data(ip=cluster_ip,
-                                                                     directories=directory_info)
-                    except Exception as ex:
-                        Toolbox.log(logger=NodeInstallationController._logger, messages=['Failed to clean Arakoon data', ex])
-
-            if external_config is None:
-                if config_store == 'etcd':
-                    Toolbox.log(logger=NodeInstallationController._logger, messages='Unconfigure Etcd')
-                    from ovs.extensions.db.etcd.installer import EtcdInstaller
-                    Toolbox.log(logger=NodeInstallationController._logger, messages='Removing Etcd cluster')
-                    try:
-                        EtcdInstaller.stop('config', target_client)
-                        EtcdInstaller.remove('config', target_client)
-                    except Exception as ex:
-                        Toolbox.log(logger=NodeInstallationController._logger, messages=['\nFailed to unconfigure Etcd', ex], loglevel='exception')
-        if config_store == 'etcd':
-            from ovs.extensions.db.etcd.installer import EtcdInstaller
-            Toolbox.log(logger=NodeInstallationController._logger, messages='Removing Etcd proxy')
-            EtcdInstaller.remove_proxy('config', cluster_ip)
+                try:
+                    ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
+                except Exception as ex:
+                    Toolbox.log(logger=NodeInstallationController._logger, messages=['\nFailed to delete cluster', ex], loglevel='exception')
+                base_dir = required_info['/ovs/framework/paths|ovsdb']
+                #  ArakoonInstall.delete_cluster calls destroy_node which removes these directories already
+                directory_info = [ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name),
+                                  ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)]
+                try:
+                    ArakoonInstaller.clean_leftover_arakoon_data(ip=cluster_ip,
+                                                                 directories=directory_info)
+                except Exception as ex:
+                    Toolbox.log(logger=NodeInstallationController._logger, messages=['Failed to clean Arakoon data', ex])
 
         target_client.file_delete('/tmp/ovs_rollback')
 
@@ -740,96 +698,57 @@ class NodeInstallationController(object):
         machine_id = System.get_my_machine_id(target_client)
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration management')
-        if external_config['type'] is None:
-            store = Interactive.ask_choice(['Arakoon', 'Etcd'],
-                                           question='Select the configuration management system',
-                                           default_value='Arakoon').lower()
-            external = None
+        if external_config is None and not cluster_name.startswith('preconfig-'):
             if Interactive.ask_yesno(message='Use an external cluster?', default_value=False) is True:
-                if store == 'arakoon':
-                    from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
-                    file_location = ArakoonConfiguration.CACC_LOCATION
-                    while not target_client.file_exists(file_location):
-                        Toolbox.log(logger=NodeInstallationController._logger, messages='Please place a copy of the Arakoon\'s client configuration file at: {0}'.format(file_location))
-                        Interactive.ask_continue()
-                    external = True
-                else:
-                    Toolbox.log(logger=NodeInstallationController._logger, messages='Provide the connection information to 1 of the Etcd servers (Can be requested by executing "etcdctl member list")')
-                    etcd_ip = Interactive.ask_string(message='Provide the peer IP address of that member',
-                                                     regex_info={'regex': SSHClient.IP_REGEX,
-                                                                 'message': 'Incorrect Etcd IP provided'})
-                    etcd_port = Interactive.ask_integer(question='Provide the port for the given IP address of that member',
-                                                        min_value=1025, max_value=65535, default_value=2380)
-                    external = 'config=http://{0}:{1}'.format(etcd_ip, etcd_port)
-            config = {'type': store,
-                      'external': external}
-        else:
-            config = external_config
+                from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+                file_location = ArakoonConfiguration.CACC_LOCATION
+                while not target_client.file_exists(file_location):
+                    Toolbox.log(logger=NodeInstallationController._logger, messages='Please place a copy of the Arakoon\'s client configuration file at: {0}'.format(file_location))
+                    Interactive.ask_continue()
+                external_config = True
 
         bootstrap_location = Configuration.BOOTSTRAP_CONFIG_LOCATION
         if not target_client.file_exists(bootstrap_location):
             target_client.file_create(bootstrap_location)
-        target_client.file_write(bootstrap_location, json.dumps({'configuration_store': config['type']}, indent=4))
+        target_client.file_write(bootstrap_location, json.dumps({'configuration_store': 'arakoon'}, indent=4))
 
-        if config['type'] == 'arakoon':
-            Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration Arakoon')
-            from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
-            if config['external'] is None:
-                arakoon_config_cluster = 'config'
-                info = ArakoonInstaller.create_cluster(cluster_name=arakoon_config_cluster,
-                                                       cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
-                                                       ip=cluster_ip,
-                                                       base_dir='/opt/OpenvStorage/db',
-                                                       locked=False,
-                                                       filesystem=True,
-                                                       ports=[26400, 26401])
-                ArakoonInstaller.start_cluster(cluster_name=arakoon_config_cluster,
-                                               master_ip=cluster_ip,
-                                               filesystem=True)
-                ArakoonInstaller.claim_cluster(cluster_name=arakoon_config_cluster,
-                                               master_ip=cluster_ip,
-                                               filesystem=True,
-                                               metadata=info['metadata'])
-                contents = target_client.file_read(ArakoonClusterConfig.CONFIG_FILE.format('config'))
-                target_client.file_write(ArakoonConfiguration.CACC_LOCATION, contents)
-                ServiceManager.register_service(node_name=machine_id,
-                                                service_metadata=info['service_metadata'])
-            else:
-                arakoon_cacc_cluster = 'cacc'
-                ArakoonInstaller.claim_cluster(cluster_name=arakoon_cacc_cluster,
-                                               master_ip=cluster_ip,
-                                               filesystem=True,
-                                               metadata={'internal': False,
-                                                         'cluster_name': arakoon_cacc_cluster,
-                                                         'cluster_type': ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
-                                                         'in_use': True})
-                arakoon_config = ArakoonClusterConfig(arakoon_cacc_cluster, True)
-                arakoon_config.load_config(cluster_ip)
-                arakoon_client = ArakoonInstaller.build_client(arakoon_config)
-                arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, arakoon_config.export_ini())
-
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration Arakoon')
+        from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+        if external_config is None:
+            arakoon_config_cluster = 'config'
+            info = ArakoonInstaller.create_cluster(cluster_name=arakoon_config_cluster,
+                                                   cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
+                                                   ip=cluster_ip,
+                                                   base_dir='/opt/OpenvStorage/db',
+                                                   locked=False,
+                                                   filesystem=True,
+                                                   ports=[26400, 26401])
+            ArakoonInstaller.start_cluster(cluster_name=arakoon_config_cluster,
+                                           master_ip=cluster_ip,
+                                           filesystem=True)
+            ArakoonInstaller.claim_cluster(cluster_name=arakoon_config_cluster,
+                                           master_ip=cluster_ip,
+                                           filesystem=True,
+                                           metadata=info['metadata'])
+            contents = target_client.file_read(ArakoonClusterConfig.CONFIG_FILE.format('config'))
+            target_client.file_write(ArakoonConfiguration.CACC_LOCATION, contents)
+            ServiceManager.register_service(node_name=machine_id,
+                                            service_metadata=info['service_metadata'])
         else:
-            Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up Etcd')
-            from etcd import EtcdConnectionFailed, EtcdException, EtcdKeyError
-            from ovs.extensions.db.etcd.installer import EtcdInstaller
-            if config['external'] is None:
-                EtcdInstaller.create_cluster('config', cluster_ip)
-            else:
-                try:
-                    EtcdInstaller.use_external(config['external'], cluster_ip, 'config')
-                except (EtcdConnectionFailed, EtcdException, EtcdKeyError):
-                    Toolbox.log(logger=NodeInstallationController._logger, messages='Failed to set up Etcd proxy')
-                    resume_config_file = '/opt/OpenvStorage/config/openvstorage_resumeconfig.json'
-                    if target_client.file_exists(resume_config_file):
-                        with open(resume_config_file, 'r') as resume_cfg:
-                            resume_config = json.loads(resume_cfg.read())
-                            if 'external_config' in resume_config:
-                                resume_config.pop('external_config')
-                        with open(resume_config_file, 'w') as resume_cfg:
-                            resume_cfg.write(json.dumps(resume_config))
-                    raise
+            arakoon_cacc_cluster = 'cacc'
+            ArakoonInstaller.claim_cluster(cluster_name=arakoon_cacc_cluster,
+                                           master_ip=cluster_ip,
+                                           filesystem=True,
+                                           metadata={'internal': False,
+                                                     'cluster_name': arakoon_cacc_cluster,
+                                                     'cluster_type': ServiceType.ARAKOON_CLUSTER_TYPES.CFG,
+                                                     'in_use': True})
+            arakoon_config = ArakoonClusterConfig(arakoon_cacc_cluster, True)
+            arakoon_config.load_config(cluster_ip)
+            arakoon_client = ArakoonInstaller.build_client(arakoon_config)
+            arakoon_client.set(ArakoonInstaller.INTERNAL_CONFIG_KEY, arakoon_config.export_ini())
 
-        Configuration.initialize(external_config=external_config['external'], logging_target=logging_target)
+        Configuration.initialize(external_config=external_config, logging_target=logging_target)
         Configuration.initialize_host(machine_id)
 
         if rdma is None:
@@ -950,6 +869,8 @@ class NodeInstallationController(object):
         """
         Sets up an additional node
         """
+        from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+
         Toolbox.log(logger=NodeInstallationController._logger, messages='Adding extra node', title=True)
         target_client = ip_client_map[cluster_ip]
         master_client = ip_client_map[master_ip]
@@ -957,16 +878,8 @@ class NodeInstallationController(object):
 
         target_client.file_write(Configuration.BOOTSTRAP_CONFIG_LOCATION,
                                  master_client.file_read(Configuration.BOOTSTRAP_CONFIG_LOCATION))
-        config_store = Configuration.get_store()
-        if config_store == 'etcd':
-            from ovs.extensions.db.etcd.installer import EtcdInstaller
-            Toolbox.log(logger=NodeInstallationController._logger, messages='Extending Etcd cluster')
-            EtcdInstaller.deploy_to_slave(master_ip, cluster_ip, 'config')
-        else:
-            from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
-            target_client.file_write(ArakoonConfiguration.CACC_LOCATION,
-                                     master_client.file_read(ArakoonConfiguration.CACC_LOCATION))
-
+        target_client.file_write(ArakoonConfiguration.CACC_LOCATION,
+                                 master_client.file_read(ArakoonConfiguration.CACC_LOCATION))
         Configuration.initialize_host(machine_id)
 
         service = 'watcher-config'

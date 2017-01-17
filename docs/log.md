@@ -1,6 +1,6 @@
 # Logs
 
-The redis log endpoint can be configured using etcd
+The redis log endpoint can be configured using the configuration management
 ```json
 /ovs/framework/logging = {"type": "console|file|redis"}
 ```
