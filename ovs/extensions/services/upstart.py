@@ -112,7 +112,7 @@ class Upstart(object):
         :rtype NoneType
         """
         configuration_key = Upstart.SERVICE_CONFIG_KEY.format(System.get_my_machine_id(client),
-                                                                           target_name.replace('ovs-', ''))
+                                                              target_name.replace('ovs-', ''))
         # If the entry is stored in arakoon, it means the service file was previously made
         if not Configuration.exists(configuration_key):
             raise RuntimeError('Service {0} was not previously added and cannot be regenerated.'.format(target_name))
