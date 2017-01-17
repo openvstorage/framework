@@ -111,15 +111,14 @@ class Systemd(object):
         Regenerates the service files of a service.
         :param name: Template name of the service to regenerate
         :type name: str
-        :param client: Client on which to add the service
+        :param client: Client on which to regenerate the service
         :type client: ovs.extensions.generic.sshclient.SSHClient
         :param target_name: The current service name eg ovs-volumedriver_flash01.service
         :type target_name: str
         :return: None
         :rtype NoneType
         """
-        configuration_key = Systemd.SERVICE_CONFIG_KEY.format(System.get_my_machine_id(client),
-                                                              target_name.replace('ovs-', ''))
+        configuration_key = Systemd.SERVICE_CONFIG_KEY.format(System.get_my_machine_id(client), Toolbox.remove_prefix(target_name, 'ovs-'))
         # If the entry is stored in arakoon, it means the service file was previously made
         if not Configuration.exists(configuration_key):
             raise RuntimeError('Service {0} was not previously added and cannot be regenerated.'.format(target_name))
