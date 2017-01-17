@@ -31,6 +31,7 @@ class Upstart(object):
     Contains all logic related to Upstart services
     """
     _logger = LogHandler.get('extensions', name='service-manager')
+    SERVICE_CONFIG_KEY = '/ovs/framework/hosts/{0}/services/{1}'
 
     @staticmethod
     def _service_exists(name, client, path):
@@ -96,6 +97,40 @@ class Upstart(object):
         if delay_registration is False:
             Upstart.register_service(service_metadata=params, node_name=System.get_my_machine_id(client))
         return params
+
+    @staticmethod
+    def regenerate_service(name, client, target_name):
+        """
+        Regenerates the service files of a service.
+        :param name: Template name of the service to regenerate
+        :type name: str
+        :param client: Client on which to regenerate the service
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :param target_name: The current service name eg ovs-volumedriver_flash01.service
+        :type target_name: str
+        :return: None
+        :rtype: NoneType
+        """
+        configuration_key = Upstart.SERVICE_CONFIG_KEY.format(System.get_my_machine_id(client), Toolbox.remove_prefix(target_name, 'ovs-'))
+        # If the entry is stored in arakoon, it means the service file was previously made
+        if not Configuration.exists(configuration_key):
+            raise RuntimeError('Service {0} was not previously added and cannot be regenerated.'.format(target_name))
+        # Rewrite the service file
+        service_params = Configuration.get(configuration_key)
+        startup_dependency = service_params['STARTUP_DEPENDENCY']
+        if startup_dependency == '':
+            startup_dependency = None
+        else:
+            startup_dependency = '.'.join(
+                startup_dependency.split('.')[:-1])  # Remove .service from startup dependency
+        output = Upstart.add_service(name=name,
+                                     client=client,
+                                     params=service_params,
+                                     target_name=target_name,
+                                     startup_dependency=startup_dependency,
+                                     delay_registration=True)
+        if output is None:
+            raise RuntimeError('Regenerating files for service {0} has failed'.format(target_name))
 
     @staticmethod
     def get_service_status(name, client):
@@ -362,7 +397,7 @@ class Upstart(object):
         :return: None
         """
         service_name = service_metadata['SERVICE_NAME']
-        Configuration.set(key='/ovs/framework/hosts/{0}/services/{1}'.format(node_name, Toolbox.remove_prefix(service_name, 'ovs-')),
+        Configuration.set(key=Upstart.SERVICE_CONFIG_KEY.format(node_name, Toolbox.remove_prefix(service_name, 'ovs-')),
                           value=service_metadata)
 
     @staticmethod
@@ -375,7 +410,7 @@ class Upstart(object):
         :type node_name: str
         :return: None
         """
-        Configuration.delete(key='/ovs/framework/hosts/{0}/services/{1}'.format(node_name, Toolbox.remove_prefix(service_name, 'ovs-')))
+        Configuration.delete(key=Upstart.SERVICE_CONFIG_KEY.format(node_name, Toolbox.remove_prefix(service_name, 'ovs-')))
 
     @staticmethod
     def is_rabbitmq_running(client):
