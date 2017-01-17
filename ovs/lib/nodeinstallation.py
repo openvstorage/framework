@@ -84,7 +84,7 @@ class NodeInstallationController(object):
             preconfig = '/opt/OpenvStorage/config/preconfig.json'
             if os.path.exists(preconfig):
                 config = {}
-                with open(preconfig, 'r') as pre_config:
+                with open(preconfig) as pre_config:
                     try:
                         config = json.loads(pre_config.read())
                     except Exception as ex:
@@ -131,7 +131,7 @@ class NodeInstallationController(object):
             resume_config = {}
             resume_config_file = '/opt/OpenvStorage/config/openvstorage_resumeconfig.json'
             if os.path.exists(resume_config_file):
-                with open(resume_config_file, 'r') as resume_cfg:
+                with open(resume_config_file) as resume_cfg:
                     resume_config = json.loads(resume_cfg.read())
 
             # Create connection to target node
@@ -578,13 +578,13 @@ class NodeInstallationController(object):
 
         endpoints = required_info['/ovs/framework/messagequeue|endpoints']
         if len(endpoints) > 0 and unconfigure_rabbitmq is True:
-            Toolbox.log(logger=NodeInstallationController._logger, messages='Unconfiguring RabbitMQ')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configuring RabbitMQ')
             try:
                 if ServiceManager.is_rabbitmq_running(client=target_client)[0] is True:
                     Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeInstallationController._logger)
                 target_client.file_delete('/etc/rabbitmq/rabbitmq.config')
             except Exception as ex:
-                Toolbox.log(logger=NodeInstallationController._logger, messages=['Failed to unconfigure RabbitMQ', ex], loglevel='exception')
+                Toolbox.log(logger=NodeInstallationController._logger, messages=['Failed to un-configure RabbitMQ', ex], loglevel='exception')
 
             for endpoint in endpoints:
                 if endpoint.startswith(target_client.ip):
@@ -595,7 +595,7 @@ class NodeInstallationController(object):
             else:
                 Configuration.set('/ovs/framework/messagequeue|endpoints', endpoints)
 
-            Toolbox.log(logger=NodeInstallationController._logger, messages='Unconfiguring Memcached')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configuring Memcached')
             endpoints = required_info['/ovs/framework/memcache|endpoints']
             if len(endpoints) > 0 and unconfigure_memcached is True:
                 ServiceManager.stop_service('memcached', target_client)
@@ -623,9 +623,9 @@ class NodeInstallationController(object):
             try:
                 storagerouter = System.get_my_storagerouter()
             except Exception as ex:
-                Toolbox.log(logger=NodeInstallationController._logger, messages='Retrieving storagerouter information failed with error: {0}'.format(ex), loglevel='error')
+                Toolbox.log(logger=NodeInstallationController._logger, messages='Retrieving StorageRouter information failed with error: {0}'.format(ex), loglevel='error')
 
-            if storagerouter is not None:  # StorageRouter will be None if storagerouter not yet modeled
+            if storagerouter is not None:  # StorageRouter will be None if StorageRouter not yet modeled
                 try:
                     for service in storagerouter.services:
                         service.delete()
@@ -640,7 +640,7 @@ class NodeInstallationController(object):
                     Toolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up model failed with error: {0}'.format(ex), loglevel='error')
             if single_node is True:
                 try:
-                    for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:  # Externally managed Arakoon services not linked to the storagerouter
+                    for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:  # Externally managed Arakoon services not linked to the StorageRouter
                         service.delete()
                 except Exception as ex:
                     Toolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up services failed with error: {0}'.format(ex), loglevel='error')
@@ -670,7 +670,7 @@ class NodeInstallationController(object):
                 Toolbox.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
 
         if single_node is True:
-            Toolbox.log(logger=NodeInstallationController._logger, messages='Unconfigure Arakoon')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configure Arakoon')
             if metadata is not None and metadata['internal'] is True:
                 try:
                     ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
@@ -698,7 +698,7 @@ class NodeInstallationController(object):
         machine_id = System.get_my_machine_id(target_client)
 
         Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration management')
-        if external_config is None:
+        if external_config is None and not cluster_name.startswith('preconfig-'):
             if Interactive.ask_yesno(message='Use an external cluster?', default_value=False) is True:
                 from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
                 file_location = ArakoonConfiguration.CACC_LOCATION
