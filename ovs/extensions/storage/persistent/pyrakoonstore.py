@@ -61,13 +61,13 @@ class PyrakoonStore(object):
         except ArakoonNotFound as field:
             raise KeyNotFoundException(field.message)
 
-    def get_multi(self, keys):
+    def get_multi(self, keys, must_exist=True):
         """
         Get multiple keys at once
         """
         try:
-            for item in self._client.get_multi(keys):
-                yield ujson.loads(item)
+            for item in self._client.get_multi(keys, must_exist=must_exist):
+                yield None if item is None else ujson.loads(item)
         except ValueError:
             raise KeyNotFoundException('Could not parse JSON stored')
         except ArakoonNotFound as field:

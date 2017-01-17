@@ -24,7 +24,7 @@ class Property(object):
     Property
     """
 
-    def __init__(self, name, property_type, mandatory=True, default=None, unique=False, doc=None):
+    def __init__(self, name, property_type, mandatory=True, default=None, unique=False, indexed=False, doc=None):
         """
         Initializes a property
         """
@@ -34,6 +34,7 @@ class Property(object):
         self.docstring = doc
         self.mandatory = mandatory
         self.unique = unique
+        self.indexed = indexed
 
 
 class Relation(object):

@@ -27,7 +27,7 @@ class Service(DataObject):
     """
     A Service represents some kind of service that needs to be managed by the framework.
     """
-    __properties = [Property('name', str, doc='Name of the Service.'),
+    __properties = [Property('name', str, indexed=True, doc='Name of the Service.'),
                     Property('ports', list, doc='Port(s) of the Service.')]
     __relations = [Relation('storagerouter', StorageRouter, 'services', mandatory=False, doc='The Storage Router running the Service.'),
                    Relation('type', ServiceType, 'services', doc='The type of the Service.')]

@@ -76,11 +76,13 @@ class PyrakoonClient(object):
         return PyrakoonClient._try(self._identifier, self._client.get, key, consistency)
 
     @locked()
-    def get_multi(self, keys):
+    def get_multi(self, keys, must_exist=True):
         """
         Get multiple keys at once
         """
-        for item in PyrakoonClient._try(self._identifier, self._client.multiGet, keys):
+        for item in PyrakoonClient._try(self._identifier,
+                                        self._client.multiGet if must_exist is True else self._client.multiGetOption,
+                                        keys):
             yield item
 
     @locked()
@@ -194,7 +196,7 @@ class PyrakoonClient(object):
         """
         Applies a transaction
         """
-        return PyrakoonClient._try(self._identifier, self._client.sequence, self._sequences[transaction])
+        return PyrakoonClient._try(self._identifier, self._client.sequence, self._sequences[transaction], max_duration=1)
 
     @staticmethod
     def _try(identifier, method, *args, **kwargs):
@@ -202,6 +204,10 @@ class PyrakoonClient(object):
         Tries to call a given method, retry-ing if Arakoon is temporary unavailable
         """
         try:
+            max_duration = 0.5
+            if 'max_duration' in kwargs:
+                max_duration = kwargs['max_duration']
+                del kwargs['max_duration']
             start = time.time()
             try:
                 return_value = method(*args, **kwargs)
@@ -210,7 +216,7 @@ class PyrakoonClient(object):
                 time.sleep(1)
                 return_value = method(*args, **kwargs)
             duration = time.time() - start
-            if duration > 0.5:
+            if duration > max_duration:
                 PyrakoonClient._logger.warning('Arakoon call {0} took {1}s'.format(method.__name__, round(duration, 2)))
             return return_value
         except (ArakoonNotFound, ArakoonAssertionFailed):

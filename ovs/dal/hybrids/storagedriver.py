@@ -41,7 +41,7 @@ class StorageDriver(DataObject):
                     Property('ports', dict, doc='Ports on which the Storage Driver is listening (management, xmlrpc, dtl, edge).'),
                     Property('cluster_ip', str, doc='IP address on which the Storage Driver is listening.'),
                     Property('storage_ip', str, doc='IP address on which the vpool is shared to hypervisor'),
-                    Property('storagedriver_id', str, unique=True, doc='ID of the Storage Driver as known by the Storage Drivers.'),
+                    Property('storagedriver_id', str, unique=True, indexed=True, doc='ID of the Storage Driver as known by the Storage Drivers.'),
                     Property('mountpoint', str, doc='Mountpoint from which the Storage Driver serves data'),
                     Property('startup_counter', int, default=0, doc='StorageDriver startup counter')]
     __relations = [Relation('vpool', VPool, 'storagedrivers'),

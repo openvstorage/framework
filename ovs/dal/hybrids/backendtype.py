@@ -28,7 +28,7 @@ class BackendType(DataObject):
     like a GUI management interface
     """
     __properties = [Property('name', str, doc='Name of the BackendType'),
-                    Property('code', str, unique=True, doc='Code representing the BackendType')]
+                    Property('code', str, unique=True, indexed=True, doc='Code representing the BackendType')]
     __relations = []
     __dynamics = [Dynamic('has_plugin', bool, 600)]
 
