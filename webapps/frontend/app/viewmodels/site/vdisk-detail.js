@@ -70,7 +70,6 @@ define([
                             return deferred.reject();
                         }
                     })
-                    .then(self.vDisk().fetchChildrenGuids)
                     .then(self.loadStorageRouters)
                     .then(self.loadDomains)
                     .then(function() {
@@ -177,7 +176,7 @@ define([
             }
         };
         self.setAsTemplate = function() {
-            if (self.vDisk() !== undefined && self.vDisk().childrenGuids().length === 0) {
+            if (self.canSetAsTemplate() === true) {
                 var vd = self.vDisk();
                 self.convertingToTemplate(true);
                 app.showMessage(
@@ -345,6 +344,24 @@ define([
         // Computed
         self.canBeModified = ko.computed(function() {
             return self.convertingToTemplate() === false && self.removing() === false;
+        });
+        self.canSetAsTemplate = ko.computed(function() {
+            if (self.vDisk() === undefined) {
+                return false;
+            }
+            return self.vDisk().parentVDiskGuid() === null && self.vDisk().childrenGuids().length === 0;
+        });
+        self.tooltipSetAsTemplate = ko.computed(function(){
+            if (self.vDisk() === undefined) {
+                return '';
+            }
+            if (self.vDisk().childrenGuids().length > 0) {
+                return $.t('ovs:vdisks.detail.has_children');
+            }
+            if (self.vDisk().parentVDiskGuid() !== null) {
+                return $.t('ovs:vdisks.detail.is_clone');
+            }
+            return $.t('ovs:vdisks.detail.set_as_template');
         });
 
         // Durandal

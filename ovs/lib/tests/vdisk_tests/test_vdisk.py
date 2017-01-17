@@ -627,26 +627,35 @@ class VDiskTest(unittest.TestCase):
         )
         storagedrivers = structure['storagedrivers']
 
-        vdisk = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 4, storagedriver_guid=storagedrivers[1].guid))
+        vdisk_1 = VDisk(VDiskController.create_new(volume_name='vdisk_1', volume_size=1024 ** 4, storagedriver_guid=storagedrivers[1].guid))
         metadata = {'is_consistent': True,
                     'is_automatic': True,
                     'is_sticky': False}
         for x in range(5):
             metadata['label'] = 'label{0}'.format(x)
             metadata['timestamp'] = int(time.time())
-            VDiskController.create_snapshot(vdisk_guid=vdisk.guid, metadata=metadata)
-        self.assertTrue(expr=len(vdisk.snapshots) == 5, msg='Expected to find 5 snapshots')
+            VDiskController.create_snapshot(vdisk_guid=vdisk_1.guid, metadata=metadata)
+        self.assertTrue(expr=len(vdisk_1.snapshots) == 5, msg='Expected to find 5 snapshots')
 
         # Set as template and validate the model
-        self.assertFalse(expr=vdisk.is_vtemplate, msg='Dynamic property "is_vtemplate" should be False')
-        VDiskController.set_as_template(vdisk.guid)
-        vdisk.invalidate_dynamics('snapshots')
-        self.assertTrue(expr=vdisk.is_vtemplate, msg='Dynamic property "is_vtemplate" should be True')
-        self.assertTrue(expr=len(vdisk.snapshots) == 1, msg='Expected to find only 1 snapshot after converting to template')
+        self.assertFalse(expr=vdisk_1.is_vtemplate, msg='Dynamic property "is_vtemplate" should be False')
+        VDiskController.set_as_template(vdisk_guid=vdisk_1.guid)
+        vdisk_1.invalidate_dynamics('snapshots')
+        self.assertTrue(expr=vdisk_1.is_vtemplate, msg='Dynamic property "is_vtemplate" should be True')
+        self.assertTrue(expr=len(vdisk_1.snapshots) == 1, msg='Expected to find only 1 snapshot after converting to template')
 
         # Try again and verify job succeeds, previously we raised error when setting as template an additional time
-        VDiskController.set_as_template(vdisk.guid)
-        self.assertTrue(expr=vdisk.is_vtemplate, msg='Dynamic property "is_vtemplate" should still be True')
+        VDiskController.set_as_template(vdisk_1.guid)
+        self.assertTrue(expr=vdisk_1.is_vtemplate, msg='Dynamic property "is_vtemplate" should still be True')
+
+        # Clone vDisk and verify both child and parent can no longer be set as template
+        vdisk_2 = VDisk(VDiskController.create_new(volume_name='vdisk_2', volume_size=1024 ** 4, storagedriver_guid=storagedrivers[1].guid))
+        vdisk_2_clone_1 = VDisk(VDiskController.clone(vdisk_guid=vdisk_2.guid,
+                                                      name='vdisk_2_clone_1')['vdisk_guid'])
+        with self.assertRaises(RuntimeError):
+            VDiskController.set_as_template(vdisk_guid=vdisk_2.guid)
+        with self.assertRaises(RuntimeError):
+            VDiskController.set_as_template(vdisk_guid=vdisk_2_clone_1.guid)
 
     def test_event_migrate_from_volumedriver(self):
         """

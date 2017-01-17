@@ -580,6 +580,7 @@
             "configuration_info": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vPool.",
             "edge_clients": "Edge Clients",
             "has_children": "vDisk has clones",
+            "is_clone": "vDisk is a clone",
             "move": "Move",
             "remove": "Remove",
             "rollback": "Rollback",

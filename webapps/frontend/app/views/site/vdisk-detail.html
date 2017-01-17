@@ -75,9 +75,9 @@ but WITHOUT ANY WARRANTY of any kind.
                 <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-set-as-template"
                         data-bind="click: function() { $root.setAsTemplate(); },
-                                   tooltip: childrenGuids().length === 0 ? 'ovs:vdisks.detail.set_as_template' : 'ovs:vdisks.detail.has_children',
+                                   tooltip: $root.tooltipSetAsTemplate(),
                                    enable: $root.shared.user.roles().contains('write') && $root.canBeModified(),
-                                   style: { color: $root.shared.user.roles().contains('write') && childrenGuids().length === 0 ? '#428bca' : 'lightgrey' }">
+                                   style: { color: $root.shared.user.roles().contains('write') && $root.canSetAsTemplate() === true ? '#428bca' : 'lightgrey' }">
                     <span class="fa hand" data-i18n="[html]ovs:icons.set_as_template"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
