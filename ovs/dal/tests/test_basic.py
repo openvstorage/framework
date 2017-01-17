@@ -1732,3 +1732,29 @@ class Basic(unittest.TestCase):
                                               ('something', DataList.operator.EQUALS, 'one')]})
         self.assertEqual(len(dlist), 1)
         self.assertEqual(dlist.from_index, 'full')
+
+    def test_index_change_racecondition(self):
+        """
+        Validates whether the DataList can cope with an index that is outdated right after it has been used, before it
+        starts iterating over the data
+        """
+        def _inject_delete(datalist_object):
+            """
+            Deletes an object
+            """
+            _ = datalist_object
+            disk1.delete()
+
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.something = 'one'
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.something = 'one'
+        disk2.save()
+        DataList.test_hooks['data_generator'] = _inject_delete
+        dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
+                                    'items': [('something', DataList.operator.EQUALS, 'one')]})
+        self.assertEqual(len(dlist), 1)
+        self.assertEqual(dlist.from_index, 'full')

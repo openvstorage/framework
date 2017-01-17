@@ -86,7 +86,7 @@ class LotsOfObjects(object):
                     disk.machine = machine
                     disk.something = current_uuid
                     disk.save()
-                    repetition[random.randint(0, LotsOfObjects.repetition_scan - 1)].append(current_uuid)
+                    random.choice(repetition).append(current_uuid)
                     counter += 1
                 avgitemspersec = ((i + 1) * LotsOfObjects.amount_of_disks) / (time.time() - start)
                 itemspersec = LotsOfObjects.amount_of_disks / (time.time() - mstart)

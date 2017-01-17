@@ -183,7 +183,7 @@ class OVSMigrator(object):
                             client.set(ukey, key)
                         for property_name in indexes:
                             if property_name not in data:
-                                continue
+                                continue  # This is the case when there's a new indexed property added.
                             ikey = index_key.format(property_name, hashlib.sha1(str(data[property_name])).hexdigest())
                             index = list(client.get_multi([ikey], must_exist=False))[0]
                             transaction = client.begin_transaction()

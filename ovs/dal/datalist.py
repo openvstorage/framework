@@ -135,11 +135,11 @@ class DataList(object):
             else:
                 if item[0] in indexed_properties:
                     if item[1] == DataList.operator.EQUALS:
-                        index_prefix = base_index_prefix.format(self._object_type.__name__.lower(), item[0],
-                                                                hashlib.sha1(str(item[2])).hexdigest())
+                        index_key = base_index_prefix.format(self._object_type.__name__.lower(), item[0],
+                                                             hashlib.sha1(str(item[2])).hexdigest())
                         # [item for sublist in mainlist for item in sublist] - shitty nested list comprehensions
                         indexed_keys = set(str(key)
-                                           for _, keys_set in self._persistent.prefix_entries(index_prefix)
+                                           for keys_set in self._persistent.get_multi([index_key], must_exist=False)
                                            if keys_set is not None
                                            for key in keys_set)
                         if keys is None:
@@ -213,8 +213,13 @@ class DataList(object):
                 if self.from_index == 'none':
                     self.from_index = 'full'
                 keys = list(keys)
-                for index, value in enumerate(self._persistent.get_multi(keys)):
-                    yield keys[index], value
+
+                if 'data_generator' in DataList.test_hooks:
+                    DataList.test_hooks['data_generator'](self)
+
+                for index, value in enumerate(self._persistent.get_multi(keys, must_exist=False)):
+                    if value is not None:
+                        yield keys[index], value
             else:
                 use_indexes = False
         if use_indexes is False:
