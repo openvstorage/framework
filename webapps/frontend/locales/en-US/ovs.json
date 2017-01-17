@@ -237,9 +237,9 @@
                 "catch_up": "Rebuilding",
                 "checkup_required": "DTL should be configured",
                 "degraded": "Degraded",
+                "disabled": "Disabled",
                 "ok_standalone": "Healthy (standalone)",
                 "ok_sync": "Healthy (sync)",
-                "undefined": "Unknown",
                 "unknown": "Unknown"
             },
             "storagerouter": {
