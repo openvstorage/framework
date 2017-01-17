@@ -105,6 +105,41 @@ class Systemd(object):
         return params
 
     @staticmethod
+    def regenerate_service(name, client, target_name):
+        """
+        :param name: Template name of the service to add
+        :type name: str
+        :param client: Client on which to add the service
+        :type client: ovs.extensions.generic.sshclient.SSHClient
+        :param target_name: The current service name eg ovs-volumedriver_flash01.service
+        :type target_name: str
+        :return: True if successful
+        :rtype bool
+        """
+        configuration_key = '/ovs/framework/hosts/{0}/services/{1}'.format(System.get_my_machine_id(client),
+                                                                           target_name.replace('ovs-', ''))
+        # If the entry is stored in arakoon, it means the service file was previously made
+        if Configuration.exists(configuration_key):
+            # Rewrite the service file
+            service_params = Configuration.get(configuration_key)
+            startup_dependency = service_params['STARTUP_DEPENDENCY']
+            if startup_dependency == '':
+                startup_dependency = None
+            else:
+                startup_dependency = '.'.join(
+                    startup_dependency.split('.')[:-1])  # Remove .service from startup dependency
+            output = Systemd.add_service(name=name,
+                                         client=client,
+                                         params=service_params,
+                                         target_name=target_name,
+                                         startup_dependency=startup_dependency,
+                                         delay_registration=True)
+            if output is None:
+                raise RuntimeError('Regenerating files for service {0} has failed'.format(target_name))
+            else:
+                return True
+
+    @staticmethod
     def get_service_status(name, client):
         """
         Retrieve the status of a service
