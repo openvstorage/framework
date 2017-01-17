@@ -239,7 +239,7 @@ class MDSServiceController(object):
     @staticmethod
     def sync_vdisk_to_reality(vdisk):
         """
-        Syncs a vdisk to reality (except hypervisor)
+        Syncs a vDisk to reality
         :param vdisk: vDisk to synchronize
         :type vdisk: ovs.dal.hybrids.vdisk.VDisk
         :return: None
@@ -284,7 +284,7 @@ class MDSServiceController(object):
     @staticmethod
     def ensure_safety(vdisk, excluded_storagerouters=None):
         """
-        Ensures (or tries to ensure) the safety of a given vdisk (except hypervisor).
+        Ensures (or tries to ensure) the safety of a given vdisk.
         Assumptions:
             * A local overloaded master is better than a non-local non-overloaded master
             * Prefer master/services to be on different hosts, a subsequent slave on the same node doesn't add safety
@@ -292,7 +292,7 @@ class MDSServiceController(object):
             * Too much safety is not wanted (it adds loads to nodes while not required)
         :param vdisk: vDisk to calculate a new safety for
         :type vdisk: ovs.dal.hybrids.vdisk.VDisk
-        :param excluded_storagerouters: Storagerouters to leave out of calculation (Eg: When 1 is down or unavailable)
+        :param excluded_storagerouters: StorageRouters to leave out of calculation (Eg: When 1 is down or unavailable)
         :type excluded_storagerouters: list
         :return: None
         """
@@ -300,13 +300,15 @@ class MDSServiceController(object):
             if len(nodes) < _safety:
                 for local_load in sorted(all_info_dict[_importance]['loads']):
                     for local_service in all_info_dict[_importance]['loads'][local_load]:
+                        if not isinstance(local_service, Service):
+                            continue
                         if len(nodes) < _safety and local_service.storagerouter.ip not in nodes:
                             try:
                                 SSHClient(local_service.storagerouter)
                                 new_services.append(local_service)
                                 nodes.add(local_service.storagerouter.ip)
                             except UnableToConnectException:
-                                MDSServiceController._logger.debug('MDS safety: vDisk {0}: Skipping storagerouter with IP {1} as it is unreachable'.format(vdisk.guid, service.storagerouter.ip))
+                                MDSServiceController._logger.debug('MDS safety: vDisk {0}: Skipping StorageRouter with IP {1} as it is unreachable'.format(vdisk.guid, service.storagerouter.ip))
             return nodes, new_services
 
         MDSServiceController._logger.debug('MDS safety: vDisk {0}: Start checkup for virtual disk {1}'.format(vdisk.guid, vdisk.name))
@@ -399,6 +401,7 @@ class MDSServiceController(object):
             if service == master_service or service in slave_services:  # Service is still in use
                 load = loads[0]
                 if importance is not None:
+                    # noinspection PyUnresolvedReferences
                     all_info_dict[importance]['used'].append(service)
                 else:
                     reconfigure_reasons.append('Service {0} cannot be used anymore because storagerouter with IP {1} is not part of the domains'.format(service.name, service.storagerouter.ip))
@@ -407,10 +410,12 @@ class MDSServiceController(object):
             services_load[service] = load
 
             if importance is not None:
+                # noinspection PyUnresolvedReferences
                 all_info_dict[importance]['available'].append(service)
                 if load <= max_load:
                     if load not in all_info_dict[importance]['loads']:
                         all_info_dict[importance]['loads'][load] = []
+                    # noinspection PyUnresolvedReferences
                     all_info_dict[importance]['loads'][load].append(service)
 
         service_nodes = []
@@ -482,7 +487,7 @@ class MDSServiceController(object):
         # CREATE NEW CONFIGURATION #
         ############################
 
-        # Check whether the master (if available) is non-local to the vdisk and/or is overloaded
+        # Check whether the master (if available) is non-local to the vDisk and/or is overloaded
         new_services = []
         master_ok = master_service is not None
         if master_ok is True:
@@ -499,6 +504,8 @@ class MDSServiceController(object):
             local_mds = None
             local_mds_load = 0
             for service in all_info_dict['primary']['available']:
+                if not isinstance(service, Service):
+                    continue
                 load = services_load[service]
                 if load <= max_load and service.storagerouter_guid == vdisk.storagerouter_guid:
                     if local_mds is None or local_mds_load > load:
@@ -561,6 +568,8 @@ class MDSServiceController(object):
                 # Try to recycle slave which is in primary domain
                 for load in sorted(all_info_dict['primary']['loads']):
                     for service in all_info_dict['primary']['loads'][load]:
+                        if not isinstance(service, Service):
+                            continue
                         if service_to_recycle is None and service in slave_services and service.storagerouter.ip not in nodes:
                             try:
                                 SSHClient(service.storagerouter)
@@ -571,6 +580,8 @@ class MDSServiceController(object):
             if service_to_recycle is None and len(secondary_storagerouters) > 0:
                 for load in sorted(all_info_dict['secondary']['loads']):
                     for service in all_info_dict['secondary']['loads'][load]:
+                        if not isinstance(service, Service):
+                            continue
                         if service_to_recycle is None and service in slave_services and service.storagerouter.ip not in nodes:
                             try:
                                 SSHClient(service.storagerouter)
@@ -602,7 +613,7 @@ class MDSServiceController(object):
                 nodes, new_services = _add_suitable_nodes(_importance='primary',
                                                           _safety=safety)
 
-        # Build the new configuration and update the vdisk
+        # Build the new configuration and update the vDisk
         configs_no_ex_master = []
         configs_all = []
         for service in new_services:

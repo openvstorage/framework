@@ -64,7 +64,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                         colors: {
                                             green: ['ok_standalone', 'ok_sync'].contains(dtlStatus()),
                                             orange: ['catch_up', 'checkup_required'].contains(dtlStatus()),
-                                            red: dtlStatus() === 'degraded'
+                                            red: dtlStatus() === 'degraded',
+                                            grey: dtlStatus() === 'disabled'
                                         },
                                         defaultColor: 'lightgrey'
                                     }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"

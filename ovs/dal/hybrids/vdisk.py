@@ -102,7 +102,7 @@ class VDisk(DataObject):
         # Verify whether 'ok_standalone' is the correct status for this vDisk
         vpool_dtl = self.vpool.configuration['dtl_enabled']
         if self.has_manual_dtl is True or vpool_dtl is False:
-            return sd_status
+            return 'disabled'
 
         domains = []
         possible_dtl_targets = set()
