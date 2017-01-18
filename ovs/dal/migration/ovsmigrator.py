@@ -30,7 +30,7 @@ class OVSMigrator(object):
     """
 
     identifier = 'ovs'
-    THIS_VERSION = 14
+    THIS_VERSION = 15
 
     def __init__(self):
         """ Init method """

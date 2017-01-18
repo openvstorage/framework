@@ -48,7 +48,7 @@ class Domain(DataObject):
     For storagerouter3 this will be all the storagerouters part of rack1 in datacenter1 (storagerouter2)
     For storagerouter4 this will be all the storagerouters part of rack1 in datacenter1 (storagerouter2)
     """
-    __properties = [Property('name', str, doc='The name of the domain')]
+    __properties = [Property('name', str, indexed=True, doc='The name of the domain')]
     __relations = []
     __dynamics = [Dynamic('storage_router_layout', dict, 5)]
 

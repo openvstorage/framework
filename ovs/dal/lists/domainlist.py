@@ -30,6 +30,20 @@ class DomainList(object):
     def get_domains():
         """
         Returns a list of all domains
+        :return: All Domains
+        :rtype: ovs.dal.datalist.DataList
         """
         return DataList(Domain, {'type': DataList.where_operator.AND,
                                  'items': []})
+
+    @staticmethod
+    def get_by_name(name):
+        """
+        Returns a list of Domains with a given name
+        :param name: Name of the Domain(s) to search
+        :type name: str
+        :return: List of Domains with a given name
+        :rtype: ovs.dal.datalist.DataList
+        """
+        return DataList(Domain, {'type': DataList.where_operator.AND,
+                                 'items': [('name', DataList.operator.EQUALS, name)]})
