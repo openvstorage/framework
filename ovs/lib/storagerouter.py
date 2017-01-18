@@ -918,6 +918,10 @@ class StorageRouterController(object):
                 temp_client = SSHClient(sr, username='root')
                 if sr in storage_routers_offline:
                     raise Exception('Storage Router "{0}" passed as "offline Storage Router" appears to be reachable'.format(sr.name))
+                if sr == storage_router:
+                    mtpt_pids = temp_client.run("lsof -t +D '/mnt/{0}' || true".format(vpool.name.replace(r"'", r"'\''")), allow_insecure=True).splitlines()
+                    if len(mtpt_pids) > 0:
+                        raise RuntimeError('vPool cannot be deleted. Following processes keep the vPool mountpoint occupied: {0}'.format(', '.join(mtpt_pids)))
                 with remote(temp_client.ip, [LocalStorageRouterClient]) as rem:
                     sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
                     if Configuration.exists(sd_key) is True:
