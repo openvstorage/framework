@@ -72,6 +72,10 @@ class DomainViewSet(viewsets.ViewSet):
         contents = None if contents is None else contents.split(',')
         serializer = FullSerializer(Domain, contents=contents, instance=Domain(), data=request.DATA)
         domain = serializer.deserialize()
+        current_domains = DomainList.get_by_name(domain.name)
+        if len(current_domains) > 0:
+            raise HttpNotAcceptableException(error_description='A Domain with the given name already exists',
+                                             error='duplicate')
         domain.save()
         return domain
 
