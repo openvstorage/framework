@@ -116,7 +116,8 @@ class DataList(object):
         if not self._can_use_indexes(indexed_properties, items, where_operator):
             raise RuntimeError('A request for loading data from indexes is aborted since the query is not index-safe.')
 
-        base_index_prefix = 'ovs_index_{0}|{1}|{2}'
+        object_key = 'ovs_data_{0}_{{0}}'.format(self._object_type.__name__.lower())
+        base_index_prefix = 'ovs_index_{0}|{{0}}|{{1}}'.format(self._object_type.__name__.lower())
         keys = None
         for item in items[:]:
             if isinstance(item, dict):
@@ -135,13 +136,15 @@ class DataList(object):
             else:
                 if item[0] in indexed_properties:
                     if item[1] == DataList.operator.EQUALS:
-                        index_key = base_index_prefix.format(self._object_type.__name__.lower(), item[0],
-                                                             hashlib.sha1(str(item[2])).hexdigest())
-                        # [item for sublist in mainlist for item in sublist] - shitty nested list comprehensions
-                        indexed_keys = set(str(key)
-                                           for keys_set in self._persistent.get_multi([index_key], must_exist=False)
-                                           if keys_set is not None
-                                           for key in keys_set)
+                        if item[0] == 'guid':
+                            indexed_keys = {object_key.format(item[2])}
+                        else:
+                            index_key = base_index_prefix.format(item[0], hashlib.sha1(str(item[2])).hexdigest())
+                            # [item for sublist in mainlist for item in sublist] - shitty nested list comprehensions
+                            indexed_keys = set(str(key)
+                                               for keys_set in self._persistent.get_multi([index_key], must_exist=False)
+                                               if keys_set is not None
+                                               for key in keys_set)
                         if keys is None:
                             keys = indexed_keys
                         elif where_operator == DataList.where_operator.AND:
@@ -152,14 +155,16 @@ class DataList(object):
                             self.from_index = 'full'
                         items.remove(item)
                     elif item[1] == DataList.operator.IN and isinstance(item[2], list):
-                        index_keys = [base_index_prefix.format(self._object_type.__name__.lower(), item[0],
-                                                               hashlib.sha1(str(sub_item)).hexdigest())
-                                      for sub_item in item[2]]
-                        # [item for sublist in mainlist for item in sublist] - shitty nested list comprehensions
-                        indexed_keys = set(str(key)
-                                           for keys_set in self._persistent.get_multi(index_keys, must_exist=False)
-                                           if keys_set is not None
-                                           for key in keys_set)
+                        if item[0] == 'guid':
+                            indexed_keys = set(object_key.format(sub_item) for sub_item in item[2])
+                        else:
+                            index_keys = [base_index_prefix.format(item[0], hashlib.sha1(str(sub_item)).hexdigest())
+                                          for sub_item in item[2]]
+                            # [item for sublist in mainlist for item in sublist] - shitty nested list comprehensions
+                            indexed_keys = set(str(key)
+                                               for keys_set in self._persistent.get_multi(index_keys, must_exist=False)
+                                               if keys_set is not None
+                                               for key in keys_set)
                         if keys is None:
                             keys = indexed_keys
                         elif where_operator == DataList.where_operator.AND:
@@ -205,7 +210,7 @@ class DataList(object):
         :param query_type: The WHERE operator
         :return: A generator that yields key-value pairs for the data to be filtered
         """
-        indexed_properties = [prop.name for prop in self._object_type._properties if prop.indexed is True]
+        indexed_properties = [prop.name for prop in self._object_type._properties if prop.indexed is True] + ['guid']
         use_indexes = self._can_use_indexes(indexed_properties, query_items, query_type)
         if use_indexes is True:
             keys = self._get_keys_from_index(indexed_properties, query_items, query_type)
