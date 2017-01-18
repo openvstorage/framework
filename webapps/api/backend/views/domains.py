@@ -74,7 +74,7 @@ class DomainViewSet(viewsets.ViewSet):
         domain = serializer.deserialize()
         current_domains = DomainList.get_by_name(domain.name)
         if len(current_domains) > 0:
-            raise HttpNotAcceptableException(error_description='A Domain with the given name already exist',
+            raise HttpNotAcceptableException(error_description='A Domain with the given name already exists',
                                              error='duplicate')
         domain.save()
         return domain
