@@ -235,7 +235,7 @@ class ArakoonClusterConfig(object):
 
 class ArakoonInstaller(object):
     """
-    class to dynamically install/(re)configure arakoon cluster
+    class to dynamically install/(re)configure Arakoon cluster
     """
     ARAKOON_BASE_DIR = '{0}/arakoon'
     ARAKOON_HOME_DIR = '{0}/arakoon/{1}/db'
@@ -258,7 +258,7 @@ class ArakoonInstaller(object):
     @staticmethod
     def clean_leftover_arakoon_data(ip, directories):
         """
-        Delete existing arakoon data
+        Delete existing Arakoon data
         :param ip: IP on which to check for existing data
         :type ip: str
         :param directories: Directories to delete
@@ -272,15 +272,15 @@ class ArakoonInstaller(object):
 
         # Verify whether all files to be archived have been released properly
         open_file_errors = []
-        ArakoonInstaller._logger.debug('Cleanup old arakoon - Checking open files')
+        ArakoonInstaller._logger.debug('Cleanup old Arakoon - Checking open files')
         dirs_with_files = {}
         for directory in directories:
-            ArakoonInstaller._logger.debug('Cleaning old arakoon - Checking directory {0}'.format(directory))
+            ArakoonInstaller._logger.debug('Cleaning old Arakoon - Checking directory {0}'.format(directory))
             if root_client.dir_exists(directory):
-                ArakoonInstaller._logger.debug('Cleaning old arakoon - Directory {0} exists'.format(directory))
+                ArakoonInstaller._logger.debug('Cleaning old Arakoon - Directory {0} exists'.format(directory))
                 file_names = root_client.file_list(directory, abs_path=True, recursive=True)
                 if len(file_names) > 0:
-                    ArakoonInstaller._logger.debug('Cleaning old arakoon - Files found in directory {0}'.format(directory))
+                    ArakoonInstaller._logger.debug('Cleaning old Arakoon - Files found in directory {0}'.format(directory))
                     dirs_with_files[directory] = file_names
                 for file_name in file_names:
                     try:
@@ -294,7 +294,7 @@ class ArakoonInstaller(object):
             raise RuntimeError('\n - ' + '\n - '.join(open_file_errors))
 
         for directory, info in dirs_with_files.iteritems():
-            ArakoonInstaller._logger.debug('Cleanup old arakoon - Removing old files from {0}'.format(directory))
+            ArakoonInstaller._logger.debug('Cleanup old Arakoon - Removing old files from {0}'.format(directory))
             root_client.file_delete(info)
 
     @staticmethod
@@ -319,7 +319,7 @@ class ArakoonInstaller(object):
         :type filesystem: bool
         :param ports: A list of ports to be used for this cluster's node
         :type ports: list
-        :return: Ports used by arakoon cluster
+        :return: Ports used by Arakoon cluster
         :rtype: dict
         """
         if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
@@ -425,7 +425,7 @@ class ArakoonInstaller(object):
         :type filesystem: bool
         :param ports: A list of ports to be used for this cluster's node
         :type ports: list
-        :return: Ports used by arakoon cluster
+        :return: Ports used by Arakoon cluster
         :rtype: dict
         """
         ArakoonInstaller._logger.debug('Extending cluster {0} from {1} to {2}'.format(cluster_name, master_ip, new_ip))
@@ -486,7 +486,7 @@ class ArakoonInstaller(object):
         :type offline_nodes: list
         :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
         :type filesystem: bool
-        :return: Remaining running arakoon IPs
+        :return: Remaining running Arakoon IPs
         :rtype: list
         """
         ArakoonInstaller._logger.debug('Shrinking cluster {0} from {1}'.format(cluster_name, deleted_node_ip))
@@ -536,19 +536,21 @@ class ArakoonInstaller(object):
         return restart_ips
 
     @staticmethod
-    def get_unused_arakoon_metadata_and_claim(cluster_type, locked=True):
+    def get_unused_arakoon_metadata_and_claim(cluster_type, locked=True, cluster_name=None):
         """
-        Retrieve arakoon cluster information based on its type
-        :param cluster_type: Type of arakoon cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
+        Retrieve Arakoon cluster information based on its type
+        :param cluster_type: Type of Arakoon cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
         :type cluster_type: str
         :param locked: Execute this in a locked context
         :type locked: bool
-        :return: Metadata of the arakoon cluster
+        :param cluster_name: Name of the cluster to claim
+        :type cluster_name: str
+        :return: Metadata of the Arakoon cluster
         :rtype: dict
         """
         cluster_type = cluster_type.upper()
         if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
-            raise ValueError('Unsupported arakoon cluster type provided. Please choose from {0}'.format(', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
+            raise ValueError('Unsupported Arakoon cluster type provided. Please choose from {0}'.format(', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
         if not Configuration.dir_exists(ArakoonInstaller.CONFIG_ROOT):
             return None
 
@@ -557,8 +559,10 @@ class ArakoonInstaller(object):
             if locked is True:
                 mutex.acquire()
 
-            for cluster_name in Configuration.list(ArakoonInstaller.CONFIG_ROOT):
-                config = ArakoonClusterConfig(cluster_id=cluster_name, filesystem=False)
+            for cl_name in Configuration.list(ArakoonInstaller.CONFIG_ROOT):
+                if cluster_name is not None and cl_name != cluster_name:
+                    continue
+                config = ArakoonClusterConfig(cluster_id=cl_name, filesystem=False)
                 config.load_config()
                 arakoon_client = ArakoonInstaller.build_client(config)
                 if arakoon_client.exists(ArakoonInstaller.METADATA_KEY):
@@ -572,10 +576,35 @@ class ArakoonInstaller(object):
                 mutex.release()
 
     @staticmethod
+    def get_unused_arakoon_clusters(cluster_type):
+        """
+        Retrieve all unclaimed clusters of type <cluster_type>
+        :param cluster_type: Type of Arakoon cluster (See ServiceType.ARAKOON_CLUSTER_TYPES)
+        :type cluster_type: str
+        :return: All unclaimed Arakoon clusters of specified type
+        :rtype: list
+        """
+        clusters = []
+        cluster_type = cluster_type.upper()
+        if cluster_type not in ServiceType.ARAKOON_CLUSTER_TYPES:
+            raise ValueError('Unsupported Arakoon cluster type provided. Please choose from {0}'.format(', '.join(ServiceType.ARAKOON_CLUSTER_TYPES)))
+        if not Configuration.dir_exists(ArakoonInstaller.CONFIG_ROOT):
+            return clusters
+
+        for cluster_name in Configuration.list(ArakoonInstaller.CONFIG_ROOT):
+            config = ArakoonClusterConfig(cluster_id=cluster_name, filesystem=False)
+            config.load_config()
+            arakoon_client = ArakoonInstaller.build_client(config)
+            metadata = json.loads(arakoon_client.get(ArakoonInstaller.METADATA_KEY))
+            if metadata['cluster_type'] == cluster_type and metadata['in_use'] is False:
+                clusters.append(metadata)
+        return clusters
+
+    @staticmethod
     def get_arakoon_metadata_by_cluster_name(cluster_name, filesystem=False, ip=None):
         """
-        Retrieve arakoon cluster information based on its name
-        :param cluster_name: Name of the arakoon cluster
+        Retrieve Arakoon cluster information based on its name
+        :param cluster_name: Name of the Arakoon cluster
         :type cluster_name: str
         :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
         :type filesystem: bool
@@ -687,7 +716,7 @@ class ArakoonInstaller(object):
     @staticmethod
     def start(cluster_name, client):
         """
-        Starts an arakoon cluster
+        Starts an Arakoon cluster
         :param cluster_name: The name of the cluster service to start
         :type cluster_name: str
         :param client: Client on which to start the service
@@ -701,7 +730,7 @@ class ArakoonInstaller(object):
     @staticmethod
     def stop(cluster_name, client):
         """
-        Stops an arakoon service
+        Stops an Arakoon service
         :param cluster_name: The name of the cluster service to stop
         :type cluster_name: str
         :param client: Client on which to stop the service
@@ -715,7 +744,7 @@ class ArakoonInstaller(object):
     @staticmethod
     def is_running(cluster_name, client):
         """
-        Checks if arakoon service is running
+        Checks if Arakoon service is running
         :param cluster_name: The name of the cluster service to check
         :type cluster_name: str
         :param client: Client on which to check the service
@@ -730,7 +759,7 @@ class ArakoonInstaller(object):
     @staticmethod
     def remove(cluster_name, client, delay_unregistration=False):
         """
-        Removes an arakoon service
+        Removes an Arakoon service
         :param cluster_name: The name of the cluster service to remove
         :type cluster_name: str
         :param client: Client on which to remove the service
@@ -788,12 +817,12 @@ class ArakoonInstaller(object):
     @staticmethod
     def restart_node(cluster_name, client):
         """
-        Execute a restart sequence for the arakoon service running on the specified IP
+        Execute a restart sequence for the Arakoon service running on the specified IP
         This scenario is only supported when NO configuration changes have been applied
-        and should have no impact on arakoon performance if 1 node fails to restart due to backwards compatibility
+        and should have no impact on Arakoon performance if 1 node fails to restart due to backwards compatibility
         :param cluster_name: Name of the cluster to restart
         :type cluster_name: str
-        :param client: Client on which to restart the arakoon service
+        :param client: Client on which to restart the Arakoon service
         :type client: SSHClient
         :return: None
         """
@@ -925,10 +954,10 @@ class ArakoonInstaller(object):
     @staticmethod
     def get_service_name_for_cluster(cluster_name):
         """
-        Retrieve the arakoon service name for the cluster specified
+        Retrieve the Arakoon service name for the cluster specified
         :param cluster_name: Name of the Arakoon cluster
         :type cluster_name: str
-        :return: Name of the arakoon service known on the system
+        :return: Name of the Arakoon service known on the system
         :rtype: str
         """
         return 'arakoon-{0}'.format(cluster_name)
