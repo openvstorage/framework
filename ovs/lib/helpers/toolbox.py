@@ -30,7 +30,7 @@ from celery.schedules import crontab
 from ovs.dal.helpers import Toolbox as HelperToolbox
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.interactive import Interactive
-from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException, NotAuthenticatedException
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.services.service import ServiceManager
 from ovs.log.log_handler import LogHandler
 
@@ -335,6 +335,8 @@ class Toolbox(object):
         :type previous: str
         :return: None
         """
+        from ovs.extensions.generic.sshclient import NotAuthenticatedException
+
         while True:
             try:
                 try:
