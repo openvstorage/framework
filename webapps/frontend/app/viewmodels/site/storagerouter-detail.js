@@ -96,7 +96,7 @@ define([
             $.each(storageRouter.recoveryDomainGuids(), function(index, guid) {
                 if (cache[guid] !== undefined && cache[guid].storageRouterLayout() !== undefined &&
                     (cache[guid].storageRouterLayout()['regular'].length === 0 ||
-                     (cache[guid].storageRouterLayout()['regular'].length === 1) && cache[guid].storageRouterLayout()['regular'][0] === storageRouter.guid())) {
+                     (cache[guid].storageRouterLayout()['regular'].length === 1 && cache[guid].storageRouterLayout()['regular'][0] === storageRouter.guid()))) {
                     domains.push(cache[guid]);
                 }
             });
