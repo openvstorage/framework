@@ -1143,8 +1143,9 @@ class StorageRouterController(object):
                     sd_can_be_deleted = False
                     break
         else:
-            if storage_router.guid in vpool.metadata:
-                vpool.metadata.pop(storage_router.guid)
+            metadata_key = 'backend_aa_{0}'.format(storage_router.guid)
+            if metadata_key in vpool.metadata:
+                vpool.metadata.pop(metadata_key)
                 vpool.save()
             StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Checking DTL for all virtual disks in vPool {1} with guid {2}'.format(storage_driver.guid, vpool.name, vpool.guid))
             try:
