@@ -45,13 +45,7 @@ class BackendViewSet(viewsets.ViewSet):
     prefix = r'backends'
     base_name = 'backends'
 
-    def validate_access(self, backend, request):
-        """
-        :param backend: The Backend to validate
-        :type backend: Backend
-        :param request: The raw request
-        :type request: Request
-        """
+    def _validate_access(self, backend, request):
         _ = self
         if not Toolbox.access_granted(request.client,
                                       user_rights=backend.user_rights,
@@ -86,7 +80,7 @@ class BackendViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read'])
     @return_object(Backend)
-    @load(Backend, validator=validate_access)
+    @load(Backend, validator=_validate_access)
     def retrieve(self, backend):
         """
         Load information about a given backend
@@ -118,7 +112,7 @@ class BackendViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_simple()
-    @load(Backend, validator=validate_access)
+    @load(Backend, validator=_validate_access)
     def set_domains(self, backend, domain_guids):
         """
         Configures the given domains to the StorageRouter.
@@ -146,7 +140,7 @@ class BackendViewSet(viewsets.ViewSet):
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_simple(mode='accepted')
-    @load(Backend, validator=validate_access)
+    @load(Backend, validator=_validate_access)
     def configure_rights(self, backend, new_rights):
         """
         Configures the access rights for this backend
@@ -158,11 +152,11 @@ class BackendViewSet(viewsets.ViewSet):
         :rtype: dict
 
         Example of `new_rights`.
-        {'users': {'guida': True,
-                   'guidb': True,
-                   'guidc': False},
-         'clients': {'guidd': False,
-                     'guide': True}}
+        {'users': {'guid_a': True,
+                   'guid_b': True,
+                   'guid_c': False},
+         'clients': {'guid_d': False,
+                     'guid_e': True}}
         """
         # Users
         matched_guids = []
