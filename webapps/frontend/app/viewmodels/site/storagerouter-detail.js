@@ -33,7 +33,6 @@ define([
         self.guard                    = { authenticated: true };
         self.refresher                = new Refresher();
         self.widgets                  = [];
-        self.domainCache              = {};
         self.loadVPoolsHandle         = undefined;
         self.loadStorageDriversHandle = {};
         self.loadDomainsHandle        = undefined;
@@ -55,6 +54,7 @@ define([
 
         // Observables
         self.checkedVPoolGuids = ko.observableArray([]);
+        self.domainCache       = ko.observable({});
         self.domains           = ko.observableArray([]);
         self.domainsLoaded     = ko.observable(false);
         self.markingOffline    = ko.observable(false);
@@ -87,6 +87,20 @@ define([
                 }
             });
             return guids;
+        });
+        self.badRecoveryDomains = ko.computed(function() {
+            var domains = [], storageRouter = self.storageRouter(), cache = self.domainCache();
+            if (storageRouter === undefined) {
+                return domains;
+            }
+            $.each(storageRouter.recoveryDomainGuids(), function(index, guid) {
+                if (cache[guid] !== undefined && cache[guid].storageRouterLayout() !== undefined &&
+                    (cache[guid].storageRouterLayout()['regular'].length === 0 ||
+                     (cache[guid].storageRouterLayout()['regular'].length === 1 && cache[guid].storageRouterLayout()['regular'][0] === storageRouter.guid()))) {
+                    domains.push(cache[guid]);
+                }
+            });
+            return domains;
         });
 
         // Functions
@@ -140,7 +154,7 @@ define([
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadDomainsHandle)) {
                     self.loadDomainsHandle = api.get('domains', {
-                        queryparams: { sort: 'name', contents: '' }
+                        queryparams: { sort: 'name', contents: 'storage_router_layout' }
                     })
                         .done(function(data) {
                             var guids = [], ddata = {};
@@ -151,8 +165,10 @@ define([
                             generic.crossFiller(
                                 guids, self.domains,
                                 function(guid) {
-                                    var domain = new Domain(guid);
-                                    self.domainCache[guid] = domain;
+                                    var domain = new Domain(guid),
+                                        cache = self.domainCache();
+                                    cache[guid] = domain;
+                                    self.domainCache(cache);
                                     if (ddata.hasOwnProperty(guid)) {
                                         domain.fillData(ddata[guid]);
                                     }

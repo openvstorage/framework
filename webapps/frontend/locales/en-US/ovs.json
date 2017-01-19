@@ -380,6 +380,7 @@
     },
     "storagerouters": {
         "detail": {
+            "bad_recovery_domains": "No StorageRouter found for:",
             "disks": {
                 "title": "Physical disks",
                 "rescan": {
