@@ -18,6 +18,7 @@ Remote RPyC wrapper module
 """
 
 import os
+import sys
 from subprocess import check_output
 from rpyc.utils.zerodeploy import DeployedServer
 from plumbum import SshMachine
@@ -93,6 +94,8 @@ class remote(object):
     def _build_remote_module(self, connection):
         if self._unittest_mode is False:
             connection.modules['sys'].path.append('/opt/OpenvStorage')
+            connection.modules['sys'].stdout = sys.stdout
+            connection.modules['sys'].stderr = sys.stderr
         remote_modules = {}
         for module in self.modules:
             if self._unittest_mode is True:
