@@ -676,7 +676,18 @@ class ClusterRegistry(object):
             ClusterRegistry._registry[self._cluster_id] = {'node_configs': []}
 
     def get_node_configs(self):
+        """
+        Retrieve the node configurations
+        :return: Dictionary with the node configurations
+        :rtype: dict
+        """
         return ClusterRegistry._registry[self._cluster_id]['node_configs']
 
     def set_node_configs(self, configs):
+        """
+        Set the node configurations
+        :param configs: Configuration to set in the registry
+        :type configs: dict
+        :return: None
+        """
         ClusterRegistry._registry[self._cluster_id]['node_configs'] = configs

@@ -335,14 +335,14 @@ class Toolbox(object):
         :type previous: str
         :return: None
         """
-        from paramiko import AuthenticationException
+        from ovs.extensions.generic.sshclient import NotAuthenticatedException
 
         while True:
             try:
                 try:
                     SSHClient(ip, username)
                     return None
-                except AuthenticationException:
+                except NotAuthenticatedException:
                     pass
                 if previous is not None:
                     try:

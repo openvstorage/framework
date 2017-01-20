@@ -86,6 +86,13 @@ class UnableToConnectException(Exception):
     pass
 
 
+class NotAuthenticatedException(Exception):
+    """
+    Custom exception thrown when client cannot connect to remote side because SSH keys have not been exchanged
+    """
+    pass
+
+
 class SSHClient(object):
     """
     Remote/local client
@@ -178,6 +185,7 @@ class SSHClient(object):
         if self.is_local is True:
             return
 
+        from paramiko import AuthenticationException
         try:
             try:
                 self._client.connect(self.ip, username=self.username, password=self.password)
@@ -193,6 +201,8 @@ class SSHClient(object):
                 SSHClient._logger.error(message)
                 raise UnableToConnectException(message)
             raise
+        except AuthenticationException:
+            raise NotAuthenticatedException('Authentication failed')
 
     def _disconnect(self):
         """

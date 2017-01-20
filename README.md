@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/openvstorage/framework.svg?branch=master)](https://travis-ci.org/openvstorage/framework)
 
 The Framework is a set of components and tools which brings the user an interface (GUI / API) to manage the Open vStorage platform.
-The main framework pieces are written in python and javascript. It makes use of other open source projects like etcd for distributed
+The main framework pieces are written in python and javascript. It makes use of other open source projects like Arakoon for distributed
 configuration management and Celery as distributed task queue.
 The intuitive GUI allows easy setup and management of an Open vStorage Backend and link that to a distributed vPool.
 Having the ability to interface with hypervisors like KVM and VMware the framework turns the platform into a VM-Centric Storage platform.

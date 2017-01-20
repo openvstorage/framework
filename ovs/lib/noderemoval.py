@@ -53,6 +53,7 @@ class NodeRemovalController(object):
         from ovs.lib.storagedriver import StorageDriverController
         from ovs.lib.storagerouter import StorageRouterController
         from ovs.dal.lists.storagerouterlist import StorageRouterList
+        from ovs.extensions.generic.sshclient import NotAuthenticatedException
 
         Toolbox.log(logger=NodeRemovalController._logger, messages='Remove node', boxed=True)
         Toolbox.log(logger=NodeRemovalController._logger, messages='WARNING: Some of these steps may take a very long time, please check the logs for more information\n\n')
@@ -98,7 +99,7 @@ class NodeRemovalController(object):
                         ip_client_map[storage_router.ip] = client
                         if storage_router != storage_router_to_remove and storage_router.node_type == 'MASTER':
                             master_ip = storage_router.ip
-                except UnableToConnectException:
+                except (UnableToConnectException, NotAuthenticatedException):
                     Toolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} is unreachable'.format(storage_router.ip))
                     storage_routers_offline.append(storage_router)
                     if storage_router == storage_router_to_remove:
@@ -184,7 +185,6 @@ class NodeRemovalController(object):
 
             # Stop / remove services
             Toolbox.log(logger=NodeRemovalController._logger, messages='Stopping and removing services')
-            config_store = Configuration.get_store()
             if storage_router_to_remove_online is True:
                 client = SSHClient(endpoint=storage_router_to_remove, username='root')
                 NodeRemovalController.remove_services(client=client, node_type=storage_router_to_remove.node_type.lower(), logger=NodeRemovalController._logger)
@@ -193,20 +193,6 @@ class NodeRemovalController(object):
                     Toolbox.log(logger=NodeRemovalController._logger, messages='Removing service {0}'.format(service))
                     ServiceManager.stop_service(service, client=client)
                     ServiceManager.remove_service(service, client=client)
-
-                if config_store == 'etcd':
-                    from ovs.extensions.db.etcd.installer import EtcdInstaller
-
-                    if Configuration.get(key='/ovs/framework/external_config') is None:
-                        Toolbox.log(logger=NodeRemovalController._logger, messages='      Removing Etcd cluster')
-                        try:
-                            EtcdInstaller.stop('config', client)
-                            EtcdInstaller.remove('config', client)
-                        except Exception as ex:
-                            Toolbox.log(logger=NodeRemovalController._logger, messages=['\nFailed to unconfigure Etcd', ex], loglevel='exception')
-
-                    Toolbox.log(logger=NodeRemovalController._logger, messages='Removing Etcd proxy')
-                    EtcdInstaller.remove_proxy('config', client.ip)
 
             Toolbox.run_hooks(component='noderemoval',
                               sub_component='remove',
@@ -232,8 +218,7 @@ class NodeRemovalController(object):
 
             if storage_router_to_remove_online is True:
                 client = SSHClient(endpoint=storage_router_to_remove, username='root')
-                if config_store == 'arakoon':
-                    client.file_delete(filenames=[ArakoonConfiguration.CACC_LOCATION])
+                client.file_delete(filenames=[ArakoonConfiguration.CACC_LOCATION])
                 client.file_delete(filenames=[Configuration.BOOTSTRAP_CONFIG_LOCATION])
             storage_router_to_remove.delete()
             Toolbox.log(logger=NodeRemovalController._logger, messages='Successfully removed node\n')

@@ -544,7 +544,7 @@ class UpdateController(object):
             local_ip = None
             for sr in storage_routers:
                 try:
-                    ssh_clients.append(SSHClient(sr.ip, username='root'))
+                    ssh_clients.append(SSHClient(sr, username='root'))
                     if sr == System.get_my_storagerouter():
                         local_ip = sr.ip
                     if sr.node_type == 'MASTER':
@@ -594,11 +594,13 @@ class UpdateController(object):
 
             # Install packages
             # First install packages on all StorageRouters individually
+            package_install_multi_hooks = Toolbox.fetch_hooks('update', 'package_install_multi')
+            package_install_single_hooks = Toolbox.fetch_hooks('update', 'package_install_single')
             if packages_to_update:
                 failures = False
                 for client in ssh_clients:
                     UpdateController._logger.debug('{0}: Installing packages'.format(client.ip))
-                    for function in Toolbox.fetch_hooks('update', 'package_install_multi'):
+                    for function in package_install_multi_hooks:
                         try:
                             function(client=client, package_info=packages_to_update, components=components)
                         except Exception as ex:
@@ -607,7 +609,7 @@ class UpdateController(object):
 
                 if set(components).difference({'framework', 'storagedriver'}):
                     # Second install packages on all ALBA nodes
-                    for function in Toolbox.fetch_hooks('update', 'package_install_single'):
+                    for function in package_install_single_hooks:
                         try:
                             function(package_info=packages_to_update, components=components)
                         except Exception as ex:

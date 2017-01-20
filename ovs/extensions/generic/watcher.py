@@ -66,29 +66,29 @@ class Watcher(object):
                 except Exception as ex:
                     self.log_message(target, '  Error during configuration store test: {0}'.format(ex), 2)
                     return False
-                if Configuration.get_store() == 'arakoon':
-                    from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
-                    from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
-                    from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
-                    with open(ArakoonConfiguration.CACC_LOCATION) as config_file:
-                        contents = config_file.read()
-                    config = ArakoonClusterConfig(cluster_id='cacc', filesystem=True)
-                    config.read_config(contents)
-                    client = ArakoonInstaller.build_client(config)
-                    contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())
-                    if Watcher.LOG_CONTENTS != contents:
-                        try:
-                            config.read_config(contents)  # Validate whether the contents are not corrupt
-                        except Exception as ex:
-                            self.log_message(target, '  Configuration stored in configuration store seems to be corrupt: {0}'.format(ex), 2)
-                            return False
-                        temp_filename = '{0}~'.format(ArakoonConfiguration.CACC_LOCATION)
-                        with open(temp_filename, 'w') as config_file:
-                            config_file.write(contents)
-                            config_file.flush()
-                            os.fsync(config_file)
-                        os.rename(temp_filename, ArakoonConfiguration.CACC_LOCATION)
-                        Watcher.LOG_CONTENTS = contents
+
+                from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
+                from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
+                from ovs.extensions.db.arakoon.pyrakoon.pyrakoon.compat import NoGuarantee
+                with open(ArakoonConfiguration.CACC_LOCATION) as config_file:
+                    contents = config_file.read()
+                config = ArakoonClusterConfig(cluster_id='cacc', filesystem=True)
+                config.read_config(contents)
+                client = ArakoonInstaller.build_client(config)
+                contents = client.get(ArakoonInstaller.INTERNAL_CONFIG_KEY, consistency=NoGuarantee())
+                if Watcher.LOG_CONTENTS != contents:
+                    try:
+                        config.read_config(contents)  # Validate whether the contents are not corrupt
+                    except Exception as ex:
+                        self.log_message(target, '  Configuration stored in configuration store seems to be corrupt: {0}'.format(ex), 2)
+                        return False
+                    temp_filename = '{0}~'.format(ArakoonConfiguration.CACC_LOCATION)
+                    with open(temp_filename, 'w') as config_file:
+                        config_file.write(contents)
+                        config_file.flush()
+                        os.fsync(config_file)
+                    os.rename(temp_filename, ArakoonConfiguration.CACC_LOCATION)
+                    Watcher.LOG_CONTENTS = contents
                 self.log_message(target, '  Configuration store OK', 0)
 
             if target == 'framework':

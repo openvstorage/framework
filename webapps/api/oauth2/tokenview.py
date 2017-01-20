@@ -73,7 +73,7 @@ class OAuth2TokenView(View):
             clients = [client for client in user.clients if client.ovs_type == 'INTERNAL' and client.grant_type == 'PASSWORD']
             if len(clients) != 1:
                 raise HttpBadRequestException(error='unauthorized_client',
-                                              error_description='Client is unautorized')
+                                              error_description='Client is unauthorized')
             client = clients[0]
             try:
                 access_token, _ = Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)

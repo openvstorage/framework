@@ -35,7 +35,8 @@ define(['knockout'], function(ko){
             },
             hooks          : {
                 dashboards: [],
-                wizards   : {}
+                wizards   : {},
+                pages     : {}
             }
         };
     };

@@ -26,7 +26,6 @@ define([
         self.shared = shared;
 
         // Handles
-        self.loadChildrenHandle      = undefined;
         self.loadConfigHandle        = undefined;
         self.loadHandle              = undefined;
         self.loadStorageRouterHandle = undefined;
@@ -61,6 +60,7 @@ define([
         self.name              = ko.observable();
         self.namespace         = ko.observable();
         self.oldConfiguration  = ko.observable();
+        self.parentVDiskGuid   = ko.observable();
         self.readSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.scoSize           = ko.observable(4);
         self.scoSizes          = ko.observableArray([4, 8, 16, 32, 64, 128]);
@@ -176,12 +176,18 @@ define([
         // Functions
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');
+            generic.trySet(self.size, data, 'size');
             generic.trySet(self.volumeId, data, 'volume_id');
+            generic.trySet(self.dtlStatus, data, 'dtl_status');
+            generic.trySet(self.vpoolGuid, data, 'vpool_guid');
+            generic.trySet(self.dtlManual, data, 'has_manual_dtl');
+            generic.trySet(self.isVTemplate, data, 'is_vtemplate');
+            generic.trySet(self.childrenGuids, data, 'child_vdisks_guids');
+            generic.trySet(self.parentVDiskGuid, data, 'parent_vdisk_guid');
+            generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             if (data.hasOwnProperty('devicename')) {
                 self.deviceName(data.devicename.replace(/^\//, ''));
             }
-            generic.trySet(self.dtlManual, data, 'has_manual_dtl');
-            generic.trySet(self.dtlStatus, data, 'dtl_status');
             if (data.hasOwnProperty('edge_clients')) {
                 var keys = [], cdata = {};
                 $.each(data.edge_clients, function (index, item) {
@@ -212,10 +218,6 @@ define([
                 });
                 self.snapshots(snapshots);
             }
-            generic.trySet(self.isVTemplate, data, 'is_vtemplate');
-            generic.trySet(self.size, data, 'size');
-            generic.trySet(self.vpoolGuid, data, 'vpool_guid');
-            generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);
                 self.namespace(data.info.namespace);
@@ -232,28 +234,12 @@ define([
                 self.backendRead(stats.backend_data_read);
                 self.bandwidthSaved(Math.max(0, stats.data_read - stats.backend_data_read));
             }
-
             self.snapshots.sort(function(a, b) {
                 // Sorting based on newest first
                 return b.timestamp - a.timestamp;
             });
-
             self.loaded(true);
             self.loading(false);
-        };
-        self.fetchChildrenGuids = function() {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadChildrenHandle)) {
-                    self.loadChildrenHandle = api.get('vdisks/' + self.guid() + '/get_children')
-                        .done(function(data) {
-                            self.childrenGuids(data.data);
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
         };
         self.load = function() {
             return $.Deferred(function(deferred) {

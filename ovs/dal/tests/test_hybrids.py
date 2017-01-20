@@ -85,6 +85,7 @@ class Hybrid(unittest.TestCase):
             # Check types
             allowed_types = [int, float, long, str, bool, list, dict, set]
             unique_types = [int, float, long, str]
+            indexed_types = [int, float, long, str, bool]
             for prop in cls._properties:
                 is_allowed_type = prop.property_type in allowed_types \
                     or isinstance(prop.property_type, list)
@@ -96,6 +97,11 @@ class Hybrid(unittest.TestCase):
                     self.assertIn(prop.property_type, unique_types,
                                   '_property {0}.{1} can only be unique if it is one of {2}'.format(
                                       cls.__name__, prop.name, unique_types
+                                  ))
+                if prop.indexed is True:
+                    self.assertIn(prop.property_type, indexed_types,
+                                  '_property {0}.{1} can only be indexed if it is one of {2}'.format(
+                                      cls.__name__, prop.name, indexed_types
                                   ))
             for dynamic in cls._dynamics:
                 is_allowed_type = dynamic.return_type in allowed_types \

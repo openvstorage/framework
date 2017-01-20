@@ -255,7 +255,7 @@ class StorageRouterController(object):
                 ip_client_map[sr.ip] = {'ovs': SSHClient(sr.ip, username='ovs'),
                                         'root': SSHClient(sr.ip, username='root')}
             except UnableToConnectException:
-                offline_nodes_detected = True  # We currently want to allow offline nodes while setting up or extend a vpool (etcd implementation should prevent further failures)
+                offline_nodes_detected = True  # We currently want to allow offline nodes while setting up or extend a vpool
             except Exception as ex:
                 raise RuntimeError('Something went wrong building SSH connections. {0}'.format(ex))
 
@@ -918,6 +918,10 @@ class StorageRouterController(object):
                 temp_client = SSHClient(sr, username='root')
                 if sr in storage_routers_offline:
                     raise Exception('Storage Router "{0}" passed as "offline Storage Router" appears to be reachable'.format(sr.name))
+                if sr == storage_router:
+                    mtpt_pids = temp_client.run("lsof -t +D '/mnt/{0}' || true".format(vpool.name.replace(r"'", r"'\''")), allow_insecure=True).splitlines()
+                    if len(mtpt_pids) > 0:
+                        raise RuntimeError('vPool cannot be deleted. Following processes keep the vPool mountpoint occupied: {0}'.format(', '.join(mtpt_pids)))
                 with remote(temp_client.ip, [LocalStorageRouterClient]) as rem:
                     sd_key = '/ovs/vpools/{0}/hosts/{1}/config'.format(vpool.guid, sd.storagedriver_id)
                     if Configuration.exists(sd_key) is True:
@@ -1139,8 +1143,9 @@ class StorageRouterController(object):
                     sd_can_be_deleted = False
                     break
         else:
-            if storage_router.guid in vpool.metadata:
-                vpool.metadata.pop(storage_router.guid)
+            metadata_key = 'backend_aa_{0}'.format(storage_router.guid)
+            if metadata_key in vpool.metadata:
+                vpool.metadata.pop(metadata_key)
                 vpool.save()
             StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Checking DTL for all virtual disks in vPool {1} with guid {2}'.format(storage_driver.guid, vpool.name, vpool.guid))
             try:

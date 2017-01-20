@@ -595,7 +595,40 @@ class DataObject(object):
             # Refresh internal data structure
             self._data = copy.deepcopy(data)
 
-            # First, update reverse index
+            # Update indexes
+            base_index_key = 'ovs_index_{0}|{1}|{2}'
+            for prop in self._properties:
+                if prop.indexed is True:
+                    if prop.property_type not in [str, int, float, long, bool]:
+                        raise RuntimeError('An index can only be set on field of type str, int, float, long, or bool')
+                    classname = self.__class__.__name__.lower()
+                    key = prop.name
+                    if self._new is False and key in changed_fields:
+                        original_value = self._original[key]
+                        index_key = base_index_key.format(classname, key, hashlib.sha1(str(original_value)).hexdigest())
+                        indexed_keys = list(self._persistent.get_multi([index_key], must_exist=False))[0]
+                        if indexed_keys is None:
+                            self._persistent.assert_value(index_key, None, transaction=transaction)
+                        elif self._key in indexed_keys:
+                            self._persistent.assert_value(index_key, indexed_keys[:], transaction=transaction)
+                            indexed_keys.remove(self._key)
+                            if len(indexed_keys) == 0:
+                                self._persistent.delete(index_key, transaction=transaction)
+                            else:
+                                self._persistent.set(index_key, indexed_keys, transaction=transaction)
+                    if self._new is True or key in changed_fields:
+                        new_value = self._data[key]
+                        index_key = base_index_key.format(classname, key, hashlib.sha1(str(new_value)).hexdigest())
+                        indexed_keys = list(self._persistent.get_multi([index_key], must_exist=False))[0]
+                        if indexed_keys is None:
+                            self._persistent.assert_value(index_key, None, transaction=transaction)
+                            self._persistent.set(index_key, [self._key], transaction=transaction)
+                        elif self._key not in indexed_keys:
+                            self._persistent.assert_value(index_key, indexed_keys[:], transaction=transaction)
+                            indexed_keys.append(self._key)
+                            self._persistent.set(index_key, indexed_keys, transaction=transaction)
+
+            # Update reverse index
             base_reverse_key = 'ovs_reverseindex_{0}_{1}|{2}|{3}'
             for relation in self._relations:
                 key = relation.name
@@ -614,7 +647,7 @@ class DataObject(object):
                         self._persistent.assert_exists('{0}_{1}_{2}'.format(DataObject.NAMESPACE, classname, new_guid))
                         self._persistent.set(reverse_key, 0, transaction=transaction)
 
-            # Second, invalidate property lists
+            # Invalidate property lists
             cache_key = '{0}_{1}|'.format(DataList.CACHELINK, self._classname)
             list_keys = set()
             cache_keys = {}
@@ -746,7 +779,24 @@ class DataObject(object):
             except KeyNotFoundException:
                 pass
 
-            # First, update reverse index
+            # Clean indexes
+            base_index_key = 'ovs_index_{0}|{1}|{2}'
+            for prop in self._properties:
+                if prop.indexed is True:
+                    classname = self.__class__.__name__.lower()
+                    key = prop.name
+                    current_value = self._original[key]
+                    index_key = base_index_key.format(classname, key, hashlib.sha1(str(current_value)).hexdigest())
+                    indexed_keys = list(self._persistent.get_multi([index_key], must_exist=False))[0]
+                    if indexed_keys is not None and self._key in indexed_keys:
+                        self._persistent.assert_value(index_key, indexed_keys[:], transaction=transaction)
+                        indexed_keys.remove(self._key)
+                        if len(indexed_keys) == 0:
+                            self._persistent.delete(index_key, transaction=transaction)
+                        else:
+                            self._persistent.set(index_key, indexed_keys, transaction=transaction)
+
+            # Clean reverse indexes
             base_reverse_key = 'ovs_reverseindex_{0}_{1}|{2}|{3}'
             for relation in self._relations:
                 key = relation.name
@@ -759,7 +809,7 @@ class DataObject(object):
                     reverse_key = base_reverse_key.format(classname, original_guid, relation.foreign_key, self.guid)
                     self._persistent.delete(reverse_key, must_exist=False, transaction=transaction)
 
-            # Second, invalidate property lists
+            # Invalidate property lists
             list_keys = []
             cache_key = '{0}_{1}|'.format(DataList.CACHELINK, self._classname)
             for key in list(self._persistent.prefix(cache_key)):

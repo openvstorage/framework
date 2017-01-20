@@ -35,6 +35,7 @@ define([
         self.loading             = ko.observable(false);
         self.name                = ko.observable('').extend({removeWhiteSpaces: null});
         self.storageRouterGuids  = ko.observableArray([]);
+        self.storageRouterLayout = ko.observable();
         self.vdiskDtlGuids       = ko.observableArray([]);
 
         // Computed
@@ -60,6 +61,9 @@ define([
             self.backendGuids(data.backends_guids);
             self.vdiskDtlGuids(data.vdisks_dtl_guids);
             self.storageRouterGuids(data.storagerouters_guids);
+            if (data.hasOwnProperty('storage_router_layout')) {
+                self.storageRouterLayout(data.storage_router_layout);
+            }
             self.loaded(true);
             self.loading(false);
         };

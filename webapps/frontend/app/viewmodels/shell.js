@@ -157,6 +157,20 @@ define([
                                                             });
                                                         });
                                                 });
+                                                $.each(hook.pages, function(page, pageName) {
+                                                    if (!shared.hooks.pages.hasOwnProperty(page)) {
+                                                        shared.hooks.pages[page] = [];
+                                                    }
+                                                    system.acquire('viewmodels/site/' + pageName)
+                                                        .then(function(module) {
+                                                            var moduleInstance = new module();
+                                                            shared.hooks.pages[page].push({
+                                                                name: pageName,
+                                                                module: moduleInstance,
+                                                                activator: activator.create()
+                                                            });
+                                                        });
+                                                });
                                                 moduleDeferred.resolve();
                                             });
                                         }).promise();

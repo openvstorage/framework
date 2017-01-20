@@ -30,7 +30,7 @@ class VPool(DataObject):
     """
     STATUSES = DataObject.enumerator('Status', ['DELETING', 'EXTENDING', 'FAILURE', 'INSTALLING', 'RUNNING', 'SHRINKING'])
 
-    __properties = [Property('name', str, unique=True, doc='Name of the vPool'),
+    __properties = [Property('name', str, unique=True, indexed=True, doc='Name of the vPool'),
                     Property('description', str, mandatory=False, doc='Description of the vPool'),
                     Property('login', str, mandatory=False, doc='Login/Username for the Storage BackendType.'),
                     Property('password', str, mandatory=False, doc='Password for the Storage BackendType.'),

@@ -41,7 +41,7 @@ class VDisk(DataObject):
                     Property('description', str, mandatory=False, doc='Description of the vDisk.'),
                     Property('size', int, doc='Size of the vDisk in Bytes.'),
                     Property('devicename', str, doc='The name of the container file (e.g. the VMDK-file) describing the vDisk.'),
-                    Property('volume_id', str, mandatory=False, doc='ID of the vDisk in the Open vStorage Volume Driver.'),
+                    Property('volume_id', str, mandatory=False, indexed=True, doc='ID of the vDisk in the Open vStorage Volume Driver.'),
                     Property('parentsnapshot', str, mandatory=False, doc='Points to a parent storage driver parent ID. None if there is no parent Snapshot'),
                     Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder'),
                     Property('has_manual_dtl', bool, default=False, doc='Indicates whether the default DTL location has been overruled by customer'),
@@ -102,7 +102,7 @@ class VDisk(DataObject):
         # Verify whether 'ok_standalone' is the correct status for this vDisk
         vpool_dtl = self.vpool.configuration['dtl_enabled']
         if self.has_manual_dtl is True or vpool_dtl is False:
-            return sd_status
+            return 'disabled'
 
         domains = []
         possible_dtl_targets = set()

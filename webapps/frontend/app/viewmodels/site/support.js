@@ -24,13 +24,10 @@ define([
         var self = this;
 
         // Variables
-        self.widgets               = [];
-        self.shared                = shared;
-        self.guard                 = { authenticated: true };
-        self.refresher             = new Refresher();
-        self.supportInfoHandle     = {};
-        self.supportMetadataHandle = {};
-        self.versionInfoHandle     = {};
+        self.widgets   = [];
+        self.shared    = shared;
+        self.guard     = { authenticated: true };
+        self.refresher = new Refresher();
 
         // Observables
         self.storageRouters = ko.observableArray([]);
@@ -38,6 +35,11 @@ define([
         self.dirty          = ko.observable(false);
         self._enable        = ko.observable();
         self._enableSupport = ko.observable();
+
+        // Handles
+        self.supportInfoHandle     = {};
+        self.supportMetadataHandle = {};
+        self.versionInfoHandle     = {};
 
         // Computed
         self.enableSupport = ko.computed({
@@ -104,7 +106,7 @@ define([
                     });
             }
         };
-        self.fetchStorageRouters = function() {
+        self.loadStorageRouters = function() {
             return $.Deferred(function(deferred) {
                 var options = {
                     sort: 'name',
@@ -180,13 +182,27 @@ define([
 
         // Durandal
         self.activate = function() {
+            $.each(shared.hooks.pages, function(pageType, pages) {
+                if (pageType === 'support') {
+                    $.each(pages, function(index, page) {
+                        page.activator.activateItem(page.module);
+                    })
+                }
+            });
             self.refresher.init(function() {
-                self.fetchStorageRouters();
+                self.loadStorageRouters();
             }, 5000);
             self.refresher.start();
             self.refresher.run();
         };
         self.deactivate = function() {
+            $.each(shared.hooks.pages, function(pageType, pages) {
+                if (pageType === 'support') {
+                    $.each(pages, function(index, page) {
+                        page.activator.deactivateItem(page.module);
+                    });
+                }
+            });
             $.each(self.widgets, function(i, item) {
                 item.deactivate();
             });

@@ -446,6 +446,8 @@ class VDiskController(object):
             return
         if len(vdisk.child_vdisks) > 0:
             raise RuntimeError('vDisk {0} has clones, cannot convert to vTemplate'.format(vdisk.name))
+        if vdisk.parent_vdisk_guid is not None:
+            raise RuntimeError('vDisk {0} has been cloned, cannot convert to vTemplate'.format(vdisk.name))
 
         VDiskController._logger.info('Converting vDisk {0} into vTemplate'.format(vdisk.name))
         try:

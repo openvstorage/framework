@@ -30,8 +30,8 @@ class StorageRouter(DataObject):
     """
     __properties = [Property('name', str, unique=True, doc='Name of the Storage Router.'),
                     Property('description', str, mandatory=False, doc='Description of the Storage Router.'),
-                    Property('machine_id', str, unique=True, mandatory=False, doc='The hardware identifier of the Storage Router'),
-                    Property('ip', str, unique=True, doc='IP Address of the Storage Router, if available'),
+                    Property('machine_id', str, unique=True, mandatory=False, indexed=True, doc='The hardware identifier of the Storage Router'),
+                    Property('ip', str, unique=True, indexed=True, doc='IP Address of the Storage Router, if available'),
                     Property('heartbeats', dict, default={}, doc='Heartbeat information of various monitors'),
                     Property('node_type', ['MASTER', 'EXTRA'], default='EXTRA', doc='Indicates the node\'s type'),
                     Property('rdma_capable', bool, doc='Is this Storage Router RDMA capable'),

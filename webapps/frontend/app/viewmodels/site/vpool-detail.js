@@ -54,11 +54,12 @@ define([
         self.loadStorageRoutersHandle = undefined;
 
         // Observables
-        self.updatingStorageRouters = ko.observable(false);
-        self.vPool                  = ko.observable();
+        self.refreshList            = ko.observableArray([]);
         self.srSDMap                = ko.observable({});
         self.storageDrivers         = ko.observableArray([]);
         self.storageRouters         = ko.observableArray([]);
+        self.updatingStorageRouters = ko.observable(false);
+        self.vPool                  = ko.observable();
 
         // Functions
         self.load = function() {
@@ -191,7 +192,7 @@ define([
         };
         self.removeStorageRouter = function(sr) {
             var single = generic.keys(self.srSDMap()).length === 1;
-            if (self.srSDMap().hasOwnProperty(sr.guid()) && self.srSDMap()[sr.guid()].canBeDeleted() === true) {
+            if (self.srSDMap().hasOwnProperty(sr.guid()) && self.srSDMap()[sr.guid()].canBeDeleted() === true && self.refreshList().length === 0) {
                 self.updatingStorageRouters(true);
                 app.showMessage(
                     $.t('ovs:wizards.shrink_vpool.confirm.remove_' + (single === true ? 'single' : 'multi'), { what: sr.name() }),
@@ -245,6 +246,42 @@ define([
                                     self.updatingStorageRouters(false);
                                 });
                         }
+                    });
+            }
+        };
+        self.refreshConfiguration = function(sr) {
+            if (self.srSDMap().hasOwnProperty(sr.guid()) && !self.refreshList().contains(sr.guid())) {
+                self.refreshList.push(sr.guid());
+                generic.alertInfo(
+                    $.t('ovs:vpools.detail.refresh.started'),
+                    $.t('ovs:vpools.detail.refresh.started_msg', { sr: sr.name(), vpool: self.vPool().name() })
+                );
+                api.post('storagedrivers/' + self.srSDMap()[sr.guid()].guid()+ '/refresh_configuration')
+                    .then(self.shared.tasks.wait)
+                    .done(function(data) {
+                        if (data === 0) {
+                            generic.alertWarning(
+                                $.t('ovs:vpools.detail.refresh.warning'),
+                                $.t('ovs:vpools.detail.refresh.warning_msg', { sr: sr.name(), vpool: self.vPool().name() })
+                            )
+                        } else {
+                            generic.alertSuccess(
+                                $.t('ovs:vpools.detail.refresh.success'),
+                                $.t('ovs:vpools.detail.refresh.success_msg', { sr: sr.name(), vpool: self.vPool().name() })
+                            );
+                        }
+                    })
+                    .fail(function(error) {
+                        error = generic.extractErrorMessage(error);
+                        generic.alertError(
+                            $.t('ovs:generic.error'),
+                            $.t('ovs:vpools.detail.refresh.failed_msg', { sr: sr.name(), vpool: self.vPool().name(), why: error})
+                        );
+                    })
+                    .always(function() {
+                        var refreshList = self.refreshList();
+                        refreshList.remove(sr.guid());
+                        self.refreshList(refreshList);
                     });
             }
         };
