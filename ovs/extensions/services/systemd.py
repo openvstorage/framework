@@ -41,7 +41,7 @@ class Systemd(object):
         return client.file_exists(file_to_check)
 
     @staticmethod
-    def _get_name(name, client, path=None):
+    def _get_name(name, client, path=None, log=True):
         """
         Make sure that for e.g. 'ovs-workers' the given service name can be either 'ovs-workers' as just 'workers'
         """
@@ -52,7 +52,8 @@ class Systemd(object):
         name = 'ovs-{0}'.format(name)
         if Systemd._service_exists(name, client, path):
             return name
-        Systemd._logger.info('Service {0} could not be found.'.format(name))
+        if log is True:
+            Systemd._logger.info('Service {0} could not be found.'.format(name))
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
@@ -269,7 +270,7 @@ class Systemd(object):
         :rtype: bool
         """
         try:
-            Systemd._get_name(name, client)
+            Systemd._get_name(name, client, log=False)
             return True
         except ValueError:
             return False
