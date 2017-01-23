@@ -41,7 +41,7 @@ class Upstart(object):
         return client.file_exists(file_to_check)
 
     @staticmethod
-    def _get_name(name, client, path=None):
+    def _get_name(name, client, path=None, log=True):
         """
         Make sure that for e.g. 'ovs-workers' the given service name can be either 'ovs-workers' as just 'workers'
         """
@@ -52,7 +52,8 @@ class Upstart(object):
         name = 'ovs-{0}'.format(name)
         if Upstart._service_exists(name, client, path):
             return name
-        Upstart._logger.info('Service {0} could not be found.'.format(name))
+        if log is True:
+            Upstart._logger.info('Service {0} could not be found.'.format(name))
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
@@ -275,7 +276,7 @@ class Upstart(object):
         :rtype: bool
         """
         try:
-            Upstart._get_name(name, client)
+            Upstart._get_name(name, client, log=False)
             return True
         except ValueError:
             return False
