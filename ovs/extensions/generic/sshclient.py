@@ -612,7 +612,7 @@ print json.dumps(os.path.isfile('{0}'))""".format(filename)
         :param filename: File to chmod
         :param mode: Mode to give to file, eg: 0744
         """
-        self.run(['chmod', str(mode), filename])
+        self.run(['chmod', oct(mode), filename])
 
     def file_chown(self, filenames, user, group):
         """

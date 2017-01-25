@@ -307,7 +307,7 @@ class NodeTypeController(object):
             master_hostname, _ = master_client.get_hostname()
             target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
             target_client.file_write(rabbitmq_cookie_file, contents)
-            target_client.file_chmod(rabbitmq_cookie_file, mode=400)
+            target_client.file_chmod(rabbitmq_cookie_file, mode=0400)
             target_client.run(['rabbitmq-server', '-detached'])
             time.sleep(5)
             target_client.run(['rabbitmqctl', 'stop_app'])
