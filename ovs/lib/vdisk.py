@@ -459,13 +459,15 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.move')
-    def move(vdisk_guid, target_storagerouter_guid):
+    def move(vdisk_guid, target_storagerouter_guid, force=False):
         """
         Move a vDisk to the specified StorageRouter
         :param vdisk_guid: Guid of the vDisk to move
         :type vdisk_guid: str
         :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisk to
         :type target_storagerouter_guid: str
+        :param force: Indicates whether to force the migration or not (forcing can lead to dataloss)
+        :type force: bool
         :return: None
         """
         vdisk = VDisk(vdisk_guid)
@@ -483,7 +485,7 @@ class VDiskController(object):
         try:
             vdisk.storagedriver_client.migrate(object_id=str(vdisk.volume_id),
                                                node_id=str(storagedriver.storagedriver_id),
-                                               force_restart=False)
+                                               force_restart=force)
         except Exception:
             VDiskController._logger.exception('Failed to move vDisk {0}'.format(vdisk.name))
             raise Exception('Moving vDisk {0} failed'.format(vdisk.name))

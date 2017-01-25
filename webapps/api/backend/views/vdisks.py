@@ -181,16 +181,19 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def move(self, vdisk, target_storagerouter_guid):
+    def move(self, vdisk, target_storagerouter_guid, force=False):
         """
         Moves a vDisk
         :param vdisk: Guid of the virtual disk to move
         :type vdisk: VDisk
         :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisk to
         :type target_storagerouter_guid: str
+        :param force: Indicate whether to force the migration (forcing the migration might cause data loss)
+        :type force: bool
         """
         return VDiskController.move.delay(vdisk_guid=vdisk.guid,
-                                          target_storagerouter_guid=target_storagerouter_guid)
+                                          target_storagerouter_guid=target_storagerouter_guid,
+                                          force=force)
 
     @action()
     @log()
