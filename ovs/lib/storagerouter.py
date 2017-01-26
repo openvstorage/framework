@@ -752,6 +752,7 @@ class StorageRouterController(object):
                          'vrouter_migrate_timeout_ms': 60000,
                          'vrouter_use_fencing': True}
 
+        # DTL path is not used, but a required parameter. The DTL transport should be the same as the one set in the DTL server.
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
         storagedriver_config.load()
         storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
@@ -760,7 +761,7 @@ class StorageRouterController(object):
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
                                                 trigger_gap='1GB',
                                                 backoff_gap='2GB')
-        storagedriver_config.configure_distributed_transaction_log(dtl_path=sdp_dtl.path,
+        storagedriver_config.configure_distributed_transaction_log(dtl_path=sdp_dtl.path,  # Not used, but required
                                                                    dtl_transport=StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport])
         storagedriver_config.configure_filesystem(**filesystem_config)
         storagedriver_config.configure_volume_manager(**volume_manager_config)
@@ -789,8 +790,6 @@ class StorageRouterController(object):
         ##################
         # START SERVICES #
         ##################
-        has_rdma = Configuration.get('/ovs/framework/rdma')
-
         sd_params = {'KILL_TIMEOUT': '30',
                      'VPOOL_NAME': vpool_name,
                      'VPOOL_MOUNTPOINT': storagedriver.mountpoint,
@@ -801,7 +800,7 @@ class StorageRouterController(object):
         dtl_params = {'DTL_PATH': sdp_dtl.path,
                       'DTL_ADDRESS': storagedriver.storage_ip,
                       'DTL_PORT': str(storagedriver.ports['dtl']),
-                      'DTL_TRANSPORT': 'RSocket' if has_rdma else 'TCP',
+                      'DTL_TRANSPORT': StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP[dtl_transport],
                       'LOG_SINK': LogHandler.get_sink_path('storagedriver')}
 
         sd_service = 'ovs-volumedriver_{0}'.format(vpool.name)
@@ -1411,7 +1410,6 @@ class StorageRouterController(object):
             StorageRouterController._logger.debug('Configuring mountpoint')
             with remote(storagerouter.ip, [DiskTools], username='root') as rem:
                 counter = 1
-                mountpoint = None
                 while True:
                     mountpoint = '/mnt/{0}{1}'.format('ssd' if disk.is_ssd else 'hdd', counter)
                     counter += 1
