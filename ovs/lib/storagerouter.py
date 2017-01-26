@@ -490,7 +490,7 @@ class StorageRouterController(object):
         model_ports_in_use = []
         for port_storagedriver in StorageDriverList.get_storagedrivers():
             if port_storagedriver.storagerouter_guid == storagerouter.guid:
-                # Local storagedrivers
+                # Local StorageDrivers
                 model_ports_in_use += port_storagedriver.ports.values()
                 for proxy in port_storagedriver.alba_proxies:
                     model_ports_in_use.append(proxy.service.ports[0])
@@ -971,7 +971,7 @@ class StorageRouterController(object):
             StorageRouterController._logger.warning('vDisk with guid {0} does no longer exist on any StorageDriver linked to vPool {1}, deleting...'.format(vdisk_guid, vpool.name))
             VDiskController.clean_vdisk_from_model(vdisk=VDisk(vdisk_guid))
 
-        # Unconfigure or reconfigure the MDSes
+        # Un-configure or reconfigure the MDSes
         StorageRouterController._logger.info('Remove Storage Driver - Guid {0} - Reconfiguring MDSes'.format(storage_driver.guid))
         vdisks = []
         mds_services_to_remove = [mds_service for mds_service in vpool.mds_services if mds_service.service.storagerouter_guid == storage_router.guid]
@@ -1473,7 +1473,7 @@ class StorageRouterController(object):
     def _retrieve_alba_arakoon_config(backend_guid, ovs_client):
         """
         Retrieve the ALBA Arakoon configuration
-        :param backend_guid: Guid of the ALBA backend
+        :param backend_guid: Guid of the ALBA Backend
         :type backend_guid: str
         :param ovs_client: OVS client object
         :type ovs_client: OVSClient

@@ -242,7 +242,7 @@ class OVSMigrator(object):
 
                 DiskController.sync_with_reality(storagerouter_guid=storagerouter.guid)
 
-            # Only support ALBA backend type
+            # Only support ALBA Backend type
             from ovs.dal.lists.backendtypelist import BackendTypeList
             for backend_type in BackendTypeList.get_backend_types():
                 if backend_type.code != 'alba':
