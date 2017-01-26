@@ -375,7 +375,7 @@ class NodeInstallationController(object):
                                           '-C', '{0}@{1}'.format(user, host_name)])
                         local_client.file_chown([private_key_filename, public_key_filename], user, user)
                         local_client.file_chmod(private_key_filename, 0600)
-                        local_client.file_chmod('{0}.pub'.format(private_key_filename), 0644)
+                        local_client.file_chmod(public_key_filename, 0644)
                     for filename in [authorized_keys_filename, known_hosts_filename]:
                         if not local_client.file_exists(filename):
                             local_client.file_create(filename)
