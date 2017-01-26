@@ -331,9 +331,9 @@ class NodeInstallationController(object):
                                                                    'client': SSHClient(endpoint=cluster_ip, username='root')}
 
                 Toolbox.log(logger=NodeInstallationController._logger, messages='Preparing node', title=True)
-                Toolbox.log(logger=NodeInstallationController._logger, messages='Exchanging SSH keys and updating hosts files')
+                Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up and exchanging SSH keys')
 
-                # Exchange SSH keys
+                # Fetching clients
                 all_ips = NodeInstallationController.host_ips
                 local_client = None
                 master_client = None
@@ -344,29 +344,47 @@ class NodeInstallationController(object):
                         local_client = node_info['client']
                     if node_ip == master_ip:
                         master_client = node_info['client']
-
                 if local_client is None or master_client is None:
                     raise ValueError('Retrieving client information failed')
 
-                known_hosts_ovs = '/opt/OpenvStorage/.ssh/known_hosts'
-                known_hosts_root = '/root/.ssh/known_hosts'
-                ssh_public_key_ovs = '/opt/OpenvStorage/.ssh/id_rsa.pub'
-                ssh_public_key_root = '/root/.ssh/id_rsa.pub'
-                authorized_keys_ovs = '/opt/OpenvStorage/.ssh/authorized_keys'
-                authorized_keys_root = '/root/.ssh/authorized_keys'
+                # Templates
+                local_home_dirs = {}
+                private_key_template = '{0}/.ssh/id_rsa'
+                public_key_template = '{0}/.ssh/id_rsa.pub'
+                authorized_keys_template = '{0}/.ssh/authorized_keys'
+                known_hosts_template = '{0}/.ssh/known_hosts'
+                host_name, _ = local_client.get_hostname()
+                # Generate SSH keys
+                for user in ['root', 'ovs']:
+                    home_dir = local_client.run('echo ~{0}'.format(user), allow_insecure=True).strip()
+                    local_home_dirs[user] = home_dir
+                    ssh_folder = '{0}/.ssh'.format(home_dir)
+                    private_key_filename = private_key_template.format(home_dir)
+                    public_key_filename = public_key_template.format(home_dir)
+                    authorized_keys_filename = authorized_keys_template.format(home_dir)
+                    known_hosts_filename = known_hosts_template.format(home_dir)
+                    if not local_client.dir_exists(ssh_folder):
+                        local_client.dir_create(ssh_folder)
+                        local_client.dir_chmod(ssh_folder, 0775)
+                        local_client.dir_chown(ssh_folder, user, user)
+                    if not local_client.file_exists(private_key_filename):
+                        local_client.run(['ssh-keygen',
+                                          '-t', 'rsa', '-b', '4096',
+                                          '-f', private_key_filename,
+                                          '-N', '',
+                                          '-C', '{0}@{1}'.format(user, host_name)])
+                        local_client.file_chown([private_key_filename, public_key_filename], user, user)
+                        local_client.file_chmod(private_key_filename, 0600)
+                        local_client.file_chmod(public_key_filename, 0644)
+                    for filename in [authorized_keys_filename, known_hosts_filename]:
+                        if not local_client.file_exists(filename):
+                            local_client.file_create(filename)
+                            local_client.file_chown(filename, user, user)
+                            local_client.file_chmod(filename, 0600)
 
-                missing_files = set()
-                for required_file in [known_hosts_ovs, known_hosts_root, ssh_public_key_ovs, ssh_public_key_root]:
-                    if not local_client.file_exists(required_file):
-                        missing_files.add('Could not find file {0} on node with IP {1}'.format(required_file, local_client.ip))
-                if missing_files:
-                    raise ValueError('Missing files:\n - {0}'.format('\n - '.join(sorted(list(missing_files)))))
-
-                # Retrieve local public SSH keys
-                local_pub_key_ovs = local_client.file_read(ssh_public_key_ovs)
-                local_pub_key_root = local_client.file_read(ssh_public_key_root)
-                if not local_pub_key_ovs or not local_pub_key_root:
-                    raise ValueError('Missing contents in the public SSH keys on node {0}'.format(local_client.ip))
+                # Exchange SSH keys
+                local_pub_key_ovs = local_client.file_read(public_key_template.format(local_home_dirs['ovs']))
+                local_pub_key_root = local_client.file_read(public_key_template.format(local_home_dirs['root']))
 
                 # Connect to master and add the ovs and root public SSH key to all other nodes in the cluster
                 all_pub_keys = [local_pub_key_ovs, local_pub_key_root]
@@ -383,18 +401,22 @@ class NodeInstallationController(object):
                                     ip_hostname_map[client.ip] = [node_fqdn_name, node_host_name]
                                 else:
                                     ip_hostname_map[client.ip] = [node_fqdn_name]
-                            for authorized_key in [authorized_keys_ovs, authorized_keys_root]:
+                            ovs_homedir = client.run('echo ~ovs', allow_insecure=True).strip()
+                            root_homedir = client.run('echo ~root', allow_insecure=True).strip()
+                            for authorized_key in [authorized_keys_template.format(ovs_homedir),
+                                                   authorized_keys_template.format(root_homedir)]:
                                 if client.file_exists(authorized_key):
                                     master_authorized_keys = client.file_read(authorized_key)
                                     for local_pub_key in [local_pub_key_ovs, local_pub_key_root]:
                                         if local_pub_key not in master_authorized_keys:
                                             master_authorized_keys += '\n{0}'.format(local_pub_key)
                                             client.file_write(authorized_key, master_authorized_keys)
-                            all_pub_keys.append(client.file_read(ssh_public_key_ovs))
-                            all_pub_keys.append(client.file_read(ssh_public_key_root))
+                            all_pub_keys.append(client.file_read(public_key_template.format(ovs_homedir)))
+                            all_pub_keys.append(client.file_read(public_key_template.format(root_homedir)))
 
                 # Now add all public keys of all nodes in the cluster to the local node
-                for authorized_keys in [authorized_keys_ovs, authorized_keys_root]:
+                for authorized_keys in [authorized_keys_template.format(local_home_dirs['ovs']),
+                                        authorized_keys_template.format(local_home_dirs['root'])]:
                     if local_client.file_exists(authorized_keys):
                         keys = local_client.file_read(authorized_keys)
                         for public_key in all_pub_keys:
@@ -402,25 +424,27 @@ class NodeInstallationController(object):
                                 keys += '\n{0}'.format(public_key)
                         local_client.file_write(authorized_keys, keys)
 
-                # Configure /etc/hosts and execute ssh-keyscan
+                # Execute ssh-keyscan, required for the "remote" functionality
                 def _raise_timeout(*args, **kwargs):
                     _ = args, kwargs
                     raise RuntimeError('Timeout during ssh keyscan, please check node inter-connectivity')
                 signal.signal(signal.SIGALRM, _raise_timeout)
                 for node_details in NodeInstallationController.nodes.itervalues():
                     signal.alarm(30)
+                    for user in ['ovs', 'root']:
+                        node_client = SSHClient(endpoint=node_details['ip'], username=user)
+                        cmd = 'cp {{0}} {{0}}.tmp; ssh-keyscan -t rsa {0} {1} 2> /dev/null >> {{0}}.tmp; cat {{0}}.tmp | sort -u - > {{0}}'.format(
+                            ' '.join(["'{0}'".format(node_client.shell_safe(_ip)) for _ip in all_ips]),
+                            ' '.join(["'{0}'".format(node_client.shell_safe(_key)) for _key in NodeInstallationController.nodes.keys()])
+                        )
+                        home_dir = node_client.run('echo ~{0}'.format(user), allow_insecure=True).strip()
+                        node_client.run(cmd.format(known_hosts_template.format(home_dir)), allow_insecure=True)
+                    signal.alarm(0)
+
+                Toolbox.log(logger=NodeInstallationController._logger, messages='Updating hosts file')
+                for node_details in NodeInstallationController.nodes.itervalues():
                     node_client = node_details.get('client', SSHClient(endpoint=node_details['ip'], username='root'))
                     System.update_hosts_file(ip_hostname_map, node_client)
-                    cmd = 'cp {{0}} {{0}}.tmp; ssh-keyscan -t rsa {0} {1} 2> /dev/null >> {{0}}.tmp; cat {{0}}.tmp | sort -u - > {{0}}'.format(
-                        ' '.join([node_client.shell_safe(_ip) for _ip in all_ips]),
-                        ' '.join([node_client.shell_safe(_key) for _key in NodeInstallationController.nodes.keys()])
-                    )
-                    root_command = cmd.format(known_hosts_root)
-                    ovs_command = cmd.format(known_hosts_ovs)
-                    ovs_command = 'su - ovs -c "{0}"'.format(ovs_command)
-                    node_client.run(root_command, allow_insecure=True)
-                    node_client.run(ovs_command, allow_insecure=True)
-                    signal.alarm(0)
 
                 # Write resume config
                 resume_config['node_type'] = node_type
