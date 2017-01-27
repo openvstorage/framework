@@ -202,7 +202,7 @@ class OVSMigrator(object):
             from ovs.lib.disk import DiskController
 
             for storagerouter in StorageRouterList.get_storagerouters():
-                client = SSHClient(storagerouter, username='root')
+                client = SSHClient(storagerouter.ip, username='root')
 
                 # Retrieve all symlinks for all devices
                 # Example of name_alias_mapping:
@@ -335,7 +335,7 @@ class OVSMigrator(object):
                     service.save()
 
                     if storagedriver.storagerouter_guid not in sr_client_map:
-                        sr_client_map[storagedriver.storagerouter_guid] = SSHClient(endpoint=storagedriver.storagerouter, username='root')
+                        sr_client_map[storagedriver.storagerouter_guid] = SSHClient(endpoint=storagedriver.storagerouter.ip, username='root')
                     root_client = sr_client_map[storagedriver.storagerouter_guid]
 
                     # Add '-reboot' to alba_proxy services (because of newly created services and removal of old service)
