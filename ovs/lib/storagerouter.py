@@ -1397,7 +1397,7 @@ class StorageRouterController(object):
             used_roles = []
             for role in removed_roles:
                 for info in partition_info[role]:
-                    if info['in_use']:
+                    if info['in_use'] and info['guid'] == partition.guid:
                         used_roles.append(role)
             if len(used_roles) > 0:
                 raise RuntimeError('Roles in use cannot be removed. Used roles: {0}'.format(', '.join(used_roles)))
