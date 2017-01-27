@@ -1393,7 +1393,7 @@ class StorageRouterController(object):
                 raise RuntimeError("It is not allowed to assign roles on partitions of type: ['swap', 'linux_raid_member', 'LVM2_member']")
             metadata = StorageRouterController.get_metadata(storagerouter_guid)
             partition_info = metadata['partitions']
-            removed_roles = set(DiskPartition.ROLES.keys()) - set(roles)
+            removed_roles = set(partition.roles) - set(roles)
             used_roles = []
             for role in removed_roles:
                 for info in partition_info[role]:
