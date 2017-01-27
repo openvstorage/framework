@@ -1391,6 +1391,16 @@ class StorageRouterController(object):
                 raise RuntimeError('The given DiskPartition is not on the given Disk')
             if partition.filesystem in ['swap', 'linux_raid_member', 'LVM2_member']:
                 raise RuntimeError("It is not allowed to assign roles on partitions of type: ['swap', 'linux_raid_member', 'LVM2_member']")
+            metadata = StorageRouterController.get_metadata(storagerouter_guid)
+            partition_info = metadata['partitions']
+            removed_roles = set(DiskPartition.ROLES.keys()) - set(roles)
+            used_roles = []
+            for role in removed_roles:
+                for info in partition_info[role]:
+                    if info['in_use']:
+                        used_roles.append(role)
+            if len(used_roles) > 0:
+                raise RuntimeError('Roles in use cannot be removed. Used roles: {0}'.format(', '.join(used_roles)))
 
         # Add filesystem
         if partition.filesystem is None or partition_guid is None:
