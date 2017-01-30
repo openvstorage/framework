@@ -665,7 +665,7 @@ class UpdateController(object):
                                                        ssh_clients=ssh_clients,
                                                        action='start')
 
-            # # Migrate model
+            # Migrate model
             if 'framework' in components:
                 UpdateController._logger.debug('Verifying DAL code migration is required')
                 old_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
