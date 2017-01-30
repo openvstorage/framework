@@ -29,13 +29,13 @@ define([
         self.loadHandle = undefined;
 
         // Observables
+        self.aliases      = ko.observable();
         self.filesystem   = ko.observable();
         self.guid         = ko.observable(guid);
-        self.loading      = ko.observable(false);
         self.loaded       = ko.observable(false);
+        self.loading      = ko.observable(false);
         self.mountpoint   = ko.observable();
         self.offset       = ko.observable().extend({ format: generic.formatBytes });
-        self.aliases      = ko.observable();
         self.relativeSize = ko.observable();
         self.roles        = ko.observableArray([]);
         self.size         = ko.observable().extend({ format: generic.formatBytes });
