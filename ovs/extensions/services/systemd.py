@@ -332,16 +332,6 @@ class Systemd(object):
         Monitor the local OVS services
         :return: None
         """
-        def _advanced_sort(name1, name2):
-            counter1 = name1.split('_')[-1]
-            counter2 = name2.split('_')[-1]
-            if counter1.isdigit() and counter2.isdigit():
-                name1 = '_'.join(name1.split('_')[:-1])
-                name2 = '_'.join(name2.split('_')[:-1])
-                if name1 == name2:
-                    return -1 if int(counter1) < int(counter2) else 1
-            return -1 if name1 < name2 else 1
-
         try:
             previous_output = None
             while True:
@@ -367,12 +357,12 @@ class Systemd(object):
                 # Put service states in list
                 output = ['OVS running processes',
                           '=====================\n']
-                for service_name in sorted(running_services, cmp=_advanced_sort):
+                for service_name in sorted(running_services, key=lambda service: Toolbox.advanced_sort(service, '_')):
                     output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), running_services[service_name]))
 
                 output.extend(['\n\nOVS non-running processes',
                                '=========================\n'])
-                for service_name in sorted(non_running_services, cmp=_advanced_sort):
+                for service_name in sorted(non_running_services, key=lambda service: Toolbox.advanced_sort(service, '_')):
                     output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), non_running_services[service_name]))
 
                 # Print service states (only if changes)

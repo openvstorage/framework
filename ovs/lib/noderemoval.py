@@ -128,6 +128,11 @@ class NodeRemovalController(object):
                 raise RuntimeError('Removal of provided nodes will result in a complete removal of the memcached service')
             if len(copy_rabbit_mq_endpoints) == 0 and internal_rabbit_mq is True:
                 raise RuntimeError('Removal of provided nodes will result in a complete removal of the messagequeue service')
+
+            Toolbox.run_hooks(component='noderemoval',
+                              sub_component='validate_removal',
+                              logger=NodeRemovalController._logger,
+                              cluster_ip=storage_router_to_remove.ip)
         except Exception as exception:
             Toolbox.log(logger=NodeRemovalController._logger, messages=[str(exception)], boxed=True, loglevel='exception')
             sys.exit(1)
