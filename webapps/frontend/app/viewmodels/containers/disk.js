@@ -85,20 +85,20 @@ define([
                 data.push(newPartition);
             }
             $.each(data, function(index, partition) {
-                partition.relativeSize = Math.round(partition.size.raw() / self.size.raw() * 100);
+                partition.relativeSize(Math.round(partition.size.raw() / self.size.raw() * 100));
                 partition.small = false;
             });
             if (data.length > 1) {
                 $.each(data, function (index, partition) {
-                    if (partition.relativeSize < minSize) {
+                    if (partition.relativeSize() < minSize) {
                         runningIndex = index + 1;
-                        while(runningIndex !== index && partition.relativeSize < minSize) {
+                        while(runningIndex !== index && partition.relativeSize() < minSize) {
                             if (runningIndex === data.length) {
                                 runningIndex = 0;
                             }
-                            if (runningIndex !== index && data[runningIndex].relativeSize >= (minSize * 2)) {
-                                data[runningIndex].relativeSize -= minSize - partition.relativeSize;
-                                partition.relativeSize = minSize;
+                            if (runningIndex !== index && data[runningIndex].relativeSize() >= (minSize * 2)) {
+                                data[runningIndex].relativeSize(data[runningIndex].relativeSize() - (minSize - partition.relativeSize()));
+                                partition.relativeSize(minSize);
                                 partition.small = true;
                             }
                             runningIndex += 1;
@@ -158,7 +158,7 @@ define([
                             generic.crossFiller(
                                 guids, self.partitions,
                                 function(guid) {
-                                    var p = new Partition(guid);
+                                    var p = new Partition(guid, self);
                                     p.loading(true);
                                     return p;
                                 }, 'guid'

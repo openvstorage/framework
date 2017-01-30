@@ -19,25 +19,29 @@ define([
     'ovs/generic', 'ovs/api'
 ], function($, ko, generic, api) {
     "use strict";
-    return function(guid) {
+    return function(guid, parent) {
         var self = this;
+
+        // Variables
+        self.parent = parent;
 
         // Handles
         self.loadHandle = undefined;
 
         // Observables
-        self.filesystem = ko.observable();
-        self.guid       = ko.observable(guid);
-        self.loading    = ko.observable(false);
-        self.loaded     = ko.observable(false);
-        self.mountpoint = ko.observable();
-        self.offset     = ko.observable().extend({ format: generic.formatBytes });
-        self.aliases    = ko.observable();
-        self.roles      = ko.observableArray([]);
-        self.size       = ko.observable().extend({ format: generic.formatBytes });
-        self.state      = ko.observable();
-        self.trigger    = ko.observable();
-        self.usage      = ko.observable();
+        self.filesystem   = ko.observable();
+        self.guid         = ko.observable(guid);
+        self.loading      = ko.observable(false);
+        self.loaded       = ko.observable(false);
+        self.mountpoint   = ko.observable();
+        self.offset       = ko.observable().extend({ format: generic.formatBytes });
+        self.aliases      = ko.observable();
+        self.relativeSize = ko.observable();
+        self.roles        = ko.observableArray([]);
+        self.size         = ko.observable().extend({ format: generic.formatBytes });
+        self.state        = ko.observable();
+        self.trigger      = ko.observable();
+        self.usage        = ko.observable();
 
         // Functions
         self.fillData = function(data) {
@@ -45,6 +49,9 @@ define([
             self.state(data.state);
             self.offset(data.offset);
             self.size(data.size);
+            if (self.relativeSize() === undefined && parent.size !== undefined && parent.size.raw !== undefined && parent.size.raw() !== 0) {
+                self.relativeSize(Math.round(data.size / parent.size.raw() * 100))
+            }
             self.mountpoint(data.mountpoint);
             self.aliases(data.aliases);
             self.usage(generic.tryGet(data, 'usage', undefined));
