@@ -247,7 +247,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                         <!-- ko foreach: fullPartitions() -->
                                             <div class="progress-bar" role="progressbar" style="position: relative;"
                                                  data-bind="style: {
-                                                                width: ((relativeSize * 10) - ($index() > 0 ? 2 : 0)) + 'px',
+                                                                width: ((relativeSize() * 10) - ($index() > 0 ? 2 : 0)) + 'px',
                                                                 marginLeft: $index() > 0 ? '2px' : 'inherit'
                                                             },
                                                             css: {
