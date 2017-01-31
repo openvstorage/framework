@@ -389,17 +389,19 @@ class OVSMigrator(object):
                 if ServiceManager.ImplementationClass == Systemd:
                     root_client.run(['systemctl', 'daemon-reload'])
 
-            # Introduction of DTL role io DTL sub-role on WRITE role
+            # Introduction of DTL role (Replaces DTL sub_role)
             for vpool in vpools:
                 for storagedriver in vpool.storagedrivers:
-                    for junction_partition in storagedriver.partitions:
-                        if junction_partition.role == DiskPartition.ROLES.WRITE and junction_partition.sub_role == 'DTL':
+                    # noinspection PyProtectedMember
+                    for junction_partition_guid, junction_partition_data in storagedriver.partitions._data.iteritems():
+                        junction_partition_data = junction_partition_data.get('data', {})
+                        if junction_partition_data.get('role') == DiskPartition.ROLES.WRITE and junction_partition_data.get('sub_role') == 'DTL':
+                            junction_partition = StorageDriverPartition(junction_partition_guid)
                             junction_partition.role = DiskPartition.ROLES.DTL
                             junction_partition.sub_role = None
                             junction_partition.save()
                             if DiskPartition.ROLES.DTL not in junction_partition.partition.roles:
                                 junction_partition.partition.roles.append(DiskPartition.ROLES.DTL)
                                 junction_partition.partition.save()
-
 
         return OVSMigrator.THIS_VERSION
