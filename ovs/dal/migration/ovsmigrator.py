@@ -392,7 +392,6 @@ class OVSMigrator(object):
             # Introduction of DTL role (Replaces DTL sub_role)
             for vpool in vpools:
                 for storagedriver in vpool.storagedrivers:
-                    # noinspection PyProtectedMember
                     for junction_partition_guid in storagedriver.partitions_guids:
                         junction_partition = StorageDriverPartition(junction_partition_guid)
                         if junction_partition.role == DiskPartition.ROLES.WRITE and junction_partition.sub_role == 'DTL':
