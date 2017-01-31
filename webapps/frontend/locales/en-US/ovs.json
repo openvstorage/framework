@@ -182,6 +182,7 @@
         "partitionroles": {
             "backend": "Backend",
             "db": "DB",
+            "dtl": "DTL",
             "scrub": "Scrub",
             "write": "Write"
         },
@@ -877,7 +878,7 @@
                 "filesystem": "Filesystem",
                 "mountpoint": "Mountpoint",
                 "offset": "Offset",
-                "role_info": "Update/select the required roles for the partition. Roles in use cannot be removed. Only one DB and one SCRUB role can be assigned to any of the partitions.",
+                "role_info": "Update/select the required roles for the partition. Roles in use cannot be removed. Only 1 DB, DTL and SCRUB role can be assigned to any of the partitions.",
                 "roles": "Roles",
                 "size": "Size"
             },

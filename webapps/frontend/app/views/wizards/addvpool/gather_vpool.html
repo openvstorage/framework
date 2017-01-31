@@ -144,15 +144,15 @@ but WITHOUT ANY WARRANTY of any kind.
                              }"></span>
         </div>
     </div>
-    <div class="alert alert-warning" data-bind="visible: !isPresetAvailable()" style="margin-top: 20px;">
+    <div class="alert alert-warning" data-bind="visible: !isPresetAvailable() && canContinue().value" style="margin-top: 20px;">
         <span data-i18n="ovs:wizards.add_vpool.gather_vpool.alba_preset_unavailable"></span>
     </div>
-    <div class="alert alert-info" data-bind="visible: data.vPool() !== undefined" style="margin-top: 20px;">
+    <div class="alert alert-info" data-bind="visible: data.vPool() !== undefined && canContinue().value" style="margin-top: 20px;">
         <span data-bind="translate: 'ovs:wizards.add_vpool.gather_vpool.information_add', visible: data.vPool() === undefined"></span>
         <span data-bind="translate: 'ovs:wizards.add_vpool.gather_vpool.information_extend', visible: data.vPool() !== undefined"></span>
     </div>
     <div class="alert alert-danger" style="margin-bottom: -3px;"
-         data-bind="visible: (data.vPool() === undefined || (data.vPool() !== undefined && data.backend() !== undefined)) && (!canContinue().value || canContinue().showErrors)">
+         data-bind="visible: !canContinue().value || canContinue().showErrors">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
         <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
         <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">

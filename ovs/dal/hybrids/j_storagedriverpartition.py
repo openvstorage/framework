@@ -31,7 +31,7 @@ class StorageDriverPartition(DataObject):
     * my_storagedriver.partitions[0].partition
     * my_partition.storagedrivers[0].storagedriver
     """
-    SUBROLE = DataObject.enumerator('Role', ['TLOG', 'MD', 'MDS', 'SCO', 'DTL', 'FD', 'FCACHE'])
+    SUBROLE = DataObject.enumerator('Role', ['FCACHE', 'FD', 'MD', 'MDS', 'SCO', 'TLOG'])
 
     __properties = [Property('number', int, doc='Number of the service in case there is more than one'),
                     Property('size', long, mandatory=False, doc='Size in bytes configured for use'),

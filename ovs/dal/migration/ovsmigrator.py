@@ -30,7 +30,7 @@ class OVSMigrator(object):
     """
 
     identifier = 'ovs'
-    THIS_VERSION = 14
+    THIS_VERSION = 15
 
     def __init__(self):
         """ Init method """
@@ -156,9 +156,24 @@ class OVSMigrator(object):
 
         # From here on, all actual migration should happen to get to the expected state for THIS RELEASE
         elif working_version < OVSMigrator.THIS_VERSION:
-            # Migrate unique constraints & indexes
             from ovs.dal.helpers import HybridRunner, Descriptor
+            from ovs.dal.hybrids.diskpartition import DiskPartition
+            from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
+            from ovs.dal.lists.backendtypelist import BackendTypeList
+            from ovs.dal.lists.diskpartitionlist import DiskPartitionList
+            from ovs.dal.lists.storagedriverlist import StorageDriverList
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
+            from ovs.dal.lists.vpoollist import VPoolList
+            from ovs.extensions.generic.configuration import Configuration
+            from ovs.extensions.generic.sshclient import SSHClient
+            from ovs.extensions.generic.toolbox import Toolbox
+            from ovs.extensions.services.service import ServiceManager
+            from ovs.extensions.services.systemd import Systemd
             from ovs.extensions.storage.persistentfactory import PersistentFactory
+            from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+            from ovs.lib.disk import DiskController
+
+            # Migrate unique constraints & indexes
             client = PersistentFactory.get_client()
             hybrid_structure = HybridRunner.get_hybrids()
             for class_descriptor in hybrid_structure.values():
@@ -197,10 +212,6 @@ class OVSMigrator(object):
 
             # Complete rework of the way we detect devices to assign roles or use as ASD
             # Allow loop-, raid-, nvme-, ??-devices and logical volumes as ASD (https://github.com/openvstorage/framework/issues/792)
-            from ovs.dal.lists.storagerouterlist import StorageRouterList
-            from ovs.extensions.generic.sshclient import SSHClient
-            from ovs.lib.disk import DiskController
-
             for storagerouter in StorageRouterList.get_storagerouters():
                 client = SSHClient(storagerouter.ip, username='root')
 
@@ -243,13 +254,11 @@ class OVSMigrator(object):
                 DiskController.sync_with_reality(storagerouter_guid=storagerouter.guid)
 
             # Only support ALBA Backend type
-            from ovs.dal.lists.backendtypelist import BackendTypeList
             for backend_type in BackendTypeList.get_backend_types():
                 if backend_type.code != 'alba':
                     backend_type.delete()
 
             # Reformat the vpool.metadata information
-            from ovs.dal.lists.vpoollist import VPoolList
             vpools = VPoolList.get_vpools()
             for vpool in vpools:
                 if vpool.metadata.get('backend', {}).get('backend_info', {}).get('name') is not None:  # Already new format
@@ -284,7 +293,6 @@ class OVSMigrator(object):
                 vpool.save()
 
             # Removal of READ role
-            from ovs.dal.lists.diskpartitionlist import DiskPartitionList
             for partition in DiskPartitionList.get_partitions():
                 if 'READ' in partition.roles:
                     partition.roles.remove('READ')
@@ -293,14 +301,6 @@ class OVSMigrator(object):
             ####################
             # Multiple Proxies #
             ####################
-            from ovs.dal.lists.storagedriverlist import StorageDriverList
-            from ovs.extensions.generic.configuration import Configuration
-            from ovs.extensions.services.service import ServiceManager
-            from ovs.extensions.services.systemd import Systemd
-            from ovs.extensions.storage.persistentfactory import PersistentFactory
-            from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-            from ovs.extensions.generic.toolbox import Toolbox
-
             # Clean up - removal of obsolete 'cfgdir'
             paths = Configuration.get(key='/ovs/framework/paths')
             if 'cfgdir' in paths:
@@ -388,5 +388,18 @@ class OVSMigrator(object):
                 Toolbox.edit_version_file(client=root_client, package_name='volumedriver', old_service_name='volumedriver_{0}'.format(vpool.name))
                 if ServiceManager.ImplementationClass == Systemd:
                     root_client.run(['systemctl', 'daemon-reload'])
+
+            # Introduction of DTL role (Replaces DTL sub_role)
+            for vpool in vpools:
+                for storagedriver in vpool.storagedrivers:
+                    for junction_partition_guid in storagedriver.partitions_guids:
+                        junction_partition = StorageDriverPartition(junction_partition_guid)
+                        if junction_partition.role == DiskPartition.ROLES.WRITE and junction_partition.sub_role == 'DTL':
+                            junction_partition.role = DiskPartition.ROLES.DTL
+                            junction_partition.sub_role = None
+                            junction_partition.save()
+                            if DiskPartition.ROLES.DTL not in junction_partition.partition.roles:
+                                junction_partition.partition.roles.append(DiskPartition.ROLES.DTL)
+                                junction_partition.partition.save()
 
         return OVSMigrator.THIS_VERSION
