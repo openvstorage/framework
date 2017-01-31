@@ -397,6 +397,9 @@ class OVSMigrator(object):
                             junction_partition.role = DiskPartition.ROLES.DTL
                             junction_partition.sub_role = None
                             junction_partition.save()
+                            if DiskPartition.ROLES.DTL not in junction_partition.partition.roles:
+                                junction_partition.partition.roles.append(DiskPartition.ROLES.DTL)
+                                junction_partition.partition.save()
 
 
         return OVSMigrator.THIS_VERSION
