@@ -347,7 +347,8 @@ class Systemd(object):
 
                     service_name = service_name.replace('.service', '')
                     if service_state == 'active':
-                        running_services[service_name] = service_state
+                        service_pid = check_output('systemctl show {0} --property=MainPID'.format(service_name), shell=True).strip().split('=')[1]
+                        running_services[service_name] = (service_state, service_pid)
                     else:
                         non_running_services[service_name] = service_state
 
@@ -358,7 +359,7 @@ class Systemd(object):
                 output = ['OVS running processes',
                           '=====================\n']
                 for service_name in sorted(running_services, key=lambda service: Toolbox.advanced_sort(service, '_')):
-                    output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), running_services[service_name]))
+                    output.append('{0} {1} {2}  {3}'.format(service_name, ' ' * (longest_service_name - len(service_name)), running_services[service_name][0], running_services[service_name][1]))
 
                 output.extend(['\n\nOVS non-running processes',
                                '=========================\n'])
