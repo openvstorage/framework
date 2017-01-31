@@ -393,10 +393,9 @@ class OVSMigrator(object):
             for vpool in vpools:
                 for storagedriver in vpool.storagedrivers:
                     # noinspection PyProtectedMember
-                    for junction_partition_guid, junction_partition_data in storagedriver.partitions._data.iteritems():
-                        junction_partition_data = junction_partition_data.get('data', {})
-                        if junction_partition_data.get('role') == DiskPartition.ROLES.WRITE and junction_partition_data.get('sub_role') == 'DTL':
-                            junction_partition = StorageDriverPartition(junction_partition_guid)
+                    for junction_partition_guid in storagedriver.partitions_guids:
+                        junction_partition = StorageDriverPartition(junction_partition_guid)
+                        if junction_partition.role == DiskPartition.ROLES.WRITE and junction_partition.sub_role == 'DTL':
                             junction_partition.role = DiskPartition.ROLES.DTL
                             junction_partition.sub_role = None
                             junction_partition.save()
