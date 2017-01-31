@@ -52,7 +52,7 @@ define([
                 .then(function(data) {
                     var timing = generic.getTimestamp() - start;
                     if (timing > 1000 && log === true) {
-                        generic.log('API call to ' + call + ' took ' + timing + 'ms', 'warning')
+                        generic.log('API call to ' + call + ' took ' + timing + 'ms', 'info')
                     }
                     return data;
                 })
