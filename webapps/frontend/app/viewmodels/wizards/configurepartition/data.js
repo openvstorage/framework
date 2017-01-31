@@ -29,17 +29,20 @@ define(['knockout', 'jquery'], function(ko, $){
                 return [];
             }
             var db = {name: 'db'},
+                dtl = {name: 'dtl'},
                 write = {name: 'write'},
                 scrub = {name: 'scrub'},
-                roles = [db, scrub, write],
+                roles = [db, dtl, scrub, write],
                 hide_db = false,
+                hide_dtl = false,
                 hide_scrub = false,
-                dictionary = {DB: db, WRITE: write, SCRUB: scrub};
+                dictionary = {DB: db, DTL: dtl, WRITE: write, SCRUB: scrub};
             $.each(data.currentUsage(), function(role, partitions) {
                 if (role !== 'BACKEND') {
                     if (partitions.length > 0) {
                         if (role === 'DB') { hide_db = true; }
-                        if (role === 'SCRUB') { hide_scrub = true; }
+                        else if (role === 'DTL') { hide_dtl = true; }
+                        else if (role === 'SCRUB') { hide_scrub = true; }
                     }
                     $.each(partitions, function (index, partition) {
                         if (partition.guid === data.partition().guid())  {
@@ -49,13 +52,15 @@ define(['knockout', 'jquery'], function(ko, $){
                             if (partition.in_use === false) {
                                 dictionary[role].disabled = false;
                                 if (role === 'DB') { hide_db = false; }
-                                if (role === 'SCRUB') { hide_scrub = false; }
+                                else if (role === 'DTL') { hide_dtl = false; }
+                                else if (role === 'SCRUB') { hide_scrub = false; }
                             }
                         }
                     });
                 }
             });
             if (hide_db === true) { dictionary['DB'].disabled = true; }
+            if (hide_dtl === true) { dictionary['DTL'].disabled = true; }
             if (hide_scrub === true) { dictionary['SCRUB'].disabled = true; }
             return roles
         });

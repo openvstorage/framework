@@ -50,10 +50,10 @@ define([
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 var roles = [], postData = {
-                    disk_guid: self.data.disk().guid(),
-                    partition_guid: self.data.partition().guid(),
+                    size: self.data.partition().size.raw(),
                     offset: self.data.partition().offset.raw(),
-                    size: self.data.partition().size.raw()
+                    disk_guid: self.data.disk().guid(),
+                    partition_guid: self.data.partition().guid()
                 };
                 $.each(self.data.roles(), function(index, roleInfo) {
                     roles.push(roleInfo.name.toUpperCase());

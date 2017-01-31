@@ -203,7 +203,6 @@ class StorageRouterController(object):
         ########################
         # VALIDATIONS (PART 1) #
         ########################
-
         # Check parameters
         if not isinstance(parameters, dict):
             raise ValueError('Parameters should be of type "dict"')
@@ -282,19 +281,31 @@ class StorageRouterController(object):
         # VALIDATIONS (PART 2) #
         ########################
         # Check mountpoint
+        metadata = StorageRouterController.get_metadata(storagerouter.guid)
         error_messages = []
+        partition_info = metadata['partitions']
         if StorageRouterController.mountpoint_exists(name=vpool_name, storagerouter_guid=storagerouter.guid):
             error_messages.append('The mountpoint for vPool {0} already exists'.format(vpool_name))
 
+        # Check mountpoints are mounted
+        for role, part_info in partition_info.iteritems():
+            for part in part_info:
+                if not client.is_mounted(part['mountpoint']) and part['mountpoint'] != DiskPartition.VIRTUAL_STORAGE_LOCATION:
+                    error_messages.append('Mountpoint {0} is not mounted'.format(part['mountpoint']))
+
         # Check required roles
-        metadata = StorageRouterController.get_metadata(storagerouter.guid)
-        partition_info = metadata['partitions']
-        required_roles = [DiskPartition.ROLES.WRITE, DiskPartition.ROLES.DB]
+        if metadata['scrub_available'] is False:
+            error_messages.append('At least 1 Storage Router must have a partition with a {0} role'.format(DiskPartition.ROLES.SCRUB))
+
+        required_roles = [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL, DiskPartition.ROLES.WRITE]
         for required_role in required_roles:
             if required_role not in partition_info:
-                error_messages.append('Missing required partition role {0}'.format(required_role))
+                error_messages.append('Missing required partition with a {0} role'.format(required_role))
             elif len(partition_info[required_role]) == 0:
-                error_messages.append('At least 1 {0} partition role is required'.format(required_role))
+                error_messages.append('At least 1 partition with a {0} role is required per StorageRouter'.format(required_role))
+            elif required_role in [DiskPartition.ROLES.DB, DiskPartition.ROLES.DTL]:
+                if len(partition_info[required_role]) > 1:
+                    error_messages.append('Only 1 partition with a {0} role is allowed per StorageRouter'.format(required_role))
             else:
                 total_available = [part['available'] for part in partition_info[required_role]]
                 if total_available == 0:
@@ -323,12 +334,6 @@ class StorageRouterController(object):
                 except RuntimeError as rte:
                     error_messages.append(rte.message)
 
-        # Check mountpoints are mounted
-        for role, part_info in partition_info.iteritems():
-            for part in part_info:
-                if not client.is_mounted(part['mountpoint']) and part['mountpoint'] != DiskPartition.VIRTUAL_STORAGE_LOCATION:
-                    error_messages.append('Mountpoint {0} is not mounted'.format(part['mountpoint']))
-
         # Check over-allocation for write cache
         writecache_size_available = metadata['writecache_size']
         writecache_size_requested = parameters['writecache_size'] * 1024 ** 3
@@ -336,18 +341,6 @@ class StorageRouterController(object):
             error_messages.append('Too much space requested for {0} cache. Available: {1:.2f} GiB, Requested: {2:.2f} GiB'.format(DiskPartition.ROLES.WRITE,
                                                                                                                                   writecache_size_available / 1024.0 ** 3,
                                                                                                                                   writecache_size_requested / 1024.0 ** 3))
-
-        if metadata['scrub_available'] is False:
-            error_messages.append('At least 1 Storage Router must have a {0} partition'.format(DiskPartition.ROLES.SCRUB))
-
-        # Check DB role
-        arakoon_service_found = False
-        for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:
-            if service.name == 'arakoon-voldrv':
-                arakoon_service_found = True
-                break
-        if arakoon_service_found is False and (DiskPartition.ROLES.DB not in partition_info or len(partition_info[DiskPartition.ROLES.DB]) == 0):
-            error_messages.append('DB partition role required')
 
         # Check current vPool configuration
         if new_vpool is False:
@@ -477,6 +470,12 @@ class StorageRouterController(object):
         ####################################
         # ARAKOON SETUP AND CONFIGURATIONS #
         ####################################
+        arakoon_service_found = False
+        for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:
+            if service.name == 'arakoon-voldrv':
+                arakoon_service_found = True
+                break
+
         if arakoon_service_found is False:
             StorageDriverController.manual_voldrv_arakoon_checkup()
 
@@ -581,6 +580,12 @@ class StorageRouterController(object):
                                 'size': '{0}KiB'.format(w_size)})
             dirs2create.append(sdp_write.path)
 
+        sdp_fd = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
+                                                                                    'role': DiskPartition.ROLES.WRITE,
+                                                                                    'sub_role': StorageDriverPartition.SUBROLE.FD,
+                                                                                    'partition': largest_write_mountpoint})
+        dirs2create.append(sdp_fd.path)
+
         # Assign DB
         db_info = partition_info[DiskPartition.ROLES.DB][0]
         sdp_tlogs = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
@@ -594,16 +599,12 @@ class StorageRouterController(object):
         dirs2create.append(sdp_tlogs.path)
         dirs2create.append(sdp_metadata.path)
 
-        sdp_fd = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
-                                                                                    'role': DiskPartition.ROLES.WRITE,
-                                                                                    'sub_role': StorageDriverPartition.SUBROLE.FD,
-                                                                                    'partition': largest_write_mountpoint})
+        # Assign DTL
+        dtl_info = partition_info[DiskPartition.ROLES.DTL][0]
         sdp_dtl = StorageDriverController.add_storagedriverpartition(storagedriver, {'size': None,
-                                                                                     'role': DiskPartition.ROLES.WRITE,
-                                                                                     'sub_role': StorageDriverPartition.SUBROLE.DTL,
-                                                                                     'partition': largest_write_mountpoint})
+                                                                                     'role': DiskPartition.ROLES.DTL,
+                                                                                     'partition': DiskPartition(dtl_info['guid'])})
         dirs2create.append(sdp_dtl.path)
-        dirs2create.append(sdp_fd.path)
         dirs2create.append(storagedriver.mountpoint)
 
         if frag_size is None and use_accelerated_alba is False:
@@ -1420,11 +1421,12 @@ class StorageRouterController(object):
             StorageRouterController._logger.debug('Configuring mountpoint')
             with remote(storagerouter.ip, [DiskTools], username='root') as rem:
                 counter = 1
+                mountpoint = '/mnt/{0}{1}'.format('ssd' if disk.is_ssd else 'hdd', counter)
                 while True:
-                    mountpoint = '/mnt/{0}{1}'.format('ssd' if disk.is_ssd else 'hdd', counter)
-                    counter += 1
                     if not rem.DiskTools.mountpoint_exists(mountpoint):
                         break
+                    counter += 1
+                    mountpoint = '/mnt/{0}{1}'.format('ssd' if disk.is_ssd else 'hdd', counter)
                 StorageRouterController._logger.debug('Found mountpoint: {0}'.format(mountpoint))
                 rem.DiskTools.add_fstab(partition_aliases=partition.aliases,
                                         mountpoint=mountpoint,
