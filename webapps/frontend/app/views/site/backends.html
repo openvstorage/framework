@@ -25,13 +25,18 @@ but WITHOUT ANY WARRANTY of any kind.
             <span data-i18n="ovs:backends.add"></span>
         </button>
     </div>
-    <div data-bind="pager: { loadData: loadBackends, headers: backendHeaders, refreshInterval: 5000, controls: true }" style="clear: both;">
+    <div data-bind="pager: {
+                        loadData: loadBackends, headers: backendHeaders, refreshInterval: 5000, controls: true,
+                        progressive: 'initial'
+                    }" style="clear: both;">
         <table data-dummy="dummy">
             <tr data-part="vitem">
                 <td style="position: relative;">
-                    <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
+                    <span data-bind="visible: liveStatus() !== undefined && loading()" style="position: absolute; top: 7px; left: -15px;">
                        <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     </span>
+                    <span data-bind="visible: liveStatus() === undefined" class="fa fa-spin"
+                          data-i18n="[html]ovs:icons.loading"></span>
                     <div data-bind="status: {
                                         colors: {
                                             blue: liveStatus() === 'installing',
@@ -40,7 +45,9 @@ but WITHOUT ANY WARRANTY of any kind.
                                             red: liveStatus() === 'failure'
                                         },
                                         defaultColor: 'lightgrey'
-                                    }, tooltip: 'ovs:generic.states.backend.' + liveStatus()"
+                                    },
+                                    tooltip: 'ovs:generic.states.backend.' + liveStatus(),
+                                    visible: liveStatus() !== undefined"
                          style="width: 14px; height: 14px; margin-top: 1px;"></div>
                 </td>
                 <td>
