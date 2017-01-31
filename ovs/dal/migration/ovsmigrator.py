@@ -393,7 +393,7 @@ class OVSMigrator(object):
             for vpool in vpools:
                 for storagedriver in vpool.storagedrivers:
                     for junction_partition in storagedriver.partitions:
-                        if junction_partition.role == DiskPartition.ROLES.WRITE and junction_partition.sub_role == StorageDriverPartition.SUBROLE.DTL:
+                        if junction_partition.role == DiskPartition.ROLES.WRITE and junction_partition.sub_role == 'DTL':
                             junction_partition.role = DiskPartition.ROLES.DTL
                             junction_partition.sub_role = None
                             junction_partition.save()
