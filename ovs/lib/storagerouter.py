@@ -863,20 +863,18 @@ class StorageRouterController(object):
         vpool.status = VPool.STATUSES.RUNNING
         vpool.save()
         vpool.invalidate_dynamics(['configuration'])
-        if offline_nodes_detected is True:
-            try:
-                VDiskController.dtl_checkup(vpool_guid=vpool.guid, ensure_single_timeout=600)
-            except:
-                pass
-            try:
-                for vdisk in vpool.vdisks:
-                    MDSServiceController.ensure_safety(vdisk=vdisk)
-            except:
-                pass
-        else:
+
+        # When a node is offline, we can run into errors, but also when 1 or more volumes are not running
+        # Scheduled tasks below, so don't really care whether they succeed or not
+        try:
             VDiskController.dtl_checkup(vpool_guid=vpool.guid, ensure_single_timeout=600)
-            for vdisk in vpool.vdisks:
+        except:
+            pass
+        for vdisk in vpool.vdisks:
+            try:
                 MDSServiceController.ensure_safety(vdisk=vdisk)
+            except:
+                pass
         StorageRouterController._logger.info('Add vPool {0} ended successfully'.format(vpool_name))
 
     @staticmethod

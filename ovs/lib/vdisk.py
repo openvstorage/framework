@@ -1278,6 +1278,28 @@ class VDiskController(object):
             raise RuntimeError('Error when scrubbing vDisk {0}:\n- {1}'.format(vdisk.guid, '\n- '.join(error_messages)))
 
     @staticmethod
+    @celery.task(name='ovs.vdisk.restart')
+    def restart(vdisk_guid, force):
+        """
+        Restart the given vDisk
+        :param vdisk_guid: The guid of the vDisk to restart
+        :type vdisk_guid: str
+        :param force: Force a restart at a possible cost of data loss
+        :type force: bool
+        :return: None
+        :rtype: NoneType
+        """
+        vdisk = VDisk(vdisk_guid)
+        vdisk.invalidate_dynamics('info')
+        if vdisk.info['live_status'] == 'RUNNING':
+            raise ValueError('Cannot restart a volume which is RUNNING')
+
+        vdisk.storagedriver_client.restart_object(object_id=str(vdisk.volume_id),
+                                                  force_restart=force,
+                                                  req_timeout_secs=60)
+        vdisk.invalidate_dynamics(['info', 'dtl_status'])
+
+    @staticmethod
     def _wait_for_snapshot_to_be_synced_to_backend(vdisk_guid, snapshot_id):
         tries = 25  # 5 minutes
         while VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk_guid, snapshot_id=snapshot_id) is False and tries > 0:

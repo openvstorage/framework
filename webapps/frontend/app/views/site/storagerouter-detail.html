@@ -313,14 +313,23 @@ but WITHOUT ANY WARRANTY of any kind.
                                 <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
                                    <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                                 </span>
-                                <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
-                                              attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) }"></a>
+                                <div data-bind="status: {
+                                                    colors: {
+                                                        green: liveStatus() === 'RUNNING',
+                                                        orange: liveStatus() === 'NON-RUNNING',
+                                                        red: liveStatus() === 'HALTED'
+                                                    },
+                                                    defaultColor: 'lightgrey'
+                                                }, tooltip: 'ovs:generic.states.vdisk.' + liveStatus()"
+                                     style="width: 14px; height: 14px;">
+                                </div>
                             </td>
+                            <td><a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '', attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) }"></a></td>
                             <td><span data-bind="text: size"></span></td>
-                            <td><span data-bind="text: storedData"></span></td>
-                            <td><span data-bind="text: iops"></span></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? storedData : '-'"></span></td>
+                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? iops : '-'"></span></td>
+                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? readSpeed : '-'"></span></td>
+                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? writeSpeed : '-'"></span></td>
                             <td>
                                 <div data-bind="status: {
                                                     colors: {
@@ -331,7 +340,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                                     },
                                                     defaultColor: 'lightgrey'
                                                 }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
-                                     style="width: 14px; height: 14px;"></div>
+                                     style="width: 14px; height: 14px;">
+                                </div>
                             </td>
                         </tr>
                     </table>

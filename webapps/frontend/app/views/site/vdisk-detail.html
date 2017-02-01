@@ -35,8 +35,7 @@ but WITHOUT ANY WARRANTY of any kind.
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
                 <button type="button" class="btn btn-mini btn-default hand"
-                        style="color: #428bca;"
-                        id="vdisk-snapshot"
+                        id="vdisk-snapshot" style="color: #428bca;"
                         data-bind="click: function() { $root.snapshot(); },
                                    enable: loaded(),
                                    tooltip: 'ovs:vdisks.detail.snapshot',
@@ -44,12 +43,11 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span class="fa hand" data-i18n="[html]ovs:icons.snapshot"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
-                        style="color: #428bca;"
-                        id="vdisk-rollback"
+                        id="vdisk-rollback" style="color: #428bca;"
                         data-bind="click: function() { $root.rollback(); },
                                    tooltip: 'ovs:vdisks.detail.rollback',
                                    enable: $root.shared.user.roles().contains('write') && $root.canBeModified()">
-                    <span class="fa hand" data-i18n="[html]ovs:icons.rollback"></span>
+                    <span class="fa hand fa-flip-horizontal" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-clone" style="color: #428bca;"
@@ -81,10 +79,17 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span class="fa hand" data-i18n="[html]ovs:icons.set_as_template"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default hand"
+                        id="vdisk-restart" style="color: #428bca;"
+                        data-bind="click: function() { $root.restartVDisk(); },
+                                   tooltip: 'ovs:vdisks.detail.restart',
+                                   enable: $root.shared.user.roles().contains('manage') && liveStatus() !== 'RUNNING' && !$root.restarting()">
+                    <span class="fa hand" data-i18n="[html]ovs:icons.load"></span>
+                </button>
+                <button type="button" class="btn btn-mini btn-default hand"
                         id="vdisk-delete"
                         data-bind="click: function() { $root.removeVDisk(); },
                                    tooltip: childrenGuids().length === 0 ? 'ovs:vdisks.detail.remove' : 'ovs:vdisks.detail.has_children',
-                                   enable: $root.shared.user.roles().contains('manage') && $root.canBeModified(),
+                                   enable: $root.shared.user.roles().contains('manage') && !$root.convertingToTemplate() && !$root.removing() && !$root.restarting(),
                                    style: { color: $root.shared.user.roles().contains('manage') && childrenGuids().length === 0 ? '#428bca' : 'lightgrey' }">
                     <span class="fa hand" data-i18n="[html]ovs:icons.delete"></span>
                 </button>
@@ -101,15 +106,32 @@ but WITHOUT ANY WARRANTY of any kind.
                     </thead>
                     <tbody>
                         <tr>
-                            <td style="width: 15%;" data-i18n="ovs:generic.vpool"></td>
+                            <td style="width: 15%;" data-i18n="ovs:generic.status"></td>
                             <td style="width: 35%;">
+                                <div style="width: 14px; height: 14px;"
+                                     data-bind="tooltip: 'ovs:generic.states.vdisk.' + liveStatus(),
+                                                status: {
+                                                    colors: {
+                                                        green: liveStatus() === 'RUNNING',
+                                                        orange: liveStatus() === 'NON-RUNNING',
+                                                        red: liveStatus() === 'HALTED'
+                                                    },
+                                                    defaultColor: 'lightgrey'
+                                                }">
+                                </div>
+                            <td style="width: 15%;" data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? iops : '-'"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.vpool"></td>
+                            <td>
                                 <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <a data-part="lazy-entry" data-bind="text: item().name(),
                                                                          attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
+                            <td data-i18n="ovs:generic.read_speed"></td>
+                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? readSpeed : '-'"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.storagerouter"></td>
@@ -119,23 +141,22 @@ but WITHOUT ANY WARRANTY of any kind.
                                                                          attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: item().guid }) }"></a>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.read_speed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:generic.write_speed"></td>
+                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? writeSpeed : '-'"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.size"></td>
                             <td><span data-bind="text: size"></span></td>
-                            <td data-i18n="ovs:generic.write_speed"></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td colspan="2">&nbsp;</td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.storeddata"></td>
-                            <td><span data-bind="text: storedData"></span></td>
+                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? storedData : '-'"></span></td>
                             <td colspan="2">&nbsp;</td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.nrofsnapshots"></td>
-                            <td><span data-bind="text: snapshots().length"></span></td>
+                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? snapshots().length : '-'"></span></td>
                             <td colspan="2">&nbsp;</td>
                         </tr>
                         <tr>
@@ -161,7 +182,7 @@ but WITHOUT ANY WARRANTY of any kind.
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.namespace"></td>
-                            <td><span data-bind="text: namespace"></span></td>
+                            <td><span data-bind="text: liveStatus() === 'RUNNING' ? namespace : '-'"></span></td>
                             <td colspan="2">&nbsp;</td>
                         </tr>
                     </tbody>

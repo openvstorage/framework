@@ -33,7 +33,7 @@ from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import \
     ClusterContact, ClusterNodeConfig, \
     DTLConfig, DTLConfigMode, DTLMode, Logger, \
-    MDSMetaDataBackendConfig,  MDSNodeConfig, \
+    MaxRedirectsExceededException, MDSMetaDataBackendConfig,  MDSNodeConfig, \
     ObjectNotFoundException as SRCObjectNotFoundException, \
     ReadCacheBehaviour, ReadCacheMode, \
     Role, Statistics, VolumeInfo
