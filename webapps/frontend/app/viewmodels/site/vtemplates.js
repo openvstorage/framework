@@ -49,7 +49,7 @@ define([
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.vDiskTemplatesHandle[options.page])) {
                     options.sort = 'name';
-                    options.contents = '';
+                    options.contents = 'child_vdisks';
                     options.query = JSON.stringify(self.query);
                     self.vDiskTemplatesHandle[options.page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
