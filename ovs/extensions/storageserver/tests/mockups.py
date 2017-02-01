@@ -202,6 +202,7 @@ class StorageRouterClient(object):
         _ = self, req_timeout_secs
         return type('Info', (), {'cluster_multiplier': 0,
                                  'lba_size': 0,
+                                 'halted': False,
                                  'metadata_backend_config': property(lambda s: None),
                                  'object_type': property(lambda s: 'BASE'),
                                  'vrouter_id': property(lambda s: None)})()
@@ -266,6 +267,7 @@ class StorageRouterClient(object):
         _ = req_timeout_secs
         return type('Info', (), {'cluster_multiplier': property(lambda s: 8),
                                  'lba_size': property(lambda s: 512),
+                                 'halted': property(lambda s: False),
                                  'metadata_backend_config': property(lambda s: StorageRouterClient._metadata_backend_config[self.vpool_guid].get(volume_id)),
                                  'object_type': property(lambda s: StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')),
                                  'vrouter_id': property(lambda s: StorageRouterClient.vrouter_id[self.vpool_guid].get(volume_id))})()
