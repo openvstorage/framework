@@ -100,7 +100,7 @@ define([
                 if (domain.guid() === guid && domain.canDelete()) {
                     app.showMessage(
                         $.t('ovs:domains.delete.delete', { what: domain.name() }),
-                        $.t('ovs:generic.areyousure'),
+                        $.t('ovs:generic.are_you_sure'),
                         [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                     )
                     .done(function(answer) {

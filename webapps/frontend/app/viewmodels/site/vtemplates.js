@@ -71,7 +71,7 @@ define([
                 if (vd.guid() === guid && vd.childrenGuids().length === 0) {
                     app.showMessage(
                         $.t('ovs:vdisks.remove_vtemplate.title_msg', {what: vd.name()}),
-                        $.t('ovs:generic.areyousure'),
+                        $.t('ovs:generic.are_you_sure'),
                         [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                     )
                         .done(function(answer) {

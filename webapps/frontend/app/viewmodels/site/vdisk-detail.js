@@ -54,6 +54,7 @@ define([
         self.domains              = ko.observableArray([]);
         self.snapshotsInitialLoad = ko.observable(true);
         self.removing             = ko.observable(false);
+        self.restarting           = ko.observable(false);
         self.vDisk                = ko.observable();
 
         // Handles
@@ -269,7 +270,7 @@ define([
         self.removeSnapshot = function(snapshotid) {
             app.showMessage(
                 $.t('ovs:vdisks.remove_snapshot.title_msg', {what: snapshotid}),
-                $.t('ovs:generic.areyousure'),
+                $.t('ovs:generic.are_you_sure'),
                 [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
             )
             .done(function(answer) {
@@ -306,7 +307,7 @@ define([
                 self.removing(true);
                 app.showMessage(
                         $.t('ovs:vdisks.remove_vdisk.title_msg', {what: vd.name()}),
-                        $.t('ovs:generic.areyousure'),
+                        $.t('ovs:generic.are_you_sure'),
                         [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                     )
                     .done(function(answer) {
@@ -340,10 +341,52 @@ define([
                     });
             }
         };
+        self.restartVDisk = function() {
+            if (self.vDisk() !== undefined && self.vDisk().liveStatus() !== 'RUNNING') {
+                var vd = self.vDisk();
+                self.restarting(true);
+                app.showMessage(
+                        $.t('ovs:vdisks.restart_vdisk.title_msg', {what: vd.name()}),
+                        $.t('ovs:generic.are_you_sure'),
+                        [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                    )
+                    .done(function(answer) {
+                        if (answer === $.t('ovs:generic.yes')) {
+                            generic.alertInfo(
+                                $.t('ovs:vdisks.restart_vdisk.started'),
+                                $.t('ovs:vdisks.restart_vdisk.started_msg', {what: vd.name()})
+                            );
+                            api.post('vdisks/' + vd.guid() + '/restart')
+                                .then(self.shared.tasks.wait)
+                                .done(function() {
+                                    generic.alertSuccess(
+                                        $.t('ovs:vdisks.restart_vdisk.success'),
+                                        $.t('ovs:vdisks.restart_vdisk.success_msg', {what: vd.name()})
+                                    );
+                                })
+                                .fail(function(error) {
+                                    error = generic.extractErrorMessage(error);
+                                    generic.alertError(
+                                        $.t('ovs:generic.error'),
+                                        $.t('ovs:vdisks.restart_vdisk.failed_msg', {what: vd.name(), why: error})
+                                    );
+                                })
+                                .always(function() {
+                                    self.restarting(false);
+                                });
+                        } else {
+                            self.restarting(false);
+                        }
+                    });
+            }
+        };
 
         // Computed
         self.canBeModified = ko.computed(function() {
-            return self.convertingToTemplate() === false && self.removing() === false;
+            if (self.vDisk() === undefined) {
+                return false;
+            }
+            return !self.convertingToTemplate() && !self.removing() && !self.restarting() && self.vDisk().liveStatus() === 'RUNNING';
         });
         self.canSetAsTemplate = ko.computed(function() {
             if (self.vDisk() === undefined) {

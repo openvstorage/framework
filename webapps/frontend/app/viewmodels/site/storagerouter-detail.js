@@ -39,6 +39,7 @@ define([
         self.vDiskCache               = {};
         self.vDisksHandle             = {};
         self.vDiskHeaders             = [
+            { key: 'status',     value: '',                            width: 30        },
             { key: 'name',       value: $.t('ovs:generic.name'),       width: undefined },
             { key: 'size',       value: $.t('ovs:generic.size'),       width: 100       },
             { key: 'storedData', value: $.t('ovs:generic.storeddata'), width: 110       },

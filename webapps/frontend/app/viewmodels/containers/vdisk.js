@@ -54,6 +54,7 @@ define([
         self.guid              = ko.observable(guid);
         self.iops              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.isVTemplate       = ko.observable();
+        self.liveStatus        = ko.observable();
         self.loaded            = ko.observable(false);
         self.loading           = ko.observable(false);
         self.loadingConfig     = ko.observable(false);
@@ -221,6 +222,7 @@ define([
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);
                 self.namespace(data.info.namespace);
+                self.liveStatus(data.info.live_status);
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;

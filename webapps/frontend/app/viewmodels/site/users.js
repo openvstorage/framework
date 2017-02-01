@@ -303,7 +303,7 @@ define([
                 if (client.guid() === guid) {
                     app.showMessage(
                         $.t('ovs:users.clients.delete', { what: client.name() }),
-                        $.t('ovs:generic.areyousure'),
+                        $.t('ovs:generic.are_you_sure'),
                         [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                     )
                     .done(function(answer) {
@@ -422,7 +422,7 @@ define([
                 if (user.guid() === guid) {
                     app.showMessage(
                         $.t('ovs:users.delete.delete', { what: user.username() }),
-                        $.t('ovs:generic.areyousure'),
+                        $.t('ovs:generic.are_you_sure'),
                         [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                     )
                     .done(function(answer) {
