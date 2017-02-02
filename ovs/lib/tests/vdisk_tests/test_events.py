@@ -63,6 +63,7 @@ class VDiskEventsTest(unittest.TestCase):
         # Cleaning storage
         self.volatile.clean()
         self.persistent.clean()
+        StorageRouterClient.clean()
 
     def test_reusing_devicename(self):
         """

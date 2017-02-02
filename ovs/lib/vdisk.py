@@ -83,7 +83,7 @@ class VDiskController(object):
         """
         Removes a vDisk from the model
         :param vdisk: The vDisk to be removed
-        :type vdisk: VDisk
+        :type vdisk: ovs.dal.hybrids.vdisk.VDisk
         :return: None
         """
         VDiskController._logger.info('Cleaning vDisk {0}'.format(vdisk.name))
@@ -98,7 +98,7 @@ class VDiskController(object):
         """
         Triggers a few (async) tasks to make sure the vDisk is in a healthy state.
         :param vdisk: The vDisk to check
-        :type vdisk: ovs.dal.hybrid.vdisk.VDisk
+        :type vdisk: ovs.dal.hybrids.vdisk.VDisk
         :return: None
         """
         VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
