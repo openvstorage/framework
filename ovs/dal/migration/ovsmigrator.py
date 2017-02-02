@@ -323,7 +323,9 @@ class OVSMigrator(object):
             sr_client_map = {}
             for storagedriver in StorageDriverList.get_storagedrivers():
                 vpool = storagedriver.vpool
-                root_client = None
+                if storagedriver.storagerouter_guid not in sr_client_map:
+                    sr_client_map[storagedriver.storagerouter_guid] = SSHClient(endpoint=storagedriver.storagerouter.ip, username='root')
+                root_client = sr_client_map[storagedriver.storagerouter_guid]
                 for alba_proxy in storagedriver.alba_proxies:
                     # Rename alba_proxy service in model
                     service = alba_proxy.service
@@ -333,10 +335,6 @@ class OVSMigrator(object):
                         continue
                     service.name = new_service_name
                     service.save()
-
-                    if storagedriver.storagerouter_guid not in sr_client_map:
-                        sr_client_map[storagedriver.storagerouter_guid] = SSHClient(endpoint=storagedriver.storagerouter.ip, username='root')
-                    root_client = sr_client_map[storagedriver.storagerouter_guid]
 
                     # Add '-reboot' to alba_proxy services (because of newly created services and removal of old service)
                     if not ServiceManager.has_service(name=old_service_name, client=root_client):

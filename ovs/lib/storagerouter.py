@@ -726,7 +726,10 @@ class StorageRouterController(object):
         for current_storagerouter in StorageRouterList.get_masters():
             queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}:5672'.format(mq_protocol, mq_user, mq_password, current_storagerouter.ip)})
 
-        backend_connection_manager = {'backend_type': 'MULTI'}
+        backend_connection_manager = {'backend_type': 'MULTI',
+                                      'backend_interface_retries_on_error': 5,
+                                      'backend_interface_retry_interval_secs': 1,
+                                      'backend_interface_retry_backoff_multiplier': 2.0}
         for index, proxy in enumerate(sorted(storagedriver.alba_proxies, key=lambda k: k.service.ports[0])):
             backend_connection_manager[str(index)] = {'alba_connection_host': storagedriver.storage_ip,
                                                       'alba_connection_port': proxy.service.ports[0],
@@ -735,10 +738,7 @@ class StorageRouterController(object):
                                                       'alba_connection_use_rora': True,
                                                       'alba_connection_transport': 'TCP',
                                                       'alba_connection_rora_manifest_cache_capacity': manifest_cache_size,
-                                                      'backend_type': 'ALBA',
-                                                      'backend_interface_retries_on_error': 5,
-                                                      'backend_interface_retry_interval_secs': 1,
-                                                      'backend_interface_retry_backoff_multiplier': 2.0}
+                                                      'backend_type': 'ALBA'}
         volume_router = {'vrouter_id': vrouter_id,
                          'vrouter_redirect_timeout_ms': '5000',
                          'vrouter_routing_retries': 10,
