@@ -371,13 +371,19 @@ class OVSMigrator(object):
                 if 'backend_connection_manager' not in storagedriver_config.configuration or storagedriver_config.configuration.get('backend_connection_manager', {}).get('backend_type') == 'MULTI':
                     continue
 
-                backend_connection_manager = {'backend_type': 'MULTI'}
+                backend_connection_manager = {'backend_type': 'MULTI',
+                                              'backend_interface_retries_on_error': 5,
+                                              'backend_interface_retry_interval_secs': 1,
+                                              'backend_interface_retry_backoff_multiplier': 2.0}
                 for index, proxy in enumerate(sorted(storagedriver.alba_proxies, key=lambda pr: pr.service.ports[0])):
                     backend_connection_manager[str(index)] = copy.deepcopy(storagedriver_config.configuration['backend_connection_manager'])
                     # noinspection PyUnresolvedReferences
                     backend_connection_manager[str(index)]['alba_connection_use_rora'] = True
                     # noinspection PyUnresolvedReferences
                     backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = 16 * 1024 ** 3
+                    for key in backend_connection_manager[str(index)].keys():
+                        if key.startswith('backend_interface'):
+                            del backend_connection_manager[str(index)][key]
                 storagedriver_config.clear_backend_connection_manager()
                 storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
                 storagedriver_config.save(root_client)
