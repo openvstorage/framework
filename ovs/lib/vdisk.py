@@ -94,6 +94,24 @@ class VDiskController(object):
         vdisk.delete()
 
     @staticmethod
+    def vdisk_checkup(vdisk):
+        """
+        Triggers a few (async) tasks to make sure the vDisk is in a healthy state.
+        :param vdisk: The vDisk to check
+        :type vdisk: ovs.dal.hybrid.vdisk.VDisk
+        :return: None
+        """
+        VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
+        try:
+            VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
+            MDSServiceController.ensure_safety(vdisk)
+        except Exception:
+            VDiskController._logger.exception('Error during vDisk checkup')
+            if vdisk.objectregistry_client.find(str(vdisk.volume_id)) is None:
+                VDiskController._logger.warning('Volume {0} does not exist anymore.'.format(vdisk.volume_id))
+                VDiskController.clean_vdisk_from_model(vdisk)
+
+    @staticmethod
     @celery.task(name='ovs.vdisk.delete_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def delete_from_voldrv(volume_id):
@@ -104,12 +122,12 @@ class VDiskController(object):
         :type volume_id: str
         :return: None
         """
-        vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
-        if vdisk is not None:
-            with volatile_mutex('voldrv_event_disk_{0}'.format(vdisk.volume_id), wait=20):
+        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=20):
+            vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+            if vdisk is not None:
                 VDiskController.clean_vdisk_from_model(vdisk)
-        else:
-            VDiskController._logger.info('Volume {0} does not exist (yet)'.format(volume_id))
+            else:
+                VDiskController._logger.info('Volume {0} does not exist'.format(volume_id))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete')
@@ -171,13 +189,15 @@ class VDiskController(object):
         :return: None
         """
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+        vpool = storagedriver.vpool
         with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+            if vpool.objectregistry_client.find(str(volume_id)) is None:
+                VDiskController._logger.warning('Ignoring resize_from_voldrv event for non-existing volume {0}'.format(volume_id))
+                return
             vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if vdisk is None:
-                vdisk = VDiskList.get_by_devicename_and_vpool(volume_path, storagedriver.vpool)
-                if vdisk is None:
-                    vdisk = VDisk()
-                    vdisk.name = VDiskController.extract_volumename(volume_path)
+                vdisk = VDisk()
+                vdisk.name = VDiskController.extract_volumename(volume_path)
             vdisk.devicename = volume_path
             vdisk.volume_id = volume_id
             vdisk.size = volume_size
@@ -185,16 +205,7 @@ class VDiskController(object):
             vdisk.metadata = {'lba_size': vdisk.info['lba_size'],
                               'cluster_multiplier': vdisk.info['cluster_multiplier']}
             vdisk.save()
-
-            VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
-            try:
-                VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
-                MDSServiceController.ensure_safety(vdisk)
-            except SRCObjectNotFoundException:
-                VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
-                VDiskController.clean_vdisk_from_model(vdisk)
-            except Exception:
-                VDiskController._logger.exception('Error processing resize_from_voldrv event')
+            VDiskController.vdisk_checkup(vdisk)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.migrate_from_voldrv')
@@ -298,29 +309,18 @@ class VDiskController(object):
         with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if new_vdisk is None:
-                new_vdisk = VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool)
-                if new_vdisk is None:
-                    new_vdisk = VDisk()
-                    new_vdisk.volume_id = volume_id
-                    new_vdisk.size = vdisk.size
-                    new_vdisk.description = name
-                    new_vdisk.devicename = devicename
-                    new_vdisk.vpool = vdisk.vpool
+                new_vdisk = VDisk()
+                new_vdisk.volume_id = volume_id
+                new_vdisk.size = vdisk.size
+                new_vdisk.description = name
+                new_vdisk.devicename = devicename
+                new_vdisk.vpool = vdisk.vpool
             new_vdisk.pagecache_ratio = pagecache_ratio if pagecache_ratio is not None else vdisk.pagecache_ratio
             new_vdisk.name = name
             new_vdisk.parent_vdisk = vdisk
             new_vdisk.parentsnapshot = snapshot_id
             new_vdisk.save()
-
-        VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
-        try:
-            VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
-            MDSServiceController.ensure_safety(new_vdisk)
-        except SRCObjectNotFoundException:
-            VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
-            VDiskController.clean_vdisk_from_model(new_vdisk)
-        except Exception:
-            VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}'.format(name))
+            VDiskController.vdisk_checkup(new_vdisk)
 
         return {'vdisk_guid': new_vdisk.guid,
                 'name': new_vdisk.name,
@@ -576,28 +576,17 @@ class VDiskController(object):
         with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if new_vdisk is None:
-                new_vdisk = VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool)
-                if new_vdisk is None:
-                    new_vdisk = VDisk()
-                    new_vdisk.volume_id = volume_id
-                    new_vdisk.size = vdisk.size
-                    new_vdisk.description = name
-                    new_vdisk.devicename = devicename
-                    new_vdisk.vpool = vdisk.vpool
+                new_vdisk = VDisk()
+                new_vdisk.volume_id = volume_id
+                new_vdisk.size = vdisk.size
+                new_vdisk.description = name
+                new_vdisk.devicename = devicename
+                new_vdisk.vpool = vdisk.vpool
             new_vdisk.pagecache_ratio = pagecache_ratio if pagecache_ratio is not None else vdisk.pagecache_ratio
             new_vdisk.name = name
             new_vdisk.parent_vdisk = vdisk
             new_vdisk.save()
-
-        VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
-        try:
-            VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
-            MDSServiceController.ensure_safety(new_vdisk)
-        except SRCObjectNotFoundException:
-            VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
-            VDiskController.clean_vdisk_from_model(new_vdisk)
-        except Exception:
-            VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}'.format(name))
+            VDiskController.vdisk_checkup(new_vdisk)
 
         return {'vdisk_guid': new_vdisk.guid,
                 'name': new_vdisk.name,
@@ -652,27 +641,16 @@ class VDiskController(object):
         with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if new_vdisk is None:
-                new_vdisk = VDiskList.get_by_devicename_and_vpool(devicename, vpool)
-                if new_vdisk is None:
-                    new_vdisk = VDisk()
-                    new_vdisk.size = volume_size
-                    new_vdisk.vpool = vpool
-                    new_vdisk.devicename = devicename
-                    new_vdisk.description = volume_name
-                    new_vdisk.volume_id = volume_id
+                new_vdisk = VDisk()
+                new_vdisk.size = volume_size
+                new_vdisk.vpool = vpool
+                new_vdisk.devicename = devicename
+                new_vdisk.description = volume_name
+                new_vdisk.volume_id = volume_id
             new_vdisk.pagecache_ratio = pagecache_ratio
             new_vdisk.name = volume_name
             new_vdisk.save()
-
-        VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
-        try:
-            VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
-            MDSServiceController.ensure_safety(new_vdisk)
-        except SRCObjectNotFoundException:
-            VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
-            VDiskController.clean_vdisk_from_model(new_vdisk)
-        except Exception:
-            VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}'.format(volume_name))
+            VDiskController.vdisk_checkup(new_vdisk)
 
         VDiskController._logger.info('Created volume. Location {0}'.format(devicename))
         return new_vdisk.guid
