@@ -647,7 +647,10 @@ class MDSServiceController(object):
                 continue
             if service not in new_services:
                 client = MetadataServerClient.load(service)
-                client.remove_namespace(str(vdisk.volume_id))
+                try:
+                    client.remove_namespace(str(vdisk.volume_id))
+                except RuntimeError:
+                    pass  # If somehow the namespace would not exist, we don't care.
 
         MDSServiceController.sync_vdisk_to_reality(vdisk)
         MDSServiceController._logger.debug('MDS safety: vDisk {0}: Completed'.format(vdisk.guid))

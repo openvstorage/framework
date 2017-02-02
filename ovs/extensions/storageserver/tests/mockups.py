@@ -523,10 +523,14 @@ class MDSClient(object):
             MDSClient._catchup[self.key] = {}
         if volume_id in MDSClient._catchup[self.key]:
             del MDSClient._catchup[self.key][volume_id]
+        else:
+            raise RuntimeError('Namespace does not exist')
         if self.key not in MDSClient._roles:
             MDSClient._roles[self.key] = {}
         if volume_id in MDSClient._roles[self.key]:
             del MDSClient._roles[self.key][volume_id]
+        else:
+            raise RuntimeError('Namespace does not exist')
 
     def _has_namespace(self, volume_id):
         """
