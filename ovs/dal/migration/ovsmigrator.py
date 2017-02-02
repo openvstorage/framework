@@ -323,7 +323,9 @@ class OVSMigrator(object):
             sr_client_map = {}
             for storagedriver in StorageDriverList.get_storagedrivers():
                 vpool = storagedriver.vpool
-                root_client = None
+                if storagedriver.storagerouter_guid not in sr_client_map:
+                    sr_client_map[storagedriver.storagerouter_guid] = SSHClient(endpoint=storagedriver.storagerouter.ip, username='root')
+                root_client = sr_client_map[storagedriver.storagerouter_guid]
                 for alba_proxy in storagedriver.alba_proxies:
                     # Rename alba_proxy service in model
                     service = alba_proxy.service
@@ -333,10 +335,6 @@ class OVSMigrator(object):
                         continue
                     service.name = new_service_name
                     service.save()
-
-                    if storagedriver.storagerouter_guid not in sr_client_map:
-                        sr_client_map[storagedriver.storagerouter_guid] = SSHClient(endpoint=storagedriver.storagerouter.ip, username='root')
-                    root_client = sr_client_map[storagedriver.storagerouter_guid]
 
                     # Add '-reboot' to alba_proxy services (because of newly created services and removal of old service)
                     if not ServiceManager.has_service(name=old_service_name, client=root_client):
@@ -368,21 +366,53 @@ class OVSMigrator(object):
                                 Configuration.set(proxy_scrub_config_key, json.dumps(proxy_scrub_config, indent=4), raw=True)
 
                 # Update 'backend_connection_manager' section
+                changes = False
                 storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
                 storagedriver_config.load()
-                if 'backend_connection_manager' not in storagedriver_config.configuration or storagedriver_config.configuration.get('backend_connection_manager', {}).get('backend_type') == 'MULTI':
+                if 'backend_connection_manager' not in storagedriver_config.configuration:
                     continue
 
-                backend_connection_manager = {'backend_type': 'MULTI'}
-                for index, proxy in enumerate(sorted(storagedriver.alba_proxies, key=lambda pr: pr.service.ports[0])):
-                    backend_connection_manager[str(index)] = copy.deepcopy(storagedriver_config.configuration['backend_connection_manager'])
-                    # noinspection PyUnresolvedReferences
-                    backend_connection_manager[str(index)]['alba_connection_use_rora'] = True
-                    # noinspection PyUnresolvedReferences
-                    backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = 16 * 1024 ** 3
-                storagedriver_config.clear_backend_connection_manager()
-                storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
-                storagedriver_config.save(root_client)
+                current_config = storagedriver_config.configuration['backend_connection_manager']
+                if current_config.get('backend_type') != 'MULTI':
+                    changes = True
+                    backend_connection_manager = {'backend_type': 'MULTI'}
+                    for index, proxy in enumerate(sorted(storagedriver.alba_proxies, key=lambda pr: pr.service.ports[0])):
+                        backend_connection_manager[str(index)] = copy.deepcopy(current_config)
+                        # noinspection PyUnresolvedReferences
+                        backend_connection_manager[str(index)]['alba_connection_use_rora'] = True
+                        # noinspection PyUnresolvedReferences
+                        backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = 16 * 1024 ** 3
+                        # noinspection PyUnresolvedReferences
+                        for key, value in backend_connection_manager[str(index)].items():
+                            if key.startswith('backend_interface'):
+                                backend_connection_manager[key] = value
+                                # noinspection PyUnresolvedReferences
+                                del backend_connection_manager[str(index)][key]
+                    for key, value in {'backend_interface_retries_on_error': 5,
+                                       'backend_interface_retry_interval_secs': 1,
+                                       'backend_interface_retry_backoff_multiplier': 2.0}.iteritems():
+                        if key not in backend_connection_manager:
+                            backend_connection_manager[key] = value
+                else:
+                    backend_connection_manager = current_config
+                    for value in backend_connection_manager.values():
+                        if isinstance(value, dict):
+                            for key, val in value.items():
+                                if key.startswith('backend_interface'):
+                                    backend_connection_manager[key] = val
+                                    changes = True
+                                    del value[key]
+                    for key, value in {'backend_interface_retries_on_error': 5,
+                                       'backend_interface_retry_interval_secs': 1,
+                                       'backend_interface_retry_backoff_multiplier': 2.0}.iteritems():
+                        if key not in backend_connection_manager:
+                            changes = True
+                            backend_connection_manager[key] = value
+
+                if changes is True:
+                    storagedriver_config.clear_backend_connection_manager()
+                    storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
+                    storagedriver_config.save(root_client)
 
                 # Add '-reboot' to volumedriver services (because of updated 'backend_connection_manager' section)
                 Toolbox.edit_version_file(client=root_client, package_name='volumedriver', old_service_name='volumedriver_{0}'.format(vpool.name))

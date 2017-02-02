@@ -327,14 +327,14 @@ class GenericController(object):
 
                     # Backend config
                     # {u'backend_type': u'MULTI',
+                    #  u'backend_interface_retries_on_error': 5,
+                    #  u'backend_interface_retry_backoff_multiplier': 2.0,
+                    #  u'backend_interface_retry_interval_secs': 1,
                     #  u'0': {u'alba_connection_host': u'10.100.193.155',
                     #         u'alba_connection_port': 26204,
                     #         u'alba_connection_preset': u'preset',
                     #         u'alba_connection_timeout': 15,
                     #         u'alba_connection_transport': u'TCP',
-                    #         u'backend_interface_retries_on_error': 5,
-                    #         u'backend_interface_retry_backoff_multiplier': 2.0,
-                    #         u'backend_interface_retry_interval_secs': 1,
                     #         u'backend_type': u'ALBA'}}
                     scrub_config = Configuration.get('ovs/vpools/{0}/proxies/scrub/generic_scrub'.format(vpool.guid))
                     scrub_config['port'] = port
