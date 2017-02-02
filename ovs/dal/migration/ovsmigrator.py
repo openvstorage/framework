@@ -369,34 +369,46 @@ class OVSMigrator(object):
                 changes = False
                 storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
                 storagedriver_config.load()
-                if 'backend_connection_manager' not in storagedriver_config.configuration or storagedriver_config.configuration['backend_connection_manager'].get('backend_type') != 'MULTI':
+                if 'backend_connection_manager' not in storagedriver_config.configuration:
+                    continue
+
+                current_config = storagedriver_config.configuration['backend_connection_manager']
+                if current_config.get('backend_type') != 'MULTI':
                     changes = True
-                    backend_connection_manager = {'backend_type': 'MULTI',
-                                                  'backend_interface_retries_on_error': 5,
-                                                  'backend_interface_retry_interval_secs': 1,
-                                                  'backend_interface_retry_backoff_multiplier': 2.0}
+                    backend_connection_manager = {'backend_type': 'MULTI'}
                     for index, proxy in enumerate(sorted(storagedriver.alba_proxies, key=lambda pr: pr.service.ports[0])):
-                        backend_connection_manager[str(index)] = copy.deepcopy(storagedriver_config.configuration['backend_connection_manager'])
+                        backend_connection_manager[str(index)] = copy.deepcopy(current_config)
                         # noinspection PyUnresolvedReferences
                         backend_connection_manager[str(index)]['alba_connection_use_rora'] = True
                         # noinspection PyUnresolvedReferences
                         backend_connection_manager[str(index)]['alba_connection_rora_manifest_cache_capacity'] = 16 * 1024 ** 3
-                        for key in backend_connection_manager[str(index)].keys():
+                        # noinspection PyUnresolvedReferences
+                        for key, value in backend_connection_manager[str(index)].items():
                             if key.startswith('backend_interface'):
+                                backend_connection_manager[key] = value
+                                # noinspection PyUnresolvedReferences
                                 del backend_connection_manager[str(index)][key]
-                else:
-                    backend_connection_manager = storagedriver_config.configuration['backend_connection_manager']
                     for key, value in {'backend_interface_retries_on_error': 5,
                                        'backend_interface_retry_interval_secs': 1,
                                        'backend_interface_retry_backoff_multiplier': 2.0}.iteritems():
                         if key not in backend_connection_manager:
                             backend_connection_manager[key] = value
+                else:
+                    backend_connection_manager = current_config
                     for value in backend_connection_manager.values():
                         if isinstance(value, dict):
-                            for key in value.keys():
+                            for key, val in value.items():
                                 if key.startswith('backend_interface'):
+                                    backend_connection_manager[key] = val
                                     changes = True
                                     del value[key]
+                    for key, value in {'backend_interface_retries_on_error': 5,
+                                       'backend_interface_retry_interval_secs': 1,
+                                       'backend_interface_retry_backoff_multiplier': 2.0}.iteritems():
+                        if key not in backend_connection_manager:
+                            changes = True
+                            backend_connection_manager[key] = value
+
                 if changes is True:
                     storagedriver_config.clear_backend_connection_manager()
                     storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
