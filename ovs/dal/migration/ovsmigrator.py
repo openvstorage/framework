@@ -414,10 +414,10 @@ class OVSMigrator(object):
                     storagedriver_config.configure_backend_connection_manager(**backend_connection_manager)
                     storagedriver_config.save(root_client)
 
-                # Add '-reboot' to volumedriver services (because of updated 'backend_connection_manager' section)
-                Toolbox.edit_version_file(client=root_client, package_name='volumedriver', old_service_name='volumedriver_{0}'.format(vpool.name))
-                if ServiceManager.ImplementationClass == Systemd:
-                    root_client.run(['systemctl', 'daemon-reload'])
+                    # Add '-reboot' to volumedriver services (because of updated 'backend_connection_manager' section)
+                    Toolbox.edit_version_file(client=root_client, package_name='volumedriver', old_service_name='volumedriver_{0}'.format(vpool.name))
+                    if ServiceManager.ImplementationClass == Systemd:
+                        root_client.run(['systemctl', 'daemon-reload'])
 
             # Introduction of DTL role (Replaces DTL sub_role)
             for vpool in vpools:
