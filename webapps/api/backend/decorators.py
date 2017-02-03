@@ -504,6 +504,11 @@ def log(log_slow=True):
             metadata = {'meta': dict((str(key), str(value)) for key, value in request.META.iteritems()),
                         'request': dict((str(key), str(value)) for key, value in request.REQUEST.iteritems()),
                         'cookies': dict((str(key), str(value)) for key, value in request.COOKIES.iteritems())}
+            # Stripping password traces
+            for mtype in metadata:
+                for key in metadata[mtype]:
+                    if 'password' in key:
+                        metadata[mtype][key] = '**********************'
             _logger = LogHandler.get('log', name='api')
             _logger.info('[{0}.{1}] - {2} - {3} - {4} - {5}'.format(
                 f.__module__,
