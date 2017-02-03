@@ -693,10 +693,11 @@ class VDiskController(object):
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, vdisk.storagedriver_id)
         storagedriver_config.load()
         volume_manager = storagedriver_config.configuration.get('volume_manager', {})
+        cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
         volume_id = str(vdisk.volume_id)
         try:
-            sco_size = vdisk.storagedriver_client.get_sco_multiplier(volume_id, req_timeout_secs=10) / 1024 * 4
+            sco_size = vdisk.storagedriver_client.get_sco_multiplier(volume_id, req_timeout_secs=10) / 1024 * (cluster_size / 1024)
             dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id, req_timeout_secs=10)
             tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id, req_timeout_secs=10)
             non_disposable_sco_factor = vdisk.storagedriver_client.get_sco_cache_max_non_disposable_factor(volume_id, req_timeout_secs=10)
