@@ -155,4 +155,43 @@ class VDiskTest(unittest.TestCase):
         capacity = vdisk_1.storagedriver_client.get_metadata_cache_capacity(str(vdisk_1.volume_id))
         self.assertEqual(capacity, 2048)
 
-        # @TODO: Add much more functionality for set_config_params
+    def test_dtl_target(self):
+        """
+        Validates whether the DTL target is set to sane values, despite incorrect values being passed in
+        """
+        structure = Helper.build_service_structure(
+            {'vpools': [1, 2],
+             'storagerouters': [1, 2, 3],
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 2, 3)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1), (2, 2), (3, 3)],  # (<id>, <storagedriver_id>),
+             'domains': [1, 2],
+             'storagerouter_domains': [(1, 1, 1, False), (2, 2, 1, False), (3, 3, 2, False)]}  # (<srd_id>, <sr_id>, <domain_id>, <backup>)
+        )
+        domains = structure['domains']
+        storagerouters = sorted(structure['storagerouters'].values(), key=lambda i: i.guid)
+        storagedrivers = {}
+        for sr in storagerouters:
+            storagedrivers[sr] = sorted(sr.storagedrivers, key=lambda i: i.guid)
+        base_params = {'sco_size': 4,
+                       'write_buffer': 128,
+                       'dtl_mode': 'sync'}  # Irrelevant for this test
+
+        vdisk = VDisk(VDiskController.create_new(volume_name='vdisk_1',
+                                                 volume_size=1024 ** 3,
+                                                 storagedriver_guid=storagedrivers[structure['storagerouters'][1]][0].guid))
+        params = copy.deepcopy(base_params)
+        params['dtl_target'] = [domains[1].guid]
+        VDiskController.set_config_params(vdisk.guid, new_config_params=params)
+        config = StorageRouterClient._dtl_config_cache[vdisk.vpool_guid][vdisk.volume_id]
+        self.assertEqual(config.host, storagedrivers[structure['storagerouters'][2]][0].storage_ip)
+        self.assertEqual(len(vdisk.domains_dtl), 1)
+        self.assertEqual(vdisk.domains_dtl[0].domain_guid, domains[1].guid)
+
+        params = copy.deepcopy(base_params)
+        params['dtl_target'] = [domains[2].guid]
+        with self.assertRaises(Exception):
+            VDiskController.set_config_params(vdisk.guid, new_config_params=params)
+        config = StorageRouterClient._dtl_config_cache[vdisk.vpool_guid][vdisk.volume_id]
+        self.assertEqual(config.host, storagedrivers[structure['storagerouters'][2]][0].storage_ip)
+        self.assertEqual(len(vdisk.domains_dtl), 1)
+        self.assertEqual(vdisk.domains_dtl[0].domain_guid, domains[1].guid)

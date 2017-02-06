@@ -1013,6 +1013,12 @@ class DataObject(object):
         finally:
             mutex.release()
 
+    def __repr__(self):
+        """
+        A short self-representation
+        """
+        return '<{0} (guid: {1}, at: {2})>'.format(self.__class__.__name__, self._guid, hex(id(self)))
+
     def __str__(self):
         """
         The string representation of a DataObject is the serialized value

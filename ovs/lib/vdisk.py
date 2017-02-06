@@ -17,6 +17,7 @@
 """
 Module for VDiskController
 """
+import os
 import re
 import time
 import uuid
@@ -757,7 +758,7 @@ class VDiskController(object):
         volume_id = str(vdisk.volume_id)
         old_config_params = VDiskController.get_config_params(vdisk.guid)
 
-        # 1st update SCO size, because this impacts TLOG multiplier which on its turn impacts write buffer
+        # Update SCO size, because this impacts TLOG multiplier which on its turn impacts write buffer
         new_sco_size = new_config_params['sco_size']
         old_sco_size = old_config_params['sco_size']
         if new_sco_size != old_sco_size:
@@ -774,7 +775,7 @@ class VDiskController(object):
                 VDiskController._logger.error('Error updating "sco_size": {0}'.format(ex))
                 errors = True
 
-        # 2nd Check for DTL changes
+        # Check for DTL changes
         new_dtl_mode = new_config_params['dtl_mode']
         old_dtl_mode = old_config_params['dtl_mode']
         new_dtl_targets = set(new_config_params['dtl_target'])  # Domain guids
@@ -791,21 +792,10 @@ class VDiskController(object):
                     VDiskController._logger.exception('Failed to disable DTL for vDisk {0}'.format(vdisk.name))
                     raise Exception('Disabling DTL for vDisk {0} failed'.format(vdisk.name))
 
-                vdisk.invalidate_dynamics(['dtl_status'])
                 for junction in vdisk.domains_dtl:
                     junction.delete()
+                vdisk.invalidate_dynamics(['dtl_status'])
         elif new_dtl_mode != old_dtl_mode or new_dtl_targets != old_dtl_targets:  # Mode is sync or async and targets changed or DTL mode changed
-            # Delete all original relations
-            for junction in vdisk.domains_dtl:
-                junction.delete()
-
-            # Create all new relations
-            for domain_guid in new_dtl_targets:
-                vdisk_domain = VDiskDomain()
-                vdisk_domain.vdisk = vdisk
-                vdisk_domain.domain = Domain(domain_guid)
-                vdisk_domain.save()
-
             VDiskController._logger.info('Checking if reconfiguration is required based on new parameters for vDisk {0}'.format(vdisk.name))
             storagerouter = StorageRouter(vdisk.storagerouter_guid)
             # No new DTL targets --> Check if we can find possible Storage Routers to configure DTL on
@@ -846,11 +836,17 @@ class VDiskController(object):
                 VDiskController._logger.exception('Failed to retrieve current DTL configuration for vDisk {0}'.format(vdisk.name))
                 raise Exception('Retrieving current DTL configuration failed for vDisk {0}'.format(vdisk.name))
 
+            dtl_failed = False
             if old_dtl_mode != new_dtl_mode or current_dtl_config.host not in [sd.storage_ip for sr in possible_storagerouters for sd in sr.storagedrivers if sd.vpool_guid == vdisk.vpool_guid]:
-                random.shuffle(possible_storagerouters)
+                if os.environ.get('RUNNING_UNITTESTS') == 'True':
+                    possible_storagerouters.sort(key=lambda i: i.guid)
+                else:
+                    random.shuffle(possible_storagerouters)
                 dtl_config = None
                 for storagerouter in possible_storagerouters:
-                    for sd in storagerouter.storagedrivers:  # DTL can reside on any node in the cluster running a volumedriver and having a DTL process running
+                    for sd in sorted(storagerouter.storagedrivers, key=lambda i: i.guid):  # DTL can reside on any node in the cluster running a volumedriver and having a DTL process running
+                        if sd.vpool_guid != vdisk.vpool_guid:
+                            continue
                         dtl_config = DTLConfig(str(sd.storage_ip), sd.ports['dtl'], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
                         vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config, req_timeout_secs=10)
                         vdisk.invalidate_dynamics(['dtl_status'])
@@ -859,10 +855,21 @@ class VDiskController(object):
                         break
 
                 if dtl_config is None:
-                    VDiskController._logger.error('No Storage Routers found in chosen Domains which have a DTL process running')
+                    VDiskController._logger.error('No suitable StorageRouters found in chosen Domains which have a DTL process for this vPool')
                     errors = True
+                    dtl_failed = True
 
-        # 2nd update rest
+            if dtl_failed is False:
+                # Reset relations
+                for junction in vdisk.domains_dtl:
+                    junction.delete()
+                for domain_guid in new_dtl_targets:
+                    vdisk_domain = VDiskDomain()
+                    vdisk_domain.vdisk = vdisk
+                    vdisk_domain.domain = Domain(domain_guid)
+                    vdisk_domain.save()
+
+        # Update all the rest
         for key in new_config_params:
             try:
                 if key in ['sco_size', 'dtl_mode', 'dtl_target']:
@@ -886,6 +893,7 @@ class VDiskController(object):
             except Exception as ex:
                 VDiskController._logger.error('Error updating "{0}": {1}'.format(key, ex))
                 errors = True
+
         if errors is True:
             raise Exception('Failed to update the values for vDisk {0}'.format(vdisk.name))
 

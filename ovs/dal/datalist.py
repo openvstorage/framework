@@ -781,3 +781,9 @@ class DataList(object):
         if self._executed is False and self._guids is None:
             self._execute_query()
         random.shuffle(self._guids)
+
+    def __repr__(self):
+        """
+        A short self-representation
+        """
+        return '<DataList (type: {0}, executed: {1}, at: {2})>'.format(self._object_type.__name__, self._executed, hex(id(self)))
