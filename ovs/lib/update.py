@@ -328,29 +328,34 @@ class UpdateController(object):
 
     @staticmethod
     @add_hooks('update', 'package_install_multi')
-    def _get_packages_to_install_core(client, package_info, components):
+    def _package_install_core(client, package_info, components):
         """
         Update the core packages
-        :param client: Unused
+        :param client: Client on which to execute update the packages
         :type client: SSHClient
         :param package_info: Information about the packages (installed, candidate)
         :type package_info: dict
         :param components: Components which have been selected for update
         :type components: list
-        :return: None
+        :return: Boolean indicating whether to continue with the update or not
+        :rtype: bool
         """
-        _ = client  # Backwards compatibility (Was used until Fargo 2.7.11.1-1)
-        packages_to_install = {}
+        packages_updated = []
+        continue_after_failure = True
         for component in components:
             for pkg_name in UpdateController._packages_core.get(component, set()):
-                if pkg_name in package_info:
+                if pkg_name in package_info and pkg_name not in packages_updated:
                     pkg_info = package_info[pkg_name]
-                    if pkg_name in UpdateController._packages_core_blocking:
-                        pkg_info['blocking'] = True
-                    else:
-                        pkg_info['blocking'] = False
-                    packages_to_install[pkg_name] = pkg_info
-        return packages_to_install
+                    try:
+                        UpdateController._logger.debug('{0}: Updating package {1} ({2} --> {3})'.format(client.ip, pkg_name, pkg_info['installed'], pkg_info['candidate']))
+                        PackageManager.install(package_name=pkg_name, client=client)
+                        packages_updated.append(pkg_name)
+                        UpdateController._logger.debug('{0}: Updated package {1}'.format(client.ip, pkg_name))
+                    except Exception as ex:
+                        UpdateController._logger.debug('{0}: Updating package {1} failed. {2}'.format(client.ip, pkg_name, ex))
+                        if pkg_name in UpdateController._packages_core_blocking:
+                            continue_after_failure = False
+        return continue_after_failure
 
     @staticmethod
     @add_hooks('update', 'post_update_multi')
@@ -596,10 +601,6 @@ class UpdateController(object):
             if len(services_post_update) > 0:
                 UpdateController._logger.debug('Services which will be restarted after update: {0}'.format(', '.join(sorted(services_post_update))))
 
-            # Set migration values (Used when update is retried)
-            if 'framework' in components:
-                Configuration.set('/ovs/framework/update/migration', {'dal': True, 'extensions': True})
-
             # Stop services
             if UpdateController.change_services_state(services=services_stop_start,
                                                       ssh_clients=ssh_clients,
@@ -610,27 +611,17 @@ class UpdateController(object):
             package_install_multi_hooks = Toolbox.fetch_hooks('update', 'package_install_multi')
             package_install_single_hooks = Toolbox.fetch_hooks('update', 'package_install_single')
 
-            packages_to_install = {}
-            for function in package_install_multi_hooks:
-                packages_to_install.update(function(client=None, package_info=packages_to_update, components=components))
-
             # Install each package on all StorageRouters
-            for pkg_name, pkg_info in packages_to_install.iteritems():
+            if packages_to_update:
                 for client in ssh_clients:
-                    UpdateController._logger.debug('{0}: Updating package {1} ({2} --> {3})'.format(client.ip, pkg_name, pkg_info['installed'], pkg_info['candidate']))
-                    try:
-                        PackageManager.install(package_name=pkg_name, client=client)
-                        UpdateController._logger.debug('{0}: Updated package {1}'.format(client.ip, pkg_name))
-                    except Exception as ex:
-                        UpdateController._logger.exception('{0}: Updating package failed. {1}'.format(client.ip, ex))
-                        if pkg_info.get('blocking', False) is True:
-                            start_fwk_after_failure = False
+                    for function in package_install_multi_hooks:
+                        start_fwk_after_failure &= function(client=client, package_info=packages_to_update, components=components)
 
             # Install packages on all ALBA nodes
             if set(components).difference(set(UpdateController._packages_core.keys())):
                 for function in package_install_single_hooks:
                     try:
-                        function(package_info=None, components=components)
+                        start_fwk_after_failure &= function(package_info=None, components=components)
                     except Exception as ex:
                         UpdateController._logger.exception('Package installation hook {0} failed with error: {1}'.format(function.__name__, ex))
 
@@ -642,10 +633,10 @@ class UpdateController(object):
                 client.file_delete(UpdateController._update_file)
 
             # Migrate extensions
-            if 'framework' in components or (Configuration.exists('/ovs/framework/update/migration') and Configuration.get('/ovs/framework/update/migration|extensions') is True):
+            if 'framework' in components:
                 failures = []
                 for client in ssh_clients:
-                    UpdateController._logger.debug('{0}: Verifying extensions code migration is required'.format(client.ip))
+                    UpdateController._logger.debug('{0}: Starting extensions code migration'.format(client.ip))
                     try:
                         key = '/ovs/framework/hosts/{0}/versions'.format(System.get_my_machine_id(client=client))
                         old_versions = Configuration.get(key) if Configuration.exists(key) else {}
@@ -660,10 +651,10 @@ class UpdateController(object):
                         if old_versions != new_versions:
                             UpdateController._logger.debug('{0}: Finished extensions code migration. Old versions: {1} --> New versions: {2}'.format(client.ip, old_versions, new_versions))
                     except Exception as ex:
+                        start_fwk_after_failure = False
                         failures.append('{0}: {1}'.format(client.ip, str(ex)))
                 if len(failures) > 0:
                     raise Exception('Failed to run the extensions migrate code on all nodes. Errors found:\n\n{0}'.format('\n\n'.join(failures)))
-                Configuration.set('/ovs/framework/update/migration|extensions', False)
 
             # Start memcached
             if 'memcached' in services_stop_start:
@@ -673,18 +664,20 @@ class UpdateController(object):
                                                        action='start')
 
             # Migrate DAL
-            if 'framework' in components or (Configuration.exists('/ovs/framework/update/migration') and Configuration.get('/ovs/framework/update/migration|dal') is True):
-                UpdateController._logger.debug('Verifying DAL code migration is required')
-                old_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
+            if 'framework' in components:
+                UpdateController._logger.debug('Starting DAL code migration')
+                try:
+                    old_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
+                    from ovs.dal.helpers import Migration
+                    with remote(ssh_clients[0].ip, [Migration]) as rem:
+                        rem.Migration.migrate()
 
-                from ovs.dal.helpers import Migration
-                with remote(ssh_clients[0].ip, [Migration]) as rem:
-                    rem.Migration.migrate()
-
-                new_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
-                if old_versions != new_versions:
-                    UpdateController._logger.debug('Finished DAL code migration. Old versions: {0} --> New versions: {1}'.format(old_versions, new_versions))
-                Configuration.set('/ovs/framework/update/migration|dal', False)
+                    new_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
+                    if old_versions != new_versions:
+                        UpdateController._logger.debug('Finished DAL code migration. Old versions: {0} --> New versions: {1}'.format(old_versions, new_versions))
+                except Exception:
+                    start_fwk_after_failure = False
+                    raise
 
             # Post update actions
             for client in ssh_clients:
