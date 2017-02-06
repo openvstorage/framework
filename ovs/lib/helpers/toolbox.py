@@ -230,7 +230,7 @@ class Toolbox(object):
         else:
             if logger is not None:
                 logger.debug('{0}: {1} service {2}'.format(client.ip, action, name))
-            print '  [{0}] {1} {2}'.format(client.ip, name, action)
+            print '  [{0}] {1} {2}'.format(client.ip, name, action.lower())
 
     @staticmethod
     def wait_for_service(client, name, status, logger):
@@ -335,22 +335,22 @@ class Toolbox(object):
         :type previous: str
         :return: None
         """
-        from ovs.extensions.generic.sshclient import NotAuthenticatedException
+        try:
+            SSHClient(ip, username)
+            return None
+        except:
+            pass
 
+        if previous is not None:
+            try:
+                SSHClient(ip, username=username, password=previous)
+                return previous
+            except:
+                pass
+
+        node_string = 'this node' if ip == '127.0.0.1' else ip
         while True:
             try:
-                try:
-                    SSHClient(ip, username)
-                    return None
-                except NotAuthenticatedException:
-                    pass
-                if previous is not None:
-                    try:
-                        SSHClient(ip, username=username, password=previous)
-                        return previous
-                    except:
-                        pass
-                node_string = 'this node' if ip == '127.0.0.1' else ip
                 password = Interactive.ask_password('Enter the {0} password for {1}'.format(username, node_string))
                 if password in ['', None]:
                     continue
@@ -361,7 +361,6 @@ class Toolbox(object):
             except UnableToConnectException:
                 raise
             except:
-                previous = None
                 Toolbox.log(logger=logger, messages='Password invalid or could not connect to this node')
 
 

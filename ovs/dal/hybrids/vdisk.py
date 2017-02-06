@@ -26,7 +26,7 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.structures import Property, Relation, Dynamic
-from ovs.extensions.storageserver.storagedriver import StorageDriverClient, ObjectRegistryClient
+from ovs.extensions.storageserver.storagedriver import MaxRedirectsExceededException, StorageDriverClient, ObjectRegistryClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
 
@@ -160,13 +160,15 @@ class VDisk(DataObject):
         """
         Fetches the info (see Volume Driver API) for the vDisk.
         """
+        vdiskinfo = StorageDriverClient.EMPTY_INFO()
+        max_redirects = False
         if self.volume_id and self.vpool:
             try:
                 vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id), req_timeout_secs=2)
-            except:
-                vdiskinfo = StorageDriverClient.EMPTY_INFO()
-        else:
-            vdiskinfo = StorageDriverClient.EMPTY_INFO()
+            except MaxRedirectsExceededException:
+                max_redirects = True
+            except Exception:
+                pass
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
@@ -183,6 +185,7 @@ class VDisk(DataObject):
                                                        'port': nodeconfig.port()})
                 else:
                     vdiskinfodict[key] = objectvalue
+        vdiskinfodict['live_status'] = 'NON-RUNNING' if max_redirects is True else 'RUNNING' if vdiskinfodict['halted'] is False else 'HALTED'
         return vdiskinfodict
 
     def _statistics(self, dynamic):
@@ -246,14 +249,12 @@ class VDisk(DataObject):
         Loads statistics from this vDisk - returns unprocessed data
         """
         # Load data from volumedriver
+        vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
         if self.volume_id and self.vpool:
             try:
                 vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id), req_timeout_secs=2)
             except Exception as ex:
                 VDisk._logger.error('Error loading statistics_volume from {0}: {1}'.format(self.volume_id, ex))
-                vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
-        else:
-            vdiskstats = StorageDriverClient.EMPTY_STATISTICS()
         # Load volumedriver data in dictionary
         vdiskstatsdict = {}
         try:

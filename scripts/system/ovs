@@ -46,6 +46,7 @@ function show_help {
     echo "    - ovs remove node <ip>                       Remove node from cluster"
     echo ""
     echo "  * Monitor options:"
+    echo "    - ovs monitor mds                            Watch Open vStorage MDS clusters for all vPools per StorageRouter"
     echo "    - ovs monitor services                       Watch Open vStorage services"
     echo "    - ovs monitor heartbeat                      Send an internal heartbeat"
     echo ""
@@ -134,6 +135,8 @@ elif [ "$1" = "monitor" ] ; then
         python -c "from ovs.extensions.services.service import ServiceManager; ServiceManager.monitor_services()"
     elif [ "$2" = "heartbeat" ] ; then
         python /opt/OpenvStorage/ovs/extensions/generic/heartbeat.py
+    elif [ "$2" = "mds" ] ; then
+        python -c "from ovs.lib.mdsservice import MDSServiceController; MDSServiceController.monitor_mds_layout()"
     else
         show_help
     fi

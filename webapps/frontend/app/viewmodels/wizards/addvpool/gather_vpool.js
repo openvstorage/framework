@@ -49,7 +49,7 @@ define([
         // Computed
         self.canContinue = ko.computed(function () {
             var showErrors = false, reasons = [], fields = [], preValidation = self.preValidateResult(),
-                requiredRoles = ['WRITE', 'DB'];
+                requiredRoles = ['DB', 'DTL', 'WRITE'];
             if (self.data.vPool() === undefined) {
                 if (!self.data.name.valid()) {
                     fields.push('name');

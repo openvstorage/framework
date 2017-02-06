@@ -23,10 +23,11 @@ define([
         var self = this;
 
         // Variables
-        self.refresher     = new Refresher();
-        self.preloadPage   = 0;
-        self.key           = undefined;
-        self.viewportCache = {};
+        self.refresher          = new Refresher();
+        self.preloadPage        = 0;
+        self.key                = undefined;
+        self.viewportCache      = {};
+        self.progressiveTracker = {};
 
         // Observables
         self.container       = ko.observable(ko.observableArray([]));
@@ -40,6 +41,7 @@ define([
         self.headers         = ko.observableArray([]);
         self.settings        = ko.observable({});
         self.padding         = ko.observable(2);
+        self.progressive     = ko.observable();
         self.controls        = ko.observable(true);
         self.viewportKeys    = ko.observableArray([]);
         self.viewportItems   = ko.observableArray([]);
@@ -48,10 +50,6 @@ define([
         self.preloading      = ko.observable(false);
         self.sorting         = ko.observable({sequence: [], directions: {}});
         self.pageSizes       = ko.observableArray([10, 25, 50, 100]);
-
-        // Handles
-        self.preloadHandle = undefined;
-        self.loadHandle    = undefined;
 
         // Computed
         self.items = ko.computed({
@@ -102,15 +100,14 @@ define([
             },
             write: function(value) {
                 self.internalCurrent(value);
-                self.load(value, false);
+                self.load(value, false, true);
 
                 // Prefetch/refresh next page
                 var preloadPage = value + 1;
                 if (preloadPage === self.lastPage()) {
                     preloadPage = 1;
                 }
-                self.hasLoad(true, true);
-                self.load(preloadPage, true);
+                self.load(preloadPage, true, false);
             }
         });
         self.hasNext = ko.computed(function() {
@@ -193,30 +190,23 @@ define([
                 }
             }
         };
-        self.hasLoad = function(preload, abort) {
-            if (preload) {
-                if (self.preloadHandle !== undefined && self.preloadHandle.state() === 'pending') {
-                    if (abort) {
-                        generic.xhrAbort(self.preloadHandle);
-                        return false;
-                    }
-                    return true;
+        self.load = function(page, preload, progressive) {
+            if (progressive === true) {
+                if (self.progressive() === 'always' || (self.progressive() === 'initial' && self.progressiveTracker[page] !== true)) {
+                    self.progressiveTracker[page] = true;
+                    return self._load(page, preload, true)
+                        .then(function () {
+                            return self._load(page, preload, false);
+                        });
                 }
-                return false;
             }
-            if (self.loadHandle !== undefined && self.loadHandle.state() === 'pending') {
-                if (abort) {
-                    generic.xhrAbort(self.loadHandle);
-                    return false;
-                }
-                return true;
-            }
-            return false;
+            return self._load(page, preload, false)
         };
-        self.load = function(page, preload) {
+        self._load = function(page, preload, progressive) {
             var options = {
                 page: page,
-                page_size: parseInt(self.pageSize(), 10)
+                page_size: parseInt(self.pageSize(), 10),
+                progressive: progressive
             };
             if (self.sortable()) {
                 options.sort = self.sortingKey()
@@ -224,10 +214,6 @@ define([
             if (self.external()) {
                 self.loadData(options);
             } else {
-                if (self.hasLoad(preload, !preload)) {
-                    // If there's a preload, it shouldn't abort. If it's not a preload, it should abort.
-                    return;
-                }
                 self.pageLoading(true);
                 $.each(self.viewportItems(), function (index, item) {
                     item.loading(true);
@@ -239,7 +225,7 @@ define([
                     self._pageFirst(self.viewportCache[page].pageFirst);
                     self._pageLast(self.viewportCache[page].pageLast);
                 }
-                var promise = self.loadData(options)
+                return self.loadData(options)
                     .then(function (dataset) {
                         if (dataset !== undefined && (preload || page === self.current())) {
                             var keys = [], idata = {}, maxPage = dataset.data._paging.max_page;
@@ -285,11 +271,6 @@ define([
                     .fail(function() {
                         self.pageLoading(false);
                     });
-                if (preload) {
-                    self.preloadHandle = promise;
-                } else {
-                    self.loadHandle = promise;
-                }
             }
         };
         self.sort = function(data, event) {
@@ -323,7 +304,7 @@ define([
                 }
             }
             self.sorting(sorting);
-            self.load(self.current(), false);
+            self.load(self.current(), false, true);
         };
 
         // Durandal
@@ -347,6 +328,7 @@ define([
             self.settings(settings);
             self.headers(settings.headers);
             self.preloading(generic.tryGet(settings, 'preloading', false));
+            self.progressive(generic.tryGet(settings, 'progressive', undefined));
             self.controls(generic.tryGet(settings, 'controls', true));
             self.sortable(generic.tryGet(settings, 'sortable', false));
             if (self.sortable() === true) {
@@ -367,14 +349,11 @@ define([
             }
 
             if (settings.hasOwnProperty('trigger')) {
-                settings.trigger.subscribe(function() { self.load(self.current(), false); });
+                settings.trigger.subscribe(function() { self.load(self.current(), false, false); });
             }
 
             self.refresher.init(function() {
-                self.load(self.current(), false);
-                if (self.hasLoad(true, false)) {
-                    return;
-                }
+                self.load(self.current(), false, true);
                 if (self.preloading()) {
                     self.preloadPage += 1;
                     if (self.preloadPage === self.current()) {
@@ -384,7 +363,7 @@ define([
                         self.preloadPage = 1;
                     }
                     if (self.preloadPage !== self.current()) {
-                        self.load(self.preloadPage, true);
+                        self.load(self.preloadPage, true, false);
                     }
                 }
             }, self.refresh);

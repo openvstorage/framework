@@ -26,7 +26,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, load, return_object, return_list, log, return_simple
 from api.backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
-from api.backend.serializers.serializers import FullSerializer, PasswordSerializer
+from api.backend.serializers.serializers import FullSerializer
 from api.backend.toolbox import Toolbox
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.j_roleclient import RoleClient
@@ -168,17 +168,18 @@ class UserViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_object(User, mode='accepted')
     @load(User)
-    def set_password(self, request, user):
+    def set_password(self, request, user, new_password):
         """
         Sets the password of a given User. A logged in User can only changes its own password, or all passwords if the logged in User has a manage role
         :param request: The raw request
         :type request: Request
         :param user: The user to update the password from
         :type user: User
+        :param new_password: The new password to be set
+        :type new_password: str
         """
         if user.guid == request.client.user_guid or Toolbox.is_client_in_roles(request.client, ['manage']):
-            serializer = PasswordSerializer(data=request.DATA)
-            user.password = hashlib.sha256(str(serializer.data['new_password'])).hexdigest()
+            user.password = hashlib.sha256(str(new_password)).hexdigest()
             user.save()
             for client in user.clients:
                 for token in client.tokens:

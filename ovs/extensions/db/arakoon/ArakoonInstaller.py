@@ -918,7 +918,7 @@ class ArakoonInstaller(object):
         :param cluster_name: Name of the cluster to un-claim
         :type cluster_name: str
         :param master_ip: IP of one of the cluster nodes
-        :type master_ip: str
+        :type master_ip: str or None
         :param filesystem: Indicates whether the configuration should be on the filesystem or in a configuration cluster
         :type filesystem: bool
         :param metadata: Metadata if not yet in the cluster

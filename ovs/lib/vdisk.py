@@ -459,13 +459,15 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.vdisk.move')
-    def move(vdisk_guid, target_storagerouter_guid):
+    def move(vdisk_guid, target_storagerouter_guid, force=False):
         """
         Move a vDisk to the specified StorageRouter
         :param vdisk_guid: Guid of the vDisk to move
         :type vdisk_guid: str
         :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisk to
         :type target_storagerouter_guid: str
+        :param force: Indicates whether to force the migration or not (forcing can lead to dataloss)
+        :type force: bool
         :return: None
         """
         vdisk = VDisk(vdisk_guid)
@@ -483,7 +485,7 @@ class VDiskController(object):
         try:
             vdisk.storagedriver_client.migrate(object_id=str(vdisk.volume_id),
                                                node_id=str(storagedriver.storagedriver_id),
-                                               force_restart=False)
+                                               force_restart=force)
         except Exception:
             VDiskController._logger.exception('Failed to move vDisk {0}'.format(vdisk.name))
             raise Exception('Moving vDisk {0} failed'.format(vdisk.name))
@@ -1274,6 +1276,28 @@ class VDiskController(object):
         GenericController.execute_scrub_work(queue, vdisk.vpool, scrub_info, error_messages)
         if len(error_messages) > 0:
             raise RuntimeError('Error when scrubbing vDisk {0}:\n- {1}'.format(vdisk.guid, '\n- '.join(error_messages)))
+
+    @staticmethod
+    @celery.task(name='ovs.vdisk.restart')
+    def restart(vdisk_guid, force):
+        """
+        Restart the given vDisk
+        :param vdisk_guid: The guid of the vDisk to restart
+        :type vdisk_guid: str
+        :param force: Force a restart at a possible cost of data loss
+        :type force: bool
+        :return: None
+        :rtype: NoneType
+        """
+        vdisk = VDisk(vdisk_guid)
+        vdisk.invalidate_dynamics('info')
+        if vdisk.info['live_status'] == 'RUNNING':
+            raise ValueError('Cannot restart a volume which is RUNNING')
+
+        vdisk.storagedriver_client.restart_object(object_id=str(vdisk.volume_id),
+                                                  force_restart=force,
+                                                  req_timeout_secs=60)
+        vdisk.invalidate_dynamics(['info', 'dtl_status'])
 
     @staticmethod
     def _wait_for_snapshot_to_be_synced_to_backend(vdisk_guid, snapshot_id):

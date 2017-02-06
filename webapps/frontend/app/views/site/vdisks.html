@@ -32,33 +32,50 @@ but WITHOUT ANY WARRANTY of any kind.
                     <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
                        <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     </span>
+                    <div data-bind="tooltip: 'ovs:generic.states.vdisk.' + liveStatus(),
+                                    status: {
+                                        colors: {
+                                            green: liveStatus() === 'RUNNING',
+                                            orange: liveStatus() === 'NON-RUNNING',
+                                            red: liveStatus() === 'HALTED'
+                                        },
+                                        defaultColor: 'lightgrey'
+                                    }"
+                         style="width: 14px; height: 14px; margin-top: 1px;">
+                    </div>
+                </td>
+                <td style="position: relative;">
                     <span class="fa pointer" data-i18n="[html]ovs:icons.link" style="margin-top: 1px;"
                           data-bind="tooltip: connectedECText(),
-                                     style: { color: edgeClients().length > 0 ? '#333' : 'lightgrey' }"></span>
+                                     style: { color: edgeClients().length > 0 ? '#333' : 'lightgrey' }">
+                    </span>
                 </td>
                 <td>
                     <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
-                                  attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) }"></a>
+                                  attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) }">
+                    </a>
                 </td>
                 <td>
                     <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded', undefinedLoading: false }">
                         <a data-part="lazy-entry"
                            data-bind="text: item().name,
-                                      attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
+                                      attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }">
+                        </a>
                     </span>
                 </td>
                 <td>
                     <span data-bind="lazyloader: { item: storageRouter, loadedObservable: 'loaded', undefinedLoading: false }">
                         <a data-part="lazy-entry"
                            data-bind="text: item().name,
-                                      attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: item().guid }) }"></a>
+                                      attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: item().guid }) }">
+                        </a>
                     </span>
                 </td>
                 <td><span data-bind="text: size"></span></td>
-                <td><span data-bind="text: storedData"></span></td>
-                <td><span data-bind="text: iops"></span></td>
-                <td><span data-bind="text: readSpeed"></span></td>
-                <td><span data-bind="text: writeSpeed"></span></td>
+                <td><span data-bind="text: liveStatus() === 'RUNNING' ? storedData : '-'"></span></td>
+                <td><span data-bind="text: liveStatus() === 'RUNNING' ? iops : '-'"></span></td>
+                <td><span data-bind="text: liveStatus() === 'RUNNING' ? readSpeed : '-'"></span></td>
+                <td><span data-bind="text: liveStatus() === 'RUNNING' ? writeSpeed : '-'"></span></td>
                 <td>
                     <div data-bind="status: {
                                         colors: {
@@ -69,7 +86,8 @@ but WITHOUT ANY WARRANTY of any kind.
                                         },
                                         defaultColor: 'lightgrey'
                                     }, tooltip: 'ovs:generic.states.dtl.' + dtlStatus()"
-                         style="width: 14px; height: 14px;"></div>
+                         style="width: 14px; height: 14px;">
+                    </div>
                 </td>
             </tr>
         </table>

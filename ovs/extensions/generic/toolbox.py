@@ -66,3 +66,26 @@ class Toolbox(object):
                     contents = '{0}-reboot'.format(contents)
                 client.file_write(filename=run_file, contents=contents)
                 client.file_chown(filenames=[run_file], user='ovs', group='ovs')
+
+    @staticmethod
+    def advanced_sort(element, separator):
+        """
+        Function which can be used to sort names
+        Eg: Sorting service_1, service_2, service_10
+            will result in service_1, service_2, service_10
+            io service_1, service_10, service_2
+        :param element: Element to sort
+        :type element: str
+        :param separator: Separator to split the element on
+        :type separator: str
+        :return: Element split on separator and digits converted to floats
+        :rtype: Tuple
+        """
+        entries = element.split(separator)
+        for index in xrange(len(entries)):
+            try:
+                entries[index] = float(entries[index])
+            except ValueError:
+                pass
+        return tuple(entries)
+

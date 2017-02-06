@@ -55,6 +55,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type storagerouterguid: str
         :param query: A query to be executed if required
         :type query: DataQuery
+        :return: List of vDisks matching the parameters specified
+        :rtype: list[ovs.dal.hybrids.vdisk.VDisk]
         """
         if vpoolguid is not None:
             vpool = VPool(vpoolguid)
@@ -79,6 +81,8 @@ class VDiskViewSet(viewsets.ViewSet):
         Load information about a given vDisk
         :param vdisk: Guid of the virtual disk to retrieve
         :type vdisk: VDisk
+        :return: The vDisk based on the guid provided
+        :rtype: ovs.dal.hybrids.vdisk.VDisk
         """
         return vdisk
 
@@ -94,9 +98,28 @@ class VDiskViewSet(viewsets.ViewSet):
         :type vdisk: VDisk
         :param timestamp: Timestamp of the snapshot to rollback to
         :type timestamp: int
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return VDiskController.rollback.delay(vdisk_guid=vdisk.guid,
                                               timestamp=str(timestamp))
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(VDisk)
+    def restart(self, vdisk, force=False):
+        """
+        Restart a vDisk
+        :param vdisk: Guid of the virtual disk
+        :type vdisk: ovs.dal.hybrids.vdisk.VDisk
+        :param force: Force a restart at a possible cost of data loss
+        :type force: bool
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
+        """
+        return VDiskController.restart.delay(vdisk_guid=vdisk.guid, force=force)
 
     @action()
     @required_roles(['read', 'write', 'manage'])
@@ -111,6 +134,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type new_config_params: dict
         :param version: Client version
         :type version: int
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         if version == 1 and 'dtl_target' in new_config_params:
             storage_router = StorageRouterList.get_by_ip(new_config_params['dtl_target'])
@@ -135,7 +160,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :param vdisk: Vdisk to get the children from
         :type vdisk: VDisk
         :return: Guids of the child vDisks
-        :rtype: list
+        :rtype: list[str]
         """
         return vdisk.child_vdisks_guids
 
@@ -148,6 +173,8 @@ class VDiskViewSet(viewsets.ViewSet):
         Retrieve the configuration parameters for the given disk from the storagedriver.
         :param vdisk: Guid of the virtual disk to retrieve its running configuration
         :type vdisk: VDisk
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return VDiskController.get_config_params.delay(vdisk_guid=vdisk.guid)
 
@@ -169,6 +196,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type snapshot_id: str
         :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
         :type pagecache_ratio: float
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return VDiskController.clone.delay(vdisk_guid=vdisk.guid,
                                            snapshot_id=snapshot_id,
@@ -181,16 +210,21 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
-    def move(self, vdisk, target_storagerouter_guid):
+    def move(self, vdisk, target_storagerouter_guid, force=False):
         """
         Moves a vDisk
         :param vdisk: Guid of the virtual disk to move
         :type vdisk: VDisk
         :param target_storagerouter_guid: Guid of the StorageRouter to move the vDisk to
         :type target_storagerouter_guid: str
+        :param force: Indicate whether to force the migration (forcing the migration might cause data loss)
+        :type force: bool
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return VDiskController.move.delay(vdisk_guid=vdisk.guid,
-                                          target_storagerouter_guid=target_storagerouter_guid)
+                                          target_storagerouter_guid=target_storagerouter_guid,
+                                          force=force)
 
     @action()
     @log()
@@ -204,6 +238,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type vdisk: VDisk
         :param snapshot_id: ID of the snapshot to remove
         :type snapshot_id: str
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return VDiskController.delete_snapshot.delay(vdisk_guid=vdisk.guid,
                                                      snapshot_id=snapshot_id)
@@ -218,6 +254,8 @@ class VDiskViewSet(viewsets.ViewSet):
         Sets a vDisk as template
         :param vdisk: Guid of the virtual disk to set as template
         :type vdisk: VDisk
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         if len(vdisk.child_vdisks) > 0:
             raise HttpNotAcceptableException(error_description='vDisk has clones',
@@ -242,6 +280,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type storagerouter_guid: str
         :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
         :type pagecache_ratio: float
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         storagerouter = StorageRouter(storagerouter_guid)
         for storagedriver in storagerouter.storagedrivers:
@@ -275,6 +315,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type automatic: bool
         :param sticky: Indicates whether the system should clean the snapshot automatically
         :type sticky: bool
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         if version >= 3:
             timestamp = str(int(time.time()))
@@ -302,6 +344,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type storagerouter_guid: str
         :param pagecache_ratio: Ratio (0 < x <= 1) of the pagecache size related to the size
         :type pagecache_ratio: float
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return VDiskController.create_from_template.delay(vdisk_guid=vdisk.guid,
                                                           name=name,
@@ -318,6 +362,8 @@ class VDiskViewSet(viewsets.ViewSet):
         Gets all possible target Storage Routers for a given vDisk (e.g. when cloning, creating from template or moving)
         :param vdisk: The vDisk to get the targets for
         :type vdisk: VDisk
+        :return: A list of StorageRouters on which the current vDisk is not attached, but the vDisk vPool is extended to
+        :rtype: list[ovs.dal.hybrids.storagerouter.StorageRouter]
         """
         return [] if vdisk.vpool is None else [sd.storagerouter for sd in vdisk.vpool.storagedrivers]
 
@@ -331,6 +377,8 @@ class VDiskViewSet(viewsets.ViewSet):
         Delete a given vDisk
         :param vdisk: The vDisk to delete
         :type vdisk: VDisk
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         if len(vdisk.child_vdisks) > 0:
             raise HttpNotAcceptableException(error_description='vDisk has clones',
@@ -347,6 +395,8 @@ class VDiskViewSet(viewsets.ViewSet):
         Deletes a vDisk (template)
         :param vdisk: the vDisk (template) to delete
         :type vdisk: VDisk
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         if not vdisk.is_vtemplate:
             raise HttpNotAcceptableException(error_description='vDisk should be a vTemplate',
@@ -366,6 +416,8 @@ class VDiskViewSet(viewsets.ViewSet):
         Schedule a backend sync on a vdisk
         :param vdisk: vdisk to schedule a backend sync to
         :type vdisk: VDisk
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return VDiskController.schedule_backend_sync.delay(vdisk_guid=vdisk.guid)
 
@@ -381,6 +433,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type vdisk: VDisk
         :param tlog_name: TLog name to verify
         :type tlog_name: str
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return VDiskController.is_volume_synced_up_to_tlog.delay(vdisk_guid=vdisk.guid, tlog_name=tlog_name)
 
@@ -396,6 +450,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type vdisk: VDisk
         :param snapshot_id: Snapshot to verify
         :type snapshot_id: str
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return VDiskController.is_volume_synced_up_to_snapshot.delay(vdisk_guid=vdisk.guid, snapshot_id=snapshot_id)
 
@@ -411,6 +467,8 @@ class VDiskViewSet(viewsets.ViewSet):
         :type vdisk: VDisk
         :param new_size: The new size of the vDisk (in bytes)
         :type new_size: int
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         new_size = int(new_size)
         return VDiskController.extend.delay(vdisk_guid=vdisk.guid,
@@ -424,6 +482,8 @@ class VDiskViewSet(viewsets.ViewSet):
     def get_scrub_storagerouters(self):
         """
         Loads a list of suitable StorageRouters for scrubbing the given vDisk
+        :return: A list of StorageRouters which have the SCRUB role
+        :rtype: list[ovs.dal.hybrids.storagerouter.StorageRouter]
         """
         storagerouters = []
         for storagerouter in StorageRouterList.get_storagerouters():
@@ -445,5 +505,7 @@ class VDiskViewSet(viewsets.ViewSet):
         :type vdisk: VDisk
         :param storagerouter_guid: The guid of the StorageRouter to scrub
         :type storagerouter_guid: str
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
         """
         return VDiskController.scrub_single_vdisk.delay(vdisk.guid, storagerouter_guid)

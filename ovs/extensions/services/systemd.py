@@ -41,7 +41,7 @@ class Systemd(object):
         return client.file_exists(file_to_check)
 
     @staticmethod
-    def _get_name(name, client, path=None):
+    def _get_name(name, client, path=None, log=True):
         """
         Make sure that for e.g. 'ovs-workers' the given service name can be either 'ovs-workers' as just 'workers'
         """
@@ -52,7 +52,8 @@ class Systemd(object):
         name = 'ovs-{0}'.format(name)
         if Systemd._service_exists(name, client, path):
             return name
-        Systemd._logger.info('Service {0} could not be found.'.format(name))
+        if log is True:
+            Systemd._logger.info('Service {0} could not be found.'.format(name))
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
@@ -269,7 +270,7 @@ class Systemd(object):
         :rtype: bool
         """
         try:
-            Systemd._get_name(name, client)
+            Systemd._get_name(name, client, log=False)
             return True
         except ValueError:
             return False
@@ -331,16 +332,6 @@ class Systemd(object):
         Monitor the local OVS services
         :return: None
         """
-        def _advanced_sort(name1, name2):
-            counter1 = name1.split('_')[-1]
-            counter2 = name2.split('_')[-1]
-            if counter1.isdigit() and counter2.isdigit():
-                name1 = '_'.join(name1.split('_')[:-1])
-                name2 = '_'.join(name2.split('_')[:-1])
-                if name1 == name2:
-                    return -1 if int(counter1) < int(counter2) else 1
-            return -1 if name1 < name2 else 1
-
         try:
             previous_output = None
             while True:
@@ -356,7 +347,8 @@ class Systemd(object):
 
                     service_name = service_name.replace('.service', '')
                     if service_state == 'active':
-                        running_services[service_name] = service_state
+                        service_pid = check_output('systemctl show {0} --property=MainPID'.format(service_name), shell=True).strip().split('=')[1]
+                        running_services[service_name] = (service_state, service_pid)
                     else:
                         non_running_services[service_name] = service_state
 
@@ -366,12 +358,12 @@ class Systemd(object):
                 # Put service states in list
                 output = ['OVS running processes',
                           '=====================\n']
-                for service_name in sorted(running_services, cmp=_advanced_sort):
-                    output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), running_services[service_name]))
+                for service_name in sorted(running_services, key=lambda service: Toolbox.advanced_sort(service, '_')):
+                    output.append('{0} {1} {2}  {3}'.format(service_name, ' ' * (longest_service_name - len(service_name)), running_services[service_name][0], running_services[service_name][1]))
 
                 output.extend(['\n\nOVS non-running processes',
                                '=========================\n'])
-                for service_name in sorted(non_running_services, cmp=_advanced_sort):
+                for service_name in sorted(non_running_services, key=lambda service: Toolbox.advanced_sort(service, '_')):
                     output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), non_running_services[service_name]))
 
                 # Print service states (only if changes)

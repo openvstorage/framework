@@ -20,6 +20,7 @@ MDSService module
 import math
 import time
 import random
+import datetime
 from ovs.celery_run import celery
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.j_mdsservice import MDSService
@@ -816,47 +817,49 @@ class MDSServiceController(object):
         MDSServiceController._logger.info('MDS checkup - Finished')
 
     @staticmethod
-    def print_current_mds_layout():
+    def monitor_mds_layout():
         """
         Prints the current MDS layout
         :return: None
         """
-        output = ['',
-                  'Open vStorage - MDS debug information',
-                  '=====================================',
-                  'timestamp: {0}'.format(time.time()),
-                  '']
-        for storagerouter in StorageRouterList.get_storagerouters():
-            output.append('+ {0} ({1})'.format(storagerouter.name, storagerouter.ip))
-            vpools = set(sd.vpool for sd in storagerouter.storagedrivers)
-            for vpool in vpools:
-                output.append('  + {0}'.format(vpool.name))
-                for mds_service in vpool.mds_services:
-                    if mds_service.service.storagerouter_guid == storagerouter.guid:
-                        masters, slaves = 0, 0
-                        for junction in mds_service.vdisks:
-                            if junction.is_master:
-                                masters += 1
-                            else:
-                                slaves += 1
-                        capacity = mds_service.capacity
-                        if capacity == -1:
-                            capacity = 'infinite'
-                        load, _ = MDSServiceController.get_mds_load(mds_service)
-                        if load == float('inf'):
-                            load = 'infinite'
-                        else:
-                            load = '{0}%'.format(round(load, 2))
-                        output.append('    + {0} - port {1} - {2} master(s), {3} slave(s) - capacity: {4}, load: {5}'.format(
-                            mds_service.number, mds_service.service.ports[0], masters, slaves, capacity, load
-                        ))
-        print '\n'.join(output)
+        try:
+            while True:
+                output = ['',
+                          'Open vStorage - MDS debug information',
+                          '=====================================',
+                          'timestamp: {0}'.format(datetime.datetime.now()),
+                          '']
+                vpools_deployed = False
+                for storagerouter in sorted(StorageRouterList.get_storagerouters(), key=lambda k: k.name):
+                    vpools = set(sd.vpool for sd in storagerouter.storagedrivers)
+                    if len(vpools) > 0:
+                        vpools_deployed = True
+                        output.append('+ {0} ({1})'.format(storagerouter.name, storagerouter.ip))
+                    for vpool in sorted(vpools, key=lambda k: k.name):
+                        output.append('  + {0}'.format(vpool.name))
+                        for mds_service in sorted(vpool.mds_services, key=lambda k: k.number):
+                            if mds_service.service.storagerouter_guid == storagerouter.guid:
+                                masters, slaves = 0, 0
+                                for junction in mds_service.vdisks:
+                                    if junction.is_master:
+                                        masters += 1
+                                    else:
+                                        slaves += 1
+                                capacity = mds_service.capacity
+                                if capacity == -1:
+                                    capacity = 'infinite'
+                                load, _ = MDSServiceController.get_mds_load(mds_service)
+                                if load == float('inf'):
+                                    load = 'infinite'
+                                else:
+                                    load = '{0}%'.format(round(load, 2))
+                                output.append('    + {0} - port {1} - {2} master(s), {3} slave(s) - capacity: {4}, load: {5}'.format(
+                                    mds_service.number, mds_service.service.ports[0], masters, slaves, capacity, load
+                                ))
+                if vpools_deployed is False:
+                    output.append('No vPools deployed')
+                print '\x1b[2J\x1b[H' + '\n'.join(output)
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
 
-if __name__ == '__main__':
-    try:
-        while True:
-            print '\x1b[2J\x1b[H'
-            MDSServiceController.print_current_mds_layout()
-            time.sleep(1)
-    except KeyboardInterrupt:
-        pass

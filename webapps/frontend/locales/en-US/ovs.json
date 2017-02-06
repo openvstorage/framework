@@ -91,7 +91,7 @@
             "unavailable": "The call is unavailable",
             "unavailable_call": "The call is unavailable in the relay"
         },
-        "areyousure": "Are you sure?",
+        "are_you_sure": "Are you sure?",
         "backend_type": "Type",
         "backendtypes": {
             "alba": "Open vStorage Backend"
@@ -182,6 +182,7 @@
         "partitionroles": {
             "backend": "Backend",
             "db": "DB",
+            "dtl": "DTL",
             "scrub": "Scrub",
             "write": "Write"
         },
@@ -248,6 +249,11 @@
                 "undefined": "Unknown",
                 "unknown": "Unknown",
                 "warning": "Warning"
+            },
+            "vdisk": {
+                "HALTED": "Halted",
+                "NON-RUNNING": "Warning",
+                "RUNNING": "Running"
             },
             "vpool": {
                 "DELETING": "Deleting",
@@ -355,7 +361,6 @@
         "snapshot": "&#xf030;",
         "storagerouter": "&#xf0c2;",
         "storagerouter_vpool_link": "&#xf07c;",
-        "sync": "&#xf021;",
         "unlink": "&#xf127;",
         "up": "&#xf106;",
         "vdisks": "&#xf0a0;",
@@ -584,6 +589,7 @@
             "is_clone": "vDisk is a clone",
             "move": "Move",
             "remove": "Remove",
+            "restart": "Restart",
             "rollback": "Rollback",
             "scrub": "Scrub",
             "set_as_template": "Set as vTemplate",
@@ -616,6 +622,14 @@
             "success": "Removed vTemplate",
             "success_msg": "vTemplate __what__ has been removed",
             "title_msg": "Are you sure you want to remove vTemplate __what__?"
+        },
+        "restart_vdisk": {
+            "failed_msg": "Restarting vDisk __what__ failed: __why__",
+            "started": "Restarting vDisk",
+            "started_msg": "vDisk __what__ is being restarted",
+            "success": "Restarted vDisk",
+            "success_msg": "vDisk __what__ has been restarted",
+            "title_msg": "Are you sure you want to restart vDisk __what__?"
         },
         "save_config": {
             "failed_msg": "Saving configuration for vDisk __what__ failed: __why__",
@@ -877,7 +891,7 @@
                 "filesystem": "Filesystem",
                 "mountpoint": "Mountpoint",
                 "offset": "Offset",
-                "role_info": "Update/select the required roles for the partition. Roles in use cannot be removed. Only one DB and one SCRUB role can be assigned to any of the partitions.",
+                "role_info": "Update/select the required roles for the partition. Roles in use cannot be removed. Only 1 DB, DTL and SCRUB role can be assigned to any of the partitions.",
                 "roles": "Roles",
                 "size": "Size"
             },

@@ -49,7 +49,7 @@ define([
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.vDiskTemplatesHandle[options.page])) {
                     options.sort = 'name';
-                    options.contents = '';
+                    options.contents = 'child_vdisks';
                     options.query = JSON.stringify(self.query);
                     self.vDiskTemplatesHandle[options.page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
@@ -71,7 +71,7 @@ define([
                 if (vd.guid() === guid && vd.childrenGuids().length === 0) {
                     app.showMessage(
                         $.t('ovs:vdisks.remove_vtemplate.title_msg', {what: vd.name()}),
-                        $.t('ovs:generic.areyousure'),
+                        $.t('ovs:generic.are_you_sure'),
                         [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                     )
                         .done(function(answer) {

@@ -35,6 +35,7 @@ define([
         self.storageRouterCache = {};
         self.vDiskCache         = {};
         self.vDiskHeaders       = [
+            { key: 'status',     value: '',                            width: 30        },
             { key: 'name',       value: $.t('ovs:generic.name'),       width: undefined },
             { key: 'size',       value: $.t('ovs:generic.size'),       width: 100       },
             { key: 'storedData', value: $.t('ovs:generic.storeddata'), width: 110       },
@@ -196,7 +197,7 @@ define([
                 self.updatingStorageRouters(true);
                 app.showMessage(
                     $.t('ovs:wizards.shrink_vpool.confirm.remove_' + (single === true ? 'single' : 'multi'), { what: sr.name() }),
-                    $.t('ovs:generic.areyousure'),
+                    $.t('ovs:generic.are_you_sure'),
                     [$.t('ovs:generic.yes'), $.t('ovs:generic.no')]
                 )
                     .done(function(answer) {

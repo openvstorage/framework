@@ -105,16 +105,3 @@ class FullSerializer(serializers.Serializer):
         """
         fields = ('guid',)
         read_only_fields = ('guid',)
-
-
-class PasswordSerializer(serializers.Serializer):
-    """
-    Serializes received passwords
-    """
-    new_password = serializers.CharField(required=True)
-
-    class Meta(object):
-        """
-        Metaclass
-        """
-        fields = ('new_password',)
