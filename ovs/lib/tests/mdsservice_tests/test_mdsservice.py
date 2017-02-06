@@ -1281,9 +1281,28 @@ class MDSServices(unittest.TestCase):
                                                                  '10.0.0.3:3: Slave (E)'])
 
         config = vdisk.info['metadata_backend_config']
-        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[0]['ip'], config[0]['port']))._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.MASTER)
-        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
-        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
+        mds_client = MDSClient(None, key='{0}:{1}'.format(config[0]['ip'], config[0]['port']))
+        self.assertEqual(mds_client._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.MASTER)
+        self.assertTrue(mds_client._has_namespace(vdisk.volume_id))
+        mds_client = MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))
+        self.assertEqual(mds_client._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
+        self.assertTrue(mds_client._has_namespace(vdisk.volume_id))
+        mds_client = MDSClient(None, key='{0}:{1}'.format(config[2]['ip'], config[2]['port']))
+        self.assertEqual(mds_client._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
+        self.assertTrue(mds_client._has_namespace(vdisk.volume_id))
+
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
+        MDSServiceController.ensure_safety(vdisk)
+
+        configs = [[{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 0, 1, 10, 10.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 0, 10, 10.0],
+                 ['10.0.0.3', 3, 0, 0, 10,  0.0]]
+        self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+        mds_client = MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))
+        self.assertTrue(mds_client._has_namespace(vdisk.volume_id))
+        mds_client = MDSClient(None, key='{0}:{1}'.format(config[2]['ip'], config[2]['port']))
+        self.assertFalse(mds_client._has_namespace(vdisk.volume_id))
 
     def test_mds_checkup(self):
         """
