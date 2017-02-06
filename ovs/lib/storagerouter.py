@@ -230,6 +230,10 @@ class StorageRouterController(object):
         if storagerouter is None:
             raise RuntimeError('Could not find Storage Router with given IP address {0}'.format(client.ip))
 
+        # Check RDMA capabilities
+        if sd_config_params['dtl_transport'] == StorageDriverClient.FRAMEWORK_DTL_TRANSPORT_RSOCKET and storagerouter.rdma_capable is False:
+            raise RuntimeError('The DTL transport is not supported by the StorageRouter')
+
         # Check duplicate vPool StorageDriver
         all_storagerouters = [storagerouter]
         if new_vpool is False:
