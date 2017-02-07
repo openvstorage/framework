@@ -46,9 +46,7 @@ define([
             generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             generic.trySet(self.vdiskGuids, data, 'vdisks_guids');
             generic.trySet(self.vpoolBackendInfo, data, 'vpool_backend_info');
-            if (data.hasOwnProperty('alba_proxies_guids')) {
-                self.albaProxyGuids(data.alba_proxies_guids);
-            }
+            generic.trySet(self.albaProxyGuids, data, 'alba_proxies_guids');
             if (data.hasOwnProperty('vpool_backend_info')) {
                 generic.trySet(self.backendInfo, data.vpool_backend_info, 'backend_info');
                 generic.trySet(self.connectionInfo, data.vpool_backend_info, 'connection_info');
