@@ -234,6 +234,7 @@ but WITHOUT ANY WARRANTY of any kind.
                                     <thead>
                                         <tr>
                                             <th><span data-i18n="ovs:generic.storagerouter"></span></th>
+                                            <th><span data-i18n="ovs:vpools.proxies_amount"></span></th>
                                             <th><span data-i18n="ovs:vpools.global_write_buffer"></span></th>
                                             <th><span data-i18n="ovs:vpools.caching"></span></th>
                                             <th><span data-i18n="ovs:vpools.accelerated_backend"></span></th>
@@ -248,22 +249,24 @@ but WITHOUT ANY WARRANTY of any kind.
                                                         <span data-bind="text: name" class="hand"></span></a>
                                                 </td>
                                                 <!-- ko if: $root.srSDMap()[guid()] === undefined -->
-                                                <td><span data-i18n="ovs:generic.null"></span></td>
-                                                <td><span data-i18n="ovs:generic.null"></span></td>
-                                                <td><span data-i18n="ovs:generic.null"></span></td>
-                                                <td style="height:37px;">
-                                                    <button type="button"
-                                                        class="btn btn-mini btn-default hand"
-                                                        data-bind="click: $root.addStorageRouter,
-                                                                   tooltip: 'ovs:vpools.detail.extend',
-                                                                   enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
-                                                                   attr: { id: 'button_add_' + guid()},
-                                                                   visible: $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
-                                                        <span class="fa hand" data-i18n="[html]ovs:icons.add"></span>
-                                                    </button>
-                                                </td>
+                                                    <td><span data-i18n="ovs:generic.null"></span></td>
+                                                    <td><span data-i18n="ovs:generic.null"></span></td>
+                                                    <td><span data-i18n="ovs:generic.null"></span></td>
+                                                    <td><span data-i18n="ovs:generic.null"></span></td>
+                                                    <td style="height:37px;">
+                                                        <button type="button"
+                                                            class="btn btn-mini btn-default hand"
+                                                            data-bind="click: $root.addStorageRouter,
+                                                                       tooltip: 'ovs:vpools.detail.extend',
+                                                                       enable: !$root.vPool().rdmaEnabled() || ($root.vPool().rdmaEnabled() && rdmaCapable),
+                                                                       attr: { id: 'button_add_' + guid()},
+                                                                       visible: $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
+                                                            <span class="fa hand" data-i18n="[html]ovs:icons.add"></span>
+                                                        </button>
+                                                    </td>
                                                 <!-- /ko -->
                                                 <!-- ko if: $root.srSDMap()[guid()] !== undefined -->
+                                                    <td><span data-bind="text: $root.srSDMap()[guid()].albaProxyGuids().length"></span></td>
                                                     <td><span data-bind="text: $root.srSDMap()[guid()].vpoolBackendInfo() === undefined ? '' : $root.formatBytes($root.srSDMap()[guid()].vpoolBackendInfo().global_write_buffer)"></span></td>
                                                     <td><span data-bind="translate: 'ovs:vpools.caching_types.' + $root.srSDMap()[guid()].caching()"></span></td>
                                                     <!-- ko if: $root.srSDMap()[guid()].backendInfo() === undefined || $root.srSDMap()[guid()].backendInfo() === null -->
@@ -286,26 +289,26 @@ but WITHOUT ANY WARRANTY of any kind.
                                                             </a>
                                                         </td>
                                                     <!-- /ko -->
-                                                <td style="height:37px;">
-                                                    <button type="button"
-                                                            class="btn btn-mini btn-default hand"
-                                                            data-bind="click: $root.refreshConfiguration,
-                                                                       tooltip: 'ovs:vpools.detail.refresh_config',
-                                                                       style: { color: $root.refreshList().contains(guid()) ? 'lightgrey' : '' },
-                                                                       attr: { id: 'button_refresh_' + guid()},
-                                                                       visible: $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
-                                                        <span class="fa hand" data-i18n="[html]ovs:icons.load"></span>
-                                                    </button>
-                                                    <button type="button"
-                                                            class="btn btn-mini btn-default hand"
-                                                            data-bind="click: $root.removeStorageRouter,
-                                                                       tooltip: ($root.srSDMap()[guid()].canBeDeleted() === true) ? 'ovs:vpools.detail.remove' : 'ovs:wizards.shrink_vpool.confirm.cannot_remove',
-                                                                       style: { color: ($root.srSDMap()[guid()].canBeDeleted() === false || $root.refreshList().length > 0) ? 'lightgrey' : '' },
-                                                                       attr: { id: 'button_remove_' + guid()},
-                                                                       visible: $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
-                                                        <span class="fa hand" data-i18n="[html]ovs:icons.delete"></span>
-                                                    </button>
-                                                </td>
+                                                    <td style="height:37px;">
+                                                        <button type="button"
+                                                                class="btn btn-mini btn-default hand"
+                                                                data-bind="click: $root.refreshConfiguration,
+                                                                           tooltip: 'ovs:vpools.detail.refresh_config',
+                                                                           style: { color: $root.refreshList().contains(guid()) ? 'lightgrey' : '' },
+                                                                           attr: { id: 'button_refresh_' + guid()},
+                                                                           visible: $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
+                                                            <span class="fa hand" data-i18n="[html]ovs:icons.load"></span>
+                                                        </button>
+                                                        <button type="button"
+                                                                class="btn btn-mini btn-default hand"
+                                                                data-bind="click: $root.removeStorageRouter,
+                                                                           tooltip: ($root.srSDMap()[guid()].canBeDeleted() === true) ? 'ovs:vpools.detail.remove' : 'ovs:wizards.shrink_vpool.confirm.cannot_remove',
+                                                                           style: { color: ($root.srSDMap()[guid()].canBeDeleted() === false || $root.refreshList().length > 0) ? 'lightgrey' : '' },
+                                                                           attr: { id: 'button_remove_' + guid()},
+                                                                           visible: $root.updatingStorageRouters() === false && $root.vPool().status() === 'RUNNING'">
+                                                            <span class="fa hand" data-i18n="[html]ovs:icons.delete"></span>
+                                                        </button>
+                                                    </td>
                                                 <!-- /ko -->
                                             </tr>
                                         <!-- /ko -->
