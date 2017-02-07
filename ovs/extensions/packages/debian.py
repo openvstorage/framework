@@ -120,12 +120,10 @@ class DebianPackage(object):
             return
 
         command = "aptdcon --hide-terminal --allow-unauthenticated --install '{0}'".format(package_name.replace(r"'", r"'\''"))
-        DebianPackage._logger.debug('{0}: Installing package {1}'.format(client.ip, package_name))
         try:
             output = client.run('yes | {0}'.format(command), allow_insecure=True)
             if 'ERROR' in output:
                 raise Exception('Installing package {0} failed. Command used: "{1}". Output returned: {2}'.format(package_name, command, output))
-            DebianPackage._logger.debug('{0}: Installed package {1}'.format(client.ip, package_name))
         except CalledProcessError as cpe:
             DebianPackage._logger.warning('{0}: Install failed, trying to reconfigure the packages: {1}'.format(client.ip, cpe.output))
             client.run(['aptdcon', '--fix-install', '--hide-terminal', '--allow-unauthenticated'])
