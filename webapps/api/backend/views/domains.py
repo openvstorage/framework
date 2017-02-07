@@ -24,6 +24,7 @@ from api.backend.decorators import load, log, required_roles, return_list, retur
 from api.backend.exceptions import HttpNotAcceptableException
 from api.backend.serializers.serializers import FullSerializer
 from ovs.dal.hybrids.domain import Domain
+from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.domainlist import DomainList
 
 
@@ -39,10 +40,24 @@ class DomainViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(Domain)
     @load()
-    def list(self):
+    def list(self, vdisk_guid=None):
         """
         Lists all available Domains
+        :param vdisk_guid: Optional vDisk GUID. If passed in, only domains suitable for this vDisk will be returned
+        :type vdisk_guid: str
         """
+        domains = set()
+        if vdisk_guid is not None:
+            vdisk = VDisk(vdisk_guid)
+            possible_storagerouter_guids = set(sd.storagerouter_guid for sd in vdisk.vpool.storagedrivers)
+            storagerouter_guid = vdisk.storagerouter_guid
+            for domain in DomainList.get_domains():
+                domain_sr_guids = domain.storage_router_layout['regular']
+                if storagerouter_guid in domain_sr_guids:
+                    domain_sr_guids.remove(storagerouter_guid)
+                if len(domain_sr_guids) > 0 and not set(domain_sr_guids).isdisjoint(possible_storagerouter_guids):
+                    domains.add(domain)
+            return list(domains)
         return DomainList.get_domains()
 
     @log()

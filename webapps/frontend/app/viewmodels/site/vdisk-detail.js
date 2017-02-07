@@ -101,7 +101,10 @@ define([
             return $.Deferred(function(deferred) {
                 var vdisk = self.vDisk();
                 if (vdisk !== undefined && generic.xhrCompleted(self.loadDomainHandle)) {
-                    self.loadDomainHandle = api.get('domains', { queryparams: { contents: 'storage_router_layout' }})
+                    self.loadDomainHandle = api.get('domains', { queryparams: {
+                        contents: 'storage_router_layout',
+                        vdisk_guid: vdisk.guid()
+                    }})
                         .done(function(data) {
                             var guids = [], ddata = {}, domainsPresent = false;
                             $.each(data.data, function(index, item) {
