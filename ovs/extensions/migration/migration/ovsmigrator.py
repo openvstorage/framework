@@ -26,7 +26,7 @@ class OVSMigrator(object):
     """
 
     identifier = 'ovs'  # Used by migrator.py, so don't remove
-    THIS_VERSION = 12
+    THIS_VERSION = 13
 
     def __init__(self):
         """ Init method """
@@ -115,5 +115,8 @@ class OVSMigrator(object):
             # Multiple Proxies
             if local_client.dir_exists(directory='/opt/OpenvStorage/config/storagedriver/storagedriver'):
                 local_client.dir_delete(directories=['/opt/OpenvStorage/config/storagedriver/storagedriver'])
+
+            # Invoke error for testing
+            1 / 0
 
         return OVSMigrator.THIS_VERSION
