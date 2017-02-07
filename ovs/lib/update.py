@@ -340,8 +340,8 @@ class UpdateController(object):
         :return: Boolean indicating whether to continue with the update or not
         :rtype: bool
         """
+        abort = False
         packages_updated = []
-        continue_after_failure = True
         for component in components:
             for pkg_name in UpdateController._packages_core.get(component, set()):
                 if pkg_name in package_info and pkg_name not in packages_updated:
@@ -354,8 +354,8 @@ class UpdateController(object):
                     except Exception as ex:
                         UpdateController._logger.debug('{0}: Updating package {1} failed. {2}'.format(client.ip, pkg_name, ex))
                         if pkg_name in UpdateController._packages_core_blocking:
-                            continue_after_failure = False
-        return continue_after_failure
+                            abort = True
+        return abort
 
     @staticmethod
     @add_hooks('update', 'post_update_multi')
@@ -541,10 +541,10 @@ class UpdateController(object):
         This is called upon by 'at'
         :return: None
         """
+        abort = False
         filemutex = file_mutex('system_update', wait=2)
         ssh_clients = []
         services_stop_start = set()
-        start_fwk_after_failure = True
         try:
             filemutex.acquire()
             UpdateController._logger.debug('+++ Starting update +++')
@@ -615,17 +615,17 @@ class UpdateController(object):
             if packages_to_update:
                 for client in ssh_clients:
                     for function in package_install_multi_hooks:
-                        start_fwk_after_failure &= function(client=client, package_info=packages_to_update, components=components)
+                        abort |= function(client=client, package_info=packages_to_update, components=components)
 
             # Install packages on all ALBA nodes
             if set(components).difference(set(UpdateController._packages_core.keys())):
                 for function in package_install_single_hooks:
                     try:
-                        start_fwk_after_failure &= function(package_info=None, components=components)
+                        abort |= function(package_info=None, components=components)
                     except Exception as ex:
                         UpdateController._logger.exception('Package installation hook {0} failed with error: {1}'.format(function.__name__, ex))
 
-            if start_fwk_after_failure is False:
+            if abort is True:
                 raise Exception('Installing the packages failed on 1 or more nodes')
 
             # Remove update file
@@ -651,7 +651,7 @@ class UpdateController(object):
                         if old_versions != new_versions:
                             UpdateController._logger.debug('{0}: Finished extensions code migration. Old versions: {1} --> New versions: {2}'.format(client.ip, old_versions, new_versions))
                     except Exception as ex:
-                        start_fwk_after_failure = False
+                        abort = True
                         failures.append('{0}: {1}'.format(client.ip, str(ex)))
                 if len(failures) > 0:
                     raise Exception('Failed to run the extensions migrate code on all nodes. Errors found:\n\n{0}'.format('\n\n'.join(failures)))
@@ -676,7 +676,7 @@ class UpdateController(object):
                     if old_versions != new_versions:
                         UpdateController._logger.debug('Finished DAL code migration. Old versions: {0} --> New versions: {1}'.format(old_versions, new_versions))
                 except Exception:
-                    start_fwk_after_failure = False
+                    abort = True
                     raise
 
             # Post update actions
@@ -707,7 +707,7 @@ class UpdateController(object):
             UpdateController._logger.debug('Another update is currently in progress!')
         except Exception as ex:
             UpdateController._logger.exception('Error during update: {0}'.format(ex))
-            if len(ssh_clients) > 0 and start_fwk_after_failure is True:
+            if len(ssh_clients) > 0 and abort is False:
                 UpdateController.change_services_state(services=services_stop_start,
                                                        ssh_clients=ssh_clients,
                                                        action='start')
