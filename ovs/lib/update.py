@@ -712,7 +712,7 @@ class UpdateController(object):
                                                        ssh_clients=ssh_clients,
                                                        action='start')
                 UpdateController._refresh_package_information()
-                UpdateController._logger.error('Failed to update. Please check all the logs for more information')
+            UpdateController._logger.error('Failed to update. Please check all the logs for more information')
         finally:
             filemutex.release()
             for ssh_client in ssh_clients:
