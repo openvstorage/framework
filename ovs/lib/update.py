@@ -51,17 +51,18 @@ class UpdateController(object):
     _update_file = '/etc/ready_for_upgrade'
     _update_ongoing_file = '/etc/update_ongoing'
 
-    framework_packages = {'arakoon', 'openvstorage'}
-    volumedriver_packages = {'alba', 'arakoon', 'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server'}
-    all_core_packages = framework_packages.union(volumedriver_packages)
-    core_packages_with_binaries = {'alba', 'arakoon', 'volumedriver-no-dedup-server'}
+    _packages_core = {'framework': {'arakoon', 'openvstorage'},
+                      'storagedriver': {'alba', 'arakoon', 'volumedriver-no-dedup-base', 'volumedriver-no-dedup-server'}}
+    _packages_core_blocking = _packages_core['framework'].difference(_packages_core['storagedriver'])
+
+    packages_core_all = _packages_core['framework'].union(_packages_core['storagedriver'])
 
     #########
     # HOOKS #
     #########
     @staticmethod
     @add_hooks('update', 'get_package_info_multi')
-    def get_package_information_core(client, package_info):
+    def _get_package_information_core(client, package_info):
         """
         Called by GenericController.refresh_package_information() every hour
 
@@ -86,11 +87,11 @@ class UpdateController(object):
             if client.username != 'root':
                 raise RuntimeError('Only the "root" user can retrieve the package information')
 
-            binaries = PackageManager.get_binary_versions(client=client, package_names=UpdateController.core_packages_with_binaries)
-            installed = PackageManager.get_installed_versions(client=client, package_names=UpdateController.all_core_packages)
-            candidate = PackageManager.get_candidate_versions(client=client, package_names=UpdateController.all_core_packages)
-            if set(installed.keys()) != set(UpdateController.all_core_packages) or set(candidate.keys()) != set(UpdateController.all_core_packages):
-                raise RuntimeError('Failed to retrieve the installed and candidate versions for packages: {0}'.format(', '.join(UpdateController.all_core_packages)))
+            binaries = PackageManager.get_binary_versions(client=client, package_names=UpdateController._packages_core['storagedriver'])
+            installed = PackageManager.get_installed_versions(client=client, package_names=UpdateController.packages_core_all)
+            candidate = PackageManager.get_candidate_versions(client=client, package_names=UpdateController.packages_core_all)
+            if set(installed.keys()) != set(UpdateController.packages_core_all) or set(candidate.keys()) != set(UpdateController.packages_core_all):
+                raise RuntimeError('Failed to retrieve the installed and candidate versions for packages: {0}'.format(', '.join(UpdateController.packages_core_all)))
 
             # Retrieve Arakoon information
             framework_arakoons = []
@@ -162,7 +163,7 @@ class UpdateController(object):
                             elif version:
                                 running_version = version
 
-                            if package_name not in UpdateController.all_core_packages:
+                            if package_name not in UpdateController.packages_core_all:
                                 raise ValueError('Unknown package dependency found in {0}'.format(version_file))
                             if package_name not in binaries:
                                 raise RuntimeError('Binary version for package {0} was not retrieved'.format(package_name))
@@ -279,7 +280,7 @@ class UpdateController(object):
 
                 # Retrieve the actual update information
                 for package_name, package_info in storagerouter.package_information[key].iteritems():
-                    if package_name not in UpdateController.all_core_packages:
+                    if package_name not in UpdateController.packages_core_all:
                         continue  # Only gather information for the core packages
 
                     information[key]['services_post_update'].update(package_info.pop('services_to_restart'))
@@ -327,7 +328,7 @@ class UpdateController(object):
 
     @staticmethod
     @add_hooks('update', 'package_install_multi')
-    def package_install_core(client, package_info, components):
+    def _package_install_core(client, package_info, components):
         """
         Update the core packages
         :param client: Client on which to execute update the packages
@@ -336,28 +337,29 @@ class UpdateController(object):
         :type package_info: dict
         :param components: Components which have been selected for update
         :type components: list
-        :return: None
+        :return: Boolean indicating whether to continue with the update or not
+        :rtype: bool
         """
-        if 'framework' not in components and 'storagedriver' not in components:
-            return
-
-        packages_to_install = {}
-        for pkg_name, pkg_info in package_info.iteritems():
-            if pkg_name in UpdateController.all_core_packages:
-                packages_to_install[pkg_name] = pkg_info
-        if not packages_to_install:
-            return
-
-        UpdateController._logger.debug('{0}: Executing hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
-        for pkg_name, pkg_info in packages_to_install.iteritems():
-            UpdateController._logger.debug('{0}: Updating core package {1} ({2} --> {3})'.format(client.ip, pkg_name, pkg_info['installed'], pkg_info['candidate']))
-            PackageManager.install(package_name=pkg_name, client=client)
-            UpdateController._logger.debug('{0}: Updated core package {1}'.format(client.ip, pkg_name))
-        UpdateController._logger.debug('{0}: Executed hook {1}'.format(client.ip, inspect.currentframe().f_code.co_name))
+        abort = False
+        packages_updated = []
+        for component in components:
+            for pkg_name in UpdateController._packages_core.get(component, set()):
+                if pkg_name in package_info and pkg_name not in packages_updated:
+                    pkg_info = package_info[pkg_name]
+                    try:
+                        UpdateController._logger.debug('{0}: Updating package {1} ({2} --> {3})'.format(client.ip, pkg_name, pkg_info['installed'], pkg_info['candidate']))
+                        PackageManager.install(package_name=pkg_name, client=client)
+                        packages_updated.append(pkg_name)
+                        UpdateController._logger.debug('{0}: Updated package {1}'.format(client.ip, pkg_name))
+                    except Exception as ex:
+                        UpdateController._logger.debug('{0}: Updating package {1} failed. {2}'.format(client.ip, pkg_name, ex))
+                        if pkg_name in UpdateController._packages_core_blocking:
+                            abort = True
+        return abort
 
     @staticmethod
     @add_hooks('update', 'post_update_multi')
-    def post_update_core(client, components):
+    def _post_update_core(client, components):
         """
         Execute functionality after the openvstorage core packages have been updated
         For framework:
@@ -386,7 +388,7 @@ class UpdateController(object):
             contents = local_client.file_read(filename='/opt/OpenvStorage/run/{0}'.format(version_file))
             for part in contents.split(';'):
                 packages.add(part.split('=')[0])
-            if packages.issubset(UpdateController.volumedriver_packages) and 'storagedriver' in components:
+            if packages.issubset(UpdateController._packages_core['storagedriver']) and 'storagedriver' in components:
                 service_name = version_file.replace('.remove', '').replace('.version', '')
                 UpdateController._logger.debug('{0}: Removing service {1}'.format(client.ip, service_name))
                 ServiceManager.stop_service(name=service_name, client=local_client)
@@ -539,6 +541,7 @@ class UpdateController(object):
         This is called upon by 'at'
         :return: None
         """
+        abort = False
         filemutex = file_mutex('system_update', wait=2)
         ssh_clients = []
         services_stop_start = set()
@@ -604,42 +607,36 @@ class UpdateController(object):
                                                       action='stop') is False:
                 raise Exception('Stopping all services on every node failed, cannot continue')
 
-            # Install packages
-            # First install packages on all StorageRouters individually
+            # Collect the functions to be executed before they get overwritten by updated packages, so on each the same functionality is executed
             package_install_multi_hooks = Toolbox.fetch_hooks('update', 'package_install_multi')
             package_install_single_hooks = Toolbox.fetch_hooks('update', 'package_install_single')
+
+            # Install each package on all StorageRouters
             if packages_to_update:
-                failures = False
                 for client in ssh_clients:
-                    UpdateController._logger.debug('{0}: Installing packages'.format(client.ip))
                     for function in package_install_multi_hooks:
-                        try:
-                            function(client=client, package_info=packages_to_update, components=components)
-                        except Exception as ex:
-                            UpdateController._logger.error('{0}: Package installation hook {1} failed with error: {2}'.format(client.ip, function.__name__, ex))
-                            failures = True
+                        abort |= function(client=client, package_info=packages_to_update, components=components)
 
-                if set(components).difference({'framework', 'storagedriver'}):
-                    # Second install packages on all ALBA nodes
-                    for function in package_install_single_hooks:
-                        try:
-                            function(package_info=packages_to_update, components=components)
-                        except Exception as ex:
-                            UpdateController._logger.exception('Package installation hook {0} failed with error: {1}'.format(function.__name__, ex))
-                            failures = True
+            # Install packages on all ALBA nodes
+            if set(components).difference(set(UpdateController._packages_core.keys())):
+                for function in package_install_single_hooks:
+                    try:
+                        abort |= function(package_info=None, components=components)
+                    except Exception as ex:
+                        UpdateController._logger.exception('Package installation hook {0} failed with error: {1}'.format(function.__name__, ex))
 
-                if failures is True:
-                    raise Exception('Installing the packages failed on 1 or more nodes')
+            if abort is True:
+                raise Exception('Installing the packages failed on 1 or more nodes')
 
             # Remove update file
             for client in ssh_clients:
                 client.file_delete(UpdateController._update_file)
 
-            # Migrate code
+            # Migrate extensions
             if 'framework' in components:
                 failures = []
                 for client in ssh_clients:
-                    UpdateController._logger.debug('{0}: Verifying extensions code migration is required'.format(client.ip))
+                    UpdateController._logger.debug('{0}: Starting extensions code migration'.format(client.ip))
                     try:
                         key = '/ovs/framework/hosts/{0}/versions'.format(System.get_my_machine_id(client=client))
                         old_versions = Configuration.get(key) if Configuration.exists(key) else {}
@@ -654,6 +651,7 @@ class UpdateController(object):
                         if old_versions != new_versions:
                             UpdateController._logger.debug('{0}: Finished extensions code migration. Old versions: {1} --> New versions: {2}'.format(client.ip, old_versions, new_versions))
                     except Exception as ex:
+                        abort = True
                         failures.append('{0}: {1}'.format(client.ip, str(ex)))
                 if len(failures) > 0:
                     raise Exception('Failed to run the extensions migrate code on all nodes. Errors found:\n\n{0}'.format('\n\n'.join(failures)))
@@ -665,18 +663,21 @@ class UpdateController(object):
                                                        ssh_clients=ssh_clients,
                                                        action='start')
 
-            # Migrate model
+            # Migrate DAL
             if 'framework' in components:
-                UpdateController._logger.debug('Verifying DAL code migration is required')
-                old_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
+                UpdateController._logger.debug('Starting DAL code migration')
+                try:
+                    old_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
+                    from ovs.dal.helpers import Migration
+                    with remote(ssh_clients[0].ip, [Migration]) as rem:
+                        rem.Migration.migrate()
 
-                from ovs.dal.helpers import Migration
-                with remote(ssh_clients[0].ip, [Migration]) as rem:
-                    rem.Migration.migrate()
-
-                new_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
-                if old_versions != new_versions:
-                    UpdateController._logger.debug('Finished DAL code migration. Old versions: {0} --> New versions: {1}'.format(old_versions, new_versions))
+                    new_versions = PersistentFactory.get_client().get('ovs_model_version') if PersistentFactory.get_client().exists('ovs_model_version') else {}
+                    if old_versions != new_versions:
+                        UpdateController._logger.debug('Finished DAL code migration. Old versions: {0} --> New versions: {1}'.format(old_versions, new_versions))
+                except Exception:
+                    abort = True
+                    raise
 
             # Post update actions
             for client in ssh_clients:
@@ -706,12 +707,12 @@ class UpdateController(object):
             UpdateController._logger.debug('Another update is currently in progress!')
         except Exception as ex:
             UpdateController._logger.exception('Error during update: {0}'.format(ex))
-            if len(ssh_clients) > 0:
+            if len(ssh_clients) > 0 and abort is False:
                 UpdateController.change_services_state(services=services_stop_start,
                                                        ssh_clients=ssh_clients,
                                                        action='start')
                 UpdateController._refresh_package_information()
-                UpdateController._logger.error('Failed to update. Please check all the logs for more information')
+            UpdateController._logger.error('Failed to update. Please check all the logs for more information')
         finally:
             filemutex.release()
             for ssh_client in ssh_clients:
