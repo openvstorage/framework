@@ -67,7 +67,7 @@ define([
                 self.vDisk().load()
                     .then(function() {
                         if (self.vDisk().isVTemplate()) {
-                            router.navigate(shared.routing.loadHash('vdisks'));
+                            router.navigateBack();
                             return deferred.reject();
                         }
                     })
@@ -91,7 +91,7 @@ define([
                     })
                     .fail(function(error) {
                         if (error !== undefined && error.status === 404) {
-                            router.navigate(shared.routing.loadHash('vdisks'));
+                            router.navigateBack();
                         }
                     })
                     .always(deferred.resolve);
@@ -326,7 +326,7 @@ define([
                                         $.t('ovs:vdisks.remove_vdisk.success'),
                                         $.t('ovs:vdisks.remove_vdisk.success_msg', {what: vd.name()})
                                     );
-                                    router.navigate(shared.routing.loadHash('vdisks'));
+                                    router.navigateBack();
                                 })
                                 .fail(function(error) {
                                     error = generic.extractErrorMessage(error);
