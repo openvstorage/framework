@@ -28,9 +28,7 @@ from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.threadhelpers import Waiter
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.storageserver.tests.mockups import LockedClient, StorageRouterClient
+from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
@@ -40,44 +38,17 @@ class Generic(unittest.TestCase):
     """
     This test class will validate the various scenarios of the Generic logic
     """
-    @classmethod
-    def setUpClass(cls):
-        """
-        Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
-        This makes sure the unittests can be executed without those libraries installed
-        """
-        cls.persistent = PersistentFactory.get_client()
-        cls.persistent.clean()
-        cls.volatile = VolatileFactory.get_client()
-        cls.volatile.clean()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Tear down changes made during setUpClass
-        """
-        # Configuration._unittest_data = {}
-        cls.persistent = PersistentFactory.get_client()
-        cls.persistent.clean()
-        cls.volatile = VolatileFactory.get_client()
-        cls.volatile.clean()
-
     def setUp(self):
         """
         (Re)Sets the stores on every test
         """
-        self.persistent.clean()
-        self.volatile.clean()
-        Helper.clean()
-        StorageRouterClient.clean()
+        self.volatile, self.persistent = Helper.setup()
 
     def tearDown(self):
         """
         Clean up test suite
         """
-        self.persistent.clean()
-        self.volatile.clean()
-        StorageRouterClient.clean()
+        Helper.teardown()
 
     def test_snapshot_all_vdisks(self):
         """
@@ -221,7 +192,6 @@ class Generic(unittest.TestCase):
                                                               'is_consistent': len(consistent_hours) > 0})
             self.persistent.clean()
             self.volatile.clean()
-            StorageRouterClient.clean()
 
     def test_happypath(self):
         """
@@ -536,47 +506,47 @@ class Generic(unittest.TestCase):
                              second=3,
                              msg='Unexpected amount of threads left for vPool {0}'.format(vpool.name))
 
-    # def arakoon_collapse_test(self):
-    #     """
-    #     Test the Arakoon collapse functionality
-    #     """
-    #     structure = Helper.build_service_structure(structure={'storagerouters': [1, 2]})
-    #     storagerouter_1 = structure['storagerouters'][1]
-    #     storagerouter_2 = structure['storagerouters'][2]
-    #     System._machine_id = {storagerouter_1.ip: '1',
-    #                           storagerouter_2.ip: '2'}
-    #
-    #     # Create new cluster
-    #     for sr in [storagerouter_1, storagerouter_2]:
-    #         Configuration.set('/ovs/framework/hosts/{0}/ports'.format(sr.machine_id), {'arakoon': [int(sr.machine_id) * 10000, int(sr.machine_id) * 10000 + 100]})
-    #
-    #     clusters_to_create = {ServiceType.ARAKOON_CLUSTER_TYPES.SD: ['voldrv'],
-    #                           ServiceType.ARAKOON_CLUSTER_TYPES.CFG: ['cacc'],
-    #                           ServiceType.ARAKOON_CLUSTER_TYPES.FWK: ['ovsdb'],
-    #                           ServiceType.ARAKOON_CLUSTER_TYPES.ABM: ['abm-1', 'abm-2'],
-    #                           ServiceType.ARAKOON_CLUSTER_TYPES.NSM: ['nsm-1_0', 'nsm-1_1', 'nsm-2_0']}
-    #     # Make sure we cover all Arakoon cluster types
-    #     self.assertEqual(first=sorted(clusters_to_create.keys()),
-    #                      second=sorted(ServiceType.ARAKOON_CLUSTER_TYPES.keys()),
-    #                      msg='An Arakoon cluster type has been removed or added')
-    #
-    #     for cluster_type, cluster_names in clusters_to_create.iteritems():
-    #         filesystem = cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG
-    #         for cluster_name in cluster_names:
-    #             base_dir = Helper.CLUSTER_DIR.format(cluster_name)
-    #             info = ArakoonInstaller.create_cluster(cluster_name=cluster_name,
-    #                                                    cluster_type=cluster_type,
-    #                                                    ip=storagerouter_1.ip,
-    #                                                    base_dir=base_dir)
-    #             ArakoonInstaller.claim_cluster(cluster_name=cluster_name,
-    #                                            master_ip=storagerouter_1.ip,
-    #                                            filesystem=filesystem,
-    #                                            metadata=info['metadata'])
-    #             ArakoonInstaller.extend_cluster(master_ip=storagerouter_1.ip,
-    #                                             new_ip=storagerouter_2.ip,
-    #                                             cluster_name=cluster_name,
-    #                                             base_dir=base_dir,
-    #                                             filesystem=filesystem)
+    def arakoon_collapse_test(self):
+        """
+        Test the Arakoon collapse functionality
+        """
+        structure = Helper.build_service_structure(structure={'storagerouters': [1, 2]})
+        storagerouter_1 = structure['storagerouters'][1]
+        storagerouter_2 = structure['storagerouters'][2]
+        System._machine_id = {storagerouter_1.ip: '1',
+                              storagerouter_2.ip: '2'}
+
+        # Create new cluster
+        for sr in [storagerouter_1, storagerouter_2]:
+            Configuration.set('/ovs/framework/hosts/{0}/ports'.format(sr.machine_id), {'arakoon': [int(sr.machine_id) * 10000, int(sr.machine_id) * 10000 + 100]})
+
+        clusters_to_create = {ServiceType.ARAKOON_CLUSTER_TYPES.SD: ['voldrv'],
+                              ServiceType.ARAKOON_CLUSTER_TYPES.CFG: ['cacc'],
+                              ServiceType.ARAKOON_CLUSTER_TYPES.FWK: ['ovsdb'],
+                              ServiceType.ARAKOON_CLUSTER_TYPES.ABM: ['abm-1', 'abm-2'],
+                              ServiceType.ARAKOON_CLUSTER_TYPES.NSM: ['nsm-1_0', 'nsm-1_1', 'nsm-2_0']}
+        # Make sure we cover all Arakoon cluster types
+        self.assertEqual(first=sorted(clusters_to_create.keys()),
+                         second=sorted(ServiceType.ARAKOON_CLUSTER_TYPES.keys()),
+                         msg='An Arakoon cluster type has been removed or added')
+
+        for cluster_type, cluster_names in clusters_to_create.iteritems():
+            filesystem = cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG
+            for cluster_name in cluster_names:
+                base_dir = Helper.CLUSTER_DIR.format(cluster_name)
+                info = ArakoonInstaller.create_cluster(cluster_name=cluster_name,
+                                                       cluster_type=cluster_type,
+                                                       ip=storagerouter_1.ip,
+                                                       base_dir=base_dir)
+                ArakoonInstaller.claim_cluster(cluster_name=cluster_name,
+                                               master_ip=storagerouter_1.ip,
+                                               filesystem=filesystem,
+                                               metadata=info['metadata'])
+                ArakoonInstaller.extend_cluster(master_ip=storagerouter_1.ip,
+                                                new_ip=storagerouter_2.ip,
+                                                cluster_name=cluster_name,
+                                                base_dir=base_dir,
+                                                filesystem=filesystem)
 
     ##################
     # HELPER METHODS #

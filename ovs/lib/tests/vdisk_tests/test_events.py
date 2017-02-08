@@ -22,8 +22,6 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import MDSMetaDataBackendConfig, MDSNodeConfig
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.tests.helpers import Helper
@@ -34,39 +32,20 @@ class VDiskEventsTest(unittest.TestCase):
     """
     This test class will validate various vDisk events functionality
     """
-    @classmethod
-    def setUpClass(cls):
-        """
-        Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
-        This makes sure the unittests can be executed without those libraries installed
-        """
-        cls.persistent = PersistentFactory.get_client()
-        cls.persistent.clean()
-        cls.volatile = VolatileFactory.get_client()
-        cls.volatile.clean()
-        StorageRouterClient.clean()
-
-        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
-        Configuration.set('/ovs/framework/storagedriver|mds_maxload', 75)
-        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
-
     def setUp(self):
         """
         (Re)Sets the stores on every test
         """
-        # Cleaning storage
-        self.volatile.clean()
-        self.persistent.clean()
-        StorageRouterClient.clean()
+        Helper.setup()
+        Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
+        Configuration.set('/ovs/framework/storagedriver|mds_maxload', 75)
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
 
     def tearDown(self):
         """
         Clean up the unittest
         """
-        # Cleaning storage
-        self.volatile.clean()
-        self.persistent.clean()
-        StorageRouterClient.clean()
+        Helper.teardown()
 
     def test_reusing_devicename(self):
         """
@@ -82,6 +61,7 @@ class VDiskEventsTest(unittest.TestCase):
         vpool = structure['vpools'][1]
         storagedriver = structure['storagedrivers'][1]
         mds_service = structure['mds_services'][1]
+        # noinspection PyArgumentList
         backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                                                  port=mds_service.service.ports[0])])
         devicename = '/test.raw'
@@ -169,6 +149,7 @@ class VDiskEventsTest(unittest.TestCase):
         vpool = structure['vpools'][1]
         storagedriver = structure['storagedrivers'][1]
         mds_service = structure['mds_services'][1]
+        # noinspection PyArgumentList
         backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                                                  port=mds_service.service.ports[0])])
         srclient = StorageRouterClient(vpool.guid, None)

@@ -25,7 +25,7 @@ import unittest
 
 class APIConfiguration(unittest.TestCase):
     """
-    This test suite will validate whether all API's are properly decorated
+    This test suite will validate whether all APIs are properly decorated
     """
 
     def test_return(self):

@@ -15,13 +15,13 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-Upstart Mock module
+Systemd Mock module
 """
 
 
-class Upstart(object):
+class Systemd(object):
     """
-    Contains all logic related to Upstart Mock services
+    Contains all logic related to Systemd Mock services
     """
     services = {}
 
@@ -30,7 +30,7 @@ class Upstart(object):
         """
         Clean up mocked Class
         """
-        Upstart.services = {}
+        Systemd.services = {}
 
     @staticmethod
     def add_service(name, client, params=None, target_name=None, startup_dependency=None, delay_registration=False):
@@ -40,7 +40,7 @@ class Upstart(object):
         _ = params, startup_dependency, delay_registration
         key = 'None' if client is None else client.ip
         name = name if target_name is None else target_name
-        Upstart.services[key] = {name: 'HALTED'}
+        Systemd.services[key] = {name: 'HALTED'}
 
     @staticmethod
     def get_service_status(name, client):
@@ -48,8 +48,8 @@ class Upstart(object):
         Retrieve the mocked service status
         """
         key = 'None' if client is None else client.ip
-        output = 'active' if name in Upstart.services[key] else 'inactive'
-        status = Upstart.services[key].get(name, 'HALTED') == 'RUNNING'
+        output = 'active' if name in Systemd.services[key] else 'inactive'
+        status = Systemd.services[key].get(name, 'HALTED') == 'RUNNING'
         return status, output
 
     @staticmethod
@@ -58,8 +58,8 @@ class Upstart(object):
         Remove a mocked service
         """
         key = 'None' if client is None else client.ip
-        if name in Upstart.services[key]:
-            Upstart.services[key].pop(name)
+        if name in Systemd.services[key]:
+            Systemd.services[key].pop(name)
 
     @staticmethod
     def start_service(name, client):
@@ -67,10 +67,10 @@ class Upstart(object):
         Start a mocked service
         """
         key = 'None' if client is None else client.ip
-        if name not in Upstart.services[key]:
+        if name not in Systemd.services[key]:
             raise RuntimeError('Service {0} does not exist'.format(name))
-        Upstart.services[key][name] = 'RUNNING'
-        status, output = Upstart.get_service_status(name, client)
+        Systemd.services[key][name] = 'RUNNING'
+        status, output = Systemd.get_service_status(name, client)
         if status is True:
             return output
         raise RuntimeError('Start {0} failed. {1}'.format(name, output))
@@ -81,10 +81,10 @@ class Upstart(object):
         Stop a mocked service
         """
         key = 'None' if client is None else client.ip
-        if name not in Upstart.services[key]:
+        if name not in Systemd.services[key]:
             raise RuntimeError('Service {0} does not exist'.format(name))
-        Upstart.services[key][name] = 'HALTED'
-        status, output = Upstart.get_service_status(name, client)
+        Systemd.services[key][name] = 'HALTED'
+        status, output = Systemd.get_service_status(name, client)
         if status is False:
             return output
         raise RuntimeError('Stop {0} failed. {1}'.format(name, output))
@@ -94,8 +94,8 @@ class Upstart(object):
         """
         Restart a mocked service
         """
-        Upstart.stop_service(name, client)
-        return Upstart.start_service(name, client)
+        Systemd.stop_service(name, client)
+        return Systemd.start_service(name, client)
 
     @staticmethod
     def has_service(name, client):
@@ -103,7 +103,7 @@ class Upstart(object):
         Verify whether a mocked service exists
         """
         key = 'None' if client is None else client.ip
-        return name in Upstart.services.get(key, {})
+        return name in Systemd.services.get(key, {})
 
     @staticmethod
     def register_service(node_name, service_metadata):
@@ -126,7 +126,7 @@ class Upstart(object):
         """
         _ = path
         key = 'None' if client is None else client.ip
-        return name in Upstart.services[key]
+        return name in Systemd.services[key]
 
     @staticmethod
     def _get_name(name, client, path=None):
