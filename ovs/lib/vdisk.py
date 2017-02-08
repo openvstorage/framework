@@ -1287,6 +1287,51 @@ class VDiskController(object):
         vdisk.invalidate_dynamics(['info', 'dtl_status'])
 
     @staticmethod
+    @celery.task(name='ovs.vdisk.sync_with_reality')
+    def sync_with_reality(vpool_guid=None):
+        """
+        Syncs vDisks in the model with reality
+        :param vpool_guid: Optional vPool guid. All vPools if omitted
+        :type vpool_guid: str or None
+        :return: None
+        :rtype: NoneType
+        """
+        if vpool_guid is None:
+            vpools = VPoolList.get_vpools()
+        else:
+            vpools = [VPool(vpool_guid)]
+        for vpool in vpools:
+            vdisks = dict((str(vdisk.volume_id), vdisk) for vdisk in vpool.vdisks)
+            for entry in vpool.objectregistry_client.get_all_registrations():
+                volume_id = entry.object_id()
+                if volume_id not in vdisks:
+                    with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+                        new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+                        if new_vdisk is None:
+                            VDiskController._logger.info('Adding missing vDisk in the model for {0}'.format(volume_id))
+                            devicename = '/{0}.raw'.format(volume_id)  # TODO: Replace with actual devicename once available
+                            name = volume_id  # VDiskController.extract_volumename(devicename)
+                            new_vdisk = VDisk()
+                            new_vdisk.volume_id = volume_id
+                            new_vdisk.vpool = vpool
+                            new_vdisk.name = name
+                            new_vdisk.description = name
+                            new_vdisk.devicename = devicename
+                            new_vdisk.size = new_vdisk.info['volume_size']
+                            new_vdisk.metadata = {'lba_size': new_vdisk.info['lba_size'],
+                                                  'cluster_multiplier': new_vdisk.info['cluster_multiplier']}
+                            new_vdisk.pagecache_ratio = 1.0
+                            new_vdisk.save()
+                            VDiskController.vdisk_checkup(new_vdisk)
+                else:
+                    del vdisks[volume_id]
+            for volume_id, vdisk in vdisks.iteritems():
+                with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+                    if vpool.objectregistry_client.find(str(volume_id)) is None:
+                        VDiskController._logger.info('Removing obsolete vDisk {0} from model'.format(vdisk.guid))
+                        VDiskController.clean_vdisk_from_model(vdisk)
+
+    @staticmethod
     def _wait_for_snapshot_to_be_synced_to_backend(vdisk_guid, snapshot_id):
         tries = 25  # 5 minutes
         while VDiskController.is_volume_synced_up_to_snapshot(vdisk_guid=vdisk_guid, snapshot_id=snapshot_id) is False and tries > 0:

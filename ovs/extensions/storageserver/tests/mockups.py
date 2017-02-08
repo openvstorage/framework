@@ -205,7 +205,8 @@ class StorageRouterClient(object):
                                  'halted': False,
                                  'metadata_backend_config': property(lambda s: None),
                                  'object_type': property(lambda s: 'BASE'),
-                                 'vrouter_id': property(lambda s: None)})()
+                                 'vrouter_id': property(lambda s: None),
+                                 'volume_size': 0})()
 
     def get_dtl_config(self, volume_id, req_timeout_secs=None):
         """
@@ -265,12 +266,14 @@ class StorageRouterClient(object):
         Info volume mockup
         """
         _ = req_timeout_secs
+        volume_size = StorageRouterClient.volumes[self.vpool_guid].get(volume_id, {}).get('volume_size', 0)
         return type('Info', (), {'cluster_multiplier': property(lambda s: 8),
                                  'lba_size': property(lambda s: 512),
                                  'halted': property(lambda s: False),
                                  'metadata_backend_config': property(lambda s: StorageRouterClient._metadata_backend_config[self.vpool_guid].get(volume_id)),
                                  'object_type': property(lambda s: StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')),
-                                 'vrouter_id': property(lambda s: StorageRouterClient.vrouter_id[self.vpool_guid].get(volume_id))})()
+                                 'vrouter_id': property(lambda s: StorageRouterClient.vrouter_id[self.vpool_guid].get(volume_id)),
+                                 'volume_size': property(lambda s: volume_size)})()
 
     def is_volume_synced_up_to_snapshot(self, volume_id, snapshot_id, req_timeout_secs=None):
         """

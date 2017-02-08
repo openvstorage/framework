@@ -18,6 +18,9 @@
 Test module for vDisk events functionality
 """
 import unittest
+from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.dal.hybrids.vdisk import VDisk
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -152,3 +155,65 @@ class VDiskEventsTest(unittest.TestCase):
         VDiskController.delete_from_voldrv(second_volume_id)
         self.assertEqual(len(srclient.list_volumes()), 0)
         self.assertEqual(len(vpool.vdisks), 0)
+
+    def test_sync(self):
+        """
+        Validates whether the sync works as expected
+        """
+        structure = Helper.build_service_structure(
+            {'vpools': [1],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1)]}  # (<id>, <storagedriver_id>)
+        )
+        vpool = structure['vpools'][1]
+        storagedriver = structure['storagedrivers'][1]
+        mds_service = structure['mds_services'][1]
+        backend_config = MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
+                                                                 port=mds_service.service.ports[0])])
+        srclient = StorageRouterClient(vpool.guid, None)
+
+        VDiskController.create_new('one', 1024 ** 3, storagedriver.guid)
+        VDiskController.create_new('two', 1024 ** 3, storagedriver.guid)
+
+        vdisks = VDiskList.get_vdisks()
+        self.assertEqual(len(vdisks), 2)
+        self.assertEqual(len(srclient.list_volumes()), 2)
+
+        VDiskController.sync_with_reality()
+        vdisks = VDiskList.get_vdisks()
+        self.assertEqual(len(vdisks), 2)
+        self.assertEqual(len(srclient.list_volumes()), 2)
+
+        volume_id = srclient.create_volume('three.raw', backend_config, 1024 ** 3, storagedriver.storagedriver_id)
+
+        vdisks = VDiskList.get_vdisks()
+        self.assertEqual(len(vdisks), 2)
+        self.assertEqual(len(srclient.list_volumes()), 3)
+
+        VDiskController.sync_with_reality()
+        vdisks = VDiskList.get_vdisks()
+        self.assertEqual(len(vdisks), 3)
+        self.assertEqual(len(srclient.list_volumes()), 3)
+
+        vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+        self.assertEqual(vdisk.devicename, '/{0}.raw'.format(volume_id))
+
+        vdisk = VDisk()
+        vdisk.volume_id = 'foo'
+        vdisk.name = 'foo'
+        vdisk.devicename = 'foo.raw'
+        vdisk.size = 1024 ** 3
+        vdisk.vpool = vpool
+        vdisk.save()
+        vdisks = VDiskList.get_vdisks()
+        self.assertEqual(len(vdisks), 4)
+        self.assertEqual(len(srclient.list_volumes()), 3)
+
+        VDiskController.sync_with_reality()
+        vdisks = VDiskList.get_vdisks()
+        self.assertEqual(len(vdisks), 3)
+        self.assertEqual(len(srclient.list_volumes()), 3)
+
+        with self.assertRaises(ObjectNotFoundException):
+            vdisk.save()
