@@ -1302,10 +1302,8 @@ class VDiskController(object):
             vpools = [VPool(vpool_guid)]
         for vpool in vpools:
             vdisks = dict((str(vdisk.volume_id), vdisk) for vdisk in vpool.vdisks)
-            volume_ids = []
             for entry in vpool.objectregistry_client.get_all_registrations():
                 volume_id = entry.object_id()
-                volume_ids.append(volume_id)
                 if volume_id not in vdisks:
                     with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
                         new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
@@ -1325,9 +1323,10 @@ class VDiskController(object):
                             new_vdisk.pagecache_ratio = 1.0
                             new_vdisk.save()
                             VDiskController.vdisk_checkup(new_vdisk)
-            for volume_id in [volume_id for volume_id in vdisks.keys() if volume_id not in volume_ids]:
+                else:
+                    del vdisks[volume_id]
+            for volume_id, vdisk in vdisks.iteritems():
                 with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
-                    vdisk = vdisks[volume_id]
                     if vpool.objectregistry_client.find(str(volume_id)) is None:
                         VDiskController._logger.info('Removing obsolete vDisk {0} from model'.format(vdisk.guid))
                         VDiskController.clean_vdisk_from_model(vdisk)
