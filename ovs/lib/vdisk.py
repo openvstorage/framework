@@ -361,12 +361,13 @@ class VDiskController(object):
         """
         if not isinstance(metadata, dict):
             raise ValueError('Expected metadata as dict, got {0} instead'.format(type(metadata)))
+        consistent = metadata.get('is_consistent', False)
         metadata = pickle.dumps(metadata)
         results = {}
         for guid in vdisk_guids:
             try:
                 vdisk = VDisk(guid)
-                VDiskController._logger.info('Create snapshot for vDisk {0}'.format(vdisk.name))
+                VDiskController._logger.info('Create {0} snapshot for vDisk {1}'.format('consistent' if consistent is True else 'inconsistent', vdisk.name))
                 snapshot_id = str(uuid.uuid4())
                 vdisk.invalidate_dynamics(['snapshots'])
                 if len(vdisk.snapshots) > 0:

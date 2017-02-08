@@ -80,6 +80,7 @@ class GenericController(object):
                 GenericController._logger.exception('Error taking snapshot for vDisk {0}'.format(vdisk.guid))
                 fail.append(vdisk.guid)
         GenericController._logger.info('[SSA] Snapshot has been taken for {0} vDisks, {1} failed.'.format(len(success), len(fail)))
+        return success, fail
 
     @staticmethod
     @celery.task(name='ovs.generic.delete_snapshots', schedule=Schedule(minute='1', hour='2'))
@@ -224,6 +225,9 @@ class GenericController(object):
             except UnableToConnectException:
                 GenericController._logger.warning('Scrubber - Storage Router {0:<15} is not reachable'.format(storage_router.ip))
 
+        if len(scrub_locations) == 0:
+            raise ValueError('No scrub locations found, cannot scrub')
+
         number_of_vpools = len(vpools)
         if number_of_vpools >= 6:
             max_threads_per_vpool = 1
@@ -245,6 +249,7 @@ class GenericController(object):
             vpool_queue = Queue()
             for vd in vp.vdisks:
                 if vd.is_vtemplate is True:
+                    GenericController._logger.info('Scrubber - vPool {0} - vDisk {1} {2} - Is a template, not scrubbing'.format(vp.name, vd.guid, vd.name))
                     continue
                 vd.invalidate_dynamics('storagedriver_id')
                 if not vd.storagedriver_id:
