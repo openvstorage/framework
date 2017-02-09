@@ -340,7 +340,7 @@ class MDSServices(unittest.TestCase):
         )
         vpools = structure['vpools']
         mds_services = structure['mds_services']
-        service_type = structure['service_type']
+        service_type = structure['service_types']['MetadataServer']
         storagedrivers = structure['storagedrivers']
         storagerouters = structure['storagerouters']
 
@@ -822,7 +822,7 @@ class MDSServices(unittest.TestCase):
         )
         vpools = structure['vpools']
         mds_services = structure['mds_services']
-        service_type = structure['service_type']
+        service_type = structure['service_types']['MetadataServer']
         storagedrivers = structure['storagedrivers']
         storagerouters = structure['storagerouters']
 

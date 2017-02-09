@@ -24,14 +24,17 @@ import datetime
 import unittest
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.servicetype import ServiceType
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
+from ovs.dal.lists.servicetypelist import ServiceTypeList
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.threadhelpers import Waiter
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
 from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
+from ovs.log.log_handler import LogHandler
 
 
 class Generic(unittest.TestCase):
@@ -265,9 +268,6 @@ class Generic(unittest.TestCase):
         * Scenario 4: 3 vPools, 9 vDisks, 5 scrub roles
                       Validate 6 threads will be spawned and used out of a potential of 15 (5 scrub roles * 3 vPools)
                       We limit max amount of threads spawned per vPool to 2 in case 3 to 5 vPools are present
-        * Scenario 5: Smaller use-cases
-                      1 vPool, 0 vDisks
-                      1 vPool, 1 vDisk which is vTemplate
         """
         for i in xrange(1, 6):
             Configuration.set('/ovs/framework/hosts/{0}/ports'.format(i), {'storagedriver': [10000, 10100]})
@@ -510,43 +510,133 @@ class Generic(unittest.TestCase):
         """
         Test the Arakoon collapse functionality
         """
+        # Set up the test
         structure = Helper.build_service_structure(structure={'storagerouters': [1, 2]})
         storagerouter_1 = structure['storagerouters'][1]
         storagerouter_2 = structure['storagerouters'][2]
         System._machine_id = {storagerouter_1.ip: '1',
                               storagerouter_2.ip: '2'}
-
-        # Create new cluster
         for sr in [storagerouter_1, storagerouter_2]:
             Configuration.set('/ovs/framework/hosts/{0}/ports'.format(sr.machine_id), {'arakoon': [int(sr.machine_id) * 10000, int(sr.machine_id) * 10000 + 100]})
 
-        clusters_to_create = {ServiceType.ARAKOON_CLUSTER_TYPES.SD: ['voldrv'],
-                              ServiceType.ARAKOON_CLUSTER_TYPES.CFG: ['cacc'],
-                              ServiceType.ARAKOON_CLUSTER_TYPES.FWK: ['ovsdb'],
-                              ServiceType.ARAKOON_CLUSTER_TYPES.ABM: ['abm-1', 'abm-2'],
-                              ServiceType.ARAKOON_CLUSTER_TYPES.NSM: ['nsm-1_0', 'nsm-1_1', 'nsm-2_0']}
         # Make sure we cover all Arakoon cluster types
+        clusters_to_create = {ServiceType.ARAKOON_CLUSTER_TYPES.SD: [{'name': 'unittest-voldrv', 'internal': True, 'success': True}],
+                              ServiceType.ARAKOON_CLUSTER_TYPES.CFG: [{'name': 'unittest-cacc', 'internal': True, 'success': True}],
+                              ServiceType.ARAKOON_CLUSTER_TYPES.FWK: [{'name': 'unittest-ovsdb', 'internal': True, 'success': False}],
+                              ServiceType.ARAKOON_CLUSTER_TYPES.ABM: [{'name': 'unittest-cluster-1-abm', 'internal': True, 'success': False},
+                                                                      {'name': 'unittest-random-abm-name', 'internal': False, 'success': True}],
+                              ServiceType.ARAKOON_CLUSTER_TYPES.NSM: [{'name': 'unittest-cluster-1-nsm_0', 'internal': True, 'success': True}]}
         self.assertEqual(first=sorted(clusters_to_create.keys()),
                          second=sorted(ServiceType.ARAKOON_CLUSTER_TYPES.keys()),
-                         msg='An Arakoon cluster type has been removed or added')
+                         msg='An Arakoon cluster type has been removed or added, please update this test accordingly')
 
-        for cluster_type, cluster_names in clusters_to_create.iteritems():
-            filesystem = cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.CFG
-            for cluster_name in cluster_names:
+        # Create all Arakoon clusters and related services
+        failed_clusters = []
+        external_clusters = []
+        successful_clusters = []
+        for cluster_type, cluster_infos in clusters_to_create.iteritems():
+            for cluster_info in cluster_infos:
+                internal = cluster_info['internal']
+                cluster_name = cluster_info['name']
+
                 base_dir = Helper.CLUSTER_DIR.format(cluster_name)
                 info = ArakoonInstaller.create_cluster(cluster_name=cluster_name,
                                                        cluster_type=cluster_type,
                                                        ip=storagerouter_1.ip,
-                                                       base_dir=base_dir)
+                                                       base_dir=base_dir,
+                                                       internal=internal)
                 ArakoonInstaller.claim_cluster(cluster_name=cluster_name,
                                                master_ip=storagerouter_1.ip,
-                                               filesystem=filesystem,
+                                               filesystem=False,
                                                metadata=info['metadata'])
                 ArakoonInstaller.extend_cluster(master_ip=storagerouter_1.ip,
                                                 new_ip=storagerouter_2.ip,
                                                 cluster_name=cluster_name,
-                                                base_dir=base_dir,
-                                                filesystem=filesystem)
+                                                base_dir=base_dir)
+
+                service_name = ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name)
+                if cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.ABM:
+                    service_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ALBA_MGR)
+                elif cluster_type == ServiceType.ARAKOON_CLUSTER_TYPES.NSM:
+                    service_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.NS_MGR)
+                else:
+                    service_type = ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON)
+
+                if internal is True:
+                    Helper.create_service(service_name=service_name,
+                                          service_type=service_type,
+                                          storagerouter=storagerouter_1,
+                                          ports=[info['client_port'], info['messaging_port']])
+                    Helper.create_service(service_name=service_name,
+                                          service_type=service_type,
+                                          storagerouter=storagerouter_2,
+                                          ports=[info['client_port'], info['messaging_port']])
+                else:
+                    Helper.create_service(service_name=service_name,
+                                          service_type=service_type)
+
+                    external_clusters.append(cluster_name)
+                    continue
+
+                if cluster_info['success'] is True:
+                    config_path = Configuration.get_configuration_path(ArakoonClusterConfig.CONFIG_KEY.format(cluster_name))
+                    SSHClient._run_returns['arakoon --collapse-local 1 2 -config {0}'.format(config_path)] = None
+                    SSHClient._run_returns['arakoon --collapse-local 2 2 -config {0}'.format(config_path)] = None
+                    successful_clusters.append(cluster_name)
+                else:  # For successful False clusters we don't emulate the collapse, thus making it fail
+                    failed_clusters.append(cluster_name)
+
+        # Start collapse and make it fail for all clusters on StorageRouter 2
+        SSHClient._raise_exceptions[storagerouter_2.ip] = {'users': ['ovs'],
+                                                           'exception_type': UnableToConnectException,
+                                                           'exception_message': 'No route to host'}
+        GenericController.collapse_arakoon()
+
+        # Verify all log messages for each type of cluster
+        generic_logs = LogHandler._logs.get('lib_generic tasks', {})
+        for cluster_name in successful_clusters + failed_clusters + external_clusters:
+            collect_msg = ('debug', 'Collecting info for cluster {0}'.format(cluster_name))
+            unreachable_msg = ('error', 'Could not collapse any cluster on {0} (not reachable)'.format(storagerouter_2.name))
+            end_collapse_msg = ('debug', 'Collapsing cluster {0} on {1} completed'.format(cluster_name, storagerouter_1.ip))
+            start_collapse_msg = ('debug', 'Collapsing cluster {0} on {1}'.format(cluster_name, storagerouter_1.ip))
+            failed_collapse_msg = ('exception', 'Collapsing cluster {0} on {1} failed'.format(cluster_name, storagerouter_1.ip))
+            messages_to_validate = []
+            if cluster_name in successful_clusters:
+                assert_function = self.assertIn
+                messages_to_validate.append(collect_msg)
+                messages_to_validate.append(unreachable_msg)
+                messages_to_validate.append(start_collapse_msg)
+                messages_to_validate.append(end_collapse_msg)
+            elif cluster_name in failed_clusters:
+                assert_function = self.assertIn
+                messages_to_validate.append(collect_msg)
+                messages_to_validate.append(unreachable_msg)
+                messages_to_validate.append(start_collapse_msg)
+                messages_to_validate.append(failed_collapse_msg)
+            else:
+                assert_function = self.assertNotIn
+                messages_to_validate.append(collect_msg)
+                messages_to_validate.append(start_collapse_msg)
+                messages_to_validate.append(end_collapse_msg)
+
+            for severity, message in messages_to_validate:
+                if assert_function == self.assertIn:
+                    assert_message = 'Expected to find log message: {0}'.format(message)
+                else:
+                    assert_message = 'Did not expect to find log message: {0}'.format(message)
+                assert_function(member=message,
+                                container=generic_logs,
+                                msg=assert_message)
+                if assert_function == self.assertIn:
+                    self.assertEqual(first=severity,
+                                     second=generic_logs[message],
+                                     msg='Log message {0} is of severity {1} expected {2}'.format(message, generic_logs[message], severity))
+
+        # Collapse should always have a 'finished' message since each cluster should be attempted to be collapsed
+        for general_message in ['Arakoon collapse started', 'Arakoon collapse finished']:
+            self.assertIn(member=general_message,
+                          container=generic_logs,
+                          msg='Expected to find log message: {0}'.format(general_message))
 
     ##################
     # HELPER METHODS #

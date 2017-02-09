@@ -293,7 +293,7 @@ class VDiskTest(unittest.TestCase):
         )
         vpools = structure['vpools']
         mds_services = structure['mds_services']
-        service_type = structure['service_type']
+        service_type = structure['service_types']['MetadataServer']
         storagedrivers = structure['storagedrivers']
         storagerouters = structure['storagerouters']
         self._roll_out_dtl_services(vpool=vpools[1], storagerouters=storagerouters)

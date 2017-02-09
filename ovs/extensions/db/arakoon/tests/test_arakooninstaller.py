@@ -52,9 +52,7 @@ class ArakoonInstallerTester(unittest.TestCase):
         Configuration.set('/ovs/framework/hosts/1/ports', {'arakoon': [10000, 10100]})
         Configuration.set('/ovs/framework/hosts/2/ports', {'arakoon': [20000, 20100]})
 
-        structure = Helper.build_service_structure(
-            {'storagerouters': [1, 2]}
-        )
+        structure = Helper.build_service_structure(structure={'storagerouters': [1, 2]})
         storagerouters = structure['storagerouters']
         System._machine_id = {storagerouters[1].ip: '1',
                               storagerouters[2].ip: '2'}

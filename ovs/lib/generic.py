@@ -17,7 +17,7 @@
 """
 GenericTaskController module
 """
-
+import os
 import copy
 import json
 import time
@@ -448,9 +448,12 @@ class GenericController(object):
         Collapse Arakoon's Tlogs
         :return: None
         """
-        GenericController._logger.info('Starting arakoon collapse')
+        GenericController._logger.info('Arakoon collapse started')
+        cluster_info = []
         storagerouters = StorageRouterList.get_storagerouters()
-        cluster_info = [('cacc', storagerouters[0], True)]
+        if os.environ.get('RUNNING_UNITTESTS') != 'True':
+            cluster_info = [('cacc', storagerouters[0], True)]
+
         cluster_names = []
         for service in ServiceList.get_services():
             if service.is_internal is True and service.type.name in (ServiceType.SERVICE_TYPES.ARAKOON,
@@ -485,12 +488,11 @@ class GenericController(object):
                         else:
                             config_path = Configuration.get_configuration_path(ArakoonClusterConfig.CONFIG_KEY.format(cluster))
                         client.run(['arakoon', '--collapse-local', node_workload['node_id'], '2', '-config', config_path])
-                        GenericController._logger.info('  Collapsing cluster {0} on {1} completed'.format(cluster, storagerouter.ip))
+                        GenericController._logger.debug('  Collapsing cluster {0} on {1} completed'.format(cluster, storagerouter.ip))
                     except:
                         GenericController._logger.exception('  Collapsing cluster {0} on {1} failed'.format(cluster, storagerouter.ip))
             except UnableToConnectException:
                 GenericController._logger.error('  Could not collapse any cluster on {0} (not reachable)'.format(storagerouter.name))
-
         GenericController._logger.info('Arakoon collapse finished')
 
     @staticmethod

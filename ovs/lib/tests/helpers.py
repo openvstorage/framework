@@ -35,8 +35,10 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.generic import fakesleep
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.toolbox import Toolbox
 from ovs.extensions.services.tests.systemd import Systemd
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -44,6 +46,7 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
 from ovs.lib.storagedriver import StorageDriverController
+from ovs.log.log_handler import LogHandler
 
 
 class Helper(object):
@@ -60,18 +63,9 @@ class Helper(object):
         :param kwargs: Additional key word arguments
         :type kwargs: dict
         """
-        volatile = VolatileFactory.get_client()
-        persistent = PersistentFactory.get_client()
-
-        volatile.clean()
-        persistent.clean()
-        Systemd.clean()
-        MDSClient.clean()
-        StorageRouterClient.clean()
         if kwargs.get('fake_sleep', False) is True:
             fakesleep.monkey_patch()
-
-        return volatile, persistent
+        return Helper._clean()
 
     @staticmethod
     def teardown(**kwargs):
@@ -80,20 +74,32 @@ class Helper(object):
         :param kwargs: Additional key word arguments
         :type kwargs: dict
         """
-        volatile = VolatileFactory.get_client()
-        persistent = PersistentFactory.get_client()
-
-        volatile.clean()
-        persistent.clean()
-        MDSClient.clean()
-        StorageRouterClient.clean()
-        Configuration._unittest_data = {}
-
         if kwargs.get('fake_sleep', False) is True:
             fakesleep.monkey_restore()
+        Helper._clean()
+
+    @staticmethod
+    def _clean():
+        volatile = VolatileFactory.get_client()
+        persistent = PersistentFactory.get_client()
+        volatile.clean()
+        persistent.clean()
+
+        # noinspection PyProtectedMember
+        SSHClient._clean()
+        Systemd.clean()
+        MDSClient.clean()
+        StorageRouterClient.clean()
+
+        LogHandler._logs = {}
+        Configuration._unittest_data = {}
+
+        for file_name in glob.glob(ArakoonClusterConfig.CONFIG_FILE.format('unittest*')):
+            os.remove(file_name)
 
         for full_path in glob.glob(Helper.UNITTEST_DIR.format('*')):
             shutil.rmtree(full_path)
+        return volatile, persistent
 
     @staticmethod
     def generate_nc_function(address, mds_service):
@@ -114,7 +120,7 @@ class Helper(object):
     @staticmethod
     def build_service_structure(structure, previous_structure=None):
         """
-        Builds an MDS service structure
+        Builds a model structure
         Example:
             structure = Helper.build_service_structure(
                 {'vpools': [1],
@@ -136,11 +142,14 @@ class Helper(object):
         storagedrivers = previous_structure.get('storagedrivers', {})
         storagerouter_domains = previous_structure.get('storagerouter_domains', {})
 
-        service_type = ServiceTypeList.get_by_name('MetadataServer')
-        if service_type is None:
-            service_type = ServiceType()
-            service_type.name = 'MetadataServer'
-            service_type.save()
+        service_types = {}
+        for service_type_name in ServiceType.SERVICE_TYPES.values():
+            service_type = ServiceTypeList.get_by_name(service_type_name)
+            if service_type is None:
+                service_type = ServiceType()
+                service_type.name = service_type_name
+                service_type.save()
+            service_types[service_type_name] = service_type
         srclients = {}
         for domain_id in structure.get('domains', []):
             if domain_id not in domains:
@@ -210,7 +219,7 @@ class Helper(object):
                 service.name = s_id
                 service.storagerouter = sd.storagerouter
                 service.ports = [mds_id]
-                service.type = service_type
+                service.type = service_types['MetadataServer']
                 service.save()
                 services[s_id] = service
                 mds_service = MDSService()
@@ -252,8 +261,8 @@ class Helper(object):
                 'vpools': vpools,
                 'domains': domains,
                 'services': services,
-                'service_type': service_type,
                 'mds_services': mds_services,
+                'service_types': service_types,
                 'storagerouters': storagerouters,
                 'storagedrivers': storagedrivers,
                 'storagerouter_domains': storagerouter_domains}
