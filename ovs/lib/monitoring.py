@@ -34,6 +34,7 @@ class MonitoringController(object):
         """
         Validates whether all nodes can SSH into eachother
         """
+        MonitoringController._logger.info('Starting SSH connectivity test...')
         ips = [sr.ip for sr in StorageRouterList.get_storagerouters()]
         for ip in ips:
             for primary_username in ['root', 'ovs']:
@@ -41,15 +42,16 @@ class MonitoringController(object):
                     with remote(ip, [SSHClient], username=primary_username) as rem:
                         for local_ip in ips:
                             for username in ['root', 'ovs']:
-                                message = 'Connection from {0}@{1} to {2}@{3}... {{0}}'.format(primary_username, ip, username, local_ip)
+                                message = '* Connection from {0}@{1} to {2}@{3}... {{0}}'.format(primary_username, ip, username, local_ip)
                                 try:
                                     c = rem.SSHClient(local_ip, username=username)
                                     assert c.run(['whoami']).strip() == username
                                     message = message.format('OK')
                                     logger = MonitoringController._logger.info
                                 except Exception as ex:
-                                    message = message.format(ex)
+                                    message = message.format(ex.message)
                                     logger = MonitoringController._logger.error
                                 logger(message)
                 except Exception as ex:
-                    MonitoringController._logger.error('Could not connect to {0}@{1}: {2}'.format(primary_username, ip, ex))
+                    MonitoringController._logger.error('* Could not connect to {0}@{1}: {2}'.format(primary_username, ip, ex.message))
+        MonitoringController._logger.info('Finished')
