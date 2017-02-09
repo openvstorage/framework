@@ -17,7 +17,7 @@
 """
 GenericTaskController module
 """
-
+import os
 import copy
 import json
 import time
@@ -80,6 +80,7 @@ class GenericController(object):
                 GenericController._logger.exception('Error taking snapshot for vDisk {0}'.format(vdisk.guid))
                 fail.append(vdisk.guid)
         GenericController._logger.info('[SSA] Snapshot has been taken for {0} vDisks, {1} failed.'.format(len(success), len(fail)))
+        return success, fail
 
     @staticmethod
     @celery.task(name='ovs.generic.delete_snapshots', schedule=Schedule(minute='1', hour='2'))
@@ -224,6 +225,9 @@ class GenericController(object):
             except UnableToConnectException:
                 GenericController._logger.warning('Scrubber - Storage Router {0:<15} is not reachable'.format(storage_router.ip))
 
+        if len(scrub_locations) == 0:
+            raise ValueError('No scrub locations found, cannot scrub')
+
         number_of_vpools = len(vpools)
         if number_of_vpools >= 6:
             max_threads_per_vpool = 1
@@ -245,6 +249,7 @@ class GenericController(object):
             vpool_queue = Queue()
             for vd in vp.vdisks:
                 if vd.is_vtemplate is True:
+                    GenericController._logger.info('Scrubber - vPool {0} - vDisk {1} {2} - Is a template, not scrubbing'.format(vp.name, vd.guid, vd.name))
                     continue
                 vd.invalidate_dynamics('storagedriver_id')
                 if not vd.storagedriver_id:
@@ -443,9 +448,12 @@ class GenericController(object):
         Collapse Arakoon's Tlogs
         :return: None
         """
-        GenericController._logger.info('Starting arakoon collapse')
+        GenericController._logger.info('Arakoon collapse started')
+        cluster_info = []
         storagerouters = StorageRouterList.get_storagerouters()
-        cluster_info = [('cacc', storagerouters[0], True)]
+        if os.environ.get('RUNNING_UNITTESTS') != 'True':
+            cluster_info = [('cacc', storagerouters[0], True)]
+
         cluster_names = []
         for service in ServiceList.get_services():
             if service.is_internal is True and service.type.name in (ServiceType.SERVICE_TYPES.ARAKOON,
@@ -480,12 +488,11 @@ class GenericController(object):
                         else:
                             config_path = Configuration.get_configuration_path(ArakoonClusterConfig.CONFIG_KEY.format(cluster))
                         client.run(['arakoon', '--collapse-local', node_workload['node_id'], '2', '-config', config_path])
-                        GenericController._logger.info('  Collapsing cluster {0} on {1} completed'.format(cluster, storagerouter.ip))
+                        GenericController._logger.debug('  Collapsing cluster {0} on {1} completed'.format(cluster, storagerouter.ip))
                     except:
                         GenericController._logger.exception('  Collapsing cluster {0} on {1} failed'.format(cluster, storagerouter.ip))
             except UnableToConnectException:
                 GenericController._logger.error('  Could not collapse any cluster on {0} (not reachable)'.format(storagerouter.name))
-
         GenericController._logger.info('Arakoon collapse finished')
 
     @staticmethod

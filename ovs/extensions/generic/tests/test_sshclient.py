@@ -23,11 +23,13 @@ from ovs.extensions.generic.sshclient import SSHClient
 
 
 class SSHClientTest(unittest.TestCase):
-
+    """
+    Test SSHClient functionality
+    """
     def test_text_cleanup(self):
         tests = {0: ['foobar', 'foobar'],
                  1: ['aàcçnñ', 'aaccnn'],
-                 2: ['foo\u201ebar', 'foo\u201ebar'],  # This isn't an actuall unicode character, just the characters \, u, 2, 0, 1 and e
+                 2: ['foo\u201ebar', 'foo\u201ebar'],  # This isn't an actual unicode character, just the characters \, u, 2, 0, 1 and e
                  3: [u'foobar', 'foobar'],
                  4: [u'foo\u1234bar', 'foobar'],
                  5: [u'foo\u201ebar', 'foo"bar'],

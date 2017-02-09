@@ -23,9 +23,6 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic import fakesleep
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.tests.helpers import Helper
@@ -35,47 +32,20 @@ class NodeConfigTest(unittest.TestCase):
     """
     This test class will validate node config related code
     """
-    @classmethod
-    def setUpClass(cls):
-        """
-        Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
-        This makes sure the unittests can be executed without those libraries installed
-        """
-        cls.persistent = PersistentFactory.get_client()
-        cls.persistent.clean()
-        cls.volatile = VolatileFactory.get_client()
-        cls.volatile.clean()
-        StorageRouterClient.clean()
-
-        fakesleep.monkey_patch()
-        Configuration.set('/ovs/framework/arakoon_clusters|voldrv', 'voldrv')
-        Configuration.set('/ovs/framework/hosts/1/ports', {'arakoon': [10000, 10100]})
-        Configuration.set('/ovs/framework/rdma', False)
-
     def setUp(self):
         """
         (Re)Sets the stores on every test
         """
-        # Cleaning storage
-        self.volatile.clean()
-        self.persistent.clean()
-        self.maxDiff = None
-        StorageRouterClient.clean()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Clean up the unittest
-        """
-        fakesleep.monkey_restore()
+        self.persistent = Helper.setup(fake_sleep=True)[1]
+        Configuration.set('/ovs/framework/arakoon_clusters|voldrv', 'voldrv')
+        Configuration.set('/ovs/framework/hosts/1/ports', {'arakoon': [10000, 10100]})
+        Configuration.set('/ovs/framework/rdma', False)
 
     def tearDown(self):
         """
         Clean up the unittest
         """
-        # Cleaning storage
-        self.volatile.clean()
-        self.persistent.clean()
+        Helper.teardown(fake_sleep=True)
 
     def test_distances(self):
         """
@@ -137,7 +107,7 @@ class NodeConfigTest(unittest.TestCase):
             self.assertDictEqual(sd._cluster_node_config()['node_distance_map'], expected[sd_id])
 
         # Some more complex scenarios
-        # StorageRouter | Primary | Secondairy
+        # StorageRouter | Primary | Secondary
         #    1          |    1    |     2
         #    2          |    1    |     3
         #    3          |    2    |     3

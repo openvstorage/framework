@@ -26,8 +26,6 @@ from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, Ara
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.lib.tests.helpers import Helper
 
 
@@ -35,45 +33,17 @@ class ArakoonInstallerTester(unittest.TestCase):
     """
     This test class will validate the various scenarios of the MDSService logic
     """
-    @classmethod
-    def setUpClass(cls):
-        """
-        Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
-        This makes sure the unittests can be executed without those libraries installed
-        """
-        cls.persistent = PersistentFactory.get_client()
-        cls.persistent.clean()
-
-        cls.volatile = VolatileFactory.get_client()
-        cls.volatile.clean()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Tear down changes made during setUpClass
-        """
-        Configuration._unittest_data = {}
-
-        cls.persistent = PersistentFactory.get_client()
-        cls.persistent.clean()
-
-        cls.volatile = VolatileFactory.get_client()
-        cls.volatile.clean()
-
     def setUp(self):
         """
         (Re)Sets the stores on every test
         """
-        self.persistent.clean()
-        self.volatile.clean()
-        self.maxDiff = None
+        Helper.setup()
 
     def tearDown(self):
         """
         Clean up test suite
         """
-        self.persistent.clean()
-        self.volatile.clean()
+        Helper.teardown()
 
     def test_cluster_maintenance(self):
         """
@@ -82,9 +52,7 @@ class ArakoonInstallerTester(unittest.TestCase):
         Configuration.set('/ovs/framework/hosts/1/ports', {'arakoon': [10000, 10100]})
         Configuration.set('/ovs/framework/hosts/2/ports', {'arakoon': [20000, 20100]})
 
-        structure = Helper.build_service_structure(
-            {'storagerouters': [1, 2]}
-        )
+        structure = Helper.build_service_structure(structure={'storagerouters': [1, 2]})
         storagerouters = structure['storagerouters']
         System._machine_id = {storagerouters[1].ip: '1',
                               storagerouters[2].ip: '2'}

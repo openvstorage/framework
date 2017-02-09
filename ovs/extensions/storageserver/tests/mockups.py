@@ -626,7 +626,20 @@ class Snapshot(object):
         """
         Init method
         """
+        mandatory_keys = ['label', 'timestamp', 'is_consistent']
+        optional_keys = {'in_backend', 'is_sticky', 'machineguid', 'is_automatic'}
         metadata_dict = pickle.loads(metadata)
+        copy_metadata = copy.deepcopy(metadata_dict)
+
+        for key in mandatory_keys:
+            if key not in copy_metadata:
+                raise ValueError('Expected key {0} to be provided to create a snapshot'.format(key))
+            copy_metadata.pop(key)
+
+        difference = set(copy_metadata.keys()).difference(optional_keys)
+        if difference:
+            raise ValueError('Unexpected keys provided to create a snapshot: {0}'.format(difference))
+
         self.metadata = metadata
         self.stored = 0
         self.in_backend = metadata_dict.get('in_backend', True)

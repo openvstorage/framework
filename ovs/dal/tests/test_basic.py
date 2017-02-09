@@ -30,7 +30,7 @@ from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.hybrids.t_teststoragedriver import TestStorageDriver
 from ovs.dal.hybrids.t_teststoragerouter import TestStorageRouter
 from ovs.dal.hybrids.t_testvpool import TestVPool
-from ovs.extensions.generic import fakesleep
+from ovs.dal.tests.helpers import Helper
 from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -38,39 +38,23 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 class Basic(unittest.TestCase):
     """
-    The basic unit-testsuite will test all basic functionality of the DAL framework
+    The basic unit-test suite will test all basic functionality of the DAL framework
     It will also try accessing all dynamic properties of all hybrids making sure
     that code actually works. This however means that all loaded 3rd party libs
     need to be mocked
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
-        This makes sure the unittests can be executed without those libraries installed
-        """
-        cls.persistent = PersistentFactory.get_client()
-        cls.volatile = VolatileFactory.get_client()
-        cls.persistent.clean()
-        cls.volatile.clean()
-
-        fakesleep.monkey_patch()
-
     def setUp(self):
         """
         (Re)Sets the stores on every test
         """
-        self.persistent.clean()
-        self.volatile.clean()
-        DataList.test_hooks = {}
+        self.volatile, self.persistent = Helper.setup(fake_sleep=True)
 
-    @classmethod
-    def tearDownClass(cls):
+    def tearDown(self):
         """
         Clean up the unittest
         """
-        fakesleep.monkey_restore()
+        Helper.teardown(fake_sleep=True)
 
     def test_invalidobject(self):
         """
@@ -122,10 +106,10 @@ class Basic(unittest.TestCase):
         """
         disk = TestDisk(data={'name': 'disk_x'})
         disk.save()
-        self.assertEqual(disk.name, 'disk_x', 'Disk name should be preloaded')
+        self.assertEqual(disk.name, 'disk_x', 'Disk name should be pre-loaded')
         disk = TestDisk(data={'name': 'disk_y', 'foo': 'bar'})
         disk.save()
-        self.assertEqual(disk.name, 'disk_y', 'Disk name should be preloaded, without raising for invalid pre-load data')
+        self.assertEqual(disk.name, 'disk_y', 'Disk name should be pre-loaded, without raising for invalid pre-load data')
 
     def test_datapersistent(self):
         """
@@ -260,7 +244,6 @@ class Basic(unittest.TestCase):
                 disk.storage = machine
             disk.save()
         self.assertEqual(len(machine.disks), 10, 'query should find added machines')
-        # pylint: disable=line-too-long
         dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                     'items': [('size', DataList.operator.EQUALS, 1)]})
         self.assertEqual(len(dlist), 1, 'list should contain 1')
@@ -793,7 +776,7 @@ class Basic(unittest.TestCase):
             """
             _ = datalist_object
             disk_x = TestDisk()
-            disk_x.name = 'testx'
+            disk_x.name = 'test_x'
             disk_x.save()
 
         def _inject_delete(datalist_object):
@@ -1545,7 +1528,7 @@ class Basic(unittest.TestCase):
 
     def test_acquired_lock_during_caching(self):
         """
-        Validates whether loading an object won't fail on a non-acquireable cache lock
+        Validates whether loading an object won't fail on a non-acquirable cache lock
         """
         _ = self
         disk = TestDisk()
@@ -1562,7 +1545,6 @@ class Basic(unittest.TestCase):
         """
         Validates whether indexes work as expected
         """
-        _ = self
         one_hash = hashlib.sha1('one').hexdigest()
         two_hash = hashlib.sha1('two').hexdigest()
         three_hash = hashlib.sha1('three').hexdigest()
@@ -1760,7 +1742,7 @@ class Basic(unittest.TestCase):
         self.assertEqual(dlist.from_index, 'full')
 
     def test_indexed_guid(self):
-        """"
+        """
         Validates whether the 'guid' is an implicitly indexed property
         """
         Basic._called = None

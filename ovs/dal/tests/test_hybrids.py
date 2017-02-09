@@ -20,8 +20,7 @@ Basic test module
 import unittest
 from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations import RelationMapper
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.lib.tests.helpers import Helper
 
 
 class Hybrid(unittest.TestCase):
@@ -31,25 +30,18 @@ class Hybrid(unittest.TestCase):
     that code actually works. This however means that all loaded 3rd party libs
     need to be mocked
     """
-
-    @classmethod
-    def setUpClass(cls):
-        """
-        Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
-        This makes sure the unittests can be executed without those libraries installed
-        """
-        cls.persistent = PersistentFactory.get_client()
-        cls.persistent.clean()
-        cls.volatile = VolatileFactory.get_client()
-        cls.volatile.clean()
-
     def setUp(self):
         """
         (Re)Sets the stores on every test
         """
         self.debug = False
-        self.persistent.clean()
-        self.volatile.clean()
+        Helper.setup()
+
+    def tearDown(self):
+        """
+        Clean up after every UnitTest
+        """
+        Helper.teardown()
 
     def _print_message(self, message):
         if self.debug is True:

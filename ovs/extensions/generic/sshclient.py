@@ -97,12 +97,14 @@ class SSHClient(object):
     """
     Remote/local client
     """
+    IP_REGEX = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
 
     _logger = LogHandler.get('extensions', name='sshclient')
+    _run_returns = {}  # Used by unit tests
+    _run_recordings = []  # Used by unit tests
+    _raise_exceptions = {}  # Used by unit tests
+
     client_cache = {}
-    IP_REGEX = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
-    _run_returns = {}
-    _run_recordings = []
 
     def __init__(self, endpoint, username='ovs', password=None, cached=True):
         """
@@ -147,6 +149,10 @@ class SSHClient(object):
 
         if self._unittest_mode is True:
             self.is_local = True
+            if self.ip in SSHClient._raise_exceptions:
+                raise_info = SSHClient._raise_exceptions[self.ip]
+                if self.username in raise_info['users']:
+                    raise raise_info['exception_type'](raise_info['exception_message'])
 
         if not self.is_local:
             logging.getLogger('paramiko').setLevel(logging.WARNING)
@@ -212,6 +218,15 @@ class SSHClient(object):
             return
 
         self._client.close()
+
+    @staticmethod
+    def _clean():
+        """
+        Clean everything up related to the unittests
+        """
+        SSHClient._run_returns = {}
+        SSHClient._run_recordings = []
+        SSHClient._raise_exceptions = {}
 
     @staticmethod
     def shell_safe(argument):

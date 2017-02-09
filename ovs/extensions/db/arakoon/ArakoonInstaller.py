@@ -237,7 +237,6 @@ class ArakoonInstaller(object):
     """
     class to dynamically install/(re)configure Arakoon cluster
     """
-    ARAKOON_BASE_DIR = '{0}/arakoon'
     ARAKOON_HOME_DIR = '{0}/arakoon/{1}/db'
     ARAKOON_TLOG_DIR = '{0}/arakoon/{1}/tlogs'
     CONFIG_ROOT = '/ovs/arakoon'
@@ -663,10 +662,6 @@ class ArakoonInstaller(object):
         """
         Deploys a complete cluster: Distributing the configuration files, creating directories and services
         """
-        if os.environ.get('RUNNING_UNITTESTS') == 'True':
-            if filesystem is True:
-                raise NotImplementedError('At this moment, there is no support for unit-testing filesystem backend Arakoon clusters')
-
         ArakoonInstaller._logger.debug('Deploying cluster {0}'.format(config.cluster_id))
         if offline_nodes is None:
             offline_nodes = []

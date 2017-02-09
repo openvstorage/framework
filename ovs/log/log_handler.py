@@ -64,8 +64,10 @@ class LogHandler(object):
     or log to files and have a separate process forward them to Redis (so logs can be re-send if Redis is unavailable)
     """
 
-    counter = itertools.count()
+    _logs = {}  # Used by unittests
+
     cache = {}
+    counter = itertools.count()
     propagate_cache = {}
 
     def __init__(self, source, name, propagate):
@@ -92,6 +94,10 @@ class LogHandler(object):
             self.handler = logging.FileHandler(target_definition['filename'])
         else:
             self.handler = logging.StreamHandler(sys.stdout)
+
+        self.unittest_mode = False
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            self.unittest_mode = True
         self.handler.setFormatter(formatter)
         self.logger = logging.getLogger(name)
         self.logger.addHandler(self.handler)
@@ -190,6 +196,11 @@ class LogHandler(object):
         """
         Log pass-through
         """
+        if self.unittest_mode is True:
+            if self._key not in LogHandler._logs:
+                LogHandler._logs[self._key] = {}
+            LogHandler._logs[self._key][msg.strip()] = severity
+
         self._fix_propagate()
         if 'print_msg' in kwargs:
             del kwargs['print_msg']

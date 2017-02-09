@@ -18,7 +18,9 @@
 Helper module
 """
 import os
+import glob
 import json
+import shutil
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.domain import Domain
@@ -33,17 +35,72 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.servicetypelist import ServiceTypeList
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
+from ovs.extensions.generic import fakesleep
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.toolbox import Toolbox
+from ovs.extensions.services.tests.systemd import Systemd
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
 from ovs.lib.storagedriver import StorageDriverController
+from ovs.log.log_handler import LogHandler
 
 
 class Helper(object):
     """
-    This class contains functionality used by all or most vDisk related tests
+    This class contains functionality used by all UnitTest related to the BLL
     """
+    UNITTEST_DIR = '/tmp/unittest'
+    CLUSTER_DIR = '{0}-{{0}}'.format(UNITTEST_DIR)
+
+    @staticmethod
+    def setup(**kwargs):
+        """
+        Execute several actions before starting a new UnitTest
+        :param kwargs: Additional key word arguments
+        :type kwargs: dict
+        """
+        if kwargs.get('fake_sleep', False) is True:
+            fakesleep.monkey_patch()
+        return Helper._clean()
+
+    @staticmethod
+    def teardown(**kwargs):
+        """
+        Execute several actions when ending a UnitTest
+        :param kwargs: Additional key word arguments
+        :type kwargs: dict
+        """
+        if kwargs.get('fake_sleep', False) is True:
+            fakesleep.monkey_restore()
+        Helper._clean()
+
+    @staticmethod
+    def _clean():
+        volatile = VolatileFactory.get_client()
+        persistent = PersistentFactory.get_client()
+        volatile.clean()
+        persistent.clean()
+
+        # noinspection PyProtectedMember
+        SSHClient._clean()
+        Systemd.clean()
+        MDSClient.clean()
+        StorageRouterClient.clean()
+
+        LogHandler._logs = {}
+        Configuration._unittest_data = {}
+
+        for file_name in glob.glob(ArakoonClusterConfig.CONFIG_FILE.format('unittest*')):
+            os.remove(file_name)
+
+        for full_path in glob.glob(Helper.UNITTEST_DIR.format('*')):
+            shutil.rmtree(full_path)
+        return volatile, persistent
+
     @staticmethod
     def generate_nc_function(address, mds_service):
         """
@@ -63,7 +120,7 @@ class Helper(object):
     @staticmethod
     def build_service_structure(structure, previous_structure=None):
         """
-        Builds an MDS service structure
+        Builds a model structure
         Example:
             structure = Helper.build_service_structure(
                 {'vpools': [1],
@@ -85,11 +142,14 @@ class Helper(object):
         storagedrivers = previous_structure.get('storagedrivers', {})
         storagerouter_domains = previous_structure.get('storagerouter_domains', {})
 
-        service_type = ServiceTypeList.get_by_name('MetadataServer')
-        if service_type is None:
-            service_type = ServiceType()
-            service_type.name = 'MetadataServer'
-            service_type.save()
+        service_types = {}
+        for service_type_name in ServiceType.SERVICE_TYPES.values():
+            service_type = ServiceTypeList.get_by_name(service_type_name)
+            if service_type is None:
+                service_type = ServiceType()
+                service_type.name = service_type_name
+                service_type.save()
+            service_types[service_type_name] = service_type
         srclients = {}
         for domain_id in structure.get('domains', []):
             if domain_id not in domains:
@@ -159,7 +219,7 @@ class Helper(object):
                 service.name = s_id
                 service.storagerouter = sd.storagerouter
                 service.ports = [mds_id]
-                service.type = service_type
+                service.type = service_types['MetadataServer']
                 service.save()
                 services[s_id] = service
                 mds_service = MDSService()
@@ -201,8 +261,8 @@ class Helper(object):
                 'vpools': vpools,
                 'domains': domains,
                 'services': services,
-                'service_type': service_type,
                 'mds_services': mds_services,
+                'service_types': service_types,
                 'storagerouters': storagerouters,
                 'storagedrivers': storagedrivers,
                 'storagerouter_domains': storagerouter_domains}
@@ -273,6 +333,31 @@ class Helper(object):
                 pointer['dirs'] = dict((entry, {'dirs': {}, 'files': []}) for entry in dirs)
                 pointer['files'] = files
         return data
+
+    @staticmethod
+    def create_service(service_name, service_type, storagerouter=None, ports=None):
+        """
+        Create a Service in the model
+        :param service_name: Name to give to the Service
+        :type service_name: str
+        :param service_type: Type of the Service
+        :type service_type: ovs.dal.hybrids.servicetype.ServiceType
+        :param storagerouter: StorageRouter hosting the Service, None for externally managed Services
+        :type storagerouter: ovs.dal.hybrids.storagerouter.StorageRouter
+        :param ports: Ports on which the Service is running
+        :type ports: list
+        :return: The newly created Service
+        :rtype: ovs.dal.hybrids.service.Service
+        """
+        if ports is None:
+            ports = []
+        service = Service()
+        service.name = service_name
+        service.storagerouter = storagerouter
+        service.ports = ports
+        service.type = service_type
+        service.save()
+        return service
 
     @staticmethod
     def _generate_mdsmetadatabackendconfig(mds_services):
