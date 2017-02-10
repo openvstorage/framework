@@ -60,6 +60,9 @@ mdsclient_service_cache = {}
 
 
 class FeatureNotAvailableException(Exception):
+    """
+    Raised when feature is not yet available
+    """
     pass
 
 
