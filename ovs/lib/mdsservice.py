@@ -85,6 +85,7 @@ class MDSServiceController(object):
 
         # VALIDATIONS
         # Verify passed on StorageRouter is part of the vPool
+        storagerouter.invalidate_dynamics(['vpools_guids'])
         if vpool.guid not in storagerouter.vpools_guids:
             raise ValueError('StorageRouter {0} is not part of vPool {1}'.format(storagerouter.name, vpool.name))
 
@@ -150,8 +151,8 @@ class MDSServiceController(object):
                 service = sd_partition.mds_service.service
                 mds_nodes.append({'host': service.storagerouter.ip,
                                   'port': service.ports[0],
-                                  'db_directory': sd_partition.path,
-                                  'scratch_directory': sd_partition.path})
+                                  'db_directory': '{0}/db'.format(sd_partition.path),
+                                  'scratch_directory': '{0}/scratch'.format(sd_partition.path)})
 
         # Generate the correct section in the Storage Driver's configuration
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
@@ -208,8 +209,8 @@ class MDSServiceController(object):
                         service = sd_partition.mds_service.service
                         mds_nodes.append({'host': service.storagerouter.ip,
                                           'port': service.ports[0],
-                                          'db_directory': sd_partition.path,
-                                          'scratch_directory': sd_partition.path})
+                                          'db_directory': '{0}/db'.format(sd_partition.path),
+                                          'scratch_directory': '{0}/scratch'.format(sd_partition.path)})
 
                 # Generate the correct section in the Storage Driver's configuration
                 storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)
