@@ -23,7 +23,7 @@ import json
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.toolbox import Toolbox
+from ovs.extensions.generic.toolbox import ExtensionsToolbox
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 
@@ -67,6 +67,9 @@ mdsclient_service_cache = {}
 
 
 class FeatureNotAvailableException(Exception):
+    """
+    Raised when feature is not yet available
+    """
     pass
 
 
@@ -403,10 +406,10 @@ class StorageDriverConfiguration(object):
 
     def __getattr__(self, item):
         if item.startswith('configure_'):
-            section = Toolbox.remove_prefix(item, 'configure_')
+            section = ExtensionsToolbox.remove_prefix(item, 'configure_')
             return lambda **kwargs: self._add(section, **kwargs)
         if item.startswith('clear_'):
-            section = Toolbox.remove_prefix(item, 'clear_')
+            section = ExtensionsToolbox.remove_prefix(item, 'clear_')
             return lambda: self._delete(section)
 
     def _add(self, section, **kwargs):

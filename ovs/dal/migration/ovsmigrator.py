@@ -166,7 +166,7 @@ class OVSMigrator(object):
             from ovs.dal.lists.vpoollist import VPoolList
             from ovs.extensions.generic.configuration import Configuration
             from ovs.extensions.generic.sshclient import SSHClient
-            from ovs.extensions.generic.toolbox import Toolbox
+            from ovs.extensions.generic.toolbox import ExtensionsToolbox
             from ovs.extensions.services.service import ServiceManager
             from ovs.extensions.services.systemd import Systemd
             from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -343,7 +343,7 @@ class OVSMigrator(object):
                     if not Configuration.exists(key=old_configuration_key):
                         continue
 
-                    Toolbox.edit_version_file(client=root_client, package_name='alba', old_service_name=old_service_name, new_service_name=new_service_name)
+                    ExtensionsToolbox.edit_version_file(client=root_client, package_name='alba', old_service_name=old_service_name, new_service_name=new_service_name)
 
                     # Register new service and remove old service
                     ServiceManager.add_service(name='ovs-albaproxy',
@@ -415,7 +415,7 @@ class OVSMigrator(object):
                     storagedriver_config.save(root_client)
 
                     # Add '-reboot' to volumedriver services (because of updated 'backend_connection_manager' section)
-                    Toolbox.edit_version_file(client=root_client, package_name='volumedriver', old_service_name='volumedriver_{0}'.format(vpool.name))
+                    ExtensionsToolbox.edit_version_file(client=root_client, package_name='volumedriver', old_service_name='volumedriver_{0}'.format(vpool.name))
                     if ServiceManager.ImplementationClass == Systemd:
                         root_client.run(['systemctl', 'daemon-reload'])
 

@@ -19,17 +19,14 @@ Token views
 """
 
 import time
-import urllib
-import base64
 import requests
 import datetime
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponseRedirect
 from api.oauth2.decorators import auto_response, limit, log
-from api.oauth2.toolbox import Toolbox
+from api.oauth2.toolbox import OAuth2Toolbox
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic.system import System
 from ovs.log.log_handler import LogHandler
 from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.rolelist import RoleList
@@ -95,7 +92,7 @@ class OAuth2RedirectView(View):
             return HttpResponseRedirect(html_endpoint)
 
         roles = RoleList.get_roles_by_codes(['read', 'write', 'manage'])
-        access_token, _ = Toolbox.generate_tokens(client, generate_access=True, scopes=roles)
+        access_token, _ = OAuth2Toolbox.generate_tokens(client, generate_access=True, scopes=roles)
         access_token.expiration = int(time.time() + expires_in)
         access_token.access_token = token
         access_token.save()

@@ -23,7 +23,7 @@ import hashlib
 import unittest
 from ovs.dal.datalist import DataList
 from ovs.dal.exceptions import *
-from ovs.dal.helpers import Descriptor, Toolbox
+from ovs.dal.helpers import Descriptor, DalToolbox
 from ovs.dal.hybrids.t_testdisk import TestDisk
 from ovs.dal.hybrids.t_testemachine import TestEMachine
 from ovs.dal.hybrids.t_testmachine import TestMachine
@@ -453,14 +453,14 @@ class Basic(unittest.TestCase):
         self.assertEqual(filtered[2].name, 'disk_3', 'Disks should be properly sliced')
         fields = [('name', True), ('size', False)]
         for field in fields:
-            disks.sort(key=lambda a: Toolbox.extract_key(a, field[0]), reverse=field[1])
+            disks.sort(key=lambda a: DalToolbox.extract_key(a, field[0]), reverse=field[1])
         self.assertEqual(disks[0].size, 0, 'Disk should be properly sorted')
         self.assertEqual(disks[1].size, 0, 'Disk should be properly sorted')
         self.assertEqual(disks[0].name, 'disk_7', 'Disk should be properly sorted')
         self.assertEqual(disks[1].name, 'disk_2', 'Disk should be properly sorted')
         fields = [('name', False), ('predictable', False)]
         for field in fields:
-            disks.sort(key=lambda a: Toolbox.extract_key(a, field[0]), reverse=field[1])
+            disks.sort(key=lambda a: DalToolbox.extract_key(a, field[0]), reverse=field[1])
         self.assertEqual(disks[0].predictable, 0, 'Disk should be properly sorted')
         self.assertEqual(disks[1].predictable, 0, 'Disk should be properly sorted')
         self.assertEqual(disks[2].predictable, 1, 'Disk should be properly sorted')

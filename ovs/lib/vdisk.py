@@ -39,14 +39,14 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
-from ovs.extensions.generic.toolbox import Toolbox as GenericToolbox
+from ovs.extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
                                                        StorageDriverClient, StorageDriverConfiguration, \
                                                        SRCObjectNotFoundException, FeatureNotAvailableException
 from ovs.lib.helpers.decorators import ensure_single, log
-from ovs.lib.helpers.toolbox import Toolbox, Schedule
+from ovs.lib.helpers.toolbox import Schedule, Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
@@ -260,7 +260,7 @@ class VDiskController(object):
                     vdisk.discard()
                     devicename = vdisk.devicename
                     if devicename.startswith(old_path):
-                        vdisk.devicename = '{0}{1}'.format(new_path, GenericToolbox.remove_prefix(devicename, old_path))
+                        vdisk.devicename = '{0}{1}'.format(new_path, ExtensionsToolbox.remove_prefix(devicename, old_path))
                         vdisk.save()
                         VDiskController._logger.info('Renamed devicename from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
 

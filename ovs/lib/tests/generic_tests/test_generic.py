@@ -24,7 +24,6 @@ import datetime
 import unittest
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.servicetype import ServiceType
-from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig, ArakoonInstaller
 from ovs.extensions.generic.configuration import Configuration
@@ -681,7 +680,7 @@ class Generic(unittest.TestCase):
         with self.assertRaises(excClass=Exception) as raise_info:
             GenericController.refresh_package_information()
 
-        storagerouter_1 = StorageRouter(storagerouter_1.guid)
+        storagerouter_1.discard()
         self.assertDictEqual(d1=expected_package_info,
                              d2=storagerouter_1.package_information,
                              msg='Incorrect package information found for StorageRouter 1'.format(storagerouter_1.name))

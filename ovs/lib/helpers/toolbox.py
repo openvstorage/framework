@@ -27,7 +27,7 @@ import string
 import inspect
 import subprocess
 from celery.schedules import crontab
-from ovs.dal.helpers import Toolbox as HelperToolbox
+from ovs.dal.helpers import DalToolbox
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
@@ -141,7 +141,7 @@ class Toolbox(object):
 
             mandatory_or_optional = 'Optional' if optional is True else 'Mandatory'
             actual_value = actual_params[required_key]
-            if HelperToolbox.check_type(actual_value, expected_type)[0] is False:
+            if DalToolbox.check_type(actual_value, expected_type)[0] is False:
                 error_messages.append('{0} param "{1}" is of type "{2}" but we expected type "{3}"'.format(mandatory_or_optional, required_key, type(actual_value), expected_type))
                 continue
 
@@ -164,9 +164,9 @@ class Toolbox(object):
                     if not minimum <= actual_value <= maximum:
                         error_messages.append('{0} param "{1}" with value "{2}" should be in range: {3} - {4}'.format(mandatory_or_optional, required_key, actual_value, minimum, maximum))
             else:
-                if HelperToolbox.check_type(expected_value, list)[0] is True and actual_value not in expected_value:
+                if DalToolbox.check_type(expected_value, list)[0] is True and actual_value not in expected_value:
                     error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
-                elif HelperToolbox.check_type(expected_value, Toolbox.compiled_regex_type)[0] is True and not re.match(expected_value, actual_value):
+                elif DalToolbox.check_type(expected_value, Toolbox.compiled_regex_type)[0] is True and not re.match(expected_value, actual_value):
                     error_messages.append('{0} param "{1}" with value "{2}" does not match regex "{3}"'.format(mandatory_or_optional, required_key, actual_value, expected_value.pattern))
         if error_messages:
             raise RuntimeError('\n' + '\n'.join(error_messages))

@@ -39,13 +39,13 @@ from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.generic import fakesleep
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.generic.toolbox import Toolbox
+from ovs.extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.services.tests.systemd import Systemd
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
-from ovs.lib.helpers.toolbox import Toolbox as LibToolbox
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.log.log_handler import LogHandler
 
@@ -92,7 +92,7 @@ class Helper(object):
         MDSClient.clean()
         StorageRouterClient.clean()
 
-        LibToolbox._function_pointers = {}
+        Toolbox._function_pointers = {}
         LogHandler._logs = {}
         Configuration._unittest_data = {}
 
@@ -322,7 +322,7 @@ class Helper(object):
         """
         data = {'dirs': {}, 'files': []}
         for current_dir, dirs, files in os.walk(directory):
-            current_dir = Toolbox.remove_prefix(current_dir, directory)
+            current_dir = ExtensionsToolbox.remove_prefix(current_dir, directory)
             if current_dir == '':
                 data['dirs'] = dict((entry, {'dirs': {}, 'files': []}) for entry in dirs)
                 data['files'] = files

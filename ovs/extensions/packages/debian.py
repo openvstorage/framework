@@ -19,7 +19,7 @@ Debian Package module
 """
 
 from subprocess import check_output, CalledProcessError
-from ovs.extensions.generic.toolbox import Toolbox
+from ovs.extensions.generic.toolbox import ExtensionsToolbox
 from ovs.log.log_handler import LogHandler
 
 
@@ -70,7 +70,7 @@ class DebianPackage(object):
             for line in client.run(['apt-cache', 'policy', package_name, DebianPackage.APT_CONFIG_STRING]).splitlines():
                 line = line.strip()
                 if line.startswith('Candidate:'):
-                    candidate = Toolbox.remove_prefix(line, 'Candidate:').strip()
+                    candidate = ExtensionsToolbox.remove_prefix(line, 'Candidate:').strip()
                     if candidate == '(none)':
                         candidate = ''
                     versions[package_name] = candidate

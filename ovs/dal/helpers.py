@@ -214,7 +214,7 @@ class HybridRunner(object):
         return hybrid_structure
 
 
-class Toolbox(object):
+class DalToolbox(object):
     """
     Generic class for various methods
     """
@@ -289,10 +289,17 @@ class Toolbox(object):
 
     @staticmethod
     def convert_unicode_to_string(original):
+        """
+        Convert any dict, list or unicode string to regular string
+        :param original: Item to do the conversion on
+        :type original: dict|list|unicode
+        :return: The same item, but all sub-items inside are converted to strings
+        :rtype: dict|list|str
+        """
         if isinstance(original, dict):
-            return {Toolbox.convert_unicode_to_string(key): Toolbox.convert_unicode_to_string(value) for key, value in original.iteritems()}
+            return {DalToolbox.convert_unicode_to_string(key): DalToolbox.convert_unicode_to_string(value) for key, value in original.iteritems()}
         if isinstance(original, list):
-            return [Toolbox.convert_unicode_to_string(item) for item in original]
+            return [DalToolbox.convert_unicode_to_string(item) for item in original]
         if isinstance(original, unicode):
             return str(original)
         return original

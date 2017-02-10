@@ -31,7 +31,7 @@ from ovs.extensions.generic.filemutex import NoLockAvailableException
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.toolbox import Toolbox as ExtensionToolbox
+from ovs.extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.migration.migrator import Migrator
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
@@ -411,7 +411,7 @@ class UpdateController(object):
                 if not service_name.startswith('arakoon-'):
                     UpdateController.change_services_state(services=[service_name], ssh_clients=[client], action='restart')
                 else:
-                    cluster_name = ArakoonClusterConfig.get_cluster_name(ExtensionToolbox.remove_prefix(service_name, 'arakoon-'))
+                    cluster_name = ArakoonClusterConfig.get_cluster_name(ExtensionsToolbox.remove_prefix(service_name, 'arakoon-'))
                     if cluster_name == 'config':
                         filesystem = True
                         arakoon_metadata = ArakoonInstaller.get_arakoon_metadata_by_cluster_name(cluster_name='cacc', filesystem=True, ip=local_ip)
@@ -545,6 +545,7 @@ class UpdateController(object):
         filemutex = file_mutex('system_update', wait=2)
         ssh_clients = []
         services_stop_start = set()
+        errors_during_update = False
         try:
             filemutex.acquire()
             UpdateController._logger.debug('+++ Starting update +++')
@@ -700,20 +701,17 @@ class UpdateController(object):
             UpdateController.change_services_state(services=services_stop_start,
                                                    ssh_clients=ssh_clients,
                                                    action='start')
-
-            UpdateController._refresh_package_information()
-            UpdateController._logger.debug('+++ Finished updating +++')
         except NoLockAvailableException:
             UpdateController._logger.debug('Another update is currently in progress!')
         except Exception as ex:
+            errors_during_update = True
             UpdateController._logger.exception('Error during update: {0}'.format(ex))
             if len(ssh_clients) > 0 and abort is False:
                 UpdateController.change_services_state(services=services_stop_start,
                                                        ssh_clients=ssh_clients,
                                                        action='start')
-                UpdateController._refresh_package_information()
-            UpdateController._logger.error('Failed to update. Please check all the logs for more information')
         finally:
+            UpdateController._refresh_package_information()
             filemutex.release()
             for ssh_client in ssh_clients:
                 for file_name in [UpdateController._update_file, UpdateController._update_ongoing_file]:
@@ -722,6 +720,10 @@ class UpdateController(object):
                             ssh_client.file_delete(file_name)
                     except:
                         UpdateController._logger.warning('[0}: Failed to remove lock file {1}'.format(ssh_client.ip, file_name))
+            if errors_during_update is True:
+                UpdateController._logger.error('Failed to update. Please check all the logs for more information')
+            else:
+                UpdateController._logger.debug('+++ Finished updating +++')
 
     @staticmethod
     def change_services_state(services, ssh_clients, action):
@@ -753,7 +755,7 @@ class UpdateController(object):
     @staticmethod
     def _refresh_package_information():
         # Refresh updates
-        UpdateController._logger.debug('Refreshing package information')
+        UpdateController._logger.debug('Refreshing update information')
         counter = 1
         while counter < 6:
             try:
@@ -762,6 +764,5 @@ class UpdateController(object):
             except Exception:
                 UpdateController._logger.debug('Attempt {0}: Could not refresh the update information, trying again'.format(counter))
                 time.sleep(6)  # Wait 30 seconds max in total
-            counter += 1
-            if counter == 6:
-                raise Exception('Could not refresh the update information')
+                counter += 1
+        UpdateController._logger.debug('Failed to refresh the update information')

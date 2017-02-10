@@ -594,7 +594,7 @@ class DataList(object):
         if key is None:
             return self._guids.sort(reverse=reverse)
 
-        def extract_key(guid):
+        def _extract_key(guid):
             if self._shallow_sort is True:
                 try:
                     type_dict = {'guid': guid}
@@ -605,7 +605,7 @@ class DataList(object):
             return key(self._get_object(guid))
 
         self._shallow_sort = True
-        self._guids.sort(key=extract_key, reverse=reverse)
+        self._guids.sort(key=_extract_key, reverse=reverse)
 
     def reverse(self):
         """

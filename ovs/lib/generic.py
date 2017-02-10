@@ -40,10 +40,10 @@ from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.toolbox import Toolbox as ExtensionToolbox
+from ovs.extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.services.service import ServiceManager
 from ovs.lib.helpers.decorators import ensure_single
-from ovs.lib.helpers.toolbox import Schedule, Toolbox
+from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
@@ -459,7 +459,7 @@ class GenericController(object):
             if service.is_internal is True and service.type.name in (ServiceType.SERVICE_TYPES.ARAKOON,
                                                                      ServiceType.SERVICE_TYPES.NS_MGR,
                                                                      ServiceType.SERVICE_TYPES.ALBA_MGR):
-                cluster = ExtensionToolbox.remove_prefix(service.name, 'arakoon-')
+                cluster = ExtensionsToolbox.remove_prefix(service.name, 'arakoon-')
                 if cluster in cluster_names:
                     continue
                 cluster_names.append(cluster)

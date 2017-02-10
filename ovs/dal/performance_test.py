@@ -30,7 +30,7 @@ from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobject import DataObject
 from ovs.dal.exceptions import ObjectNotFoundException
-from ovs.dal.helpers import Toolbox
+from ovs.dal.helpers import DalToolbox
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 
 
@@ -162,7 +162,7 @@ class LotsOfObjects(object):
             dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                         'items': []})
             start = time.time()
-            dlist.sort(key=lambda a: Toolbox.extract_key(a, 'size'))
+            dlist.sort(key=lambda a: DalToolbox.extract_key(a, 'size'))
             seconds_passed = time.time() - start
             print 'completed ({0:.2f}s) in {1:.2f} seconds (avg: {2:.2f} dps)'.format(time.time() - tstart, seconds_passed, total_amount_of_disks / seconds_passed)
 
@@ -171,7 +171,7 @@ class LotsOfObjects(object):
             dlist = DataList(TestDisk, {'type': DataList.where_operator.AND,
                                         'items': []})
             start = time.time()
-            dlist.sort(key=lambda a: Toolbox.extract_key(a, 'predictable'))
+            dlist.sort(key=lambda a: DalToolbox.extract_key(a, 'predictable'))
             seconds_passed = time.time() - start
             print 'completed ({0:.2f}s) in {1:.2f} seconds (avg: {2:.2f} dps)'.format(time.time() - tstart, seconds_passed, total_amount_of_disks / seconds_passed)
 
