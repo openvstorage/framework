@@ -26,7 +26,9 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.structures import Property, Relation, Dynamic
-from ovs.extensions.storageserver.storagedriver import MaxRedirectsExceededException, StorageDriverClient, ObjectRegistryClient, FSMetaDataClient
+from ovs.extensions.storageserver.storagedriver import \
+    MaxRedirectsExceededException, VolumeRestartInProgressException, \
+    FSMetaDataClient, ObjectRegistryClient, StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
 
@@ -139,10 +141,16 @@ class VDisk(DataObject):
         snapshots = []
         if self.volume_id and self.vpool:
             volume_id = str(self.volume_id)
+            voldrv_snapshots = []
             try:
-                voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
+                try:
+                    voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
+                except VolumeRestartInProgressException:
+                    time.sleep(0.5)
+                    voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
             except:
-                voldrv_snapshots = []
+                pass
+
             for snap_id in voldrv_snapshots:
                 snapshot = self.storagedriver_client.info_snapshot(volume_id, snap_id, req_timeout_secs=2)
                 if snapshot.metadata:
@@ -175,10 +183,14 @@ class VDisk(DataObject):
         max_redirects = False
         if self.volume_id and self.vpool:
             try:
-                vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id), req_timeout_secs=2)
+                try:
+                    vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id), req_timeout_secs=2)
+                except VolumeRestartInProgressException:
+                    time.sleep(0.5)
+                    vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id), req_timeout_secs=2)
             except MaxRedirectsExceededException:
                 max_redirects = True
-            except Exception:
+            except:
                 pass
 
         vdiskinfodict = {}
@@ -196,7 +208,7 @@ class VDisk(DataObject):
                                                        'port': nodeconfig.port()})
                 else:
                     vdiskinfodict[key] = objectvalue
-        vdiskinfodict['live_status'] = 'NON-RUNNING' if max_redirects is True else 'RUNNING' if vdiskinfodict['halted'] is False else 'HALTED'
+        vdiskinfodict['live_status'] = 'NON-RUNNING' if max_redirects is True else ('RUNNING' if vdiskinfodict['halted'] is False else 'HALTED')
         return vdiskinfodict
 
     def _statistics(self, dynamic):
