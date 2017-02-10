@@ -22,7 +22,7 @@ import json
 import uuid
 import pickle
 import threading
-from volumedriver.storagerouter.storagerouterclient import DTLConfigMode
+from volumedriver.storagerouter.storagerouterclient import DTLConfigMode, ObjectNotFoundException
 
 
 class LocalStorageRouterClient(object):
@@ -469,6 +469,27 @@ class ObjectRegistryClient(object):
                 StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')
             )
         return None
+
+
+class FileSystemMetaDataClient(object):
+    """
+    Mocks the FileSystemMetaDataClient
+    """
+
+    def __init__(self, vrouter_cluster_id, arakoon_cluster_id, arakoon_node_configs):
+        """
+        Initializes a Mocked FileSystemMetaDataClient
+        """
+        self.vpool_guid = vrouter_cluster_id
+        _ = arakoon_cluster_id, arakoon_node_configs
+
+    def lookup(self, volume_id):
+        """
+        Gets the devicename corresponding with a given Volume ID
+        """
+        if volume_id not in StorageRouterClient.volumes[self.vpool_guid]:
+            raise ObjectNotFoundException(volume_id)
+        return StorageRouterClient.volumes[self.vpool_guid][volume_id]['target_path']
 
 
 class MDSClient(object):
