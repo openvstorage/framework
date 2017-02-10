@@ -39,6 +39,8 @@ class Toolbox(object):
     """
     Generic class for various methods
     """
+    _function_pointers = {}
+
     regex_ip = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
     regex_guid = re.compile('^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$')
     regex_vpool = re.compile('^[0-9a-z][\-a-z0-9]{1,20}[a-z0-9]$')
@@ -56,6 +58,9 @@ class Toolbox(object):
         :return: The functions found decorated with the specified hooks
         :rtype: list
         """
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            return Toolbox._function_pointers.get('{0}-{1}'.format(component, sub_component), [])
+
         functions = []
         path = '{0}/../'.format(os.path.dirname(__file__))
         for filename in os.listdir(path):
