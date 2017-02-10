@@ -40,16 +40,27 @@ from volumedriver.storagerouter.storagerouterclient import \
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     from ovs.extensions.storageserver.tests.mockups import \
         ArakoonNodeConfig, ClusterRegistry, LocalStorageRouterClient, \
-        MDSClient, ObjectRegistryClient as ORClient, StorageRouterClient
+        MDSClient, ObjectRegistryClient as ORClient, StorageRouterClient, \
+        FileSystemMetaDataClient
 else:
     from volumedriver.storagerouter.storagerouterclient import \
         ArakoonNodeConfig, ClusterRegistry, LocalStorageRouterClient, \
         MDSClient, ObjectRegistryClient as ORClient, StorageRouterClient
+    try:
+        from volumedriver.storagerouter.storagerouterclient import \
+            FileSystemMetaDataClient
+    except ImportError:
+        FileSystemMetaDataClient = None
 
 client_vpool_cache = {}
 oclient_vpool_cache = {}
 crclient_vpool_cache = {}
+fsmclient_vpool_cache = {}
 mdsclient_service_cache = {}
+
+
+class FeatureNotAvailableException(Exception):
+    pass
 
 
 # noinspection PyArgumentList
@@ -246,6 +257,41 @@ class ClusterRegistryClient(object):
             client = ClusterRegistry(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
             crclient_vpool_cache[key] = client
         return crclient_vpool_cache[key]
+
+
+class FSMetaDataClient(object):
+    """
+    Builds a FileSystemMetaDataClient
+    """
+    def __init__(self):
+        """
+        Dummy init method
+        """
+        pass
+
+    @staticmethod
+    def load(vpool):
+        """
+        Initializes the wrapper for a given vPool
+        :param vpool: vPool for which the FileSystemMetaDataClient needs to be loaded
+        """
+        if FileSystemMetaDataClient is None:
+            raise FeatureNotAvailableException()
+
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            return FileSystemMetaDataClient(str(vpool.guid), None, None)
+
+        key = vpool.identifier
+        if key not in fsmclient_vpool_cache:
+            arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
+            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
+            config.load_config()
+            arakoon_node_configs = []
+            for node in config.nodes:
+                arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
+            client = FileSystemMetaDataClient(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
+            fsmclient_vpool_cache[key] = client
+        return fsmclient_vpool_cache[key]
 
 
 class StorageDriverConfiguration(object):

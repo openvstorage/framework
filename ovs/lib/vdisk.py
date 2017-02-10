@@ -39,10 +39,12 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
+from ovs.extensions.generic.toolbox import Toolbox as GenericToolbox
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
-                                                       SRCObjectNotFoundException, StorageDriverClient, StorageDriverConfiguration
+                                                       StorageDriverClient, StorageDriverConfiguration, \
+                                                       SRCObjectNotFoundException, FeatureNotAvailableException
 from ovs.lib.helpers.decorators import ensure_single, log
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.mdsservice import MDSServiceController
@@ -229,6 +231,34 @@ class VDiskController(object):
                 VDiskController._logger.info('Migration - Guid {0} - ID {1} - Storage Router {2} is the new owner of vDisk {3}'.format(vdisk.guid, vdisk.volume_id, sd.storagerouter.name, vdisk.name))
             MDSServiceController.mds_checkup()
             VDiskController.dtl_checkup(vdisk_guid=vdisk.guid)
+
+    @staticmethod
+    @celery.task(name='ovs.vdisk.rename_from_voldrv')
+    def rename_from_voldrv(old_path, new_path, storagedriver_id):
+        """
+        Processes a rename event from the volumedriver. At this point we only expect folder renames. These folders
+        might contain vDisks. Although the vDisk's .raw file cannot be moved/renamed, the folders can.
+        :param old_path: The old path (prefix) that is renamed
+        :param new_path: The new path (prefix) of that folder
+        :param storagedriver_id: The StorageDriver's ID that executed the rename
+        :return: None
+        """
+        old_path = '/{0}/'.format(old_path.strip('/'))
+        new_path = '/{0}/'.format(new_path.strip('/'))
+        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+        vpool = storagedriver.vpool
+        VDiskController._logger.debug('Processing rename on {0} from {1} to {2}'.format(vpool.name, old_path, new_path))
+        for vdisk in vpool.vdisks:
+            devicename = vdisk.devicename
+            if devicename.startswith(old_path):
+                volume_id = vdisk.volume_id
+                with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+                    vdisk.discard()
+                    devicename = vdisk.devicename
+                    if devicename.startswith(old_path):
+                        vdisk.devicename = '{0}{1}'.format(new_path, GenericToolbox.remove_prefix(devicename, old_path))
+                        vdisk.save()
+                        VDiskController._logger.info('Renaming devicename from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.clone')
@@ -1310,11 +1340,17 @@ class VDiskController(object):
                         new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
                         if new_vdisk is None:
                             VDiskController._logger.info('Adding missing vDisk in the model for {0}'.format(volume_id))
-                            devicename = '/{0}.raw'.format(volume_id)  # TODO: Replace with actual devicename once available
-                            name = volume_id  # VDiskController.extract_volumename(devicename)
                             new_vdisk = VDisk()
                             new_vdisk.volume_id = volume_id
                             new_vdisk.vpool = vpool
+                            try:
+                                fsmetadata_client = new_vdisk.fsmetadata_client
+                                devicename = fsmetadata_client.lookup(volume_id)
+                                name = VDiskController.extract_volumename(devicename)
+                            except FeatureNotAvailableException:
+                                VDiskController._logger.exception('Could not load devicename from StorageDriver')
+                                devicename = '/{0}.raw'.format(volume_id)
+                                name = volume_id
                             new_vdisk.name = name
                             new_vdisk.description = name
                             new_vdisk.devicename = devicename
