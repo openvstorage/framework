@@ -25,6 +25,11 @@ import threading
 from volumedriver.storagerouter.storagerouterclient import DTLConfigMode, ObjectNotFoundException
 
 
+class VolumeRestartInProgressException(Exception):
+    """ VolumeRestartInProgressException mockup for backwards compatibility """
+    pass
+
+
 class LocalStorageRouterClient(object):
     """
     Local Storage Router Client mock class

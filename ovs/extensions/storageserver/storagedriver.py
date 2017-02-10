@@ -27,9 +27,11 @@ from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 
-# Import below classes so the rest of the framework can always import from this module, so we can inject mocks
-# easier without having to make changes everywhere
+# Import below classes so the rest of the framework can always import from this module:
+# * We can inject mocks easier without having to make changes everywhere
+# * We can handle backwards compatibility better
 # noinspection PyUnresolvedReferences
+
 from volumedriver.storagerouter.storagerouterclient import \
     ClusterContact, ClusterNodeConfig, \
     DTLConfig, DTLConfigMode, DTLMode, Logger, \
@@ -37,6 +39,11 @@ from volumedriver.storagerouter.storagerouterclient import \
     ObjectNotFoundException as SRCObjectNotFoundException, \
     ReadCacheBehaviour, ReadCacheMode, \
     Role, Statistics, VolumeInfo
+try:
+    from volumedriver.storagerouter.storagerouterclient import VolumeRestartInProgressException
+except ImportError:
+    from ovs.extensions.storageserver.tests.mockups import VolumeRestartInProgressException
+
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     from ovs.extensions.storageserver.tests.mockups import \
         ArakoonNodeConfig, ClusterRegistry, LocalStorageRouterClient, \
@@ -47,10 +54,10 @@ else:
         ArakoonNodeConfig, ClusterRegistry, LocalStorageRouterClient, \
         MDSClient, ObjectRegistryClient as ORClient, StorageRouterClient
     try:
-        from volumedriver.storagerouter.storagerouterclient import \
-            FileSystemMetaDataClient
+        from volumedriver.storagerouter.storagerouterclient import FileSystemMetaDataClient
     except ImportError:
         FileSystemMetaDataClient = None
+
 
 client_vpool_cache = {}
 oclient_vpool_cache = {}
