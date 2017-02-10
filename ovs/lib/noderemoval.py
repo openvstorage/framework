@@ -28,7 +28,7 @@ from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
-from ovs.lib.helpers.toolbox import Toolbox
+from ovs.lib.helpers.toolbox import LibToolbox
 from ovs.lib.nodetype import NodeTypeController
 from ovs.log.log_handler import LogHandler
 
@@ -55,8 +55,8 @@ class NodeRemovalController(object):
         from ovs.dal.lists.storagerouterlist import StorageRouterList
         from ovs.extensions.generic.sshclient import NotAuthenticatedException
 
-        Toolbox.log(logger=NodeRemovalController._logger, messages='Remove node', boxed=True)
-        Toolbox.log(logger=NodeRemovalController._logger, messages='WARNING: Some of these steps may take a very long time, please check the logs for more information\n\n')
+        LibToolbox.log(logger=NodeRemovalController._logger, messages='Remove node', boxed=True)
+        LibToolbox.log(logger=NodeRemovalController._logger, messages='WARNING: Some of these steps may take a very long time, please check the logs for more information\n\n')
 
         ###############
         # VALIDATIONS #
@@ -86,7 +86,7 @@ class NodeRemovalController(object):
             if System.get_my_storagerouter() == storage_router_to_remove:
                 raise RuntimeError('The node to be removed cannot be identical to the node on which the removal is initiated')
 
-            Toolbox.log(logger=NodeRemovalController._logger, messages='Creating SSH connections to remaining master nodes')
+            LibToolbox.log(logger=NodeRemovalController._logger, messages='Creating SSH connections to remaining master nodes')
             master_ip = None
             ip_client_map = {}
             storage_routers_offline = []
@@ -95,12 +95,12 @@ class NodeRemovalController(object):
                 try:
                     client = SSHClient(storage_router, username='root')
                     if client.run(['pwd']):
-                        Toolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} successfully connected to'.format(storage_router.ip))
+                        LibToolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} successfully connected to'.format(storage_router.ip))
                         ip_client_map[storage_router.ip] = client
                         if storage_router != storage_router_to_remove and storage_router.node_type == 'MASTER':
                             master_ip = storage_router.ip
                 except (UnableToConnectException, NotAuthenticatedException):
-                    Toolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} is unreachable'.format(storage_router.ip))
+                    LibToolbox.log(logger=NodeRemovalController._logger, messages='  Node with IP {0:<15} is unreachable'.format(storage_router.ip))
                     storage_routers_offline.append(storage_router)
                     if storage_router == storage_router_to_remove:
                         storage_router_to_remove_online = False
@@ -112,8 +112,8 @@ class NodeRemovalController(object):
             if len(storage_router_to_remove.vdisks_guids) > 0:  # vDisks are supposed to be moved away manually before removing a node
                 raise RuntimeError("Still vDisks attached to Storage Router {0}".format(storage_router_to_remove.name))
 
-            internal_memcached = Toolbox.is_service_internally_managed(service='memcached')
-            internal_rabbit_mq = Toolbox.is_service_internally_managed(service='rabbitmq')
+            internal_memcached = LibToolbox.is_service_internally_managed(service='memcached')
+            internal_rabbit_mq = LibToolbox.is_service_internally_managed(service='rabbitmq')
             memcached_endpoints = Configuration.get(key='/ovs/framework/memcache|endpoints')
             rabbit_mq_endpoints = Configuration.get(key='/ovs/framework/messagequeue|endpoints')
             copy_memcached_endpoints = list(memcached_endpoints)
@@ -129,12 +129,12 @@ class NodeRemovalController(object):
             if len(copy_rabbit_mq_endpoints) == 0 and internal_rabbit_mq is True:
                 raise RuntimeError('Removal of provided nodes will result in a complete removal of the messagequeue service')
 
-            Toolbox.run_hooks(component='noderemoval',
-                              sub_component='validate_removal',
-                              logger=NodeRemovalController._logger,
-                              cluster_ip=storage_router_to_remove.ip)
+            LibToolbox.run_hooks(component='noderemoval',
+                                 sub_component='validate_removal',
+                                 logger=NodeRemovalController._logger,
+                                 cluster_ip=storage_router_to_remove.ip)
         except Exception as exception:
-            Toolbox.log(logger=NodeRemovalController._logger, messages=[str(exception)], boxed=True, loglevel='exception')
+            LibToolbox.log(logger=NodeRemovalController._logger, messages=[str(exception)], boxed=True, loglevel='exception')
             sys.exit(1)
 
         #################
@@ -145,7 +145,7 @@ class NodeRemovalController(object):
         if interactive is True:
             proceed = Interactive.ask_yesno(message='Are you sure you want to remove node {0}?'.format(storage_router_to_remove.name), default_value=False)
             if proceed is False:
-                Toolbox.log(logger=NodeRemovalController._logger, messages='Abort removal', title=True)
+                LibToolbox.log(logger=NodeRemovalController._logger, messages='Abort removal', title=True)
                 sys.exit(1)
 
             if storage_router_to_remove_online is True:
@@ -154,7 +154,7 @@ class NodeRemovalController(object):
                     remove_asd_manager = Interactive.ask_yesno(message='Do you also want to remove the ASD manager and related ASDs?', default_value=False)
 
             if remove_asd_manager is True or storage_router_to_remove_online is False:
-                for function in Toolbox.fetch_hooks('noderemoval', 'validate_asd_removal'):
+                for function in LibToolbox.fetch_hooks('noderemoval', 'validate_asd_removal'):
                     validation_output = function(storage_router_to_remove.ip)
                     if validation_output['confirm'] is True:
                         if Interactive.ask_yesno(message=validation_output['question'], default_value=False) is False:
@@ -165,16 +165,16 @@ class NodeRemovalController(object):
         # REMOVAL #
         ###########
         try:
-            Toolbox.log(logger=NodeRemovalController._logger, messages='Starting removal of node {0} - {1}'.format(storage_router_to_remove.name, storage_router_to_remove.ip))
+            LibToolbox.log(logger=NodeRemovalController._logger, messages='Starting removal of node {0} - {1}'.format(storage_router_to_remove.name, storage_router_to_remove.ip))
             if storage_router_to_remove_online is False:
-                Toolbox.log(logger=NodeRemovalController._logger, messages='  Marking all Storage Drivers served by Storage Router {0} as offline'.format(storage_router_to_remove.ip))
+                LibToolbox.log(logger=NodeRemovalController._logger, messages='  Marking all Storage Drivers served by Storage Router {0} as offline'.format(storage_router_to_remove.ip))
                 StorageDriverController.mark_offline(storagerouter_guid=storage_router_to_remove.guid)
 
             # Remove vPools
-            Toolbox.log(logger=NodeRemovalController._logger, messages='  Removing vPools from node'.format(storage_router_to_remove.ip))
+            LibToolbox.log(logger=NodeRemovalController._logger, messages='  Removing vPools from node'.format(storage_router_to_remove.ip))
             storage_routers_offline_guids = [sr.guid for sr in storage_routers_offline if sr.guid != storage_router_to_remove.guid]
             for storage_driver in storage_router_to_remove.storagedrivers:
-                Toolbox.log(logger=NodeRemovalController._logger, messages='    Removing vPool {0} from node'.format(storage_driver.vpool.name))
+                LibToolbox.log(logger=NodeRemovalController._logger, messages='    Removing vPool {0} from node'.format(storage_driver.vpool.name))
                 StorageRouterController.remove_storagedriver(storagedriver_guid=storage_driver.guid,
                                                              offline_storage_router_guids=storage_routers_offline_guids)
 
@@ -189,24 +189,24 @@ class NodeRemovalController(object):
                                                offline_nodes=storage_routers_offline)
 
             # Stop / remove services
-            Toolbox.log(logger=NodeRemovalController._logger, messages='Stopping and removing services')
+            LibToolbox.log(logger=NodeRemovalController._logger, messages='Stopping and removing services')
             if storage_router_to_remove_online is True:
                 client = SSHClient(endpoint=storage_router_to_remove, username='root')
                 NodeRemovalController.remove_services(client=client, node_type=storage_router_to_remove.node_type.lower(), logger=NodeRemovalController._logger)
                 service = 'watcher-config'
                 if ServiceManager.has_service(service, client=client):
-                    Toolbox.log(logger=NodeRemovalController._logger, messages='Removing service {0}'.format(service))
+                    LibToolbox.log(logger=NodeRemovalController._logger, messages='Removing service {0}'.format(service))
                     ServiceManager.stop_service(service, client=client)
                     ServiceManager.remove_service(service, client=client)
 
-            Toolbox.run_hooks(component='noderemoval',
-                              sub_component='remove',
-                              logger=NodeRemovalController._logger,
-                              cluster_ip=storage_router_to_remove.ip,
-                              complete_removal=remove_asd_manager)
+            LibToolbox.run_hooks(component='noderemoval',
+                                 sub_component='remove',
+                                 logger=NodeRemovalController._logger,
+                                 cluster_ip=storage_router_to_remove.ip,
+                                 complete_removal=remove_asd_manager)
 
             # Clean up model
-            Toolbox.log(logger=NodeRemovalController._logger, messages='Removing node from model')
+            LibToolbox.log(logger=NodeRemovalController._logger, messages='Removing node from model')
             for service in storage_router_to_remove.services:
                 service.delete()
             for disk in storage_router_to_remove.disks:
@@ -226,24 +226,24 @@ class NodeRemovalController(object):
                 client.file_delete(filenames=[ArakoonConfiguration.CACC_LOCATION])
                 client.file_delete(filenames=[Configuration.BOOTSTRAP_CONFIG_LOCATION])
             storage_router_to_remove.delete()
-            Toolbox.log(logger=NodeRemovalController._logger, messages='Successfully removed node\n')
+            LibToolbox.log(logger=NodeRemovalController._logger, messages='Successfully removed node\n')
         except Exception as exception:
-            Toolbox.log(logger=NodeRemovalController._logger, messages='\n')
-            Toolbox.log(logger=NodeRemovalController._logger, messages=['An unexpected error occurred:', str(exception)], boxed=True, loglevel='exception')
+            LibToolbox.log(logger=NodeRemovalController._logger, messages='\n')
+            LibToolbox.log(logger=NodeRemovalController._logger, messages=['An unexpected error occurred:', str(exception)], boxed=True, loglevel='exception')
             sys.exit(1)
         except KeyboardInterrupt:
-            Toolbox.log(logger=NodeRemovalController._logger, messages='\n')
-            Toolbox.log(logger=NodeRemovalController._logger,
-                        messages='This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.',
-                        boxed=True,
-                        loglevel='error')
+            LibToolbox.log(logger=NodeRemovalController._logger, messages='\n')
+            LibToolbox.log(logger=NodeRemovalController._logger,
+                           messages='This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.',
+                           boxed=True,
+                           loglevel='error')
             sys.exit(1)
 
         if remove_asd_manager is True:
-            Toolbox.log(logger=NodeRemovalController._logger, messages='\nRemoving ASD Manager')
+            LibToolbox.log(logger=NodeRemovalController._logger, messages='\nRemoving ASD Manager')
             with remote(storage_router_to_remove.ip, [os]) as rem:
                 rem.os.system('asd-manager remove --force-yes')
-        Toolbox.log(logger=NodeRemovalController._logger, messages='Remove nodes finished', title=True)
+        LibToolbox.log(logger=NodeRemovalController._logger, messages='Remove nodes finished', title=True)
 
     @staticmethod
     def remove_services(client, node_type, logger):
@@ -257,20 +257,20 @@ class NodeRemovalController(object):
         :type logger: ovs.log.log_handler.LogHandler
         :return: None
         """
-        Toolbox.log(logger=logger, messages='Removing services')
+        LibToolbox.log(logger=logger, messages='Removing services')
         stop_only = ['rabbitmq-server', 'memcached']
         services = ['workers', 'support-agent', 'watcher-framework']
         if node_type == 'master':
             services += ['scheduled-tasks', 'webapp-api', 'volumerouter-consumer']
-            if Toolbox.is_service_internally_managed(service='rabbitmq') is True:
+            if LibToolbox.is_service_internally_managed(service='rabbitmq') is True:
                 services.append('rabbitmq-server')
-            if Toolbox.is_service_internally_managed(service='memcached') is True:
+            if LibToolbox.is_service_internally_managed(service='memcached') is True:
                 services.append('memcached')
 
         for service in services:
             if ServiceManager.has_service(service, client=client):
-                Toolbox.log(logger=logger,
-                            messages='{0} service {1}'.format('Removing' if service not in stop_only else 'Stopping', service))
+                LibToolbox.log(logger=logger,
+                               messages='{0} service {1}'.format('Removing' if service not in stop_only else 'Stopping', service))
                 ServiceManager.stop_service(service, client=client)
                 if service not in stop_only:
                     ServiceManager.remove_service(service, client=client)

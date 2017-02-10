@@ -63,9 +63,9 @@ class PluginManager(object):
             from ovs.dal.helpers import Migration
             Migration.migrate()
 
-            from ovs.lib.helpers.toolbox import Toolbox
+            from ovs.lib.helpers.toolbox import LibToolbox
             ip = System.get_my_storagerouter().ip
-            functions = Toolbox.fetch_hooks('plugin', 'postinstall')
+            functions = LibToolbox.fetch_hooks('plugin', 'postinstall')
             if len(functions) > 0:
                 print '- Execute post installation scripts'
             for function in functions:

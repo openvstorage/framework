@@ -27,7 +27,7 @@ import string
 import inspect
 import subprocess
 from celery.schedules import crontab
-from ovs.dal.helpers import Toolbox as HelperToolbox
+from ovs.dal.helpers import DalToolbox
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
@@ -35,10 +35,12 @@ from ovs.extensions.services.service import ServiceManager
 from ovs.log.log_handler import LogHandler
 
 
-class Toolbox(object):
+class LibToolbox(object):
     """
     Generic class for various methods
     """
+    _function_pointers = {}
+
     regex_ip = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
     regex_guid = re.compile('^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$')
     regex_vpool = re.compile('^[0-9a-z][\-a-z0-9]{1,20}[a-z0-9]$')
@@ -56,6 +58,9 @@ class Toolbox(object):
         :return: The functions found decorated with the specified hooks
         :rtype: list
         """
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            return LibToolbox._function_pointers.get('{0}-{1}'.format(component, sub_component), [])
+
         functions = []
         path = '{0}/../'.format(os.path.dirname(__file__))
         for filename in os.listdir(path):
@@ -89,13 +94,13 @@ class Toolbox(object):
         :type kwargs: dict
         :return: Amount of functions executed
         """
-        functions = Toolbox.fetch_hooks(component=component, sub_component=sub_component)
+        functions = LibToolbox.fetch_hooks(component=component, sub_component=sub_component)
         functions_found = len(functions) > 0
         if logger is not None and functions_found is True:
-            Toolbox.log(logger=logger, messages='Running "{0} - {1}" hooks'.format(component, sub_component), title=True)
+            LibToolbox.log(logger=logger, messages='Running "{0} - {1}" hooks'.format(component, sub_component), title=True)
         for function in functions:
             if logger is not None:
-                Toolbox.log(logger=logger, messages='Executing {0}.{1}'.format(function.__module__, function.__name__))
+                LibToolbox.log(logger=logger, messages='Executing {0}.{1}'.format(function.__module__, function.__name__))
             function(**kwargs)
         return functions_found
 
@@ -136,7 +141,7 @@ class Toolbox(object):
 
             mandatory_or_optional = 'Optional' if optional is True else 'Mandatory'
             actual_value = actual_params[required_key]
-            if HelperToolbox.check_type(actual_value, expected_type)[0] is False:
+            if DalToolbox.check_type(actual_value, expected_type)[0] is False:
                 error_messages.append('{0} param "{1}" is of type "{2}" but we expected type "{3}"'.format(mandatory_or_optional, required_key, type(actual_value), expected_type))
                 continue
 
@@ -144,12 +149,12 @@ class Toolbox(object):
                 continue
 
             if expected_type == list:
-                if type(expected_value) == Toolbox.compiled_regex_type:  # List of strings which need to match regex
+                if type(expected_value) == LibToolbox.compiled_regex_type:  # List of strings which need to match regex
                     for item in actual_value:
                         if not re.match(expected_value, item):
                             error_messages.append('{0} param "{1}" has an item "{2}" which does not match regex "{3}"'.format(mandatory_or_optional, required_key, item, expected_value.pattern))
             elif expected_type == dict:
-                Toolbox.verify_required_params(expected_value, actual_params[required_key])
+                LibToolbox.verify_required_params(expected_value, actual_params[required_key])
             elif expected_type == int or expected_type == float:
                 if isinstance(expected_value, list) and actual_value not in expected_value:
                     error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
@@ -159,9 +164,9 @@ class Toolbox(object):
                     if not minimum <= actual_value <= maximum:
                         error_messages.append('{0} param "{1}" with value "{2}" should be in range: {3} - {4}'.format(mandatory_or_optional, required_key, actual_value, minimum, maximum))
             else:
-                if HelperToolbox.check_type(expected_value, list)[0] is True and actual_value not in expected_value:
+                if DalToolbox.check_type(expected_value, list)[0] is True and actual_value not in expected_value:
                     error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
-                elif HelperToolbox.check_type(expected_value, Toolbox.compiled_regex_type)[0] is True and not re.match(expected_value, actual_value):
+                elif DalToolbox.check_type(expected_value, LibToolbox.compiled_regex_type)[0] is True and not re.match(expected_value, actual_value):
                     error_messages.append('{0} param "{1}" with value "{2}" does not match regex "{3}"'.format(mandatory_or_optional, required_key, actual_value, expected_value.pattern))
         if error_messages:
             raise RuntimeError('\n' + '\n'.join(error_messages))
@@ -361,7 +366,7 @@ class Toolbox(object):
             except UnableToConnectException:
                 raise
             except:
-                Toolbox.log(logger=logger, messages='Password invalid or could not connect to this node')
+                LibToolbox.log(logger=logger, messages='Password invalid or could not connect to this node')
 
 
 class Schedule(object):

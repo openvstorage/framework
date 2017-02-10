@@ -32,6 +32,7 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.generic.threadhelpers import Waiter
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
+from ovs.lib.helpers.toolbox import LibToolbox
 from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
@@ -588,8 +589,7 @@ class Generic(unittest.TestCase):
 
         # Start collapse and make it fail for all clusters on StorageRouter 2
         SSHClient._raise_exceptions[storagerouter_2.ip] = {'users': ['ovs'],
-                                                           'exception_type': UnableToConnectException,
-                                                           'exception_message': 'No route to host'}
+                                                           'exception': UnableToConnectException('No route to host')}
         GenericController.collapse_arakoon()
 
         # Verify all log messages for each type of cluster
@@ -637,6 +637,65 @@ class Generic(unittest.TestCase):
             self.assertIn(member=general_message,
                           container=generic_logs,
                           msg='Expected to find log message: {0}'.format(general_message))
+
+    def refresh_package_information_test(self):
+        """
+        Test the refresh package information functionality
+        """
+        def _multi_1(client, information):
+            information[client.ip]['component1'] = {'package1': {'candidate': 'version2',
+                                                                 'installed': 'version1',
+                                                                 'services_to_restart': []}}
+
+        def _multi_2(client, information):
+            information[client.ip]['component2'] = {'package2': {'candidate': 'version2',
+                                                                 'installed': 'version1',
+                                                                 'services_to_restart': []}}
+            if client.ip == storagerouter_3.ip:
+                information[client.ip]['errors'] = ['Unexpected error occurred for StorageRouter {0}'.format(storagerouter_3.name)]
+
+        def _single_1(information):
+            _ = information  # get_package_info_single is used for Alba nodes, so not testing here
+
+        expected_package_info = {'component1': {'package1': {'candidate': 'version2',
+                                                             'installed': 'version1',
+                                                             'services_to_restart': []}},
+                                 'component2': {'package2': {'candidate': 'version2',
+                                                             'installed': 'version1',
+                                                             'services_to_restart': []}}}
+
+        # StorageRouter 1 successfully updates its package info
+        # StorageRouter 2 is inaccessible
+        # StorageRouter 3 gets error in 2nd hook --> package_information is reset to {}
+        structure = Helper.build_service_structure(structure={'storagerouters': [1, 2, 3]})
+        storagerouter_1 = structure['storagerouters'][1]
+        storagerouter_2 = structure['storagerouters'][2]
+        storagerouter_3 = structure['storagerouters'][3]
+        LibToolbox._function_pointers['update-get_package_info_multi'] = [_multi_1, _multi_2]
+        LibToolbox._function_pointers['update-get_package_info_single'] = [_single_1]
+
+        SSHClient._raise_exceptions[storagerouter_2.ip] = {'users': ['root'],
+                                                           'exception': UnableToConnectException('No route to host')}
+
+        with self.assertRaises(excClass=Exception) as raise_info:
+            GenericController.refresh_package_information()
+
+        storagerouter_1.discard()
+        self.assertDictEqual(d1=expected_package_info,
+                             d2=storagerouter_1.package_information,
+                             msg='Incorrect package information found for StorageRouter 1'.format(storagerouter_1.name))
+        self.assertDictEqual(d1={},
+                             d2=storagerouter_2.package_information,
+                             msg='Incorrect package information found for StorageRouter 2'.format(storagerouter_2.name))
+        self.assertDictEqual(d1={},
+                             d2=storagerouter_3.package_information,
+                             msg='Incorrect package information found for StorageRouter {0}'.format(storagerouter_3.name))
+        self.assertIn(member='StorageRouter {0} is inaccessible'.format(storagerouter_2.name),
+                      container=raise_info.exception.message,
+                      msg='Expected to find log message about StorageRouter {0} being inaccessible'.format(storagerouter_2.name))
+        self.assertIn(member='Unexpected error occurred for StorageRouter {0}'.format(storagerouter_3.name),
+                      container=raise_info.exception.message,
+                      msg='Expected to find log message about unexpected error for StorageRouter {0}'.format(storagerouter_3.name))
 
     ##################
     # HELPER METHODS #

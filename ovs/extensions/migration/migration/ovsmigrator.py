@@ -56,7 +56,7 @@ class OVSMigrator(object):
             from ovs.extensions.generic.configuration import Configuration, NotFoundException
             from ovs.extensions.generic.sshclient import SSHClient
             from ovs.extensions.generic.system import System
-            from ovs.extensions.generic.toolbox import Toolbox
+            from ovs.extensions.generic.toolbox import ExtensionsToolbox
             from ovs.extensions.services.service import ServiceManager
             from ovs.extensions.services.systemd import Systemd
 
@@ -110,7 +110,7 @@ class OVSMigrator(object):
 
                     # Let the update know that Arakoon needs to be restarted
                     # Inside `if Configuration.exists`, because useless to rapport restart if we haven't rewritten service file
-                    Toolbox.edit_version_file(client=local_client, package_name='arakoon', old_service_name=service_name)
+                    ExtensionsToolbox.edit_version_file(client=local_client, package_name='arakoon', old_service_name=service_name)
 
             # Multiple Proxies
             if local_client.dir_exists(directory='/opt/OpenvStorage/config/storagedriver/storagedriver'):

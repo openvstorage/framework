@@ -44,7 +44,7 @@ from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
                                                        SRCObjectNotFoundException, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single, log
-from ovs.lib.helpers.toolbox import Toolbox, Schedule
+from ovs.lib.helpers.toolbox import LibToolbox, Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
@@ -722,14 +722,14 @@ class VDiskController(object):
 
         required_params = {'dtl_mode': (str, StorageDriverClient.VDISK_DTL_MODE_MAP.keys()),
                            'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
-                           'dtl_target': (list, Toolbox.regex_guid),
+                           'dtl_target': (list, LibToolbox.regex_guid),
                            'write_buffer': (int, {'min': 128, 'max': 10 * 1024})}
 
         if new_config_params.get('pagecache_ratio') is not None:
             # noinspection PyTypeChecker
             required_params.update({'pagecache_ratio': (float, {'min': 0, 'max': 1})})
 
-        Toolbox.verify_required_params(required_params, new_config_params)
+        LibToolbox.verify_required_params(required_params, new_config_params)
         if 'pagecache_ratio' in new_config_params and new_config_params['pagecache_ratio'] == 0:
             raise RuntimeError('Parameter pagecache_ratio must be 0 < x <= 1')
 
@@ -935,10 +935,10 @@ class VDiskController(object):
 
                     vpool = vdisk.vpool
                     vpool_config = vpool.configuration
-                    Toolbox.verify_required_params(required_params={'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
-                                                                    'dtl_enabled': (bool, None),
-                                                                    'dtl_config_mode': (str, [StorageDriverClient.VOLDRV_DTL_MANUAL_MODE, StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE])},
-                                                   actual_params=vpool_config)
+                    LibToolbox.verify_required_params(required_params={'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
+                                                                       'dtl_enabled': (bool, None),
+                                                                       'dtl_config_mode': (str, [StorageDriverClient.VOLDRV_DTL_MANUAL_MODE, StorageDriverClient.VOLDRV_DTL_AUTOMATIC_MODE])},
+                                                      actual_params=vpool_config)
 
                     volume_id = str(vdisk.volume_id)
                     dtl_vpool_enabled = vpool_config['dtl_enabled']

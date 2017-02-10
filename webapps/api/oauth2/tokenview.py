@@ -27,7 +27,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from api.oauth2.decorators import auto_response, limit, log
 from api.oauth2.exceptions import HttpBadRequestException
-from api.oauth2.toolbox import Toolbox
+from api.oauth2.toolbox import OAuth2Toolbox
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
@@ -76,7 +76,7 @@ class OAuth2TokenView(View):
                                               error_description='Client is unauthorized')
             client = clients[0]
             try:
-                access_token, _ = Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)
+                access_token, _ = OAuth2Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)
                 access_token.expiration = int(time.time() + 86400)
                 access_token.save()
             except ValueError as error:
@@ -84,7 +84,7 @@ class OAuth2TokenView(View):
                     raise HttpBadRequestException(error='invalid_scope',
                                                   error_description='Invalid scope requested')
                 raise
-            Toolbox.clean_tokens(client)
+            OAuth2Toolbox.clean_tokens(client)
             return HttpResponse(json.dumps({'access_token': access_token.access_token,
                                             'token_type': 'bearer',
                                             'expires_in': 86400}),
@@ -108,14 +108,14 @@ class OAuth2TokenView(View):
                     raise HttpBadRequestException(error='inactive_user',
                                                   error_description='User is inactive')
                 try:
-                    access_token, _ = Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)
+                    access_token, _ = OAuth2Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)
                 except ValueError as error:
                     if error.message == 'invalid_scope':
                         raise HttpBadRequestException(error='invalid_scope',
                                                       error_description='Invalid scope requested')
                     raise
                 try:
-                    Toolbox.clean_tokens(client)
+                    OAuth2Toolbox.clean_tokens(client)
                 except Exception as error:
                     logger.error('Error during session cleanup: {0}'.format(error))
                 return HttpResponse(json.dumps({'access_token': access_token.access_token,

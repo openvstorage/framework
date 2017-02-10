@@ -15,7 +15,7 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-Toolbox
+OAuth2Toolbox
 """
 import time
 import random
@@ -24,11 +24,10 @@ from ovs.dal.hybrids.bearertoken import BearerToken
 from ovs.dal.hybrids.j_rolebearertoken import RoleBearerToken
 
 
-class Toolbox(object):
+class OAuth2Toolbox(object):
     """
-    Toolbox
+    OAuth2Toolbox
     """
-
     @staticmethod
     def generate_tokens(client, generate_access=False, generic_refresh=False, scopes=None):
         """
@@ -42,7 +41,7 @@ class Toolbox(object):
             raise ValueError('invalid_scope')
         if generate_access is True:
             access_token = BearerToken()
-            access_token.access_token = Toolbox.create_hash(64)
+            access_token.access_token = OAuth2Toolbox.create_hash(64)
             access_token.expiration = int(time.time() + 3600)
             access_token.client = client
             access_token.save()
@@ -53,7 +52,7 @@ class Toolbox(object):
                 link.save()
         if generic_refresh is True:
             refresh_token = BearerToken()
-            refresh_token.refresh_token = Toolbox.create_hash(128)
+            refresh_token.refresh_token = OAuth2Toolbox.create_hash(128)
             refresh_token.expiration = int(time.time() + 86400)
             refresh_token.client = client
             refresh_token.save()
@@ -77,6 +76,13 @@ class Toolbox(object):
 
     @staticmethod
     def create_hash(length):
+        """
+        Create a random hash of 'length' characters
+        :param length: Length of the hash
+        :type length: int
+        :return: A hash of 'length' characters
+        :rtype: str
+        """
         return ''.join(random.choice(string.ascii_letters +
                                      string.digits +
                                      '|_=+*#@!/-[]{}<>.?,;:~')

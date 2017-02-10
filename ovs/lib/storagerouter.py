@@ -54,7 +54,7 @@ from ovs.extensions.storageserver.storagedriver import ClusterNodeConfig, LocalS
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import ensure_single
-from ovs.lib.helpers.toolbox import Toolbox
+from ovs.lib.helpers.toolbox import LibToolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.lib.vdisk import VDiskController
@@ -178,9 +178,9 @@ class StorageRouterController(object):
         :type parameters: dict
         :return: None
         """
-        required_params = {'vpool_name': (str, Toolbox.regex_vpool),
-                           'storage_ip': (str, Toolbox.regex_ip),
-                           'storagerouter_ip': (str, Toolbox.regex_ip),
+        required_params = {'vpool_name': (str, LibToolbox.regex_vpool),
+                           'storage_ip': (str, LibToolbox.regex_ip),
+                           'storagerouter_ip': (str, LibToolbox.regex_ip),
                            'writecache_size': (int, {'min': 1, 'max': 10240}),
                            'config_params': (dict, {'dtl_mode': (str, StorageDriverClient.VPOOL_DTL_MODE_MAP.keys()),
                                                     'sco_size': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.keys()),
@@ -189,11 +189,11 @@ class StorageRouterController(object):
                                                     'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys())}),
                            'fragment_cache_on_read': (bool, None),
                            'fragment_cache_on_write': (bool, None),
-                           'backend_info': (dict, {'preset': (str, Toolbox.regex_preset),
-                                                   'alba_backend_guid': (str, Toolbox.regex_guid)}),
-                           'backend_info_aa': (dict, {'preset': (str, Toolbox.regex_preset),
-                                                      'alba_backend_guid': (str, Toolbox.regex_guid)}, False),
-                           'connection_info': (dict, {'host': (str, Toolbox.regex_ip),
+                           'backend_info': (dict, {'preset': (str, LibToolbox.regex_preset),
+                                                   'alba_backend_guid': (str, LibToolbox.regex_guid)}),
+                           'backend_info_aa': (dict, {'preset': (str, LibToolbox.regex_preset),
+                                                      'alba_backend_guid': (str, LibToolbox.regex_guid)}, False),
+                           'connection_info': (dict, {'host': (str, LibToolbox.regex_ip),
                                                       'port': (int, None),
                                                       'client_id': (str, None),
                                                       'client_secret': (str, None),
@@ -206,7 +206,7 @@ class StorageRouterController(object):
         # Check parameters
         if not isinstance(parameters, dict):
             raise ValueError('Parameters should be of type "dict"')
-        Toolbox.verify_required_params(required_params, parameters)
+        LibToolbox.verify_required_params(required_params, parameters)
 
         client = SSHClient(parameters['storagerouter_ip'])
         unique_id = System.get_my_machine_id(client)
@@ -242,8 +242,8 @@ class StorageRouterController(object):
                                          'write_buffer': (float, None),
                                          'dtl_transport': (str, StorageDriverClient.VPOOL_DTL_TRANSPORT_MAP.keys()),
                                          'tlog_multiplier': (int, StorageDriverClient.TLOG_MULTIPLIER_MAP.values())}
-            Toolbox.verify_required_params(required_params=required_params_sd_config,
-                                           actual_params=vpool.configuration)
+            LibToolbox.verify_required_params(required_params=required_params_sd_config,
+                                              actual_params=vpool.configuration)
 
             for vpool_storagedriver in vpool.storagedrivers:
                 if vpool_storagedriver.storagerouter_guid == storagerouter.guid:
@@ -329,12 +329,12 @@ class StorageRouterController(object):
                 error_messages.append('Missing the connection information for the accelerated Backend')
             else:
                 try:
-                    Toolbox.verify_required_params(required_params={'host': (str, Toolbox.regex_ip),
-                                                                    'port': (int, None),
-                                                                    'client_id': (str, None),
-                                                                    'client_secret': (str, None),
-                                                                    'local': (bool, None, False)},
-                                                   actual_params=connection_info_aa)
+                    LibToolbox.verify_required_params(required_params={'host': (str, LibToolbox.regex_ip),
+                                                                       'port': (int, None),
+                                                                       'client_id': (str, None),
+                                                                       'client_secret': (str, None),
+                                                                       'local': (bool, None, False)},
+                                                      actual_params=connection_info_aa)
                 except RuntimeError as rte:
                     error_messages.append(rte.message)
 

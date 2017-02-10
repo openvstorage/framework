@@ -25,8 +25,8 @@ import unittest
 from django.http import HttpResponse
 from api.backend.exceptions import HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException, HttpUnauthorizedException, HttpForbiddenException
 # noinspection PyUnresolvedReferences
-from api.backend.toolbox import Toolbox  # Required for the tests
-from api.oauth2.toolbox import Toolbox as OAuth2Toolbox
+from api.backend.toolbox import BackendToolbox  # Required for the tests
+from api.oauth2.toolbox import OAuth2Toolbox
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.j_roleclient import RoleClient

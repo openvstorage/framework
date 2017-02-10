@@ -27,7 +27,7 @@ from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import required_roles, load, return_object, return_list, log, return_simple
 from api.backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
 from api.backend.serializers.serializers import FullSerializer
-from api.backend.toolbox import Toolbox
+from api.backend.toolbox import BackendToolbox
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.j_roleclient import RoleClient
 from ovs.dal.hybrids.user import User
@@ -52,7 +52,7 @@ class UserViewSet(viewsets.ViewSet):
         :param request: The raw request
         :type request: Request
         """
-        if Toolbox.is_client_in_roles(request.client, ['manage']):
+        if BackendToolbox.is_client_in_roles(request.client, ['manage']):
             return UserList.get_users()
         else:
             return [request.client.user]
@@ -69,7 +69,7 @@ class UserViewSet(viewsets.ViewSet):
         :param user: The user to load
         :type user: User
         """
-        if user.guid == request.client.user_guid or Toolbox.is_client_in_roles(request.client, ['manage']):
+        if user.guid == request.client.user_guid or BackendToolbox.is_client_in_roles(request.client, ['manage']):
             return user
         raise HttpForbiddenException(error_description='Fetching user information not allowed',
                                      error='no_ownership')
@@ -178,7 +178,7 @@ class UserViewSet(viewsets.ViewSet):
         :param new_password: The new password to be set
         :type new_password: str
         """
-        if user.guid == request.client.user_guid or Toolbox.is_client_in_roles(request.client, ['manage']):
+        if user.guid == request.client.user_guid or BackendToolbox.is_client_in_roles(request.client, ['manage']):
             user.password = hashlib.sha256(str(new_password)).hexdigest()
             user.save()
             for client in user.clients:

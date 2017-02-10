@@ -25,7 +25,7 @@ import unittest
 from django.http import HttpResponse
 from api.middleware import OVSMiddleware
 from api.oauth2.exceptions import HttpBadRequestException, HttpUnauthorizedException, HttpTooManyRequestsException
-from api.oauth2.toolbox import Toolbox as OAuth2Toolbox
+from api.oauth2.toolbox import OAuth2Toolbox
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.dal.hybrids.client import Client

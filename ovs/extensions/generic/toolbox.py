@@ -15,11 +15,11 @@
 # but WITHOUT ANY WARRANTY of any kind.
 
 """
-Toolbox module
+ExtensionsToolbox module
 """
 
 
-class Toolbox(object):
+class ExtensionsToolbox(object):
     """
     Generic class for various methods
     """

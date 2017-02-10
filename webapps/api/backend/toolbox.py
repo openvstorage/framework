@@ -21,7 +21,7 @@ Contains various helping classes
 import re
 
 
-class Toolbox(object):
+class BackendToolbox(object):
     """
     This class contains generic methods
     """
@@ -37,6 +37,10 @@ class Toolbox(object):
     def is_client_in_roles(client, roles):
         """
         Checks whether a client is member of a set of roles
+        :param client: Client to check
+        :type client: ovs.dal.hybrids.client.Client
+        :param roles: Roles to check for the client
+        :type roles: list
         """
         user_roles = [j.role.code for j in client.roles]
         for required_role in roles:
@@ -57,6 +61,15 @@ class Toolbox(object):
 
     @staticmethod
     def compare(version_1, version_2):
+        """
+        Compare 2 versions
+        :param version_1: First version to compare
+        :type version_1: str
+        :param version_2: Second version to compare
+        :type version_2: str
+        :return: Value indicating which version is smaller
+        :rtype: int
+        """
         version_1 = [int(v) for v in version_1.split('.')]
         version_2 = [int(v) for v in version_2.split('.')]
         for i in xrange(max(len(version_1), len(version_2))):
@@ -72,9 +85,20 @@ class Toolbox(object):
 
     @staticmethod
     def access_granted(client, client_rights=None, user_rights=None):
+        """
+        Verify whether access can be granted to the Client based on its rights
+        :param client: Client to check his access rights
+        :type client: ovs.dal.hybrids.client.Client
+        :param client_rights: Rights of the Client
+        :type client_rights: list
+        :param user_rights: Rights of the User
+        :type user_rights: list
+        :return: Whether the client has access or not
+        :rtype: bool
+        """
         granted = False
         # Implicitly denied access
-        if Toolbox.is_client_in_roles(client, ['manage']):
+        if BackendToolbox.is_client_in_roles(client, ['manage']):
             # Implicitly granted access
             granted = True
         if user_rights is not None:

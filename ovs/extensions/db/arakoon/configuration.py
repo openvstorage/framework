@@ -19,7 +19,7 @@ Generic module for managing configuration in Arakoon
 """
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.pyrakoon.client import PyrakoonClient
-from ovs.extensions.generic.toolbox import Toolbox
+from ovs.extensions.generic.toolbox import ExtensionsToolbox
 
 
 class ArakoonConfiguration(object):
@@ -83,7 +83,7 @@ class ArakoonConfiguration(object):
         entries = []
         for entry in client.prefix(key):
             if key == '' or entry.startswith(key.rstrip('/') + '/'):
-                cleaned = Toolbox.remove_prefix(entry, key).strip('/').split('/')[0]
+                cleaned = ExtensionsToolbox.remove_prefix(entry, key).strip('/').split('/')[0]
                 if cleaned not in entries:
                     entries.append(cleaned)
                     yield cleaned
