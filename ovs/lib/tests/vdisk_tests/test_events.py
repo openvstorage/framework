@@ -166,7 +166,7 @@ class VDiskEventsTest(unittest.TestCase):
         self.assertEqual(len(vdisks), 2)
         self.assertEqual(len(srclient.list_volumes()), 2)
 
-        volume_id = srclient.create_volume('three.raw', backend_config, 1024 ** 3, storagedriver.storagedriver_id)
+        volume_id = srclient.create_volume('/three.raw', backend_config, 1024 ** 3, storagedriver.storagedriver_id)
 
         vdisks = VDiskList.get_vdisks()
         self.assertEqual(len(vdisks), 2)
@@ -178,7 +178,7 @@ class VDiskEventsTest(unittest.TestCase):
         self.assertEqual(len(srclient.list_volumes()), 3)
 
         vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
-        self.assertEqual(vdisk.devicename, '/{0}.raw'.format(volume_id))
+        self.assertEqual(vdisk.devicename, '/three.raw')
 
         vdisk = VDisk()
         vdisk.volume_id = 'foo'
@@ -198,3 +198,42 @@ class VDiskEventsTest(unittest.TestCase):
 
         with self.assertRaises(ObjectNotFoundException):
             vdisk.save()
+
+    def test_folder_renames(self):
+        """
+        Validates whether folder renames are correctly processed
+        """
+        structure = Helper.build_service_structure(
+            {'vpools': [1],
+             'storagerouters': [1],
+             'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <storagerouter_id>)
+             'mds_services': [(1, 1)]}  # (<id>, <storagedriver_id>)
+        )
+        storagedriver = structure['storagedrivers'][1]
+        vdisk1 = VDisk(VDiskController.create_new('foo/one.raw', 1024 ** 3, storagedriver.guid))
+        vdisk2 = VDisk(VDiskController.create_new('bar/two.raw', 1024 ** 3, storagedriver.guid))
+        vdisk3 = VDisk(VDiskController.create_new('three.raw', 1024 ** 3, storagedriver.guid))
+
+        VDiskController.rename_from_voldrv(old_path='/thr', new_path='/test', storagedriver_id=storagedriver.storagedriver_id)
+        vdisk1.discard()
+        vdisk2.discard()
+        vdisk3.discard()
+        self.assertEqual(vdisk1.devicename, '/foo/one.raw')
+        self.assertEqual(vdisk2.devicename, '/bar/two.raw')
+        self.assertEqual(vdisk3.devicename, '/three.raw')
+
+        VDiskController.rename_from_voldrv(old_path='/foo', new_path='/bar', storagedriver_id=storagedriver.storagedriver_id)
+        vdisk1.discard()
+        vdisk2.discard()
+        vdisk3.discard()
+        self.assertEqual(vdisk1.devicename, '/bar/one.raw')
+        self.assertEqual(vdisk2.devicename, '/bar/two.raw')
+        self.assertEqual(vdisk3.devicename, '/three.raw')
+
+        VDiskController.rename_from_voldrv(old_path='/bar', new_path='/foo', storagedriver_id=storagedriver.storagedriver_id)
+        vdisk1.discard()
+        vdisk2.discard()
+        vdisk3.discard()
+        self.assertEqual(vdisk1.devicename, '/foo/one.raw')
+        self.assertEqual(vdisk2.devicename, '/foo/two.raw')
+        self.assertEqual(vdisk3.devicename, '/three.raw')

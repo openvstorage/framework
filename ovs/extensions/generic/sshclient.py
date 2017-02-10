@@ -152,7 +152,7 @@ class SSHClient(object):
             if self.ip in SSHClient._raise_exceptions:
                 raise_info = SSHClient._raise_exceptions[self.ip]
                 if self.username in raise_info['users']:
-                    raise raise_info['exception_type'](raise_info['exception_message'])
+                    raise raise_info['exception']
 
         if not self.is_local:
             logging.getLogger('paramiko').setLevel(logging.WARNING)

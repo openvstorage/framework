@@ -708,7 +708,9 @@ class StorageRouterController(object):
                              'fs_metadata_backend_mds_nodes': [],
                              'fs_metadata_backend_type': 'MDS',
                              'fs_virtual_disk_format': 'raw',
-                             'fs_raw_disk_suffix': '.raw'}
+                             'fs_raw_disk_suffix': '.raw',
+                             'fs_file_event_rules': [{'fs_file_event_rule_calls': ['Rename'],
+                                                      'fs_file_event_rule_path_regex': '.*'}]}
         if dtl_mode == 'no_sync':
             filesystem_config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_MANUAL_MODE
         else:
