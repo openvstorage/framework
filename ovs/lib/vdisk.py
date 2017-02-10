@@ -239,9 +239,13 @@ class VDiskController(object):
         Processes a rename event from the volumedriver. At this point we only expect folder renames. These folders
         might contain vDisks. Although the vDisk's .raw file cannot be moved/renamed, the folders can.
         :param old_path: The old path (prefix) that is renamed
+        :type old_path: str
         :param new_path: The new path (prefix) of that folder
+        :type new_path: str
         :param storagedriver_id: The StorageDriver's ID that executed the rename
+        :type storagedriver_id: str
         :return: None
+        :rtype: NoneType
         """
         old_path = '/{0}/'.format(old_path.strip('/'))
         new_path = '/{0}/'.format(new_path.strip('/'))
@@ -258,7 +262,7 @@ class VDiskController(object):
                     if devicename.startswith(old_path):
                         vdisk.devicename = '{0}{1}'.format(new_path, GenericToolbox.remove_prefix(devicename, old_path))
                         vdisk.save()
-                        VDiskController._logger.info('Renaming devicename from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
+                        VDiskController._logger.info('Renamed devicename from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.clone')
