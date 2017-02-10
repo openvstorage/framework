@@ -209,8 +209,8 @@ class MDSServiceController(object):
                         service = sd_partition.mds_service.service
                         mds_nodes.append({'host': service.storagerouter.ip,
                                           'port': service.ports[0],
-                                          'db_directory': sd_partition.path,
-                                          'scratch_directory': sd_partition.path})
+                                          'db_directory': '{0}/db'.format(sd_partition.path),
+                                          'scratch_directory': '{0}/scratch'.format(sd_partition.path)})
 
                 # Generate the correct section in the Storage Driver's configuration
                 storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, storagedriver.storagedriver_id)

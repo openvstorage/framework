@@ -1307,13 +1307,13 @@ class MDSServices(unittest.TestCase):
         mds_nodes.sort(key=lambda i: i['port'])
         self.assertEqual(len(mds_nodes), 2)
         self.assertDictEqual(mds_nodes[0], {'host': '10.0.0.1',
-                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_1',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_1/scratch',
                                             'port': 1,
-                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_1'})
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_1/db'})
         self.assertDictEqual(mds_nodes[1], {'host': '10.0.0.1',
-                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/scratch',
                                             'port': 10000,
-                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2'})
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/db'})
 
         mds_service.capacity = 0
         mds_service.save()
@@ -1324,6 +1324,6 @@ class MDSServices(unittest.TestCase):
         mds_nodes = contents.get('metadata_server', {}).get('mds_nodes', [])
         self.assertEqual(len(mds_nodes), 1)
         self.assertDictEqual(mds_nodes[0], {'host': '10.0.0.1',
-                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/scratch',
                                             'port': 10000,
-                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2'})
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/db'})
