@@ -43,7 +43,7 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.services.service import ServiceManager
 from ovs.lib.helpers.decorators import ensure_single
-from ovs.lib.helpers.toolbox import LibToolbox, Schedule
+from ovs.lib.helpers.toolbox import Toolbox, Schedule
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
@@ -509,7 +509,7 @@ class GenericController(object):
         all_storagerouters = StorageRouterList.get_storagerouters()
         for storagerouter in all_storagerouters:
             information[storagerouter.ip] = {}
-            for function in LibToolbox.fetch_hooks('update', 'get_package_info_multi'):
+            for function in Toolbox.fetch_hooks('update', 'get_package_info_multi'):
                 try:
                     # We make use of these clients in Threads --> cached = False
                     client = SSHClient(endpoint=storagerouter, username='root', cached=False)
@@ -521,7 +521,7 @@ class GenericController(object):
                 thread.start()
                 threads.append(thread)
 
-        for function in LibToolbox.fetch_hooks('update', 'get_package_info_single'):
+        for function in Toolbox.fetch_hooks('update', 'get_package_info_single'):
             thread = Thread(target=function,
                             args=(information,))
             thread.start()
@@ -557,5 +557,5 @@ class GenericController(object):
         :type backend_guid: str
         :return: None
         """
-        for function in LibToolbox.fetch_hooks('backend', 'domains-update'):
+        for function in Toolbox.fetch_hooks('backend', 'domains-update'):
             function(backend_guid=backend_guid)

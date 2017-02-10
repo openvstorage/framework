@@ -23,7 +23,7 @@ from rest_framework.permissions import IsAuthenticated
 from api.backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
 from api.backend.serializers.serializers import FullSerializer
 from api.backend.decorators import required_roles, return_object, return_list, load, log, return_simple
-from api.backend.toolbox import BackendToolbox
+from api.backend.toolbox import ApiToolbox
 from api.oauth2.toolbox import OAuth2Toolbox
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.role import Role
@@ -53,7 +53,7 @@ class ClientViewSet(viewsets.ViewSet):
         :param ovs_type: Filter on the Client's ovs_type
         :type ovs_type: str
         """
-        if BackendToolbox.is_client_in_roles(request.client, ['manage']):
+        if ApiToolbox.is_client_in_roles(request.client, ['manage']):
             client_list = ClientList.get_clients()
         else:
             if ovs_type is not None and ovs_type != 'INTERNAL':
@@ -79,7 +79,7 @@ class ClientViewSet(viewsets.ViewSet):
         :type client: Client
         """
         _ = format
-        if client.guid in request.client.user.clients_guids or BackendToolbox.is_client_in_roles(request.client, ['manage']):
+        if client.guid in request.client.user.clients_guids or ApiToolbox.is_client_in_roles(request.client, ['manage']):
             return client
         raise HttpForbiddenException(error_description='Fetching client information not allowed',
                                      error='no_ownership')
@@ -101,7 +101,7 @@ class ClientViewSet(viewsets.ViewSet):
         serializer = FullSerializer(Client, instance=Client(), data=request.DATA)
         client = serializer.deserialize()
         if client.user is not None:
-            if client.user_guid == request.client.user_guid or BackendToolbox.is_client_in_roles(request.client, ['manage']):
+            if client.user_guid == request.client.user_guid or ApiToolbox.is_client_in_roles(request.client, ['manage']):
                 client.grant_type = 'CLIENT_CREDENTIALS'
                 client.client_secret = OAuth2Toolbox.create_hash(64)
                 client.save()
@@ -133,7 +133,7 @@ class ClientViewSet(viewsets.ViewSet):
         :return: None
         :rtype: None
         """
-        if client.user_guid == request.client.user_guid or BackendToolbox.is_client_in_roles(request.client, ['manage']):
+        if client.user_guid == request.client.user_guid or ApiToolbox.is_client_in_roles(request.client, ['manage']):
             for token in client.tokens:
                 for junction in token.roles.itersafe():
                     junction.delete()

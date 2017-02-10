@@ -31,7 +31,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.request import Request
 from api.backend.exceptions import HttpUnauthorizedException, HttpForbiddenException, HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException
-from api.backend.toolbox import BackendToolbox
+from api.backend.toolbox import ApiToolbox
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.helpers import DalToolbox
 from ovs.dal.lists.userlist import UserList
@@ -78,7 +78,7 @@ def required_roles(roles):
             if user is None:
                 raise HttpUnauthorizedException(error_description='Not authenticated',
                                                 error='not_authenticated')
-            if not BackendToolbox.is_token_in_roles(request.token, roles):
+            if not ApiToolbox.is_token_in_roles(request.token, roles):
                 raise HttpForbiddenException(error_description='This call requires roles: {0}'.format(', '.join(roles)),
                                              error='invalid_roles')
             return f(*args, **kw)

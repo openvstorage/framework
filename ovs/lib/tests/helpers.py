@@ -45,7 +45,7 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
-from ovs.lib.helpers.toolbox import LibToolbox
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.storagedriver import StorageDriverController
 from ovs.log.log_handler import LogHandler
 
@@ -92,7 +92,7 @@ class Helper(object):
         MDSClient.clean()
         StorageRouterClient.clean()
 
-        LibToolbox._function_pointers = {}
+        Toolbox._function_pointers = {}
         LogHandler._logs = {}
         Configuration._unittest_data = {}
 

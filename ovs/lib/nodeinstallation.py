@@ -32,7 +32,7 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.lib.helpers.toolbox import LibToolbox
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.nodetype import NodeTypeController
 from ovs.lib.noderemoval import NodeRemovalController
 from ovs.log.log_handler import LogHandler
@@ -65,11 +65,11 @@ class NodeInstallationController(object):
         :type execute_rollback: bool
         :return: None
         """
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Open vStorage Setup', boxed=True)
-        LibToolbox.verify_required_params(actual_params={'node_type': node_type,
-                                                         'execute_rollback': execute_rollback},
-                                          required_params={'node_type': (str, ['master', 'extra'], False),
-                                                           'execute_rollback': (bool, None)})
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Open vStorage Setup', boxed=True)
+        Toolbox.verify_required_params(actual_params={'node_type': node_type,
+                                                      'execute_rollback': execute_rollback},
+                                       required_params={'node_type': (str, ['master', 'extra'], False),
+                                                        'execute_rollback': (bool, None)})
 
         rdma = None
         config = None
@@ -102,16 +102,16 @@ class NodeInstallationController(object):
                 if len(errors) > 0:
                     raise ValueError('\nErrors found while verifying pre-configuration:\n - {0}\n\nAllowed keys:\n - {1}'.format('\n - '.join(errors), '\n - '.join(expected_keys)))
 
-                LibToolbox.verify_required_params(actual_params=config,
-                                                  required_params={'cluster_ip': (str, LibToolbox.regex_ip, False),
-                                                                   'enable_heartbeats': (bool, None, False),
-                                                                   'external_config': (str, None, False),
-                                                                   'logging_target': (dict, None, False),
-                                                                   'master_ip': (str, LibToolbox.regex_ip),
-                                                                   'master_password': (str, None),
-                                                                   'node_type': (str, ['master', 'extra'], False),
-                                                                   'rdma': (bool, None, False),
-                                                                   'rollback': (bool, None, False)})
+                Toolbox.verify_required_params(actual_params=config,
+                                               required_params={'cluster_ip': (str, Toolbox.regex_ip, False),
+                                                                'enable_heartbeats': (bool, None, False),
+                                                                'external_config': (str, None, False),
+                                                                'logging_target': (dict, None, False),
+                                                                'master_ip': (str, Toolbox.regex_ip),
+                                                                'master_password': (str, None),
+                                                                'node_type': (str, ['master', 'extra'], False),
+                                                                'rdma': (bool, None, False),
+                                                                'rollback': (bool, None, False)})
 
                 # Required fields
                 master_ip = config['master_ip']
@@ -135,7 +135,7 @@ class NodeInstallationController(object):
                     resume_config = json.loads(resume_cfg.read())
 
             # Create connection to target node
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='Setting up connections', title=True)
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up connections', title=True)
 
             root_client = SSHClient(endpoint='127.0.0.1', username='root')
             unique_id = System.get_my_machine_id(root_client)
@@ -156,7 +156,7 @@ class NodeInstallationController(object):
                 pass
 
             if setup_completed is False:
-                LibToolbox.log(logger=NodeInstallationController._logger, messages='Collecting cluster information', title=True)
+                Toolbox.log(logger=NodeInstallationController._logger, messages='Collecting cluster information', title=True)
 
                 if root_client.file_exists('/etc/openvstorage_id') is False:
                     raise RuntimeError("The 'openvstorage' package is not installed on this node")
@@ -175,8 +175,8 @@ class NodeInstallationController(object):
                     new_cluster = 'Create a new cluster'
                     discovery_result = {}
                     if NodeTypeController.avahi_installed(client=root_client, logger=NodeInstallationController._logger) is True:
-                        LibToolbox.change_service_state(root_client, 'dbus', 'start', NodeInstallationController._logger)
-                        LibToolbox.change_service_state(root_client, 'avahi-daemon', 'start', NodeInstallationController._logger)
+                        Toolbox.change_service_state(root_client, 'dbus', 'start', NodeInstallationController._logger)
+                        Toolbox.change_service_state(root_client, 'avahi-daemon', 'start', NodeInstallationController._logger)
                         for entry in root_client.run('timeout -k 60 45 avahi-browse -artp 2> /dev/null | egrep "ovs_cl_|ovs_cluster_" || true', allow_insecure=True).splitlines():
                             entry_parts = entry.split(';')
                             if entry_parts[0] == '=' and entry_parts[2] == 'IPv4' and entry_parts[7] not in NodeInstallationController.host_ips:
@@ -213,11 +213,11 @@ class NodeInstallationController(object):
                                                                   regex_info={'regex': '^[0-9a-zA-Z]+(\-[0-9a-zA-Z]+)*$',
                                                                               'message': 'The new cluster name can only contain numbers, letters and dashes.'})
                             if cluster_name in discovery_result:
-                                LibToolbox.log(logger=NodeInstallationController._logger, messages='The new cluster name should be unique.')
+                                Toolbox.log(logger=NodeInstallationController._logger, messages='The new cluster name should be unique.')
                                 continue
                             valid_avahi = NodeTypeController.validate_avahi_cluster_name(ip=master_ip, cluster_name=cluster_name, node_name=node_name)
                             if valid_avahi[0] is False:
-                                LibToolbox.log(logger=NodeInstallationController._logger, messages=valid_avahi[1])
+                                Toolbox.log(logger=NodeInstallationController._logger, messages=valid_avahi[1])
                                 continue
                             break
 
@@ -237,7 +237,7 @@ class NodeInstallationController(object):
 
                         NodeInstallationController._logger.debug('Trying to manually join cluster on {0}'.format(master_ip))
 
-                        master_password = LibToolbox.ask_validate_password(ip=master_ip, logger=NodeInstallationController._logger)
+                        master_password = Toolbox.ask_validate_password(ip=master_ip, logger=NodeInstallationController._logger)
                         NodeInstallationController.nodes = NodeTypeController.retrieve_storagerouter_info_via_host(ip=master_ip, password=master_password)
                         master_ips = [sr_info['ip'] for sr_info in NodeInstallationController.nodes.itervalues() if sr_info['type'] == 'master']
                         if master_ip not in master_ips:
@@ -263,7 +263,7 @@ class NodeInstallationController(object):
                         if master_ip is None:
                             raise RuntimeError('Could not find appropriate master')
 
-                        master_password = LibToolbox.ask_validate_password(ip=master_ip, logger=NodeInstallationController._logger)
+                        master_password = Toolbox.ask_validate_password(ip=master_ip, logger=NodeInstallationController._logger)
                         cluster_ip = Interactive.ask_choice(NodeInstallationController.host_ips, 'Select the public IP address of {0}'.format(node_name))
                         NodeInstallationController.nodes = NodeTypeController.retrieve_storagerouter_info_via_host(ip=master_ip, password=master_password)
 
@@ -330,8 +330,8 @@ class NodeInstallationController(object):
                                                                    'type': 'unknown',
                                                                    'client': SSHClient(endpoint=cluster_ip, username='root')}
 
-                LibToolbox.log(logger=NodeInstallationController._logger, messages='Preparing node', title=True)
-                LibToolbox.log(logger=NodeInstallationController._logger, messages='Setting up and exchanging SSH keys')
+                Toolbox.log(logger=NodeInstallationController._logger, messages='Preparing node', title=True)
+                Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up and exchanging SSH keys')
 
                 # Fetching clients
                 all_ips = NodeInstallationController.host_ips
@@ -441,7 +441,7 @@ class NodeInstallationController(object):
                         node_client.run(cmd.format(known_hosts_template.format(home_dir)), allow_insecure=True)
                     signal.alarm(0)
 
-                LibToolbox.log(logger=NodeInstallationController._logger, messages='Updating hosts file')
+                Toolbox.log(logger=NodeInstallationController._logger, messages='Updating hosts file')
                 for node_details in NodeInstallationController.nodes.itervalues():
                     node_client = node_details.get('client', SSHClient(endpoint=node_details['ip'], username='root'))
                     System.update_hosts_file(ip_hostname_map, node_client)
@@ -469,7 +469,7 @@ class NodeInstallationController(object):
                                                                      logging_target=logging_target,
                                                                      rdma=rdma)
                     except Exception as ex:
-                        LibToolbox.log(logger=NodeInstallationController._logger, messages=['Failed to setup first node', ex], loglevel='exception')
+                        Toolbox.log(logger=NodeInstallationController._logger, messages=['Failed to setup first node', ex], loglevel='exception')
                         if execute_rollback is True:
                             NodeInstallationController.rollback_setup(target_client=ip_client_map[cluster_ip])
                         else:
@@ -482,7 +482,7 @@ class NodeInstallationController(object):
                                                                      master_ip=master_ip,
                                                                      ip_client_map=ip_client_map)
                     except Exception as ex:
-                        LibToolbox.log(logger=NodeInstallationController._logger, messages=['Failed to setup extra node', ex], loglevel='exception')
+                        Toolbox.log(logger=NodeInstallationController._logger, messages=['Failed to setup extra node', ex], loglevel='exception')
                         if execute_rollback is True:
                             NodeInstallationController.rollback_setup(target_client=ip_client_map[cluster_ip])
                         else:
@@ -490,14 +490,14 @@ class NodeInstallationController(object):
                         raise
 
                     if promote_completed is False:
-                        LibToolbox.log(logger=NodeInstallationController._logger, messages='Analyzing cluster layout')
+                        Toolbox.log(logger=NodeInstallationController._logger, messages='Analyzing cluster layout')
                         framework_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|ovsdb'))
                         arakoon_config = ArakoonClusterConfig(cluster_id=framework_cluster_name, filesystem=False)
                         arakoon_config.load_config()
                         NodeInstallationController._logger.debug('{0} nodes for cluster {1} found'.format(len(arakoon_config.nodes), framework_cluster_name))
                         if (len(arakoon_config.nodes) < 3 or node_type == 'master') and node_type != 'extra':
-                            configure_rabbitmq = LibToolbox.is_service_internally_managed(service='rabbitmq')
-                            configure_memcached = LibToolbox.is_service_internally_managed(service='memcached')
+                            configure_rabbitmq = Toolbox.is_service_internally_managed(service='rabbitmq')
+                            configure_memcached = Toolbox.is_service_internally_managed(service='memcached')
                             try:
                                 NodeTypeController.promote_node(cluster_ip=cluster_ip,
                                                                 master_ip=master_ip,
@@ -507,7 +507,7 @@ class NodeInstallationController(object):
                                                                 configure_rabbitmq=configure_rabbitmq)
                             except Exception as ex:
                                 if execute_rollback is True:
-                                    LibToolbox.log(logger=NodeInstallationController._logger, messages=['\nFailed to promote node, rolling back', ex], loglevel='exception')
+                                    Toolbox.log(logger=NodeInstallationController._logger, messages=['\nFailed to promote node, rolling back', ex], loglevel='exception')
                                     NodeTypeController.demote_node(cluster_ip=cluster_ip,
                                                                    master_ip=master_ip,
                                                                    ip_client_map=ip_client_map,
@@ -520,8 +520,8 @@ class NodeInstallationController(object):
 
             root_client.file_delete(resume_config_file)
             if enable_heartbeats is True:
-                LibToolbox.log(logger=NodeInstallationController._logger, messages='')
-                LibToolbox.log(logger=NodeInstallationController._logger,
+                Toolbox.log(logger=NodeInstallationController._logger, messages='')
+                Toolbox.log(logger=NodeInstallationController._logger,
                             messages=['Open vStorage securely sends a minimal set of error, usage and health',
                                       'information. This information is used to keep the quality and performance',
                                       'of the code at the highest possible levels.',
@@ -529,8 +529,8 @@ class NodeInstallationController(object):
                             boxed=True)
 
             is_master = [node for node in NodeInstallationController.nodes.itervalues() if node['type'] == 'master' and node['ip'] == cluster_ip]
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='')
-            LibToolbox.log(logger=NodeInstallationController._logger,
+            Toolbox.log(logger=NodeInstallationController._logger, messages='')
+            Toolbox.log(logger=NodeInstallationController._logger,
                         messages=['Setup complete.',
                                   'Point your browser to https://{0} to use Open vStorage'.format(cluster_ip if len(is_master) > 0 else master_ip)],
                         boxed=True)
@@ -540,18 +540,18 @@ class NodeInstallationController(object):
                 # Try to trigger setups from possibly installed other packages
                 sys.path.append('/opt/asd-manager/')
                 from source.asdmanager import setup
-                LibToolbox.log(logger=NodeInstallationController._logger, messages='\nA local ASD Manager was detected for which the setup will now be launched.\n')
+                Toolbox.log(logger=NodeInstallationController._logger, messages='\nA local ASD Manager was detected for which the setup will now be launched.\n')
                 setup()
             except:
                 pass
 
         except Exception as exception:
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='\n')
-            LibToolbox.log(logger=NodeInstallationController._logger, messages=['An unexpected error occurred:', str(exception).lstrip('\n')], boxed=True, loglevel='exception')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='\n')
+            Toolbox.log(logger=NodeInstallationController._logger, messages=['An unexpected error occurred:', str(exception).lstrip('\n')], boxed=True, loglevel='exception')
             sys.exit(1)
         except KeyboardInterrupt:
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='\n')
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.', boxed=True, loglevel='error')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='\n')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.', boxed=True, loglevel='error')
             sys.exit(1)
 
     @staticmethod
@@ -563,18 +563,18 @@ class NodeInstallationController(object):
         """
         from ovs.dal.lists.servicetypelist import ServiceTypeList
         from ovs.dal.lists.storagerouterlist import StorageRouterList
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Rolling back setup of current node', title=True)
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Rolling back setup of current node', title=True)
 
         single_node = len(StorageRouterList.get_storagerouters()) == 1
         if target_client is None:
             target_client = SSHClient(endpoint=System.get_my_storagerouter(), username='root')
 
         if not target_client.file_exists('/tmp/ovs_rollback'):
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='Cannot rollback on nodes which have been successfully installed. Please use "ovs remove node" instead', boxed=True, loglevel='error')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Cannot rollback on nodes which have been successfully installed. Please use "ovs remove node" instead', boxed=True, loglevel='error')
             sys.exit(1)
         mode = target_client.file_read('/tmp/ovs_rollback').strip()
         if mode != 'rollback':
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='Rolling back is only supported when installation issues occurred, please execute "ovs setup {0}" first'.format(mode), boxed=True, loglevel='error')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Rolling back is only supported when installation issues occurred, please execute "ovs setup {0}" first'.format(mode), boxed=True, loglevel='error')
             sys.exit(1)
 
         cluster_ip = target_client.ip
@@ -590,25 +590,25 @@ class NodeInstallationController(object):
                 required_info[key] = Configuration.get(key=key)
             except KeyError:
                 pass
-        unconfigure_rabbitmq = LibToolbox.is_service_internally_managed(service='rabbitmq')
-        unconfigure_memcached = LibToolbox.is_service_internally_managed(service='memcached')
+        unconfigure_rabbitmq = Toolbox.is_service_internally_managed(service='rabbitmq')
+        unconfigure_memcached = Toolbox.is_service_internally_managed(service='memcached')
 
         target_client.dir_delete('/opt/OpenvStorage/webapps/frontend/logging')
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Stopping services')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Stopping services')
         for service in ['watcher-framework', 'watcher-config', 'workers', 'support-agent']:
             if ServiceManager.has_service(service, client=target_client):
-                LibToolbox.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
+                Toolbox.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
 
         endpoints = required_info['/ovs/framework/messagequeue|endpoints']
         if len(endpoints) > 0 and unconfigure_rabbitmq is True:
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='Un-configuring RabbitMQ')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configuring RabbitMQ')
             try:
                 if ServiceManager.is_rabbitmq_running(client=target_client)[0] is True:
-                    LibToolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeInstallationController._logger)
+                    Toolbox.change_service_state(target_client, 'rabbitmq-server', 'stop', NodeInstallationController._logger)
                 target_client.file_delete('/etc/rabbitmq/rabbitmq.config')
             except Exception as ex:
-                LibToolbox.log(logger=NodeInstallationController._logger, messages=['Failed to un-configure RabbitMQ', ex], loglevel='exception')
+                Toolbox.log(logger=NodeInstallationController._logger, messages=['Failed to un-configure RabbitMQ', ex], loglevel='exception')
 
             for endpoint in endpoints:
                 if endpoint.startswith(target_client.ip):
@@ -619,7 +619,7 @@ class NodeInstallationController(object):
             else:
                 Configuration.set('/ovs/framework/messagequeue|endpoints', endpoints)
 
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='Un-configuring Memcached')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configuring Memcached')
             endpoints = required_info['/ovs/framework/memcache|endpoints']
             if len(endpoints) > 0 and unconfigure_memcached is True:
                 ServiceManager.stop_service('memcached', target_client)
@@ -635,11 +635,11 @@ class NodeInstallationController(object):
         NodeRemovalController.remove_services(target_client, 'master', logger=NodeInstallationController._logger)
         service = 'watcher-config'
         if ServiceManager.has_service(service, client=target_client):
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='Removing service {0}'.format(service))
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Removing service {0}'.format(service))
             ServiceManager.stop_service(service, client=target_client)
             ServiceManager.remove_service(service, client=target_client)
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up model')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up model')
         #  Model is completely cleaned up when the arakoon cluster is destroyed
         memcache_configured = required_info['/ovs/framework/memcache']
         storagerouter = None
@@ -647,7 +647,7 @@ class NodeInstallationController(object):
             try:
                 storagerouter = System.get_my_storagerouter()
             except Exception as ex:
-                LibToolbox.log(logger=NodeInstallationController._logger, messages='Retrieving StorageRouter information failed with error: {0}'.format(ex), loglevel='error')
+                Toolbox.log(logger=NodeInstallationController._logger, messages='Retrieving StorageRouter information failed with error: {0}'.format(ex), loglevel='error')
 
             if storagerouter is not None:  # StorageRouter will be None if StorageRouter not yet modeled
                 try:
@@ -661,13 +661,13 @@ class NodeInstallationController(object):
                         storagerouter.alba_node.delete()
                     storagerouter.delete()
                 except Exception as ex:
-                    LibToolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up model failed with error: {0}'.format(ex), loglevel='error')
+                    Toolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up model failed with error: {0}'.format(ex), loglevel='error')
             if single_node is True:
                 try:
                     for service in ServiceTypeList.get_by_name(ServiceType.SERVICE_TYPES.ARAKOON).services:  # Externally managed Arakoon services not linked to the StorageRouter
                         service.delete()
                 except Exception as ex:
-                    LibToolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up services failed with error: {0}'.format(ex), loglevel='error')
+                    Toolbox.log(logger=NodeInstallationController._logger, messages='Cleaning up services failed with error: {0}'.format(ex), loglevel='error')
         if single_node is True:
             for key in Configuration.base_config.keys() + ['install_time', 'plugins']:
                 try:
@@ -691,15 +691,15 @@ class NodeInstallationController(object):
             services.append(ArakoonInstaller.get_service_name_for_cluster(cluster_name=cluster_name))
         for service in services:
             if ServiceManager.has_service(service, client=target_client):
-                LibToolbox.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
+                Toolbox.change_service_state(target_client, service, 'stop', NodeInstallationController._logger)
 
         if single_node is True:
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='Un-configure Arakoon')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Un-configure Arakoon')
             if metadata is not None and metadata['internal'] is True:
                 try:
                     ArakoonInstaller.delete_cluster(cluster_name, cluster_ip)
                 except Exception as ex:
-                    LibToolbox.log(logger=NodeInstallationController._logger, messages=['\nFailed to delete cluster', ex], loglevel='exception')
+                    Toolbox.log(logger=NodeInstallationController._logger, messages=['\nFailed to delete cluster', ex], loglevel='exception')
                 base_dir = required_info['/ovs/framework/paths|ovsdb']
                 #  ArakoonInstall.delete_cluster calls destroy_node which removes these directories already
                 directory_info = [ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name),
@@ -708,7 +708,7 @@ class NodeInstallationController(object):
                     ArakoonInstaller.clean_leftover_arakoon_data(ip=cluster_ip,
                                                                  directories=directory_info)
                 except Exception as ex:
-                    LibToolbox.log(logger=NodeInstallationController._logger, messages=['Failed to clean Arakoon data', ex])
+                    Toolbox.log(logger=NodeInstallationController._logger, messages=['Failed to clean Arakoon data', ex])
 
         target_client.file_delete('/tmp/ovs_rollback')
 
@@ -717,17 +717,17 @@ class NodeInstallationController(object):
         """
         Sets up the first node services. This node is always a master
         """
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Setting up first node', title=True)
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up first node', title=True)
         cluster_ip = target_client.ip
         machine_id = System.get_my_machine_id(target_client)
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration management')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration management')
         if external_config is None and not cluster_name.startswith('preconfig-'):
             if Interactive.ask_yesno(message='Use an external cluster?', default_value=False) is True:
                 from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
                 file_location = ArakoonConfiguration.CACC_LOCATION
                 while not target_client.file_exists(file_location):
-                    LibToolbox.log(logger=NodeInstallationController._logger, messages='Please place a copy of the Arakoon\'s client configuration file at: {0}'.format(file_location))
+                    Toolbox.log(logger=NodeInstallationController._logger, messages='Please place a copy of the Arakoon\'s client configuration file at: {0}'.format(file_location))
                     Interactive.ask_continue()
                 external_config = True
 
@@ -736,7 +736,7 @@ class NodeInstallationController(object):
             target_client.file_create(bootstrap_location)
         target_client.file_write(bootstrap_location, json.dumps({'configuration_store': 'arakoon'}, indent=4))
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration Arakoon')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up configuration Arakoon')
         from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
         if external_config is None:
             arakoon_config_cluster = 'config'
@@ -782,14 +782,14 @@ class NodeInstallationController(object):
 
         service = 'watcher-config'
         if not ServiceManager.has_service(service, target_client):
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='Adding service {0}'.format(service))
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Adding service {0}'.format(service))
             ServiceManager.add_service(service, params={}, client=target_client)
-            LibToolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+            Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         metadata = ArakoonInstaller.get_unused_arakoon_metadata_and_claim(cluster_type=ServiceType.ARAKOON_CLUSTER_TYPES.FWK, locked=False)
         arakoon_ports = []
         if metadata is None:  # No externally managed cluster found, we create 1 ourselves
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='Setting up Arakoon cluster ovsdb')
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up Arakoon cluster ovsdb')
             internal = True
             arakoon_ovsdb_cluster = 'ovsdb'
             result = ArakoonInstaller.create_cluster(cluster_name=arakoon_ovsdb_cluster,
@@ -807,15 +807,15 @@ class NodeInstallationController(object):
             arakoon_ports = [result['client_port'], result['messaging_port']]
             metadata = result['metadata']
         else:
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='Externally managed Arakoon cluster of type {0} found with name {1}'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK, metadata['cluster_name']))
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Externally managed Arakoon cluster of type {0} found with name {1}'.format(ServiceType.ARAKOON_CLUSTER_TYPES.FWK, metadata['cluster_name']))
             internal = False
 
         Configuration.set('/ovs/framework/arakoon_clusters|ovsdb', metadata['cluster_name'])
         NodeTypeController.add_services(client=target_client, node_type='master', logger=NodeInstallationController._logger)
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Build configuration files')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Build configuration files')
 
-        configure_rabbitmq = LibToolbox.is_service_internally_managed(service='rabbitmq')
-        configure_memcached = LibToolbox.is_service_internally_managed(service='memcached')
+        configure_rabbitmq = Toolbox.is_service_internally_managed(service='rabbitmq')
+        configure_memcached = Toolbox.is_service_internally_managed(service='memcached')
         if configure_rabbitmq is True:
             Configuration.set('/ovs/framework/messagequeue|endpoints', ['{0}:5672'.format(cluster_ip)])
             NodeTypeController.configure_rabbitmq(client=target_client, logger=NodeInstallationController._logger)
@@ -824,17 +824,17 @@ class NodeInstallationController(object):
             NodeTypeController.configure_memcached(client=target_client, logger=NodeInstallationController._logger)
         VolatileFactory.store = None
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Starting model services')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Starting model services')
         model_services = ['memcached', 'arakoon-ovsdb'] if internal is True else ['memcached']
         for service in model_services:
             if ServiceManager.has_service(service, client=target_client):
-                LibToolbox.change_service_state(target_client, service, 'restart', NodeInstallationController._logger)
+                Toolbox.change_service_state(target_client, service, 'restart', NodeInstallationController._logger)
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Start model migration')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Start model migration')
         from ovs.dal.helpers import Migration
         Migration.migrate()
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Finalizing setup', title=True)
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Finalizing setup', title=True)
         storagerouter = NodeInstallationController._finalize_setup(target_client, node_name, 'MASTER')
 
         from ovs.dal.lists.servicelist import ServiceList
@@ -849,27 +849,27 @@ class NodeInstallationController(object):
             service.storagerouter = storagerouter if internal is True else None
             service.save()
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Updating configuration files')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Updating configuration files')
         Configuration.set('/ovs/framework/hosts/{0}/ip'.format(machine_id), cluster_ip)
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Starting services on 1st node')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Starting services on 1st node')
         for service in model_services + ['rabbitmq-server']:
             if ServiceManager.has_service(service, client=target_client):
-                LibToolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+                Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
         # Enable HA for the rabbitMQ queues
         NodeTypeController.check_rabbitmq_and_enable_ha_mode(client=target_client, logger=NodeInstallationController._logger)
 
         for service in ['watcher-framework', 'watcher-config']:
-            LibToolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+            Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Check ovs-workers')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Check ovs-workers')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
-        LibToolbox.wait_for_service(target_client, 'workers', True, NodeInstallationController._logger)
+        Toolbox.wait_for_service(target_client, 'workers', True, NodeInstallationController._logger)
 
-        LibToolbox.run_hooks(component='nodeinstallation',
-                             sub_component='firstnode',
-                             logger=NodeInstallationController._logger,
-                             cluster_ip=cluster_ip)
+        Toolbox.run_hooks(component='nodeinstallation',
+                          sub_component='firstnode',
+                          logger=NodeInstallationController._logger,
+                          cluster_ip=cluster_ip)
 
         if enable_heartbeats is False:
             Configuration.set('/ovs/framework/support|enabled', False)
@@ -877,7 +877,7 @@ class NodeInstallationController(object):
             service = 'support-agent'
             if not ServiceManager.has_service(service, target_client):
                 ServiceManager.add_service(service, client=target_client)
-                LibToolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+                Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         if NodeTypeController.avahi_installed(client=target_client, logger=NodeInstallationController._logger) is True:
             NodeTypeController.configure_avahi(client=target_client, node_name=node_name, node_type='master', logger=NodeInstallationController._logger)
@@ -886,7 +886,7 @@ class NodeInstallationController(object):
         Configuration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'MASTER')
         Configuration.set('/ovs/framework/install_time', time.time())
         target_client.run(['chown', '-R', 'ovs:ovs', '/opt/OpenvStorage/config'])
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='First node complete')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='First node complete')
 
     @staticmethod
     def _setup_extra_node(cluster_ip, master_ip, ip_client_map):
@@ -895,7 +895,7 @@ class NodeInstallationController(object):
         """
         from ovs.extensions.db.arakoon.configuration import ArakoonConfiguration
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Adding extra node', title=True)
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Adding extra node', title=True)
         target_client = ip_client_map[cluster_ip]
         master_client = ip_client_map[master_ip]
         machine_id = System.get_my_machine_id(target_client)
@@ -908,9 +908,9 @@ class NodeInstallationController(object):
 
         service = 'watcher-config'
         if not ServiceManager.has_service(service, target_client):
-            LibToolbox.log(logger=NodeInstallationController._logger, messages='Adding service {0}'.format(service))
+            Toolbox.log(logger=NodeInstallationController._logger, messages='Adding service {0}'.format(service))
             ServiceManager.add_service(service, params={}, client=target_client)
-            LibToolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+            Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
         NodeTypeController.add_services(client=target_client, node_type='extra', logger=NodeInstallationController._logger)
 
         enabled = Configuration.get('/ovs/framework/support|enabled')
@@ -918,49 +918,49 @@ class NodeInstallationController(object):
             service = 'support-agent'
             if not ServiceManager.has_service(service, target_client):
                 ServiceManager.add_service(service, client=target_client)
-                LibToolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+                Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
         node_name, _ = target_client.get_hostname()
         NodeInstallationController._finalize_setup(target_client, node_name, 'EXTRA')
 
         Configuration.set('/ovs/framework/hosts/{0}/ip'.format(machine_id), cluster_ip)
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Starting services')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Starting services')
         for service in ['watcher-framework', 'watcher-config']:
             if ServiceManager.get_service_status(service, target_client)[0] is False:
-                LibToolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
+                Toolbox.change_service_state(target_client, service, 'start', NodeInstallationController._logger)
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Check ovs-workers')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Check ovs-workers')
         # Workers are started by ovs-watcher-framework, but for a short time they are in pre-start
-        LibToolbox.wait_for_service(target_client, 'workers', True, NodeInstallationController._logger)
+        Toolbox.wait_for_service(target_client, 'workers', True, NodeInstallationController._logger)
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Restarting workers')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Restarting workers')
         for node_client in ip_client_map.itervalues():
-            LibToolbox.change_service_state(node_client, 'workers', 'restart', NodeInstallationController._logger)
+            Toolbox.change_service_state(node_client, 'workers', 'restart', NodeInstallationController._logger)
 
-        LibToolbox.run_hooks(component='nodeinstallation',
-                             sub_component='extranode',
-                             logger=NodeInstallationController._logger,
-                             cluster_ip=cluster_ip,
-                             master_ip=master_ip)
+        Toolbox.run_hooks(component='nodeinstallation',
+                          sub_component='extranode',
+                          logger=NodeInstallationController._logger,
+                          cluster_ip=cluster_ip,
+                          master_ip=master_ip)
 
         if NodeTypeController.avahi_installed(client=target_client, logger=NodeInstallationController._logger) is True:
             NodeTypeController.configure_avahi(client=target_client, node_name=node_name, node_type='extra', logger=NodeInstallationController._logger)
         Configuration.set('/ovs/framework/hosts/{0}/setupcompleted'.format(machine_id), True)
         Configuration.set('/ovs/framework/hosts/{0}/type'.format(machine_id), 'EXTRA')
         target_client.run(['chown', '-R', 'ovs:ovs', '/opt/OpenvStorage/config'])
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Extra node complete')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Extra node complete')
 
     @staticmethod
     def _finalize_setup(client, node_name, node_type):
         # Configure Redis
         cluster_ip = client.ip
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Setting up Redis')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Setting up Redis')
         client.run(['sed', '-i', 's/^# maxmemory <bytes>.*/maxmemory 128mb/g', '/etc/redis/redis.conf'])
         client.run(['sed', '-i', 's/^# maxmemory-policy .*/maxmemory-policy allkeys-lru/g', '/etc/redis/redis.conf'])
         client.run(['sed', '-i', 's/^bind 127.0.0.1.*/bind {0}/g'.format(cluster_ip), '/etc/redis/redis.conf'])
-        LibToolbox.change_service_state(client, 'redis-server', 'restart', NodeInstallationController._logger)
+        Toolbox.change_service_state(client, 'redis-server', 'restart', NodeInstallationController._logger)
 
         client.dir_create('/opt/OpenvStorage/webapps/frontend/logging')
         config_file = '/opt/OpenvStorage/webapps/frontend/logging/config.js'
@@ -981,7 +981,7 @@ class NodeInstallationController(object):
         from ovs.dal.hybrids.storagerouter import StorageRouter
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
-        LibToolbox.log(logger=NodeInstallationController._logger, messages='Configuring/updating model')
+        Toolbox.log(logger=NodeInstallationController._logger, messages='Configuring/updating model')
         unique_id = System.get_my_machine_id(client=client)
         storagerouter = None
         for current_storagerouter in StorageRouterList.get_storagerouters():

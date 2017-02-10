@@ -32,7 +32,7 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.generic.threadhelpers import Waiter
 from ovs.extensions.storageserver.tests.mockups import LockedClient
 from ovs.lib.generic import GenericController
-from ovs.lib.helpers.toolbox import LibToolbox
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
 from ovs.log.log_handler import LogHandler
@@ -671,8 +671,8 @@ class Generic(unittest.TestCase):
         storagerouter_1 = structure['storagerouters'][1]
         storagerouter_2 = structure['storagerouters'][2]
         storagerouter_3 = structure['storagerouters'][3]
-        LibToolbox._function_pointers['update-get_package_info_multi'] = [_multi_1, _multi_2]
-        LibToolbox._function_pointers['update-get_package_info_single'] = [_single_1]
+        Toolbox._function_pointers['update-get_package_info_multi'] = [_multi_1, _multi_2]
+        Toolbox._function_pointers['update-get_package_info_single'] = [_single_1]
 
         SSHClient._raise_exceptions[storagerouter_2.ip] = {'users': ['root'],
                                                            'exception': UnableToConnectException('No route to host')}

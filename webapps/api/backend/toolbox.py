@@ -21,7 +21,7 @@ Contains various helping classes
 import re
 
 
-class BackendToolbox(object):
+class ApiToolbox(object):
     """
     This class contains generic methods
     """
@@ -98,7 +98,7 @@ class BackendToolbox(object):
         """
         granted = False
         # Implicitly denied access
-        if BackendToolbox.is_client_in_roles(client, ['manage']):
+        if ApiToolbox.is_client_in_roles(client, ['manage']):
             # Implicitly granted access
             granted = True
         if user_rights is not None:

@@ -35,7 +35,7 @@ from ovs.extensions.services.service import ServiceManager
 from ovs.log.log_handler import LogHandler
 
 
-class LibToolbox(object):
+class Toolbox(object):
     """
     Generic class for various methods
     """
@@ -59,7 +59,7 @@ class LibToolbox(object):
         :rtype: list
         """
         if os.environ.get('RUNNING_UNITTESTS') == 'True':
-            return LibToolbox._function_pointers.get('{0}-{1}'.format(component, sub_component), [])
+            return Toolbox._function_pointers.get('{0}-{1}'.format(component, sub_component), [])
 
         functions = []
         path = '{0}/../'.format(os.path.dirname(__file__))
@@ -94,13 +94,13 @@ class LibToolbox(object):
         :type kwargs: dict
         :return: Amount of functions executed
         """
-        functions = LibToolbox.fetch_hooks(component=component, sub_component=sub_component)
+        functions = Toolbox.fetch_hooks(component=component, sub_component=sub_component)
         functions_found = len(functions) > 0
         if logger is not None and functions_found is True:
-            LibToolbox.log(logger=logger, messages='Running "{0} - {1}" hooks'.format(component, sub_component), title=True)
+            Toolbox.log(logger=logger, messages='Running "{0} - {1}" hooks'.format(component, sub_component), title=True)
         for function in functions:
             if logger is not None:
-                LibToolbox.log(logger=logger, messages='Executing {0}.{1}'.format(function.__module__, function.__name__))
+                Toolbox.log(logger=logger, messages='Executing {0}.{1}'.format(function.__module__, function.__name__))
             function(**kwargs)
         return functions_found
 
@@ -149,12 +149,12 @@ class LibToolbox(object):
                 continue
 
             if expected_type == list:
-                if type(expected_value) == LibToolbox.compiled_regex_type:  # List of strings which need to match regex
+                if type(expected_value) == Toolbox.compiled_regex_type:  # List of strings which need to match regex
                     for item in actual_value:
                         if not re.match(expected_value, item):
                             error_messages.append('{0} param "{1}" has an item "{2}" which does not match regex "{3}"'.format(mandatory_or_optional, required_key, item, expected_value.pattern))
             elif expected_type == dict:
-                LibToolbox.verify_required_params(expected_value, actual_params[required_key])
+                Toolbox.verify_required_params(expected_value, actual_params[required_key])
             elif expected_type == int or expected_type == float:
                 if isinstance(expected_value, list) and actual_value not in expected_value:
                     error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
@@ -166,7 +166,7 @@ class LibToolbox(object):
             else:
                 if DalToolbox.check_type(expected_value, list)[0] is True and actual_value not in expected_value:
                     error_messages.append('{0} param "{1}" with value "{2}" should be 1 of the following: {3}'.format(mandatory_or_optional, required_key, actual_value, expected_value))
-                elif DalToolbox.check_type(expected_value, LibToolbox.compiled_regex_type)[0] is True and not re.match(expected_value, actual_value):
+                elif DalToolbox.check_type(expected_value, Toolbox.compiled_regex_type)[0] is True and not re.match(expected_value, actual_value):
                     error_messages.append('{0} param "{1}" with value "{2}" does not match regex "{3}"'.format(mandatory_or_optional, required_key, actual_value, expected_value.pattern))
         if error_messages:
             raise RuntimeError('\n' + '\n'.join(error_messages))
@@ -366,7 +366,7 @@ class LibToolbox(object):
             except UnableToConnectException:
                 raise
             except:
-                LibToolbox.log(logger=logger, messages='Password invalid or could not connect to this node')
+                Toolbox.log(logger=logger, messages='Password invalid or could not connect to this node')
 
 
 class Schedule(object):

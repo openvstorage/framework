@@ -37,7 +37,7 @@ from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.lib.helpers.decorators import add_hooks
-from ovs.lib.helpers.toolbox import LibToolbox
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.generic import GenericController
 from ovs.log.log_handler import LogHandler
 
@@ -440,7 +440,7 @@ class UpdateController(object):
         :rtype: dict
         """
         package_info = dict((storagerouter.ip, storagerouter.package_information) for storagerouter in StorageRouterList.get_storagerouters())
-        for function in LibToolbox.fetch_hooks('update', 'merge_package_info'):
+        for function in Toolbox.fetch_hooks('update', 'merge_package_info'):
             output = function()
             for ip in output:
                 if ip in package_info:
@@ -510,7 +510,7 @@ class UpdateController(object):
         :rtype: dict
         """
         information = {}
-        for function in LibToolbox.fetch_hooks('update', 'information'):
+        for function in Toolbox.fetch_hooks('update', 'information'):
             function(information=information)
 
         for component, info in copy.deepcopy(information).iteritems():
@@ -545,6 +545,7 @@ class UpdateController(object):
         filemutex = file_mutex('system_update', wait=2)
         ssh_clients = []
         services_stop_start = set()
+        errors_during_update = False
         try:
             filemutex.acquire()
             UpdateController._logger.debug('+++ Starting update +++')
@@ -582,12 +583,12 @@ class UpdateController(object):
             for component, component_info in update_information.iteritems():
                 if component in components:
                     UpdateController._logger.debug('Verifying update information for component: {0}'.format(component.upper()))
-                    LibToolbox.verify_required_params(actual_params=component_info,
-                                                      required_params={'downtime': (list, None),
-                                                                       'packages': (dict, None),
-                                                                       'prerequisites': (list, None),
-                                                                       'services_stop_start': (set, None),
-                                                                       'services_post_update': (set, None)})
+                    Toolbox.verify_required_params(actual_params=component_info,
+                                                   required_params={'downtime': (list, None),
+                                                                    'packages': (dict, None),
+                                                                    'prerequisites': (list, None),
+                                                                    'services_stop_start': (set, None),
+                                                                    'services_post_update': (set, None)})
                     if len(component_info['prerequisites']) > 0:
                         raise Exception('Update is only allowed when all prerequisites have been met')
 
@@ -608,8 +609,8 @@ class UpdateController(object):
                 raise Exception('Stopping all services on every node failed, cannot continue')
 
             # Collect the functions to be executed before they get overwritten by updated packages, so on each the same functionality is executed
-            package_install_multi_hooks = LibToolbox.fetch_hooks('update', 'package_install_multi')
-            package_install_single_hooks = LibToolbox.fetch_hooks('update', 'package_install_single')
+            package_install_multi_hooks = Toolbox.fetch_hooks('update', 'package_install_multi')
+            package_install_single_hooks = Toolbox.fetch_hooks('update', 'package_install_single')
 
             # Install each package on all StorageRouters
             if packages_to_update:
@@ -682,15 +683,15 @@ class UpdateController(object):
             # Post update actions
             for client in ssh_clients:
                 UpdateController._logger.debug('{0}: Executing post-update actions'.format(client.ip))
-                with remote(client.ip, [LibToolbox]) as rem:
-                    for function in rem.LibToolbox.fetch_hooks('update', 'post_update_multi'):
+                with remote(client.ip, [Toolbox]) as rem:
+                    for function in rem.Toolbox.fetch_hooks('update', 'post_update_multi'):
                         try:
                             function(client=client, components=components)
                         except Exception as ex:
                             UpdateController._logger.exception('{0}: Post update hook {1} failed with error: {2}'.format(client.ip, function.__name__, ex))
 
-            with remote(local_ip, [LibToolbox]) as rem:
-                for function in rem.LibToolbox.fetch_hooks('update', 'post_update_single'):
+            with remote(local_ip, [Toolbox]) as rem:
+                for function in rem.Toolbox.fetch_hooks('update', 'post_update_single'):
                     try:
                         function(components=components)
                     except Exception as ex:
@@ -700,20 +701,17 @@ class UpdateController(object):
             UpdateController.change_services_state(services=services_stop_start,
                                                    ssh_clients=ssh_clients,
                                                    action='start')
-
-            UpdateController._refresh_package_information()
-            UpdateController._logger.debug('+++ Finished updating +++')
         except NoLockAvailableException:
             UpdateController._logger.debug('Another update is currently in progress!')
         except Exception as ex:
+            errors_during_update = True
             UpdateController._logger.exception('Error during update: {0}'.format(ex))
             if len(ssh_clients) > 0 and abort is False:
                 UpdateController.change_services_state(services=services_stop_start,
                                                        ssh_clients=ssh_clients,
                                                        action='start')
-                UpdateController._refresh_package_information()
-            UpdateController._logger.error('Failed to update. Please check all the logs for more information')
         finally:
+            UpdateController._refresh_package_information()
             filemutex.release()
             for ssh_client in ssh_clients:
                 for file_name in [UpdateController._update_file, UpdateController._update_ongoing_file]:
@@ -722,6 +720,10 @@ class UpdateController(object):
                             ssh_client.file_delete(file_name)
                     except:
                         UpdateController._logger.warning('[0}: Failed to remove lock file {1}'.format(ssh_client.ip, file_name))
+            if errors_during_update is True:
+                UpdateController._logger.error('Failed to update. Please check all the logs for more information')
+            else:
+                UpdateController._logger.debug('+++ Finished updating +++')
 
     @staticmethod
     def change_services_state(services, ssh_clients, action):
@@ -737,10 +739,10 @@ class UpdateController(object):
                 description = 'stopping' if action == 'stop' else 'starting' if action == 'start' else 'restarting'
                 try:
                     if ServiceManager.has_service(service_name, client=ssh_client):
-                        LibToolbox.change_service_state(client=ssh_client,
-                                                        name=service_name,
-                                                        state=action,
-                                                        logger=UpdateController._logger)
+                        Toolbox.change_service_state(client=ssh_client,
+                                                     name=service_name,
+                                                     state=action,
+                                                     logger=UpdateController._logger)
                 except Exception as exc:
                     UpdateController._logger.warning('{0}: Something went wrong {1} service {2}: {3}'.format(ssh_client.ip, description, service_name, exc))
                     if action == 'stop':
@@ -753,7 +755,7 @@ class UpdateController(object):
     @staticmethod
     def _refresh_package_information():
         # Refresh updates
-        UpdateController._logger.debug('Refreshing package information')
+        UpdateController._logger.debug('Refreshing update information')
         counter = 1
         while counter < 6:
             try:
@@ -762,6 +764,5 @@ class UpdateController(object):
             except Exception:
                 UpdateController._logger.debug('Attempt {0}: Could not refresh the update information, trying again'.format(counter))
                 time.sleep(6)  # Wait 30 seconds max in total
-            counter += 1
-            if counter == 6:
-                raise Exception('Could not refresh the update information')
+                counter += 1
+        UpdateController._logger.debug('Failed to refresh the update information')
