@@ -60,7 +60,6 @@ class OVSMigrator(object):
             from ovs.dal.hybrids.j_roleclient import RoleClient
             from ovs.dal.hybrids.servicetype import ServiceType
             from ovs.dal.hybrids.branding import Branding
-            from ovs.dal.lists.backendtypelist import BackendTypeList
 
             # Create groups
             admin_group = Group()
@@ -159,10 +158,7 @@ class OVSMigrator(object):
             from ovs.dal.helpers import HybridRunner, Descriptor
             from ovs.dal.hybrids.diskpartition import DiskPartition
             from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
-            from ovs.dal.lists.backendtypelist import BackendTypeList
-            from ovs.dal.lists.diskpartitionlist import DiskPartitionList
             from ovs.dal.lists.storagedriverlist import StorageDriverList
-            from ovs.dal.lists.storagerouterlist import StorageRouterList
             from ovs.dal.lists.vpoollist import VPoolList
             from ovs.extensions.generic.configuration import Configuration
             from ovs.extensions.generic.sshclient import SSHClient
@@ -171,7 +167,6 @@ class OVSMigrator(object):
             from ovs.extensions.services.systemd import Systemd
             from ovs.extensions.storage.persistentfactory import PersistentFactory
             from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-            from ovs.lib.disk import DiskController
 
             # Migrate unique constraints & indexes
             client = PersistentFactory.get_client()
@@ -209,94 +204,6 @@ class OVSMigrator(object):
                                 client.assert_value(ikey, index[:], transaction=transaction)
                                 client.set(ikey, index + [key], transaction=transaction)
                             client.apply_transaction(transaction)
-
-            # Complete rework of the way we detect devices to assign roles or use as ASD
-            # Allow loop-, raid-, nvme-, ??-devices and logical volumes as ASD (https://github.com/openvstorage/framework/issues/792)
-            for storagerouter in StorageRouterList.get_storagerouters():
-                client = SSHClient(storagerouter.ip, username='root')
-
-                # Retrieve all symlinks for all devices
-                # Example of name_alias_mapping:
-                # {'/dev/md0': ['/dev/disk/by-id/md-uuid-ad2de634:26d97253:5eda0a23:96986b76', '/dev/disk/by-id/md-name-OVS-1:0'],
-                #  '/dev/sda': ['/dev/disk/by-path/pci-0000:03:00.0-sas-0x5000c295fe2ff771-lun-0'],
-                #  '/dev/sda1': ['/dev/disk/by-uuid/e3e0bc62-4edc-4c6b-a6ce-1f39e8f27e41', '/dev/disk/by-path/pci-0000:03:00.0-sas-0x5000c295fe2ff771-lun-0-part1']}
-                name_alias_mapping = {}
-                alias_name_mapping = {}
-                for path_type in client.dir_list(directory='/dev/disk'):
-                    if path_type in ['by-uuid', 'by-partuuid']:  # UUIDs can change after creating a filesystem on a partition
-                        continue
-                    directory = '/dev/disk/{0}'.format(path_type)
-                    for symlink in client.dir_list(directory=directory):
-                        symlink_path = '{0}/{1}'.format(directory, symlink)
-                        link = client.file_read_link(symlink_path)
-                        if link not in name_alias_mapping:
-                            name_alias_mapping[link] = []
-                        name_alias_mapping[link].append(symlink_path)
-                        alias_name_mapping[symlink_path] = link
-
-                for disk in storagerouter.disks:
-                    if disk.aliases is None:
-                        # noinspection PyProtectedMember
-                        device_path = '/dev/{0}'.format(disk.name)
-                        disk.aliases = name_alias_mapping.get(device_path, [device_path])
-                        disk.save()
-                    for partition in disk.partitions:
-                        if partition.aliases is None:
-                            # noinspection PyProtectedMember
-                            partition_device = alias_name_mapping.get(partition._data.get('path'))
-                            if partition_device is None:
-                                partition.aliases = []
-                                partition.save()
-                                continue
-                            partition.aliases = name_alias_mapping.get(partition_device, [])
-                            partition.save()
-
-                DiskController.sync_with_reality(storagerouter_guid=storagerouter.guid)
-
-            # Only support ALBA Backend type
-            for backend_type in BackendTypeList.get_backend_types():
-                if backend_type.code != 'alba':
-                    backend_type.delete()
-
-            # Reformat the vpool.metadata information
-            vpools = VPoolList.get_vpools()
-            for vpool in vpools:
-                if vpool.metadata.get('backend', {}).get('backend_info', {}).get('name') is not None:  # Already new format
-                    continue
-                new_metadata = {}
-                for metadata_key, value in vpool.metadata.items():
-                    new_info = {}
-                    storagerouter_guids = [key for key in vpool.metadata.keys() if not key.startswith('backend')]
-                    if isinstance(value, dict):
-                        read_cache = value.get('backend_info', {}).get('fragment_cache_on_read', True)
-                        write_cache = value.get('backend_info', {}).get('fragment_cache_on_write', False)
-                        new_info['backend_info'] = {'alba_backend_guid': value.get('backend_guid'),
-                                                    'backend_guid': None,
-                                                    'frag_size': value.get('backend_info', {}).get('frag_size'),
-                                                    'name': value.get('name'),
-                                                    'policies': value.get('backend_info', {}).get('policies'),
-                                                    'preset': value.get('preset'),
-                                                    'sco_size': value.get('backend_info', {}).get('sco_size'),
-                                                    'total_size': value.get('backend_info', {}).get('total_size')}
-                        new_info['arakoon_config'] = value.get('arakoon_config')
-                        new_info['connection_info'] = {'host': value.get('connection', {}).get('host', ''),
-                                                       'port': value.get('connection', {}).get('port', ''),
-                                                       'local': value.get('connection', {}).get('local', ''),
-                                                       'client_id': value.get('connection', {}).get('client_id', ''),
-                                                       'client_secret': value.get('connection', {}).get('client_secret', '')}
-                        if metadata_key == 'backend':
-                            new_info['caching_info'] = dict((sr_guid, {'fragment_cache_on_read': read_cache, 'fragment_cache_on_write': write_cache}) for sr_guid in storagerouter_guids)
-                    if metadata_key in storagerouter_guids:
-                        metadata_key = 'backend_aa_{0}'.format(metadata_key)
-                    new_metadata[metadata_key] = new_info
-                vpool.metadata = new_metadata
-                vpool.save()
-
-            # Removal of READ role
-            for partition in DiskPartitionList.get_partitions():
-                if 'READ' in partition.roles:
-                    partition.roles.remove('READ')
-                    partition.save()
 
             ####################
             # Multiple Proxies #
@@ -420,7 +327,7 @@ class OVSMigrator(object):
                         root_client.run(['systemctl', 'daemon-reload'])
 
             # Introduction of DTL role (Replaces DTL sub_role)
-            for vpool in vpools:
+            for vpool in VPoolList.get_vpools():
                 for storagedriver in vpool.storagedrivers:
                     for junction_partition_guid in storagedriver.partitions_guids:
                         junction_partition = StorageDriverPartition(junction_partition_guid)
