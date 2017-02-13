@@ -31,7 +31,6 @@ from ovs.extensions.generic.filemutex import NoLockAvailableException
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.migration.migrator import Migrator
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
@@ -376,6 +375,8 @@ class UpdateController(object):
         """
         if 'framework' not in components and 'storagedriver' not in components:
             return
+
+        from ovs.extensions.generic.toolbox import ExtensionsToolbox
 
         # Remove services which have been renamed in the migration code
         local_sr = System.get_my_storagerouter()

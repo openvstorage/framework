@@ -19,7 +19,6 @@ Debian Package module
 """
 
 from subprocess import check_output, CalledProcessError
-from ovs.extensions.generic.toolbox import ExtensionsToolbox
 from ovs.log.log_handler import LogHandler
 
 
@@ -63,6 +62,8 @@ class DebianPackage(object):
         :return: Package candidate versions
         :rtype: dict
         """
+        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+
         DebianPackage.update(client=client)
         versions = {}
         for package_name in package_names:

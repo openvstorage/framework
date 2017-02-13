@@ -40,7 +40,6 @@ from ovs.extensions.generic.filemutex import file_mutex
 from ovs.extensions.generic.remote import remote
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.toolbox import ExtensionsToolbox
 from ovs.extensions.services.service import ServiceManager
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.lib.helpers.toolbox import Toolbox, Schedule
@@ -448,6 +447,8 @@ class GenericController(object):
         Collapse Arakoon's Tlogs
         :return: None
         """
+        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+
         GenericController._logger.info('Arakoon collapse started')
         cluster_info = []
         storagerouters = StorageRouterList.get_storagerouters()
