@@ -42,8 +42,7 @@ from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.volatilemutex import NoLockAvailableException, volatile_mutex
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
-                                                       StorageDriverClient, StorageDriverConfiguration, \
-                                                       SRCObjectNotFoundException, FeatureNotAvailableException
+                                                       SRCObjectNotFoundException, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single, log
 from ovs.lib.helpers.toolbox import Schedule, Toolbox
 from ovs.lib.mdsservice import MDSServiceController
@@ -1332,6 +1331,8 @@ class VDiskController(object):
         :return: None
         :rtype: NoneType
         """
+        from ovs.extensions.storageserver.storagedriver import FeatureNotAvailableException
+
         if vpool_guid is None:
             vpools = VPoolList.get_vpools()
         else:
