@@ -23,7 +23,6 @@ import json
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.toolbox import ExtensionsToolbox
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 
@@ -405,6 +404,8 @@ class StorageDriverConfiguration(object):
         return changes
 
     def __getattr__(self, item):
+        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+
         if item.startswith('configure_'):
             section = ExtensionsToolbox.remove_prefix(item, 'configure_')
             return lambda **kwargs: self._add(section, **kwargs)
