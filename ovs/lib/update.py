@@ -765,4 +765,4 @@ class UpdateController(object):
                 UpdateController._logger.debug('Attempt {0}: Could not refresh the update information, trying again'.format(counter))
                 time.sleep(6)  # Wait 30 seconds max in total
                 counter += 1
-        UpdateController._logger.debug('Failed to refresh the update information')
+        UpdateController._logger.exception('Failed to refresh the update information')
