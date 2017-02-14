@@ -22,7 +22,7 @@ import time
 from subprocess import CalledProcessError, check_output
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.toolbox import Toolbox
+from ovs.extensions.generic.toolbox import ExtensionsToolbox
 from ovs.log.log_handler import LogHandler
 
 
@@ -88,7 +88,7 @@ class Upstart(object):
         if target_name is not None:
             service_name = target_name
 
-        params.update({'SERVICE_NAME': Toolbox.remove_prefix(service_name, 'ovs-'),
+        params.update({'SERVICE_NAME': ExtensionsToolbox.remove_prefix(service_name, 'ovs-'),
                        'STARTUP_DEPENDENCY': '' if startup_dependency is None else 'started {0}'.format(startup_dependency)})
         template_content = client.file_read(template_file)
         for key, value in params.iteritems():
@@ -112,7 +112,7 @@ class Upstart(object):
         :return: None
         :rtype: NoneType
         """
-        configuration_key = Upstart.SERVICE_CONFIG_KEY.format(System.get_my_machine_id(client), Toolbox.remove_prefix(target_name, 'ovs-'))
+        configuration_key = Upstart.SERVICE_CONFIG_KEY.format(System.get_my_machine_id(client), ExtensionsToolbox.remove_prefix(target_name, 'ovs-'))
         # If the entry is stored in arakoon, it means the service file was previously made
         if not Configuration.exists(configuration_key):
             raise RuntimeError('Service {0} was not previously added and cannot be regenerated.'.format(target_name))
@@ -174,7 +174,7 @@ class Upstart(object):
         :return: None
         """
         name = Upstart._get_name(name, client)
-        run_file_name = '/opt/OpenvStorage/run/{0}.version'.format(Toolbox.remove_prefix(name, 'ovs-'))
+        run_file_name = '/opt/OpenvStorage/run/{0}.version'.format(ExtensionsToolbox.remove_prefix(name, 'ovs-'))
         if client.file_exists(run_file_name):
             client.file_delete(run_file_name)
         client.file_delete('/etc/init/{0}.conf'.format(name))
@@ -369,12 +369,12 @@ class Upstart(object):
                 # Put service states in list
                 output = ['OVS running processes',
                           '=====================\n']
-                for service_name in sorted(running_services, key=lambda service: Toolbox.advanced_sort(service, '_')):
+                for service_name in sorted(running_services, key=lambda service: ExtensionsToolbox.advanced_sort(service, '_')):
                     output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), running_services[service_name]))
 
                 output.extend(['\n\nOVS non-running processes',
                                '=========================\n'])
-                for service_name in sorted(non_running_services, key=lambda service: Toolbox.advanced_sort(service, '_')):
+                for service_name in sorted(non_running_services, key=lambda service: ExtensionsToolbox.advanced_sort(service, '_')):
                     output.append('{0} {1} {2}'.format(service_name, ' ' * (longest_service_name - len(service_name)), non_running_services[service_name]))
 
                 # Print service states (only if changes)
@@ -398,7 +398,7 @@ class Upstart(object):
         :return: None
         """
         service_name = service_metadata['SERVICE_NAME']
-        Configuration.set(key=Upstart.SERVICE_CONFIG_KEY.format(node_name, Toolbox.remove_prefix(service_name, 'ovs-')),
+        Configuration.set(key=Upstart.SERVICE_CONFIG_KEY.format(node_name, ExtensionsToolbox.remove_prefix(service_name, 'ovs-')),
                           value=service_metadata)
 
     @staticmethod
@@ -411,7 +411,7 @@ class Upstart(object):
         :type node_name: str
         :return: None
         """
-        Configuration.delete(key=Upstart.SERVICE_CONFIG_KEY.format(node_name, Toolbox.remove_prefix(service_name, 'ovs-')))
+        Configuration.delete(key=Upstart.SERVICE_CONFIG_KEY.format(node_name, ExtensionsToolbox.remove_prefix(service_name, 'ovs-')))
 
     @staticmethod
     def is_rabbitmq_running(client):

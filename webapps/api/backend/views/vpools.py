@@ -175,3 +175,18 @@ class VPoolViewSet(viewsets.ViewSet):
         :type snapshot_mapping: dict
         """
         return VDiskController.delete_snapshots.delay(snapshot_mapping=snapshot_mapping)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(VPool)
+    def sync_with_reality(self, vpool):
+        """
+        Syncs the model for given vPool with reality
+        :param vpool: vPool to sync
+        :type vpool: ovs.dal.hybrids.vpool.VPool
+        :return: Asynchronous result of a CeleryTask
+        :rtype: celery.result.AsyncResult
+        """
+        return VDiskController.sync_with_reality.delay(vpool_guid=vpool.guid)

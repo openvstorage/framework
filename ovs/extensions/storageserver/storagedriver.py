@@ -23,13 +23,14 @@ import json
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonClusterConfig
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.remote import remote
-from ovs.extensions.generic.toolbox import Toolbox
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 
-# Import below classes so the rest of the framework can always import from this module, so we can inject mocks
-# easier without having to make changes everywhere
+# Import below classes so the rest of the framework can always import from this module:
+# * We can inject mocks easier without having to make changes everywhere
+# * We can handle backwards compatibility better
 # noinspection PyUnresolvedReferences
+
 from volumedriver.storagerouter.storagerouterclient import \
     ClusterContact, ClusterNodeConfig, \
     DTLConfig, DTLConfigMode, DTLMode, Logger, \
@@ -37,19 +38,38 @@ from volumedriver.storagerouter.storagerouterclient import \
     ObjectNotFoundException as SRCObjectNotFoundException, \
     ReadCacheBehaviour, ReadCacheMode, \
     Role, Statistics, VolumeInfo
+try:
+    from volumedriver.storagerouter.storagerouterclient import VolumeRestartInProgressException
+except ImportError:
+    from ovs.extensions.storageserver.tests.mockups import VolumeRestartInProgressException
+
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
     from ovs.extensions.storageserver.tests.mockups import \
         ArakoonNodeConfig, ClusterRegistry, LocalStorageRouterClient, \
-        MDSClient, ObjectRegistryClient as ORClient, StorageRouterClient
+        MDSClient, ObjectRegistryClient as ORClient, StorageRouterClient, \
+        FileSystemMetaDataClient
 else:
     from volumedriver.storagerouter.storagerouterclient import \
         ArakoonNodeConfig, ClusterRegistry, LocalStorageRouterClient, \
         MDSClient, ObjectRegistryClient as ORClient, StorageRouterClient
+    try:
+        from volumedriver.storagerouter.storagerouterclient import FileSystemMetaDataClient
+    except ImportError:
+        FileSystemMetaDataClient = None
+
 
 client_vpool_cache = {}
 oclient_vpool_cache = {}
 crclient_vpool_cache = {}
+fsmclient_vpool_cache = {}
 mdsclient_service_cache = {}
+
+
+class FeatureNotAvailableException(Exception):
+    """
+    Raised when feature is not yet available
+    """
+    pass
 
 
 # noinspection PyArgumentList
@@ -248,6 +268,41 @@ class ClusterRegistryClient(object):
         return crclient_vpool_cache[key]
 
 
+class FSMetaDataClient(object):
+    """
+    Builds a FileSystemMetaDataClient
+    """
+    def __init__(self):
+        """
+        Dummy init method
+        """
+        pass
+
+    @staticmethod
+    def load(vpool):
+        """
+        Initializes the wrapper for a given vPool
+        :param vpool: vPool for which the FileSystemMetaDataClient needs to be loaded
+        """
+        if FileSystemMetaDataClient is None:
+            raise FeatureNotAvailableException()
+
+        if os.environ.get('RUNNING_UNITTESTS') == 'True':
+            return FileSystemMetaDataClient(str(vpool.guid), None, None)
+
+        key = vpool.identifier
+        if key not in fsmclient_vpool_cache:
+            arakoon_cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
+            config = ArakoonClusterConfig(cluster_id=arakoon_cluster_name, filesystem=False)
+            config.load_config()
+            arakoon_node_configs = []
+            for node in config.nodes:
+                arakoon_node_configs.append(ArakoonNodeConfig(str(node.name), str(node.ip), node.client_port))
+            client = FileSystemMetaDataClient(str(vpool.guid), arakoon_cluster_name, arakoon_node_configs)
+            fsmclient_vpool_cache[key] = client
+        return fsmclient_vpool_cache[key]
+
+
 class StorageDriverConfiguration(object):
     """
     StorageDriver configuration class
@@ -349,11 +404,13 @@ class StorageDriverConfiguration(object):
         return changes
 
     def __getattr__(self, item):
+        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+
         if item.startswith('configure_'):
-            section = Toolbox.remove_prefix(item, 'configure_')
+            section = ExtensionsToolbox.remove_prefix(item, 'configure_')
             return lambda **kwargs: self._add(section, **kwargs)
         if item.startswith('clear_'):
-            section = Toolbox.remove_prefix(item, 'clear_')
+            section = ExtensionsToolbox.remove_prefix(item, 'clear_')
             return lambda: self._delete(section)
 
     def _add(self, section, **kwargs):

@@ -23,6 +23,7 @@ define([
         var self = this;
 
         // Observables
+        self.albaProxyGuids    = ko.observableArray([]);
         self.backendInfo       = ko.observable();
         self.connectionInfo    = ko.observable();
         self.guid              = ko.observable(guid);
@@ -45,6 +46,7 @@ define([
             generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
             generic.trySet(self.vdiskGuids, data, 'vdisks_guids');
             generic.trySet(self.vpoolBackendInfo, data, 'vpool_backend_info');
+            generic.trySet(self.albaProxyGuids, data, 'alba_proxies_guids');
             if (data.hasOwnProperty('vpool_backend_info')) {
                 generic.trySet(self.backendInfo, data.vpool_backend_info, 'backend_info');
                 generic.trySet(self.connectionInfo, data.vpool_backend_info, 'connection_info');

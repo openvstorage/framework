@@ -17,8 +17,6 @@
 """
 Authentication test module
 """
-import os
-import sys
 import json
 import time
 import uuid
@@ -26,11 +24,9 @@ import hashlib
 import unittest
 from django.http import HttpResponse
 from api.backend.exceptions import HttpNotAcceptableException, HttpNotFoundException, HttpTooManyRequestsException, HttpUnauthorizedException, HttpForbiddenException
-from api.backend.toolbox import Toolbox  # Required for the tests
-from api.oauth2.toolbox import Toolbox as OAuth2Toolbox
-from ovs.extensions.generic import fakesleep
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+# noinspection PyUnresolvedReferences
+from api.backend.toolbox import ApiToolbox  # Required for the tests
+from api.oauth2.toolbox import OAuth2Toolbox
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.j_roleclient import RoleClient
@@ -40,6 +36,7 @@ from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.hybrids.user import User
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.lists.userlist import UserList
+from ovs.lib.tests.helpers import Helper
 
 
 class Decorators(unittest.TestCase):
@@ -52,9 +49,7 @@ class Decorators(unittest.TestCase):
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        cls.factory = None
-        PersistentFactory.get_client().clean()
-        VolatileFactory.get_client().clean()
+        Helper.setup(fake_sleep=True)
 
         admin_group = Group()
         admin_group.name = 'administrators'
@@ -155,14 +150,12 @@ class Decorators(unittest.TestCase):
         from django.test import RequestFactory
         cls.factory = RequestFactory()
 
-        fakesleep.monkey_patch()
-
     @classmethod
     def tearDownClass(cls):
         """
         Clean up the unittest
         """
-        fakesleep.monkey_restore()
+        Helper.teardown(fake_sleep=True)
 
     def test_ratelimit(self):
         """
@@ -354,6 +347,7 @@ class Decorators(unittest.TestCase):
         self.assertIn('request', output['value'].keys())
         self.assertEqual(json.loads(response.content), 6)
 
+    # noinspection PyUnresolvedReferences
     def test_return_task(self):
         """
         Validates whether the return_task decorator will return a task ID
@@ -372,6 +366,7 @@ class Decorators(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, 1)
 
+    # noinspection PyUnresolvedReferences
     def test_return_object(self):
         """
         Validates whether the return_object decorator works:

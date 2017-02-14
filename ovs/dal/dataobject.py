@@ -27,7 +27,7 @@ from random import randint
 from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
                                 MissingMandatoryFieldsException, RaceConditionException, InvalidRelationException,
                                 VolatileObjectException, UniqueConstraintViolationException)
-from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
+from ovs.dal.helpers import Descriptor, DalToolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.datalist import DataList
 from ovs.extensions.generic.volatilemutex import volatile_mutex, NoLockAvailableException
@@ -421,7 +421,7 @@ class DataObject(object):
         if value is None:
             self._data[prop.name] = value
         else:
-            correct, allowed_types, given_type = Toolbox.check_type(value, prop.property_type)
+            correct, allowed_types, given_type = DalToolbox.check_type(value, prop.property_type)
             if correct:
                 self._data[prop.name] = value
             else:
@@ -1001,7 +1001,7 @@ class DataObject(object):
                         dynamic_data = function(dynamic=dynamic)  # Load data from backend
                     else:
                         dynamic_data = function()
-                    correct, allowed_types, given_type = Toolbox.check_type(dynamic_data, dynamic.return_type)
+                    correct, allowed_types, given_type = DalToolbox.check_type(dynamic_data, dynamic.return_type)
                     if not correct:
                         raise TypeError('Dynamic property {0} allows types {1}. {2} given'.format(
                             caller_name, str(allowed_types), given_type
@@ -1009,9 +1009,15 @@ class DataObject(object):
                     cached_data = {'data': dynamic_data}
                     if dynamic.timeout > 0:
                         self._volatile.set(cache_key, cached_data, dynamic.timeout)
-            return Toolbox.convert_unicode_to_string(cached_data['data'])
+            return DalToolbox.convert_unicode_to_string(cached_data['data'])
         finally:
             mutex.release()
+
+    def __repr__(self):
+        """
+        A short self-representation
+        """
+        return '<{0} (guid: {1}, at: {2})>'.format(self.__class__.__name__, self._guid, hex(id(self)))
 
     def __str__(self):
         """

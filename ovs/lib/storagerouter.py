@@ -230,6 +230,10 @@ class StorageRouterController(object):
         if storagerouter is None:
             raise RuntimeError('Could not find Storage Router with given IP address {0}'.format(client.ip))
 
+        # Check RDMA capabilities
+        if sd_config_params['dtl_transport'] == StorageDriverClient.FRAMEWORK_DTL_TRANSPORT_RSOCKET and storagerouter.rdma_capable is False:
+            raise RuntimeError('The DTL transport is not supported by the StorageRouter')
+
         # Check duplicate vPool StorageDriver
         all_storagerouters = [storagerouter]
         if new_vpool is False:
@@ -422,8 +426,8 @@ class StorageRouterController(object):
                                    version=2)
             preset_name = metadata['backend_info']['preset']
             alba_backend_guid = metadata['backend_info']['alba_backend_guid']
-            arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(backend_guid=alba_backend_guid, ovs_client=ovs_client)
             try:
+                arakoon_config = StorageRouterController._retrieve_alba_arakoon_config(backend_guid=alba_backend_guid, ovs_client=ovs_client)
                 backend_dict = ovs_client.get('/alba/backends/{0}/'.format(alba_backend_guid), params={'contents': 'name,usages,presets,backend,remote_stack'})
                 preset_info = dict((preset['name'], preset) for preset in backend_dict['presets'])
                 if preset_name not in preset_info:
@@ -704,7 +708,9 @@ class StorageRouterController(object):
                              'fs_metadata_backend_mds_nodes': [],
                              'fs_metadata_backend_type': 'MDS',
                              'fs_virtual_disk_format': 'raw',
-                             'fs_raw_disk_suffix': '.raw'}
+                             'fs_raw_disk_suffix': '.raw',
+                             'fs_file_event_rules': [{'fs_file_event_rule_calls': ['Rename'],
+                                                      'fs_file_event_rule_path_regex': '.*'}]}
         if dtl_mode == 'no_sync':
             filesystem_config['fs_dtl_config_mode'] = StorageDriverClient.VOLDRV_DTL_MANUAL_MODE
         else:

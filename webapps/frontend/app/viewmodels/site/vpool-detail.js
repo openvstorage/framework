@@ -73,7 +73,7 @@ define([
                 ])
                     .fail(function(error) {
                         if (error !== undefined && error.status === 404) {
-                            router.navigate(shared.routing.loadHash('vpools'));
+                            router.navigateBack();
                         }
                     })
                     .always(deferred.resolve);
@@ -115,7 +115,12 @@ define([
         self.loadStorageDrivers = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadStorageDriversHandle)) {
-                    self.loadStorageDriversHandle = api.get('storagedrivers', {queryparams: {vpool_guid: self.vPool().guid(), contents: 'storagerouter,vpool_backend_info,vdisks_guids'}})
+                    self.loadStorageDriversHandle = api.get('storagedrivers', {
+                        queryparams: {
+                            vpool_guid: self.vPool().guid(),
+                            contents: 'storagerouter,vpool_backend_info,vdisks_guids,alba_proxies'
+                        }
+                    })
                         .done(function(data) {
                             var guids = [], sddata = {}, map = {};
                             $.each(data.data, function(index, item) {

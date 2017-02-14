@@ -17,6 +17,7 @@
 """
 Module for VDiskController
 """
+import os
 import re
 import time
 import uuid
@@ -43,7 +44,7 @@ from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, MDSMetaDataBackendConfig, MDSNodeConfig, \
                                                        SRCObjectNotFoundException, StorageDriverClient, StorageDriverConfiguration
 from ovs.lib.helpers.decorators import ensure_single, log
-from ovs.lib.helpers.toolbox import Toolbox, Schedule
+from ovs.lib.helpers.toolbox import Schedule, Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.log_handler import LogHandler
 from volumedriver.storagerouter import storagerouterclient, VolumeDriverEvents_pb2
@@ -83,7 +84,7 @@ class VDiskController(object):
         """
         Removes a vDisk from the model
         :param vdisk: The vDisk to be removed
-        :type vdisk: VDisk
+        :type vdisk: ovs.dal.hybrids.vdisk.VDisk
         :return: None
         """
         VDiskController._logger.info('Cleaning vDisk {0}'.format(vdisk.name))
@@ -92,6 +93,24 @@ class VDiskController(object):
         for domain_junction in vdisk.domains_dtl:
             domain_junction.delete()
         vdisk.delete()
+
+    @staticmethod
+    def vdisk_checkup(vdisk):
+        """
+        Triggers a few (async) tasks to make sure the vDisk is in a healthy state.
+        :param vdisk: The vDisk to check
+        :type vdisk: ovs.dal.hybrids.vdisk.VDisk
+        :return: None
+        """
+        VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
+        try:
+            VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
+            MDSServiceController.ensure_safety(vdisk)
+        except Exception:
+            VDiskController._logger.exception('Error during vDisk checkup')
+            if vdisk.objectregistry_client.find(str(vdisk.volume_id)) is None:
+                VDiskController._logger.warning('Volume {0} does not exist anymore.'.format(vdisk.volume_id))
+                VDiskController.clean_vdisk_from_model(vdisk)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete_from_voldrv')
@@ -104,12 +123,12 @@ class VDiskController(object):
         :type volume_id: str
         :return: None
         """
-        vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
-        if vdisk is not None:
-            with volatile_mutex('voldrv_event_disk_{0}'.format(vdisk.volume_id), wait=20):
+        with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=20):
+            vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+            if vdisk is not None:
                 VDiskController.clean_vdisk_from_model(vdisk)
-        else:
-            VDiskController._logger.info('Volume {0} does not exist (yet)'.format(volume_id))
+            else:
+                VDiskController._logger.info('Volume {0} does not exist'.format(volume_id))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.delete')
@@ -171,13 +190,15 @@ class VDiskController(object):
         :return: None
         """
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+        vpool = storagedriver.vpool
         with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+            if vpool.objectregistry_client.find(str(volume_id)) is None:
+                VDiskController._logger.warning('Ignoring resize_from_voldrv event for non-existing volume {0}'.format(volume_id))
+                return
             vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if vdisk is None:
-                vdisk = VDiskList.get_by_devicename_and_vpool(volume_path, storagedriver.vpool)
-                if vdisk is None:
-                    vdisk = VDisk()
-                    vdisk.name = VDiskController.extract_volumename(volume_path)
+                vdisk = VDisk()
+                vdisk.name = VDiskController.extract_volumename(volume_path)
             vdisk.devicename = volume_path
             vdisk.volume_id = volume_id
             vdisk.size = volume_size
@@ -185,16 +206,7 @@ class VDiskController(object):
             vdisk.metadata = {'lba_size': vdisk.info['lba_size'],
                               'cluster_multiplier': vdisk.info['cluster_multiplier']}
             vdisk.save()
-
-            VDiskController.dtl_checkup.delay(vdisk_guid=vdisk.guid)
-            try:
-                VDiskController._set_vdisk_metadata_pagecache_size(vdisk)
-                MDSServiceController.ensure_safety(vdisk)
-            except SRCObjectNotFoundException:
-                VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
-                VDiskController.clean_vdisk_from_model(vdisk)
-            except Exception:
-                VDiskController._logger.exception('Error processing resize_from_voldrv event')
+            VDiskController.vdisk_checkup(vdisk)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.migrate_from_voldrv')
@@ -217,6 +229,40 @@ class VDiskController(object):
                 VDiskController._logger.info('Migration - Guid {0} - ID {1} - Storage Router {2} is the new owner of vDisk {3}'.format(vdisk.guid, vdisk.volume_id, sd.storagerouter.name, vdisk.name))
             MDSServiceController.mds_checkup()
             VDiskController.dtl_checkup(vdisk_guid=vdisk.guid)
+
+    @staticmethod
+    @celery.task(name='ovs.vdisk.rename_from_voldrv')
+    def rename_from_voldrv(old_path, new_path, storagedriver_id):
+        """
+        Processes a rename event from the volumedriver. At this point we only expect folder renames. These folders
+        might contain vDisks. Although the vDisk's .raw file cannot be moved/renamed, the folders can.
+        :param old_path: The old path (prefix) that is renamed
+        :type old_path: str
+        :param new_path: The new path (prefix) of that folder
+        :type new_path: str
+        :param storagedriver_id: The StorageDriver's ID that executed the rename
+        :type storagedriver_id: str
+        :return: None
+        :rtype: NoneType
+        """
+        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+
+        old_path = '/{0}/'.format(old_path.strip('/'))
+        new_path = '/{0}/'.format(new_path.strip('/'))
+        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+        vpool = storagedriver.vpool
+        VDiskController._logger.debug('Processing rename on {0} from {1} to {2}'.format(vpool.name, old_path, new_path))
+        for vdisk in vpool.vdisks:
+            devicename = vdisk.devicename
+            if devicename.startswith(old_path):
+                volume_id = vdisk.volume_id
+                with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+                    vdisk.discard()
+                    devicename = vdisk.devicename
+                    if devicename.startswith(old_path):
+                        vdisk.devicename = '{0}{1}'.format(new_path, ExtensionsToolbox.remove_prefix(devicename, old_path))
+                        vdisk.save()
+                        VDiskController._logger.info('Renamed devicename from {0} to {1} on vDisk {2}'.format(devicename, vdisk.devicename, vdisk.guid))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.clone')
@@ -298,29 +344,18 @@ class VDiskController(object):
         with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if new_vdisk is None:
-                new_vdisk = VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool)
-                if new_vdisk is None:
-                    new_vdisk = VDisk()
-                    new_vdisk.volume_id = volume_id
-                    new_vdisk.size = vdisk.size
-                    new_vdisk.description = name
-                    new_vdisk.devicename = devicename
-                    new_vdisk.vpool = vdisk.vpool
+                new_vdisk = VDisk()
+                new_vdisk.volume_id = volume_id
+                new_vdisk.size = vdisk.size
+                new_vdisk.description = name
+                new_vdisk.devicename = devicename
+                new_vdisk.vpool = vdisk.vpool
             new_vdisk.pagecache_ratio = pagecache_ratio if pagecache_ratio is not None else vdisk.pagecache_ratio
             new_vdisk.name = name
             new_vdisk.parent_vdisk = vdisk
             new_vdisk.parentsnapshot = snapshot_id
             new_vdisk.save()
-
-        VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
-        try:
-            VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
-            MDSServiceController.ensure_safety(new_vdisk)
-        except SRCObjectNotFoundException:
-            VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
-            VDiskController.clean_vdisk_from_model(new_vdisk)
-        except Exception:
-            VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}'.format(name))
+            VDiskController.vdisk_checkup(new_vdisk)
 
         return {'vdisk_guid': new_vdisk.guid,
                 'name': new_vdisk.name,
@@ -360,12 +395,13 @@ class VDiskController(object):
         """
         if not isinstance(metadata, dict):
             raise ValueError('Expected metadata as dict, got {0} instead'.format(type(metadata)))
+        consistent = metadata.get('is_consistent', False)
         metadata = pickle.dumps(metadata)
         results = {}
         for guid in vdisk_guids:
             try:
                 vdisk = VDisk(guid)
-                VDiskController._logger.info('Create snapshot for vDisk {0}'.format(vdisk.name))
+                VDiskController._logger.info('Create {0} snapshot for vDisk {1}'.format('consistent' if consistent is True else 'inconsistent', vdisk.name))
                 snapshot_id = str(uuid.uuid4())
                 vdisk.invalidate_dynamics(['snapshots'])
                 if len(vdisk.snapshots) > 0:
@@ -576,28 +612,17 @@ class VDiskController(object):
         with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if new_vdisk is None:
-                new_vdisk = VDiskList.get_by_devicename_and_vpool(devicename, vdisk.vpool)
-                if new_vdisk is None:
-                    new_vdisk = VDisk()
-                    new_vdisk.volume_id = volume_id
-                    new_vdisk.size = vdisk.size
-                    new_vdisk.description = name
-                    new_vdisk.devicename = devicename
-                    new_vdisk.vpool = vdisk.vpool
+                new_vdisk = VDisk()
+                new_vdisk.volume_id = volume_id
+                new_vdisk.size = vdisk.size
+                new_vdisk.description = name
+                new_vdisk.devicename = devicename
+                new_vdisk.vpool = vdisk.vpool
             new_vdisk.pagecache_ratio = pagecache_ratio if pagecache_ratio is not None else vdisk.pagecache_ratio
             new_vdisk.name = name
             new_vdisk.parent_vdisk = vdisk
             new_vdisk.save()
-
-        VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
-        try:
-            VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
-            MDSServiceController.ensure_safety(new_vdisk)
-        except SRCObjectNotFoundException:
-            VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
-            VDiskController.clean_vdisk_from_model(new_vdisk)
-        except Exception:
-            VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}'.format(name))
+            VDiskController.vdisk_checkup(new_vdisk)
 
         return {'vdisk_guid': new_vdisk.guid,
                 'name': new_vdisk.name,
@@ -652,27 +677,16 @@ class VDiskController(object):
         with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
             new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
             if new_vdisk is None:
-                new_vdisk = VDiskList.get_by_devicename_and_vpool(devicename, vpool)
-                if new_vdisk is None:
-                    new_vdisk = VDisk()
-                    new_vdisk.size = volume_size
-                    new_vdisk.vpool = vpool
-                    new_vdisk.devicename = devicename
-                    new_vdisk.description = volume_name
-                    new_vdisk.volume_id = volume_id
+                new_vdisk = VDisk()
+                new_vdisk.size = volume_size
+                new_vdisk.vpool = vpool
+                new_vdisk.devicename = devicename
+                new_vdisk.description = volume_name
+                new_vdisk.volume_id = volume_id
             new_vdisk.pagecache_ratio = pagecache_ratio
             new_vdisk.name = volume_name
             new_vdisk.save()
-
-        VDiskController.dtl_checkup.delay(vdisk_guid=new_vdisk.guid)
-        try:
-            VDiskController._set_vdisk_metadata_pagecache_size(new_vdisk)
-            MDSServiceController.ensure_safety(new_vdisk)
-        except SRCObjectNotFoundException:
-            VDiskController._logger.warning('vDisk object seems to be removed in the meantime')
-            VDiskController.clean_vdisk_from_model(new_vdisk)
-        except Exception:
-            VDiskController._logger.exception('Got failure during (re)configuration of vDisk {0}'.format(volume_name))
+            VDiskController.vdisk_checkup(new_vdisk)
 
         VDiskController._logger.info('Created volume. Location {0}'.format(devicename))
         return new_vdisk.guid
@@ -693,10 +707,11 @@ class VDiskController(object):
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.guid, vdisk.storagedriver_id)
         storagedriver_config.load()
         volume_manager = storagedriver_config.configuration.get('volume_manager', {})
+        cluster_size = storagedriver_config.configuration.get('volume_manager', {}).get('default_cluster_size', 4096)
 
         volume_id = str(vdisk.volume_id)
         try:
-            sco_size = vdisk.storagedriver_client.get_sco_multiplier(volume_id, req_timeout_secs=10) / 1024 * 4
+            sco_size = vdisk.storagedriver_client.get_sco_multiplier(volume_id, req_timeout_secs=10) / 1024 * (cluster_size / 1024)
             dtl_config = vdisk.storagedriver_client.get_dtl_config(volume_id, req_timeout_secs=10)
             tlog_multiplier = vdisk.storagedriver_client.get_tlog_multiplier(volume_id, req_timeout_secs=10)
             non_disposable_sco_factor = vdisk.storagedriver_client.get_sco_cache_max_non_disposable_factor(volume_id, req_timeout_secs=10)
@@ -757,7 +772,7 @@ class VDiskController(object):
         volume_id = str(vdisk.volume_id)
         old_config_params = VDiskController.get_config_params(vdisk.guid)
 
-        # 1st update SCO size, because this impacts TLOG multiplier which on its turn impacts write buffer
+        # Update SCO size, because this impacts TLOG multiplier which on its turn impacts write buffer
         new_sco_size = new_config_params['sco_size']
         old_sco_size = old_config_params['sco_size']
         if new_sco_size != old_sco_size:
@@ -774,7 +789,7 @@ class VDiskController(object):
                 VDiskController._logger.error('Error updating "sco_size": {0}'.format(ex))
                 errors = True
 
-        # 2nd Check for DTL changes
+        # Check for DTL changes
         new_dtl_mode = new_config_params['dtl_mode']
         old_dtl_mode = old_config_params['dtl_mode']
         new_dtl_targets = set(new_config_params['dtl_target'])  # Domain guids
@@ -791,21 +806,10 @@ class VDiskController(object):
                     VDiskController._logger.exception('Failed to disable DTL for vDisk {0}'.format(vdisk.name))
                     raise Exception('Disabling DTL for vDisk {0} failed'.format(vdisk.name))
 
-                vdisk.invalidate_dynamics(['dtl_status'])
                 for junction in vdisk.domains_dtl:
                     junction.delete()
+                vdisk.invalidate_dynamics(['dtl_status'])
         elif new_dtl_mode != old_dtl_mode or new_dtl_targets != old_dtl_targets:  # Mode is sync or async and targets changed or DTL mode changed
-            # Delete all original relations
-            for junction in vdisk.domains_dtl:
-                junction.delete()
-
-            # Create all new relations
-            for domain_guid in new_dtl_targets:
-                vdisk_domain = VDiskDomain()
-                vdisk_domain.vdisk = vdisk
-                vdisk_domain.domain = Domain(domain_guid)
-                vdisk_domain.save()
-
             VDiskController._logger.info('Checking if reconfiguration is required based on new parameters for vDisk {0}'.format(vdisk.name))
             storagerouter = StorageRouter(vdisk.storagerouter_guid)
             # No new DTL targets --> Check if we can find possible Storage Routers to configure DTL on
@@ -846,11 +850,17 @@ class VDiskController(object):
                 VDiskController._logger.exception('Failed to retrieve current DTL configuration for vDisk {0}'.format(vdisk.name))
                 raise Exception('Retrieving current DTL configuration failed for vDisk {0}'.format(vdisk.name))
 
+            dtl_failed = False
             if old_dtl_mode != new_dtl_mode or current_dtl_config.host not in [sd.storage_ip for sr in possible_storagerouters for sd in sr.storagedrivers if sd.vpool_guid == vdisk.vpool_guid]:
-                random.shuffle(possible_storagerouters)
+                if os.environ.get('RUNNING_UNITTESTS') == 'True':
+                    possible_storagerouters.sort(key=lambda i: i.guid)
+                else:
+                    random.shuffle(possible_storagerouters)
                 dtl_config = None
                 for storagerouter in possible_storagerouters:
-                    for sd in storagerouter.storagedrivers:  # DTL can reside on any node in the cluster running a volumedriver and having a DTL process running
+                    for sd in sorted(storagerouter.storagedrivers, key=lambda i: i.guid):  # DTL can reside on any node in the cluster running a volumedriver and having a DTL process running
+                        if sd.vpool_guid != vdisk.vpool_guid:
+                            continue
                         dtl_config = DTLConfig(str(sd.storage_ip), sd.ports['dtl'], StorageDriverClient.VDISK_DTL_MODE_MAP[new_dtl_mode])
                         vdisk.storagedriver_client.set_manual_dtl_config(volume_id, dtl_config, req_timeout_secs=10)
                         vdisk.invalidate_dynamics(['dtl_status'])
@@ -859,10 +869,21 @@ class VDiskController(object):
                         break
 
                 if dtl_config is None:
-                    VDiskController._logger.error('No Storage Routers found in chosen Domains which have a DTL process running')
+                    VDiskController._logger.error('No suitable StorageRouters found in chosen Domains which have a DTL process for this vPool')
                     errors = True
+                    dtl_failed = True
 
-        # 2nd update rest
+            if dtl_failed is False:
+                # Reset relations
+                for junction in vdisk.domains_dtl:
+                    junction.delete()
+                for domain_guid in new_dtl_targets:
+                    vdisk_domain = VDiskDomain()
+                    vdisk_domain.vdisk = vdisk
+                    vdisk_domain.domain = Domain(domain_guid)
+                    vdisk_domain.save()
+
+        # Update all the rest
         for key in new_config_params:
             try:
                 if key in ['sco_size', 'dtl_mode', 'dtl_target']:
@@ -886,6 +907,7 @@ class VDiskController(object):
             except Exception as ex:
                 VDiskController._logger.error('Error updating "{0}": {1}'.format(key, ex))
                 errors = True
+
         if errors is True:
             raise Exception('Failed to update the values for vDisk {0}'.format(vdisk.name))
 
@@ -1298,6 +1320,59 @@ class VDiskController(object):
                                                   force_restart=force,
                                                   req_timeout_secs=60)
         vdisk.invalidate_dynamics(['info', 'dtl_status'])
+
+    @staticmethod
+    @celery.task(name='ovs.vdisk.sync_with_reality')
+    def sync_with_reality(vpool_guid=None):
+        """
+        Syncs vDisks in the model with reality
+        :param vpool_guid: Optional vPool guid. All vPools if omitted
+        :type vpool_guid: str or None
+        :return: None
+        :rtype: NoneType
+        """
+        from ovs.extensions.storageserver.storagedriver import FeatureNotAvailableException
+
+        if vpool_guid is None:
+            vpools = VPoolList.get_vpools()
+        else:
+            vpools = [VPool(vpool_guid)]
+        for vpool in vpools:
+            vdisks = dict((str(vdisk.volume_id), vdisk) for vdisk in vpool.vdisks)
+            for entry in vpool.objectregistry_client.get_all_registrations():
+                volume_id = entry.object_id()
+                if volume_id not in vdisks:
+                    with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+                        new_vdisk = VDiskList.get_vdisk_by_volume_id(volume_id)
+                        if new_vdisk is None:
+                            VDiskController._logger.info('Adding missing vDisk in the model for {0}'.format(volume_id))
+                            new_vdisk = VDisk()
+                            new_vdisk.volume_id = volume_id
+                            new_vdisk.vpool = vpool
+                            try:
+                                fsmetadata_client = new_vdisk.fsmetadata_client
+                                devicename = fsmetadata_client.lookup(volume_id)
+                                name = VDiskController.extract_volumename(devicename)
+                            except FeatureNotAvailableException:
+                                VDiskController._logger.exception('Could not load devicename from StorageDriver')
+                                devicename = '/{0}.raw'.format(volume_id)
+                                name = volume_id
+                            new_vdisk.name = name
+                            new_vdisk.description = name
+                            new_vdisk.devicename = devicename
+                            new_vdisk.size = new_vdisk.info['volume_size']
+                            new_vdisk.metadata = {'lba_size': new_vdisk.info['lba_size'],
+                                                  'cluster_multiplier': new_vdisk.info['cluster_multiplier']}
+                            new_vdisk.pagecache_ratio = 1.0
+                            new_vdisk.save()
+                            VDiskController.vdisk_checkup(new_vdisk)
+                else:
+                    del vdisks[volume_id]
+            for volume_id, vdisk in vdisks.iteritems():
+                with volatile_mutex('voldrv_event_disk_{0}'.format(volume_id), wait=30):
+                    if vpool.objectregistry_client.find(str(volume_id)) is None:
+                        VDiskController._logger.info('Removing obsolete vDisk {0} from model'.format(vdisk.guid))
+                        VDiskController.clean_vdisk_from_model(vdisk)
 
     @staticmethod
     def _wait_for_snapshot_to_be_synced_to_backend(vdisk_guid, snapshot_id):

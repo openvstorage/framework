@@ -664,7 +664,7 @@
             "write": "Write"
         },
         "cluster_size": "Cluster Size",
-        "configuration": "Configurations",
+        "configuration": "Configuration",
         "detail": {
             "extend": "Extend",
             "refresh": {
@@ -687,6 +687,7 @@
         "dtl_transport": "DTL Transport",
         "global_write_buffer": "Global Write Buffer",
         "preset": "Preset",
+        "proxies_amount": "# Proxies",
         "sco_size": "SCO Size",
         "statistics": "Statistics",
         "title": "vPools",

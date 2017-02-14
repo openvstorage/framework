@@ -31,6 +31,7 @@ from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations import RelationMapper
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
 from ovs.log.log_handler import LogHandler
 
 
@@ -125,7 +126,7 @@ class OpenAPIView(View):
                                              'required': ['error', 'error_description']}},
                 'securityDefinitions': {'oauth2': {'type': 'oauth2',
                                                    'flow': 'password',
-                                                   'tokenUrl': 'oauth2/token',
+                                                   'tokenUrl': 'https://{0}/api/oauth2/token/'.format(System.get_my_storagerouter().ip),
                                                    'scopes': {'read': 'Read access',
                                                               'write': 'Write access',
                                                               'manage': 'Management access'}}},

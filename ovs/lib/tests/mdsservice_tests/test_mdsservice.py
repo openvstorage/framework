@@ -24,8 +24,6 @@ from ovs.dal.hybrids.j_storagerouterdomain import StorageRouterDomain
 from ovs.dal.hybrids.service import Service
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import MetadataServerClient, StorageDriverConfiguration
 from ovs.extensions.storageserver.tests.mockups import MDSClient, StorageRouterClient, LocalStorageRouterClient
 from ovs.lib.mdsservice import MDSServiceController
@@ -36,57 +34,21 @@ class MDSServices(unittest.TestCase):
     """
     This test class will validate the various scenarios of the MDSService logic
     """
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
         """
-        Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
-        This makes sure the unittests can be executed without those libraries installed
+        (Re)Sets the stores on every test
         """
-        cls.persistent = PersistentFactory.get_client()
-        cls.persistent.clean()
-
-        cls.volatile = VolatileFactory.get_client()
-        cls.volatile.clean()
-
-        StorageRouterClient.clean()
-        MDSClient.clean()
-
+        self.volatile, self.persistent = Helper.setup()
         Configuration.set('/ovs/framework/logging|path', '/var/log/ovs')
         Configuration.set('/ovs/framework/logging|level', 'DEBUG')
         Configuration.set('/ovs/framework/logging|default_file', 'generic')
         Configuration.set('/ovs/framework/logging|default_name', 'logger')
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Tear down changes made during setUpClass
-        """
-        Configuration._unittest_data = {}
-
-        cls.persistent = PersistentFactory.get_client()
-        cls.persistent.clean()
-
-        cls.volatile = VolatileFactory.get_client()
-        cls.volatile.clean()
-
-    def setUp(self):
-        """
-        (Re)Sets the stores on every test
-        """
-        self.persistent.clean()
-        self.volatile.clean()
-        self.maxDiff = None
-        StorageRouterClient.clean()
-        MDSClient.clean()
-
     def tearDown(self):
         """
         Clean up test suite
         """
-        self.persistent.clean()
-        self.volatile.clean()
-        StorageRouterClient.clean()
-        MDSClient.clean()
+        Helper.teardown()
 
     def _check_reality(self, configs, loads, vdisks, mds_services, display=False):
         """
@@ -378,7 +340,7 @@ class MDSServices(unittest.TestCase):
         )
         vpools = structure['vpools']
         mds_services = structure['mds_services']
-        service_type = structure['service_type']
+        service_type = structure['service_types']['MetadataServer']
         storagedrivers = structure['storagedrivers']
         storagerouters = structure['storagerouters']
 
@@ -560,8 +522,8 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Clean everything from here on out
-        PersistentFactory.store.clean()
-        VolatileFactory.store.clean()
+        self.volatile.clean()
+        self.persistent.clean()
 
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 3)
         Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
@@ -860,7 +822,7 @@ class MDSServices(unittest.TestCase):
         )
         vpools = structure['vpools']
         mds_services = structure['mds_services']
-        service_type = structure['service_type']
+        service_type = structure['service_types']['MetadataServer']
         storagedrivers = structure['storagedrivers']
         storagerouters = structure['storagerouters']
 
@@ -1036,8 +998,8 @@ class MDSServices(unittest.TestCase):
         self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
 
         # Clean everything from here on out
-        PersistentFactory.store.clean()
-        VolatileFactory.store.clean()
+        self.volatile.clean()
+        self.persistent.clean()
 
         Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
         Configuration.set('/ovs/framework/storagedriver|mds_tlogs', 100)
@@ -1281,9 +1243,28 @@ class MDSServices(unittest.TestCase):
                                                                  '10.0.0.3:3: Slave (E)'])
 
         config = vdisk.info['metadata_backend_config']
-        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[0]['ip'], config[0]['port']))._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.MASTER)
-        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
-        self.assertEqual(MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
+        mds_client = MDSClient(None, key='{0}:{1}'.format(config[0]['ip'], config[0]['port']))
+        self.assertEqual(mds_client._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.MASTER)
+        self.assertTrue(mds_client._has_namespace(vdisk.volume_id))
+        mds_client = MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))
+        self.assertEqual(mds_client._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
+        self.assertTrue(mds_client._has_namespace(vdisk.volume_id))
+        mds_client = MDSClient(None, key='{0}:{1}'.format(config[2]['ip'], config[2]['port']))
+        self.assertEqual(mds_client._get_role(vdisk.volume_id), MetadataServerClient.MDS_ROLE.SLAVE)
+        self.assertTrue(mds_client._has_namespace(vdisk.volume_id))
+
+        Configuration.set('/ovs/framework/storagedriver|mds_safety', 2)
+        MDSServiceController.ensure_safety(vdisk)
+
+        configs = [[{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 0, 1, 10, 10.0],  # Storage Router IP, MDS service port, #masters, #slaves, capacity, load
+                 ['10.0.0.2', 2, 1, 0, 10, 10.0],
+                 ['10.0.0.3', 3, 0, 0, 10,  0.0]]
+        self._check_reality(configs=configs, loads=loads, vdisks=vdisks, mds_services=mds_services)
+        mds_client = MDSClient(None, key='{0}:{1}'.format(config[1]['ip'], config[1]['port']))
+        self.assertTrue(mds_client._has_namespace(vdisk.volume_id))
+        mds_client = MDSClient(None, key='{0}:{1}'.format(config[2]['ip'], config[2]['port']))
+        self.assertFalse(mds_client._has_namespace(vdisk.volume_id))
 
     def test_mds_checkup(self):
         """
@@ -1326,13 +1307,13 @@ class MDSServices(unittest.TestCase):
         mds_nodes.sort(key=lambda i: i['port'])
         self.assertEqual(len(mds_nodes), 2)
         self.assertDictEqual(mds_nodes[0], {'host': '10.0.0.1',
-                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_1',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_1/scratch',
                                             'port': 1,
-                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_1'})
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_1/db'})
         self.assertDictEqual(mds_nodes[1], {'host': '10.0.0.1',
-                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/scratch',
                                             'port': 10000,
-                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2'})
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/db'})
 
         mds_service.capacity = 0
         mds_service.save()
@@ -1343,6 +1324,6 @@ class MDSServices(unittest.TestCase):
         mds_nodes = contents.get('metadata_server', {}).get('mds_nodes', [])
         self.assertEqual(len(mds_nodes), 1)
         self.assertDictEqual(mds_nodes[0], {'host': '10.0.0.1',
-                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2',
+                                            'scratch_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/scratch',
                                             'port': 10000,
-                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2'})
+                                            'db_directory': '/tmp/unittest/sr_1/disk_1/partition_1/1_db_mds_2/db'})

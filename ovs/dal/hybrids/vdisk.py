@@ -26,7 +26,9 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.structures import Property, Relation, Dynamic
-from ovs.extensions.storageserver.storagedriver import MaxRedirectsExceededException, StorageDriverClient, ObjectRegistryClient
+from ovs.extensions.storageserver.storagedriver import \
+    MaxRedirectsExceededException, VolumeRestartInProgressException, \
+    FSMetaDataClient, ObjectRegistryClient, StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.log_handler import LogHandler
 
@@ -57,7 +59,7 @@ class VDisk(DataObject):
                   Dynamic('storagerouter_guid', str, 15),
                   Dynamic('is_vtemplate', bool, 60),
                   Dynamic('edge_clients', list, 30)]
-    _fixed_properties = ['storagedriver_client', 'objectregistry_client']
+    _fixed_properties = ['storagedriver_client', 'objectregistry_client', 'fsmetadata_client']
 
     def __init__(self, *args, **kwargs):
         """
@@ -67,12 +69,13 @@ class VDisk(DataObject):
         self._frozen = False
         self._storagedriver_client = None
         self._objectregistry_client = None
+        self._fsmetadata_client = None
         self._frozen = True
 
     @property
     def storagedriver_client(self):
         """
-        Client used for communication between Storage Driver and framework
+        Client used for communication between StorageDriver and framework
         :return: StorageDriverClient
         """
         if self._storagedriver_client is None:
@@ -82,12 +85,22 @@ class VDisk(DataObject):
     @property
     def objectregistry_client(self):
         """
-        Client used for communication between Storage Driver OR and framework
+        Client used for communication between StorageDriver OR and framework
         :return: ObjectRegistryClient
         """
         if self._objectregistry_client is None:
             self.reload_client('objectregistry')
         return self._objectregistry_client
+
+    @property
+    def fsmetadata_client(self):
+        """
+        Client used for communications between StorageDriver FS metadata and framework
+        :return: FileSystemMetaDataClient
+        """
+        if self._fsmetadata_client is None:
+            self.reload_client('filesystem_metadata')
+        return self._fsmetadata_client
 
     def _dtl_status(self):
         """
@@ -128,10 +141,16 @@ class VDisk(DataObject):
         snapshots = []
         if self.volume_id and self.vpool:
             volume_id = str(self.volume_id)
+            voldrv_snapshots = []
             try:
-                voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
+                try:
+                    voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
+                except VolumeRestartInProgressException:
+                    time.sleep(0.5)
+                    voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id, req_timeout_secs=2)
             except:
-                voldrv_snapshots = []
+                pass
+
             for snap_id in voldrv_snapshots:
                 snapshot = self.storagedriver_client.info_snapshot(volume_id, snap_id, req_timeout_secs=2)
                 if snapshot.metadata:
@@ -164,10 +183,14 @@ class VDisk(DataObject):
         max_redirects = False
         if self.volume_id and self.vpool:
             try:
-                vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id), req_timeout_secs=2)
+                try:
+                    vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id), req_timeout_secs=2)
+                except VolumeRestartInProgressException:
+                    time.sleep(0.5)
+                    vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id), req_timeout_secs=2)
             except MaxRedirectsExceededException:
                 max_redirects = True
-            except Exception:
+            except:
                 pass
 
         vdiskinfodict = {}
@@ -185,7 +208,7 @@ class VDisk(DataObject):
                                                        'port': nodeconfig.port()})
                 else:
                     vdiskinfodict[key] = objectvalue
-        vdiskinfodict['live_status'] = 'NON-RUNNING' if max_redirects is True else 'RUNNING' if vdiskinfodict['halted'] is False else 'HALTED'
+        vdiskinfodict['live_status'] = 'NON-RUNNING' if max_redirects is True else ('RUNNING' if vdiskinfodict['halted'] is False else 'HALTED')
         return vdiskinfodict
 
     def _statistics(self, dynamic):
@@ -318,4 +341,6 @@ class VDisk(DataObject):
                 self._storagedriver_client = StorageDriverClient.load(self.vpool)
             elif client == 'objectregistry':
                 self._objectregistry_client = ObjectRegistryClient.load(self.vpool)
+            elif client == 'filesystem_metadata':
+                self._fsmetadata_client = FSMetaDataClient.load(self.vpool)
             self._frozen = True

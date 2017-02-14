@@ -129,16 +129,12 @@ class Watcher(object):
                         try:
                             logging.disable(logging.WARNING)
                             persistent = PersistentFactory.get_client()
-                            persistent.set(key, value)
-                            if persistent.get(key) == value:
-                                persistent.delete(key)
-                                break
-                            persistent.delete(key)
+                            persistent.nop()
+                            break
                         finally:
                             logging.disable(logging.NOTSET)
                     except Exception as message:
                         self.log_message(target, '  Error during persistent store test: {0}'.format(message), 2)
-                    key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
                     time.sleep(1)
                     tries += 1
                 if tries == max_tries:
@@ -157,14 +153,10 @@ class Watcher(object):
                         from ovs.extensions.storage.persistent.pyrakoonstore import PyrakoonStore
                         cluster_name = str(Configuration.get('/ovs/framework/arakoon_clusters|voldrv'))
                         client = PyrakoonStore(cluster=cluster_name)
-                        client.set(key, value)
-                        if client.get(key) == value:
-                            client.delete(key)
-                            break
-                        client.delete(key)
+                        client.nop()
+                        break
                     except Exception as message:
                         self.log_message(target, '  Error during arakoon (voldrv) test: {0}'.format(message), 2)
-                    key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
                     time.sleep(1)
                     tries += 1
                 if tries == max_tries:

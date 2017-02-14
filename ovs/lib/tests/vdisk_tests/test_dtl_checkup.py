@@ -26,11 +26,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.services.tests.upstart import Upstart
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import DTLConfig, DTLConfigMode, DTLMode
-from ovs.extensions.storageserver.tests.mockups import StorageRouterClient
 from ovs.lib.tests.helpers import Helper
 from ovs.lib.vdisk import VDiskController
 
@@ -39,42 +35,17 @@ class DTLCheckup(unittest.TestCase):
     """
     This test class will validate the various scenarios of the DTL checkup logic
     """
-    @classmethod
-    def setUpClass(cls):
-        """
-        Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
-        This makes sure the unittests can be executed without those libraries installed
-        """
-        cls.persistent = PersistentFactory.get_client()
-        cls.persistent.clean()
-
-        cls.volatile = VolatileFactory.get_client()
-        cls.volatile.clean()
-        Upstart.clean()
-        ServiceManager.clean()
-        StorageRouterClient.clean()
-
     def setUp(self):
         """
         (Re)Sets the stores on every test
         """
-        # Cleaning storage
-        self.volatile.clean()
-        self.persistent.clean()
-        Upstart.clean()
-        ServiceManager.clean()
-        StorageRouterClient.clean()
+        Helper.setup()
 
     def tearDown(self):
         """
         Clean up the unittest
         """
-        # Cleaning storage
-        self.volatile.clean()
-        self.persistent.clean()
-        Upstart.clean()
-        ServiceManager.clean()
-        StorageRouterClient.clean()
+        Helper.teardown()
 
     def _run_and_validate_dtl_checkup(self, vdisk, validations):
         """

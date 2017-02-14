@@ -22,7 +22,12 @@ import json
 import uuid
 import pickle
 import threading
-from volumedriver.storagerouter.storagerouterclient import DTLConfigMode
+from volumedriver.storagerouter.storagerouterclient import DTLConfigMode, ObjectNotFoundException
+
+
+class VolumeRestartInProgressException(Exception):
+    """ VolumeRestartInProgressException mockup for backwards compatibility """
+    pass
 
 
 class LocalStorageRouterClient(object):
@@ -205,7 +210,8 @@ class StorageRouterClient(object):
                                  'halted': False,
                                  'metadata_backend_config': property(lambda s: None),
                                  'object_type': property(lambda s: 'BASE'),
-                                 'vrouter_id': property(lambda s: None)})()
+                                 'vrouter_id': property(lambda s: None),
+                                 'volume_size': 0})()
 
     def get_dtl_config(self, volume_id, req_timeout_secs=None):
         """
@@ -265,12 +271,14 @@ class StorageRouterClient(object):
         Info volume mockup
         """
         _ = req_timeout_secs
+        volume_size = StorageRouterClient.volumes[self.vpool_guid].get(volume_id, {}).get('volume_size', 0)
         return type('Info', (), {'cluster_multiplier': property(lambda s: 8),
                                  'lba_size': property(lambda s: 512),
                                  'halted': property(lambda s: False),
                                  'metadata_backend_config': property(lambda s: StorageRouterClient._metadata_backend_config[self.vpool_guid].get(volume_id)),
                                  'object_type': property(lambda s: StorageRouterClient.object_type[self.vpool_guid].get(volume_id, 'BASE')),
-                                 'vrouter_id': property(lambda s: StorageRouterClient.vrouter_id[self.vpool_guid].get(volume_id))})()
+                                 'vrouter_id': property(lambda s: StorageRouterClient.vrouter_id[self.vpool_guid].get(volume_id)),
+                                 'volume_size': property(lambda s: volume_size)})()
 
     def is_volume_synced_up_to_snapshot(self, volume_id, snapshot_id, req_timeout_secs=None):
         """
@@ -468,6 +476,27 @@ class ObjectRegistryClient(object):
         return None
 
 
+class FileSystemMetaDataClient(object):
+    """
+    Mocks the FileSystemMetaDataClient
+    """
+
+    def __init__(self, vrouter_cluster_id, arakoon_cluster_id, arakoon_node_configs):
+        """
+        Initializes a Mocked FileSystemMetaDataClient
+        """
+        self.vpool_guid = vrouter_cluster_id
+        _ = arakoon_cluster_id, arakoon_node_configs
+
+    def lookup(self, volume_id):
+        """
+        Gets the devicename corresponding with a given Volume ID
+        """
+        if volume_id not in StorageRouterClient.volumes[self.vpool_guid]:
+            raise ObjectNotFoundException(volume_id)
+        return StorageRouterClient.volumes[self.vpool_guid][volume_id]['target_path']
+
+
 class MDSClient(object):
     """
     Mocks the Metadata Server Client
@@ -514,6 +543,29 @@ class MDSClient(object):
         if self.key not in MDSClient._roles:
             MDSClient._roles[self.key] = {}
         MDSClient._roles[self.key][volume_id] = None
+
+    def remove_namespace(self, volume_id):
+        """
+        Dummy remove namespace method
+        """
+        if self.key not in MDSClient._catchup:
+            MDSClient._catchup[self.key] = {}
+        if volume_id in MDSClient._catchup[self.key]:
+            del MDSClient._catchup[self.key][volume_id]
+        else:
+            raise RuntimeError('Namespace does not exist')
+        if self.key not in MDSClient._roles:
+            MDSClient._roles[self.key] = {}
+        if volume_id in MDSClient._roles[self.key]:
+            del MDSClient._roles[self.key][volume_id]
+        else:
+            raise RuntimeError('Namespace does not exist')
+
+    def _has_namespace(self, volume_id):
+        """
+        Indicates a namespace exist
+        """
+        return volume_id in MDSClient._catchup.get(self.key, {}) and volume_id in MDSClient._roles.get(self.key, {})
 
     def set_role(self, volume_id, role, _internal=False):
         """
@@ -600,7 +652,20 @@ class Snapshot(object):
         """
         Init method
         """
+        mandatory_keys = ['label', 'timestamp', 'is_consistent']
+        optional_keys = {'in_backend', 'is_sticky', 'machineguid', 'is_automatic'}
         metadata_dict = pickle.loads(metadata)
+        copy_metadata = copy.deepcopy(metadata_dict)
+
+        for key in mandatory_keys:
+            if key not in copy_metadata:
+                raise ValueError('Expected key {0} to be provided to create a snapshot'.format(key))
+            copy_metadata.pop(key)
+
+        difference = set(copy_metadata.keys()).difference(optional_keys)
+        if difference:
+            raise ValueError('Unexpected keys provided to create a snapshot: {0}'.format(difference))
+
         self.metadata = metadata
         self.stored = 0
         self.in_backend = metadata_dict.get('in_backend', True)

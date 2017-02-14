@@ -21,7 +21,7 @@ import os
 from subprocess import check_output
 from ovs.log.log_handler import LogHandler
 if os.environ.get('RUNNING_UNITTESTS') == 'True':
-    from ovs.extensions.services.tests.upstart import Upstart
+    from ovs.extensions.services.tests.systemd import Systemd
 else:
     from ovs.extensions.services.upstart import Upstart
     from ovs.extensions.services.systemd import Systemd
@@ -46,7 +46,7 @@ class ServiceManager(object):
             _ = cls
             if ServiceManager.ImplementationClass is None:
                 if os.environ.get('RUNNING_UNITTESTS') == 'True':
-                    ServiceManager.ImplementationClass = Upstart
+                    ServiceManager.ImplementationClass = Systemd
                 else:
                     try:
                         init_info = check_output('cat /proc/1/comm', shell=True)

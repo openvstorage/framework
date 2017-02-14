@@ -17,7 +17,6 @@
 """
 Authentication test module
 """
-import os
 import json
 import time
 import base64
@@ -26,12 +25,9 @@ import unittest
 from django.http import HttpResponse
 from api.middleware import OVSMiddleware
 from api.oauth2.exceptions import HttpBadRequestException, HttpUnauthorizedException, HttpTooManyRequestsException
-from api.oauth2.toolbox import Toolbox as OAuth2Toolbox
+from api.oauth2.toolbox import OAuth2Toolbox
 from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.generic import fakesleep
 from ovs.extensions.generic.system import System
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.j_roleclient import RoleClient
@@ -40,6 +36,7 @@ from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.user import User
 from ovs.dal.lists.userlist import UserList
+from ovs.lib.tests.helpers import Helper
 
 
 class Authentication(unittest.TestCase):
@@ -52,9 +49,7 @@ class Authentication(unittest.TestCase):
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        cls.factory = None
-        PersistentFactory.get_client().clean()
-        VolatileFactory.get_client().clean()
+        Helper.setup(fake_sleep=True)
 
         admin_group = Group()
         admin_group.name = 'administrators'
@@ -155,12 +150,9 @@ class Authentication(unittest.TestCase):
         from django.test import RequestFactory
         cls.factory = RequestFactory()
 
-        fakesleep.monkey_patch()
-
         Configuration.set('/ovs/framework/plugins/installed', {'generic': [],
                                                                'backends': []})
         Configuration.set('/ovs/framework/cluster_id', 'cluster_id')
-
         System._machine_id = {'none': '1'}
 
     @classmethod
@@ -168,7 +160,7 @@ class Authentication(unittest.TestCase):
         """
         Clean up the unittest
         """
-        fakesleep.monkey_restore()
+        Helper.teardown(fake_sleep=True)
 
     def _assert_failure(self, view, request, status_code, error_code, exception):
         middleware = OVSMiddleware()

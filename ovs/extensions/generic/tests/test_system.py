@@ -28,9 +28,6 @@ class TestSystem(unittest.TestCase):
     single_port_range = [[8870, 8880]]
     ip = '127.0.0.1'
 
-    def setUp(self):
-        pass
-
     def test_no_free_port_can_be_found_within_system_range(self):
         self.assertRaises(ValueError, System.get_free_ports, [range(0, 1024)])
 

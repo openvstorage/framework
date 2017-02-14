@@ -594,7 +594,7 @@ class DataList(object):
         if key is None:
             return self._guids.sort(reverse=reverse)
 
-        def extract_key(guid):
+        def _extract_key(guid):
             if self._shallow_sort is True:
                 try:
                     type_dict = {'guid': guid}
@@ -605,7 +605,7 @@ class DataList(object):
             return key(self._get_object(guid))
 
         self._shallow_sort = True
-        self._guids.sort(key=extract_key, reverse=reverse)
+        self._guids.sort(key=_extract_key, reverse=reverse)
 
     def reverse(self):
         """
@@ -781,3 +781,9 @@ class DataList(object):
         if self._executed is False and self._guids is None:
             self._execute_query()
         random.shuffle(self._guids)
+
+    def __repr__(self):
+        """
+        A short self-representation
+        """
+        return '<DataList (type: {0}, executed: {1}, at: {2})>'.format(self._object_type.__name__, self._executed, hex(id(self)))

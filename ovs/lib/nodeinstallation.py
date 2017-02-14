@@ -365,7 +365,7 @@ class NodeInstallationController(object):
                     known_hosts_filename = known_hosts_template.format(home_dir)
                     if not local_client.dir_exists(ssh_folder):
                         local_client.dir_create(ssh_folder)
-                        local_client.dir_chmod(ssh_folder, 0775)
+                        local_client.dir_chmod(ssh_folder, 0700)
                         local_client.dir_chown(ssh_folder, user, user)
                     if not local_client.file_exists(private_key_filename):
                         local_client.run(['ssh-keygen',

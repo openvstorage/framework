@@ -24,7 +24,7 @@ from rest_framework.permissions import IsAuthenticated
 from api.backend.decorators import return_object, return_list, load, required_roles, log, return_simple
 from api.backend.exceptions import HttpForbiddenException, HttpNotAcceptableException
 from api.backend.serializers.serializers import FullSerializer
-from api.backend.toolbox import Toolbox
+from api.backend.toolbox import ApiToolbox
 from ovs.dal.lists.backendlist import BackendList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.hybrids.backend import Backend
@@ -47,9 +47,9 @@ class BackendViewSet(viewsets.ViewSet):
 
     def _validate_access(self, backend, request):
         _ = self
-        if not Toolbox.access_granted(request.client,
-                                      user_rights=backend.user_rights,
-                                      client_rights=backend.client_rights):
+        if not ApiToolbox.access_granted(request.client,
+                                         user_rights=backend.user_rights,
+                                         client_rights=backend.client_rights):
             raise HttpForbiddenException(error_description='The requesting client has no access to this Backend',
                                          error='no_ownership')
 
@@ -71,9 +71,9 @@ class BackendViewSet(viewsets.ViewSet):
             possible_backends = BackendTypeList.get_backend_type_by_code(backend_type).backends
         backends = []
         for backend in possible_backends:
-            if Toolbox.access_granted(request.client,
-                                      user_rights=backend.user_rights,
-                                      client_rights=backend.client_rights):
+            if ApiToolbox.access_granted(request.client,
+                                         user_rights=backend.user_rights,
+                                         client_rights=backend.client_rights):
                 backends.append(backend)
         return backends
 

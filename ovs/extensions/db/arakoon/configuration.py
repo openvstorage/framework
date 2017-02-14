@@ -19,7 +19,6 @@ Generic module for managing configuration in Arakoon
 """
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.pyrakoon.client import PyrakoonClient
-from ovs.extensions.generic.toolbox import Toolbox
 
 
 class ArakoonConfiguration(object):
@@ -78,12 +77,14 @@ class ArakoonConfiguration(object):
         :return: Generator with all keys
         :rtype: generator
         """
+        from ovs.extensions.generic.toolbox import ExtensionsToolbox
+
         key = ArakoonConfiguration._clean_key(key)
         client = ArakoonConfiguration._get_client()
         entries = []
         for entry in client.prefix(key):
             if key == '' or entry.startswith(key.rstrip('/') + '/'):
-                cleaned = Toolbox.remove_prefix(entry, key).strip('/').split('/')[0]
+                cleaned = ExtensionsToolbox.remove_prefix(entry, key).strip('/').split('/')[0]
                 if cleaned not in entries:
                     entries.append(cleaned)
                     yield cleaned
