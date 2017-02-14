@@ -90,9 +90,9 @@ define([
                     fields.push('host');
                 }
             }
-            if (self.loadingMetadata() === true) {
-                reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.metadata_loading'));
-            } else {
+            if (self.loadingMetadata() === false) {
+            //     reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.metadata_loading'));
+            // } else {
                 if (self.scrubAvailable() === false) {
                     reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', {what: 'SCRUB'}));
                 }
@@ -287,50 +287,52 @@ define([
             }).promise();
         };
 
-        // Subscriptions
-        self.hostSubscription = self.data.host.subscribe(self.resetBackends);
-        self.portSubscription = self.data.port.subscribe(self.resetBackends);
-        self.clientIDSubscription = self.data.clientID.subscribe(self.resetBackends);
-        self.clientSecretSubscription = self.data.clientSecret.subscribe(self.resetBackends);
-        self.localHostSubscription = self.data.localHost.subscribe(function(local) {
-            self.data.host('');
-            self.data.port(80);
-            self.data.clientID('');
-            self.data.clientSecret('');
-            if (local === true && self.data.backends().length === 0) {
-                self.loadBackends();
-            }
-        });
-        self.scoSizeSubscription = self.data.scoSize.subscribe(function(size) {
-            if (size < 128) {
-                self.data.writeBufferVolume.min = 128;
-            } else {
-                self.data.writeBufferVolume.min = 256;
-            }
-            self.data.writeBufferVolume(self.data.writeBufferVolume());
-        });
-        self.storageRouterSubscription = self.data.storageRouter.subscribe(function (storageRouter) {
-            if (storageRouter == undefined) {
-                return;
-            }
-            self.loadingMetadata(true);
-            var map = self.srMetadataMap(), srGuid = storageRouter.guid();
-            if (!map.hasOwnProperty(srGuid)) {
-                self.srMetadataMap()[srGuid] = undefined;
-                generic.xhrAbort(self.loadSRMetadataHandle);
-                self.loadSRMetadataHandle = api.post('storagerouters/' + srGuid + '/get_metadata')
-                    .then(self.shared.tasks.wait)
-                    .done(function (srData) {
-                        self.srMetadataMap()[storageRouter.guid()] = srData;
-                        self.fillSRData(srData);
-                    });
-            } else if (map[srGuid] !== undefined) {
-                self.fillSRData(map[srGuid]);
-            }
-        });
-
         // Durandal
         self.activate = function () {
+            self.hostSubscription = self.data.host.subscribe(self.resetBackends);
+            self.portSubscription = self.data.port.subscribe(self.resetBackends);
+            self.clientIDSubscription = self.data.clientID.subscribe(self.resetBackends);
+            self.clientSecretSubscription = self.data.clientSecret.subscribe(self.resetBackends);
+
+            // Subscriptions
+            self.localHostSubscription = self.data.localHost.subscribe(function(local) {
+                self.data.host('');
+                self.data.port(80);
+                self.data.clientID('');
+                self.data.clientSecret('');
+                if (local === true && self.data.backends().length === 0) {
+                    self.loadBackends();
+                }
+            });
+            self.scoSizeSubscription = self.data.scoSize.subscribe(function(size) {
+                if (size < 128) {
+                    self.data.writeBufferVolume.min = 128;
+                } else {
+                    self.data.writeBufferVolume.min = 256;
+                }
+                self.data.writeBufferVolume(self.data.writeBufferVolume());
+            });
+            self.storageRouterSubscription = self.data.storageRouter.subscribe(function (storageRouter) {
+                if (storageRouter == undefined) {
+                    return;
+                }
+                self.loadingMetadata(true);
+                var map = self.srMetadataMap(), srGuid = storageRouter.guid();
+                if (!map.hasOwnProperty(srGuid)) {
+                    map[srGuid] = undefined;
+                    generic.xhrAbort(self.loadSRMetadataHandle);
+                    self.loadSRMetadataHandle = api.post('storagerouters/' + srGuid + '/get_metadata')
+                        .then(self.shared.tasks.wait)
+                        .done(function (srData) {
+                            map[storageRouter.guid()] = srData;
+                            self.fillSRData(srData);
+                            self.srMetadataMap(map);
+                        });
+                } else if (map[srGuid] !== undefined) {
+                    self.fillSRData(map[srGuid]);
+                }
+            });
+
             var promise;
             if (self.data.vPool() !== undefined) {
                 promise = self.data.vPool().loadStorageRouters();
