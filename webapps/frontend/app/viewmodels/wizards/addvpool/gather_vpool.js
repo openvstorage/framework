@@ -91,8 +91,6 @@ define([
                 }
             }
             if (self.loadingMetadata() === false) {
-            //     reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.metadata_loading'));
-            // } else {
                 if (self.scrubAvailable() === false) {
                     reasons.push($.t('ovs:wizards.add_vpool.gather_vpool.missing_role', {what: 'SCRUB'}));
                 }
